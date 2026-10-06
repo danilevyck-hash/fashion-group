@@ -37,7 +37,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { readFileSync } from "fs";
 import path from "path";
 import { NextRequest } from "next/server";
@@ -381,11 +381,13 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
     // 🔄 8-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA: ahora son DOS botones
     // (el mes en PDF y el mes en Excel), así que hay que nombrar cuál. La regla
     // no cambió: contabilidad se lleva el mes.
-    const excel = await screen.findByRole("button", { name: /Descargar Excel del mes/i });
-    await waitFor(() => expect((excel as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 });
-    // CONTROL: y el de PDF, que es el mismo mes, también le sirve.
-    const pdf = await screen.findByRole("button", { name: /Descargar PDF del mes/i });
-    await waitFor(() => expect((pdf as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 });
+    // 🔄 6-oct-2026 — v2 (`COMISIONES_APPLE_V2_2026_10`): los dos papeles viven
+    // en UN «Descargar ▾». Contabilidad lo tiene prendido y adentro están los dos.
+    const boton = await screen.findByRole("button", { name: /^Descargar/i });
+    await waitFor(() => expect((boton as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 });
+    fireEvent.click(boton);
+    expect(await screen.findByRole("menuitem", { name: /Descargar en Excel/i })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /Descargar en PDF/i })).toBeTruthy();
   }, 20000);
 
   it("🔴 NO le dibuja «Actualizar ahora» — ese POST le contesta 403", async () => {

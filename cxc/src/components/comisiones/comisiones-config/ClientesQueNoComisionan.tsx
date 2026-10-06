@@ -41,6 +41,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { ConfirmDeleteModal } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import { useEsCelularComisiones } from "../celular/useEsCelularComisiones";
 import ClienteSwitchPicker, { type ClienteSwitchOpcion } from "@/components/catalogo/ClienteSwitchPicker";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
@@ -138,6 +139,13 @@ export function ClientesQueNoComisionan({ onSaved, v2 = false }: { onSaved: (msg
 
   // Cambiar qué no comisiona una regla que ya está.
   const [editando, setEditando] = useState<ReglaEnPalabras | null>(null);
+  /**
+   * 🩸 EN EL CELULAR, RENGLONES Y NO TABLA (6-oct-2026). Medido a 390 px: la
+   * tabla de cuatro columnas medía 468 px en 356 útiles —«Excluye», lo que la
+   * regla DICE, quedaba cortado en «E v c»— y el «Quitar» escondido del
+   * encabezado empujaba la página 58 px de lado. Un árbol solo, como el resto.
+   */
+  const enCelular = useEsCelularComisiones();
   const [edVenta, setEdVenta] = useState(true);
   const [edCobro, setEdCobro] = useState(true);
   const [cambiando, setCambiando] = useState(false);
@@ -299,6 +307,19 @@ export function ClientesQueNoComisionan({ onSaved, v2 = false }: { onSaved: (msg
     () => [...new Set(reglas.filter((r) => !r.vendedorEsTodos).map((r) => r.vendedor))].sort(),
     [reglas],
   );
+
+  /** «Editar exclusión» · «Quitar»: lo mismo en la tabla y en los renglones. */
+  const opcionesDe = (r: ReglaEnPalabras) => [
+    {
+      label: "Editar exclusión",
+      onClick: () => {
+        setEditando(r);
+        setEdVenta(r.que !== "solo-el-cobro");
+        setEdCobro(r.que !== "solo-la-venta");
+      },
+    },
+    { label: "Quitar", onClick: () => setAQuitar(r), destructive: true },
+  ];
 
   return (
     <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5" aria-labelledby="sin-comision-titulo">
@@ -498,7 +519,33 @@ export function ClientesQueNoComisionan({ onSaved, v2 = false }: { onSaved: (msg
         </div>
       ) : (
         /* 🔴 UNA SOLA LISTA, UN SOLO ENCABEZADO, CERO CASILLAS. */
-        <div className="overflow-x-auto">
+        enCelular ? (
+          <ul className="divide-y divide-gray-100" data-lista-sin-comision>
+            {visibles.map((r) => (
+              <li key={r.llave} className="flex items-start gap-2 py-2.5" data-regla={r.llave}>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-gray-900">
+                    {r.clienteNombre}
+                    {r.clienteNombre !== r.clienteCodigo && (
+                      <span className="ml-1 tabular-nums text-xs text-gray-400">{r.clienteCodigo}</span>
+                    )}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {r.vendedor} · {r.chipsEmpresas.join(" · ")}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-900">
+                    Excluido: <b className="font-semibold">{loQueNoComisiona(r.que)}</b>
+                  </p>
+                  {avisoFila?.llave === r.llave && (
+                    <span role="alert" className="mt-1 block text-[11px] text-red-600">{avisoFila.texto}</span>
+                  )}
+                </div>
+                <OverflowMenu ariaLabel={`Opciones de ${r.clienteNombre}`} items={opcionesDe(r)} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+        <div className="relative overflow-x-auto">
           <table className="w-full text-sm" data-lista-sin-comision>
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
@@ -533,26 +580,14 @@ export function ClientesQueNoComisionan({ onSaved, v2 = false }: { onSaved: (msg
                     )}
                   </td>
                   <td className="py-2.5 pl-3.5 text-right">
-                    <OverflowMenu
-                      ariaLabel={`Opciones de ${r.clienteNombre}`}
-                      items={[
-                        {
-                          label: "Editar exclusión",
-                          onClick: () => {
-                            setEditando(r);
-                            setEdVenta(r.que !== "solo-el-cobro");
-                            setEdCobro(r.que !== "solo-la-venta");
-                          },
-                        },
-                        { label: "Quitar", onClick: () => setAQuitar(r), destructive: true },
-                      ]}
-                    />
+                    <OverflowMenu ariaLabel={`Opciones de ${r.clienteNombre}`} items={opcionesDe(r)} />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        )
       )}
 
       {/* Cambiar qué no comisiona: la MISMA pregunta del alta, al derecho. */}

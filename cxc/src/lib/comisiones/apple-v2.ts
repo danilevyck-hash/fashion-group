@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// COMISIONES «COMO LO HARÍA APPLE», v2 (6-oct-2026, PROPUESTA, apagada).
+// COMISIONES «COMO LO HARÍA APPLE», v2 (6-oct-2026). PRENDIDA: Daniel la aprobó.
 // Módulo PURO: sin React, sin fetch, sin reloj.
 //
 // El método que Daniel aprobó en Nueva guía, Ventas, CxC, Guías, Reclamos y
@@ -41,8 +41,12 @@ import { cifraDeLaTira } from "@/lib/ventas/celular";
 import { fmtMoney } from "@/lib/ventas/format";
 import { celdaVacia } from "./matriz-celda";
 
-/** `false` = como hoy. Se prende con el «sí» de Daniel al mockup HOY vs RECOMENDACIÓN. */
-export const COMISIONES_APPLE_V2_2026_10 = false;
+/**
+ * 🔴 PRENDIDO el 6-oct-2026: Daniel aprobó el mockup HOY vs RECOMENDACIÓN
+ * (capturas reales a 390 y 1440 de «Todas», una empresa, el detalle y
+ * Configuración). `false` = la pantalla de antes, intacta.
+ */
+export const COMISIONES_APPLE_V2_2026_10 = true;
 
 /** El rótulo del número grande. */
 export const ROTULO_TOTAL_V2 = "Total a pagar";

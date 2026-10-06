@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔴 CANDADO — COMISIONES «COMO LO HARÍA APPLE», v2 (6-oct-2026). APAGADO.
+// 🔴 CANDADO — COMISIONES «COMO LO HARÍA APPLE», v2 (6-oct-2026). PRENDIDO (Daniel lo aprobó).
 //
 // La MISMA pantalla con las reglas de docs/diseno.md y las piezas aprobadas
 // (número grande con línea gris, dos renglones con ›, `LineaDeFrescura`, un
 // solo «Descargar»). Ver `lib/comisiones/apple-v2.ts`.
 //
 // Lo que sostiene:
-//   1. Nace APAGADO y `false` = la pantalla de hoy (rollback por código).
+//   1. Prendido; `false` = la pantalla de antes (rollback por código).
 //   2. 🔴 NINGÚN CÁLCULO CAMBIA: el número grande dice el MISMO total del pie
 //      (`sumarPagable`), y el módulo puro no suma nada.
 //   3. DEFAULT y Daniel Levy siguen detrás de «Mostrar no pagables».
@@ -90,13 +90,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("1 · el interruptor", () => {
-  it("nace APAGADO y es de código", () => {
-    expect(COMISIONES_APPLE_V2_2026_10).toBe(false);
+  // 6-oct-2026: Daniel aprobó el mockup HOY vs RECOMENDACIÓN → prendido.
+  it("está PRENDIDO (Daniel, 6-oct-2026) y es de código", () => {
+    expect(COMISIONES_APPLE_V2_2026_10).toBe(true);
     expect(leer("src/lib/comisiones/apple-v2.ts")).not.toContain("process.env");
   });
 
   it("apagado, la computadora es la de hoy: dos filas, dos botones de papel, el ⓘ arriba", async () => {
-    render(<ComisionesView availableYears={[2026]} />);
+    render(<ComisionesView availableYears={[2026]} v2={false} />);
     await screen.findByLabelText("Empresa");
     expect(document.querySelector("[data-comisiones-v2]")).toBeNull();
     expect(screen.getByRole("button", { name: /Descargar PDF del mes/ })).toBeTruthy();

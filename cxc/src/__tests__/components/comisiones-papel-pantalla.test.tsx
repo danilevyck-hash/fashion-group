@@ -103,34 +103,42 @@ afterEach(() => {
 
 // ═══ 1 · Los DOS botones están, también con «Todo el año» ══════════════════
 
-describe("🔴 los dos botones de arriba están con el mes Y con el año", () => {
-  const abrirShell = async () => {
-    render(<ComisionesView availableYears={[2026, 2025]} />);
-    // Las vistas cargan con `next/dynamic`: se espera a que la barra exista.
-    await screen.findByRole("button", { name: /Descargar PDF del mes/ });
+// 🔄 6-oct-2026 — RE-APUNTADO A LA v2 (`COMISIONES_APPLE_V2_2026_10`, Daniel la
+// aprobó): los DOS papeles siguen, ahora detrás de UN «Descargar ▾» (Descargar
+// en PDF · Descargar en Excel). La regla de fondo no cambió: con un mes Y con
+// «Todo el año» se baja en los dos formatos.
+describe("🔴 los dos papeles están con el mes Y con el año, en UN «Descargar»", () => {
+  const abrirMenu = async () => {
+    const boton = await screen.findByRole("button", { name: /^Descargar/ });
+    await waitFor(() => expect((boton as HTMLButtonElement).disabled).toBe(false));
+    await act(async () => { fireEvent.click(boton); });
+    expect(await screen.findByRole("menuitem", { name: /Descargar en PDF/ })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /Descargar en Excel/ })).toBeTruthy();
   };
 
-  it("con un mes: «Descargar PDF del mes» y «…en Excel»", async () => {
-    await abrirShell();
-    expect(screen.getByRole("button", { name: /Descargar PDF del mes/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Descargar Excel del mes/ })).toBeTruthy();
+  it("con un mes: PDF y Excel", async () => {
+    render(<ComisionesView availableYears={[2026, 2025]} />);
+    await abrirMenu();
+    // Y ya no hay dos botones sueltos.
+    expect(screen.queryByRole("button", { name: /Descargar (PDF|Excel) del mes/ })).toBeNull();
   });
 
-  it("🔴 y con «Todo el año» los DOS siguen ahí, diciendo «el año»", async () => {
-    // 🩸 Acá vivía la regla vieja: con el año elegido el botón de PDF NO se
-    // dibujaba, y «Descargar el año» era Excel y nada más.
-    await abrirShell();
-    // Se abre el selector de período y se elige el año entero.
+  it("🔴 y con «Todo el año» los DOS siguen ahí", async () => {
+    render(<ComisionesView availableYears={[2026, 2025]} />);
+    await screen.findByRole("button", { name: /^Descargar/ });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Período:/ }));
     });
     await act(async () => {
       fireEvent.click(await screen.findByRole("button", { name: ROTULO_TODO_EL_ANIO }));
     });
-    expect(await screen.findByRole("button", { name: /Descargar PDF del año/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Descargar Excel del año/ })).toBeTruthy();
-    // Y ya no queda ningún botón hablando del mes.
-    expect(screen.queryByRole("button", { name: /Descargar (PDF|Excel) del mes/ })).toBeNull();
+    await abrirMenu();
+  });
+
+  it("sin la v2, los dos botones de antes", async () => {
+    render(<ComisionesView availableYears={[2026, 2025]} v2={false} />);
+    expect(await screen.findByRole("button", { name: /Descargar PDF del mes/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Descargar Excel del mes/ })).toBeTruthy();
   });
 });
 

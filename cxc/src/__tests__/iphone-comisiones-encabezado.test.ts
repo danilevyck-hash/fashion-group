@@ -35,119 +35,85 @@
 // Verificación en navegador: `node scripts/_medir-comisiones-encabezado.mjs`
 // (solo lectura; ver los gotchas en su encabezado).
 //
-// 🔄 6-oct-2026 · NOTA FECHADA — `COMISIONES_APPLE_V2_2026_10` (apagado). Este
-// candado cuida la pantalla de HOY y sigue igual: con el interruptor en `false`
-// todo lo que mide existe tal cual. Con v2 el total pasa a ser el NÚMERO GRANDE
-// de arriba (la clase de Ventas y CxC) y por eso el «primer número» ES el total:
-// el presupuesto de 200 px se cumple por construcción y lo que se protege allá
-// es que no nazca otra fila de controles ni vuelva la barra negra del pie
-// (`__tests__/comisiones/comisiones-apple-v2.test.tsx` › 7). Cuando Daniel diga
-// «sí», este archivo se re-apunta a la v2 en vez de borrarse.
+// ── 🔄 6-oct-2026 · RE-APUNTADO A LA v2 («como Apple») ────────────────────────
+// Daniel aprobó `COMISIONES_APPLE_V2_2026_10` (prendido hoy). Lo que este
+// candado cuida NO cambia —el primer número en la primera pantalla, controles de
+// 44 px, cero scroll lateral, «Actualizar» que recarga—, pero la forma sí:
+//   · el primer número ES el total a pagar, el número grande (la clase de
+//     Ventas y CxC), debajo de UNA fila de empresa y mes: el presupuesto se
+//     cumple por construcción y lo que se congela es que no nazca otra fila;
+//   · la computadora tiene UNA fila de controles (empresa · período · Descargar
+//     ▾ · ⚙) y el ⓘ de criterios vive en la línea del pie;
+//   · ya no hay barra negra al pie que el ☰ tape.
+// La pantalla de antes sigue en el código con el interruptor en `false`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
+import { COMISIONES_APPLE_V2_2026_10 } from "@/lib/comisiones/apple-v2";
 
-const leer = (rel: string) => readFileSync(path.join(process.cwd(), "src", rel), "utf-8");
+const leer = (rel: string) => readFileSync(path.join(process.cwd(), "src", rel), "utf8");
 
 const page = leer("app/comisiones/ComisionesPageClient.tsx");
 const shell = leer("components/comisiones/ComisionesView.tsx");
+const computadora = leer("components/comisiones/ComisionesComputadoraV2.tsx");
+const portada = leer("components/comisiones/celular/PortadaComisionesCelular.tsx");
 const criterios = leer("components/comisiones/ComisionesCriterios.tsx");
 const periodo = leer("components/comisiones/ComisionesPeriodo.tsx");
 const consolidado = leer("components/comisiones/ComisionesConsolidadoView.tsx");
 const porEmpresa = leer("components/comisiones/ComisionesPorEmpresaView.tsx");
 const tarjetas = leer("components/comisiones/ComisionesTarjetas.tsx");
 
-/** Techo acordado: el primer número tiene que verse en la primera pantalla. */
-const PRESUPUESTO_PX = 200;
-
-/** Medidos en el navegador — no dependen de este código. */
-const ALTO_APPHEADER_MOVIL = 45; // barra sticky de la app en 390px
-const ALTO_THEAD_TABLA = 34.5; // encabezado de columnas de la tabla
-const BORDE_CARD = 1;
-
-/** Alto táctil mínimo de la casa. */
-const TARGET_MIN = 44;
-
-/** Escala de espaciado de Tailwind: `pt-2` = 8px, `space-y-1.5` = 6px, … */
-const escala = (n: number) => n * 4;
-
-/** Lee el número de una clase de espaciado (pt-2 → 2). */
-function claseEspaciado(src: string, re: RegExp): number {
-  const m = src.match(re);
-  expect(m, `no encontré ${re} — ¿cambió la estructura del encabezado?`).toBeTruthy();
-  return parseFloat(m![1]);
-}
-
-/** El padding de arriba de <main> EN MÓVIL (ignora los `md:` de escritorio). */
-function padTopMovil(): number {
-  const cls = page.match(/<main className="([^"]*)"/);
-  expect(cls, "no encontré el <main> de /comisiones").toBeTruthy();
-  const clases = cls![1].split(/\s+/).filter((c) => !c.includes(":")); // sin breakpoints
-  const pt = clases.find((c) => /^pt-\d/.test(c));
-  const py = clases.find((c) => /^py-\d/.test(c));
-  const usada = pt ?? py;
-  expect(usada, `<main> sin padding de arriba en móvil: ${cls![1]}`).toBeTruthy();
-  return escala(parseFloat(usada!.split("-")[1]));
-}
-
-/**
- * El bloque JSX de la barra de controles (hasta que arranca la vista hija).
- *
- * 🔄 6-sep-2026: el corte era `{mode === "todas"`, la primera de las CUATRO
- * pestañas. Las pestañas se fueron (un solo selector de empresa + un ⚙), así que
- * el corte pasa a ser el aviso de rechazos, que es lo último de la barra y lo
- * primero que no es un control.
- */
-function barraDeControles(): string {
-  const i = shell.indexOf('<div className="space-y-2">');
-  const j = shell.indexOf('<AvisoRechazosSwitch', i);
+/** El bloque de la fila de controles de la computadora v2 (hasta el aviso de rechazos). */
+function filaDeLaComputadora(): string {
+  const i = computadora.indexOf('<div data-comisiones-v2');
+  const j = computadora.indexOf("<AvisoRechazosSwitch", i);
   expect(i).toBeGreaterThan(-1);
   expect(j).toBeGreaterThan(i);
-  return shell.slice(i, j);
+  return computadora.slice(i, j);
 }
 
-describe("Comisiones — el encabezado entra en la primera pantalla del iPhone", () => {
-  it("la barra de controles tiene DOS filas, ni una más", () => {
-    // Cada fila es un <div className="flex …"> hijo directo de la barra. Los
-    // botones de adentro usan template literals o `inline-flex`, así que no
-    // cuentan. Una tercera fila rompe el presupuesto de 200px.
-    const filas = [...barraDeControles().matchAll(/<div className="flex /g)];
-    expect(filas).toHaveLength(2);
+describe("Comisiones v2 — el total es el primer número de la pantalla", () => {
+  it("la v2 está prendida (Daniel, 6-oct-2026) y es la que se monta", () => {
+    expect(COMISIONES_APPLE_V2_2026_10).toBe(true);
+    expect(shell).toContain("v2 = COMISIONES_APPLE_V2_2026_10");
   });
 
-  it("las dos filas miden 44px (mínimo táctil) y nada más", () => {
-    const barra = barraDeControles();
-    // Ningún alto fijo mayor que el target mínimo escondido en la barra.
-    expect(barra).not.toMatch(/(?<!min-)h-\[\d+px\]/);
-    expect(barra).not.toMatch(/\bpy-\d/); // el alto lo da min-h-[44px], no padding
+  it("celular: título, UNA fila de empresa y mes, y enseguida el número grande", () => {
+    const fila = portada.indexOf("data-mes-celular");
+    const numero = portada.indexOf("data-numero-comisiones");
+    const lista = portada.indexOf("{children}");
+    expect(fila).toBeGreaterThan(-1);
+    expect(numero).toBeGreaterThan(fila);
+    expect(lista).toBeGreaterThan(numero);
+    // Entre la fila del mes y el número no nace otra fila de controles.
+    const entre = portada.slice(fila, numero);
+    expect(entre.match(/<div className="mt-3 flex/g) ?? []).toHaveLength(0);
+    // La cifra de Ventas y CxC (36 px, peso normal), no una negrita.
+    expect(portada).toContain("CLASE_TOTAL_CELULAR");
   });
 
-  it("la cuenta del encabezado da menos de 200px en 390px de ancho", () => {
-    const padTop = padTopMovil();
-    const separacion = escala(claseEspaciado(shell, /<div className="space-y-(\d+(?:\.\d+)?)">/));
-    const filas = [...barraDeControles().matchAll(/<div className="flex /g)].length;
-
-    // <main pt> + (filas × 44) + (separación entre filas y antes de la tabla)
-    const alto =
-      ALTO_APPHEADER_MOVIL +
-      padTop +
-      filas * TARGET_MIN +
-      filas * separacion +
-      BORDE_CARD +
-      ALTO_THEAD_TABLA;
-
-    // 45 + 8 + 88 + 16 + 1 + 34.5 = 192.5 (medido en el navegador: 193.5).
-    expect(alto).toBeLessThan(PRESUPUESTO_PX);
+  it("computadora: UNA fila de controles y debajo el número grande", () => {
+    const fila = filaDeLaComputadora();
+    expect(fila.match(/<div className="flex flex-wrap items-center/g) ?? []).toHaveLength(1);
+    expect(computadora.indexOf("data-numero-comisiones")).toBeGreaterThan(computadora.indexOf("<AvisoRechazosSwitch"));
+    expect(computadora.indexOf("data-numero-comisiones")).toBeLessThan(computadora.indexOf("{children}"));
   });
 
-  it("no volvió el título grande (lo dicen el header sticky y el breadcrumb)", () => {
+  it("no volvió el título grande de la página (lo dicen la portada y el breadcrumb)", () => {
     expect(page).not.toMatch(/<h1/);
     expect(page).not.toContain("font-display");
     expect(page).not.toContain("text-3xl");
   });
+
+  it("🔴 no hay barra negra al pie: las filas v2 no dibujan el total", () => {
+    const v2 = tarjetas.slice(tarjetas.indexOf("function FilasConsolidadoV2"));
+    expect(v2).not.toContain("<TarjetaTotal");
+    expect(shell).toContain("totalArriba={enCelular || v2}");
+  });
 });
+
 
 /**
  * CANDADO del #365 — en el celular la tabla de Comisiones no se arrastra.
@@ -249,7 +215,9 @@ describe("Comisiones — la tabla ancha son TARJETAS bajo lg", () => {
     expect(tarjetas).not.toContain("formatCompactCurrency");
   });
 
-  it("el total del mes va ABAJO, donde estaba el tfoot", () => {
+  // 🔄 6-oct-2026: con la v2 el total va ARRIBA (bloque de arriba); esto cuida
+  // la pantalla de antes, que sigue detrás del interruptor apagado.
+  it("sin la v2, el total del mes va ABAJO, donde estaba el tfoot", () => {
     // Un "hero" arriba empujaría la primera fila y se comería el encabezado de
     // 193px que costó ganar. Las tarjetas arrancan pegadas a la barra.
     const iTotal = tarjetas.indexOf("function TarjetaTotal");
@@ -278,147 +246,83 @@ describe("Comisiones — la tabla ancha son TARJETAS bajo lg", () => {
   });
 });
 
-describe("Comisiones — lo que Daniel usa sigue a un toque", () => {
-  // 🔄 CANDADO RE-APUNTADO EL 6-sep-2026. Exigía las etiquetas de las cuatro
-  // pestañas («Todas las empresas», «Por empresa»…) y que el shell NO importara
-  // el `Select` de la casa. Las dos cosas cambiaron a propósito. Daniel,
-  // textual: *«opino eliminar los tabs y dejar configuración como el depurador,
-  // estilo engranaje y ya. Todas las empresas solo se agrega en una opción con
-  // las empresas. Y multifashion es una empresa más»*, *«entonces a, pero en
-  // todas pon fashion group para no confundir»* y *«el merge de los tabs no es
-  // solo en el cel, sino también en desktop»*.
-  it("hay UN selector de empresa, no cuatro pestañas", () => {
-    // Las opciones y sus rótulos viven en el módulo puro, no acá.
+describe("Comisiones v2 — lo que Daniel usa sigue a un toque", () => {
+  it("UN selector de empresa y el ⚙, sin pestañas", () => {
+    const fila = filaDeLaComputadora();
+    expect(fila).toContain("<SelectTrigger");
+    expect(fila).toContain('aria-label="Configuración"');
     expect(shell).toContain("OPCIONES_VISTA");
-    expect(shell).toContain("<SelectTrigger");
-    // Ninguna de las cuatro pestañas volvió.
-    expect(shell).not.toContain('"Todas las empresas"');
-    expect(shell).not.toContain('"Por empresa"');
-    expect(shell).not.toContain('"Multifashion"');
+    for (const t of ['"Todas las empresas"', '"Por empresa"', '"Multifashion"']) expect(shell).not.toContain(t);
   });
 
-  it("mes y año siguen siendo UN control (el Select de arriba es la EMPRESA)", () => {
-    expect(shell).toContain("<ComisionesPeriodo");
-    // El shell no arma selectores de mes/año por su cuenta: el único `Select`
-    // que importa es el de la empresa.
-    expect(shell).not.toContain("SelectItem value={String(");
-    expect(shell).not.toContain("MESES");
+  it("el período es UN control, con Rango", () => {
+    expect(filaDeLaComputadora()).toContain("<ComisionesPeriodo");
+    expect(filaDeLaComputadora()).toContain("onRango={onRango}");
   });
 
-  it("'Actualizar ahora' y Excel viven en la barra, no en una fila propia", () => {
-    const barra = barraDeControles();
-    expect(barra).toContain("<SyncNowButton");
-    // 🔄 6-sep-2026: el botón decía «Excel» y ahora dice QUÉ TRAE — «Descargar
-    // el mes» / «Descargar el año» (Daniel: «a, pero descargar, no bajar, como
-    // esté en todos los módulos»). El rótulo vive en el módulo puro.
-    // 🔄 8-sep-2026 — CAMBIA DE DIRECCIÓN, NO SE BORRA: ahora son DOS botones
-    // (el mes en PDF y el mes en Excel) y los dos rótulos siguen viniendo del
-    // módulo puro, nunca escritos a mano en la barra. CONTROL de la regla
-    // original más abajo: las vistas hijas siguen sin dibujar su propio botón.
-    expect(barra).toContain("rotuloDescargarExcel(mes)");
-    // 🔄 9-SEP-2026 — el rótulo del PDF pasó de constante a función, porque el
-    // botón también existe con «Todo el año» («Descargar PDF del año»). Sigue
-    // saliendo del módulo puro, nunca escrito a mano en la barra.
-    expect(barra).toContain("rotuloDescargarPdf(mes)");
-    // Las vistas hijas ya no dibujan su propio botón Excel (era una fila de
-    // 44px + 16px de separación, solo para él).
-    expect(consolidado).not.toContain("FileSpreadsheet");
-    expect(porEmpresa).not.toContain("FileSpreadsheet");
-    // …pero SIGUEN siendo las dueñas del cálculo del Excel.
+  it("🔴 UN «Descargar» en la computadora y en el celular", () => {
+    const fila = filaDeLaComputadora();
+    expect(fila.match(/<MenuDescargaComision/g) ?? []).toHaveLength(1);
+    expect(fila).toContain("rotulo={ROTULO_DESCARGAR_V2}");
+    expect(computadora).not.toContain("rotuloDescargarPdf");
+    expect(portada).toContain("onClick={() => setDescarga(true)}");
+    // Las vistas hijas siguen siendo dueñas del cálculo del papel.
     expect(consolidado).toContain("exportComisionesConsolidado");
-    expect(consolidado).toContain("onExcel?.(");
     expect(porEmpresa).toContain("exportComisionesResumen");
-    expect(porEmpresa).toContain("onExcel?.(");
   });
 });
 
-describe("Comisiones — Criterios y la fecha de sincronizado NO se borraron", () => {
-  it("el texto de los criterios está intacto (explica un cálculo de plata)", () => {
+describe("Comisiones v2 — Criterios y la frescura NO se borraron", () => {
+  it("el texto de los criterios está intacto", () => {
     expect(criterios).toContain("facturas con utilidad &gt;20% menos notas de crédito");
     expect(criterios).toContain("excluyendo retenciones de ITBMS");
-    expect(criterios).toContain("Fuente: reportes de Switch");
   });
 
-  it("Criterios vive en un ⓘ que cerrado no ocupa alto propio", () => {
-    // El panel es un popover absoluto: no empuja a la tabla hacia abajo.
-    expect(criterios).toContain("absolute right-0 top-full");
-    expect(criterios).not.toContain("w-full items-center gap-2 px-3 py-2 text-left"); // el acordeón viejo
-    expect(barraDeControles()).toContain("<ComisionesCriterios");
+  it("el ⓘ vive en la línea del pie, con la frescura por empresa y su punto ámbar", () => {
+    const pie = computadora.slice(computadora.indexOf("export function PieComisionesV2"));
+    expect(pie).toContain("<ComisionesCriterios aviso={syncStale}>");
+    expect(pie).toContain("<SyncStatus");
+    expect(pie).toContain("onStale={onStale}");
+    expect(shell).toContain("<PieComisionesV2");
   });
 
-  it("la frescura del dato sigue en pantalla, adentro del mismo ⓘ", () => {
-    expect(shell).toContain("<SyncStatus");
-    // 1-oct-2026, Daniel: nombres normales de ERP — se vuelve a «Actualizado…»
-    // (el rótulo por omisión de SyncStatus), sin «sincroniz» en pantalla.
-    expect(shell).not.toMatch(/prefix="[^"]*[Ss]incroniz/);
-    // Y si alguna empresa quedó sin actualizar, el ⓘ lo avisa sin abrirlo.
-    expect(shell).toContain("onStale={setSyncStale}");
-    expect(criterios).toContain("bg-amber-500");
+  it("la frescura se ve sin abrir nada: la línea común, junto al número", () => {
+    expect(computadora).toContain("<LineaDeFrescura");
+    expect(portada).toContain("<LineaDeFrescura");
   });
 });
 
-describe("Comisiones — 44px al tacto y cero scroll lateral en iPhone", () => {
+describe("Comisiones v2 — 44px al tacto", () => {
   const archivos: [string, string][] = [
-    ["shell", shell],
+    ["computadora v2", computadora],
     ["criterios", criterios],
     ["período", periodo],
-    // Las tarjetas del celular son la superficie que se TOCA en el iPhone:
-    // abren el detalle por empresa y despliegan la matriz. Sin esta línea, el
-    // 44px quedaba cubierto solo en el encabezado.
     ["tarjetas", tarjetas],
   ];
 
   it.each(archivos)("todo lo tocable de %s llega a 44px", (_nombre, src) => {
-    // Cada <button> del encabezado declara min-h-[44px] o h-11 en su className.
-    // (No se puede cortar la etiqueta en el primer ">": las flechas de las
-    // arrow functions tienen uno.)
-    const botones = src
-      .split("<button")
-      .slice(1)
-      .map((c) => {
-        const hasta = c.indexOf("</button");
-        return hasta > -1 ? c.slice(0, hasta) : c;
-      });
+    const botones = src.split("<button").slice(1).map((c) => {
+      const hasta = c.indexOf("</button");
+      return hasta > -1 ? c.slice(0, hasta) : c;
+    });
     expect(botones.length).toBeGreaterThan(0);
     for (const b of botones) {
       const clases = b.match(/className=(?:"([^"]*)"|\{`([\s\S]*?)`\})/);
       expect(clases, b.slice(0, 160)).toBeTruthy();
-      const valor = clases![1] ?? clases![2];
-      expect(valor, valor).toMatch(/min-h-\[44px\]|h-11/);
+      expect(clases![1] ?? clases![2]).toMatch(/min-h-\[44px\]|h-11/);
     }
   });
 
-  it("el ⓘ llega a 44px de ANCHO aunque solo muestre el ícono", () => {
-    expect(criterios).toContain("min-w-[44px]");
-  });
-
   it("el control de período mide igual en mayo que en julio", () => {
-    // "May 2026" es 8.6px más ancho que "Jul 2026" (medido con la fuente real).
-    // Con ancho automático eso alcanzaba para que "Actualizar ahora" se
-    // partiera en dos líneas y el encabezado creciera 6px. Ancho fijo en
-    // iPhone + mes abreviado = la fila mide lo mismo los 12 meses del año.
     expect(periodo).toContain("w-[110px]");
-    // 🔄 6-sep-2026: la abreviatura del mes salió a `lib/comisiones/periodo`
-    // porque «Todo el año» es otro rótulo del mismo control. Sigue siendo el
-    // texto corto en el iPhone y el largo en escritorio.
     expect(periodo).toContain("etiquetaPeriodoCorta(year, mes)");
-    expect(periodo).toContain("etiquetaPeriodo(year, mes)");
   });
 
-  it("los controles no se comprimen; si algún día no entran, bajan de línea", () => {
-    // flex-wrap es el modo de fallar bueno: nunca saca la página para el
-    // costado. shrink-0 evita que un control se achique y parta su texto.
-    const barra = barraDeControles();
-    expect(barra).toContain("flex flex-wrap items-center");
-    // Se verifica lo que IMPORTA (que el botón no se comprima), no el formato
-    // exacto del JSX: fijarlo a una línea hizo fallar este test cuando el botón
-    // ganó `onSuccess`, que no tiene nada que ver con el layout.
-    const boton = /<SyncNowButton[\s\S]*?\/>/.exec(barra)?.[0] ?? "";
-    expect(boton).toContain("SYNC_NOW_RECIBOS_OPCIONES");
-    expect(boton).toContain('className="shrink-0"');
-    expect(periodo).toContain("shrink-0");
+  it("la fila de la computadora baja de línea antes que salirse", () => {
+    expect(filaDeLaComputadora()).toContain("flex flex-wrap items-center");
   });
 });
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🩸 "Actualizar ahora" tiene que RECARGAR lo que se ve.
@@ -459,6 +363,9 @@ describe("🔴 sincronizar y no refrescar es peor que no sincronizar", () => {
       "utf8",
     );
     expect(vista).toContain("onSuccess={() => setRefreshKey((k) => k + 1)}");
+    // v2: la línea de frescura de la computadora y del celular también recarga.
+    expect(vista).toContain("onActualizado={() => setRefreshKey((k) => k + 1)}");
+    expect(computadora).toContain("onSuccess={onActualizado}");
     expect(vista).toContain("refreshKey={refreshKey}");
   });
 
