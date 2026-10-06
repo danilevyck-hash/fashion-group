@@ -24,8 +24,8 @@ import {
   PEDIDOS_BULTOS_2026_10 as BULTOS,
   ESTADOS_BULTOS,
   ROTULO_ESTADO_BULTOS,
-  ROLES_TERMINADO,
   estadoLeido,
+  firmasEnOrden,
   siguienteEstado,
   type EstadoBultos,
 } from "@/lib/guias/pedidos-bultos";
@@ -76,7 +76,7 @@ const detalleDe = (p: PedidoBodega): PedidoDelDetalle => ({
 
 export default function PedidosView({
   puedeMarcar = true,
-  /** 🔴 «Recibido» lo marca la secretaria (y admin), nunca bodega. */
+  /** 🔴 «Verificado» lo marca la secretaria (y admin), nunca bodega. */
   puedeRecibir = false,
 }: {
   puedeMarcar?: boolean;
@@ -237,35 +237,35 @@ export default function PedidosView({
 
   /**
    * 🔴 CON BULTOS, UN SOLO CONTROL POR FILA Y DICE QUÉ HACE (6-oct-2026):
-   *   · Pendiente  → el círculo ○ de siempre, que lo pasa a Terminado (bodega).
-   *   · Terminado  → «Recibido», y SOLO lo ve quien puede marcarlo: bodega lee
-   *     el chip «Terminado» quieto, porque «no se puede confiar solo en bodega».
-   *   · Recibido   → ✓ quieto. De ahí salió a Etiquetas.
+   *   · Pendiente  → el círculo ○ de siempre, que lo pasa a Preparado.
+   *   · Preparado  → «Verificar», y SOLO lo ve quien puede marcarlo: bodega lee
+   *     el chip «Preparado» quieto, porque «no se puede confiar solo en bodega».
+   *   · Verificado → ✓ quieto. De ahí salió a Etiquetas.
    */
   const controlBultos = (p: PedidoBodega) => {
     const e = estadoLeido(p.estado);
     const firma = p.cambiado_por && p.cambiado_en ? `${p.cambiado_por} · ${fmtDate(fechaPanamaDe(p.cambiado_en))}` : undefined;
     if (e === "pendiente") return circulo(p);
     const base = "inline-flex h-7 items-center whitespace-nowrap rounded-full border px-2.5 text-xs font-medium";
-    if (e === "recibido") {
+    if (e === "verificado") {
       return (
         <span className={`${base} border-emerald-200 bg-emerald-50 text-emerald-700`} title={firma}>
           <Check size={13} strokeWidth={3} aria-hidden className="mr-1" />
-          {ROTULO_ESTADO_BULTOS.recibido}
+          {ROTULO_ESTADO_BULTOS.verificado}
         </span>
       );
     }
     if (!puedeRecibir) {
-      return <span className={`${base} border-gray-300 bg-white text-gray-700`} title={firma}>{ROTULO_ESTADO_BULTOS.terminado}</span>;
+      return <span className={`${base} border-gray-300 bg-white text-gray-700`} title={firma}>{ROTULO_ESTADO_BULTOS.preparado}</span>;
     }
     return (
       <button
         type="button"
-        onClick={() => void cambiar(p, "recibido")}
+        onClick={() => void cambiar(p, "verificado")}
         title={firma}
         className={`${base} relative border-gray-900 bg-gray-900 text-white transition active:scale-[0.97] before:absolute before:-inset-x-1 before:-inset-y-2 before:content-['']`}
       >
-        Marcar recibido
+        Verificar
       </button>
     );
   };
@@ -291,7 +291,7 @@ export default function PedidosView({
         type="button"
         role="checkbox"
         aria-checked={lleno}
-        aria-label={`${p.cliente_nombre} · ${p.secuencial}: ${lleno ? (BULTOS ? "terminado" : "preparado") : "pendiente"}`}
+        aria-label={`${p.cliente_nombre} · ${p.secuencial}: ${lleno ? "preparado" : "pendiente"}`}
         disabled={enTransito.has(k)}
         onClick={() => {
           setEnTransito((s) => new Set(s).add(k));
@@ -323,7 +323,7 @@ export default function PedidosView({
       <table className="w-full text-left text-xs sm:text-sm">
         <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
           <tr>
-            {conCirculo && <th className="w-11 py-2 pl-1.5 sm:pl-2"><span className="sr-only">{BULTOS ? "Terminado" : "Preparado"}</span></th>}
+            {conCirculo && <th className="w-11 py-2 pl-1.5 sm:pl-2"><span className="sr-only">Preparado</span></th>}
             <ThOrden col="antiguedad" api={orden} className={`py-2 pr-1 sm:px-3 ${conCirculo ? "pl-1" : "pl-3"}`}><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></ThOrden>
             <ThOrden col="cliente" api={orden} className="px-1 py-2 sm:px-3">Cliente</ThOrden>
             <ThOrden col="vendedor" api={orden} className={`py-2 sm:px-3 ${conCirculo ? "pl-1 pr-3" : "px-1"}`}>Vendedor</ThOrden>
@@ -361,6 +361,15 @@ export default function PedidosView({
                     <button type="button" onClick={() => setAbierto(detalleDe(p))} className="text-left">
                       <span className="font-medium text-blue-600 hover:text-blue-800">{p.cliente_nombre}</span>
                       <span className="block whitespace-nowrap text-xs text-gray-500">{p.secuencial}</span>
+                      {/* 🔴 Quién marcó cada paso y cuándo, debajo del pedido. */}
+                      {firmasEnOrden({
+                        preparado_por: p.preparado_por ?? null,
+                        preparado_en: p.preparado_en ?? null,
+                        verificado_por: p.verificado_por ?? null,
+                        verificado_en: p.verificado_en ?? null,
+                      }).map((t) => (
+                        <span key={t} className="block text-xs text-gray-500">{t}</span>
+                      ))}
                     </button>
                   ) : (
                     <>

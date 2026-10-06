@@ -191,12 +191,39 @@ const linea = (
   descripcion: string,
   cantidad: number,
   bulto: number | null,
-) => ({ codigo_barra_id: 900000 + i, codigo: `10${2000 + i}-${bulto ?? 0}`, descripcion, cantidad, precio: 49.95, bulto });
+) => {
+  const codigo = `4RG82${2000 + i}`;
+  const precio = 49.95;
+  return {
+    codigo_barra_id: 900000 + i,
+    codigo,
+    // ⚠️ El API no manda la referencia: la columna va vacía. En el papel de
+    // Switch sí existe (`4RG822G200` → `4RG822G200-HMT`), y por eso la columna
+    // se queda — pendiente de que Daniel diga de dónde sale.
+    referencia: null,
+    descripcion,
+    talla: null,
+    color: null,
+    cantidad,
+    precio,
+    // El total lo manda Switch; aquí se escribe el que cuadra, porque un
+    // ejemplo que no cierra esconde un papel que no cierra.
+    total: Math.round(cantidad * precio * 100) / 100,
+    bulto,
+  };
+};
 
 const BULTOS: PapelDeBultos = {
   secuencial: "05-000001274",
   empresa: "Fashion Shoes",
   cliente: "INVERSIONES Y DISTRIBUIDORA PASO CANOAS INTERNACIONAL, S.A.",
+  // Las dos firmas del control de dos personas, que van al pie del papel.
+  firmas: {
+    preparado_por: "Julio",
+    preparado_en: "2026-10-06T15:42:00-05:00",
+    verificado_por: "Angela",
+    verificado_en: "2026-10-06T16:15:00-05:00",
+  },
   lineas: [
     linea(1, "NIKE AIR MAX 90 ESSENTIAL BLANCO/NEGRO TALLA 10.5 US", 12, 1),
     linea(2, "NIKE AIR MAX 90 ESSENTIAL BLANCO/NEGRO TALLA 11 US", 6, 1),

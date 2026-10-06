@@ -3,10 +3,18 @@
 -- (6-oct-2026, `PEDIDOS_BULTOS_2026_10`)
 -- ═════════════════════════════════════════════════════════════════════════════
 -- Daniel, 6-oct-2026. Reemplaza su decisión del 5-oct-2026 («SOLO 2 estados»),
--- a propósito y con el porqué: «Recibido lo marca la secretaria, porque no se
--- puede confiar solo en bodega».
+-- a propósito y con el porqué: «no se puede confiar solo en bodega».
 --
---   Pendiente → Terminado (bodega) → Recibido (secretaria) → Etiquetas
+--   Pendiente → Preparado (bodega o la secretaria) → Verificado (la secretaria)
+--             → Etiquetas
+--
+-- 🔑 NOMBRES DE ERP, NO INVENTADOS (`docs/nombres-erp.md`): «Preparado» ya era
+-- el nombre aprobado el 5-oct y NO se toca; «Verificado» es el término de ERP
+-- para la segunda revisión.
+--
+-- 🔑 POR ESO ESTA MIGRACIÓN NO RENOMBRA NI UNA FILA: lo guardado es
+-- `pendiente` | `preparado`, los dos siguen valiendo, y lo único que cambia el
+-- CHECK es que AGREGA `verificado`. Cero riesgo sobre lo que bodega ya marcó.
 --
 -- Y el detalle del pedido, que hoy no existe: las líneas de Switch
 -- (`/apipedido/info?pedidoId=`, doc §5.37, págs 50-51) y en qué BULTO quedó
@@ -49,10 +57,23 @@ CREATE TABLE IF NOT EXISTS pedidos_lineas (
   orden             smallint      NOT NULL,
   articulo_id       integer,
   codigo            text          NOT NULL,
-  -- Talla y color vienen ADENTRO: Switch no los manda aparte.
+  -- ⚠️ La «Referencia» del papel de Switch. MEDIDO el 6-oct-2026 contra el API
+  -- real (`scripts/_diag-pedido-referencia.ts`): NO viene en ningun campo de
+  -- /apipedido/info, ni en la cabecera, con ningun nombre. La columna existe
+  -- para el dia que Switch la mande o Daniel diga de donde sale; hasta entonces
+  -- queda NULL y la pantalla la muestra vacia. NO se deriva del codigo.
+  referencia        text,
+  -- La CATEGORIA que manda Switch («Men-T-Shirts S/S»), no un nombre comercial.
   descripcion       text          NOT NULL,
+  -- 🔑 Talla y color SI vienen separados del API (medido). Switch manda «-»
+  -- cuando la empresa no los usa, y eso se guarda tal cual: es su «sin dato».
+  talla             text,
+  color             text,
   cantidad          numeric(14,4) NOT NULL,
   precio            numeric(14,4) NOT NULL,
+  -- 🔑 El total de la linea lo CALCULA Switch, con sus descuentos. Se guarda tal
+  -- cual y NUNCA se recalcula: la regla de la casa para todo numero de Switch.
+  total             numeric(14,4) NOT NULL DEFAULT 0,
   -- Porcentajes, no montos (doc §5.37). Se guardan crudos y no se recalculan.
   descuento         numeric(9,4)  NOT NULL DEFAULT 0,
   descuento_global  numeric(9,4)  NOT NULL DEFAULT 0,
@@ -116,17 +137,30 @@ COMMENT ON TABLE pedidos_linea_bulto IS
 -- Lo guardado hoy es 'pendiente' | 'preparado'. «Preparado» ES el mismo lugar
 -- del flujo que «Terminado» (bodega termino de preparar), asi que se renombra
 -- el dato: no se pierde ni un toque de bodega.
--- 🔴 EL ORDEN IMPORTA: primero se suelta el CHECK viejo, DESPUÉS se renombra el
--- dato y recién entonces se pone el CHECK nuevo. Al revés, el UPDATE choca
--- contra el CHECK que todavía solo acepta 'pendiente' | 'preparado' y la
--- migración se cae entera.
+-- Solo se ENSANCHA el CHECK: los dos valores de hoy siguen siendo válidos y se
+-- suma el tercero. Ninguna fila se toca.
 ALTER TABLE pedidos_bodega_estado DROP CONSTRAINT IF EXISTS pedidos_bodega_estado_valido;
-
-UPDATE pedidos_bodega_estado SET estado = 'terminado' WHERE estado = 'preparado';
-
 ALTER TABLE pedidos_bodega_estado
   ADD CONSTRAINT pedidos_bodega_estado_valido
-  CHECK (estado IN ('pendiente', 'terminado', 'recibido'));
+  CHECK (estado IN ('pendiente', 'preparado', 'verificado'));
+
+-- 🔴 UNA FIRMA POR PASO (Daniel, 6-oct-2026: «guarda y muestra quién y cuándo
+-- marcó cada paso»). 🩸 Con la sola `cambiado_por` que ya existía, el toque de
+-- «Recibido» PISABA el de «Terminado» y se perdía quién lo había terminado —
+-- que es justo el dato del que depende la regla de las dos personas.
+ALTER TABLE pedidos_bodega_estado
+  ADD COLUMN IF NOT EXISTS preparado_por  text,
+  ADD COLUMN IF NOT EXISTS preparado_en   timestamptz,
+  ADD COLUMN IF NOT EXISTS verificado_por text,
+  ADD COLUMN IF NOT EXISTS verificado_en  timestamptz;
+
+-- Lo ya marcado «preparado» conserva su firma: quien lo tocó es quien lo
+-- preparó. No se inventa nada donde no había dato.
+UPDATE pedidos_bodega_estado
+   SET preparado_por = cambiado_por,
+       preparado_en  = cambiado_en
+ WHERE estado = 'preparado'
+   AND preparado_por IS NULL;
 
 -- De qué envío de Etiquetas salió este pedido, para no crear dos (regla 6).
 -- NULL = todavía no se creó ninguno, o no se pudo (falla ABIERTA: «Recibido»
@@ -135,15 +169,20 @@ ALTER TABLE pedidos_bodega_estado
   ADD COLUMN IF NOT EXISTS envio_id uuid;
 
 COMMENT ON COLUMN pedidos_bodega_estado.estado IS
-  'pendiente | terminado (lo marca bodega) | recibido (lo marca la secretaria, nunca '
-  'bodega). Sin fila = pendiente. Daniel, 6-oct-2026, cambiando su decision del 5-oct.';
+  'pendiente | preparado (lo marca bodega o la secretaria) | verificado (lo marca la '
+  'secretaria, nunca bodega). Sin fila = pendiente. Nombres de ERP; preparado es el '
+  'mismo valor de siempre. Daniel, 6-oct-2026, cambiando su decision del 5-oct.';
 COMMENT ON COLUMN pedidos_bodega_estado.envio_id IS
   'El envio de guias_etiquetas que nacio al marcar Recibido. NULL = no se creo. Sirve '
   'para no crear dos por el mismo pedido.';
--- 🔑 `cambiado_por` sigue siendo QUIEN HIZO EL ÚLTIMO CAMBIO, y por eso alcanza
--- para la regla «quien marcó Terminado solo marca Recibido si es admin»: con el
--- pedido en «terminado», `cambiado_por` ES quien lo terminó. Ninguna columna
--- nueva para eso.
+COMMENT ON COLUMN pedidos_bodega_estado.preparado_por IS
+  'Quien marco Preparado (bodega o la secretaria). De aqui sale la regla de los dos '
+  'pares de ojos: quien preparo un pedido no puede verificarlo, ni siquiera admin. Se '
+  'muestra en pantalla y en el papel: «Preparado por Julio · 10:42 a. m.».';
+COMMENT ON COLUMN pedidos_bodega_estado.verificado_por IS
+  'Quien marco Verificado (solo la secretaria o admin). Se muestra junto al anterior.';
+-- 🔑 `cambiado_por` se queda como estaba: el ULTIMO que tocó la fila. Las dos
+-- firmas de arriba son las que se leen; ésta sirve de respaldo y no se borra.
 
 -- ── 4 · Permisos ────────────────────────────────────────────────────────────
 DO $$

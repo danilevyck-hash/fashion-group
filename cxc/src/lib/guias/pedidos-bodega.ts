@@ -88,11 +88,11 @@ export function pedidoEntra(codigo: string | null | undefined, codigosConFicha: 
 
 /**
  * 🔴 Con `PEDIDOS_BULTOS_2026_10` los estados son TRES y ésta es la lista de
- * los CUATRO valores que la pantalla puede recibir: los dos de hoy
- * (`pendiente` · `preparado`) y los dos nuevos (`terminado` · `recibido`). Así el tipo no miente durante la transición (los `estado` viejos
+ * los TRES valores que la pantalla puede recibir: los dos de hoy —`pendiente` y
+ * `preparado`, que NO cambian de nombre— más `verificado`. Así el tipo no miente durante la transición (los `estado` viejos
  * siguen llegando mientras la migración no corra, y se LEEN con `estadoLeido`).
  */
-export type EstadoPedidoCualquiera = EstadoPedido | "terminado" | "recibido";
+export type EstadoPedidoCualquiera = EstadoPedido | "verificado";
 
 export interface PedidoBodega {
   empresa_key: string;
@@ -105,6 +105,15 @@ export interface PedidoBodega {
   estado: EstadoPedidoCualquiera;
   cambiado_por: string | null;
   cambiado_en: string | null;
+  /**
+   * 🔴 Las dos firmas, una por paso (6-oct-2026, `PEDIDOS_BULTOS_2026_10`):
+   * «Preparado por Julio · 10:42 a. m.» · «Verificado por Angela · 11:15 a. m.».
+   * Opcionales: sin la migración no llegan y la pantalla no las dibuja.
+   */
+  preparado_por?: string | null;
+  preparado_en?: string | null;
+  verificado_por?: string | null;
+  verificado_en?: string | null;
 }
 
 /** Del más viejo al más nuevo; empate por número. */

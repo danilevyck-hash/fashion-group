@@ -21,7 +21,7 @@ import { mesEnCurso } from "@/lib/comisiones/mes-inicial";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
 import { puedeMarcarPedidos, puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
-import { ROLES_RECIBIDO } from "@/lib/guias/pedidos-bultos";
+import { ROLES_VERIFICADO } from "@/lib/guias/pedidos-bultos";
 
 // LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
 // celular y la configuración es de admin/secretaria — su JS solo se descarga
@@ -288,8 +288,8 @@ export default function GuiasPage() {
         {enPedidos ? (
           <PedidosView
             puedeMarcar={puedeMarcarPedidos(role)}
-            // 🔴 «Recibido» lo marca la secretaria (y admin), nunca bodega.
-            puedeRecibir={!!role && ROLES_RECIBIDO.includes(role)}
+            // 🔴 «Verificado» lo marca la secretaria (y admin), nunca bodega.
+            puedeRecibir={!!role && ROLES_VERIFICADO.includes(role)}
           />
         ) : enConfig ? (
           <GuiasConfiguracionView />

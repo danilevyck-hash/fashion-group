@@ -3,10 +3,16 @@
 // ⚠️ NOTA FECHADA — 6-oct-2026: los DOS estados que este candado fija
 // (`pendiente` · `preparado`) siguen siendo los de producción, pero ya NO son
 // la decisión vigente. Daniel cambió de opinión a propósito ese día y los
-// estados pasan a TRES —Pendiente → Terminado (bodega) → Recibido (la
-// secretaria) → Etiquetas—, porque *«no se puede confiar solo en bodega»*. Eso
-// vive detrás de `PEDIDOS_BULTOS_2026_10` (`lib/guias/pedidos-bultos.ts`, hoy
-// `false`) y lo fija su propio candado, `pedidos-bultos.test.ts`.
+// estados pasan a TRES —Pendiente → **Preparado** (bodega o la secretaria) →
+// **Verificado** (la secretaria) → Etiquetas—, porque *«no se puede confiar
+// solo en bodega»*. Eso vive detrás de `PEDIDOS_BULTOS_2026_10`
+// (`lib/guias/pedidos-bultos.ts`, hoy `false`) y lo fija su propio candado,
+// `pedidos-bultos.test.ts`.
+//
+// 🔑 «Preparado» NO cambia de nombre ni de valor: el estado nuevo solo AGREGA
+// «Verificado», así que lo que este archivo fija sigue siendo cierto en los dos
+// mundos. 🩸 Dos borradores míos llamaron a esos pasos «Terminado» y
+// «Recibido»; Daniel los descartó el mismo día por no ser nombres de ERP.
 //
 // 🔴 Este archivo NO se borra ni se relaja: es lo que protege la pantalla que
 // Daniel tiene hoy publicada mientras el interruptor nuevo esté apagado. Con el

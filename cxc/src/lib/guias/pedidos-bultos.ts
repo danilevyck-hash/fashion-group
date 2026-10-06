@@ -9,20 +9,24 @@
 //   2. Quién ve qué, POR EMPRESA y nunca por vendedor (`EMPRESAS_POR_PERSONA`).
 //      El recorte es DURO, como el de Boston: si piden otra empresa, no la ven,
 //      y lo decide el SERVIDOR.
-//   3. Los estados pasan de dos a TRES:
-//        Pendiente → Terminado (lo marca bodega) → Recibido (lo marca la
-//        secretaria) → y de ahí sale a Etiquetas.
+//   3. Los estados pasan de dos a TRES, con NOMBRES DE ERP (`docs/nombres-erp.md`):
+//        Pendiente → **Preparado** (lo marca bodega o la secretaria)
+//                  → **Verificado** (lo marca la secretaria) → y de ahí a Etiquetas.
 //      🔴 Daniel CAMBIA A PROPÓSITO su decisión del 5-oct-2026 («SOLO 2
-//      estados»): «no se puede confiar solo en bodega». Quien marcó Terminado
-//      solo puede marcar Recibido si es admin.
-//      «Recibido» es por pedido COMPLETO: ahí ya está listo para imprimir
+//      estados»): «no se puede confiar solo en bodega».
+//      🔑 «Preparado» ya era el nombre aprobado el 5-oct y NO se toca —ni en la
+//      pantalla ni en la base—. «Verificado» es el término de ERP para la
+//      segunda revisión: ni «Recibido» ni «Terminado», que eran nombres míos.
+//      🔴 LA MISMA PERSONA NO HACE LOS DOS PASOS, ni siquiera admin: si la
+//      secretaria lo preparó, otra persona lo verifica. Siempre dos ojos.
+//      «Verificado» es por pedido COMPLETO: ahí ya está listo para imprimir
 //      etiqueta y facturar.
 //   4. El detalle del pedido se ve como el PDF de pedido de Switch, SIN la
 //      columna «Código barra»: Código · Referencia · Descripción · Cantidad ·
 //      Precio · Total · Bulto. Bodega selecciona varias líneas con casillas y
 //      toca «Poner en bulto…», escribe el número y esas líneas quedan ahí.
 //   5. Imprimir: un papel ordenado por bulto, con el estilo de papel de la casa.
-//   6. Al marcar «Recibido» se crea el envío de Etiquetas ya puesto.
+//   6. Al marcar «Verificado» se crea el envío de Etiquetas ya puesto.
 //
 // 🔑 LO MEDIDO (6-oct-2026): un envío real tuvo **416 bultos y 56 líneas**, así
 // que nada de esta pantalla puede ser O(bultos × líneas) ni pedir una lista de
@@ -31,17 +35,29 @@
 // 🔑 SWITCH NO MANDA TALLA NI COLOR SEPARADOS: van dentro de `descripcion` y
 // así se muestran. No se parten ni se adivinan.
 //
-// ⚠️ «Referencia» NO EXISTE en el API de Switch (§5.37 `/apipedido/info` trae
-// `codigoArticulo`, `codigobarra`, `descripcion`, `cantidad`, `precio`,
-// `descuento`; ningún campo «referencia» — tampoco `/apiarticulos/lista` ni
-// `/info`). Se DERIVA del código con la MISMA regla ya aprobada de Consulta de
-// artículos (`modeloDe`, quitar los 3 últimos caracteres, candado
-// `referencia-modelo-3-caracteres`). 🔴 Decisión pendiente de Daniel: ver
-// `referenciaDeCodigo` abajo.
+// ⚠️ «Referencia» NO LA MANDA EL API — MEDIDO CONTRA SWITCH, no leído en la doc
+// (6-oct-2026, `scripts/_diag-pedido-referencia.ts`, Vistana, pedido 16-000002362).
+// La línea REAL trae MÁS campos que los documentados —`id · codigoBarraId ·
+// codigobarra · articuloId · codigoArticulo · imagen · cantidad · precio ·
+// descuento · descuentoGlobal · descuentoTotal · impuestoTotal ·
+// subTotalConDescuento · total · vendedorId · articuloImpuesto ·
+// articuloImpuestoCodigo · descripcion · detalle · tipoArticulo ·
+// descuentoLineaTotal · estatusLote · talla · color`— y entre TODOS ellos no hay
+// ninguno que sea la referencia. Tampoco está en la cabecera.
+// 🔴 Así que NO SE INVENTA: la columna se muestra vacía («—») hasta que Daniel
+// diga de dónde sale. 🩸 El primer borrador la derivaba con `modeloDe` (quitar 3
+// caracteres), y el PDF de Switch prueba que eso está MAL: ahí la referencia es
+// más LARGA que el código (`4RG822G200` → `4RG822G200-HMT`), no más corta.
+//
+// 🔑 Y DOS COSAS QUE SÍ MANDA Y NO SABÍAMOS:
+//   · `talla` y `color` vienen SEPARADOS (en Vistana llegan como «-», pero los
+//     campos existen). La `descripcion` es la CATEGORÍA («Men-Trunk»), no un
+//     nombre comercial — igual que en el PDF de Switch.
+//   · `total` por línea viene CALCULADO por Switch, con sus descuentos. No se
+//     recalcula: la regla de la casa es que los números de Switch no se tocan.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
-import { modeloDe } from "@/lib/ventas/referencia";
 
 /**
  * 🔴 `false` = la pantalla de hoy: dos estados (Pendiente/Preparado), sin
@@ -71,6 +87,7 @@ export const PEDIDOS_BULTOS_2026_10: boolean =
  * es para las personas que Daniel nombró, no un permiso nuevo para todos.
  * Admin pasa siempre, como en todo el sistema.
  */
+// ⚠️ Solo gente de BODEGA. La secretaria NO entra: ve las 6 (Daniel, 6-oct-2026).
 export const EMPRESAS_POR_PERSONA: Readonly<Record<string, readonly string[]>> = {
   julio: ["fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"],
   rodrigo: ["vistana"],
@@ -95,13 +112,13 @@ export function veLaEmpresa(
 
 // ─── 3 · Los TRES estados ────────────────────────────────────────────────────
 
-export const ESTADOS_BULTOS = ["pendiente", "terminado", "recibido"] as const;
+export const ESTADOS_BULTOS = ["pendiente", "preparado", "verificado"] as const;
 export type EstadoBultos = (typeof ESTADOS_BULTOS)[number];
 
 export const ROTULO_ESTADO_BULTOS: Record<EstadoBultos, string> = {
   pendiente: "Pendiente",
-  terminado: "Terminado",
-  recibido: "Recibido",
+  preparado: "Preparado",
+  verificado: "Verificado",
 };
 
 export function esEstadoBultos(v: unknown): v is EstadoBultos {
@@ -109,36 +126,39 @@ export function esEstadoBultos(v: unknown): v is EstadoBultos {
 }
 
 /**
- * Lo guardado hoy es `pendiente` | `preparado`. 🔴 Falla ABIERTA mientras la
- * migración no corra: «preparado» se LEE como «terminado», que es el mismo
- * lugar del flujo (bodega terminó de preparar). Nada se pierde y nada se pisa.
+ * 🔑 NO HACE FALTA RENOMBRAR NADA EN LA BASE: lo guardado hoy es
+ * `pendiente` | `preparado`, y los dos siguen siendo estados válidos. El estado
+ * nuevo solo AGREGA `verificado`. Un valor desconocido cae a «pendiente», que
+ * es lo que significa no tener fila.
  */
 export function estadoLeido(v: unknown): EstadoBultos {
-  if (v === "preparado") return "terminado";
   return esEstadoBultos(v) ? v : "pendiente";
 }
 
-/** El siguiente paso del flujo; `recibido` ya es el final. */
+/** El siguiente paso del flujo; `verificado` ya es el final. */
 export function siguienteEstado(e: EstadoBultos): EstadoBultos | null {
-  return e === "pendiente" ? "terminado" : e === "terminado" ? "recibido" : null;
+  return e === "pendiente" ? "preparado" : e === "preparado" ? "verificado" : null;
 }
 
 /** El paso de atrás, para deshacer un toque. `pendiente` no tiene atrás. */
 export function estadoAnterior(e: EstadoBultos): EstadoBultos | null {
-  return e === "recibido" ? "terminado" : e === "terminado" ? "pendiente" : null;
+  return e === "verificado" ? "preparado" : e === "preparado" ? "pendiente" : null;
 }
 
-/** Bodega marca Terminado: los mismos que hoy marcan en Pedidos. */
-export const ROLES_TERMINADO: readonly string[] = ["admin", "secretaria", "bodega", "vendedor"];
+/**
+ * 🔴 «Preparado» lo marca BODEGA —en sus empresas— O LA SECRETARIA
+ * (Daniel, 6-oct-2026). ⚠️ `vendedor` queda afuera: no es bodega ni secretaría.
+ */
+export const ROLES_PREPARADO: readonly string[] = ["admin", "secretaria", "bodega"];
 
 /**
- * 🔴 Recibido lo marca LA SECRETARIA (y admin), nunca bodega: «no se puede
- * confiar solo en bodega» (Daniel, 6-oct-2026).
+ * 🔴 «Verificado» lo marca SOLO LA SECRETARIA (y admin), nunca bodega: «no se
+ * puede confiar solo en bodega» (Daniel, 6-oct-2026).
  */
-export const ROLES_RECIBIDO: readonly string[] = ["admin", "secretaria"];
+export const ROLES_VERIFICADO: readonly string[] = ["admin", "secretaria"];
 
 export function rolesDelEstado(destino: EstadoBultos): readonly string[] {
-  return destino === "recibido" ? ROLES_RECIBIDO : ROLES_TERMINADO;
+  return destino === "verificado" ? ROLES_VERIFICADO : ROLES_PREPARADO;
 }
 
 export interface QuienMarca {
@@ -153,10 +173,13 @@ export type Veredicto = { ok: true } | { ok: false; error: string };
  * leen la pantalla y el servidor.
  *
  * Reglas, todas del 6-oct-2026:
- *   1. Solo se avanza o se retrocede UN paso (sin saltarse Terminado).
- *   2. El rol tiene que estar en la lista del estado DESTINO.
- *   3. 🔴 Quien marcó Terminado puede marcar Recibido **solo si es admin**: en
- *      cualquier otro caso tiene que marcarlo otra persona.
+ *   1. Solo se avanza o se retrocede UN paso (sin saltarse Preparado).
+ *   2. El rol tiene que estar en la lista del estado DESTINO: «Preparado» lo
+ *      marcan bodega y la secretaria; «Verificado», SOLO la secretaria.
+ *   3. 🔴 NADIE HACE LOS DOS PASOS DEL MISMO PEDIDO, NI SIQUIERA ADMIN
+ *      (Daniel, 6-oct-2026). Quien lo marcó Preparado no puede verificarlo:
+ *      tiene que ser otra persona. Es el control que hace que el segundo par de
+ *      ojos sirva de algo — y vale también si lo preparó la secretaria.
  *   4. Y la empresa del pedido tiene que ser una de las suyas.
  */
 export function puedeMover(
@@ -164,15 +187,15 @@ export function puedeMover(
     desde: EstadoBultos;
     hasta: EstadoBultos;
     empresa_key: string;
-    /** Quién dejó el pedido en «Terminado», si alguien lo hizo. */
-    terminado_por: string | null;
+    /** Quién dejó el pedido en «Preparado», si alguien lo hizo. */
+    preparado_por: string | null;
   },
   quien: QuienMarca,
 ): Veredicto {
-  const { desde, hasta, empresa_key, terminado_por } = args;
+  const { desde, hasta, empresa_key, preparado_por } = args;
   if (desde === hasta) return { ok: false, error: "El pedido ya está así" };
   if (siguienteEstado(desde) !== hasta && estadoAnterior(desde) !== hasta) {
-    return { ok: false, error: "Ese pedido tiene que pasar primero por Terminado" };
+    return { ok: false, error: "Ese pedido tiene que pasar primero por Preparado" };
   }
   if (!veLaEmpresa(empresa_key, quien.userName, quien.role)) {
     return { ok: false, error: "Ese pedido no es de una de tus empresas" };
@@ -180,11 +203,12 @@ export function puedeMover(
   if (!quien.role || !rolesDelEstado(hasta).includes(quien.role)) {
     return {
       ok: false,
-      error: hasta === "recibido" ? "«Recibido» lo marca la secretaria" : "No puedes marcar pedidos",
+      error: hasta === "verificado" ? "«Verificado» lo marca la secretaria" : "No puedes marcar pedidos",
     };
   }
-  if (hasta === "recibido" && quien.role !== "admin" && mismaPersona(terminado_por, quien.userName)) {
-    return { ok: false, error: "«Recibido» lo marca otra persona, no quien lo terminó" };
+  // 🔴 Ni siquiera admin: el segundo par de ojos tiene que ser de otra persona.
+  if (hasta === "verificado" && mismaPersona(preparado_por, quien.userName)) {
+    return { ok: false, error: "«Verificado» lo marca otra persona, no quien lo preparó" };
   }
   return { ok: true };
 }
@@ -203,12 +227,33 @@ export interface LineaPedido {
   /** `codigoBarraId` de Switch: la identidad de la línea dentro del pedido. */
   codigo_barra_id: number;
   codigo: string;
-  /** Talla y color vienen ADENTRO (Switch no los manda aparte). */
+  /**
+   * ⚠️ La «Referencia» del papel de Switch. El API NO la manda (medido): queda
+   * en `null` y la columna se ve vacía. No se deriva ni se inventa.
+   */
+  referencia: string | null;
+  /** La CATEGORÍA que manda Switch («Men-T-Shirts S/S»), no un nombre comercial. */
   descripcion: string;
+  /** Vienen SEPARADAS del API; Switch manda «-» cuando la empresa no las usa. */
+  talla: string | null;
+  color: string | null;
   cantidad: number;
   precio: number;
+  /** 🔑 El total de la línea lo CALCULA Switch, con sus descuentos. No se recalcula. */
+  total: number;
   /** El bulto donde quedó, o `null` si todavía no se asignó. */
   bulto: number | null;
+}
+
+/** «-» y «» son el «no tengo dato» de Switch: no se dibujan. */
+export function dato(v: string | null | undefined): string | null {
+  const t = (v ?? "").trim();
+  return !t || t === "-" ? null : t;
+}
+
+/** «Men-T-Shirts S/S · Talla M · Azul» — lo que se lee en pantalla y en el papel. */
+export function descripcionCompleta(l: Pick<LineaPedido, "descripcion" | "talla" | "color">): string {
+  return [l.descripcion, dato(l.talla), dato(l.color)].filter(Boolean).join(" · ");
 }
 
 /** Las columnas de la pantalla y del papel, en el orden del PDF de Switch. */
@@ -221,25 +266,6 @@ export const COLUMNAS_DETALLE = [
   "Total",
   "Bulto",
 ] as const;
-
-/**
- * La «Referencia» del PDF de Switch, que el API no manda: el MODELO del código,
- * con la regla ya aprobada de Consulta de artículos (quitar los 3 últimos
- * caracteres). `NB2570001` → `NB2570`.
- *
- * 🔴 PENDIENTE DE DANIEL: si la «Referencia» que él ve en el papel de Switch es
- * otro dato (uno que solo vive en el panel web), esta columna sale de aquí y
- * hay que traerla de otro lado. No se inventa nada más.
- */
-export function referenciaDeCodigo(codigo: string): string {
-  const c = (codigo ?? "").trim();
-  return c ? modeloDe(c) : "";
-}
-
-/** Cantidad × precio, a dos decimales. No se recalcula nada más de Switch. */
-export function totalDeLinea(l: Pick<LineaPedido, "cantidad" | "precio">): number {
-  return Math.round(l.cantidad * l.precio * 100) / 100;
-}
 
 export const MIN_BULTO = 1;
 /** Un envío real tuvo 416 bultos; el tope deja aire y atrapa un dedazo. */
@@ -266,7 +292,7 @@ export function resumenAsignacion(lineas: readonly Pick<LineaPedido, "bulto">[])
   return `${art} · ${bultos} ${bultos === 1 ? "bulto" : "bultos"}`;
 }
 
-/** ¿Está el pedido entero en algún bulto? Es lo que habilita «Recibido». */
+/** ¿Está el pedido entero en algún bulto? Es lo que habilita «Verificado». */
 export function todoAsignado(lineas: readonly Pick<LineaPedido, "bulto">[]): boolean {
   return lineas.length > 0 && lineas.every((l) => l.bulto != null);
 }
@@ -312,7 +338,53 @@ export function tituloPapelBultos(secuencial: string, empresa: string, cliente: 
   return `Pedido ${secuencial} · ${empresa} · ${cliente}`;
 }
 
-// ─── 6 · El envío de Etiquetas que nace al marcar «Recibido» ─────────────────
+// ─── 1 · Quién marcó cada paso, y cuándo ─────────────────────────────────────
+//
+// 🔴 Daniel, 6-oct-2026: «guarda y muestra quién y cuándo marcó cada paso», en
+// la pantalla y en el papel. Por eso cada paso tiene SU firma en la base
+// (`preparado_por/_en` · `verificado_por/_en`): con una sola columna
+// `cambiado_por` el segundo toque borraba el primero y no quedaba rastro de
+// quién lo preparó — que es justo el dato del que depende la regla de los dos
+// pares de ojos.
+
+/** Las dos firmas de un pedido, como vienen de `pedidos_bodega_estado`. */
+export interface FirmasPedido {
+  preparado_por: string | null;
+  preparado_en: string | null;
+  verificado_por: string | null;
+  verificado_en: string | null;
+}
+
+/** «10:42 a. m.», hora de Panamá. */
+export function horaPanama(iso: string): string {
+  return new Date(iso)
+    .toLocaleTimeString("es-PA", { timeZone: "America/Panama", hour: "numeric", minute: "2-digit" })
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * «Preparado por Julio · 10:42 a. m.» — la línea que se lee en la pantalla y en
+ * el papel. `null` cuando ese paso todavía no ocurrió: no se inventa una firma.
+ */
+export function firmaDelPaso(
+  paso: "preparado" | "verificado",
+  por: string | null,
+  en: string | null,
+): string | null {
+  const quien = (por ?? "").trim();
+  if (!quien || !en) return null;
+  return `${ROTULO_ESTADO_BULTOS[paso]} por ${quien} · ${horaPanama(en)}`;
+}
+
+/** Las firmas que haya, de arriba abajo. Vacío = nadie marcó nada todavía. */
+export function firmasEnOrden(f: FirmasPedido): string[] {
+  return [
+    firmaDelPaso("preparado", f.preparado_por, f.preparado_en),
+    firmaDelPaso("verificado", f.verificado_por, f.verificado_en),
+  ].filter((t): t is string => !!t);
+}
+
+// ─── 6 · El envío de Etiquetas que nace al marcar «Verificado» ──────────────
 
 /** 15 letras es el tope de la nota de una etiqueta (`MAX_NOTA`). */
 export const MAX_NOTA_ETIQUETA = 15;

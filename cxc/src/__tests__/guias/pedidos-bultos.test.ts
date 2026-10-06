@@ -4,19 +4,25 @@
 // Las decisiones de Daniel del 6-oct-2026, que REEMPLAZAN las del 5-oct. Cada
 // una tiene su prueba, y la nota de arriba dice qué cambió y cuándo:
 //
-//   1. 🔴 LOS ESTADOS SON TRES, no dos: Pendiente → Terminado (bodega) →
-//      Recibido (la secretaria) → Etiquetas. Daniel cambia a propósito su
-//      decisión del 5-oct-2026 («SOLO 2 estados», `pedidos-bodega.ts`), y el
-//      porqué queda escrito: *«no se puede confiar solo en bodega»*.
-//   2. 🔴 «RECIBIDO» NO LO MARCA BODEGA. Lo marcan la secretaria y admin.
-//   3. 🔴 QUIEN MARCÓ TERMINADO SOLO MARCA RECIBIDO SI ES ADMIN. Para los
-//      demás, lo tiene que marcar otra persona.
-//   4. 🔴 NO SE SALTA UN PASO: de Pendiente no se va directo a Recibido.
+//   1. 🔴 LOS ESTADOS SON TRES, no dos, y con NOMBRES DE ERP:
+//      Pendiente → **Preparado** → **Verificado** → Etiquetas. Daniel cambia a
+//      propósito su decisión del 5-oct-2026 («SOLO 2 estados»), y el porqué
+//      queda escrito: *«no se puede confiar solo en bodega»*.
+//      🔑 «Preparado» es el MISMO nombre y el MISMO valor de siempre: no se
+//      renombra nada en la base. «Verificado» es el término de ERP para la
+//      segunda revisión — ni «Recibido» ni «Terminado», que eran inventos míos.
+//   2. 🔴 «VERIFICADO» NO LO MARCA BODEGA. Lo marcan la secretaria y admin.
+//      «Preparado» lo marcan bodega Y la secretaria.
+//   3. 🔴 NADIE HACE LOS DOS PASOS DEL MISMO PEDIDO, NI SIQUIERA ADMIN
+//      (6-oct-2026, corrige la regla del mismo día: antes admin era excepción).
+//      Vale también si lo preparó la secretaria: siempre dos pares de ojos.
+//  3b. 🔴 QUEDA REGISTRADO QUIÉN Y CUÁNDO, por paso, en pantalla y en el papel.
+//   4. 🔴 NO SE SALTA UN PASO: de Pendiente no se va directo a Verificado.
 //   5. 🔴 EL RECORTE POR EMPRESA ES POR PERSONA Y ES DURO, como el de Boston:
-//      Julio no ve Vistana; Rodrigo y Jorman SOLO ven Vistana; admin y los que
-//      no están en la lista ven las 6 (falla ABIERTA).
-//   6. 🔴 «PREPARADO» SE LEE COMO «TERMINADO»: mientras la migración no corra,
-//      ni un toque de bodega se pierde ni se pisa.
+//      Julio no ve Vistana; Rodrigo y Jorman SOLO ven Vistana; admin, LA
+//      SECRETARIA y los que no están en la lista ven las 6 (falla ABIERTA).
+//   6. 🔑 NINGUNA FILA SE RENOMBRA: `pendiente` y `preparado` siguen valiendo y
+//      la migración solo AGREGA `verificado`.
 //   7. 🔴 EL RESUMEN CUENTA ARTÍCULOS Y BULTOS: «18 de 24 artículos asignados ·
 //      6 bultos».
 //   8. 🔴 EL PAPEL NO CALLA LO QUE FALTA: lo que no tiene bulto sale aparte.
@@ -32,24 +38,25 @@ import {
   ESTADOS_BULTOS,
   MAX_BULTO,
   PEDIDOS_BULTOS_EN_CODIGO,
-  ROLES_RECIBIDO,
-  ROLES_TERMINADO,
+  ROLES_PREPARADO,
+  ROLES_VERIFICADO,
   ROTULO_ESTADO_BULTOS,
   bultosDelPapel,
   cuantosBultos,
+  descripcionCompleta,
   empresasQueVe,
   esEstadoBultos,
   estadoAnterior,
   estadoLeido,
   mismaPersona,
   notaDelPedido,
+  firmaDelPaso,
+  firmasEnOrden,
   puedeMover,
-  referenciaDeCodigo,
   resumenAsignacion,
   siguienteEstado,
   sinBulto,
   todoAsignado,
-  totalDeLinea,
   validarBulto,
   veLaEmpresa,
   type LineaPedido,
@@ -59,9 +66,13 @@ import { ESTADOS_PEDIDO } from "@/lib/guias/pedidos-bodega";
 
 const linea = (p: Partial<LineaPedido> & { codigo_barra_id: number }): LineaPedido => ({
   codigo: "NB2570001",
-  descripcion: "NEW BALANCE 2570 BLANCO TALLA 9",
+  referencia: null,
+  descripcion: "Men-T-Shirts S/S",
+  talla: null,
+  color: null,
   cantidad: 12,
   precio: 15.05,
+  total: 180.6,
   bulto: null,
   ...p,
 });
@@ -73,8 +84,27 @@ describe("🔴 10 · el interruptor nace apagado", () => {
 });
 
 describe("🔴 1 · los estados son TRES, y reemplazan los dos de hoy", () => {
-  it("son exactamente pendiente · terminado · recibido, en el orden del flujo", () => {
-    expect([...ESTADOS_BULTOS]).toEqual(["pendiente", "terminado", "recibido"]);
+  it("son exactamente pendiente · preparado · verificado, en el orden del flujo", () => {
+    expect([...ESTADOS_BULTOS]).toEqual(["pendiente", "preparado", "verificado"]);
+  });
+
+  it("🔑 «preparado» SIGUE SIENDO un estado válido: la base no se renombra", () => {
+    expect(esEstadoBultos("preparado")).toBe(true);
+    expect(estadoLeido("preparado")).toBe("preparado");
+    const sql = fs.readFileSync(
+      path.resolve(__dirname, "../../../supabase/migrations/20261231120000_pedidos_bultos.sql"),
+      "utf8",
+    );
+    expect(sql).toContain("'pendiente', 'preparado', 'verificado'");
+    // 🔴 Ninguna fila cambia de estado: solo se ensancha el CHECK.
+    expect(sql).not.toContain("SET estado =");
+  });
+
+  it("🔴 nada de nombres inventados: ni «Terminado» ni «Recibido» (docs/nombres-erp.md)", () => {
+    const rotulos = Object.values(ROTULO_ESTADO_BULTOS);
+    expect(rotulos).toEqual(["Pendiente", "Preparado", "Verificado"]);
+    expect(rotulos).not.toContain("Terminado");
+    expect(rotulos).not.toContain("Recibido");
   });
 
   it("los dos de hoy siguen siendo dos: esta decisión no los reescribió", () => {
@@ -84,34 +114,30 @@ describe("🔴 1 · los estados son TRES, y reemplazan los dos de hoy", () => {
   it("los rótulos son los de un ERP, sin inventos", () => {
     expect(ROTULO_ESTADO_BULTOS).toEqual({
       pendiente: "Pendiente",
-      terminado: "Terminado",
-      recibido: "Recibido",
+      preparado: "Preparado",
+      verificado: "Verificado",
     });
   });
 
-  it("el flujo avanza de uno en uno y Recibido es el final", () => {
-    expect(siguienteEstado("pendiente")).toBe("terminado");
-    expect(siguienteEstado("terminado")).toBe("recibido");
-    expect(siguienteEstado("recibido")).toBeNull();
+  it("el flujo avanza de uno en uno y Verificado es el final", () => {
+    expect(siguienteEstado("pendiente")).toBe("preparado");
+    expect(siguienteEstado("preparado")).toBe("verificado");
+    expect(siguienteEstado("verificado")).toBeNull();
   });
 
   it("y se puede deshacer un paso, nunca dos", () => {
-    expect(estadoAnterior("recibido")).toBe("terminado");
-    expect(estadoAnterior("terminado")).toBe("pendiente");
+    expect(estadoAnterior("verificado")).toBe("preparado");
+    expect(estadoAnterior("preparado")).toBe("pendiente");
     expect(estadoAnterior("pendiente")).toBeNull();
   });
 
-  it("«preparado» NO es un estado nuevo válido", () => {
-    expect(esEstadoBultos("preparado")).toBe(false);
-    expect(esEstadoBultos("terminado")).toBe(true);
+  it("y «terminado»/«recibido» NO son estados: fueron nombres descartados", () => {
+    expect(esEstadoBultos("terminado")).toBe(false);
+    expect(esEstadoBultos("recibido")).toBe(false);
   });
 });
 
-describe("🔴 6 · «preparado» se LEE como «terminado» (falla abierta sin la migración)", () => {
-  it("el toque de bodega de hoy sigue valiendo mañana", () => {
-    expect(estadoLeido("preparado")).toBe("terminado");
-  });
-
+describe("🔑 6 · la base no se renombra: lo guardado hoy sigue valiendo", () => {
   it("sin fila, pendiente; y un valor raro no inventa un estado", () => {
     expect(estadoLeido(null)).toBe("pendiente");
     expect(estadoLeido(undefined)).toBe("pendiente");
@@ -121,44 +147,55 @@ describe("🔴 6 · «preparado» se LEE como «terminado» (falla abierta sin l
 });
 
 describe("🔴 2 y 3 · quién marca qué", () => {
-  const pedido = { empresa_key: "vistana", terminado_por: null as string | null };
+  const pedido = { empresa_key: "vistana", preparado_por: null as string | null };
 
-  it("bodega marca Terminado", () => {
-    expect(ROLES_TERMINADO).toContain("bodega");
-    const v = puedeMover({ desde: "pendiente", hasta: "terminado", ...pedido }, { role: "bodega", userName: "rodrigo" });
-    expect(v.ok).toBe(true);
+  it("«Preparado» lo marcan BODEGA y LA SECRETARIA (Daniel, 6-oct-2026)", () => {
+    expect([...ROLES_PREPARADO]).toEqual(["admin", "secretaria", "bodega"]);
+    expect(puedeMover({ desde: "pendiente", hasta: "preparado", ...pedido }, { role: "bodega", userName: "rodrigo" }).ok).toBe(true);
+    expect(puedeMover({ desde: "pendiente", hasta: "preparado", ...pedido }, { role: "secretaria", userName: "ana" }).ok).toBe(true);
+    // ⚠️ El vendedor no es ninguno de los dos oficios.
+    expect(ROLES_PREPARADO).not.toContain("vendedor");
   });
 
-  it("🔴 bodega NO marca Recibido, ni aunque lo pida: «no se puede confiar solo en bodega»", () => {
-    expect(ROLES_RECIBIDO).not.toContain("bodega");
-    expect(ROLES_RECIBIDO).not.toContain("vendedor");
+  it("🔴 bodega NO verifica, ni aunque lo pida: «no se puede confiar solo en bodega»", () => {
+    expect(ROLES_VERIFICADO).not.toContain("bodega");
+    expect(ROLES_VERIFICADO).not.toContain("vendedor");
     const v = puedeMover(
-      { desde: "terminado", hasta: "recibido", empresa_key: "vistana", terminado_por: "alguien" },
+      { desde: "preparado", hasta: "verificado", empresa_key: "vistana", preparado_por: "alguien" },
       { role: "bodega", userName: "rodrigo" },
     );
-    expect(v).toEqual({ ok: false, error: "«Recibido» lo marca la secretaria" });
+    expect(v).toEqual({ ok: false, error: "«Verificado» lo marca la secretaria" });
   });
 
-  it("la secretaria sí lo marca", () => {
-    expect(ROLES_RECIBIDO).toEqual(["admin", "secretaria"]);
+  it("la secretaria sí verifica lo que preparó otra persona", () => {
+    expect(ROLES_VERIFICADO).toEqual(["admin", "secretaria"]);
     const v = puedeMover(
-      { desde: "terminado", hasta: "recibido", empresa_key: "vistana", terminado_por: "rodrigo" },
+      { desde: "preparado", hasta: "verificado", empresa_key: "vistana", preparado_por: "rodrigo" },
       { role: "secretaria", userName: "ana" },
     );
     expect(v.ok).toBe(true);
   });
 
-  it("🔴 quien marcó Terminado NO puede marcar Recibido…", () => {
+  it("🔴 pero si LA SECRETARIA lo preparó, NO puede verificarlo ella misma", () => {
+    // El caso que Daniel nombró al dejar que la secretaria también prepare.
     const v = puedeMover(
-      { desde: "terminado", hasta: "recibido", empresa_key: "vistana", terminado_por: "Ana" },
+      { desde: "preparado", hasta: "verificado", empresa_key: "vistana", preparado_por: "Ana" },
       { role: "secretaria", userName: "ana" },
     );
-    expect(v).toEqual({ ok: false, error: "«Recibido» lo marca otra persona, no quien lo terminó" });
+    expect(v).toEqual({ ok: false, error: "«Verificado» lo marca otra persona, no quien lo preparó" });
   });
 
-  it("…salvo que sea admin", () => {
+  it("🔴 NI SIQUIERA SIENDO ADMIN (6-oct-2026: «nadie hace los dos pasos»)", () => {
     const v = puedeMover(
-      { desde: "terminado", hasta: "recibido", empresa_key: "vistana", terminado_por: "daniel" },
+      { desde: "preparado", hasta: "verificado", empresa_key: "vistana", preparado_por: "daniel" },
+      { role: "admin", userName: "daniel" },
+    );
+    expect(v).toEqual({ ok: false, error: "«Verificado» lo marca otra persona, no quien lo preparó" });
+  });
+
+  it("pero admin sí verifica lo que preparó OTRA persona", () => {
+    const v = puedeMover(
+      { desde: "preparado", hasta: "verificado", empresa_key: "vistana", preparado_por: "julio" },
       { role: "admin", userName: "daniel" },
     );
     expect(v.ok).toBe(true);
@@ -172,18 +209,68 @@ describe("🔴 2 y 3 · quién marca qué", () => {
   });
 });
 
+describe("🔴 3b · queda registrado quién y cuándo, por paso", () => {
+  const EN = "2026-10-06T10:42:00-05:00";
+
+  it("«Preparado por Julio · 10:42 a. m.» — tal como lo pidió Daniel", () => {
+    expect(firmaDelPaso("preparado", "Julio", EN)).toBe("Preparado por Julio · 10:42 a. m.");
+  });
+
+  it("y «Verificado por Angela · 11:15 a. m.»", () => {
+    expect(firmaDelPaso("verificado", "Angela", "2026-10-06T11:15:00-05:00"))
+      .toBe("Verificado por Angela · 11:15 a. m.");
+  });
+
+  it("🔴 un paso que NO ocurrió no se firma: nunca se inventa una firma", () => {
+    expect(firmaDelPaso("preparado", null, EN)).toBeNull();
+    expect(firmaDelPaso("preparado", "Julio", null)).toBeNull();
+    expect(firmaDelPaso("preparado", "   ", EN)).toBeNull();
+  });
+
+  it("salen en el orden del flujo: primero quien preparó, después quien verificó", () => {
+    expect(
+      firmasEnOrden({
+        preparado_por: "Julio",
+        preparado_en: EN,
+        verificado_por: "Angela",
+        verificado_en: "2026-10-06T11:15:00-05:00",
+      }),
+    ).toEqual(["Preparado por Julio · 10:42 a. m.", "Verificado por Angela · 11:15 a. m."]);
+  });
+
+  it("con el pedido solo preparado, sale UNA sola línea", () => {
+    const f = { preparado_por: "Julio", preparado_en: EN, verificado_por: null, verificado_en: null };
+    expect(firmasEnOrden(f)).toHaveLength(1);
+  });
+
+  it("🔑 la hora es la de PANAMÁ, no la del servidor (Vercel corre en UTC)", () => {
+    // Las 15:42 UTC son las 10:42 a. m. de Panamá (UTC−5 fijo).
+    expect(firmaDelPaso("preparado", "Julio", "2026-10-06T15:42:00Z")).toContain("10:42");
+  });
+
+  it("🔴 y las dos firmas quedan GUARDADAS, una columna por paso", () => {
+    const sql = fs.readFileSync(
+      path.resolve(__dirname, "../../../supabase/migrations/20261231120000_pedidos_bultos.sql"),
+      "utf8",
+    );
+    for (const col of ["preparado_por", "preparado_en", "verificado_por", "verificado_en"]) {
+      expect(sql).toContain(col);
+    }
+  });
+});
+
 describe("🔴 4 · no se salta un paso", () => {
-  it("de Pendiente no se va directo a Recibido, ni siendo admin", () => {
+  it("de Pendiente no se va directo a Verificado, ni siendo admin", () => {
     const v = puedeMover(
-      { desde: "pendiente", hasta: "recibido", empresa_key: "vistana", terminado_por: null },
+      { desde: "pendiente", hasta: "verificado", empresa_key: "vistana", preparado_por: null },
       { role: "admin", userName: "daniel" },
     );
-    expect(v).toEqual({ ok: false, error: "Ese pedido tiene que pasar primero por Terminado" });
+    expect(v).toEqual({ ok: false, error: "Ese pedido tiene que pasar primero por Preparado" });
   });
 
   it("y marcar lo que ya está no es un cambio", () => {
     const v = puedeMover(
-      { desde: "terminado", hasta: "terminado", empresa_key: "vistana", terminado_por: null },
+      { desde: "preparado", hasta: "preparado", empresa_key: "vistana", preparado_por: null },
       { role: "admin", userName: "daniel" },
     );
     expect(v.ok).toBe(false);
@@ -207,7 +294,7 @@ describe("🔴 5 · el recorte por empresa es POR PERSONA y es duro", () => {
 
   it("🔴 y si piden otra empresa, no la ven: `puedeMover` la rechaza", () => {
     const v = puedeMover(
-      { desde: "pendiente", hasta: "terminado", empresa_key: "vistana", terminado_por: null },
+      { desde: "pendiente", hasta: "preparado", empresa_key: "vistana", preparado_por: null },
       { role: "bodega", userName: "julio" },
     );
     expect(v).toEqual({ ok: false, error: "Ese pedido no es de una de tus empresas" });
@@ -218,8 +305,9 @@ describe("🔴 5 · el recorte por empresa es POR PERSONA y es duro", () => {
     expect([...empresasQueVe("daniel", "admin")]).toEqual([...B2B_EMPRESA_KEYS]);
   });
 
-  it("quien no está en la lista ve las 6 (falla ABIERTA): el recorte es para los nombrados", () => {
+  it("🔴 LA SECRETARIA VE LAS 6 (Daniel, 6-oct-2026), como todo el que no esté en la lista", () => {
     expect([...empresasQueVe("ana", "secretaria")]).toEqual([...B2B_EMPRESA_KEYS]);
+    expect(Object.keys(EMPRESAS_POR_PERSONA)).toEqual(["julio", "rodrigo", "jorman"]);
     expect([...empresasQueVe(null, "bodega")]).toEqual([...B2B_EMPRESA_KEYS]);
   });
 
@@ -279,8 +367,13 @@ describe("🔴 8 y 9 · el papel, y lo medido", () => {
     // El primer borrador escribía «artículo · 12» Y la columna Cantidad: el 12
     // salía dos veces en el mismo renglón (docs/diseno.md, regla 8).
     const papel = fs.readFileSync(path.resolve(__dirname, "../../lib/guias/pdf-pedido-bultos.ts"), "utf8");
-    expect(papel).toContain("l.descripcion");
+    expect(papel).toContain("descripcionCompleta(l)");
     expect(papel).not.toContain("renglonDelPapel");
+  });
+
+  it("🔴 y el papel lleva al pie quién preparó y quién verificó", () => {
+    const papel = fs.readFileSync(path.resolve(__dirname, "../../lib/guias/pdf-pedido-bultos.ts"), "utf8");
+    expect(papel).toContain("firmasEnOrden");
   });
 
   it("🔑 416 bultos y 56 líneas: el papel se arma de una pasada por las LÍNEAS", () => {
@@ -311,41 +404,48 @@ describe("🔴 el bulto se ESCRIBE: validación del número", () => {
 });
 
 describe("el total y la referencia", () => {
-  it("Total = cantidad × precio, a dos decimales", () => {
-    expect(totalDeLinea({ cantidad: 12, precio: 15.05 })).toBe(180.6);
-    expect(totalDeLinea({ cantidad: 3, precio: 0.333 })).toBe(1);
+  it("⚠️ «Referencia» NO se inventa: el API no la manda y la línea la trae en null", () => {
+    // 🩸 El primer borrador la derivaba con `modeloDe` (quitar 3 caracteres).
+    // El PDF de Switch prueba que está MAL: ahí la referencia es más LARGA que
+    // el código (`4RG822G200` → `4RG822G200-HMT`), no más corta. Medido el
+    // 6-oct-2026 contra el API real: no viene con ningún nombre.
+    expect(linea({ codigo_barra_id: 1 }).referencia).toBeNull();
+    // Y no se deriva de ningún lado: el módulo no importa la regla del modelo.
+    const fuente = fs.readFileSync(path.resolve(__dirname, "../../lib/guias/pedidos-bultos.ts"), "utf8");
+    expect(fuente).not.toMatch(/^import .*modeloDe/m);
   });
 
-  it("⚠️ «Referencia» se DERIVA del código con la regla ya aprobada (−3 caracteres)", () => {
-    expect(referenciaDeCodigo("NB2570001")).toBe("NB2570");
-    expect(referenciaDeCodigo("")).toBe("");
-    // Un código cortísimo no se queda en nada.
-    expect(referenciaDeCodigo("ABC")).toBe("ABC");
+  it("🔑 talla y color vienen SEPARADOS, y «-» es el «sin dato» de Switch", () => {
+    expect(descripcionCompleta({ descripcion: "Men-T-Shirts S/S", talla: "-", color: "-" }))
+      .toBe("Men-T-Shirts S/S");
+    expect(descripcionCompleta({ descripcion: "Men-T-Shirts S/S", talla: "M", color: "Azul" }))
+      .toBe("Men-T-Shirts S/S · M · Azul");
+  });
+
+  it("🔑 el total de la línea es el de SWITCH, no uno recalculado", () => {
+    const fuente = fs.readFileSync(path.resolve(__dirname, "../../lib/guias/pedidos-bultos.ts"), "utf8");
+    expect(fuente).not.toContain("totalDeLinea");
+    // Switch lo manda con sus descuentos: 12 × 15.05 sin descuento = 180.60.
+    expect(linea({ codigo_barra_id: 1 }).total).toBe(180.6);
   });
 });
 
-describe("🩸 el aviso de las 9 a.m. no grita en falso", () => {
-  // 🩸 El cron `pedidos-pendientes` resolvía el estado con `esEstadoPedido`, que
-  // NO conoce «terminado»: el día que corra la migración, un pedido que bodega
-  // ya terminó caía en el `else` y salía en 📊 NEGOCIO como «pendiente de más de
-  // 7 días». Ese chat no tiene perilla de silenciar, así que la alarma falsa se
-  // queda. Ahora el cron usa `estadoLeido`, y esta prueba fija la diferencia.
-  it("«terminado» NO se lee como «pendiente» (eso era la alarma falsa)", () => {
-    expect(estadoLeido("terminado")).toBe("terminado");
-    expect(estadoLeido("terminado")).not.toBe("pendiente");
+describe("🩸 «terminado» no se lee como «pendiente»", () => {
+  // 🩸 Nació con el cron `pedidos-pendientes`, que resolvía el estado con
+  // `esEstadoPedido` — que NO conoce «terminado» — y mandaba a 📊 NEGOCIO como
+  // «pendiente de más de 7 días» un pedido que bodega ya había terminado.
+  // El aviso de las 9 a.m. se retiró el 6-oct-2026 («quita el aviso de pedidos
+  // de las 9 am»), pero la diferencia entre los dos lectores queda fijada:
+  // cualquier pantalla o reporte que lea el estado la necesita igual.
+  it("«preparado» NO se lee como «pendiente» (eso era la alarma falsa)", () => {
+    expect(estadoLeido("preparado")).toBe("preparado");
+    expect(estadoLeido("preparado")).not.toBe("pendiente");
   });
 
-  it("y «recibido» tampoco", () => {
-    expect(estadoLeido("recibido")).toBe("recibido");
+  it("y «verificado» tampoco", () => {
+    expect(estadoLeido("verificado")).toBe("verificado");
   });
 
-  it("el cron lee el estado con `estadoLeido`, no con `esEstadoPedido`", () => {
-    const ruta = fs.readFileSync(
-      path.resolve(__dirname, "../../app/api/cron/pedidos-pendientes/route.ts"),
-      "utf8",
-    );
-    expect(ruta).toContain("estadoLeido");
-  });
 });
 
 describe("🔴 6 · el envío de Etiquetas que nace al recibir", () => {

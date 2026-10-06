@@ -154,8 +154,8 @@ describe("🔴 la medición no se tocó", () => {
     // entradas más, ~cada 2 h como facturas).
     // ⚠️ 5-oct-2026: son 90 — `sync-articulo-info` suma Multifashion sola a las
     // 04:00 UTC (Stock en Multifashion › Productos). Ver `cron-sync-articulo-info.test.ts`.
-    // ⚠️ 6-oct-2026: son 91 — `pedidos-pendientes`, el aviso de las 9:00 a.m.
-    // de los pedidos pendientes de más de 7 días. Ver `guias/pedidos-aviso.test.ts`.
+    // ⚠️ 6-oct-2026: son 91 — entró `pedidos-pendientes`, el aviso de las 9:00
+    // a.m. de los pedidos pendientes de más de 7 días.
     // Este candado cambió de número con nota, no de regla: la medición
     // (`integrity-check`) sigue intacta, y el caso de arriba lo comprueba.
     const vercel = JSON.parse(leer("vercel.json")) as { crons: unknown[] };
@@ -163,7 +163,10 @@ describe("🔴 la medición no se tocó", () => {
     // de los cobros del día. Ver `cxc/cobros-del-dia.test.ts`.
     // ⚠️ 6-oct-2026: bajan a 89 — `sync-pedidos` pasó de 7 pasadas a 4 (8:10 a.m.,
     // 10:40 a.m., 1:20 p.m. y 3:45 p.m. de Panamá) y se apagó la de madrugada.
-    expect(vercel.crons).toHaveLength(89);
+    // ⚠️ 6-oct-2026: bajan a 88 — se retiró `pedidos-pendientes`, el aviso de las
+    // 9:00 a.m., el mismo día que nació. Daniel: «quita el aviso de pedidos de
+    // las 9 am». Se fueron el cron, su texto y su prueba.
+    expect(vercel.crons).toHaveLength(88);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

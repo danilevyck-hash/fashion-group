@@ -333,10 +333,6 @@
       "schedule": "45 21 * * *"
     },
     {
-      "path": "/api/cron/pedidos-pendientes",
-      "schedule": "0 14 * * *"
-    },
-    {
       "path": "/api/cron/guias-pendientes",
       "schedule": "30 14 * * *"
     },

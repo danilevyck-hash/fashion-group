@@ -19,7 +19,7 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
   PEDIDOS_BULTOS_2026_10,
-  ROLES_TERMINADO,
+  ROLES_PREPARADO,
   resumenAsignacion,
   validarBulto,
   veLaEmpresa,
@@ -96,8 +96,8 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   if (!PEDIDOS_BULTOS_2026_10) return apagado();
-  // Poner en bulto lo hace BODEGA: los mismos que marcan «Terminado».
-  const auth = requireRole(req, [...ROLES_TERMINADO]);
+  // Poner en bulto lo hace quien prepara: los mismos que marcan «Preparado».
+  const auth = requireRole(req, [...ROLES_PREPARADO]);
   if (auth instanceof NextResponse) return auth;
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;

@@ -33,9 +33,8 @@ import {
   COLUMNAS_DETALLE,
   MAX_BULTO,
   MIN_BULTO,
-  referenciaDeCodigo,
+  descripcionCompleta,
   resumenAsignacion,
-  totalDeLinea,
   validarBulto,
   type LineaPedido,
 } from "@/lib/guias/pedidos-bultos";
@@ -251,12 +250,15 @@ export default function PedidoBultos({
                     </td>
                   )}
                   <td className="hidden whitespace-nowrap px-3 py-2 tabular-nums text-gray-700 sm:table-cell">{l.codigo}</td>
+                  {/* ⚠️ El API de Switch NO manda la referencia (medido): la
+                      celda va vacía antes que repetir el código y hacerla pasar
+                      por otro dato. */}
                   <td className="hidden whitespace-nowrap px-3 py-2 tabular-nums text-gray-500 sm:table-cell">
-                    {referenciaDeCodigo(l.codigo)}
+                    {l.referencia ?? <span className="text-gray-300">—</span>}
                   </td>
-                  {/* Talla y color vienen adentro: no se parten. */}
+                  {/* La categoría de Switch, con su talla y su color si los manda. */}
                   <td className="break-words py-2 pl-1 pr-1 font-medium text-gray-900 sm:px-3">
-                    {l.descripcion}
+                    {descripcionCompleta(l)}
                     <span className="block tabular-nums text-xs font-normal text-gray-500 sm:hidden">{l.codigo}</span>
                   </td>
                   <td className="whitespace-nowrap px-1 py-2 text-right tabular-nums text-gray-700 sm:px-3">{l.cantidad}</td>
@@ -264,7 +266,7 @@ export default function PedidoBultos({
                     ${fmt(l.precio)}
                   </td>
                   <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 sm:table-cell">
-                    ${fmt(totalDeLinea(l))}
+                    ${fmt(l.total)}
                   </td>
                   <td className="whitespace-nowrap py-2 pl-1 pr-3 text-right tabular-nums sm:px-3">
                     {l.bulto == null ? (

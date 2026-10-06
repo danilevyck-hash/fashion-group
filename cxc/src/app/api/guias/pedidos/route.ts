@@ -27,7 +27,7 @@ import {
   estadoLeido,
   esEstadoBultos,
   puedeMover,
-  ROLES_TERMINADO,
+  ROLES_PREPARADO,
   type EstadoBultos,
 } from "@/lib/guias/pedidos-bultos";
 import { crearEnvioDelPedido } from "@/lib/guias/pedido-detalle-server";
@@ -59,7 +59,10 @@ export async function GET(req: NextRequest) {
       .in("empresa_key", [...empresas])
       .order("fecha")
       .limit(1000),
-    supabaseServer.from("pedidos_bodega_estado").select("empresa_key, pedido_switch_id, estado, cambiado_por, cambiado_en").limit(5000),
+    supabaseServer
+      .from("pedidos_bodega_estado")
+      .select("empresa_key, pedido_switch_id, estado, cambiado_por, cambiado_en, preparado_por, preparado_en, verificado_por, verificado_en")
+      .limit(5000),
     leerAliasOVacio(),
   ]);
   if (ped.error) return NextResponse.json({ error: "No se pudieron leer los pedidos" }, { status: 500 });
@@ -87,6 +90,12 @@ export async function GET(req: NextRequest) {
           : "pendiente",
       cambiado_por: m?.cambiado_por ?? null,
       cambiado_en: m?.cambiado_en ?? null,
+      // 🔴 Las DOS firmas, una por paso: «Preparado por Julio · 10:42 a. m.».
+      // Sin la migración no llegan y la pantalla simplemente no las dibuja.
+      preparado_por: m?.preparado_por ?? null,
+      preparado_en: m?.preparado_en ?? null,
+      verificado_por: m?.verificado_por ?? null,
+      verificado_en: m?.verificado_en ?? null,
     };
   });
   return NextResponse.json({
@@ -100,8 +109,8 @@ export async function PATCH(req: NextRequest) {
   if (!PEDIDOS_BODEGA_2026_10) return apagado();
   // Con bultos, quién puede marcar QUÉ lo decide `puedeMover` abajo (que mira el
   // estado destino, quién terminó el pedido y de qué empresa es): aquí solo se
-  // exige estar en la lista más ANCHA de las dos, que es la de «Terminado».
-  const auth = requireRole(req, [...(PEDIDOS_BULTOS_2026_10 ? ROLES_TERMINADO : PEDIDOS_BODEGA_ROLES)]);
+  // exige estar en la lista más ANCHA de las dos, que es la de «Preparado».
+  const auth = requireRole(req, [...(PEDIDOS_BULTOS_2026_10 ? ROLES_PREPARADO : PEDIDOS_BODEGA_ROLES)]);
   if (auth instanceof NextResponse) return auth;
 
   // El CHECK de la tabla exige la firma; una inventada es peor que ninguna.
@@ -137,23 +146,25 @@ export async function PATCH(req: NextRequest) {
     // la regla «quien marcó Terminado solo marca Recibido si es admin».
     const { data: previo } = await supabaseServer
       .from("pedidos_bodega_estado")
-      .select("estado, cambiado_por, envio_id")
+      .select("estado, cambiado_por, envio_id, preparado_por, preparado_en")
       .eq("empresa_key", empresa)
       .eq("pedido_switch_id", id)
       .maybeSingle();
     const desde = estadoLeido(previo?.estado);
-    const terminadoPor = desde === "terminado" ? (previo?.cambiado_por ?? null) : null;
+    // Quien lo preparó sale de SU columna; antes de la migración cae a la vieja
+    // `cambiado_por`, que con el pedido en «preparado» es la misma persona.
+    const preparadoPor = previo?.preparado_por ?? (desde === "preparado" ? (previo?.cambiado_por ?? null) : null);
 
     const v = puedeMover(
-      { desde, hasta: estado as EstadoBultos, empresa_key: empresa, terminado_por: terminadoPor },
+      { desde, hasta: estado as EstadoBultos, empresa_key: empresa, preparado_por: preparadoPor },
       { role: auth.role, userName: auth.userName },
     );
     if (!v.ok) return NextResponse.json({ error: v.error }, { status: 403 });
 
-    // Regla 6: al RECIBIR nace el envío de Etiquetas, con el cliente, los
+    // Regla 6: al VERIFICAR nace el envío de Etiquetas, con el cliente, los
     // bultos y el contenido ya puestos. 🔴 FALLA ABIERTA: si no se puede crear,
-    // «Recibido» se marca igual y se dice por qué. Y no se crea dos veces.
-    if (estado === "recibido" && !previo?.envio_id) {
+    // «Verificado» se marca igual y se dice por qué. Y no se crea dos veces.
+    if (estado === "verificado" && !previo?.envio_id) {
       try {
         const r = await crearEnvioDelPedido(pedido, quienFirma);
         if (r.ok) envio = { envio_id: r.envio_id, bultos: r.bultos };
@@ -164,12 +175,23 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  const ahora = new Date().toISOString();
+  // 🔴 Cada paso firma SU columna, y al deshacer un paso se borra su firma: un
+  // pedido que volvió a «Pendiente» no puede seguir diciendo quién lo terminó.
+  const firma = PEDIDOS_BULTOS_2026_10
+    ? estado === "preparado"
+      ? { preparado_por: quienFirma, preparado_en: ahora, verificado_por: null, verificado_en: null }
+      : estado === "verificado"
+        ? { verificado_por: quienFirma, verificado_en: ahora }
+        : { preparado_por: null, preparado_en: null, verificado_por: null, verificado_en: null }
+    : {};
   const fila = {
     empresa_key: empresa,
     pedido_switch_id: id,
     estado,
     cambiado_por: quienFirma,
-    cambiado_en: new Date().toISOString(),
+    cambiado_en: ahora,
+    ...firma,
     ...(envio ? { envio_id: envio.envio_id } : {}),
   };
   const { error } = await supabaseServer.from("pedidos_bodega_estado").upsert(fila, { onConflict: "empresa_key,pedido_switch_id" });

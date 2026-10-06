@@ -8,7 +8,7 @@
 //     guarda. Se llama SOLO si no hay líneas o están viejas.
 //   · `ponerEnBulto`    — lo que hace «Poner en bulto…» con las líneas marcadas.
 //   · `quitarDelBulto`  — deshacer ese toque.
-//   · `crearEnvioDelPedido` — el envío de Etiquetas que nace con «Recibido».
+//   · `crearEnvioDelPedido` — el envío de Etiquetas que nace con «Verificado».
 //
 // 🔴 EL DETALLE SE BAJA CUANDO ALGUIEN ABRE EL PEDIDO, no en el cron. El cron
 // de `sync-pedidos` baja la LISTA (una llamada por empresa); bajar el detalle
@@ -17,7 +17,7 @@
 // Boston. Abrir un pedido es UNA llamada, y queda guardada.
 //
 // 🔴 TODO FALLA ABIERTO. Sin la migración `20261231120000` el detalle dice que
-// todavía no hay líneas; si Etiquetas no se puede crear, «Recibido» se marca
+// todavía no hay líneas; si Etiquetas no se puede crear, «Verificado» se marca
 // igual y se dice. Nada de esto puede tumbar la pantalla de hoy.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -52,9 +52,13 @@ interface FilaLinea {
   codigo_barra_id: number;
   orden: number;
   codigo: string;
+  referencia: string | null;
   descripcion: string;
+  talla: string | null;
+  color: string | null;
   cantidad: number | string;
   precio: number | string;
+  total: number | string;
   synced_at: string;
 }
 
@@ -70,7 +74,7 @@ export async function leerLineas(empresaKey: string, pedidoId: number): Promise<
   const [lin, bul] = await Promise.all([
     supabaseServer
       .from("pedidos_lineas")
-      .select("codigo_barra_id, orden, codigo, descripcion, cantidad, precio, synced_at")
+      .select("codigo_barra_id, orden, codigo, referencia, descripcion, talla, color, cantidad, precio, total, synced_at")
       .eq("empresa_key", empresaKey)
       .eq("pedido_switch_id", pedidoId)
       .order("orden"),
@@ -95,9 +99,13 @@ export async function leerLineas(empresaKey: string, pedidoId: number): Promise<
     return {
       codigo_barra_id: Number(f.codigo_barra_id),
       codigo: f.codigo,
+      referencia: f.referencia,
       descripcion: f.descripcion,
+      talla: f.talla,
+      color: f.color,
       cantidad: num(f.cantidad),
       precio: num(f.precio),
+      total: num(f.total),
       bulto: deBulto.get(Number(f.codigo_barra_id)) ?? null,
     };
   });
@@ -131,10 +139,19 @@ export async function bajarLineas(empresaKey: string, pedidoId: number): Promise
       orden: i + 1,
       articulo_id: Number.isFinite(Number(l.articuloId)) ? Number(l.articuloId) : null,
       codigo: String(l.codigoArticulo ?? "").trim() || "—",
-      // Talla y color vienen ADENTRO. Se guarda tal cual lo manda Switch.
+      // ⚠️ Medido el 6-oct-2026: el API no manda la referencia con ningún nombre.
+      // Se deja NULL. Si algún día la manda, se lee de aquí sin cambiar nada más.
+      referencia: null,
+      // La CATEGORÍA de Switch, tal cual.
       descripcion: String(l.descripcion ?? "").trim() || "—",
+      // 🔑 Talla y color SÍ vienen separados. Se guardan como vienen —«-»
+      // incluido—: ése es el «sin dato» de Switch y la pantalla ya lo entiende.
+      talla: typeof l.talla === "string" ? l.talla.trim() || null : null,
+      color: typeof l.color === "string" ? l.color.trim() || null : null,
       cantidad: num(l.cantidad),
       precio: num(l.precio),
+      // 🔑 El total lo calcula Switch, con sus descuentos: no se recalcula.
+      total: num(l.total ?? l.subTotalConDescuento),
       descuento: num(l.descuento),
       descuento_global: num(l.descuentoGlobal),
       synced_at: now,
@@ -213,14 +230,14 @@ export async function quitarDelBulto(
   if (error && !esTablaAusente(error)) throw new Error(`pedidos_linea_bulto: ${error.message}`);
 }
 
-// ─── El envío de Etiquetas que nace con «Recibido» ───────────────────────────
+// ─── El envío de Etiquetas que nace con «Verificado» ─────────────────────────
 
 export type ResultadoEnvioDelPedido =
   | { ok: true; envio_id: string; bultos: number }
   | { ok: false; motivo: string };
 
 /**
- * Regla 6 (Daniel, 6-oct-2026): «al marcar Recibido, desde el pedido se crea el
+ * Regla 6 (Daniel, 6-oct-2026): «al marcar Verificado, desde el pedido se crea el
  * envío de Etiquetas con el cliente, los bultos y el contenido ya puestos».
  *
  * 🔑 Un pedido NO TIENE FACTURA: «Activo» en Switch significa justamente que
@@ -229,7 +246,7 @@ export type ResultadoEnvioDelPedido =
  * único que acepta un envío sin factura. Al facturarse, la etiqueta de la
  * factura se hace como siempre desde Etiquetas.
  *
- * 🔴 FALLA ABIERTA Y DEVUELVE EL MOTIVO: «Recibido» se marca igual. Sin destino
+ * 🔴 FALLA ABIERTA Y DEVUELVE EL MOTIVO: «Verificado» se marca igual. Sin destino
  * definido para ese cliente no se inventa uno — el destino es una decisión de
  * una persona (regla 4 de `docs/diseno.md`).
  */
