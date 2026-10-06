@@ -27,6 +27,7 @@ import { construirPdfEtiquetas, datosDeEtiqueta } from "@/lib/guias/pdf-etiqueta
 import { cajasDelJuego, type EtiquetaFila } from "@/lib/guias/etiquetas";
 import { construirPdfPedidos } from "@/lib/guias/pdf-pedidos";
 import type { PedidoBodega } from "@/lib/guias/pedidos-bodega";
+import { construirPdfPedidoBultos, type PapelDeBultos } from "@/lib/guias/pdf-pedido-bultos";
 import { buildOrderPdfDoc, type PdfOrderItem } from "@/lib/catalogo/order-pdf-core";
 import { buildCatalogPdfDoc } from "@/lib/catalogo/catalog-pdf";
 import { buildEstadoCuentaLotePDF, buildEstadoCuentaPDF } from "@/lib/pdf-estado-cuenta";
@@ -180,6 +181,38 @@ const PEDIDOS: PedidoBodega[] = Array.from({ length: 12 }, (_, i) => ({
   cambiado_por: null,
   cambiado_en: null,
 })) as unknown as PedidoBodega[];
+
+// El peor caso del papel de bultos: talla y color van ADENTRO de la descripción
+// (Switch no los manda aparte), el cliente lleva razón social completa, hay un
+// bulto de tres dígitos (el envío medido tuvo 416) y dos artículos siguen sin
+// bulto, para que salga el bloque «Sin bulto todavía».
+const linea = (
+  i: number,
+  descripcion: string,
+  cantidad: number,
+  bulto: number | null,
+) => ({ codigo_barra_id: 900000 + i, codigo: `10${2000 + i}-${bulto ?? 0}`, descripcion, cantidad, precio: 49.95, bulto });
+
+const BULTOS: PapelDeBultos = {
+  secuencial: "05-000001274",
+  empresa: "Fashion Shoes",
+  cliente: "INVERSIONES Y DISTRIBUIDORA PASO CANOAS INTERNACIONAL, S.A.",
+  lineas: [
+    linea(1, "NIKE AIR MAX 90 ESSENTIAL BLANCO/NEGRO TALLA 10.5 US", 12, 1),
+    linea(2, "NIKE AIR MAX 90 ESSENTIAL BLANCO/NEGRO TALLA 11 US", 6, 1),
+    linea(3, "TOMMY HILFIGER CHAQUETA ACOLCHADA REVERSIBLE AZUL MARINO/CRUDO TALLA XL", 3, 1),
+    linea(4, "REEBOK CLASSIC LEATHER LEGACY AZ GRIS JASPEADO/BLANCO TALLA 9 US", 24, 2),
+    linea(5, "REEBOK CLASSIC LEATHER LEGACY AZ GRIS JASPEADO/BLANCO TALLA 9.5 US", 18, 2),
+    linea(6, "CALVIN KLEIN JEANS CAMISA OXFORD MANGA LARGA CELESTE RAYADO TALLA M", 9, 7),
+    linea(7, "CALVIN KLEIN FOOTWEAR SANDALIA PLATAFORMA CUERO NEGRO TALLA 7 US", 4.5, 7),
+    linea(8, "JOYBEES VARSITY CLOG NIÑO AZUL ELÉCTRICO/AMARILLO TALLA 13 LITTLE KID", 36, 38),
+    linea(9, "JOYBEES ACTIVE CLOG ADULTO NEGRO/GRAFITO TALLA 10 US", 30, 38),
+    linea(10, "ADIDAS SUPERSTAR FOUNDATION BLANCO/NEGRO/ORO METÁLICO TALLA 8.5 US", 15, 416),
+    linea(11, "ADIDAS PANTALÓN DEPORTIVO TIRO 23 NEGRO CON TRES RAYAS BLANCAS TALLA L", 7, 416),
+    linea(12, "PUMA SUEDE CLASSIC XXI ROJO INTENSO/BLANCO TALLA 12 US", 10, null),
+    linea(13, "PUMA ESSENTIALS SUDADERA CON CAPUCHA GRIS MEDIO JASPEADO TALLA XXL", 2, null),
+  ],
+};
 
 // ── Catálogos ────────────────────────────────────────────────────────────────
 
@@ -367,6 +400,7 @@ export const PAPELES: Papel[] = [
   { nombre: "Guías — etiquetas carta", tipo: "pdf", generar: async () => pdf(construirPdfEtiquetas(datosDeEtiqueta(ETIQUETA), cajasDelJuego(4), "carta")), estiloPropio: TERMICA },
   { nombre: "Guías — etiquetas 4x6", tipo: "pdf", generar: async () => pdf(construirPdfEtiquetas(datosDeEtiqueta(ETIQUETA), cajasDelJuego(2), "4x6")), estiloPropio: TERMICA },
   { nombre: "Guías — pedidos impresos", tipo: "pdf", generar: async () => pdf(construirPdfPedidos("Pedidos pendientes", PEDIDOS, "2026-10-06")) },
+  { nombre: "Guías — bultos de un pedido", tipo: "pdf", generar: async () => pdf(construirPdfPedidoBultos(BULTOS)) },
   { nombre: "Catálogos — pedido Reebok", tipo: "pdf", generar: async () => pdf(buildOrderPdfDoc({ marca: "reebok", orderNumber: "RBK-001", clientName: "Inversiones y Distribuidora Paso Canoas Internacional, S.A.", createdAt: "2026-09-24T12:00:00Z", items: itemsPedido(30), bultoSize: () => 12, images: {} })), estiloPropio: MARCA },
   { nombre: "Catálogos — pedido Joybees", tipo: "pdf", generar: async () => pdf(buildOrderPdfDoc({ marca: "joybees", orderNumber: "JB-001", clientName: "City Mall Paso Canoa", createdAt: "2026-09-24", items: itemsPedido(8), bultoSize: () => 12, images: {} })), estiloPropio: MARCA },
   { nombre: "Catálogos — catálogo Reebok", tipo: "pdf", generar: async () => pdf(buildCatalogPdfDoc({ marca: "reebok", sections: [seccion("HOMBRE", 9), seccion("MUJER", 4)], subtitle: "Todos los productos", totalCount: 13, images: {} })), estiloPropio: MARCA },

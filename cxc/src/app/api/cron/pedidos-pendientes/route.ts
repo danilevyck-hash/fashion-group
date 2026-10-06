@@ -4,7 +4,7 @@
 // «Pendiente» de Guías › Pedidos con más de 7 días. Aprobado el 6-oct-2026.
 //
 // 14:00 UTC = 9:00 a.m. de Panamá, como los demás avisos (Daniel, 6-oct-2026),
-// después del `sync-pedidos` de las 13:40. No toca Switch —lee solo Supabase—, así que la separación de 15 min
+// después del primer `sync-pedidos` del día (13:10 desde el 6-oct-2026). No toca Switch —lee solo Supabase—, así que la separación de 15 min
 // no le aplica. Sin ninguno viejo NO manda nada. El texto: `pedidos-aviso.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -14,7 +14,8 @@ import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
 import { enviarNegocio } from "@/lib/alertas/canal";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { PEDIDOS_BODEGA_2026_10, esEstadoPedido, type EstadoPedido } from "@/lib/guias/pedidos-bodega";
+import { PEDIDOS_BODEGA_2026_10, esEstadoPedido, type EstadoPedidoCualquiera } from "@/lib/guias/pedidos-bodega";
+import { PEDIDOS_BULTOS_2026_10, estadoLeido } from "@/lib/guias/pedidos-bultos";
 import { mensajePedidosViejos } from "@/lib/guias/pedidos-aviso";
 
 const CRON_NAME = "pedidos-pendientes";
@@ -48,7 +49,14 @@ export async function GET(req: NextRequest) {
   const marca = new Map((est.data ?? []).map((e) => [`${e.empresa_key}:${e.pedido_switch_id}`, e.estado]));
   const pedidos = (ped.data ?? []).map((p) => {
     const m = marca.get(`${p.empresa_key}:${p.pedido_switch_id}`);
-    return { ...p, estado: (esEstadoPedido(m) ? m : "pendiente") as EstadoPedido };
+    // 🔴 CON TRES ESTADOS, «terminado» NO ES «pendiente» (6-oct-2026). Sin esto,
+    // el día que corra la migración un pedido que bodega YA terminó caía en el
+    // `else` y salía en el aviso como «pendiente de más de 7 días» — una
+    // alarma falsa en 📊 NEGOCIO, que no tiene perilla de silenciar.
+    const estado: EstadoPedidoCualquiera = PEDIDOS_BULTOS_2026_10
+      ? estadoLeido(m)
+      : esEstadoPedido(m) ? m : "pendiente";
+    return { ...p, estado };
   });
   const mensaje = mensajePedidosViejos(pedidos, hoyPanama());
 

@@ -161,7 +161,9 @@ describe("🔴 la medición no se tocó", () => {
     const vercel = JSON.parse(leer("vercel.json")) as { crons: unknown[] };
     // ⚠️ 6-oct-2026: son 92 — `cobros-del-dia`, el resumen de las 7:00 p.m.
     // de los cobros del día. Ver `cxc/cobros-del-dia.test.ts`.
-    expect(vercel.crons).toHaveLength(92);
+    // ⚠️ 6-oct-2026: bajan a 89 — `sync-pedidos` pasó de 7 pasadas a 4 (8:10 a.m.,
+    // 10:40 a.m., 1:20 p.m. y 3:45 p.m. de Panamá) y se apagó la de madrugada.
+    expect(vercel.crons).toHaveLength(89);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

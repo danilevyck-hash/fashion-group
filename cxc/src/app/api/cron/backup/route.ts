@@ -335,6 +335,10 @@ const DATASETS: Dataset[] = [
   { table: "guias_etiquetas" },
   // Guías › Pedidos (5-oct-2026): lo que marcó bodega, con quién y cuándo.
   { table: "pedidos_bodega_estado" },
+  // Y en qué bulto quedó cada línea del pedido (6-oct-2026). Switch manda las
+  // líneas, pero no sabe nada de bultos: si esto se pierde, hay que volver a
+  // armar el pedido a mano.
+  { table: "pedidos_linea_bulto" },
   // Catálogo Reebok: a qué cajón va cada rubro de Switch (17-sep-2026). Lo
   // escribe Daniel a mano; Switch manda el rubro, no dice a qué categoría va.
   { table: "reebok_rubro_categoria" },
@@ -482,6 +486,7 @@ const ORDER_BY: Record<string, string[]> = {
   switch_estadocuenta_saldo: ["empresa_key", "cliente_switch_id"],
   switch_ingresos_mercancia: ["empresa_key", "n_interno", "linea"],
   pedidos_bodega_estado: ["empresa_key", "pedido_switch_id"],
+  pedidos_linea_bulto: ["empresa_key", "pedido_switch_id", "codigo_barra_id", "bulto"],
   switch_pedidos: ["empresa_key", "pedido_switch_id"],
 };
 

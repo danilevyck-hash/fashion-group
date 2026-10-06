@@ -21,6 +21,16 @@ import {
   type EstadoPedido,
   type PedidoBodega,
 } from "@/lib/guias/pedidos-bodega";
+import {
+  PEDIDOS_BULTOS_2026_10,
+  empresasQueVe,
+  estadoLeido,
+  esEstadoBultos,
+  puedeMover,
+  ROLES_TERMINADO,
+  type EstadoBultos,
+} from "@/lib/guias/pedidos-bultos";
+import { crearEnvioDelPedido } from "@/lib/guias/pedido-detalle-server";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { aplicarAlias } from "@/lib/comisiones/alias";
 import { leerAliasOVacio } from "@/lib/comisiones/exclusiones-server";
@@ -35,12 +45,18 @@ export async function GET(req: NextRequest) {
   const auth = requireRole(req, [...PEDIDOS_VER_ROLES]);
   if (auth instanceof NextResponse) return auth;
 
+  // 🔴 El RECORTE POR EMPRESA lo decide el SERVIDOR (6-oct-2026): Julio no ve
+  // Vistana y Rodrigo/Jorman solo ven Vistana, pidan lo que pidan. Es duro,
+  // como el de Boston. Admin y los no listados siguen viendo las 6.
+  const empresas = PEDIDOS_BULTOS_2026_10 ? empresasQueVe(auth.userName, auth.role) : B2B_EMPRESA_KEYS;
+
   // ponytail: sin paginar; los Activo medidos el 5-oct son decenas, no miles.
   // El alias de Comisiones (REINALDO/REYNALDO/REINDALDO → una persona); falla abierto.
   const [ped, est, alias] = await Promise.all([
     supabaseServer
       .from("switch_pedidos")
       .select("empresa_key, pedido_switch_id, secuencial, fecha, cliente_codigo, cliente_nombre, vendedor_nombre, synced_at")
+      .in("empresa_key", [...empresas])
       .order("fecha")
       .limit(1000),
     supabaseServer.from("pedidos_bodega_estado").select("empresa_key, pedido_switch_id, estado, cambiado_por, cambiado_en").limit(5000),
@@ -62,34 +78,107 @@ export async function GET(req: NextRequest) {
       cliente_codigo: p.cliente_codigo,
       cliente_nombre: p.cliente_nombre,
       vendedor_nombre: p.vendedor_nombre ? aplicarAlias(p.vendedor_nombre, alias) : null,
-      estado: (m && esEstadoPedido(m.estado) ? m.estado : "pendiente") as EstadoPedido,
+      // Con bultos son TRES estados y «preparado» se LEE como «terminado»
+      // (falla abierta mientras la migración no corra).
+      estado: PEDIDOS_BULTOS_2026_10
+        ? estadoLeido(m?.estado)
+        : m && esEstadoPedido(m.estado)
+          ? m.estado
+          : "pendiente",
       cambiado_por: m?.cambiado_por ?? null,
       cambiado_en: m?.cambiado_en ?? null,
     };
   });
-  return NextResponse.json({ pedidos: ordenarPedidos(pedidos), actualizado });
+  return NextResponse.json({
+    pedidos: ordenarPedidos(pedidos),
+    actualizado,
+    ...(PEDIDOS_BULTOS_2026_10 ? { empresas } : {}),
+  });
 }
 
 export async function PATCH(req: NextRequest) {
   if (!PEDIDOS_BODEGA_2026_10) return apagado();
-  const auth = requireRole(req, [...PEDIDOS_BODEGA_ROLES]);
+  // Con bultos, quién puede marcar QUÉ lo decide `puedeMover` abajo (que mira el
+  // estado destino, quién terminó el pedido y de qué empresa es): aquí solo se
+  // exige estar en la lista más ANCHA de las dos, que es la de «Terminado».
+  const auth = requireRole(req, [...(PEDIDOS_BULTOS_2026_10 ? ROLES_TERMINADO : PEDIDOS_BODEGA_ROLES)]);
   if (auth instanceof NextResponse) return auth;
+
+  // El CHECK de la tabla exige la firma; una inventada es peor que ninguna.
+  const quienFirma = auth.userName || auth.userId;
+  if (!quienFirma) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const empresa = String(body?.empresa_key ?? "");
   const id = Number(body?.pedido_switch_id);
   const estado = body?.estado;
-  if (!(B2B_EMPRESA_KEYS as readonly string[]).includes(empresa) || !Number.isInteger(id) || !esEstadoPedido(estado)) {
+  const valido = PEDIDOS_BULTOS_2026_10 ? esEstadoBultos(estado) : esEstadoPedido(estado);
+  if (!(B2B_EMPRESA_KEYS as readonly string[]).includes(empresa) || !Number.isInteger(id) || !valido) {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
   }
+
+  let envio: { envio_id: string; bultos: number } | null = null;
+  let avisoEnvio: string | null = null;
+
+  if (PEDIDOS_BULTOS_2026_10) {
+    // 🔴 El pedido tiene que existir Y ser de una empresa de esta persona: si no,
+    // 404 (no se confirma que exista), como `/api/clientes/[codigo]`.
+    const { data: pedido } = await supabaseServer
+      .from("switch_pedidos")
+      .select("empresa_key, pedido_switch_id, secuencial, cliente_codigo, cliente_nombre")
+      .eq("empresa_key", empresa)
+      .eq("pedido_switch_id", id)
+      .maybeSingle();
+    if (!pedido || !empresasQueVe(auth.userName, auth.role).includes(empresa)) {
+      return NextResponse.json({ error: "Ese pedido no existe" }, { status: 404 });
+    }
+
+    // 🔑 `cambiado_por` del estado «terminado» ES quien lo terminó: de ahí sale
+    // la regla «quien marcó Terminado solo marca Recibido si es admin».
+    const { data: previo } = await supabaseServer
+      .from("pedidos_bodega_estado")
+      .select("estado, cambiado_por, envio_id")
+      .eq("empresa_key", empresa)
+      .eq("pedido_switch_id", id)
+      .maybeSingle();
+    const desde = estadoLeido(previo?.estado);
+    const terminadoPor = desde === "terminado" ? (previo?.cambiado_por ?? null) : null;
+
+    const v = puedeMover(
+      { desde, hasta: estado as EstadoBultos, empresa_key: empresa, terminado_por: terminadoPor },
+      { role: auth.role, userName: auth.userName },
+    );
+    if (!v.ok) return NextResponse.json({ error: v.error }, { status: 403 });
+
+    // Regla 6: al RECIBIR nace el envío de Etiquetas, con el cliente, los
+    // bultos y el contenido ya puestos. 🔴 FALLA ABIERTA: si no se puede crear,
+    // «Recibido» se marca igual y se dice por qué. Y no se crea dos veces.
+    if (estado === "recibido" && !previo?.envio_id) {
+      try {
+        const r = await crearEnvioDelPedido(pedido, quienFirma);
+        if (r.ok) envio = { envio_id: r.envio_id, bultos: r.bultos };
+        else avisoEnvio = r.motivo;
+      } catch {
+        avisoEnvio = "No se pudo crear el envío de Etiquetas";
+      }
+    }
+  }
+
   const fila = {
     empresa_key: empresa,
     pedido_switch_id: id,
     estado,
-    cambiado_por: auth.userName || auth.userId,
+    cambiado_por: quienFirma,
     cambiado_en: new Date().toISOString(),
+    ...(envio ? { envio_id: envio.envio_id } : {}),
   };
   const { error } = await supabaseServer.from("pedidos_bodega_estado").upsert(fila, { onConflict: "empresa_key,pedido_switch_id" });
   if (error) return NextResponse.json({ error: "No se pudo guardar el estado" }, { status: 500 });
-  return NextResponse.json({ ok: true, cambiado_por: fila.cambiado_por, cambiado_en: fila.cambiado_en });
+  return NextResponse.json({
+    ok: true,
+    cambiado_por: fila.cambiado_por,
+    cambiado_en: fila.cambiado_en,
+    ...(envio ? { envio } : {}),
+    ...(avisoEnvio ? { avisoEnvio } : {}),
+  });
 }

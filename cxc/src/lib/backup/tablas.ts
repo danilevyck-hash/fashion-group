@@ -206,6 +206,11 @@ export const TABLAS_PERSONAS = [
   "guias_etiquetas",
   // Guías › Pedidos (5-oct-2026): lo que marcó bodega, con quién y cuándo.
   "pedidos_bodega_estado",
+  // 🔴 En qué bulto quedó cada línea del pedido (6-oct-2026). La escribe una
+  // PERSONA —bodega, con las casillas y «Poner en bulto…»— y NO se puede volver
+  // a conseguir de ningún lado: Switch manda las líneas, pero no sabe nada de
+  // bultos. Las líneas (`pedidos_lineas`) sí vuelven a bajar: van en `switch`.
+  "pedidos_linea_bulto",
   "transportistas",
   // 🔴 La lista de «Despachado por» (19-sep-2026). La escriben personas en
   // Guías › Configuración y NO se puede volver a conseguir: antes vivía mitad
@@ -305,6 +310,10 @@ export const TABLAS_CONGELADAS = [
 // está en `SWITCH_DATASETS` del route, con el motivo al lado.
 export const TABLAS_SWITCH = [
   "switch_pedidos",
+  // Las líneas de un pedido (6-oct-2026), de `/apipedido/info`. Se vuelven a
+  // bajar al abrir el pedido, así que no obligan respaldo; lo que NO vuelve es
+  // en qué bulto las puso bodega (`pedidos_linea_bulto`, en `personas`).
+  "pedidos_lineas",
   "switch_facturas",
   "switch_factura_lineas",
   "switch_factura_utilidad",
@@ -473,6 +482,8 @@ export const PK_QUE_NO_ES_ID: Readonly<Record<string, readonly string[]>> = Obje
   fg_user_switch_vendedor: ["user_id", "empresa_key"],
   login_attempts: ["ip"],
   pedidos_bodega_estado: ["empresa_key", "pedido_switch_id"],
+  pedidos_lineas: ["empresa_key", "pedido_switch_id", "codigo_barra_id"],
+  pedidos_linea_bulto: ["empresa_key", "pedido_switch_id", "codigo_barra_id", "bulto"],
   multifashion_caja_diaria: ["fecha"],
   switch_articulo_info: ["empresa_key", "codigo"],
   switch_articulo_marca: ["empresa_key", "articulo_id"],

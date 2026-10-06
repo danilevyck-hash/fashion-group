@@ -19,6 +19,16 @@ import { descargarArchivo } from "@/lib/compartir-archivo";
 import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe, hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import PedidoBultos, { type PedidoDelDetalle } from "./PedidoBultos";
+import {
+  PEDIDOS_BULTOS_2026_10 as BULTOS,
+  ESTADOS_BULTOS,
+  ROTULO_ESTADO_BULTOS,
+  ROLES_TERMINADO,
+  estadoLeido,
+  siguienteEstado,
+  type EstadoBultos,
+} from "@/lib/guias/pedidos-bultos";
 import {
   PEDIDOS_BODEGA_ROLES,
   PEDIDOS_TABLA_2026_10 as NUEVO,
@@ -36,19 +46,51 @@ import {
   type PedidoBodega,
 } from "@/lib/guias/pedidos-bodega";
 
-type Filtro = EstadoPedido;
-const CHIPS: { value: Filtro; label: string }[] = [
-  { value: "pendiente", label: "Pendientes" },
-  { value: "preparado", label: "Preparados" },
-];
+type Filtro = EstadoPedido | EstadoBultos;
+/**
+ * 🔴 Con bultos son TRES chips, los tres estados del flujo (6-oct-2026):
+ * Pendiente → Terminado (bodega) → Recibido (la secretaria) → Etiquetas.
+ * Apagado, los dos de hoy.
+ */
+const CHIPS: { value: Filtro; label: string }[] = BULTOS
+  ? ESTADOS_BULTOS.map((e) => ({ value: e, label: `${ROTULO_ESTADO_BULTOS[e]}s` }))
+  : [
+      { value: "pendiente", label: "Pendientes" },
+      { value: "preparado", label: "Preparados" },
+    ];
 
 const clave = (p: Pick<PedidoBodega, "empresa_key" | "pedido_switch_id">) => `${p.empresa_key}:${p.pedido_switch_id}`;
 
-export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: boolean }) {
+/** Lo que el detalle con bultos necesita de la fila. */
+/** El rótulo del estado, con los dos juegos: los 2 de hoy y los 3 con bultos. */
+const rotuloDe = (e: PedidoBodega["estado"]): string =>
+  e === "pendiente" || e === "preparado" ? ROTULO_ESTADO[e] : ROTULO_ESTADO_BULTOS[e];
+
+const detalleDe = (p: PedidoBodega): PedidoDelDetalle => ({
+  empresa_key: p.empresa_key,
+  pedido_switch_id: p.pedido_switch_id,
+  secuencial: p.secuencial,
+  cliente_codigo: p.cliente_codigo,
+  cliente_nombre: p.cliente_nombre,
+});
+
+export default function PedidosView({
+  puedeMarcar = true,
+  /** 🔴 «Recibido» lo marca la secretaria (y admin), nunca bodega. */
+  puedeRecibir = false,
+}: {
+  puedeMarcar?: boolean;
+  puedeRecibir?: boolean;
+}) {
   const barra = useHayBarraCelular();
+  // El pedido abierto en el detalle con bultos; `null` = la lista.
+  const [abierto, setAbierto] = useState<PedidoDelDetalle | null>(null);
   const { toast } = useToast();
   const [pedidos, setPedidos] = useState<PedidoBodega[] | null>(null);
   const [actualizado, setActualizado] = useState<string | null>(null);
+  // 🔴 Las empresas que ESTA persona ve, según el SERVIDOR (`empresasQueVe`):
+  // el chip no puede ofrecer Vistana a Julio y devolverle una lista vacía.
+  const [susEmpresas, setSusEmpresas] = useState<readonly string[]>(B2B_EMPRESA_KEYS);
   const [error, setError] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>("pendiente");
   // v2: filtro simple; abre SIEMPRE en «Todas» y no se acota por persona (Daniel, 5-oct-2026).
@@ -63,9 +105,10 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
     try {
       const r = await fetch("/api/guias/pedidos", { cache: "no-store" });
       if (!r.ok) throw new Error(String(r.status));
-      const d = (await r.json()) as { pedidos: PedidoBodega[]; actualizado: string | null };
+      const d = (await r.json()) as { pedidos: PedidoBodega[]; actualizado: string | null; empresas?: string[] };
       setPedidos(d.pedidos);
       setActualizado(d.actualizado);
+      if (d.empresas?.length) setSusEmpresas(d.empresas);
       setError(false);
     } catch {
       setError(true);
@@ -73,9 +116,17 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
   }
   useEffect(() => { void cargar(); }, []);
 
-  async function cambiar(p: PedidoBodega) {
-    const nuevo: EstadoPedido = p.estado === "pendiente" ? "preparado" : "pendiente";
-    const poner = (estado: EstadoPedido) =>
+  /**
+   * Mueve el pedido al estado que se pide. Con bultos el flujo AVANZA
+   * (pendiente → terminado → recibido); apagado, el interruptor alterna como
+   * siempre entre los dos de hoy.
+   */
+  async function cambiar(p: PedidoBodega, destino?: EstadoBultos) {
+    const nuevo = destino ?? (BULTOS
+      ? siguienteEstado(estadoLeido(p.estado))
+      : p.estado === "pendiente" ? "preparado" : "pendiente");
+    if (!nuevo) return;
+    const poner = (estado: PedidoBodega["estado"]) =>
       setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado } : x)));
     poner(nuevo); // optimista; se revierte si el servidor no guarda
     try {
@@ -84,12 +135,19 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ empresa_key: p.empresa_key, pedido_switch_id: p.pedido_switch_id, estado: nuevo }),
       });
-      if (!r.ok) throw new Error(String(r.status));
-      const d = (await r.json()) as { cambiado_por: string; cambiado_en: string };
-      setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, cambiado_por: d.cambiado_por, cambiado_en: d.cambiado_en } : x)));
-    } catch {
+      const d = (await r.json().catch(() => null)) as
+        | { cambiado_por: string; cambiado_en: string; envio?: { bultos: number }; avisoEnvio?: string; error?: string }
+        | null;
+      if (!r.ok) throw new Error(d?.error ?? String(r.status));
+      setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, cambiado_por: d!.cambiado_por, cambiado_en: d!.cambiado_en } : x)));
+      // Regla 6: el envío de Etiquetas nace al recibir. Si no se pudo, se DICE
+      // (el pedido quedó recibido igual: el aviso no es un error).
+      if (d?.envio) toast(`Envío de Etiquetas creado · ${d.envio.bultos} ${d.envio.bultos === 1 ? "bulto" : "bultos"}`, "success");
+      else if (d?.avisoEnvio) toast(`Recibido. ${d.avisoEnvio}`, "warning");
+    } catch (e) {
       poner(p.estado);
-      toast("No se pudo guardar el estado. Intenta de nuevo.", "error");
+      const msg = e instanceof Error && e.message.length < 90 ? e.message : "No se pudo guardar el estado. Intenta de nuevo.";
+      toast(msg, "error");
     }
   }
 
@@ -102,17 +160,22 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
   });
   const ordenarGrupo = (ps: PedidoBodega[]) => orden.ordenar(ps, (p, c) =>
     c === "antiguedad" ? -Date.parse(p.fecha) : c === "cliente" ? p.cliente_nombre : vendedorEnPantalla(p.vendedor_nombre));
+  // Con una sola empresa el chip no decide nada: no se dibuja (docs/diseno.md).
   const OPCIONES_EMPRESA = [
     { valor: "todas", etiqueta: "Todas" },
-    ...B2B_EMPRESA_KEYS.map((k) => ({ valor: k, etiqueta: nombreCortoEmpresa(k) })),
+    ...susEmpresas.map((k) => ({ valor: k, etiqueta: nombreCortoEmpresa(k) })),
   ];
+  const hayQueElegirEmpresa = susEmpresas.length > 1;
 
   // Imprime lo filtrado (estado + empresa), para bodega sin celular. Pestaña
   // nueva pidiendo imprimir, como la nota de entrega; si la bloquean, se descarga.
   async function imprimir() {
     try {
       const { construirPdfPedidos } = await import("@/lib/guias/pdf-pedidos");
-      const titulo = tituloPedidosImpresos(filtro, empresa === "todas" ? null : nombreCortoEmpresa(empresa), new Date());
+      // Con bultos el estado del título sale del rótulo nuevo; apagado, de los dos de siempre.
+      const titulo = BULTOS
+        ? `Pedidos ${ROTULO_ESTADO_BULTOS[filtro as EstadoBultos].toLowerCase()}s · ${empresa === "todas" ? "Todas las empresas" : nombreCortoEmpresa(empresa)} · impreso ${fmtDate(hoy)}`
+        : tituloPedidosImpresos(filtro as EstadoPedido, empresa === "todas" ? null : nombreCortoEmpresa(empresa), new Date());
       const doc = construirPdfPedidos(titulo, visibles, hoy);
       doc.autoPrint();
       if (!window.open(doc.output("bloburl") as unknown as string, "_blank")) {
@@ -142,7 +205,7 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
           </button>
         ))}
       </div>
-      {NUEVO && <ChipSelector rotulo="Empresa" valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
+      {NUEVO && hayQueElegirEmpresa && <ChipSelector rotulo="Empresa" valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
       {POR_EMPRESA && !barra && (
         <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={`${CLASE_BOTON_TEXTO} gap-1.5`}>
           <Printer size={15} strokeWidth={1.8} aria-hidden /> Imprimir
@@ -155,7 +218,7 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
   const chipEstado = (p: PedidoBodega) => {
     const color = p.estado === "preparado" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-300 bg-white text-gray-700";
     const clase = `inline-flex h-7 items-center whitespace-nowrap rounded-full border px-1.5 text-xs font-medium sm:px-2.5 ${color}`;
-    if (!puedeMarcar) return <span className={clase}>{ROTULO_ESTADO[p.estado]}</span>;
+    if (!puedeMarcar) return <span className={clase}>{rotuloDe(p.estado)}</span>;
     return (
       <button
         type="button"
@@ -163,7 +226,42 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
         title={p.cambiado_por && p.cambiado_en ? `${p.cambiado_por} · ${fmtDate(fechaPanamaDe(p.cambiado_en))}` : undefined}
         className={`${clase} relative transition active:scale-[0.97] before:absolute before:-inset-x-1 before:-inset-y-2 before:content-['']`}
       >
-        {ROTULO_ESTADO[p.estado]}
+        {rotuloDe(p.estado)}
+      </button>
+    );
+  };
+
+  /**
+   * 🔴 CON BULTOS, UN SOLO CONTROL POR FILA Y DICE QUÉ HACE (6-oct-2026):
+   *   · Pendiente  → el círculo ○ de siempre, que lo pasa a Terminado (bodega).
+   *   · Terminado  → «Recibido», y SOLO lo ve quien puede marcarlo: bodega lee
+   *     el chip «Terminado» quieto, porque «no se puede confiar solo en bodega».
+   *   · Recibido   → ✓ quieto. De ahí salió a Etiquetas.
+   */
+  const controlBultos = (p: PedidoBodega) => {
+    const e = estadoLeido(p.estado);
+    const firma = p.cambiado_por && p.cambiado_en ? `${p.cambiado_por} · ${fmtDate(fechaPanamaDe(p.cambiado_en))}` : undefined;
+    if (e === "pendiente") return circulo(p);
+    const base = "inline-flex h-7 items-center whitespace-nowrap rounded-full border px-2.5 text-xs font-medium";
+    if (e === "recibido") {
+      return (
+        <span className={`${base} border-emerald-200 bg-emerald-50 text-emerald-700`} title={firma}>
+          <Check size={13} strokeWidth={3} aria-hidden className="mr-1" />
+          {ROTULO_ESTADO_BULTOS.recibido}
+        </span>
+      );
+    }
+    if (!puedeRecibir) {
+      return <span className={`${base} border-gray-300 bg-white text-gray-700`} title={firma}>{ROTULO_ESTADO_BULTOS.terminado}</span>;
+    }
+    return (
+      <button
+        type="button"
+        onClick={() => void cambiar(p, "recibido")}
+        title={firma}
+        className={`${base} relative border-gray-900 bg-gray-900 text-white transition active:scale-[0.97] before:absolute before:-inset-x-1 before:-inset-y-2 before:content-['']`}
+      >
+        Marcar recibido
       </button>
     );
   };
@@ -189,7 +287,7 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
         type="button"
         role="checkbox"
         aria-checked={lleno}
-        aria-label={`${p.cliente_nombre} · ${p.secuencial}: ${lleno ? "preparado" : "pendiente"}`}
+        aria-label={`${p.cliente_nombre} · ${p.secuencial}: ${lleno ? (BULTOS ? "terminado" : "preparado") : "pendiente"}`}
         disabled={enTransito.has(k)}
         onClick={() => {
           setEnTransito((s) => new Set(s).add(k));
@@ -206,6 +304,14 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
     );
   };
 
+  // 🔴 CADA LISTA MUESTRA UN SOLO TIPO DE CONTROL, porque se filtra por UN
+  // estado: en «Pendientes» va el círculo a la izquierda, como hoy; en
+  // «Terminados» y «Recibidos» va la columna Estado a la derecha, donde cabe
+  // «Marcar recibido». Así no conviven dos controles en la misma fila.
+  const conCirculo = CIRCULO && (!BULTOS || filtro === "pendiente");
+  const conEstado = BULTOS ? filtro !== "pendiente" : !CIRCULO;
+  const columnas = 3 + (conCirculo ? 1 : 0) + (conEstado ? 1 : 0);
+
   // Agrupada por empresa (Daniel, 6-oct-2026): el encabezado del grupo dice la
   // empresa y la cuenta; las filas ya no la repiten. Con una sola empresa, un solo grupo.
   const tabla = (
@@ -213,24 +319,24 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
       <table className="w-full text-left text-xs sm:text-sm">
         <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
           <tr>
-            {CIRCULO && <th className="w-11 py-2 pl-1.5 sm:pl-2"><span className="sr-only">Preparado</span></th>}
-            <ThOrden col="antiguedad" api={orden} className={`py-2 pr-1 sm:px-3 ${CIRCULO ? "pl-1" : "pl-3"}`}><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></ThOrden>
+            {conCirculo && <th className="w-11 py-2 pl-1.5 sm:pl-2"><span className="sr-only">{BULTOS ? "Terminado" : "Preparado"}</span></th>}
+            <ThOrden col="antiguedad" api={orden} className={`py-2 pr-1 sm:px-3 ${conCirculo ? "pl-1" : "pl-3"}`}><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></ThOrden>
             <ThOrden col="cliente" api={orden} className="px-1 py-2 sm:px-3">Cliente</ThOrden>
-            <ThOrden col="vendedor" api={orden} className={`py-2 sm:px-3 ${CIRCULO ? "pl-1 pr-3" : "px-1"}`}>Vendedor</ThOrden>
-            {!CIRCULO && <th className="py-2 pl-0.5 pr-3 text-right sm:px-3">Estado</th>}
+            <ThOrden col="vendedor" api={orden} className={`py-2 sm:px-3 ${conCirculo ? "pl-1 pr-3" : "px-1"}`}>Vendedor</ThOrden>
+            {conEstado && <th className="py-2 pl-0.5 pr-3 text-right sm:px-3">Estado</th>}
           </tr>
         </thead>
         {agruparPorEmpresa(visibles).map((g) => (
           <tbody key={g.empresa_key} className="divide-y divide-gray-100 align-top">
             <tr className="bg-gray-50">
-              <th colSpan={4} scope="colgroup" className="px-3 py-2 text-left text-sm font-semibold text-gray-900">
+              <th colSpan={columnas} scope="colgroup" className="px-3 py-2 text-left text-sm font-semibold text-gray-900">
                 {nombreCortoEmpresa(g.empresa_key)} · {g.pedidos.length}
               </th>
             </tr>
             {ordenarGrupo(g.pedidos).map((p) => (
               <tr key={clave(p)}>
-                {CIRCULO && <td className="py-0 pl-1.5 align-top sm:pl-2">{circulo(p)}</td>}
-                <td className={`whitespace-nowrap py-2 pr-1 text-gray-700 sm:px-3 ${CIRCULO ? "pl-1 pt-3" : "pl-3"}`}>
+                {conCirculo && <td className="py-0 pl-1.5 align-top sm:pl-2">{circulo(p)}</td>}
+                <td className={`whitespace-nowrap py-2 pr-1 text-gray-700 sm:px-3 ${conCirculo ? "pl-1 pt-3" : "pl-3"}`}>
                   <button
                     type="button"
                     title={fmtDate(fechaPanamaDe(p.fecha))}
@@ -245,12 +351,24 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
                     )}
                   </button>
                 </td>
-                <td className={`break-words px-1 py-2 sm:px-3 ${CIRCULO ? "pt-3" : ""}`}>
-                  <span className="font-medium text-gray-900">{p.cliente_nombre}</span>
-                  <span className="block whitespace-nowrap text-xs text-gray-500">{p.secuencial}</span>
+                <td className={`break-words px-1 py-2 sm:px-3 ${conCirculo ? "pt-3" : ""}`}>
+                  {/* Con bultos, tocar el cliente abre el detalle del pedido. */}
+                  {BULTOS ? (
+                    <button type="button" onClick={() => setAbierto(detalleDe(p))} className="text-left">
+                      <span className="font-medium text-blue-600 hover:text-blue-800">{p.cliente_nombre}</span>
+                      <span className="block whitespace-nowrap text-xs text-gray-500">{p.secuencial}</span>
+                    </button>
+                  ) : (
+                    <>
+                      <span className="font-medium text-gray-900">{p.cliente_nombre}</span>
+                      <span className="block whitespace-nowrap text-xs text-gray-500">{p.secuencial}</span>
+                    </>
+                  )}
                 </td>
-                <td className={`break-words py-2 text-gray-700 sm:px-3 ${CIRCULO ? "pl-1 pr-3 pt-3" : "px-1"}`}>{vendedorEnPantalla(p.vendedor_nombre)}</td>
-                {!CIRCULO && <td className="py-1.5 pl-0.5 pr-3 text-right sm:px-3">{chipEstado(p)}</td>}
+                <td className={`break-words py-2 text-gray-700 sm:px-3 ${conCirculo ? "pl-1 pr-3 pt-3" : "px-1"}`}>{vendedorEnPantalla(p.vendedor_nombre)}</td>
+                {conEstado && (
+                  <td className="py-1.5 pl-0.5 pr-3 text-right sm:px-3">{BULTOS ? controlBultos(p) : chipEstado(p)}</td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -314,9 +432,23 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
           : "border-gray-300 bg-white text-gray-700"
       }`}
     >
-      {ROTULO_ESTADO[p.estado]}
+      {rotuloDe(p.estado)}
     </button>
   );
+
+  // Una pantalla, una pregunta: el detalle REEMPLAZA la lista, no la tapa.
+  if (BULTOS && abierto) {
+    return (
+      <PedidoBultos
+        pedido={abierto}
+        puedePoner={puedeMarcar}
+        onVolver={() => {
+          setAbierto(null);
+          void cargar();
+        }}
+      />
+    );
+  }
 
   return (
     <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
@@ -341,7 +473,7 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
           <LineaDeFrescura
             className={CIRCULO ? "!text-xs" : undefined}
             actualizado={actualizado}
-            opciones={B2B_EMPRESA_KEYS.map((empresa) => ({ modulo: "pedidos", empresa, label: nombreCortoEmpresa(empresa) }))}
+            opciones={susEmpresas.map((empresa) => ({ modulo: "pedidos", empresa, label: nombreCortoEmpresa(empresa) }))}
             secuencial
             engancharRunning
             roles={[...PEDIDOS_BODEGA_ROLES]}
@@ -357,7 +489,9 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
         <p className="py-10 text-center text-sm text-gray-500">Cargando…</p>
       ) : visibles.length === 0 ? (
         <p className="py-10 text-center text-sm text-gray-500">
-          {filtro === "pendiente" ? "Sin pedidos pendientes" : "Sin pedidos preparados"}
+          {BULTOS
+            ? `Sin pedidos ${CHIPS.find((c) => c.value === filtro)?.label.toLowerCase() ?? ""}`.trim()
+            : filtro === "pendiente" ? "Sin pedidos pendientes" : "Sin pedidos preparados"}
         </p>
       ) : NUEVO ? (
         POR_EMPRESA ? tabla : tablaV2

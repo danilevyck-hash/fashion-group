@@ -709,8 +709,6 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync all", hhmmUtc: "0530", empresas: ["vistana", "active_wear"] },
   { cron: "switch-sync all", hhmmUtc: "0535", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync all", hhmmUtc: "0540", empresas: ["active_shoes", "joystep"] },
-  // Guías › Pedidos (5-oct-2026): 30 min tras el «all» de 05:40 y 50 antes de sync-utilidad.
-  { cron: "sync-pedidos", hhmmUtc: "0610", empresas: CRON_EMPRESAS_PEDIDOS },
   { cron: "switch-sync all", hhmmUtc: "0630", empresas: ["american_classic", "confecciones_boston"] },
   { cron: "sync-utilidad", hhmmUtc: "0700", empresas: CRON_EMPRESAS_UTILIDAD },
   { cron: "sync-recibos", hhmmUtc: "0750", empresas: CRON_EMPRESAS_RECIBOS },
@@ -838,14 +836,19 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync facturas", hhmmUtc: "2300", empresas: CRON_EMPRESAS_VENTAS },
   { cron: "sync-recibos", hhmmUtc: "2315", empresas: CRON_EMPRESAS_RECIBOS },
   { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"] },
-  // Guías › Pedidos de día (5-oct-2026, Daniel): ~cada 2 h, como facturas, y
-  // a ≥15 min de toda entrada que comparta empresa.
-  { cron: "sync-pedidos", hhmmUtc: "1210", empresas: CRON_EMPRESAS_PEDIDOS },
-  { cron: "sync-pedidos", hhmmUtc: "1340", empresas: CRON_EMPRESAS_PEDIDOS },
-  { cron: "sync-pedidos", hhmmUtc: "1535", empresas: CRON_EMPRESAS_PEDIDOS },
-  { cron: "sync-pedidos", hhmmUtc: "1830", empresas: CRON_EMPRESAS_PEDIDOS },
-  { cron: "sync-pedidos", hhmmUtc: "2015", empresas: CRON_EMPRESAS_PEDIDOS },
-  { cron: "sync-pedidos", hhmmUtc: "2230", empresas: CRON_EMPRESAS_PEDIDOS },
+  // Guías › Pedidos, CUATRO pasadas de día (6-oct-2026, Daniel): 8:10, 10:40,
+  // 1:20 y 3:45 de Panamá, todas dentro de la jornada de bodega, y la pasada de
+  // la madrugada (06:10 UTC = 01:10 de Panamá) se apagó: nadie mira el dato a
+  // esa hora y gastaba una sesión de Switch de las 6 empresas. Cada slot queda a
+  // ≥15 min de toda entrada que comparta empresa: 1310 a 50 min de la
+  // reconciliación de las 14:00; 1540 a 25 de los recibos de las 15:15 y a 20 del
+  // estadocuenta de las 16:00; 1820 a 20 de la reconciliación de las 18:00 y a 40
+  // de las ventas de las 19:00; 2045 a 50 de joybees (19:55) y a 25 del
+  // estadocuenta de las 21:10.
+  { cron: "sync-pedidos", hhmmUtc: "1310", empresas: CRON_EMPRESAS_PEDIDOS },
+  { cron: "sync-pedidos", hhmmUtc: "1540", empresas: CRON_EMPRESAS_PEDIDOS },
+  { cron: "sync-pedidos", hhmmUtc: "1820", empresas: CRON_EMPRESAS_PEDIDOS },
+  { cron: "sync-pedidos", hhmmUtc: "2045", empresas: CRON_EMPRESAS_PEDIDOS },
 ];
 
 // ─── QUÉ ESCRIBE CADA ENTRADA DEL CRONOGRAMA, Y CUÁNTAS VECES AL DÍA ─────────

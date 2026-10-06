@@ -1,4 +1,16 @@
 // Candado de Guías › «Pedidos» (5-oct-2026, `PEDIDOS_BODEGA_2026_10`).
+//
+// ⚠️ NOTA FECHADA — 6-oct-2026: los DOS estados que este candado fija
+// (`pendiente` · `preparado`) siguen siendo los de producción, pero ya NO son
+// la decisión vigente. Daniel cambió de opinión a propósito ese día y los
+// estados pasan a TRES —Pendiente → Terminado (bodega) → Recibido (la
+// secretaria) → Etiquetas—, porque *«no se puede confiar solo en bodega»*. Eso
+// vive detrás de `PEDIDOS_BULTOS_2026_10` (`lib/guias/pedidos-bultos.ts`, hoy
+// `false`) y lo fija su propio candado, `pedidos-bultos.test.ts`.
+//
+// 🔴 Este archivo NO se borra ni se relaja: es lo que protege la pantalla que
+// Daniel tiene hoy publicada mientras el interruptor nuevo esté apagado. Con el
+// interruptor prendido, el que manda es el otro.
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";

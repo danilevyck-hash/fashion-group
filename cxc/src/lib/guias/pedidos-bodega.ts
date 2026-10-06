@@ -86,6 +86,14 @@ export function pedidoEntra(codigo: string | null | undefined, codigosConFicha: 
   return codigosConFicha.has(c);
 }
 
+/**
+ * 🔴 Con `PEDIDOS_BULTOS_2026_10` los estados son TRES y ésta es la lista de
+ * los CUATRO valores que la pantalla puede recibir: los dos de hoy
+ * (`pendiente` · `preparado`) y los dos nuevos (`terminado` · `recibido`). Así el tipo no miente durante la transición (los `estado` viejos
+ * siguen llegando mientras la migración no corra, y se LEEN con `estadoLeido`).
+ */
+export type EstadoPedidoCualquiera = EstadoPedido | "terminado" | "recibido";
+
 export interface PedidoBodega {
   empresa_key: string;
   pedido_switch_id: number;
@@ -94,7 +102,7 @@ export interface PedidoBodega {
   cliente_codigo: string;
   cliente_nombre: string;
   vendedor_nombre: string | null;
-  estado: EstadoPedido;
+  estado: EstadoPedidoCualquiera;
   cambiado_por: string | null;
   cambiado_en: string | null;
 }
