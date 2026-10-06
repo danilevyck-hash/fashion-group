@@ -60,8 +60,8 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     expect(abreviarEmpresa("Vistana")).toBe("Vistana");
   });
 
-  it("v3 por empresa APAGADA hasta el «sí» de Daniel al mockup (6-oct-2026); apagada, la tabla v2 de hoy y sin Imprimir", () => {
-    expect(PEDIDOS_POR_EMPRESA_2026_10).toBe(false);
+  it("v3 por empresa PRENDIDA con el «sí» de Daniel al mockup (6-oct-2026); apagada, la tabla v2 y sin Imprimir", () => {
+    expect(PEDIDOS_POR_EMPRESA_2026_10).toBe(true);
     const src = leer("src/app/guias/components/PedidosView.tsx");
     expect(src).toContain("POR_EMPRESA ? tabla : tablaV2");
     expect(src).toContain("POR_EMPRESA && !barra && (");
@@ -98,7 +98,7 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     expect(src).toMatch(/<td className="whitespace-nowrap py-2 pl-3/);
   });
 
-  it("Imprimir: lo filtrado, carta en blanco y negro, un bloque por empresa con su entrega firmada, sin montos", () => {
+  it("Imprimir: lo filtrado, carta en blanco y negro, un bloque por empresa con firmas por pedido, sin montos", () => {
     const t = tituloPedidosImpresos("pendiente", "Joystep", new Date("2026-10-06T20:15:00Z"));
     expect(t).toMatch(/^Pedidos pendientes · Joystep · impreso 6 oct 2026, 3:15/);
     expect(tituloPedidosImpresos("preparado", null, new Date())).toMatch(/^Pedidos preparados · Todas las empresas · impreso /);
@@ -106,7 +106,8 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     expect(pdf).toContain('format: "letter"');
     expect(pdf).toContain("agruparPorEmpresa(pedidos)");
     expect(pdf).toMatch(/"Antigüedad", "N° de pedido", "Cliente", "Vendedor", "Entregado por", "Recibido por"/);
-    expect(pdf).toMatch(/PIE_DE_BLOQUE = "Entregado por _+ · Recibido por _+ · Fecha _+"/);
+    // Las firmas van solo por pedido: sin línea de firmas al pie del bloque.
+    expect(pdf).not.toMatch(/Fecha _|PIE_DE_BLOQUE/);
     expect(pdf).not.toMatch(/NAVY|CEBRA|estilosDeTabla|\.total\b|fmt\(/);
     const src = leer("src/app/guias/components/PedidosView.tsx");
     expect(src).toContain("construirPdfPedidos(titulo, visibles, hoy)");

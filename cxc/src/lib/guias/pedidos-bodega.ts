@@ -35,7 +35,8 @@ export const PEDIDOS_TABLA_2026_10 = true;
  * celular, y el botón «Imprimir» para bodega. `false` = la tabla v2 de hoy.
  * Se prende con el «sí» de Daniel al mockup.
  */
-export const PEDIDOS_POR_EMPRESA_2026_10 = false;
+// 6-oct-2026: PRENDIDO. Daniel vio el mockup v3: «sí» (sin la línea de firmas al pie de cada bloque).
+export const PEDIDOS_POR_EMPRESA_2026_10 = true;
 
 /** Quién MARCA Pendiente ↔ Preparado y dispara «Actualizar» (admin pasa siempre por `requireRole`). */
 export const PEDIDOS_BODEGA_ROLES = ["admin", "bodega"] as const;

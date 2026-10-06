@@ -3,8 +3,9 @@
 // Comisiones (`pdf-chrome`), en blanco y negro, hoja carta. Sin montos: la
 // pantalla tampoco los tiene. Un bloque por empresa con su título, para que
 // bodega pueda separar la hoja; por pedido, «Entregado por» y «Recibido por»
-// para firmar, y al pie de cada bloque la entrega de la hoja con fecha. Se abre en otra pestaña pidiendo imprimir, como
-// la nota de entrega (`autoPrint`).
+// para firmar (6-oct-2026: Daniel quitó la línea de firmas del pie de cada
+// bloque; las firmas van solo por pedido). Se abre en otra pestaña pidiendo
+// imprimir, como la nota de entrega (`autoPrint`).
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -25,8 +26,6 @@ import { agruparPorEmpresa, haceDias, vendedorEnPantalla, type PedidoBodega } fr
 const NEGRO: [number, number, number] = [0, 0, 0];
 const BLANCO: [number, number, number] = [255, 255, 255];
 export const COLUMNAS_PEDIDOS_IMPRESOS = ["Antigüedad", "N° de pedido", "Cliente", "Vendedor", "Entregado por", "Recibido por"] as const;
-/** Al pie de cada bloque: la entrega de la hoja entera, firmada a mano. */
-export const PIE_DE_BLOQUE = "Entregado por ______________________ · Recibido por ______________________ · Fecha ____________";
 
 export function construirPdfPedidos(titulo: string, pedidos: readonly PedidoBodega[], hoy: string): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
@@ -61,12 +60,7 @@ export function construirPdfPedidos(titulo: string, pedidos: readonly PedidoBode
         5: { cellWidth: 30, lineWidth: { bottom: 0.1, left: 0.1 } },
       },
     });
-    y = asegurarEspacio(doc, finDeTabla(doc) + 8, 6);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(...NEGRO);
-    doc.text(PIE_DE_BLOQUE, MARGEN, y);
-    y += 12;
+    y = finDeTabla(doc) + 8;
   }
   piePorHoja(doc);
   return doc;
