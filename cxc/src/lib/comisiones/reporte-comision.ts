@@ -34,6 +34,7 @@ import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
 import { renglonesDelPapel } from "@/lib/comisiones/papel-pagable";
 import {
+  comisionLinea,
   tipoDocCorto,
   type ComisionDetalle,
   type ComisionDescuento,
@@ -80,8 +81,11 @@ export function encabezadoReporte(h: HojaReporte): string {
   return `Comisión — ${nombreVendedorEnPantalla(h.vendedor)} · ${h.empresaNombre} · ${etiquetaPeriodo(h.year, h.mes)}`;
 }
 
-export const COLUMNAS_VENTAS = ["Fecha", "Cliente", "Factura", "Tipo", "Subtotal"] as const;
-export const COLUMNAS_COBROS = ["Fecha", "Cliente", "Monto"] as const;
+// 🔴 6-oct-2026: «Comisión» por línea, como el detalle v3 de pantalla (subtotal y
+// comisión a la derecha). Sin renglón «Total»: la base va en la línea del pie y
+// la comisión total es el número grande de arriba — repetirlo sería ruido.
+export const COLUMNAS_VENTAS = ["Fecha", "Cliente", "Factura", "Tipo", "Subtotal", "Comisión"] as const;
+export const COLUMNAS_COBROS = ["Fecha", "Cliente", "Monto", "Comisión"] as const;
 
 /** Un renglón del papel; `negativo` es la nota de crédito, que se pinta en rojo. */
 export interface FilaPapel {
@@ -99,6 +103,7 @@ export function filasVentas(data: ComisionDetalle): FilaPapel[] {
       v.secuencial,
       tipoDocCorto(v.tipo),
       fmtMoney(v.subtotal),
+      fmtMoney(comisionLinea(v.subtotal, data.tasa_venta)),
     ],
     negativo: v.subtotal < 0,
   }));
@@ -107,7 +112,7 @@ export function filasVentas(data: ComisionDetalle): FilaPapel[] {
 /** Los cobros comisionables (solo lo pagable: un recibo en cero no se lista). */
 export function filasCobros(data: ComisionDetalle): FilaPapel[] {
   return renglonesDelPapel(data).cobros.map((c) => ({
-    celdas: [fmtDate(c.fecha), c.cliente, fmtMoney(c.monto)],
+    celdas: [fmtDate(c.fecha), c.cliente, fmtMoney(c.monto), fmtMoney(comisionLinea(c.monto, data.tasa_cobro))],
     negativo: c.monto < 0,
   }));
 }

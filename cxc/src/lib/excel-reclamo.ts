@@ -130,6 +130,7 @@ export function buildReclamoSheet(
   h[r] = 22; r++;
 
   // Items (celdas td/tdN del helper; alt=true → fondo dataBg uniforme)
+  const primeraFilaItems = r;
   for (const item of renglones) {
     columnas.forEach((c, i) => {
       const v = valorDeCelda(item, c.clave);
@@ -175,9 +176,21 @@ export function buildReclamoSheet(
   const tLbl = (v: string, fuerte: boolean) => ({ v, t: "s", s: { font: { bold: true, sz: fuerte ? 11 : 9, color: { rgb: fuerte ? "111111" : palette.pri }, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" }, ...(fuerte ? { border: { top: { style: "medium", color: { rgb: "111111" } } } } : {}) } });
   const tVal = (v: number, fuerte: boolean) => ({ v, t: "n", z: MONEY_FMT, s: { font: { bold: fuerte, sz: fuerte ? 11 : 10, color: { rgb: "111111" }, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" }, border: fuerte ? { top: { style: "medium", color: { rgb: "111111" } } } : { bottom: { style: "thin", color: { rgb: palette.brd } } } } });
 
+  // 🔴 6-oct-2026: «Subtotal» suma la columna de los renglones y «Total» suma
+  // el pie, con FÓRMULA (solo si da lo mismo que el papel: ningún número cambia).
+  const colSub = columnas.findIndex((c) => c.clave === "subtotal");
+  const primeraFilaPie = r;
+  let sumaPie = 0;
   for (const t of totalesDelPapel(empresa, subtotal)) {
     ws[addr(r, colRotulo)] = tLbl(`${t.rotulo}:`, t.fuerte);
-    ws[addr(r, colValor)] = tVal(t.valor, t.fuerte);
+    const celda: Record<string, unknown> = tVal(t.valor, t.fuerte);
+    if (t.rotulo === "Subtotal" && colSub >= 0 && renglones.length > 0) {
+      celda.f = `SUM(${addr(primeraFilaItems, colSub)}:${addr(primeraFilaItems + renglones.length - 1, colSub)})`;
+    } else if (t.fuerte && r > primeraFilaPie && Math.abs(sumaPie - t.valor) < 0.005) {
+      celda.f = `SUM(${addr(primeraFilaPie, colValor)}:${addr(r - 1, colValor)})`;
+    }
+    sumaPie += t.valor;
+    ws[addr(r, colValor)] = celda as unknown as XLSX.CellObject;
     h[r] = t.fuerte ? 22 : 16; r++;
   }
 

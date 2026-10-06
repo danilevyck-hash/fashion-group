@@ -234,7 +234,7 @@ describe("🔴 la regla vive en UN solo lugar", () => {
         "didDrawPage: () => cabecera(",
       );
       // La cabeza se dibuja UNA vez por reporte, antes de la tabla.
-      expect(src.match(/cabecera\(doc, titulo\)/g)?.length ?? 0, `${rel} dibuja la cabeza de más`).toBe(1);
+      expect(src.match(/cabecera\(doc, titulo(, false)?\)/g)?.length ?? 0, `${rel} dibuja la cabeza de más`).toBe(1);
       // Y las hojas de continuación arrancan arriba, sin franja en blanco.
       expect(src).toContain("top: ALTO_CONTINUACION");
     }

@@ -200,12 +200,15 @@ function pieDelPapel(
   porCobrar: { t0: number; t1: number; t2: number; total: number }[],
   aFavor: { t0: number; t1: number; t2: number; total: number }[],
 ): Celda[][] {
+  // 🩸 6-oct-2026: `columnStyles` no alcanza al pie de `autoTable`, y los montos
+  // del total salían pegados a la izquierda de su columna. Van a la derecha.
+  const der = (v: number): Celda => ({ content: dinero(v), styles: { halign: "right" } });
   const t = totalDeLasFilas(porCobrar);
   if (aFavor.length === 0) {
-    return [["", "Total", dinero(t.t0), dinero(t.t1), dinero(t.t2), dinero(t.total)]];
+    return [["", "Total", der(t.t0), der(t.t1), der(t.t2), der(t.total)]];
   }
   const g = totalGeneral(porCobrar, aFavor);
-  return [["", ROTULO_TOTAL_GENERAL, dinero(g.t0), dinero(g.t1), dinero(g.t2), dinero(g.total)]];
+  return [["", ROTULO_TOTAL_GENERAL, der(g.t0), der(g.t1), der(g.t2), der(g.total)]];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

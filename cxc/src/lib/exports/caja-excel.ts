@@ -128,12 +128,17 @@ function appendSaldoSummary(ws: XLSX.WorkSheet, fondo: number, totalTotal: numbe
 
   heights[r] = 6; r++; // espaciador
 
+  // 🔴 6-oct-2026: «Total gastado» y «Saldo disponible» son FÓRMULAS (el total
+  // de la tabla y fondo − gastado): borrar un gasto los recalcula.
+  const filaTotales = range.e.r;
+  const filaFondo = r;
   ws[addr(r, lastCol - 2)] = lbl("Fondo inicial:");
   ws[addr(r, lastCol)] = num(fondo);
   heights[r] = 18; r++;
 
+  const filaGastado = r;
   ws[addr(r, lastCol - 2)] = lbl("Total gastado:");
-  ws[addr(r, lastCol)] = num(totalTotal, totalTotal > fondo * 0.8 ? { fg: SALDO_NEGATIVO.fg } : {});
+  ws[addr(r, lastCol)] = { ...num(totalTotal, totalTotal > fondo * 0.8 ? { fg: SALDO_NEGATIVO.fg } : {}), f: addr(filaTotales, lastCol) };
   heights[r] = 18; r++;
 
   // MISMA cuenta que la pantalla, el modal de cierre y el papel: una sola vez.
@@ -147,6 +152,7 @@ function appendSaldoSummary(ws: XLSX.WorkSheet, fondo: number, totalTotal: numbe
       alignment: { horizontal: "right" },
       border: B,
     },
+    f: `ROUND(${addr(filaFondo, lastCol)}-${addr(filaGastado, lastCol)},2)`,
   };
   heights[r] = 20; r++;
 

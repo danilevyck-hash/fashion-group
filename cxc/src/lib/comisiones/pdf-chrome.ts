@@ -72,8 +72,24 @@ export const ALTO_CONTINUACION = MARGEN;
 /** Aire de abajo, donde va el pie. */
 export const PIE = 18;
 
-/** La cabeza del papel: logo y de qué es. Se dibuja UNA vez, en su primera hoja. */
-export function cabecera(doc: jsPDF, titulo: string): void {
+/** Dónde cae el renglón del título (línea base), debajo del logo. */
+export const Y_TITULO = 10 + FG_LOGO_HEIGHT + 5;
+
+/** La raya gris de la casa, a lo ancho entre márgenes. */
+export function rayaGris(doc: jsPDF, y: number): void {
+  const w = doc.internal.pageSize.getWidth();
+  doc.setDrawColor(...LINEA);
+  doc.setLineWidth(0.3);
+  doc.line(MARGEN, y, w - MARGEN, y);
+}
+
+/**
+ * La cabeza del papel: logo y de qué es. Se dibuja UNA vez, en su primera hoja.
+ * `conRaya: false` la deja sin la raya de debajo del título: el reporte de un
+ * vendedor la pone después de su número grande (6-oct-2026: 🩸 la raya cruzaba
+ * el «$40.67» de Rodrigo).
+ */
+export function cabecera(doc: jsPDF, titulo: string, conRaya = true): void {
   const w = doc.internal.pageSize.getWidth();
   try {
     doc.addImage(FG_LOGO_BASE64, "JPEG", MARGEN, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
@@ -83,10 +99,8 @@ export function cabecera(doc: jsPDF, titulo: string): void {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(...TINTA);
-  doc.text(textoDePdf(titulo), MARGEN, 10 + FG_LOGO_HEIGHT + 5);
-  doc.setDrawColor(...LINEA);
-  doc.setLineWidth(0.3);
-  doc.line(MARGEN, 10 + FG_LOGO_HEIGHT + 7.5, w - MARGEN, 10 + FG_LOGO_HEIGHT + 7.5);
+  doc.text(textoDePdf(titulo), MARGEN, Y_TITULO, { maxWidth: w - 2 * MARGEN });
+  if (conRaya) rayaGris(doc, Y_TITULO + 2.5);
 }
 
 /** El pie de la casa, con la numeración. Se escribe al final, ya con el total. */

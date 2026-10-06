@@ -31,6 +31,7 @@
     - En el celular, todo lo que se toca mide al menos 44 px.
     - Al elegir, una tarjeta entera es más fácil de tocar que una casilla chica.
 11. **Impresos.** Las etiquetas de la Zebra (térmica) no llevan fondos negros sólidos: van en texto negro sobre blanco, con negrita para lo importante.
+    - **Ningún papel sale con textos encimados ni cortados** (6-oct-2026): todo PDF o Excel nuevo se agrega a `src/lib/papeles-qa/catalogo.ts`. La prueba `papeles-sin-encimar` lo revisa en CI y `npx tsx scripts/revisar-papeles.ts <carpeta>` arma la galería para mirarlos todos de un vistazo.
 12. **Rollback.** Todo rediseño entra detrás de un interruptor (`false` = como antes) y con un test candado de lo que no debe cambiar (datos, PDF, reglas).
 
 ## Detalles aprendidos (se aplican en TODO el sistema)

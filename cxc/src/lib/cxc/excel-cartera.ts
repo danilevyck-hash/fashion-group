@@ -15,6 +15,7 @@
 // ⚠️ La fila de Total al pie queda FUERA del filtro (lo decide
 // `buildReportSheet`): filtrar no la esconde ni la suma como si fuera un cliente.
 // ─────────────────────────────────────────────────────────────────────────────
+import XLSX from "xlsx-js-style";
 import {
   buildReportSheet,
   workbookFromSheets,
@@ -64,6 +65,22 @@ function filaDeSuma(rotulo: string, antes: number, t: { t0: number; t1: number; 
   return [...vacias, fuerte(rotulo), { v: t.t0, bold: true }, { v: t.t1, bold: true }, { v: t.t2, bold: true }, { v: t.total, bold: true }];
 }
 
+/**
+ * 🔴 6-oct-2026: «Total por cobrar» es una FÓRMULA sobre sus renglones, y el
+ * «Total general» suma todo MENOS esa fila (`fueraDelTotal`): borrar un renglón
+ * recalcula los dos. Ningún número cambia.
+ */
+function subtotalConFormula(ws: XLSX.WorkSheet, filaSubtotal: number, primeraCol: number): void {
+  // Título en la 1, vacía la 2, encabezados en la 3: los datos arrancan en la 4.
+  const primera = 4;
+  const fila = primera + filaSubtotal;
+  for (let c = primeraCol; c < primeraCol + 4; c++) {
+    const ref = XLSX.utils.encode_cell({ r: fila - 1, c });
+    const letra = XLSX.utils.encode_col(c);
+    if (ws[ref] && filaSubtotal > 0) ws[ref].f = `SUM(${letra}${primera}:${letra}${fila - 1})`;
+  }
+}
+
 /** «Total por cliente»: un renglón por cliente. */
 export function libroTotalPorCliente(filas: FilaCliente[], aFavor: FilaCliente[], titulo: string) {
   const columns: ReportColumn[] = [
@@ -84,7 +101,9 @@ export function libroTotalPorCliente(filas: FilaCliente[], aFavor: FilaCliente[]
     columns,
     rows,
     totals: ["", aFavor.length > 0 ? ROTULO_TOTAL_GENERAL : "Total", t.t0, t.t1, t.t2, t.total],
+    fueraDelTotal: aFavor.length > 0 ? [filas.length] : [],
   });
+  if (aFavor.length > 0) subtotalConFormula(ws, filas.length, 2);
   return workbookFromSheets([{ name: "Cartera", ws }]);
 }
 
@@ -105,6 +124,7 @@ export function libroPorCompania(bloques: BloqueCliente[], aFavor: BloqueCliente
     }
   };
   renglones(bloques);
+  const filaSubtotal = rows.length;
   if (aFavor.length > 0) {
     rows.push(filaDeSuma(ROTULO_TOTAL_POR_COBRAR, 2, totalDeLasFilas(bloques)));
     rows.push(["", "", fuerte(rotuloSaldoAFavor(aFavor.length))]);
@@ -116,6 +136,8 @@ export function libroPorCompania(bloques: BloqueCliente[], aFavor: BloqueCliente
     columns,
     rows,
     totals: ["", "", aFavor.length > 0 ? ROTULO_TOTAL_GENERAL : "Total", t.t0, t.t1, t.t2, t.total],
+    fueraDelTotal: aFavor.length > 0 ? [filaSubtotal] : [],
   });
+  if (aFavor.length > 0) subtotalConFormula(ws, filaSubtotal, 3);
   return workbookFromSheets([{ name: "Cartera por empresa", ws }]);
 }

@@ -225,8 +225,8 @@ describe("🔴 4. las dos formas del detalle bajan el MISMO archivo", () => {
 
 describe("⚠️ 5. lo que el papel dice no cambió", () => {
   it("🔴 la factura va LARGA y la columna «Tipo» se queda", async () => {
-    expect([...COLUMNAS_VENTAS]).toEqual(["Fecha", "Cliente", "Factura", "Tipo", "Subtotal"]);
-    expect([...COLUMNAS_COBROS]).toEqual(["Fecha", "Cliente", "Monto"]);
+    expect([...COLUMNAS_VENTAS]).toEqual(["Fecha", "Cliente", "Factura", "Tipo", "Subtotal", "Comisión"]);
+    expect([...COLUMNAS_COBROS]).toEqual(["Fecha", "Cliente", "Monto", "Comisión"]);
     const celdas = filasVentas(EDWIN).map((f) => f.celdas);
     expect(celdas[0]).toContain("11-000003022");
     expect(celdas[0]).toContain("FA");

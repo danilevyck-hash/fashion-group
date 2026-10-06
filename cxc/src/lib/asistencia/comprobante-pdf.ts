@@ -55,9 +55,11 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
   // en blanco en un papel de pago no informa: confunde.
   if (c.identificacion) {
     doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(90);
-    doc.text(c.identificacion, HOJA.ancho / 2, y - 3.5, { align: "center" });
+    // 🩸 6-oct-2026: iba a 3,5 mm sobre el renglón y pisaba el nombre de la
+    // empresa (lo cazó `papeles-sin-encimar`). Ahora va DEBAJO, con aire.
+    doc.text(c.identificacion, HOJA.ancho / 2, y - 1, { align: "center" });
     doc.setTextColor(0);
-    y += 2;
+    y += 4;
   }
   doc.setFont("helvetica", "normal").setFontSize(9.5);
   for (const linea of c.encabezado.slice(0, 2)) {

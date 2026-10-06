@@ -49,8 +49,10 @@ import {
   ROJO,
   TINTA,
   GRIS,
+  Y_TITULO,
   asegurarEspacio,
   cabecera,
+  rayaGris,
   estilosDeTabla,
   finDeTabla,
   piePorHoja,
@@ -90,18 +92,26 @@ function tituloSeccion(doc: jsPDF, y: number, texto: string): number {
  * y la caja «Resumen», que repetían lo de arriba. Ningún número cambia: el
  * total es `totalAPagarComision`, la misma cuenta de la pantalla.
  */
-function dibujarNumero(doc: jsPDF, y: number, hoja: HojaReporte, s: SeccionesDelPapel): number {
+// 🩸 6-oct-2026: el número arrancaba en la MISMA altura que el título y la raya
+// lo cruzaba («$40.67» de Rodrigo · Vistana · sep). Orden fijo: logo · título ·
+// número grande · línea gris · raya · VENTAS.
+function dibujarNumero(doc: jsPDF, hoja: HojaReporte, s: SeccionesDelPapel): number {
   const total = totalAPagarComision(hoja.data, hoja.descuentos);
+  const yNumero = Y_TITULO + 10;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(22);
   doc.setTextColor(...(total < 0 ? ROJO : TINTA));
-  doc.text(textoDePdf(fmtMoney(total)), MARGEN, y + 7);
+  doc.text(textoDePdf(fmtMoney(total)), MARGEN, yNumero);
   const partes = [lineaDeComisionesDelPapel(hoja.data, s)];
   for (const d of descuentosActivos(hoja.descuentos)) partes.push(`${d.concepto} −${fmtMoney(d.monto)}`);
   doc.setFontSize(9);
   doc.setTextColor(...GRIS);
-  doc.text(textoDePdf(partes.filter(Boolean).join(" · ")), MARGEN, y + 13);
-  return y + 20;
+  const ancho = doc.internal.pageSize.getWidth() - 2 * MARGEN;
+  const lineas = doc.splitTextToSize(textoDePdf(partes.filter(Boolean).join(" · ")), ancho) as string[];
+  doc.text(lineas, MARGEN, yNumero + 6);
+  const yRaya = yNumero + 6 + (lineas.length - 1) * 4 + 3;
+  rayaGris(doc, yRaya);
+  return yRaya + 6;
 }
 
 /** La línea gris del pie: tasas y bases de lo que aplica. */
@@ -135,9 +145,9 @@ export function construirPdfComision(hojasPedidas: HojaReporte[]): jsPDF {
   hojas.forEach(({ hoja, s }, i) => {
     const titulo = encabezadoReporte(hoja);
     if (i > 0) doc.addPage();
-    cabecera(doc, titulo);
+    cabecera(doc, titulo, false);
 
-    let y = dibujarNumero(doc, ALTO_CABECERA - 6, hoja, s);
+    let y = dibujarNumero(doc, hoja, s);
 
     if (s.ventas) {
       const ventas = filasVentas(hoja.data);
@@ -148,13 +158,14 @@ export function construirPdfComision(hojasPedidas: HojaReporte[]): jsPDF {
         head: [[...COLUMNAS_VENTAS]],
         body: ventas.length
           ? ventas.map((f) => f.celdas.map(textoDePdf))
-          : [["", "Sin ventas en el período.", "", "", ""]],
+          : [["", "Sin ventas en el período.", "", "", "", ""]],
         columnStyles: {
           0: { cellWidth: 20 },
           1: { cellWidth: "auto" },
           2: { cellWidth: 28 },
           3: { cellWidth: 12, halign: "center" },
           4: { cellWidth: 26, halign: "right" },
+          5: { cellWidth: 24, halign: "right" },
         },
         didParseCell: (d) => {
           if (d.section === "body" && ventas[d.row.index]?.negativo) d.cell.styles.textColor = ROJO;
@@ -174,11 +185,12 @@ export function construirPdfComision(hojasPedidas: HojaReporte[]): jsPDF {
         head: [[...COLUMNAS_COBROS]],
         body: cobros.length
           ? cobros.map((f) => f.celdas.map(textoDePdf))
-          : [["", "Sin cobros en el período.", ""]],
+          : [["", "Sin cobros en el período.", "", ""]],
         columnStyles: {
           0: { cellWidth: 20 },
           1: { cellWidth: "auto" },
           2: { cellWidth: 26, halign: "right" },
+          3: { cellWidth: 24, halign: "right" },
         },
         didParseCell: (d) => {
           if (d.section === "body" && cobros[d.row.index]?.negativo) d.cell.styles.textColor = ROJO;

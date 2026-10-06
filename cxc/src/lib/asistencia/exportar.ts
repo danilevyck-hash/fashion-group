@@ -302,6 +302,11 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
   for (let c = 0; c < resumen[0].length; c++) {
     const ref = XLSX.utils.encode_cell({ r: filaTotal, c });
     if (h2[ref]) h2[ref].s = { font: { bold: true }, alignment: { horizontal: c >= 3 ? "right" : "left" } };
+    // 🔴 6-oct-2026: el TOTAL es una FÓRMULA de su columna (da el mismo número).
+    if (h2[ref] && h2[ref].t === "n" && personas.length > 0) {
+      const col = XLSX.utils.encode_col(c);
+      h2[ref].f = `SUM(${col}2:${col}${personas.length + 1})`;
+    }
   }
   // La columna "…de días a revisar" en rojo: es la advertencia.
   // ⚠️ El 9 sigue a la posición de ESA columna: al insertar "Días trabajando
@@ -421,6 +426,11 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     styles: { fontSize: 7.5, cellPadding: 1.6, textColor: [31, 41, 55], lineColor: [229, 231, 235], lineWidth: 0.1 },
     headStyles: { fontStyle: "bold", fontSize: 6.8, textColor: [107, 114, 128], lineWidth: { bottom: 0.3 }, valign: "bottom" },
     footStyles: { fontStyle: "bold", fontSize: 7.5, textColor: [17, 24, 39], lineWidth: { top: 0.3 } },
+    // 🩸 6-oct-2026: `columnStyles` no alcanza al pie y los totales salían a la
+    // izquierda de su columna. Los números del TOTAL van a la derecha.
+    didParseCell: (d) => {
+      if (d.section === "foot" && d.column.index >= 2) d.cell.styles.halign = "right";
+    },
     columnStyles: {
       0: { cellWidth: 46 }, 1: { halign: "center", cellWidth: 13 },
       2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" },

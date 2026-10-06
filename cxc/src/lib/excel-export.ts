@@ -353,7 +353,9 @@ export function formulaDelTotal(
     hayNumeros = true;
     if (!fuera.includes(i)) suma += n;
   });
-  if (!hayNumeros || Math.abs(suma - total) > 0.005) return null;
+  // Una columna en blanco con total 0 también suma: `=SUM()` de vacías da 0.
+  if (!hayNumeros && total !== 0) return null;
+  if (Math.abs(suma - total) > 0.005) return null;
   const letra = XLSX.utils.encode_col(col);
   const ultima = primeraFila + rows.length - 1;
   const restas = fuera
