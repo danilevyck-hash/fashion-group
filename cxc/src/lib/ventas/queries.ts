@@ -10,7 +10,8 @@ import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
 import { RPC_RETAIL, type RpcRetail } from "@/lib/multifashion/rpc-retail";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { filasClientesRango } from "@/lib/ventas/clientes-rango-server";
+import { filasClientesRango, unaFilaPorCliente } from "@/lib/ventas/clientes-rango-server";
+import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { esEmpresaDelGrupo } from "@/lib/clientes/mundos";
 import { withDbRetry, isTransientDbError } from "@/lib/supabase-retry";
 import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
@@ -483,13 +484,31 @@ export async function fetchClientes({
   if (isClosedYear) {
     // Año cerrado: usar RPC clientes_anio(p_year, p_empresa). Filtra
     // clientes con compras en p_year (no rolling 12m) y delta vs p_year-1.
+    //
+    // 🩸 «TODAS» = LA SUMA DE CADA EMPRESA POR SEPARADO (5-oct-2026). Con
+    // `p_empresa = NULL` la RPC filtra la empresa principal en el WHERE, que
+    // Postgres evalúa ANTES de sus SUM() OVER: cada cliente salía solo con la
+    // venta de su principal. Se pide empresa por empresa y se junta con
+    // `unaFilaPorCliente`, la misma cuenta del «Rango de fechas».
     viewLabel = `clientes_anio(${year}, ${empresaKey ?? "todas"})`;
-    const res = await supabaseServer.rpc("clientes_anio", {
-      p_year: year,
-      p_empresa: isTodas ? null : empresaKey,
-    });
-    data = (res.data as ClientesEmpresaRow[] | null) ?? null;
-    error = res.error ? { message: res.error.message } : null;
+    const empresas = isTodas ? [...B2B_EMPRESA_KEYS] : [empresaKey as string];
+    const respuestas = await Promise.all(
+      empresas.map((e) => supabaseServer.rpc("clientes_anio", { p_year: year, p_empresa: e })),
+    );
+    const fallida = respuestas.find((r) => r.error);
+    error = fallida?.error ? { message: fallida.error.message } : null;
+    const porEmpresa = respuestas.flatMap((r) => (r.data as ClientesEmpresaRow[] | null) ?? []);
+    data = isTodas
+      ? (unaFilaPorCliente(porEmpresa.map((r) => ({
+          ...r,
+          compras_ytd: toNum(r.compras_ytd),
+          compras_anio_anterior: toNum(r.compras_anio_anterior),
+          delta_vs_2025: r.delta_vs_2025 == null ? null : toNum(r.delta_vs_2025),
+          empresas_count: 1,
+          empresas_breakdown: null,
+        }))) as unknown as ClientesEmpresaRow[])
+          .sort((a, b) => (b.ultima_compra ?? "").localeCompare(a.ultima_compra ?? ""))
+      : porEmpresa;
   } else {
     // Año en curso: vista 12m rolling existente (materialized views).
     //

@@ -118,30 +118,38 @@ export function armarFilasRango(args: {
     };
   });
 
-  let filas = porEmpresa;
-  if (todas) {
-    // Como el SQL: una fila por (cliente_id, nombre), en la empresa que más le vendió.
-    const grupos = new Map<string, FilaClienteRango[]>();
-    for (const f of porEmpresa) {
-      const k = `${f.cliente_id ?? ""}|${f.cliente_nombre}`;
-      grupos.set(k, [...(grupos.get(k) ?? []), f]);
-    }
-    filas = [...grupos.values()].map((g): FilaClienteRango => {
-      const orden = [...g].sort((a, b) => b.compras_ytd - a.compras_ytd);
-      const actual = r2(g.reduce((s, f) => s + f.compras_ytd, 0));
-      const previo = r2(g.reduce((s, f) => s + f.compras_anio_anterior, 0));
-      return {
-        ...orden[0],
-        compras_ytd: actual,
-        compras_anio_anterior: previo,
-        delta_vs_2025: previo > 0 ? (actual - previo) / previo : null,
-        ultima_compra: g.reduce<string | null>((u, f) => (f.ultima_compra && (!u || f.ultima_compra > u) ? f.ultima_compra : u), null),
-        empresas_count: g.length,
-        empresas_breakdown: orden.map(f => ({ empresa: f.empresa ?? "", monto: f.compras_ytd })),
-      };
-    });
-  }
+  const filas = todas ? unaFilaPorCliente(porEmpresa) : porEmpresa;
   return filas.sort((a, b) => (b.ultima_compra ?? "").localeCompare(a.ultima_compra ?? ""));
+}
+
+/**
+ * PURO: «Todas» = la suma de cada empresa por separado. Una fila por
+ * (cliente_id, nombre), en la empresa que más le vendió, con compras, año
+ * anterior, Δ, última compra y desglose de TODAS sus empresas. Lo usan el rango
+ * y los años CERRADOS: 🩸 la RPC `clientes_anio(año, NULL)` filtraba la empresa
+ * principal en el WHERE, ANTES de sus SUM() OVER, y cada cliente salía solo con
+ * la venta de su principal (5-oct-2026).
+ */
+export function unaFilaPorCliente(porEmpresa: readonly FilaClienteRango[]): FilaClienteRango[] {
+  const grupos = new Map<string, FilaClienteRango[]>();
+  for (const f of porEmpresa) {
+    const k = `${f.cliente_id ?? ""}|${f.cliente_nombre}`;
+    grupos.set(k, [...(grupos.get(k) ?? []), f]);
+  }
+  return [...grupos.values()].map((g): FilaClienteRango => {
+    const orden = [...g].sort((a, b) => b.compras_ytd - a.compras_ytd);
+    const actual = r2(g.reduce((s, f) => s + f.compras_ytd, 0));
+    const previo = r2(g.reduce((s, f) => s + f.compras_anio_anterior, 0));
+    return {
+      ...orden[0],
+      compras_ytd: actual,
+      compras_anio_anterior: previo,
+      delta_vs_2025: previo > 0 ? (actual - previo) / previo : null,
+      ultima_compra: g.reduce<string | null>((u, f) => (f.ultima_compra && (!u || f.ultima_compra > u) ? f.ultima_compra : u), null),
+      empresas_count: g.length,
+      empresas_breakdown: orden.map(f => ({ empresa: f.empresa ?? "", monto: f.compras_ytd })),
+    };
+  });
 }
 
 const inicioPanama = (iso: string) => `${iso}T00:00:00-05:00`;
