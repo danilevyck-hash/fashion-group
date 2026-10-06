@@ -61,6 +61,7 @@ import {
   siguienteEstado,
   sinBulto,
   todoAsignado,
+  totalesDelPedido,
   validarBulto,
   veLaEmpresa,
   veLaPlata,
@@ -431,8 +432,8 @@ describe("🔴 lo que Daniel pidió al APROBAR (6-oct-2026)", () => {
     expect(detalle).toContain("guardarUna");
     expect(detalle).toContain("onBlur");
     expect(detalle).toContain('e.key !== "Enter"');
-    // 🔴 Y las casillas con «Poner en bulto…» SIGUEN existiendo.
-    expect(detalle).toContain("Poner en bulto");
+    // 🔴 Y las casillas con «Asignar bulto» SIGUEN existiendo.
+    expect(detalle).toContain("Asignar bulto");
     expect(detalle).toContain("marcarTodas");
   });
 
@@ -441,6 +442,61 @@ describe("🔴 lo que Daniel pidió al APROBAR (6-oct-2026)", () => {
     // La casilla de escribir solo aparece desde `sm`; en el celular, el chip.
     expect(detalle).toContain('className="hidden h-9 w-16 rounded-md border border-gray-300 px-2 text-right tabular-nums focus:border-gray-900 focus:outline-none sm:block"');
     expect(detalle).toContain('<span className="sm:hidden">{chip}</span>');
+  });
+});
+
+describe("🔴 EL PAPEL: EL TOTAL AL PIE Y LAS DOS FORMAS (6-oct-2026)", () => {
+  // Daniel, al ver el papel: falta el total de unidades y el total en dinero,
+  // en negrita con raya arriba; y «a veces el cliente pide con precio y sin
+  // precio», las dos a la vista y para todos.
+  const leer = (f: string) => fs.readFileSync(path.resolve(__dirname, "../..", f), "utf8");
+  const L = (cant: number, total: number | null) =>
+    linea({ codigo_barra_id: cant, cantidad: cant, total, precio: total == null ? null : 1 });
+
+  it("el total suma UNIDADES y DINERO", () => {
+    expect(totalesDelPedido([L(12, 180.6), L(6, 90.3)])).toEqual({ unidades: 18, dinero: 270.9 });
+  });
+
+  it("🔴 sin precios va SOLO el de unidades: un cero en dinero no diría nada", () => {
+    expect(totalesDelPedido([L(12, null), L(6, null)])).toEqual({ unidades: 18, dinero: null });
+  });
+
+  it("las unidades admiten decimales (Switch manda 4.5) y no se redondean a entero", () => {
+    expect(totalesDelPedido([L(4.5, null)]).unidades).toBe(4.5);
+  });
+
+  it("el papel dibuja el pie con `foot`, que es el que lleva raya y negrita", () => {
+    const papel = leer("lib/guias/pdf-pedido-bultos.ts");
+    expect(papel).toContain("foot:");
+    expect(papel).toContain("totalesDelPedido");
+  });
+
+  it("🔴 y existen las DOS formas, con y sin precios", () => {
+    const papel = leer("lib/guias/pdf-pedido-bultos.ts");
+    expect(papel).toContain("COLUMNAS_PAPEL_SIN_PRECIOS");
+    expect(papel).toContain("conPrecios");
+    // La ruta las sirve por `?precios=`, y por omisión CON precios.
+    const ruta = leer("app/api/guias/pedidos/detalle/papel/route.ts");
+    expect(ruta).toContain('q.get("precios") !== "no"');
+  });
+
+  it("🔴 las dos están A LA VISTA, ninguna escondida en un «···»", () => {
+    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    expect(detalle).toContain("Con precios");
+    expect(detalle).toContain("Sin precios");
+    // Y las dos las puede pedir cualquiera que entre a Pedidos: la ruta del
+    // papel se autoriza con `PEDIDOS_VER_ROLES`, no con quien ve la plata.
+    const ruta = leer("app/api/guias/pedidos/detalle/papel/route.ts");
+    expect(ruta).toContain("PEDIDOS_VER_ROLES");
+    expect(ruta).not.toContain("veLaPlata");
+  });
+
+  it("🔴 nombres de ERP, no palabras de la casa (docs/nombres-erp.md)", () => {
+    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    expect(detalle).toContain("Asignar bulto");
+    expect(detalle).not.toContain("Poner en bulto");
+    expect(detalle).not.toContain("artículos marcados");
+    expect(detalle).toContain("Seleccionar todos los artículos");
   });
 });
 

@@ -424,6 +424,7 @@ export const PAPELES: Papel[] = [
   { nombre: "Guías — etiquetas 4x6", tipo: "pdf", generar: async () => pdf(construirPdfEtiquetas(datosDeEtiqueta(ETIQUETA), cajasDelJuego(2), "4x6")), estiloPropio: TERMICA },
   { nombre: "Guías — pedidos impresos", tipo: "pdf", generar: async () => pdf(construirPdfPedidos("Pedidos pendientes", PEDIDOS, "2026-10-06")) },
   { nombre: "Guías — bultos de un pedido", tipo: "pdf", generar: async () => pdf(construirPdfPedidoBultos(BULTOS)) },
+  { nombre: "Guías — bultos de un pedido, sin precios", tipo: "pdf", generar: async () => pdf(construirPdfPedidoBultos({ ...BULTOS, conPrecios: false })) },
   { nombre: "Catálogos — pedido Reebok", tipo: "pdf", generar: async () => pdf(buildOrderPdfDoc({ marca: "reebok", orderNumber: "RBK-001", clientName: "Inversiones y Distribuidora Paso Canoas Internacional, S.A.", createdAt: "2026-09-24T12:00:00Z", items: itemsPedido(30), bultoSize: () => 12, images: {} })), estiloPropio: MARCA },
   { nombre: "Catálogos — pedido Joybees", tipo: "pdf", generar: async () => pdf(buildOrderPdfDoc({ marca: "joybees", orderNumber: "JB-001", clientName: "City Mall Paso Canoa", createdAt: "2026-09-24", items: itemsPedido(8), bultoSize: () => 12, images: {} })), estiloPropio: MARCA },
   { nombre: "Catálogos — catálogo Reebok", tipo: "pdf", generar: async () => pdf(buildCatalogPdfDoc({ marca: "reebok", sections: [seccion("HOMBRE", 9), seccion("MUJER", 4)], subtitle: "Todos los productos", totalCount: 13, images: {} })), estiloPropio: MARCA },

@@ -53,6 +53,7 @@ Antes de nombrar algo nuevo, busca aquí el término. Si el concepto no está, u
 | Respaldo de un gasto | Comprobante | Foto o factura, Papel |
 | Dónde se gastó | Tienda | De una tienda, La tienda esa |
 | Agrupar mercancía para despacho | Bultos · Unidades por bulto | Poner en bulto, Embultar |
+| Poner una línea del pedido en un bulto | Asignar bulto · Quitar bulto · «N artículos asignados» | Poner en bulto, Poner en el bulto, Quitar del bulto, Marcar artículos |
 | Rótulos de formulario | Sustantivo («Pago por planilla», «Marcación en reloj») | Preguntas («¿Qué…?», «¿Quién…?», «¿A quién…?»), salvo «¿Es X (D-25)?», que Daniel aprobó textual |
 
 ## Palabras prohibidas en textos visibles

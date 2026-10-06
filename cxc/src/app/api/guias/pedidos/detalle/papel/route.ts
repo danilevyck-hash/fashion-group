@@ -1,8 +1,13 @@
 /**
- * EL PAPEL DEL PEDIDO, DIBUJADO EN EL SERVIDOR
+ * EL PAPEL DEL PEDIDO, DIBUJADO EN EL SERVIDOR, EN SUS DOS FORMAS
  * (6-oct-2026, `PEDIDOS_BULTOS_2026_10`).
  *
- *   GET ?empresa_key=&pedido_switch_id=  → el PDF
+ *   GET ?empresa_key=&pedido_switch_id=&precios=si|no  → el PDF
+ *
+ * 🔴 DOS FORMAS, LAS DOS PARA TODOS (Daniel, 6-oct-2026): *«a veces el cliente
+ * pide con precio y sin precio»*. Las dos las puede pedir cualquiera que entre
+ * a Pedidos —bodega incluida—, porque el papel se arma acá: a su navegador no
+ * le viaja ningún precio, ni cuando imprime la forma que sí los lleva.
  *
  * 🔴 POR QUÉ EN EL SERVIDOR Y NO EN EL NAVEGADOR, como los demás papeles de la
  * casa: Daniel decidió el 6-oct-2026 que **bodega no ve Precio ni Total** y que
@@ -38,6 +43,8 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams;
   const empresa = (q.get("empresa_key") ?? "").trim();
   const id = Number(q.get("pedido_switch_id"));
+  // Por omisión, con precios: es la forma de siempre.
+  const conPrecios = q.get("precios") !== "no";
   if (!empresa || !Number.isInteger(id)) {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
   }
@@ -69,6 +76,7 @@ export async function GET(req: NextRequest) {
       secuencial: pedido.secuencial,
       empresa: nombreCortoEmpresa(pedido.empresa_key),
       cliente: pedido.cliente_nombre,
+      conPrecios,
       lineas,
       firmas: estado
         ? {
@@ -83,7 +91,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(bytes, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="bultos-${pedido.secuencial}.pdf"`,
+        "Content-Disposition": `inline; filename="pedido-${pedido.secuencial}${conPrecios ? "" : "-sin-precios"}.pdf"`,
         "Cache-Control": "no-store",
       },
     });

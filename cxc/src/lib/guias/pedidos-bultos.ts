@@ -290,6 +290,22 @@ export const COLUMNAS_DETALLE_SIN_PLATA = COLUMNAS_DETALLE.filter(
   (c) => c !== "Precio" && c !== "Total",
 );
 
+/**
+ * El pie del papel: **total de unidades** y **total en dinero** (Daniel, al ver
+ * el papel, 6-oct-2026). Sin precios se suman solo las unidades, y el dinero
+ * queda en `null` — no se escribe un cero que no significa nada.
+ */
+export function totalesDelPedido(
+  lineas: readonly Pick<LineaPedido, "cantidad" | "total">[],
+): { unidades: number; dinero: number | null } {
+  const unidades = lineas.reduce((a, l) => a + l.cantidad, 0);
+  const conDinero = lineas.filter((l) => l.total != null);
+  return {
+    unidades: Math.round(unidades * 100) / 100,
+    dinero: conDinero.length === 0 ? null : Math.round(conDinero.reduce((a, l) => a + (l.total ?? 0), 0) * 100) / 100,
+  };
+}
+
 export const MIN_BULTO = 1;
 /** Un envío real tuvo 416 bultos; el tope deja aire y atrapa un dedazo. */
 export const MAX_BULTO = 9999;

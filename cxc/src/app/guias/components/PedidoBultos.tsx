@@ -8,8 +8,8 @@
 // Se ve como el PDF de pedido de Switch, SIN la columna «Código barra»:
 //   Código · Referencia · Descripción · Cantidad · Precio · Total · Bulto
 //
-// Bodega marca varias líneas con casillas y toca «Poner en bulto…», escribe el
-// número y esas líneas quedan ahí. Repite hasta terminar. Arriba se lee
+// Bodega selecciona varias líneas con casillas y toca «Asignar bulto», escribe
+// el número y esas líneas quedan ahí. Repite hasta terminar. Arriba se lee
 // «18 de 24 artículos asignados · 6 bultos».
 //
 // 🔑 Lo medido: 416 bultos y 56 líneas en un envío real. Por eso el bulto se
@@ -138,7 +138,7 @@ export default function PedidoBultos({
       setMarcadas(new Set());
       setPidiendoBulto(false);
       setNumero("");
-      toast(bulto == null ? "Artículos sin bulto" : `Artículos en el bulto ${bulto}`, "success");
+      toast(bulto == null ? "Bulto quitado" : `Bulto ${bulto} asignado`, "success");
     } catch (e) {
       toast(e instanceof Error && e.message.length < 90 ? e.message : "No se pudo guardar el bulto. Intenta de nuevo.", "error");
     } finally {
@@ -201,11 +201,12 @@ export default function PedidoBultos({
    * 🔴 EL PAPEL LO DIBUJA EL SERVIDOR (6-oct-2026). Daniel pidió que bodega no
    * vea Precio ni Total y que el papel SIEMPRE los lleve: las dos cosas solo se
    * cumplen si el PDF se arma allá, donde los números existen. Acá solo se pide
-   * y se abre.
+   * y se abre — y por eso las DOS formas las puede imprimir cualquiera que entre
+   * a Pedidos, bodega incluida.
    */
-  async function imprimir() {
+  async function imprimir(conPrecios: boolean) {
     try {
-      const r = await fetch(`/api/guias/pedidos/detalle/papel?${clave}`, { cache: "no-store" });
+      const r = await fetch(`/api/guias/pedidos/detalle/papel?${clave}&precios=${conPrecios ? "si" : "no"}`, { cache: "no-store" });
       if (!r.ok) throw new Error(String(r.status));
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
@@ -213,7 +214,7 @@ export default function PedidoBultos({
       if (ventana) {
         ventana.addEventListener("load", () => ventana.print(), { once: true });
       } else {
-        descargarArchivo(new File([blob], `bultos-${pedido.secuencial}.pdf`, { type: "application/pdf" }));
+        descargarArchivo(new File([blob], `pedido-${pedido.secuencial}${conPrecios ? "" : "-sin-precios"}.pdf`, { type: "application/pdf" }));
         toast("Papel descargado — ábrelo para imprimir", "success");
       }
       // El navegador necesita la URL viva mientras abre la pestaña.
@@ -226,7 +227,7 @@ export default function PedidoBultos({
   /**
    * El bulto de una línea. En la computadora es una casilla que se escribe
    * (Tab pasa a la siguiente); en el celular, el chip de siempre, quieto —ahí
-   * se usan las casillas y «Poner en bulto…»—. Quien no puede poner bultos ve
+   * se usan las casillas y «Asignar bulto»—. Quien no puede asignar bultos ve
    * el chip en las dos.
    */
   const celdaBulto = (l: LineaPedido) => {
@@ -286,14 +287,27 @@ export default function PedidoBultos({
           </p>
           {resumen && <p className="text-xs text-gray-500">{resumen}</p>}
         </div>
-        <button
-          type="button"
-          onClick={() => void imprimir()}
-          disabled={!lineas || lineas.length === 0}
-          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 text-[13px] font-medium text-gray-700 transition active:scale-[0.97] disabled:opacity-40"
-        >
-          <Printer size={15} strokeWidth={1.8} aria-hidden /> Imprimir
-        </button>
+        {/* 🔴 Las DOS formas a la vista, ninguna escondida en un «···»
+            (Daniel, 6-oct-2026: «a veces el cliente pide con precio y sin
+            precio»). Las dos las puede usar cualquiera que entre a Pedidos:
+            el papel se arma en el servidor. */}
+        <div className="flex items-center gap-2">
+          <span className="hidden text-xs text-gray-500 sm:inline">Imprimir</span>
+          {[
+            { conPrecios: true, texto: "Con precios" },
+            { conPrecios: false, texto: "Sin precios" },
+          ].map((o) => (
+            <button
+              key={o.texto}
+              type="button"
+              onClick={() => void imprimir(o.conPrecios)}
+              disabled={!lineas || lineas.length === 0}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 text-[13px] font-medium text-gray-700 transition active:scale-[0.97] disabled:opacity-40"
+            >
+              <Printer size={15} strokeWidth={1.8} aria-hidden /> {o.texto}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error ? (
@@ -313,7 +327,7 @@ export default function PedidoBultos({
                   <th className="w-11 py-2 pl-1.5 sm:pl-2">
                     <input
                       type="checkbox"
-                      aria-label="Marcar todos los artículos"
+                      aria-label="Seleccionar todos los artículos"
                       checked={todasMarcadas}
                       onChange={(e) => marcarTodas(e.target.checked)}
                       className="h-[18px] w-[18px] rounded border-gray-300"
@@ -389,7 +403,7 @@ export default function PedidoBultos({
         >
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-gray-600">
-              {marcadas.size} {marcadas.size === 1 ? "artículo marcado" : "artículos marcados"}
+              {marcadas.size} {marcadas.size === 1 ? "artículo seleccionado" : "artículos seleccionados"}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -398,7 +412,7 @@ export default function PedidoBultos({
                 disabled={guardando}
                 className="h-11 rounded-md px-3 text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-40"
               >
-                Quitar del bulto
+                Quitar bulto
               </button>
               {pidiendoBulto ? (
                 <>
@@ -423,7 +437,7 @@ export default function PedidoBultos({
                     disabled={guardando || !numero.trim()}
                     className="h-11 rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:opacity-40"
                   >
-                    Poner en el bulto
+                    Asignar
                   </button>
                 </>
               ) : (
@@ -432,7 +446,7 @@ export default function PedidoBultos({
                   onClick={() => setPidiendoBulto(true)}
                   className="h-11 rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
                 >
-                  Poner en bulto…
+                  Asignar bulto
                 </button>
               )}
             </div>

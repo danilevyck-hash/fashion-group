@@ -52,6 +52,7 @@ import {
   firmasEnOrden,
   resumenAsignacion,
   tituloPapelBultos,
+  totalesDelPedido,
   type FirmasPedido,
   type LineaPedido,
 } from "./pedidos-bultos";
@@ -66,6 +67,11 @@ export const COLUMNAS_PAPEL_BULTOS = [
   "Total",
 ] as const;
 
+/** 🔴 «A veces el cliente pide con precio y sin precio» (Daniel, 6-oct-2026). */
+export const COLUMNAS_PAPEL_SIN_PRECIOS = COLUMNAS_PAPEL_BULTOS.filter(
+  (c) => c !== "Precio" && c !== "Total",
+);
+
 const SIN_BULTO = "—";
 
 const cantidad = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
@@ -78,39 +84,56 @@ export interface PapelDeBultos {
   lineas: readonly LineaPedido[];
   /** Quién marcó cada paso. Sin firmas, el pie no se dibuja. */
   firmas?: FirmasPedido;
+  /**
+   * 🔴 Las DOS formas de imprimir (Daniel, 6-oct-2026): *«a veces el cliente
+   * pide con precio y sin precio»*. `false` saca las columnas Precio y Total y
+   * deja solo el total de unidades.
+   */
+  conPrecios?: boolean;
 }
 
 /** El pedido entero en una tabla, en el orden de Switch, con su columna Bulto. */
 export function construirPdfPedidoBultos(p: PapelDeBultos): jsPDF {
+  const conPrecios = p.conPrecios !== false;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
   const y = cabeceraPapel(doc, {
     titulo: tituloPapelBultos(p.secuencial, p.empresa, sinMayusculas(p.cliente)),
     subtitulo: resumenAsignacion(p.lineas),
   });
 
-  const body = p.lineas.map((l) => [
-    l.bulto == null ? SIN_BULTO : String(l.bulto),
-    l.codigo,
-    descripcionCompleta(l),
-    cantidad(l.cantidad),
-    // 🔴 El papel SIEMPRE los lleva: se dibuja en el servidor, que los lee
-    // aunque quien imprime no los vea en pantalla.
-    monto(l.precio),
-    monto(l.total),
-  ]);
+  const body = p.lineas.map((l) => {
+    const fila = [
+      l.bulto == null ? SIN_BULTO : String(l.bulto),
+      l.codigo,
+      descripcionCompleta(l),
+      cantidad(l.cantidad),
+    ];
+    // 🔴 Con precios, el papel SIEMPRE los lleva —se dibuja en el servidor, que
+    // los lee aunque quien imprime no los vea en pantalla—. Sin precios, las dos
+    // columnas no existen; no van vacías.
+    return conPrecios ? [...fila, monto(l.precio), monto(l.total)] : fila;
+  });
+
+  // 🔴 EL TOTAL AL PIE, en negrita y con raya arriba, como el resto de los
+  // papeles de la casa (Daniel, al ver el papel): unidades y dinero. Sin precios
+  // va solo el de unidades — un cero en dinero no significaría nada.
+  const totales = totalesDelPedido(p.lineas);
+  const pie = conPrecios
+    ? [["", "", "Total", cantidad(totales.unidades), "", monto(totales.dinero)]]
+    : [["", "", "Total", cantidad(totales.unidades)]];
 
   autoTable(doc, {
     startY: y,
     margin: { top: MARGEN_PAPEL, left: MARGEN_PAPEL, right: MARGEN_PAPEL, bottom: PIE_PAPEL },
-    head: [[...COLUMNAS_PAPEL_BULTOS]],
-    body: body.length > 0 ? body : [["", "", "Este pedido todavía no tiene artículos", "", "", ""]],
+    head: [conPrecios ? [...COLUMNAS_PAPEL_BULTOS] : [...COLUMNAS_PAPEL_SIN_PRECIOS]],
+    body: body.length > 0 ? body : [["", "", "Este pedido no tiene artículos"]],
+    foot: body.length > 0 ? pie : undefined,
     styles: { font: "helvetica", fontSize: 8, cellPadding: 1.6, valign: "middle" },
     columnStyles: {
       0: { cellWidth: 16, halign: "right", fontStyle: "bold" },
       1: { cellWidth: 26 },
-      3: { cellWidth: 14, halign: "right" },
-      4: { cellWidth: 18, halign: "right" },
-      5: { cellWidth: 20, halign: "right" },
+      3: { cellWidth: 16, halign: "right" },
+      ...(conPrecios ? { 4: { cellWidth: 18, halign: "right" as const }, 5: { cellWidth: 20, halign: "right" as const } } : {}),
     },
     didParseCell: (d) => {
       // El bulto en el azul de la casa; lo que falta por asignar, en rojo, que
