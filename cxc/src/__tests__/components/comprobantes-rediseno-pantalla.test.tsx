@@ -325,7 +325,7 @@ describe("4. 🔴 la columna «Vendedor»", () => {
   it("dice QUIÉN armó cada pedido — el dato ya viajaba en la fila", () => {
     const { container } = pintar([EN_SWITCH, TRABADO]);
     abrirMeses(container);
-    expect([...filaDe(container, "PED-017").querySelectorAll("td")][3].textContent).toBe("Reinaldo Espinosa");
+    expect([...filaDe(container, "PED-017").querySelectorAll("td")][3].textContent).toBe("Reynaldo Espinosa");
     expect([...filaDe(container, "PED-004").querySelectorAll("td")][3].textContent).toBe("Daniel");
   });
 
@@ -389,7 +389,7 @@ describe("6-7. 🔴 ficha y tabla, y todo lo que se toca mide 44 px", () => {
     expect(f.textContent).toContain("Sporting Shoes");
     expect(f.textContent).toContain("PED-017");
     expect(f.textContent).toContain("16-000000503");
-    expect(f.textContent).toContain("Reinaldo Espinosa");
+    expect(f.textContent).toContain("Reynaldo Espinosa");
     expect(within(f).getByRole("button", { name: "Ver PDF" })).toBeTruthy();
     expect(abrirMenu(f)).toContain("Editar");
   });

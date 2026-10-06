@@ -50,7 +50,33 @@ export function aplicarAlias(nombre: string | null | undefined, alias: readonly 
 }
 
 /**
- * «REYNALDO ESPINOSA» → «Reynaldo Espinosa». Cada palabra con su primera letra
+ * El alias para PANTALLA — espejo de las filas de `comision_vendedor_alias`.
+ *
+ * 🩸 Daniel, 5-oct-2026: «un solo nombre por persona en todo el sistema».
+ * Pedidos ya decía «Reynaldo Espinosa» (la ruta aplica el alias), pero
+ * Catálogos, Comprobantes, Usuarios y Multifashion reciben la grafía cruda de
+ * Switch en el navegador, donde la tabla no llega, y decían «Reinaldo». Con
+ * este espejo `nombreVendedorEnPantalla` colapsa la grafía en TODOS lados sin
+ * que cada ruta tenga que leer la tabla. Solo cambia lo que se MUESTRA: lo
+ * guardado y las llaves siguen con la grafía de Switch.
+ *
+ * ponytail: copia a mano de la semilla; el candado
+ * `vendedor-un-solo-nombre.test.ts` falla si una migración agrega una fila que
+ * no está acá. Si algún día el alias se edita desde una pantalla, servirlo por
+ * una ruta y quitar esta copia.
+ */
+export const ALIAS_EN_PANTALLA: readonly AliasVendedor[] = [
+  { nombre_switch: "REINALDO ESPINOSA", vendedor_canonico: "REYNALDO ESPINOSA" },
+  { nombre_switch: "REYNALDO ESPINOSA", vendedor_canonico: "REYNALDO ESPINOSA" },
+  { nombre_switch: "REINDALDO ESPINOSA", vendedor_canonico: "REYNALDO ESPINOSA" },
+  { nombre_switch: "AGUAS", vendedor_canonico: "REY STOUTE AGUAS" },
+  { nombre_switch: "REY STOUTE AGUAS", vendedor_canonico: "REY STOUTE AGUAS" },
+];
+
+/**
+ * LA función para mostrar un vendedor de Switch, en cualquier pantalla:
+ * alias (REINALDO/REINDALDO → REYNALDO) + capitalizado.
+ * «REINALDO ESPINOSA» → «Reynaldo Espinosa». Cada palabra con su primera letra
  * en mayúscula y el resto en minúscula; el guion y el apóstrofo también
  * cortan palabra («O'Neil», «Jean-Paul»). DEFAULT pasa por `etiquetaVendedor`,
  * y la etiqueta ya puesta («Oficina (DEFAULT)», que es como viaja la fila de la
@@ -65,10 +91,11 @@ export function nombreVendedorEnPantalla(nombre: string): string {
   if (v === VENDEDOR_TODOS) return ROTULO_VENDEDOR_TODOS;
   if (v === DEFAULT_VENDEDOR) return etiquetaVendedor(v);
   if (v === ETIQUETA_DEFAULT) return ETIQUETA_DEFAULT;
+  const persona = aplicarAlias(v, ALIAS_EN_PANTALLA);
   // 🔑 El capitalizador vive en `lib/nombre-en-pantalla.ts` desde el
   // 10-sep-2026 y lo comparte con la Planilla: dos formas de capitalizar un
   // nombre es cómo la misma persona termina escrita distinto en dos pantallas.
   // Los casos propios de VENDEDOR (el comodín, el DEFAULT de Switch) se quedan
   // acá arriba, que es donde significan algo.
-  return capitalizarNombre(v);
+  return capitalizarNombre(persona);
 }

@@ -319,7 +319,7 @@ describe("G. LOS NOMBRES SE MUESTRAN CAPITALIZADOS, LO GUARDADO NO SE TOCA", () 
 
   // 🔑 Y HAY UN SOLO CAPITALIZADOR: Comisiones llama al mismo.
   it("Comisiones usa el capitalizador compartido, no una copia", () => {
-    expect(sinComentarios("src/lib/comisiones/alias.ts")).toMatch(/capitalizarNombre\(v\)/);
+    expect(sinComentarios("src/lib/comisiones/alias.ts")).toMatch(/capitalizarNombre\(persona\)/);
   });
 
   // ⚠️ Lo GUARDADO sigue en mayúsculas: nadie escribe el nombre capitalizado.

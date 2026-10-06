@@ -219,7 +219,7 @@ describe("🔴 4. ninguna celda en blanco sin explicación", () => {
   });
 
   it("el vendedor de verdad se escribe capitalizado, como en Comisiones (5-oct-2026)", () => {
-    expect(ws[A(D0 + 1, COL.vendedor)].v).toBe("Reinaldo Espinosa");
+    expect(ws[A(D0 + 1, COL.vendedor)].v).toBe("Reynaldo Espinosa");
   });
 });
 

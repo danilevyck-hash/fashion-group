@@ -367,7 +367,7 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
     const selector = await screen.findByLabelText("Empresa");
     expect(selector.textContent).toContain("Todas");
     // 2) Y llegó el DATO, no un esqueleto: el vendedor y su comisión.
-    await waitFor(() => expect(screen.getAllByText(/REINALDO ESPINOSA/i).length).toBeGreaterThan(0), { timeout: 5000 });
+    await waitFor(() => expect(screen.getAllByText(/REYNALDO ESPINOSA/i).length).toBeGreaterThan(0), { timeout: 5000 });
     expect(screen.getAllByText(/1,234\.56/).length).toBeGreaterThan(0);
     // 3) Nunca la mandó a /home.
     expect(push).not.toHaveBeenCalled();
@@ -414,7 +414,7 @@ describe("contabilidad ENTRA a /comisiones y la pantalla renderiza con datos", (
       sesion(rol, mods);
       const { unmount } = render(<ComisionesPageClient availableYears={[2026]} />);
       await screen.findByLabelText("Empresa");
-      await waitFor(() => expect(screen.getAllByText(/REINALDO ESPINOSA/i).length).toBeGreaterThan(0), { timeout: 5000 });
+      await waitFor(() => expect(screen.getAllByText(/REYNALDO ESPINOSA/i).length).toBeGreaterThan(0), { timeout: 5000 });
       expect(push, rol).not.toHaveBeenCalled();
       unmount();
     }
