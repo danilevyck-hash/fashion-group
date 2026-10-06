@@ -31,6 +31,7 @@
 // detalle es peor que verla vacía: así se sabe que existe y que le falta algo.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { nombreSinGritar } from "@/lib/cxc/nombre-cliente";
 import {
   buildReportSheet,
   workbookFromSheets,
@@ -88,7 +89,7 @@ function filaDeEnvio(
     // "2 de 4" dice de un vistazo cuántos envíos lleva la guía, así que un
     // renglón salteado se ve sin tener que contar filas.
     { v: posicion === null ? "" : `${posicion} de ${totalEnvios}`, sz: 9, fg: "888888" },
-    { v: item?.cliente || "", sz: 9, fg: "444444" },
+    { v: nombreSinGritar(item?.cliente), sz: 9, fg: "444444" },
     { v: item?.direccion || "", sz: 9, fg: "666666" },
     { v: item?.empresa || "", sz: 9, fg: "555555" },
     { v: facturasParaMostrar(item?.facturas) || "", sz: 9, fg: "666666" },

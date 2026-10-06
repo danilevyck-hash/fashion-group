@@ -28,7 +28,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable from "@/lib/pdf-tabla";
 import { casaDeEmpresa, type CasaDelPapel } from "@/lib/cxc/casa-del-papel";
 import { AGING_ORDER, tramoRango } from "@/lib/cxc-aging";
 import { comoPagar, fichaFiscal, lineasDePago } from "@/lib/cxc/empresa-fiscal";

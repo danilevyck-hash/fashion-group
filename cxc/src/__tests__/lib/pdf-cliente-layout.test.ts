@@ -21,7 +21,7 @@ describe("PDF de pedido — encabezado Cliente / Pedido / Fecha", () => {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
 
-  it("recorta el nombre largo para que no llegue a la columna 'Pedido:' (x=90mm)", () => {
+  it("recorta el nombre largo para que no llegue a la columna 'Pedido:' (x=125mm)", () => {
     const recortado = fitClientName(doc, NOMBRE_LARGO);
     expect(recortado).not.toBe(NOMBRE_LARGO);
     expect(recortado.endsWith("…")).toBe(true);

@@ -396,7 +396,7 @@ describe("🔴 la cuota entra SOLA — la aprobación quincenal se retiró el 11
     const avisos = avisosDeUltimaCuota(out, true);
     expect(avisos).toEqual([{ tipo: "ultima-cuota", codigo: "10", etiqueta: "LUIS PARAJON", cuenta: "prestamo", cuota: 45, saldo: 40 }]);
     const texto = textoAvisoPrestamo(avisos)!;
-    expect(texto).toContain("LUIS PARAJON");
+    expect(texto).toContain("Luis Parajon");
     expect(texto).toContain("$40.00");
     expect(texto).toContain("$45.00");
     expect(texto).toContain("termina de pagar");

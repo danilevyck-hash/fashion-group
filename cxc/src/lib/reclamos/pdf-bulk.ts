@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable from "@/lib/pdf-tabla";
 // Forma FUNCIONAL de jspdf-autotable v5 —`autoTable(doc, …)`— igual que
 // `lib/catalogo/order-pdf-core.ts`. El `import "jspdf-autotable"` a secas solo
 // parcha `jsPDF.API.autoTable` en el build CJS: resuelto como ESM el método no

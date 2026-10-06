@@ -28,7 +28,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable from "@/lib/pdf-tabla";
 import { FICHA_CLIENTE_VACIA, type EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
 import { monto, nombreDelPapel } from "@/lib/cxc/estado-cuenta-switch";
 import {

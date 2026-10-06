@@ -27,7 +27,8 @@
 // ni una fila suya: esta función recibe el cliente que la pantalla ya tiene.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { nombreDelPapel } from "./estado-cuenta-switch";
+import { capitalizarNombre, nombreDelPapel } from "./estado-cuenta-switch";
+import { esGritado } from "@/lib/nombre-en-pantalla";
 
 /** Lo mínimo que hace falta de un cliente para saber cómo se escribe su nombre. */
 export interface ClienteConNombre {
@@ -50,4 +51,14 @@ export interface ClienteConNombre {
 export function nombreDeCliente(c: ClienteConNombre): string {
   const deSwitch = Object.values(c.companies ?? {}).find((x) => x?.nombre)?.nombre;
   return nombreDelPapel(deSwitch, c.nombre_normalized);
+}
+
+/**
+ * Un nombre de cliente escrito a mano (Guías): si viene a los GRITOS se
+ * capitaliza con la misma regla; si alguien ya lo escribió bien, sale tal cual.
+ * Daniel, 6-oct-2026: la guía decía «CITY MALL PASO CANOA».
+ */
+export function nombreSinGritar(nombre: string | null | undefined): string {
+  const v = String(nombre ?? "").trim();
+  return esGritado(v) ? capitalizarNombre(v) : v;
 }

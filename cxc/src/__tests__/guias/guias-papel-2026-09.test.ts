@@ -315,9 +315,10 @@ describe("🔴 4 · los renglones, juntos por cliente", () => {
     // fila de cada grupo: son las cinco.
     const t = textoEntero(await pedazos(construirPdfGuia(GUIA_EXTERNA)));
     const veces = (s: string) => t.split("\n").filter((l) => l.trim() === s).length;
-    expect(veces("SUPERTIENDA COLON")).toBe(2);
-    expect(veces("BAZAR CHITRE")).toBe(2);
-    expect(veces("ALMACEN PENONOME")).toBe(1);
+    // 🔄 6-oct-2026: sin gritar — el nombre pasa por `nombreSinGritar`.
+    expect(veces("Supertienda Colon")).toBe(2);
+    expect(veces("Bazar Chitre")).toBe(2);
+    expect(veces("Almacen Penonome")).toBe(1);
   });
 
   it("🔴 el total de bultos NO cambia: el mismo antes y después", async () => {

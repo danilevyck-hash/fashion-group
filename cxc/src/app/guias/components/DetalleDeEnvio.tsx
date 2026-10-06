@@ -38,6 +38,7 @@ import { filaTieneDatos } from "./guia-form-logic";
 import { emptyItem } from "./constants";
 import AgregarSinEtiquetas from "./AgregarSinEtiquetas";
 import { facturasParaMostrar } from "@/lib/guias/numero-factura";
+import { nombreSinGritar } from "@/lib/cxc/nombre-cliente";
 
 /** El chip del renglón escrito a mano. */
 export const CHIP_SIN_ETIQUETA = "Sin etiqueta";
@@ -169,7 +170,7 @@ export default function DetalleDeEnvio({
                   )}
                 </span>
                 <span className="min-w-0 basis-full break-words lg:basis-auto">
-                  <span className="font-medium">{item.cliente || "Sin cliente"}</span>
+                  <span className="font-medium">{nombreSinGritar(item.cliente) || "Sin cliente"}</span>
                   {!etiquetado && (
                     <span className="ml-2 inline-block rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 align-middle text-xs text-gray-600">
                       {CHIP_SIN_ETIQUETA}

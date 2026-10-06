@@ -21,7 +21,7 @@
 import type * as XLSX from "xlsx-js-style";
 import { PESTANA_FICHAS } from "./persona-en-el-centro";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable from "@/lib/pdf-tabla";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
@@ -520,7 +520,9 @@ function hojaAjusteAnterior(lineas: readonly LineaPlanilla[]): XLSX.WorkSheet | 
 
 // ── PDF ──────────────────────────────────────────────────────────────────────
 
-const m2 = (v: number | null): string => (v === null || v === 0 ? "" : v.toFixed(2));
+// Con separador de miles, como el Excel («4,000.00», no «4000.00»).
+const m2 = (v: number | null): string =>
+  v === null || v === 0 ? "" : v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
   // 19 columnas de dinero no caben en carta ni acostada: legal apaisada es lo
@@ -633,10 +635,13 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
     columnStyles: {
       0: { cellWidth: 42, halign: "left" },
       ...Object.fromEntries(
-        Array.from({ length: 18 }, (_, i) => [i + 1, { halign: "right" as const }]),
+        Array.from({ length: 19 }, (_, i) => [i + 1, { halign: "right" as const }]),
       ),
-      9: { halign: "right", fontStyle: "bold" },
-      18: { halign: "right", fontStyle: "bold" },
+      // 🩸 6-oct-2026: eran 18 y la 9 y la 18 — quedaron así antes de que
+      // entrara «Salida temprana», y «Neto a pagar» salía a la izquierda y en
+      // negrita iban Feriados y Otros servicios en vez de los dos totales.
+      10: { halign: "right", fontStyle: "bold" },
+      19: { halign: "right", fontStyle: "bold" },
     },
     // La fila de quien no se pudo calcular, en rojo y con el motivo legible.
     didParseCell: (data) => {

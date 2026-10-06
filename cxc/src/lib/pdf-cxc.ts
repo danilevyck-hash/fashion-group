@@ -30,7 +30,7 @@
 // sí mismo— qué empresas se listan.
 // ─────────────────────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable from "@/lib/pdf-tabla";
 import { CASA_GRUPO, type CasaDelPapel } from "@/lib/cxc/casa-del-papel";
 import { tramoLabel } from "@/lib/cxc-aging";
 import { fmtDate } from "@/lib/format";
@@ -61,8 +61,10 @@ function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// El signo va ANTES del «$» («-$1,147.52», no «$-1,147.52»). Guion ASCII: la
+// letra base del PDF no trae el «−» tipográfico de la pantalla.
 function dinero(n: number) {
-  return `$${fmt(n)}`;
+  return n < 0 ? `-$${fmt(-n)}` : `$${fmt(n)}`;
 }
 
 /**

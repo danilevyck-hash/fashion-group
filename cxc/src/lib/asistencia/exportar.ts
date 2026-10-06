@@ -15,7 +15,7 @@
 
 import * as XLSX from "xlsx-js-style";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable from "@/lib/pdf-tabla";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, cuentaHorasExtra, extraQueCuenta, type DiaReporte, type PersonaReporte, type ReglasReporte } from "./reporte";
 import { textoAlmuerzo } from "./config";

@@ -282,6 +282,8 @@ describe("🔴 el nombre del cliente no vuelve a MAYÚSCULAS", () => {
     expect(capitalizarNombre("CITY MALL S A")).toBe("City Mall S A");
     expect(capitalizarNombre("FASHION CITY, INC RANGUNI")).toBe("Fashion City, Inc Ranguni");
     expect(capitalizarNombre("C/C EL DOLLAR 1,2,3,4 Y 5")).toBe("C/C El Dollar 1,2,3,4 Y 5");
+    expect(capitalizarNombre("INVERSIONES Y DISTRIBUIDORA PASO CANOAS INTERNACIONAL")).toBe("Inversiones y Distribuidora Paso Canoas Internacional");
+    expect(capitalizarNombre("DE LA CRUZ Y ASOCIADOS")).toBe("De la Cruz y Asociados");
   });
 
   it("🔴 el servidor lo arma del `cliente_nombre` de Switch, no del código", () => {

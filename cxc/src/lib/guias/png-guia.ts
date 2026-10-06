@@ -38,6 +38,7 @@
 // manda por chat.
 // ============================================================================
 
+import { nombreSinGritar } from "@/lib/cxc/nombre-cliente";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import { nombreDespachadoPor } from "./despachado-por";
 import { facturasParaMostrar } from "./numero-factura";
@@ -238,7 +239,7 @@ export function construirPngGuia(g: Guia): File | null {
     const valores = directa
       ? [
           String(idx + 1),
-          String(it.cliente ?? ""),
+          nombreSinGritar(it.cliente),
           String(it.direccion ?? ""),
           String(it.empresa ?? ""),
           facturasParaMostrar(it.facturas),
@@ -246,7 +247,7 @@ export function construirPngGuia(g: Guia): File | null {
         ]
       : [
           String(idx + 1),
-          String(it.cliente ?? ""),
+          nombreSinGritar(it.cliente),
           String(it.direccion ?? ""),
           String(it.empresa ?? ""),
           facturasParaMostrar(it.facturas),

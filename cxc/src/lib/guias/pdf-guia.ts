@@ -31,8 +31,9 @@
 // generado.
 // ============================================================================
 
+import { nombreSinGritar } from "@/lib/cxc/nombre-cliente";
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable from "@/lib/pdf-tabla";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import { nombreDespachadoPor } from "@/lib/guias/despachado-por";
@@ -256,7 +257,7 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
       ...renglones.map(({ item: it }, i) => {
         const fila = [
           String(i + 1),
-          it.cliente ?? "",
+          nombreSinGritar(it.cliente),
           it.direccion ?? "",
           it.empresa ?? "",
           facturasParaElPapel(it.facturas),

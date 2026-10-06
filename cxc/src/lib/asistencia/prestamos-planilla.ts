@@ -109,6 +109,7 @@ import { centavos } from "./planilla";
 import type { DineroLinea, ManualesLinea } from "./planilla";
 import { ORIGEN_POR_DEFECTO } from "@/lib/prestamos-conceptos";
 import { CASILLAS_AUTOMATICAS, estadoCasilla, type CasillaAutomatica } from "./casilla-sin-descontar";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * 🔴 EL INTERRUPTOR: EL PRÉSTAMO DEJA DE DESCONTARSE SOLO (15-sep-2026)
@@ -819,7 +820,10 @@ export function prestamosDeQuienNoCobra(opts: {
  */
 export function textoAvisoPrestamo(avisos: readonly AvisoPrestamo[]): string | null {
   if (avisos.length === 0) return null;
-  const frases = avisos.map((a) => {
+  const frases = avisos.map((a0) => {
+    // 🔑 6-oct-2026: el nombre, capitalizado como en el resto de la planilla
+    // («LUIS PARAJON» → «Luis Parajon»); el aviso también sale en el papel.
+    const a = { ...a0, etiqueta: capitalizarNombre(a0.etiqueta) };
     if (a.tipo === "ultima-cuota") {
       const que = a.cuenta === "terceros" ? "de terceros" : a.cuenta === "dano" ? "del daño de mercancía" : "del préstamo";
       return `${a.etiqueta}: se le descuenta ${plata(a.saldo)} y no su cuota ${que} de ${plata(a.cuota)} — con eso termina de pagar.`;

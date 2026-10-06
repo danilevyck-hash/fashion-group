@@ -43,6 +43,7 @@ import { construirExcelPlanilla, construirPdfPlanilla, type DatosPlanillaExport 
 import { totalizar, type DineroLinea, type HorasPersona, type LineaPlanilla } from "@/lib/asistencia/planilla";
 import type { PersonaReporte } from "@/lib/asistencia/reporte";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
+import { textoAvisoPrestamo } from "@/lib/asistencia/prestamos-planilla";
 import { armarComprobante } from "@/lib/asistencia/comprobante";
 import { construirPdfComprobantes } from "@/lib/asistencia/comprobante-pdf";
 import { buildComprobanteEntregaDoc } from "@/lib/marketing/pdf-entrega-mueble";
@@ -103,12 +104,20 @@ const EMPRESAS6 = [
 ] as const;
 const VENDEDORES = ["Rodrigo", "Edwin", "Reynaldo Espinosa", "Oficina (sin vendedor)", "Daniel Levy"];
 
+const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Los totales SUMAN: un ejemplo que no cierra esconde un papel que no cierra.
+const MONTOS_GRUPO = VENDEDORES.map((_, i) => EMPRESAS6.map((__, j) => Math.round(1234.56 * (i + 1) * 100 + j * 1111) / 100));
+const PAGAN = VENDEDORES.map((_, i) => i <= 2);
 const TABLA_GRUPO: TablaPapel = {
   titulo: TITULO_PAPEL_GRUPO,
   subtitulo: "Septiembre 2026",
   columnas: [{ header: "Vendedor", numerica: false }, ...EMPRESAS6.map(([, n]) => ({ header: n, numerica: true })), { header: "Total", numerica: true }],
-  filas: VENDEDORES.map((v, i) => ({ celdas: [v, ...EMPRESAS6.map(() => `$${(1234.56 * (i + 1)).toLocaleString("en-US", { minimumFractionDigits: 2 })}`), "$44,444.16"], apagada: i > 2 })),
-  totales: ["Total a pagar", ...EMPRESAS6.map(() => "$7,407.36"), "$44,444.16"],
+  filas: VENDEDORES.map((v, i) => ({ celdas: [v, ...MONTOS_GRUPO[i].map(usd), usd(MONTOS_GRUPO[i].reduce((s, n) => s + n, 0))], apagada: !PAGAN[i] })),
+  totales: [
+    "Total a pagar",
+    ...EMPRESAS6.map((_, j) => usd(MONTOS_GRUPO.reduce((s, fila, i) => s + (PAGAN[i] ? fila[j] : 0), 0))),
+    usd(MONTOS_GRUPO.reduce((s, fila, i) => s + (PAGAN[i] ? fila.reduce((a, n) => a + n, 0) : 0), 0)),
+  ],
 } as unknown as TablaPapel;
 
 const TABLA_EMPRESA: TablaPapel = {
@@ -195,17 +204,18 @@ const ESTADO: EstadoCuenta = {
     direccion: "Paso Canoas, frontera, local 14 al lado de la aduana, Chiriquí",
     limiteCredito: 25000, tiempoMorosidad: 90,
   },
-  total: 6579.91,
+  total: 6578.71,
   generadoEn: "2026-09-09T12:00:00.000Z",
   empresas: [
     {
-      empresa_key: "fashion_wear", empresa_nombre: "Fashion Wear", subtotal: 5579.91, saldoSwitch: null,
+      empresa_key: "fashion_wear", empresa_nombre: "Fashion Wear", subtotal: 5578.71, saldoSwitch: null,
       documentos: [
         { numero: "11-000003121", fecha: "2026-06-16", tipo: "Factura", monto: 2978.88, saldo: 1006.8, debito: 1006.8, credito: 0, dias: 85, plazoCredito: 90, numeroFiscal: "FE012000040254-103-278837-5400012026061600000031210010114344239888" },
         { numero: "11-000003122", fecha: "2026-06-17", tipo: "Factura", monto: 2792.7, saldo: 2701.35, debito: 2701.35, credito: 0, dias: 84, plazoCredito: 90, numeroFiscal: null },
         { numero: "14-000000258", fecha: "2026-06-23", tipo: "Nota de Débito", monto: 8.16, saldo: 8.16, debito: 8.16, credito: 0, dias: 78, plazoCredito: 90, numeroFiscal: null },
         { numero: "11-000003124", fecha: "2026-06-24", tipo: "Factura", monto: 1926, saldo: 1863, debito: 1863, credito: 0, dias: 77, plazoCredito: 0, numeroFiscal: null },
-        { numero: "15-000000031", fecha: "2026-06-25", tipo: "Nota de Crédito", monto: 0.6, saldo: 0.6, debito: 0.6, credito: 0, dias: 76, plazoCredito: 90, numeroFiscal: null },
+        // Switch manda la NC con `debito: 0` y el monto en `credito` (verificado el 6-oct-2026 en `switch_estadocuenta`).
+        { numero: "13-000000031", fecha: "2026-06-25", tipo: "Nota de Crédito", monto: 0.6, saldo: 0.6, debito: 0, credito: 0.6, dias: 76, plazoCredito: 90, numeroFiscal: null },
       ],
     },
     {
@@ -220,8 +230,12 @@ function empresaCxc(codigo: string, nombre: string, b: Record<string, number>) {
   return { nombre, codigo, ...base, total: Object.values(base).reduce((s, n) => s + n, 0), ultimoPagoFecha: null, ultimoPagoMonto: null, ultimaCompraFecha: null, ultimaCompraMonto: null };
 }
 function clienteCxc(llave: string, companies: Record<string, ReturnType<typeof empresaCxc>>): ConsolidatedClient {
-  const total = Object.values(companies).reduce((s, c) => s + c.total, 0);
-  return { nombre_normalized: llave, companies, correo: "", telefono: "", celular: "", contacto: "", total, current: total, watch: 0, overdue: 0, d0_30: 0, d31_60: 0, d61_90: 0, d91_120: 0, d121_plus: 0 } as unknown as ConsolidatedClient;
+  // Los tramos del cliente salen de sus empresas, como en la consolidación real.
+  const suma = (f: (c: ReturnType<typeof empresaCxc>) => number) => Object.values(companies).reduce((s, c) => s + f(c), 0);
+  const d0_30 = suma((c) => c.d0_30), d31_60 = suma((c) => c.d31_60), d61_90 = suma((c) => c.d61_90), d91_120 = suma((c) => c.d91_120);
+  const total = suma((c) => c.total);
+  const d121_plus = total - d0_30 - d31_60 - d61_90 - d91_120;
+  return { nombre_normalized: llave, companies, correo: "", telefono: "", celular: "", contacto: "", total, current: d0_30 + d31_60 + d61_90, watch: d91_120, overdue: d121_plus, d0_30, d31_60, d61_90, d91_120, d121_plus } as unknown as ConsolidatedClient;
 }
 const CARTERA = [
   clienteCxc("INVERSIONES Y DISTRIBUIDORA PASO CANOAS INTERNACIONAL", {
@@ -293,7 +307,11 @@ const PLANILLA = {
   quincena: QUINCENA,
   empresaEtiqueta: "Fashion Wear",
   reglas: REGLAS_DEFAULT,
-  avisoPrestamo: "Préstamos: SAMUEL ANTONIO GOMEZ ADAMES DE LA ROSA · $120,00 — MARIA ELENA RODRIGUEZ DE GONZALEZ · $75,00",
+  // El aviso real, con los nombres como llegan de la base (en mayúsculas).
+  avisoPrestamo: textoAvisoPrestamo([
+    { tipo: "ultima-cuota", codigo: "201", etiqueta: "SAMUEL ANTONIO GOMEZ ADAMES DE LA ROSA", cuenta: "prestamo", cuota: 45, saldo: 40 },
+    { tipo: "no-cobra", codigo: "300", etiqueta: "MARIA ELENA RODRIGUEZ DE GONZALEZ", saldo: 75 },
+  ]),
 } as unknown as DatosPlanillaExport;
 
 const COMPROBANTES = [1, 2, 3].map((i) =>

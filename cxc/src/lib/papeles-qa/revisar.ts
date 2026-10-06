@@ -6,6 +6,8 @@
 //
 // · PDF: lee la posición de cada texto (pdfjs-dist, ya instalado) y acusa dos
 //   cajas de texto que se pisan o un texto que se sale de la hoja.
+// · PDF: el encabezado de una columna de NÚMEROS se alinea como sus números
+//   (Daniel, 6-oct: «Subtotal» a la izquierda y sus montos a la derecha).
 // · Excel: el renglón «Total…» lleva FÓRMULAS, y ninguna celda dice «#».
 //
 // ⚠️ Mide TEXTO contra TEXTO. Una raya o un logo encima de un texto no se ve
@@ -79,7 +81,7 @@ export async function cajasDeTexto(bytes: Uint8Array): Promise<{ cajas: Caja[]; 
 
 export interface Problema {
   pagina: number;
-  tipo: "encimado" | "fuera de la hoja";
+  tipo: "encimado" | "fuera de la hoja" | "columna desalineada";
   detalle: string;
 }
 
@@ -106,6 +108,56 @@ export async function revisarPdf(bytes: Uint8Array): Promise<Problema[]> {
       if (dx > TOLERANCIA && dy > TOLERANCIA) {
         problemas.push({ pagina: a.pagina, tipo: "encimado", detalle: `«${corto(a.texto)}» pisa «${corto(b.texto)}»` });
       }
+    }
+  }
+  problemas.push(...columnasDesalineadas(cajas));
+  return problemas;
+}
+
+/** Un número de tabla: «$1,180.35», «-0.60», «12», «45.5». Nada de letras. */
+const esNumero = (t: string) => /^[-$(]*\d[\d,.]*\)?%?$/.test(t.trim());
+/** Cuánto pueden diferir dos bordes (o dos centros) para contar como alineados. */
+const ALINEADO = 3;
+/** Letra de tabla, no de título: más alto que esto no se mide (el «$40.67», el bulto de la etiqueta). */
+const ALTO_DE_TABLA = 14;
+
+/** Lo más lejos (en puntos) que puede estar el encabezado del primer número de su columna. */
+const HASTA_EL_ENCABEZADO = 60;
+/** Un número a menos de esto encima es el renglón anterior de la MISMA tabla. */
+const OTRO_RENGLON = 40;
+
+/**
+ * 🔴 EL ENCABEZADO VA COMO SU COLUMNA. Para cada número se mira el renglón de
+ * texto que tiene justo encima. Si ese renglón es un ENCABEZADO —tres textos o
+ * más y casi ningún número—, se busca el título de su columna, y
+ * tienen que compartir el borde derecho, el izquierdo o el centro (las
+ * columnas centradas, como «Bultos»). Un renglón con números encima es cuerpo
+ * de tabla: ese número no es el primero de su columna y no se mide.
+ */
+export function columnasDesalineadas(cajas: Caja[]): Problema[] {
+  const problemas: Problema[] = [];
+  const alto = (k: Caja) => k.y1 - k.y0;
+  for (const n of cajas) {
+    if (!esNumero(n.texto) || alto(n) > ALTO_DE_TABLA) continue;
+    const encima = cajas.filter((k) => k.pagina === n.pagina && k.y0 >= n.y1 - 1 && k.y0 - n.y1 <= HASTA_EL_ENCABEZADO);
+    if (!encima.length) continue;
+    // No es el primero de su columna: tiene otro número justo encima (el
+    // renglón de arriba puede ser la segunda línea de un nombre largo).
+    if (encima.some((k) => esNumero(k.texto) && k.y0 - n.y1 <= OTRO_RENGLON && Math.min(k.x1, n.x1) - Math.max(k.x0, n.x0) > 0)) continue;
+    const base = Math.min(...encima.map((k) => k.y0));
+    const renglon = encima.filter((k) => Math.abs(k.y0 - base) <= 2);
+    // Un encabezado puede traer un número suelto («Extra 1.25» partido en dos); un renglón del cuerpo trae muchos.
+    const numeros = renglon.filter((k) => esNumero(k.texto)).length;
+    if (renglon.length - numeros < 3 || numeros * 4 > renglon.length || renglon.some((k) => alto(k) > ALTO_DE_TABLA)) continue;
+    // El título de su columna es el último que EMPIEZA antes de donde termina
+    // el número: vale para encabezados a la izquierda, a la derecha y centrados.
+    const titulo = renglon.filter((k) => k.x0 < n.x1).sort((a, b) => b.x0 - a.x0)[0];
+    if (!titulo) continue;
+    const der = Math.abs(titulo.x1 - n.x1) <= ALINEADO;
+    const izq = Math.abs(titulo.x0 - n.x0) <= ALINEADO;
+    const centro = Math.abs((titulo.x0 + titulo.x1) / 2 - (n.x0 + n.x1) / 2) <= ALINEADO;
+    if (!der && !izq && !centro) {
+      problemas.push({ pagina: n.pagina, tipo: "columna desalineada", detalle: `«${corto(titulo.texto)}» no se alinea con «${corto(n.texto)}»` });
     }
   }
   return problemas;

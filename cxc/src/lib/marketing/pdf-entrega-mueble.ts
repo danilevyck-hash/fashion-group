@@ -64,7 +64,7 @@
 // ============================================================================
 
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable from "@/lib/pdf-tabla";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import { textoBultos } from "./piezas-bultos";
 

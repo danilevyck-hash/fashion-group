@@ -120,6 +120,8 @@ export function nombreDelPapel(nombreSwitch: string | null | undefined, respaldo
   return capitalizarNombre(respaldo);
 }
 
+const PARTICULAS = new Set(["y", "e", "de", "del", "la", "las", "los"]);
+
 /**
  * «CITY MALL PASO CANOA» → «City Mall Paso Canoa».
  *
@@ -130,10 +132,16 @@ export function nombreDelPapel(nombreSwitch: string | null | undefined, respaldo
 export function capitalizarNombre(nombre: string): string {
   const v = (nombre ?? "").trim();
   if (!v) return "";
-  return v
-    .split(/(\s+)/)
-    .map((token) => {
+  const tokens = v.split(/(\s+)/);
+  return tokens
+    .map((token, i) => {
       if (/^\s+$/.test(token) || token === "") return token;
+      // 🔑 6-oct-2026: «INVERSIONES Y DISTRIBUIDORA» → «Inversiones y
+      // Distribuidora», no «Y Distribuidora». La partícula va en minúscula solo
+      // ENTRE dos palabras: «1,2,3,4 Y 5» la deja, y al principio abre el nombre.
+      if (i > 0 && PARTICULAS.has(token.toLocaleLowerCase("es")) && /^\p{L}/u.test(tokens[i + 2] ?? "")) {
+        return token.toLocaleLowerCase("es");
+      }
       const letras = token.replace(/[^\p{L}]/gu, "");
       if (letras.length <= 1 && token === token.toLocaleUpperCase("es")) return token;
       if (/^(?:\p{Lu}\.)+$/u.test(token)) return token;

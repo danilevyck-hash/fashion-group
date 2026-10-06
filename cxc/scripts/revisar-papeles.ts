@@ -6,7 +6,9 @@
 // Genera TODOS los PDF y Excel del sistema con datos de ejemplo
 // (`src/lib/papeles-qa/catalogo.ts`; no toca la base), y:
 //   a) acusa textos encimados o fuera de la hoja, y Excel con totales fijos o «#»;
-//   b) arma una galería: la hoja 1 de cada PDF en PNG, en `index.html`.
+//   b) arma una galería: TODAS las hojas de cada PDF en PNG, en `index.html`
+//      (la hoja 1 es `<papel>.png`; las demás, `<papel>-h2.png`, …). Con solo
+//      la hoja 1 no se veía qué traía un «1 / 2».
 // Sale con código 1 si encontró algo. La parte (a) también corre en CI
 // (`src/__tests__/lib/papeles-sin-encimar.test.ts`).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,16 +30,20 @@ mkdirSync(carpeta, { recursive: true });
 const archivo = (nombre: string) => nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
-async function hojaUnoEnPng(bytes: Uint8Array): Promise<Buffer> {
+async function hojasEnPng(bytes: Uint8Array): Promise<Buffer[]> {
   const { abrirPdf } = await import("../src/lib/papeles-qa/revisar");
   const doc = await abrirPdf(bytes);
-  const page = await doc.getPage(1);
-  const vista = page.getViewport({ scale: 2 });
-  const { canvas, context } = doc.canvasFactory.create(Math.ceil(vista.width), Math.ceil(vista.height));
-  context.fillStyle = "#fff";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  await page.render({ canvasContext: context, viewport: vista, canvas }).promise;
-  return canvas.toBuffer("image/png");
+  const pngs: Buffer[] = [];
+  for (let n = 1; n <= doc.numPages; n++) {
+    const page = await doc.getPage(n);
+    const vista = page.getViewport({ scale: 2 });
+    const { canvas, context } = doc.canvasFactory.create(Math.ceil(vista.width), Math.ceil(vista.height));
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: context, viewport: vista, canvas }).promise;
+    pngs.push(canvas.toBuffer("image/png"));
+  }
+  return pngs;
 }
 
 async function main() {
@@ -56,8 +62,12 @@ async function main() {
     console.log(`${problemas.length ? "✗" : "✓"} ${p.nombre}${problemas.length ? `\n    ${problemas.join("\n    ")}` : ""}`);
     let img = "";
     if (p.tipo === "pdf") {
-      writeFileSync(path.join(carpeta, `${base}.png`), await hojaUnoEnPng(bytes.slice()));
-      img = `<a href="${base}.pdf"><img src="${base}.png" alt="${esc(p.nombre)}"></a>`;
+      const pngs = await hojasEnPng(bytes.slice());
+      img = pngs.map((png, i) => {
+        const nombre = i === 0 ? `${base}.png` : `${base}-h${i + 1}.png`;
+        writeFileSync(path.join(carpeta, nombre), png);
+        return `<a href="${base}.pdf"><img src="${nombre}" alt="${esc(p.nombre)} · hoja ${i + 1} de ${pngs.length}"></a>`;
+      }).join("");
     } else {
       img = `<a class="xlsx" href="${base}.xlsx">Abrir Excel</a>`;
     }
@@ -71,7 +81,7 @@ async function main() {
     `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Papeles del sistema</title>
 <style>body{font:14px -apple-system,system-ui,sans-serif;background:#f9fafb;color:#111827;margin:0;padding:24px}
 h1{font-size:20px;margin:0 0 16px}main{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
-figure{margin:0;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px}img{width:100%;border:1px solid #e5e7eb;display:block}
+figure{margin:0;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px}img{width:100%;border:1px solid #e5e7eb;display:block;margin-bottom:8px}
 .xlsx{display:block;padding:40px 0;text-align:center;background:#f3f4f6;border-radius:8px;color:#2563eb;text-decoration:none}
 figcaption{margin-top:8px}.bien{color:#047857;margin:4px 0 0}.mal{color:#b91c1c;margin:4px 0 0;padding-left:18px}</style>
 <h1>Papeles del sistema · ${PAPELES.length} archivos · ${malos ? `${malos} con problemas` : "todos bien"}</h1><main>${tarjetas.join("\n")}</main>`,

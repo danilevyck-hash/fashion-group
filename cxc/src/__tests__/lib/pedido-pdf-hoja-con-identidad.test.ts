@@ -104,7 +104,7 @@ describe("🔴 1. cada hoja dice de quién es el papel", () => {
       for (const [i, texto] of paginas.entries()) {
         expect(texto, `hoja ${i + 1} sin cliente`).toContain(CLIENTE);
         expect(texto, `hoja ${i + 1} sin número`).toContain(`${etiqueta}: ${NUMERO}`);
-        expect(texto, `hoja ${i + 1} sin fecha`).toContain("3 de septiembre de 2026");
+        expect(texto, `hoja ${i + 1} sin fecha`).toContain("3 sept 2026");
         // Y la banda de la marca, que es lo que se reconoce de lejos.
         expect(texto, `hoja ${i + 1} sin la banda de la casa`).toContain("Fashion Group · Panamá");
       }

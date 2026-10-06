@@ -14,7 +14,7 @@
 
 import { jsPDF } from "jspdf";
 import { resolverLineas, resumirPedido } from "./lineas-pedido";
-import autoTable from "jspdf-autotable";
+import autoTable from "@/lib/pdf-tabla";
 import { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } from "@/lib/reebok-logo";
 import { TOMMY_LOGO_BASE64, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT } from "@/lib/tommy-logo";
 import { CALVIN_LOGO_BLANCO_BASE64, CALVIN_LOGO_WIDTH, CALVIN_LOGO_HEIGHT } from "@/lib/calvin-logo";
@@ -124,9 +124,11 @@ export function medidasDeLaHoja(doc: jsPDF): { ancho: number; alto: number; dere
   return { ancho, alto: doc.internal.pageSize.getHeight(), derecha: ancho - MARGEN_MM };
 }
 
-/** Ancho útil (mm) del nombre del cliente antes de chocar con "Pedido:" (x=90),
- *  descontando la etiqueta "Cliente: " y 2 mm de aire. */
-export const CLIENT_NAME_MAX_MM = 90 - 14 - 2;
+/** Ancho útil (mm) del nombre del cliente antes de chocar con "Pedido:" (x=125),
+ *  descontando la etiqueta "Cliente: " y 2 mm de aire.
+ *  🩸 6-oct-2026: «Pedido:» estaba en x=90 y el cliente salía cortado
+ *  («Inversiones y Distribuidora Paso Canoas I…») en el papel que lo recibe. */
+export const CLIENT_NAME_MAX_MM = 125 - 14 - 2;
 
 /** Recorta el nombre del cliente con "…" para que quepa en su columna. */
 export function fitClientName(doc: jsPDF, name: string): string {
@@ -158,7 +160,9 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   // El ancho y el alto salen de la HOJA, nunca de un número escrito a mano.
   const hoja = medidasDeLaHoja(doc);
   const fechaLabel = new Date(createdAt + (createdAt.includes("T") ? "" : "T12:00:00"))
-    .toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" });
+    // «24 sept 2026», como el resto de los papeles: el mes largo no dejaba
+    // lugar al nombre del cliente.
+    .toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
 
   /**
    * 🔴 LA CABECERA DE UNA HOJA — banda de la marca + de quién es el papel.
@@ -211,14 +215,14 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
     doc.setFontSize(8); doc.setTextColor(255); doc.setFont("helvetica", "normal");
     doc.text("Fashion Group · Panamá", hoja.derecha, 12, { align: "right" });
 
-    // Cliente / Pedido / Fecha en columnas FIJAS (14 / 90 / 150 mm): el nombre del
+    // Cliente / Pedido / Fecha en columnas FIJAS (14 / 125 / 165 mm): el nombre del
     // cliente se recorta al ancho disponible o se montaba encima de "Pedido:"
     // ("COMERCIAL EL MACHETAZO, S.A. — SUCURSAL VÍA ESPAÑA" pisaba el número de
     // pedido en el PDF que recibe el cliente).
     doc.setTextColor(100); doc.setFontSize(9);
     doc.text(`Cliente: ${fitClientName(doc, clientName)}`, 14, 26);
-    doc.text(`${documentoLabel}: ${orderNumber}`, 90, 26);
-    doc.text(`Fecha: ${fechaLabel}`, 150, 26);
+    doc.text(`${documentoLabel}: ${orderNumber}`, 125, 26);
+    doc.text(`Fecha: ${fechaLabel}`, 165, 26);
   }
 
   // Las hojas que YA llevan su cabecera. autoTable avisa por tabla, no por

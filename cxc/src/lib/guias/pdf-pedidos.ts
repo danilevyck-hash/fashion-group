@@ -8,7 +8,7 @@
 // imprimir, como la nota de entrega (`autoPrint`).
 
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable from "@/lib/pdf-tabla";
 import {
   ALTO_CABECERA,
   ALTO_CONTINUACION,

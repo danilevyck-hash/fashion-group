@@ -174,10 +174,12 @@ describe("🔴 3. con varias hojas no se sale ni se corta nada", () => {
 });
 
 describe("lo que el cambio de hoja NO tocó", () => {
-  it("las columnas Cliente / Pedido / Fecha siguen en 14, 90 y 150 mm", () => {
+  // 🔄 6-oct-2026: Pedido y Fecha se corrieron a 125 y 165 mm para que el nombre
+  // del cliente no salga cortado (la fecha pasó a «24 sept 2026»).
+  it("las columnas Cliente / Pedido / Fecha van en 14, 125 y 165 mm", () => {
     expect(sinComentarios).toContain("`Cliente: ${fitClientName(doc, clientName)}`, 14, 26");
-    expect(sinComentarios).toContain("`${documentoLabel}: ${orderNumber}`, 90, 26");
-    expect(sinComentarios).toContain("`Fecha: ${fechaLabel}`, 150, 26");
+    expect(sinComentarios).toContain("`${documentoLabel}: ${orderNumber}`, 125, 26");
+    expect(sinComentarios).toContain("`Fecha: ${fechaLabel}`, 165, 26");
   });
 
   it("sigue habiendo UN solo generador del PDF de pedido", () => {
