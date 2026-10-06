@@ -193,6 +193,19 @@ export async function coloresFueraDePaleta(bytes: Uint8Array, paleta: ReadonlySe
   return problemas;
 }
 
+/**
+ * La paleta del papel, leída de `docs/marca.md` (entre `<!-- paleta:inicio -->`
+ * y `<!-- paleta:fin -->`). La revisión de color mide contra ESTO, no contra el
+ * código: el brandbook escrito manda. Solo para Node (la prueba y el script).
+ */
+export async function paletaDeMarca(): Promise<Set<string>> {
+  const { readFileSync } = await import("node:fs");
+  const path = await import("node:path");
+  const md = readFileSync(path.join(process.cwd(), "docs/marca.md"), "utf8");
+  const tramo = md.split("<!-- paleta:inicio -->")[1]?.split("<!-- paleta:fin -->")[0] ?? "";
+  return new Set((tramo.match(/#[0-9a-fA-F]{6}\b/g) ?? []).map((h) => h.toLowerCase()));
+}
+
 /** Excel: el renglón que dice «Total…» suma con fórmulas, y nada dice «#». */
 export function revisarExcel(bytes: Uint8Array): string[] {
   const wb = XLSX.read(bytes, { type: "array", cellFormula: true });

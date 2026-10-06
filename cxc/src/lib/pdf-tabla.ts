@@ -38,9 +38,9 @@ export default function autoTable(doc: jsPDF, opciones: UserOptions): void {
 
 // ── El estilo único (`pdf-estilo.ts`, interruptor PAPELES_ESTILO_UNICO_2026_10) ──
 // La tabla de TODOS los papeles se ve igual aunque el módulo pida otra cosa:
-// encabezado gris oscuro chico sobre gris muy claro con raya fina abajo, sin
-// rayas verticales ni cebra, separadores finos, negativos en rojo, totales en
-// negrita con raya arriba. Los colores que pida el módulo se llevan a la paleta.
+// encabezado lleno en el azul de la casa con letra blanca, sin rayas verticales
+// ni cebra, separadores finos, negativos en rojo, totales en negrita con raya
+// arriba. Los colores que pida el módulo se llevan a la paleta (un solo azul).
 
 type Estilos = Record<string, unknown>;
 const limpio = (e: Estilos | undefined): Estilos => {
@@ -56,13 +56,14 @@ function conEstiloUnico(o: UserOptions): UserOptions {
   const tam = typeof base.fontSize === "number" ? base.fontSize : 8;
   const suyoParse = o.didParseCell;
   const suyoDraw = o.didDrawCell;
+  const suyoWill = o.willDrawCell;
   return {
     ...o,
     theme: "plain",
     tableLineColor: PAPEL.linea,
     tableLineWidth: 0,
     styles: { ...limpio(base), lineWidth: 0, lineColor: PAPEL.linea, fillColor: false, textColor: (limpio(base).textColor as [number, number, number] | undefined) ?? PAPEL.tinta },
-    headStyles: { ...limpio(o.headStyles as Estilos), fillColor: PAPEL.fondo, textColor: PAPEL.grisOscuro, fontStyle: "bold", fontSize: Math.min(7, tam), lineWidth: 0 },
+    headStyles: { ...limpio(o.headStyles as Estilos), fillColor: PAPEL.azul, textColor: PAPEL.blanco, fontStyle: "bold", fontSize: Math.min(7.5, tam), lineWidth: 0 },
     bodyStyles: { ...limpio(o.bodyStyles as Estilos), lineWidth: 0 },
     alternateRowStyles: {},
     footStyles: { ...limpio(o.footStyles as Estilos), fillColor: false, textColor: PAPEL.tinta, fontStyle: "bold", lineWidth: 0 },
@@ -71,8 +72,8 @@ function conEstiloUnico(o: UserOptions): UserOptions {
       suyoParse?.(d);
       const st = d.cell.styles as unknown as Estilos;
       if (d.section === "head") {
-        st.fillColor = PAPEL.fondo;
-        st.textColor = PAPEL.grisOscuro;
+        st.fillColor = PAPEL.azul;
+        st.textColor = PAPEL.blanco;
         return;
       }
       st.textColor = aPaleta(st.textColor, "texto") || PAPEL.tinta;
@@ -82,14 +83,20 @@ function conEstiloUnico(o: UserOptions): UserOptions {
       st.lineColor = aPaleta(st.lineColor, "linea");
       if (d.section === "body" && esNegativo(d.cell.text.join(" "))) st.textColor = PAPEL.rojo;
     },
+    // Debajo de cada celda del encabezado, un azul un poco más ancho: sin él,
+    // entre dos celdas llenas se ve un hilo blanco (parece raya vertical).
+    willDrawCell: (d: CellHookData) => {
+      if (d.section === "head") {
+        d.doc.setFillColor(...PAPEL.azul);
+        const ultima = d.column.index === d.table.columns.length - 1;
+        d.doc.rect(d.cell.x, d.cell.y, d.cell.width + (ultima ? 0 : 0.3), d.cell.height, "F");
+      }
+      return suyoWill?.(d);
+    },
     didDrawCell: (d: CellHookData) => {
       suyoDraw?.(d);
       const { x, y, width, height } = d.cell;
-      if (d.section === "head") {
-        d.doc.setDrawColor(...PAPEL.linea);
-        d.doc.setLineWidth(0.3);
-        d.doc.line(x, y + height, x + width, y + height);
-      } else if (d.section === "body") {
+      if (d.section === "body") {
         d.doc.setDrawColor(...PAPEL.separador);
         d.doc.setLineWidth(0.15);
         d.doc.line(x, y + height, x + width, y + height);

@@ -48,9 +48,10 @@ async function hojasEnPng(bytes: Uint8Array): Promise<Buffer[]> {
 
 async function main() {
   const { PAPELES } = await import("../src/lib/papeles-qa/catalogo");
-  const { revisarExcel, revisarPdf, coloresFueraDePaleta } = await import("../src/lib/papeles-qa/revisar");
-  // Con el estilo único prendido (PAPELES_ESTILO_UNICO=1), también los colores.
-  const { ESTILO_UNICO, PALETA_PAPEL } = await import("../src/lib/pdf-estilo");
+  const { revisarExcel, revisarPdf, coloresFueraDePaleta, paletaDeMarca } = await import("../src/lib/papeles-qa/revisar");
+  // Con el estilo único prendido, también los colores: los de docs/marca.md.
+  const { ESTILO_UNICO } = await import("../src/lib/pdf-estilo");
+  const PALETA = await paletaDeMarca();
   const tarjetas: string[] = [];
   let malos = 0;
   for (const p of PAPELES) {
@@ -58,7 +59,7 @@ async function main() {
     const bytes = await p.generar();
     writeFileSync(path.join(carpeta, `${base}.${p.tipo}`), bytes);
     const problemas = p.tipo === "pdf"
-      ? [...await revisarPdf(bytes.slice()), ...(ESTILO_UNICO && !p.estiloPropio ? await coloresFueraDePaleta(bytes.slice(), PALETA_PAPEL) : [])]
+      ? [...await revisarPdf(bytes.slice()), ...(ESTILO_UNICO && !p.estiloPropio ? await coloresFueraDePaleta(bytes.slice(), PALETA) : [])]
           .map((x) => `hoja ${x.pagina} · ${x.tipo}: ${x.detalle}`)
       : revisarExcel(bytes);
     if (problemas.length) malos++;

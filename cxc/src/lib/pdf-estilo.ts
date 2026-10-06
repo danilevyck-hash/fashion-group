@@ -7,18 +7,21 @@
 // (pedido Reebok), solo texto (Asistencia); márgenes de 14 a 21 mm; el pie en
 // tres formas distintas; el rojo de los negativos en dos tonos.
 //
-// 🔴 UN SOLO PAPEL, «un ERP hecho por Apple»:
-//   · Logo arriba a la izquierda; título negro y subtítulo gris a su lado; lo
-//     del documento (número, fecha) arriba a la derecha; una raya fina abajo.
-//   · Tabla: encabezado gris oscuro chico sobre gris muy claro con una raya fina
-//     abajo; filas sin rayas verticales ni cebra, separadas por una raya
-//     finísima; números a la derecha (Helvetica ya trae cifras del mismo ancho:
-//     son tabulares); negativos en el rojo de la paleta; totales en negrita con
-//     raya arriba.
+// 🔴 UN SOLO PAPEL, «un ERP hecho por Apple», CON LOS COLORES DE LA CASA:
+//   · Logo arriba a la izquierda; título en el azul de la casa y subtítulo gris
+//     a su lado; lo del documento (número, fecha) arriba a la derecha; una raya
+//     fina DORADA abajo (el dorado del logo, solo ahí).
+//   · Tabla: encabezado LLENO en el azul de la casa con letra blanca (Daniel,
+//     6-oct-2026: «PDF me gusta en estilo azul, son nuestros colores»); filas
+//     sin rayas verticales ni cebra, separadas por una raya finísima; números a
+//     la derecha (Helvetica ya trae cifras del mismo ancho: son tabulares);
+//     negativos en el rojo de la paleta; totales en negrita con raya arriba.
 //   · El mismo pie («Confidencial · Página N de M · fashiongr.com») y el mismo
 //     margen (16 mm) en todos.
-//   · Colores: SOLO los de `PALETA_PAPEL` (los grises, el negro, el blanco y el
-//     rojo de `docs/diseno.md`). La revisión automática lo controla.
+//   · Colores: SOLO los de `PALETA_PAPEL`, que es la tabla de `docs/marca.md`
+//     (el azul #1B3A5C, el dorado, los grises, el negro, el blanco y el rojo).
+//     UN solo azul: el que pida otro tono se lleva a este. La revisión
+//     automática lee la paleta de `docs/marca.md` y exige que coincida.
 //
 // Excepciones (no usan este estilo, y la revisión de color no las mide):
 //   · Etiquetas 4x6 y carta: van a la Zebra térmica; blanco y negro, letra
@@ -27,15 +30,17 @@
 //     el cliente y llevan el color de su marca (la excepción de marca de
 //     `docs/diseno.md`). La TABLA del pedido sí es la de la casa.
 //
-// Interruptor `PAPELES_ESTILO_UNICO_2026_10` (false = como antes). Para la
-// maqueta y la prueba de color se prende sin publicar con la variable de
-// entorno `PAPELES_ESTILO_UNICO=1` (solo en la máquina; en el navegador no existe).
+// Interruptor `PAPELES_ESTILO_UNICO_2026_10` (hoy `true`; false = como antes).
+// Con el interruptor apagado, la maqueta y la prueba de color lo prenden con la
+// variable de entorno `PAPELES_ESTILO_UNICO=1` (solo en la máquina).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { jsPDF } from "jspdf";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 
-export const PAPELES_ESTILO_UNICO_2026_10 = false;
+// 6-oct-2026: PRENDIDO. Daniel vio la maqueta con el azul de la casa y lo aprobó:
+// «aprobado si es que te parece, no me preguntes». `false` = los papeles de antes.
+export const PAPELES_ESTILO_UNICO_2026_10 = true;
 
 export const ESTILO_UNICO: boolean =
   PAPELES_ESTILO_UNICO_2026_10 ||
@@ -43,16 +48,18 @@ export const ESTILO_UNICO: boolean =
 
 type RGB = [number, number, number];
 
-/** La paleta del papel: la de las pantallas (`docs/diseno.md`). Nada más. */
+/** La paleta del papel: la de `docs/marca.md` › «Colores». Nada más. */
 export const PAPEL = {
+  azul: [27, 58, 92] as RGB, // #1B3A5C, azul de la casa: encabezado de tabla y título
+  dorado: [201, 169, 110] as RGB, // #C9A96E, dorado del logo: SOLO la raya fina de la cabecera
   negro: [0, 0, 0] as RGB,
   tinta: [17, 24, 39] as RGB, // gray-900: títulos, texto, totales
-  grisOscuro: [75, 85, 99] as RGB, // gray-600: encabezado de tabla
+  grisOscuro: [75, 85, 99] as RGB, // gray-600: datos secundarios
   gris: [107, 114, 128] as RGB, // gray-500: subtítulos, rótulos
   grisClaro: [156, 163, 175] as RGB, // gray-400: pie, filas apagadas
-  linea: [209, 213, 219] as RGB, // gray-300: raya bajo el encabezado de tabla, campos
+  linea: [209, 213, 219] as RGB, // gray-300: campos, rayas de las cajas
   separador: [229, 231, 235] as RGB, // gray-200: entre filas, bajo la cabecera
-  fondo: [249, 250, 251] as RGB, // gray-50: fondo del encabezado de tabla y de los grupos
+  fondo: [249, 250, 251] as RGB, // gray-50: fondo de los grupos
   blanco: [255, 255, 255] as RGB,
   rojo: [220, 38, 38] as RGB, // red-600: negativos y NC
 } as const;
@@ -63,8 +70,9 @@ export const PALETA_PAPEL: ReadonlySet<string> = new Set(Object.values(PAPEL).ma
 
 /**
  * Lleva cualquier color al de la paleta con el mismo papel: un rojizo al rojo,
- * un fondo de color a gris muy claro, un texto oscuro a la tinta. Así la tabla
- * de un módulo no puede volver a pintar su azul aunque se lo pida.
+ * un texto azulado al azul de la casa (nunca otro tono), un fondo de color a
+ * gris muy claro, un texto oscuro a la tinta. Así ningún módulo pinta su
+ * propio azul aunque se lo pida.
  */
 export function aPaleta(c: unknown, rol: "texto" | "fondo" | "linea"): RGB | false {
   if (c === false || c == null) return false;
@@ -75,6 +83,7 @@ export function aPaleta(c: unknown, rol: "texto" | "fondo" | "linea"): RGB | fal
   if (PALETA_PAPEL.has(hex(rgb))) return rgb;
   const [r, g, b] = rgb;
   if (r > 150 && r - Math.max(g, b) > 60) return rol === "fondo" ? PAPEL.fondo : PAPEL.rojo;
+  if (rol === "texto" && b - r > 25 && b >= g && b < 200) return PAPEL.azul;
   if (rol === "fondo") return r + g + b > 750 ? PAPEL.blanco : PAPEL.fondo;
   if (rol === "linea") return r + g + b > 600 ? PAPEL.separador : PAPEL.linea;
   const luz = (r + g + b) / 3;
@@ -135,7 +144,7 @@ export function cabeceraPapel(doc: jsPDF, c: Cabecera): number {
   let tam = 13;
   doc.setFontSize(tam);
   while (doc.getTextWidth(c.titulo) > ancho && tam > 9) doc.setFontSize((tam -= 0.5));
-  doc.setTextColor(...PAPEL.tinta);
+  doc.setTextColor(...PAPEL.azul);
   doc.text(recortar(doc, c.titulo, ancho), x, Y_TITULO);
   const subs = (Array.isArray(c.subtitulo) ? c.subtitulo : [c.subtitulo]).filter((t): t is string => !!t);
   doc.setFont("helvetica", "normal");
@@ -143,7 +152,7 @@ export function cabeceraPapel(doc: jsPDF, c: Cabecera): number {
   doc.setTextColor(...PAPEL.gris);
   subs.forEach((t, i) => doc.text(recortar(doc, t, ancho), x, Y_SUBTITULO + i * 4.2));
   const extra = Math.max(0, subs.length - 1) * 4.2;
-  if (!c.sinRaya) rayaPapel(doc, Y_RAYA + extra);
+  if (!c.sinRaya) rayaPapel(doc, Y_RAYA + extra, PAPEL.dorado);
   // Lo que se escriba después va en tinta, no en el gris del subtítulo.
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...PAPEL.tinta);
@@ -157,7 +166,7 @@ function recortar(doc: jsPDF, t: string, ancho: number): string {
   return `${s.trimEnd()}…`;
 }
 
-/** La raya fina de la casa, de margen a margen. */
+/** La raya fina de margen a margen (gris; la de la cabecera va en dorado). */
 export function rayaPapel(doc: jsPDF, y: number, color: RGB = PAPEL.separador): void {
   doc.setDrawColor(...color);
   doc.setLineWidth(0.25);
