@@ -358,3 +358,60 @@ describe("codigoDeCuenta — el envoltorio se acepta ancho, el VALOR no se afloj
     }
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 🩸 LA FILA DE PIE (6-oct-2026)
+ *
+ * Ese día las 7 empresas mandaron, como ÚLTIMO renglón, una fila con la cuenta
+ * vacía — también Joystep y Multifashion, que no tienen ni un egreso en el año.
+ * Se descartó como «renglón ilegible» y salieron seis avisos a 🔧 SISTEMA.
+ * Los conteos que sí entraron fueron los mismos del día anterior (Vistana 378,
+ * Fashion Wear 135, Fashion Shoes 123, Active Shoes 47, Active Wear 26). El
+ * archivo crudo NO se vio (abrir sesión web expulsa a Daniel del panel), así
+ * que se cubren las tres formas posibles del pie: vacío, con el total que
+ * cuadra y con un total que no cuadra.
+ * ────────────────────────────────────────────────────────────────────────── */
+describe("la fila de pie del reporte", () => {
+  const cab = "FECHA;N.INTERNO; CUENTA  CONTABLE ;SUCURSAL;PROVEEDOR;REFERENCIA;TOTAL";
+  const r1 = "2026-01-02;120-1;6.02.01.00.00 - SERVICIOS;PRINCIPAL;;A;10.00";
+  const r2 = "2026-01-03;120-2;2.01.01.00.00 - PLANILLA;PRINCIPAL;;B;5.50";
+
+  it("vacía: se ignora en silencio (el caso de Joystep: solo el pie)", () => {
+    const r = parsearEgresosCsv(`${cab}\n;;;;;;`);
+    expect(r.lineas).toEqual([]);
+    expect(r.errores).toEqual([]);
+    expect(r.totalDelReporteCent).toBeNull();
+  });
+
+  it("con el total que cuadra: se ignora y queda como cuadre", () => {
+    const r = parsearEgresosCsv(`${cab}\n${r1}\n${r2}\n;;;;;TOTAL;15.50`);
+    expect(r.lineas).toHaveLength(2);
+    expect(r.errores).toEqual([]);
+    expect(r.totalDelReporteCent).toBe(1550);
+  });
+
+  it("🔴 con un total que NO cuadra: la diferencia es plata que falta y se dice", () => {
+    const r = parsearEgresosCsv(`${cab}\n${r1}\n${r2}\n;;;;;TOTAL;115.50`);
+    expect(r.lineas).toHaveLength(2);
+    expect(r.errores).toHaveLength(1);
+    expect(r.errores[0].motivo).toContain("no cuadra");
+    expect(r.errores[0].totalCent).toBe(10000);
+  });
+
+  it("lo ya reportado como ilegible no se cuenta dos veces en el cuadre", () => {
+    const malo = "2026-01-04;120-3;6.02;PRINCIPAL;;C;100.00";
+    const r = parsearEgresosCsv(`${cab}\n${r1}\n${r2}\n${malo}\n;;;;;TOTAL;115.50`);
+    expect(r.errores).toHaveLength(1);
+    expect(r.errores[0].nInterno).toBe("120-3");
+    expect(r.errores[0].totalCent).toBe(10000);
+  });
+
+  it("🔴 cuenta vacía CON fecha o N. INTERNO es plata sin cuenta: sigue siendo error", () => {
+    const conFecha = parsearEgresosCsv(`${cab}\n${r1}\n2026-01-05;;;PRINCIPAL;;X;80.00`);
+    expect(conFecha.errores).toHaveLength(1);
+    expect(conFecha.errores[0].totalCent).toBe(8000);
+    const conNumero = parsearEgresosCsv(`${cab}\n${r1}\n;120-9;;PRINCIPAL;;X;80.00`);
+    expect(conNumero.errores).toHaveLength(1);
+    expect(conNumero.errores[0].nInterno).toBe("120-9");
+  });
+});

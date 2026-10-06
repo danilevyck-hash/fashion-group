@@ -80,7 +80,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     try {
       session = await loginSwitchWeb(empresaKey);
       const { csv, rondas, archivo } = await fetchEgresosVarios(session, desde, hasta);
-      const { lineas, errores, meses, rangoObservado } = parsearEgresosCsv(csv);
+      const { lineas, errores, meses, rangoObservado, totalDelReporteCent } = parsearEgresosCsv(csv);
 
       const porMes: Record<string, { renglones: number; total: string }> = {};
       const porGrupo: Record<string, { renglones: number; total: string }> = {};
@@ -104,6 +104,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         // Los números del cuadre.
         renglones: lineas.length,
         total: usd(lineas.reduce((a, l) => a + l.totalCent, 0)),
+        // El total de la fila de pie de Switch, si trae uno (ya cuadrado).
+        totalDelReporte: totalDelReporteCent === null ? null : usd(totalDelReporteCent),
         renglonesGasto: gasto.length,
         totalGasto: usd(gasto.reduce((a, l) => a + l.totalCent, 0)),
         cuentasDistintas: new Set(lineas.map((l) => l.cuenta)).size,

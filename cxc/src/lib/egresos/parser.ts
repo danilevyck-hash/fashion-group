@@ -100,6 +100,8 @@ export interface EgresoParseError {
    * que falló fue justamente esa celda.
    */
   nInterno?: string;
+  /** Lo que valía el renglón, si la celda TOTAL sí se pudo leer: es la plata que no entró. */
+  totalCent?: number;
 }
 
 export interface EgresoParseResult {
@@ -109,6 +111,12 @@ export interface EgresoParseResult {
   rangoObservado: { desde: string; hasta: string } | null;
   /** Meses distintos presentes, ordenados. */
   meses: string[];
+  /**
+   * El TOTAL de la fila de pie que Switch agrega al final, si trae uno (`null`
+   * si no hay pie o viene vacío). Ya se comparó contra la suma de los renglones:
+   * si no cuadra, la diferencia va a `errores`.
+   */
+  totalDelReporteCent: number | null;
 }
 
 /**
@@ -224,6 +232,7 @@ export function parsearEgresosCsv(texto: string): EgresoParseResult {
       errores: [{ linea: 0, motivo: "El archivo está vacío.", crudo: "" }],
       rangoObservado: null,
       meses: [],
+      totalDelReporteCent: null,
     };
   }
 
@@ -241,6 +250,7 @@ export function parsearEgresosCsv(texto: string): EgresoParseResult {
       ],
       rangoObservado: null,
       meses: [],
+      totalDelReporteCent: null,
     };
   }
   const col = (nombre: string) => cabecera.indexOf(nombre);
@@ -253,6 +263,7 @@ export function parsearEgresosCsv(texto: string): EgresoParseResult {
   const iRef = col("referencia");
 
   let nLinea = 0;
+  let pie: { linea: number; totalCent: number | null; crudo: string } | null = null;
   for (let i = iCabecera + 1; i < filas.length; i++) {
     const cruda = filas[i];
     if (normalizarTexto(cruda) === "") continue;
@@ -264,12 +275,14 @@ export function parsearEgresosCsv(texto: string): EgresoParseResult {
     // con la llave que lo identifica (ver `EgresoParseError.nInterno`). Se lee,
     // no se valida: su propia validación sigue estando abajo, en su turno.
     const nInternoCrudo = campo(iNum);
+    const montoCrudo = montoACentavos(campos[iTotal] ?? "");
     const err = (motivo: string) =>
       errores.push({
         linea: i + 1,
         motivo,
         crudo: normalizarTexto(cruda).slice(0, 200),
         ...(nInternoCrudo === "" ? {} : { nInterno: nInternoCrudo }),
+        ...(montoCrudo === null ? {} : { totalCent: montoCrudo }),
       });
 
     // Se compara contra la última columna OBLIGATORIA, no contra el largo del
@@ -284,6 +297,18 @@ export function parsearEgresosCsv(texto: string): EgresoParseResult {
     // detrás: las dos formas se leen, y del nombre no se toma nada (ver
     // `codigoDeCuenta`).
     const celdaCuenta = campo(iCuenta);
+
+    // 🩸 LA FILA DE PIE (6-oct-2026). Switch empezó a mandar, al final del
+    // reporte, una fila sin cuenta, sin N. INTERNO y sin fecha — en las 7
+    // empresas a la vez, también en las que no tienen ni un egreso. No es un
+    // egreso: es el pie del reporte. Se aparta en silencio y, si trae un
+    // monto, se usa de cuadre más abajo. Un renglón con fecha o con N. INTERNO
+    // y la cuenta vacía SÍ es plata sin cuenta, y sigue siendo error.
+    if (celdaCuenta === "" && nInternoCrudo === "" && fechaEgresoAIso(campos[iFecha]) === null) {
+      pie = { linea: i + 1, totalCent: montoCrudo, crudo: normalizarTexto(cruda).slice(0, 200) };
+      continue;
+    }
+
     const cuenta = codigoDeCuenta(celdaCuenta);
     if (cuenta === null) {
       // 🩸 EL TEXTO DICE LA VERDAD, Y ESO ES LA MITAD DEL ARREGLO. Hasta el
@@ -331,6 +356,32 @@ export function parsearEgresosCsv(texto: string): EgresoParseResult {
     });
   }
 
+  // El pie sirve de CUADRE: si trae un total, tiene que dar la suma de los
+  // renglones. Si no da, la diferencia es plata que no entró y se dice. Lo que
+  // ya se reportó como ilegible cuenta del lado de los renglones, para no
+  // decir dos veces la misma plata.
+  const sumaCent =
+    lineas.reduce((a, l) => a + l.totalCent, 0) +
+    errores.reduce((a, e) => a + (e.totalCent ?? 0), 0);
+  const totalDelReporteCent = pie && pie.totalCent !== 0 ? pie.totalCent : null;
+  if (pie && pie.totalCent === null) {
+    errores.push({
+      linea: pie.linea,
+      motivo: `La fila de total del reporte trae un monto que no entiendo: "${pie.crudo}".`,
+      crudo: pie.crudo,
+    });
+  } else if (totalDelReporteCent !== null && totalDelReporteCent !== sumaCent) {
+    const usd = (c: number) => `$${(c / 100).toFixed(2)}`;
+    errores.push({
+      linea: pie!.linea,
+      motivo:
+        `El total del reporte (${usd(totalDelReporteCent)}) no cuadra con la suma de los ` +
+        `renglones (${usd(sumaCent)}).`,
+      crudo: pie!.crudo,
+      totalCent: totalDelReporteCent - sumaCent,
+    });
+  }
+
   const fechas = lineas.map((l) => l.fecha).sort();
   const meses = [...new Set(lineas.map((l) => l.mes))].sort();
 
@@ -339,5 +390,6 @@ export function parsearEgresosCsv(texto: string): EgresoParseResult {
     errores,
     rangoObservado: fechas.length > 0 ? { desde: fechas[0], hasta: fechas[fechas.length - 1] } : null,
     meses,
+    totalDelReporteCent,
   };
 }

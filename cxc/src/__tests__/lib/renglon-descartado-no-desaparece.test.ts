@@ -113,7 +113,7 @@ vi.mock("@/lib/supabase-server", () => ({
   },
 }));
 
-import { syncEmpresaEgresos } from "@/lib/switch-api/sync-egresos-varios";
+import { syncEmpresaEgresos, syncAllEgresos } from "@/lib/switch-api/sync-egresos-varios";
 import { CAMPO_ILEGIBLE } from "@/lib/switch-api/renglones-ilegibles";
 import { lineaDeNoLeidos } from "@/lib/rechazos-de-switch";
 
@@ -267,8 +267,36 @@ describe("el aviso de 🔧 SISTEMA", () => {
     expect(msg).toContain("120-000009999");
     expect(msg).toContain("Gastos");
     expect(msg).toContain("Qué pasó:");
-    expect(msg).toContain("Qué significa:");
+    expect(msg).toContain("Cuánta plata falta:");
     expect(msg).toContain("Qué hacer:");
+  });
+
+  it("🔴 son TRES líneas y dice cuánta plata falta", async () => {
+    responde(csv);
+    await syncEmpresaEgresos("vistana", 2026);
+    const msg = String((enviarSistema.mock.calls[0] as unknown[])[0]);
+    expect(msg.split("\n")).toHaveLength(3);
+    expect(msg).toContain("$500.00");
+  });
+
+  it("🔴 el mismo problema en varias empresas sale en UN solo aviso, con la plata por empresa", async () => {
+    responde(csv);
+    await syncAllEgresos(["vistana", "fashion_wear", "active_shoes"], 2026);
+    expect(enviarSistema).toHaveBeenCalledTimes(1);
+    const msg = String((enviarSistema.mock.calls[0] as unknown[])[0]);
+    expect(msg).toContain("3 renglones");
+    expect(msg).toContain("Vistana International $500.00");
+    expect(msg).toContain("Fashion Wear $500.00");
+    // En Gastos las empresas no se suman entre sí.
+    expect(msg).not.toContain("$1,500.00");
+  });
+
+  it("🩸 6-oct-2026: el pie vacío que Switch agrega al final NO avisa ni se descarta", async () => {
+    responde([CAB, ...Array.from({ length: 9 }, (_, i) => BUENO(i)), ";;;;;;"].join("\n"));
+    const r = await syncAllEgresos(["vistana", "joystep"], 2026);
+    expect(r.every((x) => x.ok)).toBe(true);
+    expect(skipped()).toBe(0);
+    expect(enviarSistema).not.toHaveBeenCalled();
   });
 
   it("dice cuántos SÍ entraron, para que se pueda medir el daño", async () => {

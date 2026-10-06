@@ -79,6 +79,8 @@ export interface RenglonIlegible {
   motivo: string;
   /** El identificador del documento, si esa celda sí se pudo leer. */
   nInterno?: string;
+  /** Lo que valía, si el monto sí se pudo leer. */
+  totalCent?: number;
 }
 
 /** Lo que se guarda en `switch_sync_log.skip_details`, misma forma que el guard. */
@@ -114,53 +116,76 @@ export function detallesDeIlegibles(
 
 const MAX_EN_MENSAJE = 5;
 
-/**
- * UN aviso por corrida al canal 🔧 SISTEMA. Nunca puede tumbar una corrida que
- * ya escribió bien: el llamador lo envuelve en try/catch.
- *
- * `que` es cómo se nombra el dato en el mensaje, en palabras de negocio —
- * "gastos de caja y banco", no el nombre de una tabla. `donde` es la pantalla
- * que Daniel tiene que mirar.
- */
-export async function avisarRenglonesIlegibles(opts: {
+/** Lo que una empresa dejó sin leer en una corrida. */
+export interface IlegiblesDeEmpresa {
   empresaKey: string;
-  syncType: string;
-  /** Qué se estaba trayendo. Sin nombres de tabla. */
-  que: string;
-  /** En qué pantalla se ve. */
-  donde: string;
   ilegibles: readonly RenglonIlegible[];
   /** Cuántos renglones SÍ entraron, para que el aviso tenga proporción. */
   entraron: number;
   logId: string | null;
+}
+
+const usd = (cent: number) =>
+  `$${(cent / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * UN aviso al canal 🔧 SISTEMA por corrida, aunque el problema esté en varias
+ * empresas: el cron corre una vez al día, así que es UNO por día.
+ *
+ * 🩸 6-oct-2026: el mismo pie de reporte en 6 empresas dio 6 avisos idénticos
+ * de 6 líneas cada uno. Ahora son TRES líneas —qué pasó · cuánta plata falta ·
+ * qué hacer— y las empresas van juntas en cada una. La plata va POR EMPRESA:
+ * en Gastos las empresas nunca se suman entre sí.
+ *
+ * Nunca puede tumbar una corrida que ya escribió bien: el llamador lo envuelve
+ * en try/catch. `donde` es la pantalla que Daniel tiene que mirar.
+ */
+export async function avisarRenglonesIlegibles(opts: {
+  syncType: string;
+  donde: string;
+  empresas: readonly IlegiblesDeEmpresa[];
 }): Promise<void> {
-  const { empresaKey, syncType, que, donde, ilegibles, entraron, logId } = opts;
-  if (ilegibles.length === 0) return;
+  const { syncType, donde } = opts;
 
-  const claves = ilegibles.map(claveDeIlegible);
-  const nuevas = new Set(
-    clavesPorAvisar(
-      claves,
-      await clavesYaAvisadasPorCampo(CAMPO_ILEGIBLE, empresaKey, syncType, logId),
-    ),
+  // Anti-loop POR EMPRESA: solo lo que no se avisó en 7 días.
+  const nuevasPorEmpresa: Array<{ e: IlegiblesDeEmpresa; nuevos: RenglonIlegible[] }> = [];
+  for (const e of opts.empresas) {
+    if (e.ilegibles.length === 0) continue;
+    const nuevas = new Set(
+      clavesPorAvisar(
+        e.ilegibles.map(claveDeIlegible),
+        await clavesYaAvisadasPorCampo(CAMPO_ILEGIBLE, e.empresaKey, syncType, e.logId),
+      ),
+    );
+    const nuevos = e.ilegibles.filter((r) => nuevas.has(claveDeIlegible(r)));
+    if (nuevos.length > 0) nuevasPorEmpresa.push({ e, nuevos });
+  }
+  if (nuevasPorEmpresa.length === 0) return; // ya se avisó por estos renglones
+
+  const nombre = (k: string) => mapEmpresaName(k);
+  const total = nuevasPorEmpresa.reduce((a, x) => a + x.nuevos.length, 0);
+  const cuantos = total === 1 ? "1 renglón" : `${total} renglones`;
+  const resumen = nuevasPorEmpresa
+    .map(({ e, nuevos }) => `${nombre(e.empresaKey)} ${nuevos.length} (entraron ${e.entraron})`)
+    .join(" · ");
+  const plata = nuevasPorEmpresa
+    .map(({ e, nuevos }) => {
+      const cent = nuevos.reduce((a, r) => a + (r.totalCent ?? 0), 0);
+      const sinMonto = nuevos.filter((r) => r.totalCent === undefined).length;
+      return `${nombre(e.empresaKey)} ${usd(cent)}${sinMonto > 0 ? ` + ${sinMonto} sin monto legible` : ""}`;
+    })
+    .join(" · ");
+  const docs = nuevasPorEmpresa.flatMap(({ e, nuevos }) =>
+    nuevos.map((r) => `${nombre(e.empresaKey)} ${claveDeIlegible(r)}`),
   );
-  if (nuevas.size === 0) return; // ya se avisó por estos renglones: no se repite
-
-  const aMostrar = ilegibles
-    .filter((r) => nuevas.has(claveDeIlegible(r)))
-    .slice(0, MAX_EN_MENSAJE);
-  const detalle = aMostrar.map((r) => `• ${claveDeIlegible(r)}: ${r.motivo}`).join("\n");
-  const extra = nuevas.size > MAX_EN_MENSAJE ? `\n…y ${nuevas.size - MAX_EN_MENSAJE} más.` : "";
-  const cuantos =
-    ilegibles.length === 1 ? "1 renglón" : `${ilegibles.length} renglones`;
+  const buscar =
+    docs.slice(0, MAX_EN_MENSAJE).join(" · ") +
+    (docs.length > MAX_EN_MENSAJE ? ` y ${docs.length - MAX_EN_MENSAJE} más` : "");
 
   await enviarSistema(
-    `Hay ${cuantos} que Switch mandó y no pude leer — ${mapEmpresaName(empresaKey)}\n${detalle}${extra}\n\n` +
-      `Qué pasó: al traer ${que}, esos renglones vinieron con un formato que la app todavía no ` +
-      `reconoce. Los otros ${entraron} sí entraron.\n` +
-      `Qué significa: esa plata NO está en ${donde}. El total que ves está corto por lo que no entró.\n` +
-      `Qué hacer: buscar esos documentos en Switch. Si allá se ven bien, es el formato del reporte lo ` +
-      `que cambió y hay que enseñárselo a la app. Mientras siga así, este aviso se repite una vez por ` +
-      `semana, no todos los días.`,
+    `Qué pasó: ${donde} — Switch mandó ${cuantos} que no pude leer: ${resumen}.\n` +
+      `Cuánta plata falta: ${plata}.\n` +
+      `Qué hacer: busca en Switch ${buscar}; si allá se ve bien, cambió el formato del reporte ` +
+      `y hay que enseñárselo a la app. Se repite una vez por semana, no a diario.`,
   );
 }

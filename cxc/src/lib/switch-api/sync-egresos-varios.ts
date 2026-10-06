@@ -51,7 +51,11 @@ import { createSwitchSyncLog, finishSwitchSyncLog } from "./sync-log";
 import { parsearEgresosCsv, type EgresoLinea } from "@/lib/egresos/parser";
 import { duplicadosExactos, claveIdentidad, esGasto } from "@/lib/egresos/reglas";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
-import { detallesDeIlegibles, avisarRenglonesIlegibles } from "./renglones-ilegibles";
+import {
+  detallesDeIlegibles,
+  avisarRenglonesIlegibles,
+  type IlegiblesDeEmpresa,
+} from "./renglones-ilegibles";
 import { particionarFilas } from "./monto-guard";
 import { ALL_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { empresasConEgresosEnCron } from "./empresas";
@@ -154,6 +158,9 @@ export async function syncEmpresaEgresos(
   empresaKey: string,
   anio: number,
   rango?: { desde: string; hasta: string },
+  /** Si viene, el aviso de renglones ilegibles se JUNTA aquí y lo manda quien
+   *  corre todas las empresas, en UN solo mensaje. Si no, sale ahora. */
+  avisosJuntos?: IlegiblesDeEmpresa[],
 ): Promise<ResultadoEgresosEmpresa> {
   const { desde, hasta } = rango ?? rangoDelAnio(anio);
   const logId = await createSwitchSyncLog({
@@ -325,19 +332,9 @@ export async function syncEmpresaEgresos(
     }
 
     if (parsed.errores.length > 0) {
-      try {
-        await avisarRenglonesIlegibles({
-          empresaKey,
-          syncType: "egresos_varios",
-          que: "lo que salió de caja y del banco",
-          donde: "Gastos",
-          ilegibles: parsed.errores,
-          entraron: lineas.length,
-          logId,
-        });
-      } catch (e) {
-        console.error(`[sync-egresos ${empresaKey}] aviso de renglones ilegibles: ${String(e)}`);
-      }
+      const aviso = { empresaKey, ilegibles: parsed.errores, entraron: lineas.length, logId };
+      if (avisosJuntos) avisosJuntos.push(aviso);
+      else await avisarIlegiblesSinTumbar([aviso]);
     }
 
     return {
@@ -374,10 +371,22 @@ export async function syncAllEgresos(
   rango?: { desde: string; hasta: string },
 ): Promise<ResultadoEgresosEmpresa[]> {
   const out: ResultadoEgresosEmpresa[] = [];
+  const avisos: IlegiblesDeEmpresa[] = [];
   for (const empresaKey of empresas) {
-    out.push(await syncEmpresaEgresos(empresaKey, anio, rango));
+    out.push(await syncEmpresaEgresos(empresaKey, anio, rango, avisos));
   }
+  // El mismo problema en varias empresas es UN aviso, no uno por empresa.
+  if (avisos.length > 0) await avisarIlegiblesSinTumbar(avisos);
   return out;
+}
+
+/** Los avisos nunca pueden tumbar una corrida que ya escribió bien. */
+async function avisarIlegiblesSinTumbar(empresas: IlegiblesDeEmpresa[]): Promise<void> {
+  try {
+    await avisarRenglonesIlegibles({ syncType: "egresos_varios", donde: "Gastos", empresas });
+  } catch (e) {
+    console.error(`[sync-egresos] aviso de renglones ilegibles: ${String(e)}`);
+  }
 }
 
 /**
