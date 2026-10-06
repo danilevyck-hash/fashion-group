@@ -130,6 +130,11 @@ export const TABLAS_PERSONAS = [
   // dónde volver a sacarla — de hecho es lo que Switch tiene mal.
   "proveedor_amarre",
 
+  // ── Marketing: quién es quién entre los proveedores de las facturas
+  // («Krysthel», «Kristel» y «Changalo» son uno solo). Lista escrita a mano por
+  // Daniel el 6-oct-2026; de ninguna otra parte se puede volver a sacar.
+  "mk_proveedor_alias",
+
   // ── Catálogos públicos: el precio lo manda Switch, pero la FOTO, el badge y
   // el nombre a mano no tienen otra fuente. `products` es el de Reebok — la
   // documentación lo daba por respaldado y no lo estaba.

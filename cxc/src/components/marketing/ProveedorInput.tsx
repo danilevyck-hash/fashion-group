@@ -12,6 +12,11 @@
 
 import { useMemo, useState } from "react";
 import { sugerirProveedores } from "@/lib/marketing/proveedor";
+import {
+  MKT_PROVEEDORES_2026_10,
+  claveDeProveedor,
+  sugerirProveedoresConAlias,
+} from "@/lib/marketing/proveedores-2026-10";
 import { vidrioSobre } from "@/lib/ui/vidrio";
 
 interface Props {
@@ -26,7 +31,21 @@ interface Props {
 
 export function ProveedorInput({ id, value, onChange, historico, required, className }: Props) {
   const [abierto, setAbierto] = useState(false);
-  const sugerencias = useMemo(() => sugerirProveedores(value, historico), [value, historico]);
+  // 🔴 PROVEEDORES (6-oct-2026): las sugerencias agrupan por el AMARRE, así
+  // «Impreco» e «Impresora Comercial S a» no se ofrecen como dos proveedores
+  // distintos. Apagado, es `sugerirProveedores` de siempre, intacto.
+  const sugerencias = useMemo(
+    () =>
+      MKT_PROVEEDORES_2026_10
+        ? sugerirProveedoresConAlias(value, historico)
+        : sugerirProveedores(value, historico),
+    [value, historico],
+  );
+  // La ficha del proveedor se llega desde acá y desde la pestaña Proveedores.
+  const claveElegida = MKT_PROVEEDORES_2026_10 ? claveDeProveedor(value) : "";
+  const yaEsUno =
+    claveElegida.length > 0 &&
+    historico.some((h) => claveDeProveedor(h) === claveElegida);
   // Si lo tecleado ya es exactamente la única sugerencia, no hay nada que ofrecer.
   const visibles =
     abierto && !(sugerencias.length === 1 && sugerencias[0].nombre === value.trim())
@@ -80,6 +99,18 @@ export function ProveedorInput({ id, value, onChange, historico, required, class
             </li>
           ))}
         </ul>
+      )}
+      {/* 🔴 «Ver su ficha ›»: desde el gasto nuevo se llega a todo lo que se le
+          pagó a ese proveedor. Solo si el proveedor ya tiene facturas — si es
+          nuevo, su ficha estaría vacía y el enlace no diría nada. */}
+      {MKT_PROVEEDORES_2026_10 && yaEsUno && visibles.length === 0 && (
+        <a
+          href={`/marketing?tab=proveedores&prov=${encodeURIComponent(claveElegida)}`}
+          data-testid="ver-ficha-proveedor"
+          className="mt-1 inline-flex min-h-[44px] items-center text-sm text-blue-600 hover:text-blue-800"
+        >
+          Ficha del proveedor ›
+        </a>
       )}
     </div>
   );

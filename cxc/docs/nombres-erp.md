@@ -54,6 +54,9 @@ Antes de nombrar algo nuevo, busca aquí el término. Si el concepto no está, u
 | Dónde se gastó | Tienda | De una tienda, La tienda esa |
 | Agrupar mercancía para despacho | Bultos · Unidades por bulto | Poner en bulto, Embultar |
 | Poner una línea del pedido en un bulto | Asignar bulto · Quitar bulto · «N artículos asignados» | Poner en bulto, Poner en el bulto, Quitar del bulto, Marcar artículos |
+| A quién se le cobra un gasto (Marketing) | Se cobra a (las 5 marcas, o «A cargo de la empresa») · Se cobra (Completo · Mitad) | A quién se le pasa, mi costo, costo propio, inventario propio, porcentajes en pantalla |
+| Adjunto de un gasto | Comprobante · Adjuntar comprobante | Foto o factura, Subir foto o factura |
+| Gasto sin tienda | Sin tienda (en el formulario; el cajón del reporte y del ZIP sigue siendo «General») | De una tienda, General (como botón) |
 | Rótulos de formulario | Sustantivo («Pago por planilla», «Marcación en reloj») | Preguntas («¿Qué…?», «¿Quién…?», «¿A quién…?»), salvo «¿Es X (D-25)?», que Daniel aprobó textual |
 
 ## Palabras prohibidas en textos visibles
@@ -88,6 +91,9 @@ Candado: `src/__tests__/lib/nombres-erp-prohibidos.test.ts`, que **lee esta tabl
 | Terminado (como estado) | Completado · Entregado |
 | Foto o factura | Comprobante |
 | De una tienda | Tienda |
+| A quién se le pasa | Se cobra a |
+| costo propio · inventario propio | A cargo de la empresa |
+| Subir foto o factura | Adjuntar comprobante |
 | Poner en bulto | Bultos |
 | Revocar | Quitar acceso |
 

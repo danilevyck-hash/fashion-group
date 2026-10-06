@@ -55,6 +55,44 @@ export const ROTULO_PESTANA_TM: Record<PestanaTiendasYMarcas, string> = {
   mobiliario: "Mobiliario",
 };
 
+/**
+ * 🔴 PROVEEDORES, LA QUINTA PESTAÑA (6-oct-2026, `MKT_PROVEEDORES_2026_10`).
+ *
+ * `PESTANAS_TIENDAS_Y_MARCAS` NO se toca: su candado
+ * (`marketing-tiendas-y-marcas`) exige las cuatro de siempre. La pestaña nueva
+ * se AGREGA al final, así nadie cambia de aterrizaje — la misma razón por la
+ * que «Marcaciones» fue al final de la barra de Asistencia.
+ *
+ * Apagado el interruptor, la barra es exactamente la de hoy.
+ */
+export const PESTANA_PROVEEDORES = "proveedores" as const;
+
+export function pestanasVisibles(
+  conProveedores: boolean,
+): ReadonlyArray<PestanaTiendasYMarcas | typeof PESTANA_PROVEEDORES> {
+  return conProveedores
+    ? [...PESTANAS_TIENDAS_Y_MARCAS, PESTANA_PROVEEDORES]
+    : PESTANAS_TIENDAS_Y_MARCAS;
+}
+
+export function rotuloDePestanaVisible(
+  p: PestanaTiendasYMarcas | typeof PESTANA_PROVEEDORES,
+): string {
+  return p === PESTANA_PROVEEDORES ? "Proveedores" : ROTULO_PESTANA_TM[p];
+}
+
+/** Una pestaña de la barra: las cuatro de siempre, más Proveedores. */
+export type PestanaVisible = PestanaTiendasYMarcas | typeof PESTANA_PROVEEDORES;
+
+/**
+ * ¿Es una pestaña que la barra muestra AHORA? Con el interruptor apagado,
+ * `?tab=proveedores` NO es válida y cae en Tiendas, como cualquier valor raro.
+ */
+export function esPestanaVisible(v: unknown, conProveedores: boolean): v is PestanaVisible {
+  if (conProveedores && v === PESTANA_PROVEEDORES) return true;
+  return esPestanaTiendasYMarcas(v);
+}
+
 export function esPestanaTiendasYMarcas(v: unknown): v is PestanaTiendasYMarcas {
   return typeof v === "string" && (PESTANAS_TIENDAS_Y_MARCAS as readonly string[]).includes(v);
 }

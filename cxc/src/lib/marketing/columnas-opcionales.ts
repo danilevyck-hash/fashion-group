@@ -39,6 +39,31 @@ export const COLUMNAS_DEL_PERIODO = {
   zips_bajados: [] as ReadonlyArray<unknown>,
 } as const;
 
+/**
+ * 🔴 La columna de PROVEEDORES (6-oct-2026, migración
+ * `20261231120000_mkt_proveedores.sql`, escrita y SIN aplicar). Mientras no
+ * exista, el módulo se porta como el 5-oct-2026: una factura sin marca no se
+ * puede guardar y a ninguna se le cobra la mitad — o sea, la función nueva no
+ * aparece, pero NADA se rompe.
+ */
+export const COLUMNAS_DE_PROVEEDORES = {
+  pct_a_la_marca: null as number | null,
+} as const;
+
+/**
+ * Completa una fila con el valor de hoy. Sin la migración, toda factura se lee
+ * entera de su marca, que es exactamente lo que hay.
+ */
+export function completarProveedores<T extends Record<string, unknown>>(
+  fila: T,
+): T & { pct_a_la_marca: number | null } {
+  const n = Number(fila.pct_a_la_marca);
+  return {
+    ...fila,
+    pct_a_la_marca: Number.isFinite(n) ? n : null,
+  };
+}
+
 /** Un error como lo devuelve PostgREST/Supabase. */
 export interface ErrorPg {
   code?: string | null;
@@ -122,7 +147,11 @@ export async function conRespaldoSinColumnas<T>(
 /** Quita de un payload de escritura las columnas del rediseño, para el reintento. */
 export function sinColumnasDelRediseno<T extends Record<string, unknown>>(payload: T): Partial<T> {
   const copia: Record<string, unknown> = { ...payload };
-  for (const col of [...Object.keys(COLUMNAS_DEL_GASTO), ...Object.keys(COLUMNAS_DEL_PERIODO)]) {
+  for (const col of [
+    ...Object.keys(COLUMNAS_DEL_GASTO),
+    ...Object.keys(COLUMNAS_DEL_PERIODO),
+    ...Object.keys(COLUMNAS_DE_PROVEEDORES),
+  ]) {
     delete copia[col];
   }
   return copia as Partial<T>;

@@ -315,6 +315,30 @@ Hecho ese día: a Multifashion **no se le puede cargar deuda de día libre** (el
 - **`/prestamos/[id]`** ya no espera la sesión, pero sigue en blanco hasta que llega la ficha por `fetch`. Pide traerla en el servidor, como Recordatorios.
 - **Pestaña nueva con la cookie viva** (enlace de WhatsApp): antes blanco → login → casa; ahora la pantalla propia un instante → login → casa. El enlace se pierde igual que antes; conservarlo pide que el gancho rehidrate `sessionStorage` desde `/api/auth/sesion` en vez de rebotar.
 
+## Marketing — los nombres que quedaron para otra pasada (6-oct-2026)
+
+Daniel, 6-oct-2026: *«porque no termino ERP yaaa»*. La pantalla **Registrar gasto**
+quedó en nombres de ERP (`docs/nombres-erp.md`), y en el mismo barrido salieron
+**~20 frases narrativas más** que **NO se tocaron** por decisión suya («déjalo
+para otra pasada»):
+
+- **`src/lib/marketing/zip-marca.ts`** — los mensajes de error del ZIP: «…así que
+  no hay reporte que **mandar**» (🔴 «mandar» está en la lista de prohibidas),
+  «Esa marca no existe. Las marcas con reporte son Tommy, Calvin…», «Hay que
+  correr la **migración** antes de descargar» (expone las tripas), «Puede que lo
+  hayan borrado o que el enlace sea viejo».
+- **`src/components/marketing/FacturaForm.tsx`** — «Sube el PDF de la factura»
+  (2.ª persona como título de paso), «La factura ya está», «Leyendo factura con
+  **IA**…», «Datos pre-llenados con IA», «**¿Guardar factura duplicada?**»
+  (pregunta como título de modal), «…en el **log** de actividad».
+- **`src/app/marketing/components/celular/PuertasDeLaFacturaCelular.tsx`** — «Los
+  campos **se llenan solos**» (🔴 también en la lista de prohibidas), «listo para
+  guardarse con el gasto».
+
+⚠️ **El candado no los caza hoy**: `nombres-erp-prohibidos.test.ts` busca
+`\bMandar\b` con mayúscula, así que el «mandar» del ZIP pasa. Al hacer esa
+pasada, arreglar también el patrón.
+
 ---
 
 ## Cómo se llegó a esta lista

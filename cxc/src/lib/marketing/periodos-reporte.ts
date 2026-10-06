@@ -34,6 +34,7 @@ import { conRespaldoSinColumnas } from "./columnas-opcionales";
 import { sumaEnElPeriodo } from "./periodo-estado";
 import { MARKETING_PORTADA_REDISENO } from "./portada-rediseno";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
+import { MKT_PROVEEDORES_2026_10, montoDeLaMarca } from "./proveedores-2026-10";
 import {
   agregarPorBloques,
   crearClasificadorPeriodos,
@@ -139,6 +140,11 @@ interface FacturaFila {
   proveedor: string | null;
   concepto: string | null;
   se_reporta?: boolean | null;
+  /**
+   * 🔴 PROVEEDORES (6-oct-2026). Cuánto se le cobra a la marca: 100 · 50 · 0.
+   * Ausente o `null` = factura de antes, entera para su marca (falla ABIERTO).
+   */
+  pct_a_la_marca?: number | null;
 }
 interface EntregaFila {
   id: string;
@@ -204,7 +210,7 @@ export interface DatosPeriodos {
  * lecturas se propaga como cualquier otro.
  */
 const COLS_FACTURA =
-  "id, proyecto_id, total, grupo_legacy, impulsadora_id, numero_factura, fecha_factura, proveedor, concepto";
+  "id, proyecto_id, total, grupo_legacy, impulsadora_id, numero_factura, fecha_factura, proveedor, concepto, pct_a_la_marca";
 const COLS_ENTREGA =
   "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, notas, created_at";
 
@@ -349,8 +355,13 @@ export function armarReportePeriodo(
   const marcaPedida = opciones?.marca;
   // 🔴 Un gasto apagado pertenece al período (se sella) pero no se reporta
   // (no hay línea ni suma). Solo con la bandera del rediseño.
-  const apagado = (g: { se_reporta?: boolean | null }): boolean =>
-    datos.excluirNoReportado === true && !sumaEnElPeriodo({ seReporta: g.se_reporta });
+  // 🔴 Y LO QUE QUEDA A CARGO DE LA EMPRESA TAMPOCO SE REPORTA (6-oct-2026).
+  // Daniel: «si es nada, no se debería poder descargar para presentar los
+  // gastos a la marca». `pct_a_la_marca = 0` es eso.
+  const apagado = (g: { se_reporta?: boolean | null; pct_a_la_marca?: number | null }): boolean => {
+    if (MKT_PROVEEDORES_2026_10 && Number(g.pct_a_la_marca) === 0) return true;
+    return datos.excluirNoReportado === true && !sumaEnElPeriodo({ seReporta: g.se_reporta });
+  };
   // Normalmente UNA marca. Un período viejo por proveedor ('pvh') junta tres:
   // sin esto, cerrar un período heredado generaría un reporte VACÍO.
   const marcasDelReporte = new Set(
@@ -513,7 +524,13 @@ export function armarReportePeriodo(
         cliente: ctx.cliente,
         clienteCodigo: ctx.clienteCodigo,
         marca: nombrePorMarca.get(r.marca_id) ?? "",
-        monto: round2(num(f.total) * (r.porcentaje / sumPct)),
+        // 🔴 Con «Mitad» va la MITAD: el total se recorta ANTES de repartir.
+        monto: round2(
+          (MKT_PROVEEDORES_2026_10
+            ? montoDeLaMarca(num(f.total), f.pct_a_la_marca)
+            : num(f.total)) *
+            (r.porcentaje / sumPct),
+        ),
       });
     }
   }

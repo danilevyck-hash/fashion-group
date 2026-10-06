@@ -33,6 +33,11 @@ import {
   observacionesAbiertas,
   seReportaAbierto,
 } from "@/lib/marketing/marketing-2026-10";
+import {
+  MKT_PROVEEDORES_2026_10,
+  ROTULO_SIN_TIENDA,
+} from "@/lib/marketing/proveedores-2026-10";
+import BloqueDestinoDelGasto, { type DestinoDelGasto } from "./BloqueDestinoDelGasto";
 
 export interface TiendaElegida {
   codigo: string;
@@ -57,6 +62,17 @@ interface Props {
    * Sin la prop, el bloque es EXACTAMENTE el de la puerta «＋ Gasto».
    */
   sinMarca?: boolean;
+  /**
+   * 🔴 PROVEEDORES (6-oct-2026, `MKT_PROVEEDORES_2026_10`). Con esto puesto, el
+   * renglón de la MARCA lo dibuja `BloqueDestinoDelGasto`, que pregunta lo
+   * mismo con tres respuestas (una marca completo · una marca la mitad ·
+   * ninguna marca). Sin esto, el bloque es EXACTAMENTE el de hoy.
+   */
+  destino?: {
+    valor: DestinoDelGasto;
+    onChange: (v: DestinoDelGasto) => void;
+    proveedor?: string;
+  } | null;
 }
 
 const CAMPO =
@@ -70,6 +86,7 @@ export default function BloqueDatosDelGasto({
   marcaDeImpulsadora,
   tiendaInicial = null,
   sinMarca = false,
+  destino = null,
 }: Props) {
   const [cambiandoMarca, setCambiandoMarca] = useState(false);
   // 🔴 MARKETING_APPLE_2026_10: lo que casi nunca se toca va detrás de un
@@ -98,8 +115,23 @@ export default function BloqueDatosDelGasto({
 
   return (
     <div className="space-y-5">
+      {/* 🔴 PROVEEDORES (6-oct-2026): la MARCA pasa a ser «a quién se le pasa»,
+          con cuatro respuestas. Sin la prop o con el interruptor apagado, abajo
+          se dibuja el renglón de la marca de siempre, intacto. */}
+      {!sinMarca && MKT_PROVEEDORES_2026_10 && destino && !esImpulsadora && (
+        <BloqueDestinoDelGasto
+          valor={destino.valor}
+          onChange={destino.onChange}
+          marcaId={datos.marcaId}
+          onMarcaId={(id) => cambiar({ marcaId: id })}
+          marcas={marcas}
+          marcaFija={marcaInicial && !cambiandoMarca ? marcaInicial : null}
+          proveedor={destino.proveedor ?? ""}
+        />
+      )}
+
       {/* ─── MARCA ─────────────────────────────────────────────────────── */}
-      {!sinMarca && (
+      {!sinMarca && !(MKT_PROVEEDORES_2026_10 && destino && !esImpulsadora) && (
       <div>
         <label htmlFor="gasto-marca" className="block text-sm font-medium text-gray-700 mb-1">
           Marca{!MARKETING_APPLE_2026_10 && <span className="text-red-500 ml-0.5">*</span>}
@@ -177,6 +209,10 @@ export default function BloqueDatosDelGasto({
                     : "border-gray-200 hover:border-gray-400"
                 }`}
               >
+                {/* 🔴 NOMBRES DE ERP: «Tienda», no «De una tienda». Ya lo
+                    renombró origin/main sin interruptor, así que acá no queda
+                    condicional. ⚠️ `TIENDA_GENERAL` («General») sigue nombrando
+                    el cajón en los reportes y el ZIP: solo cambió el botón. */}
                 Tienda
               </button>
               <button
@@ -190,7 +226,7 @@ export default function BloqueDatosDelGasto({
                     : "border-gray-200 hover:border-gray-400"
                 }`}
               >
-                {TIENDA_GENERAL}
+                {MKT_PROVEEDORES_2026_10 ? ROTULO_SIN_TIENDA : TIENDA_GENERAL}
               </button>
             </div>
             {codigoSinNombre && (
@@ -234,7 +270,9 @@ export default function BloqueDatosDelGasto({
               onClick={() => setAbrioSeReporta(true)}
               className={`text-sm min-h-[44px] inline-flex items-center ${ENLACE}`}
             >
-              No se reporta a la marca…
+              {/* 🔴 NOMBRES DE ERP (6-oct-2026): un enlace que ABRE un campo se
+                  nombra por el campo, no con una oración negada. */}
+              {MKT_PROVEEDORES_2026_10 ? "Reporte a la marca" : "No se reporta a la marca…"}
             </button>
           )}
         </div>
@@ -253,7 +291,9 @@ export default function BloqueDatosDelGasto({
         </label>
         {!datos.seReporta && (
           <p className="text-xs text-gray-500 pb-2" data-testid="aviso-no-se-reporta">
-            Se guarda y se ve en la tienda, pero no suma ni va al ZIP de la marca.
+            {MKT_PROVEEDORES_2026_10
+              ? "No suma en la marca ni entra al ZIP."
+              : "Se guarda y se ve en la tienda, pero no suma ni va al ZIP de la marca."}
           </p>
         )}
       </div>

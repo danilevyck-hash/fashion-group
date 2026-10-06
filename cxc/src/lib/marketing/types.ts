@@ -251,6 +251,14 @@ export interface CreateFacturaInput {
   seReporta?: boolean;
   tiendaCodigo?: string | null;
   nota?: string | null;
+  /**
+   * PROVEEDORES (6-oct-2026, `MKT_PROVEEDORES_2026_10`). OPCIONAL y solo se
+   * escribe con el interruptor prendido: qué PORCENTAJE de la factura se le
+   * cobra a la marca — 100, 50 o 0. `null`/ausente = la factura se lee entera
+   * para su marca, como hoy. Lo que no se le cobra queda a cargo de la empresa,
+   * sin elegir cuál. Ver `lib/marketing/proveedores-2026-10.ts`.
+   */
+  pctALaMarca?: number | null;
 }
 
 export interface UpdateFacturaInput {

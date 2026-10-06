@@ -30,6 +30,7 @@
 
 import { unirEnHumano } from "@/lib/guias/falta-para-despachar";
 import { mensajeDuplicado, type HuellaDeGasto } from "./duplicado";
+import { MKT_PROVEEDORES_2026_10 } from "./proveedores-2026-10";
 import {
   ROTULO_DE_TIPO,
   SE_REPORTA_POR_DEFECTO,
@@ -135,12 +136,26 @@ export function queFaltaEnLaPuerta(e: {
   return out;
 }
 
-const NOMBRE_FALTANTE: Readonly<Record<FaltanteDeLaPuerta, string>> = {
-  tipo: "qué tipo de gasto es",
-  impulsadora: "a quién le pagas",
-  marca: "la marca",
-  tienda: "la tienda",
-};
+/**
+ * 🔴 NOMBRES DE ERP (6-oct-2026). Daniel: «porque no termino ERP yaaa».
+ * `docs/nombres-erp.md`: sustantivos, nunca preguntas («qué tipo de gasto es»)
+ * ni segunda persona («a quién le pagas»). Salen dentro de un BOTÓN
+ * («Falta: el tipo de gasto y la marca»), así que son lo primero que se lee.
+ * `false` = los de antes, intactos.
+ */
+const NOMBRE_FALTANTE: Readonly<Record<FaltanteDeLaPuerta, string>> = MKT_PROVEEDORES_2026_10
+  ? {
+      tipo: "el tipo de gasto",
+      impulsadora: "el beneficiario",
+      marca: "la marca",
+      tienda: "la tienda",
+    }
+  : {
+      tipo: "qué tipo de gasto es",
+      impulsadora: "a quién le pagas",
+      marca: "la marca",
+      tienda: "la tienda",
+    };
 
 /** «Falta: la marca» · «Falta: la marca y la tienda». Sin faltantes, "". */
 export function textoFaltaEnLaPuerta(faltantes: readonly FaltanteDeLaPuerta[]): string {

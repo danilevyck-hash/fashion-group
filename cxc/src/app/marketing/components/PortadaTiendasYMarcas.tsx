@@ -26,16 +26,21 @@ import type { MkMarca } from "@/lib/marketing/types";
 import { puedeEscribirMarketing, TEXTO_SOLO_LECTURA } from "@/lib/marketing/roles";
 import {
   HREF_MOBILIARIO,
-  PESTANAS_TIENDAS_Y_MARCAS,
+  PESTANA_PROVEEDORES,
+  esPestanaVisible,
+  pestanasVisibles,
+  rotuloDePestanaVisible,
   PESTANA_INICIAL,
   ROTULO_PESTANA_TM,
   esPestanaTiendasYMarcas,
-  type PestanaTiendasYMarcas,
+  type PestanaVisible,
 } from "@/lib/marketing/tiendas-y-marcas";
 import PortadaTiendas from "./PortadaTiendas";
 import { useEsCelular } from "./celular/useEsCelular";
 import PortadaAbiertosCerrados from "./PortadaAbiertosCerrados";
 import ImpulsadorasView from "./ImpulsadorasView";
+import PortadaProveedores from "./PortadaProveedores";
+import { MKT_PROVEEDORES_2026_10 } from "@/lib/marketing/proveedores-2026-10";
 import { MARKETING_APPLE_2026_10, PESTANA_ACTIVA, PESTANA_INACTIVA } from "@/lib/marketing/marketing-2026-10";
 
 interface Props {
@@ -58,11 +63,15 @@ export default function PortadaTiendasYMarcas({
   onSelectCerrado,
 }: Props) {
   const router = useRouter();
-  const [tabRaw, setTab] = useUrlState<PestanaTiendasYMarcas>("tab", PESTANA_INICIAL);
-  const tab: PestanaTiendasYMarcas = esPestanaTiendasYMarcas(tabRaw) ? tabRaw : PESTANA_INICIAL;
+  const [tabRaw, setTab] = useUrlState<PestanaVisible>("tab", PESTANA_INICIAL);
+  // 🔴 Con el interruptor apagado, `?tab=proveedores` cae en Tiendas: la
+  // pestaña nueva no existe.
+  const tab: PestanaVisible = esPestanaVisible(tabRaw, MKT_PROVEEDORES_2026_10)
+    ? tabRaw
+    : PESTANA_INICIAL;
   const escribe = puedeEscribirMarketing(role);
 
-  const elegir = (p: PestanaTiendasYMarcas) => {
+  const elegir = (p: PestanaVisible) => {
     // Mobiliario es otra página: drill-down con push, Atrás vuelve acá.
     if (p === "mobiliario") {
       router.push(HREF_MOBILIARIO);
@@ -100,7 +109,7 @@ export default function PortadaTiendasYMarcas({
 
       {!cel && (
       <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto" role="tablist">
-        {PESTANAS_TIENDAS_Y_MARCAS.map((p) => (
+        {pestanasVisibles(MKT_PROVEEDORES_2026_10).map((p) => (
           <button
             key={p}
             type="button"
@@ -113,7 +122,7 @@ export default function PortadaTiendasYMarcas({
                 : MARKETING_APPLE_2026_10 ? PESTANA_INACTIVA : "border-transparent text-gray-500 hover:text-gray-800"
             }`}
           >
-            {ROTULO_PESTANA_TM[p]}
+            {rotuloDePestanaVisible(p)}
           </button>
         ))}
         {/* 🔴 MARKETING_APPLE_2026_10: «＋ Gasto» en la línea de las pestañas. */}
@@ -154,6 +163,10 @@ export default function PortadaTiendasYMarcas({
           sinBotonDeGasto
           celular={cel ? { escribe, hrefVolver: hrefVolverACelular } : null}
         />
+      )}
+      {/* 🔴 PROVEEDORES (6-oct-2026): la lista y la ficha. `false` = no existe. */}
+      {MKT_PROVEEDORES_2026_10 && tab === PESTANA_PROVEEDORES && (
+        <PortadaProveedores refreshKey={refreshKey} />
       )}
       {tab === "impulsadoras" && (
         <ImpulsadorasView

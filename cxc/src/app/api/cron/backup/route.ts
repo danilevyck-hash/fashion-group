@@ -294,6 +294,9 @@ const DATASETS: Dataset[] = [
   // una por una; soft delete = HISTORIAL. Switch no la tiene — de hecho es lo
   // que Switch tiene mal (tres pares comparten cédula y son empresas distintas).
   { table: "proveedor_amarre" },
+  // Marketing: los alias de proveedor («Krysthel» = «Kristel» = «Changalo»).
+  // Escrita a mano por Daniel el 6-oct-2026; de ninguna otra parte sale.
+  { table: "mk_proveedor_alias" },
   // Catálogos públicos de las 4 marcas. El PRECIO lo manda Switch, pero la foto,
   // el badge y el nombre a mano NO tienen otra fuente. `products` es el de
   // Reebok — la documentación lo daba por respaldado y no lo estaba.

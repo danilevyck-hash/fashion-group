@@ -130,13 +130,22 @@ export async function setMarcasDeFactura(
   if (!Array.isArray(marcas) || marcas.length === 0) {
     throw new Error("Debe especificar al menos una marca");
   }
-  // 🔴 UN GASTO TIENE UNA MARCA (22-sep-2026, `lib/marketing/gasto.ts`). Con
-  // dos, se frena aquí y se dice; medido: 108 de 108 facturas con una sola.
+  // 🔴 UN GASTO TIENE UNA MARCA, Y SIGUE SIENDO ASÍ (22-sep-2026; confirmado el
+  // 6-oct-2026). Daniel: «nunca se reparte entre varias marcas». Lo que sí
+  // existe desde el 6-oct-2026 es cobrarle a esa marca el 100 % o el 50 %, y
+  // eso NO vive acá: vive en `mk_facturas.pct_a_la_marca`
+  // (`proveedores-2026-10.ts`). Esta tabla y sus porcentajes no se tocan.
+  //
+  // 🩸 Y NO SE PUEDEN TOCAR: medido el 6-oct-2026, 58 de las 108 filas tienen
+  // `porcentaje = 50` y hoy significan el 100 % (el reporte normaliza por la
+  // suma, y todas las facturas tienen UNA marca). Darle otro significado al 50
+  // partiría 58 facturas de plata real a la mitad, en silencio.
   exigirUnaMarca(marcas);
+  const marcasAEscribir = marcas;
 
   // Validación: marcaIds únicas y no vacías
   const ids = new Set<string>();
-  for (const m of marcas) {
+  for (const m of marcasAEscribir) {
     if (!m.marcaId) throw new Error("marcaId vacío en alguna entrada");
     if (ids.has(m.marcaId)) {
       throw new Error(`Marca duplicada en el input: ${m.marcaId}`);
@@ -155,8 +164,8 @@ export async function setMarcasDeFactura(
 
   // Insertar nuevas con el % real del input (clamp al CHECK: 0 < pct <= 100).
   // Si el input no trae % válido, repartir parejo entre las marcas.
-  const parejo = round2(100 / marcas.length);
-  const payload = marcas.map((m) => {
+  const parejo = round2(100 / marcasAEscribir.length);
+  const payload = marcasAEscribir.map((m) => {
     const pct = Number(m.porcentaje);
     const porcentaje =
       Number.isFinite(pct) && pct > 0 ? Math.min(100, round2(pct)) : parejo;
@@ -189,7 +198,7 @@ export async function setMarcasDeFactura(
   await sellarDocumentoPorMarcas(
     "factura",
     facturaId,
-    marcas.map((m) => m.marcaId),
+    marcasAEscribir.map((m) => m.marcaId),
   );
 }
 

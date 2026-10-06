@@ -43,6 +43,17 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { FacturaForm } from "@/components/marketing";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import RegistrarPagoModal from "./RegistrarPagoModal";
+import {
+  MKT_PROVEEDORES_2026_10,
+  ROTULO_ADJUNTAR_COMPROBANTE,
+  ROTULO_COMPROBANTE,
+  pctQueSeGuarda,
+} from "@/lib/marketing/proveedores-2026-10";
+import BloqueDestinoDelGastoTipos, {
+  destinoInicial,
+  type DestinoDelGasto,
+} from "./BloqueDestinoDelGasto";
+void BloqueDestinoDelGastoTipos;
 import BloqueDatosDelGasto, { type TiendaElegida } from "./BloqueDatosDelGasto";
 import PuertasDeLaFacturaCelular from "./celular/PuertasDeLaFacturaCelular";
 import { BotonAncho } from "./celular/PiezasCelular";
@@ -148,6 +159,8 @@ export default function PuertaGasto({
       : null);
 
   const [paso, setPaso] = useState<Paso>("tipo");
+  // 🔴 PROVEEDORES (6-oct-2026). Apagado, nada de esto se usa ni se pide.
+  const [destino, setDestino] = useState<DestinoDelGasto>(destinoInicial);
   const [tipo, setTipo] = useState<TipoGasto | null>(null);
   const [datos, setDatos] = useState<DatosDelGasto>(() => datosPorDefecto("factura"));
 
@@ -237,9 +250,24 @@ export default function PuertaGasto({
     setPaso("datos");
   };
 
-  const faltantes = queFaltaEnLaPuerta({ tipo, datos, impulsadoraId: impulsadoraSel?.id ?? null });
-  const textoFalta = textoFaltaEnLaPuerta(faltantes);
-  const puedeContinuar = faltantes.length === 0;
+  // 🔴 PROVEEDORES (6-oct-2026): con un destino que no es «una marca», la
+  // marca NO se exige: el gasto queda a cargo de la empresa.
+  const usaDestino = MKT_PROVEEDORES_2026_10 && tipo !== "impulsadora";
+  // Sin marca, el gasto queda a cargo de la empresa.
+  const sinMarca = usaDestino && destino.aCargoDeLaEmpresa;
+  const faltantes = queFaltaEnLaPuerta({
+    tipo,
+    datos: sinMarca ? { ...datos, marcaId: "sin-marca" } : datos,
+    impulsadoraId: impulsadoraSel?.id ?? null,
+  });
+  // El destino no pide nada que escribir: o es una marca (y esa ya la exige
+  // `queFaltaEnLaPuerta`) o no lleva ninguna. No hay faltantes propios.
+  const faltanDelDestino: string[] = [];
+  const textoFalta =
+    faltanDelDestino.length > 0
+      ? faltanDelDestino.join(" ")
+      : textoFaltaEnLaPuerta(faltantes);
+  const puedeContinuar = faltantes.length === 0 && faltanDelDestino.length === 0;
   // 🔴 MARKETING_APPLE_2026_10 (computadora): lo que falta se dice al tocar
   // «Continuar», no antes. La regla de qué falta es la MISMA.
   const [intentoContinuar, setIntentoContinuar] = useState(false);
@@ -361,6 +389,13 @@ export default function PuertaGasto({
     [toast],
   );
 
+  /**
+   * 🔴 Cuánto por ciento se le cobra a la marca: 100, 50 o 0. `null` con el
+   * interruptor apagado, o sea que la columna nueva no viaja y la factura se
+   * lee como siempre.
+   */
+  const pctALaMarca = usaDestino ? pctQueSeGuarda(destino) : null;
+
   // ---- Guardar la FACTURA: la marca y lo del paso 2 viajan CON ella. ----
   const guardarFactura = async (
     data: {
@@ -385,7 +420,11 @@ export default function PuertaGasto({
       body: JSON.stringify({
         proyectoId: null,
         ...payload,
-        marcaId: marcaEfectiva?.id ?? "",
+        // 🔴 PROVEEDORES (6-oct-2026). Sin marca, `marcaId` viaja vacío y el
+        // servidor NO anula, porque viene `pctALaMarca` = 0. Con el 50 %, la
+        // marca viaja igual que siempre y lo único nuevo es el porcentaje.
+        marcaId: sinMarca ? "" : (marcaEfectiva?.id ?? ""),
+        ...(usaDestino ? { pctALaMarca } : {}),
         tiendaCodigo: comun.tiendaCodigo,
         seReporta: comun.seReporta,
         nota: comun.nota,
@@ -569,6 +608,15 @@ export default function PuertaGasto({
                 marcaInicial={marcaInicial}
                 marcaDeImpulsadora={tipo === "impulsadora" ? marcaDeImpulsadora : undefined}
                 tiendaInicial={tiendaInicial}
+                destino={
+                  usaDestino
+                    ? {
+                        valor: destino,
+                        onChange: setDestino,
+                        proveedor: lectura?.proveedor ?? "",
+                      }
+                    : null
+                }
               />
 
               {/* 🔴 4c — EN EL CELULAR, TRES PUERTAS PARA LA FACTURA
@@ -612,8 +660,18 @@ export default function PuertaGasto({
                   la tienda; un PDF de factura ahí no tendría factura. */}
               <div className={enCelular && tipo === "factura" ? "hidden" : undefined}>
                   <div className="text-sm font-medium text-gray-700 mb-1">
-                    {tipo === "mueble" ? "Foto del mueble" : rotuloDeLaPuerta()}{" "}
-                    <span className="font-normal text-gray-400">(opcional)</span>
+                    {/* 🔴 NOMBRES DE ERP (6-oct-2026): «Comprobante», no «Foto
+                        o factura (opcional)». Lo opcional ya lo dice el botón
+                        apagado y el aviso al guardar (docs/diseno.md, regla 8).
+                        Apagado, el rótulo de siempre, intacto. */}
+                    {MKT_PROVEEDORES_2026_10 ? (
+                      ROTULO_COMPROBANTE
+                    ) : (
+                      <>
+                        {tipo === "mueble" ? "Foto del mueble" : rotuloDeLaPuerta()}{" "}
+                        <span className="font-normal text-gray-400">(opcional)</span>
+                      </>
+                    )}
                   </div>
                   <input
                     ref={fotoRef}
@@ -648,7 +706,11 @@ export default function PuertaGasto({
                       className="w-full rounded-md border border-dashed border-gray-300 px-3 min-h-[44px] py-2 text-sm text-gray-600 hover:border-gray-500 hover:text-black transition"
                       data-testid="subir-archivo-de-la-puerta"
                     >
-                      {tipo === "mueble" ? "Subir foto" : rotuloBotonDeLaPuerta()}
+                      {MKT_PROVEEDORES_2026_10
+                        ? ROTULO_ADJUNTAR_COMPROBANTE
+                        : tipo === "mueble"
+                          ? "Subir foto"
+                          : rotuloBotonDeLaPuerta()}
                     </button>
                   )}
               </div>

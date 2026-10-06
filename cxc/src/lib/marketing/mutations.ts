@@ -18,6 +18,7 @@ import {
   sinColumnasDelRediseno,
 } from "./columnas-opcionales";
 import { columnasDelGasto, traeColumnasDelGasto } from "./puerta-gasto";
+import { columnasDeProveedores } from "./proveedores-2026-10";
 import {
   exigirTiendaDelDirectorio,
   frenarFacturaDuplicada,
@@ -264,7 +265,13 @@ export const MSG_SIN_CLIENTE_SIN_DDL =
 async function insertarFacturaConRespaldo(payload: Record<string, unknown>) {
   const insertar = (p: Record<string, unknown>) =>
     supabaseServer.from("mk_facturas").insert(p).select("*").single();
-  const traeNuevas = ["se_reporta", "tienda_codigo", "nota"].some((c) => c in payload);
+  const traeNuevas = [
+    "se_reporta",
+    "tienda_codigo",
+    "nota",
+    // PROVEEDORES (6-oct-2026): la columna nueva falla abierta igual.
+    "pct_a_la_marca",
+  ].some((c) => c in payload);
   if (!traeNuevas) {
     return { resultado: await insertar(payload), conLasColumnas: true };
   }
@@ -315,6 +322,9 @@ export async function createFactura(
   // estar en el directorio; y ANTES de escribir, el freno de duplicados
   // (proveedor normalizado + monto + fecha) — que lanza y no guarda.
   const cols = columnasDelGasto(input);
+  // 🔴 PROVEEDORES (6-oct-2026): el destino sin marca y la compra de inventario
+  // propio. Con el interruptor apagado devuelve `{}` y nada cambia.
+  const colsProveedores = columnasDeProveedores(input as { pctALaMarca?: unknown });
   await exigirTiendaDelDirectorio(cols.tienda_codigo);
   await frenarFacturaDuplicada({
     proveedor,
@@ -336,6 +346,7 @@ export async function createFactura(
     tiene_importacion: tieneImportacion,
     estado_pago: estadoPago,
     ...cols,
+    ...colsProveedores,
   };
 
   const { resultado } = await insertarFacturaConRespaldo(payload);

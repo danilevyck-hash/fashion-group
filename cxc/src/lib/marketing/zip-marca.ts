@@ -81,6 +81,7 @@ import { seReportaDe, TIENDA_GENERAL } from "./gasto";
 import { MARKETING_FOTOS_CON_PERIODO } from "./fotos-periodo";
 import { conRespaldoSinColumnas, type ResultadoPg } from "./columnas-opcionales";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "./zip-e-impulsadoras";
+import { MKT_PROVEEDORES_2026_10, montoDeLaMarca } from "./proveedores-2026-10";
 import {
   grafiasUnicasDeProveedor,
   limpiarTextoParaLaMarca,
@@ -190,6 +191,11 @@ interface FacturaFila {
   periodo_desde?: string | null;
   periodo_hasta?: string | null;
   anulado_en: string | null;
+  /**
+   * 🔴 PROVEEDORES (6-oct-2026). Cuánto se le cobra a la marca: 100 · 50 · 0.
+   * Ausente o `null` = factura de antes, entera para su marca (falla ABIERTO).
+   */
+  pct_a_la_marca?: number | null;
   /** 🔴 Columna del rediseño. Ausente = se reporta (falla ABIERTO). */
   se_reporta?: boolean | null;
   /** La tienda del GASTO (23-sep-2026). Ausente = la del proyecto. */
@@ -398,7 +404,7 @@ async function leerFacturasConSeReporta(): Promise<ResultadoPg<FacturaFila[]>> {
     () =>
       supabaseServer
         .from("mk_facturas")
-        .select(`${COLUMNAS_FACTURA}, se_reporta, tienda_codigo`) as unknown as PromiseLike<
+        .select(`${COLUMNAS_FACTURA}, se_reporta, tienda_codigo, pct_a_la_marca`) as unknown as PromiseLike<
         ResultadoPg<FacturaFila[]>
       >,
     () =>
@@ -431,8 +437,23 @@ async function leerEntregasConSeReporta(): Promise<ResultadoPg<EntregaFila[]>> {
  * ¿Este gasto va en el papel de la marca? Con el interruptor apagado, todos
  * (como hoy). Con él prendido, solo los que se reportan — y un `se_reporta`
  * que no vino se lee como que SÍ (`seReportaDe`).
+ *
+ * 🔴 LO QUE QUEDA A CARGO DE LA EMPRESA NO SE LE PRESENTA A LA MARCA
+ * (6-oct-2026, `MKT_PROVEEDORES_2026_10`). Daniel: «si es nada, no se debería
+ * poder descargar para presentar los gastos a la marca». `pct_a_la_marca = 0`
+ * es exactamente eso, y se corta ACÁ —la única puerta que usan los cuatro
+ * lugares que arman el papel— y no en cada uno.
+ *
+ * 🔑 Hoy una factura así tampoco tiene fila en `mk_factura_marcas`, así que ya
+ * quedaba fuera por no tener marca. Este guard es la red explícita: si alguna
+ * vez una factura conservara su marca y se pasara a «A cargo de la empresa»,
+ * igual no sale en el ZIP.
  */
-function vaEnElPapel(fila: { se_reporta?: boolean | null }): boolean {
+function vaEnElPapel(fila: {
+  se_reporta?: boolean | null;
+  pct_a_la_marca?: number | null;
+}): boolean {
+  if (MKT_PROVEEDORES_2026_10 && Number(fila.pct_a_la_marca) === 0) return false;
   if (!ZIP_E_IMPULSADORAS_NUEVO) return true;
   return seReportaDe(fila.se_reporta);
 }
@@ -793,8 +814,17 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
       const rows = rowsPorFactura.get(String(f.id)) ?? [];
       if (!rows.some((r) => r.marcaId === marcaId)) continue;
       if (!entraEnElPeriodo("factura", String(f.id))) continue;
-      // 🔴 UNA MARCA = 100 % (`papel-de-la-marca.ts › porcionDeLaFactura`).
-      facturasDeMarca.push({ f, monto: porcionDeLaFactura(num(f.total), rows, marcaId) });
+      // 🔴 UNA MARCA = 100 % (`papel-de-la-marca.ts › porcionDeLaFactura`), y
+      // con «Mitad» va la MITAD: `montoDeLaMarca` recorta el total ANTES de
+      // repartir, así que el papel y el Excel dicen lo que se le cobra.
+      facturasDeMarca.push({
+        f,
+        monto: porcionDeLaFactura(
+          MKT_PROVEEDORES_2026_10 ? montoDeLaMarca(num(f.total), f.pct_a_la_marca) : num(f.total),
+          rows,
+          marcaId,
+        ),
+      });
     }
   }
 
