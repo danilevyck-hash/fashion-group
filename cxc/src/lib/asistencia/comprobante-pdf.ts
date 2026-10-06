@@ -16,10 +16,16 @@
 import jsPDF from "jspdf";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import type { Comprobante } from "./comprobante";
+import { ESTILO_UNICO, MARGEN_PAPEL, PAPEL, cabeceraPapel, piePapel, sinMayusculas } from "@/lib/pdf-estilo";
+
+/** Estilo único: los grises sueltos (90, 110, 120, 180…) salen de la paleta. */
+const U = ESTILO_UNICO;
+const gris = (doc: jsPDF, n: number) => (U ? doc.setTextColor(...PAPEL.gris) : doc.setTextColor(n));
+const raya = (doc: jsPDF, n: number) => (U ? doc.setDrawColor(...(n < 100 ? PAPEL.gris : PAPEL.linea)) : doc.setDrawColor(n));
 
 /** Carta vertical, en milímetros. Es la hoja en la que se imprime hoy. */
 const HOJA = { formato: "letter" as const, ancho: 215.9, alto: 279.4 };
-const MARGEN = 18;
+const MARGEN = ESTILO_UNICO ? MARGEN_PAPEL : 18;
 /** Dónde termina la columna de montos (alineada a la derecha). */
 const X_MONTO = 150;
 /** Dónde arranca la nota (los minutos de tardanza). */
@@ -39,6 +45,15 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
   const derecha = HOJA.ancho - MARGEN;
   let y = MARGEN;
 
+  if (U) {
+    y = cabeceraPapel(doc, {
+      titulo: "Comprobante de pago",
+      subtitulo: [
+        [sinMayusculas(c.empresa), c.identificacion].filter(Boolean).join(" · "),
+        [c.encabezado[0], c.titulo].filter(Boolean).join(" · "),
+      ],
+    }) + 4;
+  } else {
   // ── El logo de la casa. Es NUESTRO papel, aunque copie la forma del de la
   //    contadora: el que lo firma tiene que saber de quién es.
   try {
@@ -73,6 +88,7 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
   doc.setDrawColor(180).setLineWidth(0.3);
   doc.line(MARGEN, y, derecha, y);
   y += 7;
+  }
 
   // ── La ficha de la persona.
   //
@@ -114,12 +130,14 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
       // 🔴 LOS MINUTOS VAN ACÁ, AL LADO DEL NÚMERO — nunca dentro del rótulo.
       // Meterlos en el título es lo que produjo las 23 grafías distintas del
       // renglón de tardanza en los 34 comprobantes de julio.
-      doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(110);
+      doc.setFont("helvetica", "normal").setFontSize(7.5);
+      gris(doc, 110);
       doc.text(r.nota, X_NOTA, y);
       doc.setTextColor(0);
     }
     if (esTotal) {
-      doc.setDrawColor(120).setLineWidth(0.2);
+      raya(doc, 120);
+      doc.setLineWidth(0.2);
       doc.line(X_MONTO - 30, y + 1.2, X_MONTO, y + 1.2);
     }
     y += ALTO_LINEA;
@@ -133,13 +151,15 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
   //    las firmas: dice que unas columnas traen los días que la quincena
   //    anterior pagó sin medir. Solo se dibuja cuando hay algo que decir.
   if (c.nota) {
-    doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(110);
+    doc.setFont("helvetica", "normal").setFontSize(7.5);
+      gris(doc, 110);
     const lineasNota = doc.splitTextToSize(c.nota, derecha - MARGEN) as string[];
     doc.text(lineasNota, MARGEN, yPie - 10 - (lineasNota.length - 1) * 3.5);
     doc.setTextColor(0);
   }
 
-  doc.setDrawColor(180).setLineWidth(0.3);
+  raya(doc, 180);
+  doc.setLineWidth(0.3);
   doc.line(MARGEN, yPie - 6, derecha, yPie - 6);
 
   doc.setFont("helvetica", "normal").setFontSize(9);
@@ -156,13 +176,16 @@ export function dibujarComprobante(doc: jsPDF, c: Comprobante): void {
     const x = MARGEN + anchoCol * i;
     const finLinea = x + anchoCol - 8;
     if (valor) doc.text(valor, x, yPie - 1);
-    doc.setDrawColor(60).setLineWidth(0.3);
+    raya(doc, 60);
+    doc.setLineWidth(0.3);
     doc.line(x, yPie + 1, finLinea, yPie + 1);
-    doc.setFontSize(7.5).setTextColor(90);
+    doc.setFontSize(7.5);
+    gris(doc, 90);
     doc.text(rotulo, x, yPie + 5);
     doc.setFontSize(9).setTextColor(0);
   });
 
+  if (U) return; // el pie común lo pone `piePapel` al final
   doc.setFontSize(6.5).setTextColor(130);
   doc.text("Confidencial · fashiongr.com", MARGEN, HOJA.alto - 8);
   doc.setTextColor(0);
@@ -200,7 +223,8 @@ export function construirPdfComprobantes(comprobantes: readonly Comprobante[]): 
     if (i > 0) doc.addPage();
     dibujarComprobante(doc, c);
   });
-  numerarHojas(doc);
+  if (ESTILO_UNICO) piePapel(doc);
+  else numerarHojas(doc);
   return doc;
 }
 

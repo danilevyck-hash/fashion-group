@@ -22,10 +22,15 @@ import {
   type ColumnaPapel,
   type ContactoDePapel,
 } from "@/lib/reclamos/papel";
+import {
+  ESTILO_UNICO, MARGEN_PAPEL, PAPEL, PIE_PAPEL as RESERVA_PIE, Y_CONTENIDO, cabeceraPapel, piePapel, rotuloPapel,
+} from "@/lib/pdf-estilo";
 
 const PAGE_W = 216;
 const PAGE_H = 279;
-const MARGIN = 15;
+const MARGIN = ESTILO_UNICO ? MARGEN_PAPEL : 15;
+/** Estilo único: la tabla va entre los MISMOS márgenes que la cabecera. */
+const MARGEN_TABLA = ESTILO_UNICO ? { margin: { left: MARGIN, right: MARGIN, bottom: RESERVA_PIE } } : {};
 
 interface ReclamoItem {
   referencia?: string;
@@ -118,6 +123,14 @@ async function downloadFoto(storagePath: string): Promise<{ base64: string; ext:
 }
 
 function drawCoverHeader(doc: jsPDF, empresa: string, count: number, grandTotal: number) {
+  if (ESTILO_UNICO) {
+    cabeceraPapel(doc, {
+      titulo: "Resumen de reclamos",
+      subtitulo: empresa,
+      derecha: [`Total a acreditar $${fmt(grandTotal)}`, `${count} reclamo${count === 1 ? "" : "s"} · ${fechaDelPapel(hoyPanama())}`],
+    });
+    return;
+  }
   doc.setFillColor(27, 58, 92);
   doc.rect(0, 0, PAGE_W, 26, "F");
   try {
@@ -149,6 +162,14 @@ function drawCoverHeader(doc: jsPDF, empresa: string, count: number, grandTotal:
  * número adentro y a la rejilla de metadatos en tres columnas.
  */
 function drawCabecera(doc: jsPDF, rec: ReclamoFull, startY: number): number {
+  if (ESTILO_UNICO) {
+    const fecha = fechaDeLaCabecera(rec);
+    return cabeceraPapel(doc, {
+      titulo: `Reclamo ${rec.nro_reclamo || ""}`.trim(),
+      subtitulo: rec.empresa || undefined,
+      derecha: fecha ? [fechaDelPapel(fecha)] : undefined,
+    });
+  }
   let y = startY;
   try {
     doc.addImage(FG_LOGO_BASE64, "JPEG", MARGIN, y, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
@@ -192,7 +213,8 @@ function drawLineaDatos(doc: jsPDF, rec: ReclamoFull, contacto: ContactoDePapel 
   const texto = datos.map((d) => `${d.rotulo} ${d.valor}`).join("   ·   ");
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.setTextColor(70, 70, 70);
+  if (ESTILO_UNICO) doc.setTextColor(...PAPEL.grisOscuro);
+  else doc.setTextColor(70, 70, 70);
   const lineas = doc.splitTextToSize(texto, PAGE_W - 2 * MARGIN) as string[];
   doc.text(lineas, MARGIN, startY);
   return startY + lineas.length * 4.5 + 3;
@@ -210,6 +232,22 @@ function drawPieTotales(doc: jsPDF, empresa: string | undefined, subtotal: numbe
   const xRotulo = PAGE_W - MARGIN - 40;
   let y = startY;
   for (const f of filas) {
+    if (ESTILO_UNICO) {
+      // Total en negrita con raya arriba; lo demás en gris. Solo la paleta.
+      doc.setFont("helvetica", f.fuerte ? "bold" : "normal");
+      doc.setFontSize(f.fuerte ? 10 : 9);
+      if (f.fuerte) {
+        doc.setDrawColor(...PAPEL.tinta);
+        doc.setLineWidth(0.35);
+        doc.line(xRotulo - 4, y - 3.2, xValor, y - 3.2);
+      }
+      doc.setTextColor(...(f.fuerte ? PAPEL.tinta : PAPEL.gris));
+      doc.text(f.rotulo, xRotulo, y, { align: "left" });
+      doc.setTextColor(...PAPEL.tinta);
+      doc.text(`$${fmt(f.valor)}`, xValor, y, { align: "right" });
+      y += f.fuerte ? 6 : 5;
+      continue;
+    }
     if (f.fuerte) {
       doc.setDrawColor(30, 30, 30);
       doc.setLineWidth(0.4);
@@ -251,6 +289,7 @@ function drawTablaRenglones(doc: jsPDF, rec: ReclamoFull, items: ReclamoItem[], 
   });
   autoTable(doc, {
     startY,
+    ...MARGEN_TABLA,
     head: [columnas.map((c) => c.rotulo)],
     body: cuerpo,
     styles: { fontSize: 8, cellPadding: 2 },
@@ -272,6 +311,32 @@ function drawSettlementBlock(doc: jsPDF, rec: ReclamoFull, subtotal: number, sta
   const recuperado = settlements.reduce((s, x) => s + (Number(x.monto) || 0), 0);
 
   let y = startY;
+  if (ESTILO_UNICO) {
+    // Sin franja azul ni cajas de color: rótulo gris y dos cifras.
+    rotuloPapel(doc, "Recuperación · notas de crédito", MARGIN, y + 4);
+    y += 10;
+    [["Reclamado", reclamado], ["Recuperado", recuperado]].forEach(([rotulo, valor], i) => {
+      const x = MARGIN + i * 50;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...PAPEL.gris);
+      doc.text(String(rotulo), x, y);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...PAPEL.tinta);
+      doc.text(`$${fmt(Number(valor))}`, x, y + 5.5);
+    });
+    y += 12;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...PAPEL.grisOscuro);
+    for (const s of settlements) {
+      const nc = s.nota_credito ? ` · NC ${s.nota_credito}` : "";
+      doc.text(`${fechaDelPapel(s.fecha)} — $${fmt(Number(s.monto) || 0)}${nc}`, MARGIN, y);
+      y += 5;
+    }
+    return y + 2;
+  }
   // Encabezado de sección
   doc.setFillColor(46, 94, 142);
   doc.rect(MARGIN, y, PAGE_W - 2 * MARGIN, 8, "F");
@@ -325,7 +390,8 @@ function drawSettlementBlock(doc: jsPDF, rec: ReclamoFull, subtotal: number, sta
 }
 
 function drawNotas(doc: jsPDF, notas: string, startY: number): number {
-  doc.setTextColor(80, 80, 80);
+  if (ESTILO_UNICO) doc.setTextColor(...PAPEL.grisOscuro);
+  else doc.setTextColor(80, 80, 80);
   doc.setFont("helvetica", "italic");
   doc.setFontSize(9);
   const lines = doc.splitTextToSize(`Notas: ${notas}`, PAGE_W - 2 * MARGIN);
@@ -334,7 +400,7 @@ function drawNotas(doc: jsPDF, notas: string, startY: number): number {
 }
 
 function ensureSpace(doc: jsPDF, cursorY: number, needed: number): number {
-  if (cursorY + needed > PAGE_H - MARGIN) {
+  if (cursorY + needed > PAGE_H - (ESTILO_UNICO ? RESERVA_PIE : MARGIN)) {
     doc.addPage();
     return MARGIN;
   }
@@ -377,7 +443,8 @@ export async function buildBulkReclamosPdf(
     });
 
     autoTable(doc, {
-      startY: 50,
+      startY: ESTILO_UNICO ? Y_CONTENIDO : 50,
+      ...MARGEN_TABLA,
       // 🔴 SIN «ESTADO» (20-sep-2026): son nuestras palabras de adentro
       // —«Creado», «Pagado»— y al proveedor extranjero la segunda se le lee al
       // revés. Adentro del sistema el estado no cambia; lo que cambia es el
@@ -437,6 +504,10 @@ export async function buildBulkReclamosPdf(
       const valid = downloaded.filter((d): d is { base64: string; ext: string } => d !== null);
       if (valid.length > 0) {
         cursorY = ensureSpace(doc, cursorY, 20);
+        if (ESTILO_UNICO) {
+          rotuloPapel(doc, `Evidencia fotográfica — ${rec.nro_reclamo || ""}`, MARGIN, cursorY + 5);
+          cursorY += 9;
+        } else {
         doc.setFillColor(46, 94, 142);
         doc.rect(MARGIN, cursorY, PAGE_W - 2 * MARGIN, 8, "F");
         doc.setTextColor(255, 255, 255);
@@ -444,6 +515,7 @@ export async function buildBulkReclamosPdf(
         doc.setFontSize(9);
         doc.text(`Evidencia fotográfica — ${rec.nro_reclamo || ""}`, PAGE_W / 2, cursorY + 5.5, { align: "center" });
         cursorY += 14;
+        }
 
         const imgSize = 110;
         for (const photo of valid) {
@@ -458,6 +530,10 @@ export async function buildBulkReclamosPdf(
     }
   }
 
+  if (ESTILO_UNICO) {
+    piePapel(doc);
+    return doc;
+  }
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);

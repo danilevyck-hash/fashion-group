@@ -14,6 +14,7 @@
 
 import type jsPDF from "jspdf";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
+import { ESTILO_UNICO, MARGEN_PAPEL, PAPEL, PIE_PAPEL, Y_CONTENIDO, cabeceraPapel, piePapel, rayaPapel } from "@/lib/pdf-estilo";
 
 /** Navy de la casa — el MISMO `pri` de los Excel y del papel del CXC. */
 export const NAVY: [number, number, number] = [27, 58, 92];
@@ -21,7 +22,7 @@ export const TINTA: [number, number, number] = [17, 24, 39];
 export const GRIS: [number, number, number] = [107, 114, 128];
 export const GRIS_CLARO: [number, number, number] = [156, 163, 175];
 export const CEBRA: [number, number, number] = [248, 249, 249];
-export const ROJO: [number, number, number] = [225, 29, 72];
+export const ROJO: [number, number, number] = ESTILO_UNICO ? PAPEL.rojo : [225, 29, 72];
 export const LINEA: [number, number, number] = [209, 213, 219];
 
 /**
@@ -46,9 +47,9 @@ export function textoDePdf(texto: string): string {
   return texto.replace(/\u2212/g, MENOS_EN_PDF);
 }
 
-export const MARGEN = 19;
+export const MARGEN = ESTILO_UNICO ? MARGEN_PAPEL : 19;
 /** Dónde arranca la tabla en la PRIMERA hoja: debajo de la cabecera. */
-export const ALTO_CABECERA = 32;
+export const ALTO_CABECERA = ESTILO_UNICO ? Y_CONTENIDO : 32;
 /**
  * 🔴 EL TÍTULO VA SOLO EN LA PRIMERA HOJA (17-sep-2026).
  *
@@ -70,13 +71,14 @@ export const ALTO_CABECERA = 32;
  */
 export const ALTO_CONTINUACION = MARGEN;
 /** Aire de abajo, donde va el pie. */
-export const PIE = 18;
+export const PIE = ESTILO_UNICO ? PIE_PAPEL : 18;
 
 /** Dónde cae el renglón del título (línea base), debajo del logo. */
-export const Y_TITULO = 10 + FG_LOGO_HEIGHT + 5;
+export const Y_TITULO = ESTILO_UNICO ? 24 : 10 + FG_LOGO_HEIGHT + 5;
 
 /** La raya gris de la casa, a lo ancho entre márgenes. */
 export function rayaGris(doc: jsPDF, y: number): void {
+  if (ESTILO_UNICO) return rayaPapel(doc, y);
   const w = doc.internal.pageSize.getWidth();
   doc.setDrawColor(...LINEA);
   doc.setLineWidth(0.3);
@@ -90,6 +92,12 @@ export function rayaGris(doc: jsPDF, y: number): void {
  * el «$40.67» de Rodrigo).
  */
 export function cabecera(doc: jsPDF, titulo: string, conRaya = true): void {
+  if (ESTILO_UNICO) {
+    // «Comisión — Rodrigo · Vistana · Septiembre 2026»: título y, en gris, el resto.
+    const [t, ...resto] = textoDePdf(titulo).split(" · ");
+    cabeceraPapel(doc, { titulo: t, subtitulo: resto.join(" · ") || undefined, sinRaya: !conRaya });
+    return;
+  }
   const w = doc.internal.pageSize.getWidth();
   try {
     doc.addImage(FG_LOGO_BASE64, "JPEG", MARGEN, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
@@ -105,6 +113,7 @@ export function cabecera(doc: jsPDF, titulo: string, conRaya = true): void {
 
 /** El pie de la casa, con la numeración. Se escribe al final, ya con el total. */
 export function piePorHoja(doc: jsPDF): void {
+  if (ESTILO_UNICO) return piePapel(doc);
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();
   const hojas = doc.getNumberOfPages();

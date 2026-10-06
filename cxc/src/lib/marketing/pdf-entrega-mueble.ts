@@ -67,9 +67,11 @@ import { jsPDF } from "jspdf";
 import autoTable from "@/lib/pdf-tabla";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import { textoBultos } from "./piezas-bultos";
+import { fmtDate } from "@/lib/format";
+import { ESTILO_UNICO, MARGEN_PAPEL, PAPEL, PIE_PAPEL, cabeceraPapel, piePapel } from "@/lib/pdf-estilo";
 
 const PAGE_W = 216; // Letter
-const MARGIN = 15;
+const MARGIN = ESTILO_UNICO ? MARGEN_PAPEL : 15;
 const ANCHO = PAGE_W - 2 * MARGIN;
 const NAVY: [number, number, number] = [27, 58, 92];
 
@@ -132,6 +134,8 @@ function fmt(n: number): string {
 
 function fmtFecha(iso: string): string {
   const d = (iso || "").slice(0, 10);
+  // Estilo único: la fecha de todos los papeles, «10 sept 2026».
+  if (ESTILO_UNICO && d) return fmtDate(d);
   const [y, m, day] = d.split("-");
   return day && m && y ? `${day}/${m}/${y}` : "—";
 }
@@ -182,14 +186,16 @@ function campo(
 ): void {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
-  doc.setTextColor(140, 140, 140);
+  if (ESTILO_UNICO) doc.setTextColor(...PAPEL.gris);
+  else doc.setTextColor(140, 140, 140);
   doc.setCharSpace(0.5);
   doc.text(label.toUpperCase(), x, y);
   doc.setCharSpace(0);
   if (!valor) return;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(12);
-  doc.setTextColor(30, 30, 30);
+  if (ESTILO_UNICO) doc.setTextColor(...PAPEL.tinta);
+  else doc.setTextColor(30, 30, 30);
   // Un nombre de cliente largo se parte en vez de pisar la columna de al lado.
   const lineas = doc.splitTextToSize(valor, ancho) as string[];
   doc.text(lineas.slice(0, 2), x, y + 7);
@@ -213,6 +219,12 @@ export function buildComprobanteEntregaDoc(
   const doc = new jsPDF({ unit: "mm", format: "letter" });
 
   // ── Banda: de quién es (logo), qué es (título), cuál es y de cuándo ───────
+  if (ESTILO_UNICO) {
+    cabeceraPapel(doc, {
+      titulo: incluirBultos ? "Nota de entrega" : "Comprobante de entrega",
+      derecha: [numeroComprobante(d), fmtFecha(d.fecha)],
+    });
+  } else {
   doc.setFillColor(...NAVY);
   doc.rect(0, 0, PAGE_W, 26, "F");
   try {
@@ -240,6 +252,7 @@ export function buildComprobanteEntregaDoc(
   doc.setFontSize(9.5);
   doc.setTextColor(178, 196, 214);
   doc.text(fmtFecha(d.fecha), PAGE_W - MARGIN, 19, { align: "right" });
+  }
 
   // ── Contexto: a quién, de qué obra, a qué marca se le carga ──────────────
   const col2 = MARGIN + ANCHO / 2;
@@ -285,7 +298,7 @@ export function buildComprobanteEntregaDoc(
 
   autoTable(doc, {
     startY: 71,
-    margin: { left: MARGIN, right: MARGIN },
+    margin: { left: MARGIN, right: MARGIN, ...(ESTILO_UNICO ? { bottom: PIE_PAPEL } : {}) },
     head: [
       [
         "",
@@ -358,6 +371,20 @@ export function buildComprobanteEntregaDoc(
   let y = (doc as any).lastAutoTable.finalY + 6;
   const boxW = 74;
   const boxX = PAGE_W - MARGIN - boxW;
+  if (ESTILO_UNICO) {
+    // Total en negrita con raya arriba, como todos los papeles: sin caja azul.
+    doc.setDrawColor(...PAPEL.tinta);
+    doc.setLineWidth(0.35);
+    doc.line(boxX, y, PAGE_W - MARGIN, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...PAPEL.gris);
+    doc.text("Total", boxX, y + 7);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(...PAPEL.tinta);
+    doc.text(`$${fmt(d.total)}`, PAGE_W - MARGIN, y + 7, { align: "right" });
+  } else {
   doc.setFillColor(...NAVY);
   doc.rect(boxX, y, boxW, 15, "F");
   doc.setTextColor(180, 195, 210);
@@ -370,6 +397,7 @@ export function buildComprobanteEntregaDoc(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.text(`$${fmt(d.total)}`, boxX + boxW - 4, y + 11.5, { align: "right" });
+  }
 
   // ── Notas ─────────────────────────────────────────────────────────────────
   // Sólo si alguien escribió algo. No es decoración: es texto del formulario.
@@ -378,11 +406,13 @@ export function buildComprobanteEntregaDoc(
     campo(doc, "Notas", "", MARGIN, y, ANCHO);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
+    if (ESTILO_UNICO) doc.setTextColor(...PAPEL.tinta);
+    else doc.setTextColor(50, 50, 50);
     const lineas = doc.splitTextToSize(d.notas.trim(), ANCHO) as string[];
     doc.text(lineas.slice(0, 4), MARGIN, y + 7);
   }
 
+  if (ESTILO_UNICO) piePapel(doc);
   return doc;
 }
 

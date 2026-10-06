@@ -34,6 +34,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import type jsPDF from "jspdf";
+import { ESTILO_UNICO, PAPEL, PIE_PAPEL, Y_NOTA_DESDE_ABAJO } from "@/lib/pdf-estilo";
 
 /**
  * El alto de un renglón del pie. A 6,5–7 pt una línea mide ~2,5 mm de alto;
@@ -98,6 +99,10 @@ export function armarPie(
     .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
     .flatMap((p) => doc.splitTextToSize(p, util) as string[]);
 
+  if (ESTILO_UNICO) {
+    // Estilo único: las notas van ENCIMA del pie común («Confidencial · Página N de M»).
+    return { lineas, reservaMm: Math.max(PIE_PAPEL, Y_NOTA_DESDE_ABAJO + lineas.length * PIE_ALTO_LINEA_MM + RESPIRO_MM) };
+  }
   return {
     lineas,
     reservaMm: Math.max(
@@ -120,6 +125,13 @@ export function dibujarPie(doc: jsPDF, pie: PieDePagina, fontSize: number, marge
   doc.setFont("helvetica", "normal");
   doc.setFontSize(fontSize);
   doc.setTextColor(156, 163, 175);
+  if (ESTILO_UNICO) {
+    // El número de hoja lo pone `piePapel` al final, con el total de hojas.
+    doc.setTextColor(...PAPEL.gris);
+    const base = h - Y_NOTA_DESDE_ABAJO;
+    pie.lineas.forEach((linea, i) => doc.text(linea, margen, base - (pie.lineas.length - 1 - i) * PIE_ALTO_LINEA_MM));
+    return;
+  }
 
   const abajo = h - PIE_BASE_MM;
   pie.lineas.forEach((linea, i) => {

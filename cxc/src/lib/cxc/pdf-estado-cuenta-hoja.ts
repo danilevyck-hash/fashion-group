@@ -40,10 +40,11 @@ import {
   fechaDMY,
   type FilaDelPapel,
 } from "@/lib/cxc/estado-cuenta-switch";
+import { ESTILO_UNICO, MARGEN_PAPEL, PIE_PAPEL, cabeceraPapel, piePapel } from "@/lib/pdf-estilo";
 
-export const MARGEN = 12;
+export const MARGEN = ESTILO_UNICO ? MARGEN_PAPEL : 12;
 /** Alto reservado abajo para el pie de la casa. */
-export const FOOTER_RESERVA_MM = 16;
+export const FOOTER_RESERVA_MM = ESTILO_UNICO ? PIE_PAPEL : 16;
 
 const GRIS = [107, 114, 128] as const;
 const NEGRO = [17, 24, 39] as const;
@@ -73,6 +74,11 @@ export function dibujarCabeza(doc: jsPDF, empresaKey: string, empresaNombre: str
   const centro = w / 2;
   const f = fichaFiscal(empresaKey, empresaNombre);
   const casa = casaDeEmpresa(empresaKey);
+  if (ESTILO_UNICO) {
+    const datos = [f.identificacion ? `Identificación: ${f.identificacion}` : "", f.telefono ? `Tel. ${f.telefono}` : "", f.correo]
+      .filter(Boolean).join(" · ");
+    return cabeceraPapel(doc, { titulo: "Estado de cuenta", subtitulo: [f.legal, datos], derecha: [hoyDMY()], logo: casa.logo }) + 2;
+  }
 
   if (casa.logo) {
     try {
@@ -405,6 +411,7 @@ export function dibujarRecibidoConforme(doc: jsPDF, y: number): number {
 // ── 5. El pie de la casa ─────────────────────────────────────────────────────
 
 export function dibujarPieDeLaCasa(doc: jsPDF, casa: CasaDelPapel): void {
+  if (ESTILO_UNICO) return piePapel(doc, undefined, casa.pie.includes("fashiongr.com") ? "fashiongr.com" : null);
   const pages = doc.getNumberOfPages();
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();

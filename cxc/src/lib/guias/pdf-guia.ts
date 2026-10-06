@@ -39,6 +39,7 @@ import { fmtDate, fmtGuia } from "@/lib/format";
 import { nombreDespachadoPor } from "@/lib/guias/despachado-por";
 import { facturasParaElPapel } from "./numero-factura";
 import { tintaDeLaCasilla } from "./casilla-en-blanco";
+import { ESTILO_UNICO, MARGEN_PAPEL, PAPEL, Y_CONTENIDO, cabeceraPapel, piePapel } from "@/lib/pdf-estilo";
 import { cedulaParaMostrar } from "./cedula";
 import { observacionesVisibles } from "./observaciones";
 import type { Guia } from "@/app/guias/components/types";
@@ -72,7 +73,11 @@ import {
 } from "@/lib/guias/papel-2026-09";
 
 const PAGE_W = 216; // Letter
-const MARGIN = 15;
+const MARGIN = ESTILO_UNICO ? MARGEN_PAPEL : 15;
+/** Estilo único: los grises sueltos de las rayas salen de la paleta. */
+const raya = (doc: jsPDF, n: number) => (ESTILO_UNICO ? doc.setDrawColor(...(n < 170 ? PAPEL.linea : PAPEL.separador)) : doc.setDrawColor(n));
+/** «GUÍA DE TRANSPORTE EXTERNO» → «Guía de transporte externo». */
+const sinGritar = (t: string) => t.charAt(0) + t.slice(1).toLowerCase();
 const ANCHO = PAGE_W - 2 * MARGIN;
 
 const TEXTO_LEGAL =
@@ -99,7 +104,7 @@ function bloqueCampos(doc: jsPDF, campos: Array<[string, string]>, yInicio: numb
     doc.text(valor || "", x + anchoEtiqueta, y);
     // 🔴 La casilla VACÍA sale con la raya marcada, para escribirla a mano
     // (19-sep-2026): la misma regla —y la misma función— que la hoja impresa.
-    doc.setDrawColor(tintaDeLaCasilla(valor));
+    raya(doc, tintaDeLaCasilla(valor));
     doc.line(x + anchoEtiqueta, y + 1, x + colW - 6, y + 1);
     if (i % 2 === 1) y += 7;
   });
@@ -129,7 +134,7 @@ function bloqueFirma(
   let cursor = y + 8;
   doc.text(`NOMBRE: ${opts.nombre || ""}`, x, cursor);
   if (!opts.nombre) {
-    doc.setDrawColor(150);
+    raya(doc, 150);
     doc.line(x + 18, cursor + 1, x + colW - 6, cursor + 1);
   }
   cursor += 7;
@@ -137,7 +142,7 @@ function bloqueFirma(
   if (opts.cedula !== undefined) {
     doc.text(`CÉDULA: ${opts.cedula || ""}`, x, cursor);
     if (!opts.cedula) {
-      doc.setDrawColor(150);
+      raya(doc, 150);
       doc.line(x + 17, cursor + 1, x + colW - 6, cursor + 1);
     }
     cursor += 7;
@@ -164,13 +169,14 @@ function bloqueFirma(
       /* firma ilegible: queda la línea vacía, nunca se rompe el documento */
     }
   } else {
-    doc.setDrawColor(150);
+    raya(doc, 150);
     doc.line(x + 15, cursor + 1, x + colW - 6, cursor + 1);
   }
   cursor += 8;
 
   doc.setFontSize(7);
-  doc.setTextColor(150);
+  if (ESTILO_UNICO) doc.setTextColor(...PAPEL.grisClaro);
+  else doc.setTextColor(150);
   doc.text(opts.pie, x, cursor);
   doc.setTextColor(0);
 }
@@ -201,6 +207,10 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   const esDirecta = esEntregaDirecta(g);
 
   // ── Encabezado ────────────────────────────────────────────────────────────
+  if (ESTILO_UNICO) {
+    // N.° y fecha ya van en los campos de abajo: no se repiten arriba.
+    cabeceraPapel(doc, { titulo: sinGritar(tituloDelPapel(g)) });
+  } else {
   try {
     doc.addImage(FG_LOGO_BASE64, "PNG", MARGIN, 12, 10, 10, undefined, "FAST");
   } catch {
@@ -212,6 +222,7 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   // «GUÍA DE ENTREGA DIRECTA». Decía «INTERIOR» en las dos, que no distinguía
   // nada y por eso hacía falta además la fila «TIPO».
   doc.text(tituloDelPapel(g), PAGE_W / 2, 19, { align: "center" });
+  }
 
   // ── Datos de la guía ──────────────────────────────────────────────────────
   const campos: Array<[string, string]> = [
@@ -233,9 +244,9 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   if (!esDirecta && transpUnico) campos.push([rotuloNumeroTransp(), transpUnico]);
   if (esDirecta && g.nombre_chofer) campos.push(["CHOFER:", g.nombre_chofer]);
 
-  let y = bloqueCampos(doc, campos, 32);
+  let y = bloqueCampos(doc, campos, ESTILO_UNICO ? Y_CONTENIDO + 4 : 32);
 
-  doc.setDrawColor(180);
+  raya(doc, 180);
   doc.line(MARGIN, y - 2, PAGE_W - MARGIN, y - 2);
 
   // ── Detalle ───────────────────────────────────────────────────────────────
@@ -292,7 +303,7 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
       if (data.section !== "body" || data.column.index !== 0) return;
       if (data.row.index === 0) return;
       if (!renglones[data.row.index]?.primeroDeSuGrupo) return;
-      doc.setDrawColor(140);
+      raya(doc, 140);
       doc.setLineWidth(0.4);
       doc.line(MARGIN, data.cell.y, PAGE_W - MARGIN, data.cell.y);
       doc.setLineWidth(0.1);
@@ -313,7 +324,7 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   const textoObs = observacionesVisibles(g.observaciones);
   const obs = doc.splitTextToSize(textoObs, ANCHO - 4);
   const altoObs = Math.max(12, obs.length * 4 + 4);
-  doc.setDrawColor(180);
+  raya(doc, 180);
   doc.rect(MARGIN, y + 2, ANCHO, altoObs);
   if (textoObs) doc.text(obs, MARGIN + 2, y + 7);
   // 🔴 LAS FIRMAS QUEDAN PEGADAS DEBAJO DE OBSERVACIONES, y el pie legal al pie
@@ -353,11 +364,13 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
   });
 
   // ── Pie legal ─────────────────────────────────────────────────────────────
-  const pieY = GUIA_PAPEL_2026_09 ? PIE_LEGAL_Y : 250;
-  doc.setDrawColor(220);
+  // Estilo único: 4 mm más arriba, para dejarle su renglón al pie común.
+  const pieY = (GUIA_PAPEL_2026_09 ? PIE_LEGAL_Y : 250) - (ESTILO_UNICO ? 4 : 0);
+  raya(doc, 220);
   doc.line(MARGIN, pieY, PAGE_W - MARGIN, pieY);
   doc.setFontSize(6.5);
-  doc.setTextColor(150);
+  if (ESTILO_UNICO) doc.setTextColor(...PAPEL.grisClaro);
+  else doc.setTextColor(150);
   doc.text(doc.splitTextToSize(TEXTO_LEGAL, ANCHO), PAGE_W / 2, pieY + 5, { align: "center" });
   doc.setTextColor(0);
 
@@ -367,6 +380,7 @@ function dibujarGuiaEnPdf(doc: jsPDF, g: Guia): void {
 export function construirPdfGuia(g: Guia): jsPDF {
   const doc = nuevoDocumento();
   dibujarGuiaEnPdf(doc, g);
+  if (ESTILO_UNICO) piePapel(doc);
   return doc;
 }
 
@@ -391,6 +405,7 @@ export function construirPdfGuias(guias: readonly Guia[]): jsPDF {
     if (i > 0) doc.addPage();
     dibujarGuiaEnPdf(doc, g);
   });
+  if (ESTILO_UNICO && guias.length) piePapel(doc);
   return doc;
 }
 

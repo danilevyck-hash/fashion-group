@@ -81,7 +81,7 @@ export async function cajasDeTexto(bytes: Uint8Array): Promise<{ cajas: Caja[]; 
 
 export interface Problema {
   pagina: number;
-  tipo: "encimado" | "fuera de la hoja" | "columna desalineada";
+  tipo: "encimado" | "fuera de la hoja" | "columna desalineada" | "color fuera de la paleta";
   detalle: string;
 }
 
@@ -159,6 +159,36 @@ export function columnasDesalineadas(cajas: Caja[]): Problema[] {
     if (!der && !izq && !centro) {
       problemas.push({ pagina: n.pagina, tipo: "columna desalineada", detalle: `«${corto(titulo.texto)}» no se alinea con «${corto(n.texto)}»` });
     }
+  }
+  return problemas;
+}
+
+/**
+ * 🔴 LOS COLORES SALEN SOLO DE LA PALETA DEL PAPEL (`pdf-estilo.ts`, 6-oct-2026).
+ * Daniel: «Algunos PDF en azul, gris, negro. No hay congruencia». Lee del
+ * archivo cada color de relleno, de texto y de raya, y devuelve los que no
+ * son de `PALETA_PAPEL` (con en qué hoja salen). Las fotos y el logo son
+ * imágenes: no cuentan.
+ */
+export async function coloresFueraDePaleta(bytes: Uint8Array, paleta: ReadonlySet<string>): Promise<Problema[]> {
+  const lib = await pdfjs();
+  // jsPDF guarda cada canal con 2 decimales (0–1): #f9fafb vuelve como #fafafa.
+  const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const permitidos = [...paleta].map(rgb);
+  const enPaleta = (h: string) => permitidos.some((q) => rgb(h).every((v, k) => Math.abs(v - q[k]) <= 3));
+  const pdf = await abrirPdf(bytes);
+  const problemas: Problema[] = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const ops = await (await pdf.getPage(p)).getOperatorList();
+    const vistos = new Set<string>();
+    ops.fnArray.forEach((fn: number, i: number) => {
+      if (fn !== lib.OPS.setFillRGBColor && fn !== lib.OPS.setStrokeRGBColor) return;
+      const c = String(ops.argsArray[i]?.[0] ?? "").toLowerCase();
+      if (/^#[0-9a-f]{6}$/.test(c) && !enPaleta(c) && !vistos.has(c)) {
+        vistos.add(c);
+        problemas.push({ pagina: p, tipo: "color fuera de la paleta", detalle: c });
+      }
+    });
   }
   return problemas;
 }

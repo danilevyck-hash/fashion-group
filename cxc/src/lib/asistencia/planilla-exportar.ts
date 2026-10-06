@@ -52,6 +52,7 @@ import type { AvisoPeriodoAbierto } from "./periodo";
 import { totalOtrosServicios, type OtroServicio } from "./otros-servicios";
 // 🔴 El pie se PARTE contra el ancho de la hoja. `doc.text` no envuelve solo:
 // la línea de avisos llegaba a 491 mm en una hoja de 335. Ver `pdf-pie.ts`.
+import { ESTILO_UNICO, MARGEN_PAPEL, Y_CONTENIDO, cabeceraPapel, piePapel } from "@/lib/pdf-estilo";
 import { armarPie, dibujarPie } from "./pdf-pie";
 // 🔴 El ajuste de la quincena anterior ya viene ADENTRO de las columnas
 // (11-sep-2026); lo que este archivo agrega es la NOTA que dice de dónde
@@ -530,6 +531,9 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "legal" });
   const w = doc.internal.pageSize.getWidth();
 
+  if (ESTILO_UNICO) {
+    cabeceraPapel(doc, { titulo: "Planilla", subtitulo: subtitulo(d) });
+  } else {
   try {
     doc.addImage(FG_LOGO_BASE64, "JPEG", 10, 8, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
   } catch { /* sin logo si falla */ }
@@ -542,6 +546,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
   doc.setFontSize(9);
   doc.setTextColor(107, 114, 128);
   doc.text(`Planilla — ${subtitulo(d)}`, w - 10, 15, { align: "right" });
+  }
 
   // 🔴 EL PAPEL ES EL QUE SE FIRMA, y en él la columna «Ausencias» puede traer
   // minutos de alguien que vino todos los días. Sin esta línea, quien lo revise
@@ -551,7 +556,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
   // El pie se arma ANTES de la tabla: de cuántas líneas ocupe sale el margen de
   // abajo que hay que reservarle, y una tabla ya dibujada no se puede correr.
   const PIE_PT = 6.5;
-  const PIE_MARGEN = 10;
+  const PIE_MARGEN = ESTILO_UNICO ? MARGEN_PAPEL : 10;
   const pie = armarPie(doc, [
     // Lo que no puede perderse al mandar el papel por correo. Va arriba de la
     // fórmula porque es lo que cambia la lectura del cuadro entero. Cada aviso
@@ -578,7 +583,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
 
   const t = d.totales;
   autoTable(doc, {
-    startY: 24,
+    startY: ESTILO_UNICO ? Y_CONTENIDO : 24,
     head: [[
       "Colaborador", "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas", "Salida\ntemprana",
       "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
@@ -662,5 +667,6 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
     didDrawPage: () => dibujarPie(doc, pie, PIE_PT, PIE_MARGEN),
   });
 
+  if (ESTILO_UNICO) piePapel(doc);
   return doc;
 }

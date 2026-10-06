@@ -44,6 +44,7 @@ import {
   piePorHoja,
   textoDePdf,
 } from "./pdf-chrome";
+import { ESTILO_UNICO, piePapel } from "@/lib/pdf-estilo";
 import { orientacionPapel, type TablaPapel } from "./tabla-papel";
 
 /** El papel completo. Una sola tabla; se parte en hojas cuando no cabe. */
@@ -90,6 +91,10 @@ export function construirPdfTablaComisiones(tabla: TablaPapel): jsPDF {
 
   // La nota de la casa: qué ya está descontado. Es la MISMA frase del pie de la
   // pantalla — el papel no puede explicar el número distinto que la pantalla.
+  if (ESTILO_UNICO) {
+    piePapel(doc, textoDePdf("Ya están descontados lo devuelto y los descuentos."));
+    return doc;
+  }
   const h = doc.internal.pageSize.getHeight();
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);

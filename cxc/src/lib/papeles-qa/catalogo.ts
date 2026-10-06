@@ -55,7 +55,15 @@ export interface Papel {
   nombre: string;
   tipo: "pdf" | "xlsx";
   generar: () => Promise<Uint8Array>;
+  /**
+   * Por qué este papel NO sigue el estilo único (`pdf-estilo.ts`): la revisión
+   * de colores no lo mide. Solo etiquetas térmicas y piezas de marca.
+   */
+  estiloPropio?: string;
 }
+
+const TERMICA = "Etiqueta para la Zebra térmica: blanco y negro, letra grande (docs/diseno.md, regla 11).";
+const MARCA = "Lo ve el cliente: lleva el color de su marca (excepción de marca de docs/diseno.md).";
 
 const pdf = (doc: jsPDF) => new Uint8Array(doc.output("arraybuffer"));
 const libro = (wb: WorkBook) => workbookBytes(wb);
@@ -356,12 +364,12 @@ export const PAPELES: Papel[] = [
   { nombre: "Comisiones — por empresa", tipo: "pdf", generar: async () => pdf(construirPdfTablaComisiones(TABLA_EMPRESA)) },
   { nombre: "Comisiones — consolidado", tipo: "pdf", generar: async () => pdf(construirPdfTablaComisiones(TABLA_GRUPO)) },
   { nombre: "Guías — guía de despacho", tipo: "pdf", generar: async () => pdf(construirPdfGuias([GUIA])) },
-  { nombre: "Guías — etiquetas carta", tipo: "pdf", generar: async () => pdf(construirPdfEtiquetas(datosDeEtiqueta(ETIQUETA), cajasDelJuego(4), "carta")) },
-  { nombre: "Guías — etiquetas 4x6", tipo: "pdf", generar: async () => pdf(construirPdfEtiquetas(datosDeEtiqueta(ETIQUETA), cajasDelJuego(2), "4x6")) },
+  { nombre: "Guías — etiquetas carta", tipo: "pdf", generar: async () => pdf(construirPdfEtiquetas(datosDeEtiqueta(ETIQUETA), cajasDelJuego(4), "carta")), estiloPropio: TERMICA },
+  { nombre: "Guías — etiquetas 4x6", tipo: "pdf", generar: async () => pdf(construirPdfEtiquetas(datosDeEtiqueta(ETIQUETA), cajasDelJuego(2), "4x6")), estiloPropio: TERMICA },
   { nombre: "Guías — pedidos impresos", tipo: "pdf", generar: async () => pdf(construirPdfPedidos("Pedidos pendientes", PEDIDOS, "2026-10-06")) },
-  { nombre: "Catálogos — pedido Reebok", tipo: "pdf", generar: async () => pdf(buildOrderPdfDoc({ marca: "reebok", orderNumber: "RBK-001", clientName: "Inversiones y Distribuidora Paso Canoas Internacional, S.A.", createdAt: "2026-09-24T12:00:00Z", items: itemsPedido(30), bultoSize: () => 12, images: {} })) },
-  { nombre: "Catálogos — pedido Joybees", tipo: "pdf", generar: async () => pdf(buildOrderPdfDoc({ marca: "joybees", orderNumber: "JB-001", clientName: "City Mall Paso Canoa", createdAt: "2026-09-24", items: itemsPedido(8), bultoSize: () => 12, images: {} })) },
-  { nombre: "Catálogos — catálogo Reebok", tipo: "pdf", generar: async () => pdf(buildCatalogPdfDoc({ marca: "reebok", sections: [seccion("HOMBRE", 9), seccion("MUJER", 4)], subtitle: "Todos los productos", totalCount: 13, images: {} })) },
+  { nombre: "Catálogos — pedido Reebok", tipo: "pdf", generar: async () => pdf(buildOrderPdfDoc({ marca: "reebok", orderNumber: "RBK-001", clientName: "Inversiones y Distribuidora Paso Canoas Internacional, S.A.", createdAt: "2026-09-24T12:00:00Z", items: itemsPedido(30), bultoSize: () => 12, images: {} })), estiloPropio: MARCA },
+  { nombre: "Catálogos — pedido Joybees", tipo: "pdf", generar: async () => pdf(buildOrderPdfDoc({ marca: "joybees", orderNumber: "JB-001", clientName: "City Mall Paso Canoa", createdAt: "2026-09-24", items: itemsPedido(8), bultoSize: () => 12, images: {} })), estiloPropio: MARCA },
+  { nombre: "Catálogos — catálogo Reebok", tipo: "pdf", generar: async () => pdf(buildCatalogPdfDoc({ marca: "reebok", sections: [seccion("HOMBRE", 9), seccion("MUJER", 4)], subtitle: "Todos los productos", totalCount: 13, images: {} })), estiloPropio: MARCA },
   { nombre: "CxC — estado de cuenta", tipo: "pdf", generar: async () => pdf(buildEstadoCuentaPDF(ESTADO, "INVERSIONES Y DISTRIBUIDORA PASO CANOAS INTERNACIONAL").doc) },
   { nombre: "CxC — estado de cuenta (lote)", tipo: "pdf", generar: async () => pdf(buildEstadoCuentaLotePDF([{ data: ESTADO, nombre: "A" }, { data: ESTADO, nombre: "B" }]).doc) },
   { nombre: "CxC — cartera por cliente", tipo: "pdf", generar: async () => pdf(pdfTotalPorCliente(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA), OPTS_CXC)) },

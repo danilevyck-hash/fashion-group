@@ -34,6 +34,7 @@ import { textoTodasLasMarcas } from "./marcas-del-dia";
 import { SEGUNDOS_MARCA_REPETIDA, textoTodasLasMarcasConRepetidas } from "./marca-repetida";
 // 🔴 El pie se PARTE contra el ancho de la hoja. `doc.text` no envuelve solo:
 // ver el encabezado de `pdf-pie.ts` para los milímetros que se perdían.
+import { ESTILO_UNICO, MARGEN_PAPEL, Y_CONTENIDO, cabeceraPapel, piePapel } from "@/lib/pdf-estilo";
 import { armarPie, dibujarPie } from "./pdf-pie";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -363,6 +364,9 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
   const w = doc.internal.pageSize.getWidth();
 
+  if (ESTILO_UNICO) {
+    cabeceraPapel(doc, { titulo: "Reporte de asistencia", subtitulo: rango(desde, hasta) });
+  } else {
   try {
     doc.addImage(FG_LOGO_BASE64, "JPEG", 14, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
   } catch { /* sin logo si falla */ }
@@ -371,6 +375,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
   doc.text("FASHION GROUP", 14 + FG_LOGO_WIDTH + 3, 17);
   doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(107, 114, 128);
   doc.text(`Asistencia — ${rango(desde, hasta)}`, w - 14, 17, { align: "right" });
+  }
 
   const t = personas.reduce((a, p) => ({
     aus: a.aus + p.resumen.ausenciasSinJustificar,
@@ -385,7 +390,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
   // El pie se arma ANTES de la tabla: de cuántas líneas ocupe sale el margen de
   // abajo que hay que reservarle, y una tabla ya dibujada no se puede correr.
   const PIE_PT = 7;
-  const PIE_MARGEN = 14;
+  const PIE_MARGEN = ESTILO_UNICO ? MARGEN_PAPEL : 14;
   const pie = armarPie(doc, [
     `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${textoAlmuerzo()}${g.graciaAlmuerzoMin > 0 ? ` (${g.graciaAlmuerzoMin} min de gracia)` : ""} · `
     // 🔴 Misma corrección que la hoja «Cómo se calcula»: la extra se paga
@@ -405,7 +410,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
   ], PIE_PT, PIE_MARGEN);
 
   autoTable(doc, {
-    startY: 27,
+    startY: ESTILO_UNICO ? Y_CONTENIDO : 27,
     // 🔴 «Corregidos» va en el papel QUE SE FIRMA. Este PDF es el que llega a
     // planilla: un total que se lee sin saber que hay horas escritas a mano es
     // exactamente lo que no puede pasar.
@@ -445,5 +450,6 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     didDrawPage: () => dibujarPie(doc, pie, PIE_PT, PIE_MARGEN),
   });
 
+  if (ESTILO_UNICO) piePapel(doc);
   return doc;
 }

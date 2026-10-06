@@ -34,6 +34,7 @@ import autoTable from "@/lib/pdf-tabla";
 import { CASA_GRUPO, type CasaDelPapel } from "@/lib/cxc/casa-del-papel";
 import { tramoLabel } from "@/lib/cxc-aging";
 import { fmtDate } from "@/lib/format";
+import { ESTILO_UNICO, MARGEN_PAPEL, PIE_PAPEL, Y_CONTENIDO, cabeceraPapel, piePapel, sinMayusculas } from "@/lib/pdf-estilo";
 import type { BloqueCliente, FilaCliente } from "@/lib/cxc/descargas";
 import {
   ROTULO_TOTAL_GENERAL,
@@ -53,9 +54,9 @@ const GRIS: [number, number, number] = [107, 114, 128];
 const GRIS_CLARO: [number, number, number] = [156, 163, 175];
 const CEBRA: [number, number, number] = [248, 249, 249];
 
-const MARGEN = 19;
+const MARGEN = ESTILO_UNICO ? MARGEN_PAPEL : 19;
 /** Dónde arranca la tabla: debajo de la cabecera, en todas las hojas. */
-const ALTO_CABECERA = 32;
+const ALTO_CABECERA = ESTILO_UNICO ? Y_CONTENIDO : 32;
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -79,6 +80,10 @@ function dinero(n: number) {
 // `lib/cxc/casa-del-papel.ts`: Boston firma como Boston, sin el logo del grupo
 // y sin `fashiongr.com` en el pie. Sin `casa`, el grupo, como siempre.
 function cabecera(doc: jsPDF, subtitulo: string, hoy: string, casa: CasaDelPapel) {
+  if (ESTILO_UNICO) {
+    cabeceraPapel(doc, { titulo: "Cuentas por cobrar", subtitulo: `${sinMayusculas(casa.membrete)} · ${subtitulo}`, derecha: [fmtDate(hoy)], logo: casa.logo });
+    return;
+  }
   const w = doc.internal.pageSize.getWidth();
 
   let anchoLogo = 0;
@@ -111,6 +116,7 @@ function cabecera(doc: jsPDF, subtitulo: string, hoy: string, casa: CasaDelPapel
 
 /** `Hoja N de M` arriba a la derecha y el pie, en todas las hojas. */
 function piePorHoja(doc: jsPDF, casa: CasaDelPapel) {
+  if (ESTILO_UNICO) return piePapel(doc, undefined, casa.pie.includes("fashiongr.com") ? "fashiongr.com" : null);
   const hojas = doc.getNumberOfPages();
   const w = doc.internal.pageSize.getWidth();
   const h = doc.internal.pageSize.getHeight();
@@ -237,7 +243,7 @@ export function pdfTotalPorCliente(
 
   autoTable(doc, {
     startY: ALTO_CABECERA,
-    margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: 18 },
+    margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: ESTILO_UNICO ? PIE_PAPEL : 18 },
     head: [["Código", "Cliente", tramo("current"), tramo("watch"), tramo("overdue"), "Total"]],
     body: cuerpo,
     foot: pieDelPapel(filas, aFavor),
@@ -294,7 +300,7 @@ export function pdfPorCompania(
 
   autoTable(doc, {
     startY: ALTO_CABECERA,
-    margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: 18 },
+    margin: { top: ALTO_CABECERA, left: MARGEN, right: MARGEN, bottom: ESTILO_UNICO ? PIE_PAPEL : 18 },
     head: [["Código", "Cliente / Empresa", tramo("current"), tramo("watch"), tramo("overdue"), "Total"]],
     body: cuerpo,
     foot: pieDelPapel(bloques, aFavor),
