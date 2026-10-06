@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// RECLAMOS «COMO LO HARÍA APPLE» (5-oct-2026). Propuesta, APAGADA.
+// RECLAMOS «COMO LO HARÍA APPLE» (5-oct-2026). PRENDIDO el 5-oct-2026 (Daniel: «aprobado»).
 //
 // El método que Daniel aprobó en Nueva guía, CxC, Multifashion, Ventas y la
 // lista de Guías: la MISMA pantalla con las reglas de docs/diseno.md, sin
@@ -26,8 +26,8 @@
 
 import { DIAS_RECLAMO_VIEJO } from "./viejos";
 
-/** `false` = como hoy. Se prende con el «sí» de Daniel. */
-export const RECLAMOS_APPLE_2026_10 = false;
+/** `false` = como antes. PRENDIDO el 5-oct-2026: Daniel aprobó el mockup HOY vs RECOMENDACIÓN («aprobado»). */
+export const RECLAMOS_APPLE_2026_10 = true;
 
 /**
  * La línea gris bajo el número: «19 pendientes» y, en rojo y solo si no son

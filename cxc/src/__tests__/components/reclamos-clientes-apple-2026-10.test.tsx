@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────────────────────
  * 🔴 CANDADO — RECLAMOS Y CLIENTES «COMO LO HARÍA APPLE» (5-oct-2026).
  *
- * Los dos interruptores nacen APAGADOS; aquí cada pantalla se pinta con
+ * PRENDIDOS el 5-oct-2026 (Daniel: «aprobado»). Aquí cada pantalla se pinta con
  * `apple` forzado para comprobar que la propuesta se dibuja y que los NÚMEROS
  * son los de siempre (salen de los mismos módulos puros). Apagado, las pruebas
  * de siempre de cada pantalla siguen cuidando lo de hoy.
@@ -68,9 +68,12 @@ const mk = (o: Partial<Reclamo> & { precio?: number; id: string }): Reclamo => (
 const leer = (p: string) => readFileSync(join(__dirname, "../..", p), "utf8");
 
 describe("los interruptores", () => {
-  it("nacen apagados: se prenden solo con el «sí» de Daniel", () => {
-    expect(RECLAMOS_APPLE_2026_10).toBe(false);
-    expect(CLIENTES_APPLE_2026_10).toBe(false);
+  // 5-oct-2026: Daniel aprobó el mockup («aprobado»). Lo sin decidir quedó como
+  // se propuso: la línea «Se llenan solos…» abajo de la caja, «+90 días» (corte
+  // de CxC) en la ficha y las 4 tarjetas de la ficha se quedan.
+  it("están PRENDIDOS desde el 5-oct-2026 (Daniel aprobó el mockup)", () => {
+    expect(RECLAMOS_APPLE_2026_10).toBe(true);
+    expect(CLIENTES_APPLE_2026_10).toBe(true);
   });
 });
 

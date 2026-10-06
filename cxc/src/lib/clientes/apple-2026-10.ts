@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CLIENTES «COMO LO HARÍA APPLE» (5-oct-2026). Propuesta, APAGADA.
+// CLIENTES «COMO LO HARÍA APPLE» (5-oct-2026). PRENDIDO el 5-oct-2026 (Daniel: «aprobado»).
 //
 // La MISMA lista y la MISMA ficha con las reglas de docs/diseno.md:
 //   · Lista: «150 clientes» arriba se va (lo dice el chip «Todos 150»); al
@@ -16,5 +16,5 @@
 // como hoy. Candado: `reclamos-clientes-apple-2026-10.test.tsx`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** `false` = como hoy. Se prende con el «sí» de Daniel. */
-export const CLIENTES_APPLE_2026_10 = false;
+/** `false` = como antes. PRENDIDO el 5-oct-2026: Daniel aprobó el mockup HOY vs RECOMENDACIÓN («aprobado»). */
+export const CLIENTES_APPLE_2026_10 = true;

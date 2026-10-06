@@ -9,6 +9,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ClienteDetail, { type ClienteDetailData } from "@/app/clientes/[codigo]/ClienteDetail";
+// 5-oct-2026: `CLIENTES_APPLE_2026_10` quedó PRENDIDO (Daniel aprobó el mockup). Esta prueba
+// cuida la pantalla de ANTES —la del rollback—, así que lo fuerza apagado. La
+// pantalla nueva la cuida `reclamos-clientes-apple-2026-10.test.tsx`.
+vi.mock("@/lib/clientes/apple-2026-10", async (original) => ({ ...(await original<object>()), CLIENTES_APPLE_2026_10: false }));
 
 const REFRESH = vi.fn();
 const PUSH = vi.fn();

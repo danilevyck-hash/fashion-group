@@ -79,6 +79,10 @@ import { esPendiente, soloPendientes, ESTADO_PAGADO } from "@/lib/reclamos/pendi
 import { buildBulkReclamosPdf } from "@/lib/reclamos/pdf-bulk";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
 import EmpresaList from "@/app/reclamos/components/EmpresaList";
+// 5-oct-2026: `RECLAMOS_APPLE_2026_10` quedó PRENDIDO (Daniel aprobó el mockup). Esta prueba
+// cuida la pantalla de ANTES —la del rollback—, así que lo fuerza apagado. La
+// pantalla nueva la cuida `reclamos-clientes-apple-2026-10.test.tsx`.
+vi.mock("@/lib/reclamos/apple-2026-10", async (original) => ({ ...(await original<object>()), RECLAMOS_APPLE_2026_10: false }));
 
 beforeAll(() => { process.env.SESSION_SECRET = "test-secret-reclamos"; });
 

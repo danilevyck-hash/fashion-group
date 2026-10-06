@@ -27,6 +27,10 @@ import { diasDesde } from "@/lib/reclamos/dias";
 import { FALTA_PDF } from "@/lib/reclamos/validate";
 import type { Reclamo } from "@/app/reclamos/components/types";
 import { CHIP_COBRADO, MARCAR_COBRADO } from "@/lib/reclamos/rotulos";
+// 5-oct-2026: `RECLAMOS_APPLE_2026_10` quedó PRENDIDO (Daniel aprobó el mockup). Esta prueba
+// cuida la pantalla de ANTES —la del rollback—, así que lo fuerza apagado. La
+// pantalla nueva la cuida `reclamos-clientes-apple-2026-10.test.tsx`.
+vi.mock("@/lib/reclamos/apple-2026-10", async (original) => ({ ...(await original<object>()), RECLAMOS_APPLE_2026_10: false }));
 
 // jsdom en este Node no trae localStorage: el AppHeader lo lee en un efecto
 // (barra lateral plegada). Un almacén de mentira, como en comisiones-flecha.
