@@ -154,7 +154,7 @@ describe("🔴 LAS CUATRO COLUMNAS", () => {
     pintar();
     await waitFor(() => {
       const enc = [...document.querySelectorAll('[data-vista="tabla"] thead th')].map((t) =>
-        (t.textContent ?? "").replace(/[↕↓↑]/g, "").trim(),
+        (t.textContent ?? "").replace(/[↕↓↑▲▼]/g, "").trim(),
       );
       // 1-oct-2026, Daniel: nombres normales de ERP («Compró · Debe · Cómo contactarlo»).
       expect(enc).toEqual(["Cliente", "Compras 2026", "Saldo", "Contacto"]);

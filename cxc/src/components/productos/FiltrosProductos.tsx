@@ -21,6 +21,7 @@ import { BuscarEnLaBarra, EnLaBarra } from "@/components/celular/BarraDeControle
 import { fmtMoney } from "@/lib/ventas/format";
 import { fmtPorcentaje } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
+import { OrdenarEnLaBarra, ThOrden, useOrdenTabla, type OrdenTablaApi } from "@/components/ui/OrdenTabla";
 import {
   coberturaDe,
   filtrarArticulos,
@@ -165,6 +166,23 @@ export interface PantallaProductosProps {
 }
 
 const TANDA = 100;
+
+// 🔴 6-oct-2026 (Daniel): «Quiero poder ordenar por Descripción, Unidades,
+// Venta, Margen y Stock». Abre como siempre (por venta) y sin flecha; los
+// artículos de una descripción abierta siguen el MISMO orden.
+const COLUMNAS_ORDEN = ["descripcion", "unidades", "venta", "margen", "stock"] as const;
+type ColOrden = (typeof COLUMNAS_ORDEN)[number];
+const ROTULOS_ORDEN: Record<ColOrden, string> = {
+  descripcion: "Descripción", unidades: "Unidades", venta: "Venta", margen: "Margen", stock: "Stock",
+};
+function valorRenglon(r: RenglonDescripcion, c: ColOrden) {
+  return c === "descripcion" ? r.descripcion : c === "stock" ? r.existencia : r[c];
+}
+function valorArticulo(a: ArticuloVendido, c: ColOrden) {
+  if (c === "descripcion") return a.codigo;
+  if (c === "stock") return a.existencia ?? null;
+  return c === "margen" ? totalesDe([a]).margen : a[c];
+}
 const fmtU = (n: number) => Math.round(n).toLocaleString("en-US");
 
 export function PantallaProductos(p: PantallaProductosProps) {
@@ -190,7 +208,15 @@ export function PantallaProductos(p: PantallaProductosProps) {
       .filter(x => elegidos[x.chip.campo] || x.opciones.length > 0),
     [p.chips, delModo, codigo, elegidos],
   );
-  const renglones = useMemo(() => porDescripcion(filtrados), [filtrados]);
+  const orden = useOrdenTabla<ColOrden>("productos", { columnas: COLUMNAS_ORDEN, textos: ["descripcion"] });
+  const renglones = useMemo(() => {
+    const rs = orden.ordenar(porDescripcion(filtrados), valorRenglon);
+    return orden.orden ? rs.map(r => ({ ...r, articulos: orden.ordenar(r.articulos, valorArticulo) })) : rs;
+  }, [filtrados, orden]);
+  const opcionesOrden = COLUMNAS_ORDEN
+    .filter(c => c !== "stock" || p.conInventario)
+    .map(c => ({ col: c, rotulo: ROTULOS_ORDEN[c] }));
+  const ordenarCelular = <OrdenarEnLaBarra api={orden} opciones={opcionesOrden} />;
   const filtro = hayFiltro(codigo, elegidos) || modo !== "todo";
   const totales = !filtro && p.totalesSinFiltro ? p.totalesSinFiltro : totalesDe(filtrados);
   const existenciaTotal = filtrados.reduce((s, a) => s + Math.max(a.existencia ?? 0, 0), 0);
@@ -271,11 +297,13 @@ export function PantallaProductos(p: PantallaProductosProps) {
           pestana="productos"
           iconos={<BuscarEnLaBarra valor={codigo} onCambiar={v => { setCodigo(v); setVisibles(TANDA); }} placeholder="Buscar un código…" etiqueta="Buscar un código" />}
           filaIzq={<div data-filtros-productos className={cn(FILA_QUE_SE_DESLIZA, "min-w-0 flex-[1_1_100%] items-center py-1")}>{p.antesCelular}{chipsNodo}</div>}
+          filaDer={ordenarCelular}
           menu={descargar}
         />
       ) : (
         <div data-filtros-productos className={cn(FILA_QUE_SE_DESLIZA, "items-center py-1 sm:flex-wrap sm:overflow-visible")}>
           {p.antes}
+          <span className="contents sm:hidden">{ordenarCelular}</span>
           {chipsNodo}
           {buscarCodigo}
           {p.despues && <span className="hidden flex-1 sm:block" />}
@@ -326,6 +354,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
               abierta={abierta}
               onAbrir={d => setAbierta(a => (a === d ? null : d))}
               conInventario={p.conInventario}
+              orden={orden}
               vacio={filtro ? "Sin resultados para este filtro." : "Sin ventas en el período."}
             />
           )}
@@ -371,10 +400,10 @@ function NombreCodigo({ a }: { a: ArticuloVendido }) {
   );
 }
 
-function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, conInventario, vacio }: {
+function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, conInventario, orden, vacio }: {
   renglones: RenglonDescripcion[]; total: number; onVerMas: () => void;
   abierta: string | null; onAbrir: (d: string) => void;
-  conInventario: boolean; vacio: string;
+  conInventario: boolean; orden: OrdenTablaApi<ColOrden>; vacio: string;
 }) {
   if (renglones.length === 0) {
     return <p className="rounded-lg border border-gray-200 bg-white px-3 py-8 text-center text-sm text-gray-500">{vacio}</p>;
@@ -386,11 +415,11 @@ function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, con
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-400">
-              <th className="px-3 py-2.5 font-normal">Descripción</th>
-              <th className="px-3 py-2.5 text-right font-normal">Unidades</th>
-              <th className="px-3 py-2.5 text-right font-normal">Venta</th>
-              <th className="px-3 py-2.5 text-right font-normal">Margen</th>
-              {conInventario && <th className="px-3 py-2.5 text-right font-normal">Stock</th>}
+              <ThOrden col="descripcion" api={orden} className="px-3 py-2.5 font-normal">Descripción</ThOrden>
+              <ThOrden col="unidades" api={orden} derecha className="px-3 py-2.5 font-normal">Unidades</ThOrden>
+              <ThOrden col="venta" api={orden} derecha className="px-3 py-2.5 font-normal">Venta</ThOrden>
+              <ThOrden col="margen" api={orden} derecha className="px-3 py-2.5 font-normal">Margen</ThOrden>
+              {conInventario && <ThOrden col="stock" api={orden} derecha className="px-3 py-2.5 font-normal">Stock</ThOrden>}
             </tr>
           </thead>
           <tbody>

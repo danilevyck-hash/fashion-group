@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { SkeletonTable } from "@/components/ui";
 import { TiraOrden } from "./ChipOrden";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
@@ -19,7 +20,10 @@ import { UNA_SOLA_VENTA, textoCuadreUtilidad, textoDatosDesde } from "@/lib/vent
 import { montoDeLaTabla } from "@/lib/ventas/celular";
 
 export type UtilidadSortKey = "ventas" | "utilidad" | "margen";
-type SortKey = UtilidadSortKey;
+// 🔴 6-oct-2026: todas las columnas ordenan, con la regla común (`OrdenTabla`).
+const COLUMNAS_ORDEN = ["cliente", "empresa", "ventas", "costo", "utilidad", "margen"] as const;
+type SortKey = (typeof COLUMNAS_ORDEN)[number];
+const TH_ORDEN = "px-3 py-0 font-normal [&>button]:min-h-[44px] [&>button]:min-w-[44px]";
 
 /** Criterios del selector de orden de las tarjetas. Mismas etiquetas que los
  *  encabezados de la tabla — no se abrevió ni se renombró nada. */
@@ -70,13 +74,24 @@ export function UtilidadView({
   const [data, setData] = useState<UtilidadClienteResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: ordenInicial, dir: "desc" });
+  // El orden con el que abre lo fija el modo: se recuerda solo en la visita.
+  const orden = useOrdenTabla<SortKey>("ventas-utilidad", {
+    columnas: COLUMNAS_ORDEN,
+    textos: ["cliente", "empresa"],
+    inicial: { col: ordenInicial, dir: "desc" },
+    recordar: "visita",
+  });
+  const sort = { key: orden.orden?.col ?? ordenInicial, dir: orden.orden?.dir ?? "desc" };
 
   // Cambiar de modo (Utilidad ⇄ Margen %) mueve la columna por la que se
   // ordena, no los datos: no hay refetch y la búsqueda no se toca.
+  const modoPrevio = useRef(ordenInicial);
+  const { poner } = orden;
   useEffect(() => {
-    setSort((prev) => (prev.key === ordenInicial ? prev : { key: ordenInicial, dir: "desc" }));
-  }, [ordenInicial]);
+    if (modoPrevio.current === ordenInicial) return;
+    modoPrevio.current = ordenInicial;
+    poner({ col: ordenInicial, dir: "desc" });
+  }, [ordenInicial, poner]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,19 +123,9 @@ export function UtilidadView({
     // acentos y espacios incluidos): dos formas de buscar en la misma pantalla
     // devuelven dos listas distintas para lo que se escribió igual.
     if (search.trim()) r = r.filter((c) => coincideBusqueda(search, [c.cliente, c.empresa]));
-    const dir = sort.dir === "asc" ? 1 : -1;
-    return [...r].sort((a, b) => {
-      // null margen al fondo siempre (independiente de dir).
-      if (sort.key === "margen") {
-        if (a.margen == null && b.margen == null) return 0;
-        if (a.margen == null) return 1;
-        if (b.margen == null) return -1;
-      }
-      const av = (a[sort.key] ?? -Infinity) as number;
-      const bv = (b[sort.key] ?? -Infinity) as number;
-      return (av - bv) * dir;
-    });
-  }, [data, search, sort, empresaFiltro]);
+    // Sin margen (null) va al final siempre.
+    return orden.ordenar(r, (c, col) => (col === "cliente" ? c.cliente : col === "empresa" ? c.empresa : c[col]));
+  }, [data, search, orden, empresaFiltro]);
 
   useEffect(() => { onFilas?.(rows); }, [rows, onFilas]);
 
@@ -138,9 +143,7 @@ export function UtilidadView({
     ? textoDatosDesde("Utilidad", data.datosDesde)
     : "Sin clientes para este filtro.";
 
-  const toggleSort = (key: SortKey) => {
-    setSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
-  };
+  const toggleSort = orden.tocar;
 
   return (
     <div>
@@ -231,12 +234,12 @@ export function UtilidadView({
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
-                <th className="px-3 py-2.5 font-normal">Cliente</th>
-                <th className="px-3 py-2.5 font-normal">Empresa</th>
-                <SortableTh label="Ventas" active={sort} sortKey="ventas" onClick={toggleSort} />
-                <th className="px-3 py-2.5 text-right font-normal">Costo</th>
-                <SortableTh label="Utilidad" active={sort} sortKey="utilidad" onClick={toggleSort} />
-                <SortableTh label="Margen %" active={sort} sortKey="margen" onClick={toggleSort} />
+                <ThOrden col="cliente" api={orden} className={TH_ORDEN}>Cliente</ThOrden>
+                <ThOrden col="empresa" api={orden} className={TH_ORDEN}>Empresa</ThOrden>
+                <ThOrden col="ventas" api={orden} derecha className={TH_ORDEN}>Ventas</ThOrden>
+                <ThOrden col="costo" api={orden} derecha className={TH_ORDEN}>Costo</ThOrden>
+                <ThOrden col="utilidad" api={orden} derecha className={TH_ORDEN}>Utilidad</ThOrden>
+                <ThOrden col="margen" api={orden} derecha className={TH_ORDEN}>Margen %</ThOrden>
               </tr>
             </thead>
             <tbody>
@@ -278,30 +281,6 @@ export function UtilidadView({
   );
 }
 
-function SortableTh({
-  label, active, sortKey, onClick, className = "",
-}: {
-  label: string;
-  active: { key: SortKey; dir: "asc" | "desc" };
-  sortKey: SortKey;
-  onClick: (k: SortKey) => void;
-  className?: string;
-}) {
-  const isActive = active.key === sortKey;
-  return (
-    <th className={`px-3 py-0 text-right font-normal ${className}`}>
-      {/* 44 px de alto: el iPad horizontal (1194) también es táctil y cae del
-          lado de la tabla. El `py` pasó del th al button para no duplicar alto. */}
-      <button
-        onClick={() => onClick(sortKey)}
-        className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-end gap-0.5 hover:text-gray-700 ${isActive ? "text-gray-900" : ""}`}
-      >
-        {label}
-        <span className="w-2 text-xs">{isActive ? (active.dir === "desc" ? "▼" : "▲") : ""}</span>
-      </button>
-    </th>
-  );
-}
 
 /** Clave estable de una fila/tarjeta. El verificador la usa para cruzar la
  *  tarjeta del celular contra la fila del escritorio: es un `data-` fijo, NO una

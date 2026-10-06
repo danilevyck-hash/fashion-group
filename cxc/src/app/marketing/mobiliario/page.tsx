@@ -60,6 +60,13 @@ import type {
   ProyectoConMarcas,
 } from "@/lib/marketing/types";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+
+// 🔴 6-oct-2026: las dos tablas de la computadora ordenan por encabezado
+// (abren como siempre).
+const COLS_PRODUCTO = ["nombre", "precio", "comprado", "entregado", "disponible", "valor"] as const;
+type ColProducto = (typeof COLS_PRODUCTO)[number];
+const TH_MOB = "font-medium px-3 py-2";
 import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 /** 🔴 MARKETING_APPLE_2026_10: el resumen usa la misma letra que Productos. */
@@ -261,6 +268,7 @@ export default function MobiliarioPage() {
     return resumirPorTienda(entregas, proyectos, productos, marcas);
   }, [entregas, proyectoById, productos, marcas]);
 
+
   const totalResumen = useMemo(() => {
     const montoPorMarca: Record<string, number> = {};
     let totalPaneles = 0;
@@ -297,6 +305,22 @@ export default function MobiliarioPage() {
     }
     return out;
   }, [entregas]);
+
+  const ordenProductos = useOrdenTabla<ColProducto>("marketing-mobiliario", { columnas: COLS_PRODUCTO, textos: ["nombre"] });
+  const productosOrdenados = ordenProductos.ordenar(productos, (p, c) => {
+    const entregado = entregadoPorProducto.get(p.id) ?? 0;
+    if (c === "nombre") return p.nombre;
+    if (c === "precio") return Number(p.precio);
+    if (c === "entregado") return entregado;
+    if (c === "disponible") return Number(p.stock_total);
+    if (c === "comprado") return entregado + Number(p.stock_total);
+    return Number(p.precio) * Number(p.stock_total);
+  });
+  const colsTienda = ["tienda", "paneles", ...resumenMarcas.map((m) => `marca:${m.id}`), "total"];
+  const ordenTiendas = useOrdenTabla<string>("marketing-mobiliario-tiendas", { columnas: colsTienda, textos: ["tienda"] });
+  const tiendasOrdenadas = ordenTiendas.ordenar(resumenFilas, (f, c) =>
+    c === "tienda" ? f.tienda : c === "paneles" ? f.totalPaneles : c === "total" ? f.totalMonto : (f.montoPorMarca[c.slice(6)] ?? 0),
+  );
 
   // Handlers
   const abrirNuevoProducto = () => {
@@ -724,12 +748,12 @@ export default function MobiliarioPage() {
                   {/* La foto no lleva encabezado: se entiende sola y ahorra
                       ancho en una tabla que ya tuvo un recorte grave. */}
                   <th className="w-16 px-3 py-2" aria-label="Foto" />
-                  <th className="text-left font-medium px-3 py-2">Producto</th>
-                  <th className="text-right font-medium px-3 py-2 w-24">Precio</th>
-                  <th className="text-right font-medium px-3 py-2 w-24">Comprado</th>
-                  <th className="text-right font-medium px-3 py-2 w-24">Entregado</th>
-                  <th className="text-right font-medium px-3 py-2 w-24">Disponible</th>
-                  <th className="text-right font-medium px-3 py-2 w-28">Valor</th>
+                  <ThOrden col="nombre" api={ordenProductos} className={`text-left ${TH_MOB}`}>Producto</ThOrden>
+                  <ThOrden col="precio" api={ordenProductos} derecha className={`${TH_MOB} w-24`}>Precio</ThOrden>
+                  <ThOrden col="comprado" api={ordenProductos} derecha className={`${TH_MOB} w-24`}>Comprado</ThOrden>
+                  <ThOrden col="entregado" api={ordenProductos} derecha className={`${TH_MOB} w-24`}>Entregado</ThOrden>
+                  <ThOrden col="disponible" api={ordenProductos} derecha className={`${TH_MOB} w-24`}>Disponible</ThOrden>
+                  <ThOrden col="valor" api={ordenProductos} derecha className={`${TH_MOB} w-28`}>Valor</ThOrden>
                   <th className="text-right font-medium px-3 py-2 w-28">{MARKETING_APPLE_2026_10 ? "" : "Acciones"}</th>
                 </tr>
               </thead>
@@ -748,7 +772,7 @@ export default function MobiliarioPage() {
                   </tr>
                 ) : (
                   <>
-                    {productos.map((p) => {
+                    {productosOrdenados.map((p) => {
                       const entregado = entregadoPorProducto.get(p.id) ?? 0;
                       const comprado = entregado + Number(p.stock_total);
                       const valor = Number(p.precio) * Number(p.stock_total);
@@ -984,21 +1008,18 @@ export default function MobiliarioPage() {
             <table className="w-full text-sm border-collapse">
               <thead className="bg-gray-50">
                 <tr className="text-xs uppercase tracking-wide text-gray-500">
-                  <th className="text-left font-medium px-3 py-2">Tienda</th>
-                  <th className="text-right font-medium px-3 py-2 w-28">
+                  <ThOrden col="tienda" api={ordenTiendas} className={`text-left ${TH_MOB}`}>Tienda</ThOrden>
+                  <ThOrden col="paneles" api={ordenTiendas} derecha className={`${TH_MOB} w-28`}>
                     Total paneles
-                  </th>
+                  </ThOrden>
                   {resumenMarcas.map((m) => (
-                    <th
-                      key={m.id}
-                      className="text-right font-medium px-3 py-2 w-28"
-                    >
+                    <ThOrden key={m.id} col={`marca:${m.id}`} api={ordenTiendas} derecha className={`${TH_MOB} w-28`}>
                       $ {m.nombre}
-                    </th>
+                    </ThOrden>
                   ))}
-                  <th className="text-right font-medium px-3 py-2 w-28">
+                  <ThOrden col="total" api={ordenTiendas} derecha className={`${TH_MOB} w-28`}>
                     Total $
-                  </th>
+                  </ThOrden>
                 </tr>
               </thead>
               <tbody>
@@ -1022,7 +1043,7 @@ export default function MobiliarioPage() {
                   </tr>
                 ) : (
                   <>
-                    {resumenFilas.map((f) => (
+                    {tiendasOrdenadas.map((f) => (
                       <tr
                         key={f.tienda}
                         data-fg-fila={f.tienda}

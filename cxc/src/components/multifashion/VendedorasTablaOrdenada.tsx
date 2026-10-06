@@ -29,8 +29,11 @@ import { bonoDeFila, chipDeBono, totalAPagarMultifashion, totalDeFila } from "@/
 import { nombreEnPantalla } from "@/lib/multifashion/nombres";
 import { desgloseCanales } from "@/lib/multifashion/canales";
 import { ChipBono } from "./BonosSection";
+import { ThOrden, type OrdenTablaApi } from "@/components/ui/OrdenTabla";
 
-export type ClaveOrden = "tickets" | "ventas" | "delta_ventas" | "comision";
+/** Las columnas que ordenan (6-oct-2026: TODAS, con la regla común). */
+export type ClaveOrden = "nombre" | "ventas" | "tickets" | "ticket_promedio" | "delta_ventas" | "comision" | "bono" | "total";
+
 
 const TH = "border-b border-gray-200 px-3.5 py-2.5 text-xs font-medium uppercase tracking-wide text-gray-500 whitespace-nowrap";
 const NUM = "px-3.5 py-3 text-right text-sm tabular-nums";
@@ -40,27 +43,8 @@ const FLECHA: Record<DeltaTone, string> = {
   stone: "text-gray-400",
 };
 
-function Encabezado({ col, children, ordenarPor, dir, onOrdenar }: {
-  col?: ClaveOrden;
-  children: React.ReactNode;
-  ordenarPor: ClaveOrden;
-  dir: "asc" | "desc";
-  onOrdenar: (c: ClaveOrden) => void;
-}) {
-  const activa = col != null && ordenarPor === col;
-  return (
-    <th
-      onClick={col ? () => onOrdenar(col) : undefined}
-      aria-sort={activa ? (dir === "asc" ? "ascending" : "descending") : undefined}
-      className={cn(TH, "text-right", col && "cursor-pointer select-none hover:text-gray-700")}
-    >
-      {children}
-      {activa && <span className="ml-1">{dir === "asc" ? "↑" : "↓"}</span>}
-    </th>
-  );
-}
 
-export function VendedorasTablaOrdenada({ filas, bonos, rotuloDelta, ordenarPor, dir, onOrdenar, deltas, ventasTotal }: {
+export function VendedorasTablaOrdenada({ filas, bonos, rotuloDelta, orden, deltas, ventasTotal }: {
   filas: VendedoraDetalle[];
   /** Δ contra el mismo mes del año pasado (2-oct-2026); «nueva» = no vendió ese mes. */
   deltas?: Map<string, DeltaAnioPasado>;
@@ -69,13 +53,11 @@ export function VendedorasTablaOrdenada({ filas, bonos, rotuloDelta, ordenarPor,
   /** Los bonos del mes CERRADO; `null` con el mes abierto o en un rango (sin Bono ni Total). */
   bonos: BonosMultifashion | null;
   rotuloDelta: string;
-  ordenarPor: ClaveOrden;
-  dir: "asc" | "desc";
-  onOrdenar: (c: ClaveOrden) => void;
+  orden: Pick<OrdenTablaApi<ClaveOrden>, "orden" | "tocar">;
 }) {
   const conPago = bonos != null;
   const pagar = conPago ? totalAPagarMultifashion(filas, bonos) : null;
-  const h = { ordenarPor, dir, onOrdenar };
+  const h = { api: orden, derecha: true, className: TH };
   const parte = (ventas: number) => (ventasTotal != null ? participacion(ventas, ventasTotal) : null);
   return (
     <Card data-vista="tabla" data-tabla-ordenada className="hidden p-0 lg:block">
@@ -84,14 +66,14 @@ export function VendedorasTablaOrdenada({ filas, bonos, rotuloDelta, ordenarPor,
           <thead>
             <tr className="bg-gray-100">
               <th className={cn(TH, "w-10 text-right")}>#</th>
-              <th className={cn(TH, "text-left")}>Vendedora</th>
-              <Encabezado col="ventas" {...h}>Ventas</Encabezado>
-              <Encabezado col="tickets" {...h}>Tickets</Encabezado>
-              <Encabezado {...h}>Ticket prom.</Encabezado>
-              <Encabezado col="delta_ventas" {...h}>{rotuloDelta}</Encabezado>
-              <Encabezado col="comision" {...h}>Comisión</Encabezado>
-              {conPago && <Encabezado {...h}>Bono</Encabezado>}
-              {conPago && <Encabezado {...h}>Total a pagar</Encabezado>}
+              <ThOrden col="nombre" api={orden} className={TH}>Vendedora</ThOrden>
+              <ThOrden col="ventas" {...h}>Ventas</ThOrden>
+              <ThOrden col="tickets" {...h}>Tickets</ThOrden>
+              <ThOrden col="ticket_promedio" {...h}>Ticket prom.</ThOrden>
+              <ThOrden col="delta_ventas" {...h}>{rotuloDelta}</ThOrden>
+              <ThOrden col="comision" {...h}>Comisión</ThOrden>
+              {conPago && <ThOrden col="bono" {...h}>Bono</ThOrden>}
+              {conPago && <ThOrden col="total" {...h}>Total a pagar</ThOrden>}
             </tr>
           </thead>
           <tbody>

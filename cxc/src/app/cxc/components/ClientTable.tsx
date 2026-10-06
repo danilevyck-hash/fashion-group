@@ -139,20 +139,20 @@ export default function ClientTable({
               />
             )}
             <span className="cursor-pointer hover:text-gray-900 transition" onClick={() => toggleSort("name")}>
-              Cliente{sortArrow("name")}
+              Cliente<span aria-hidden className="ml-1 inline-block w-2 text-xs leading-none">{sortArrow("name")}</span>
             </span>
           </div>
           <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="0-90 días · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("current")}>
-            0-90 d{sortArrow("current")}
+            0-90 d<span aria-hidden className="ml-1 inline-block w-2 text-xs leading-none">{sortArrow("current")}</span>
           </div>
           <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="91-120 días · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("watch")}>
-            91-120 d{sortArrow("watch")}
+            91-120 d<span aria-hidden className="ml-1 inline-block w-2 text-xs leading-none">{sortArrow("watch")}</span>
           </div>
           <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition font-semibold text-gray-600" data-tooltip="+120 días · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("overdue")}>
-            +120 d{sortArrow("overdue")}
+            +120 d<span aria-hidden className="ml-1 inline-block w-2 text-xs leading-none">{sortArrow("overdue")}</span>
           </div>
           <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Saldo total · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("total")}>
-            Total{sortArrow("total")}
+            Total<span aria-hidden className="ml-1 inline-block w-2 text-xs leading-none">{sortArrow("total")}</span>
           </div>
         </div>
 

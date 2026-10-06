@@ -142,7 +142,8 @@ describe("7. Préstamos: «Descuento a terceros» solo cuando alguien lo tiene",
     expect(p).toMatch(/const hayTerceros = fichas\.some\(\(f\) => \(f\.saldoTerceros \?\? 0\) > 0\);/);
     // 29-sep-2026 (audit visual aprobado por Daniel): el encabezado dice
     // «Terceros» en una palabra; el nombre largo queda en el `title`.
-    expect(p).toMatch(/\{hayTerceros && <th[^>]*title=\{NOMBRE_CUENTA\.terceros\}>Terceros<\/th>\}/);
+    // 6-oct-2026: el encabezado ordena (`ThOrden`); el nombre largo sigue en el `title`.
+    expect(p).toMatch(/\{hayTerceros && <ThOrden col="terceros"[^>]*><span title=\{NOMBRE_CUENTA\.terceros\}>Terceros<\/span><\/ThOrden>\}/);
     expect(p).toMatch(/\{hayTerceros && \(\s*<td/);
     expect(p).toMatch(/\(f\.saldoTerceros \?\? 0\) > 0 && ` · \$\{NOMBRE_CUENTA\.terceros\} \$\{money\(f\.saldoTerceros \?\? 0\)\}`/);
     // Y la página del colaborador ya desglosaba solo las cuentas con saldo.

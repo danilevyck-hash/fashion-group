@@ -25,6 +25,7 @@
 // grupo) y la ficha `/clientes/…` (Boston no está en `clientes_master`).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { flecha } from "@/lib/orden-tabla";
 import { useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
 import type { ConsolidatedClient } from "@/lib/types";
@@ -225,7 +226,7 @@ export default function CarteraBoston() {
   };
 
   const toggleSort = (key: SortKey) => setOrdenOverride({ risk: riskFilter, ...ordenAlTocarTitulo(orden, key) });
-  const sortArrow = (key: SortKey) => (orden.key !== key ? " ↕" : orden.dir === "desc" ? " ↓" : " ↑");
+  const sortArrow = (key: SortKey) => flecha({ col: orden.key, dir: orden.dir }, key);
 
   const renderDetalle = useCallback(
     (client: ConsolidatedClient, abierto: boolean) => (

@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { esPendiente } from "./pendientes";
+import { flecha } from "@/lib/orden-tabla";
 import { fechaDeCobro } from "./portada";
 
 export type FiltroEstado = "por-cobrar" | "cobrados";
@@ -130,10 +131,12 @@ export function alTocarColumna(actual: Orden, columna: ColumnaOrden): Orden {
   return { columna, sentido: SENTIDO_AL_TOCAR[columna] };
 }
 
-/** La flecha del encabezado: `↑`, `↓`, o nada si no es la columna ordenada. */
+/**
+ * La flecha del encabezado: ▲, ▼, o nada si no es la columna ordenada. Es la
+ * MISMA de todas las tablas del sistema (`lib/orden-tabla.ts`, 6-oct-2026).
+ */
 export function flechaDeColumna(orden: Orden, columna: ColumnaOrden): string {
-  if (orden.columna !== columna) return "";
-  return orden.sentido === "asc" ? "↑" : "↓";
+  return flecha({ col: orden.columna, dir: orden.sentido }, columna);
 }
 
 export interface Reclamable extends Ordenable {

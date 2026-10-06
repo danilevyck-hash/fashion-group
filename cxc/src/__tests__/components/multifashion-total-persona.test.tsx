@@ -165,7 +165,7 @@ describe("🔴 1 · septiembre 2026: el total de cada persona", () => {
 describe("🔴 1b · la tabla ordenada (Daniel: «no se siente ordenado»)", () => {
   it("columnas de lo que vendió a lo que se paga", async () => {
     await pintar(SEP_CERRADO);
-    const ths = [...document.querySelectorAll("[data-vista='tabla'] thead th")].map((t) => t.textContent!.replace(/[↑↓]/g, ""));
+    const ths = [...document.querySelectorAll("[data-vista='tabla'] thead th")].map((t) => t.textContent!.replace(/[↑↓▲▼]/g, ""));
     expect(ths).toEqual(["#", "Vendedora", "Ventas", "Tickets", "Ticket prom.", "Δ vs agosto 2026", "Comisión", "Bono", "Total a pagar"]);
   });
 

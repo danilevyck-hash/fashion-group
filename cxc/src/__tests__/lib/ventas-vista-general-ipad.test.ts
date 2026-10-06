@@ -36,7 +36,6 @@ const clientes = read(path.join(ventas, "ClientesView.tsx"));
 const productos = read(path.join(ventas, "ProductosView.tsx"));
 const utilidad = read(path.join(ventas, "UtilidadView.tsx"));
 const clienteSheet = read(path.join(ventas, "ClienteSheet.tsx"));
-const sortSheet = read(path.join(ventas, "SortSheet.tsx"));
 const shell = read(path.join(app, "ventas/VentasShell.tsx"));
 // La sección "Rentabilidad por empresa" (antes "Semáforo por empresa") vive en
 // su propio archivo desde el 13-ago-2026, para poder pintarla en un test sin
@@ -67,8 +66,8 @@ describe("Ventas › Clientes — el iPad deja de recibir la tabla de escritorio
     // Con `whitespace-nowrap`, "Compras 2026" y "Última compra" fuerzan su ancho
     // de una sola línea. Se mira la CLASE del <th>, no el archivo entero: el
     // comentario de al lado nombra la clase justo para explicar por qué no está.
-    const th = clientes.slice(clientes.indexOf("function SortHeader"));
-    const clase = /"cursor-pointer select-none[^"]*"/.exec(th);
+    // 6-oct-2026: el encabezado es el común (`ThOrden`); su clase vive en TH_ORDEN.
+    const clase = /const TH_ORDEN = "[^"]*"/.exec(clientes);
     expect(clase).not.toBeNull();
     expect(clase![0]).not.toContain("whitespace-nowrap");
   });
@@ -136,9 +135,7 @@ describe("Ventas › Clientes — el iPad deja de recibir la tabla de escritorio
 
   it("los sheets acompañan el corte: con md se abrían sólo debajo de 768 y el iPad quedaba sin ellos", () => {
     expect(clienteSheet).toContain("z-50 lg:hidden");
-    expect(sortSheet).toContain("z-50 lg:hidden");
     expect(clienteSheet).not.toContain("z-50 md:hidden");
-    expect(sortSheet).not.toContain("z-50 md:hidden");
   });
 
   it("el HoverCard sólo aparece donde hay tabla (debajo de lg no hay hover)", () => {
@@ -307,9 +304,9 @@ describe("blancos táctiles de 44 px en lo que se toca", () => {
   });
 
   it("los botones de ordenar de Productos y Utilidad miden 44×44 (Cant medía 41 de ancho)", () => {
-    for (const src of [productos, utilidad]) {
-      expect(src).toContain("inline-flex min-h-[44px] min-w-[44px] items-center justify-end");
-    }
+    expect(productos).toContain("inline-flex min-h-[44px] min-w-[44px] items-center justify-end");
+    // 6-oct-2026: Utilidad usa el encabezado común (`ThOrden`); el blanco va en su clase.
+    expect(utilidad).toContain("[&>button]:min-h-[44px] [&>button]:min-w-[44px]");
   });
 
   it("Vista General: el enlace a Gastos respeta los 44 px de alto", () => {

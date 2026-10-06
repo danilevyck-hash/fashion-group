@@ -407,6 +407,9 @@ describe("6-7. 🔴 ficha y tabla, y todo lo que se toca mide 44 px", () => {
       .filter((b) => {
         const t = (b.textContent || "").trim();
         // El encabezado del mes es un renglón de texto, no un control táctil.
+        // El encabezado que ordena (6-oct-2026) vive en la tabla de la
+        // computadora (desde 1024 px), que se usa con el mouse.
+        if (b.closest("th[data-th-orden]")) return false;
         return t !== "" && !/comprobantes?\)/.test(t);
       })
       .filter((b) => !b.className.includes("min-h-[44px]"))

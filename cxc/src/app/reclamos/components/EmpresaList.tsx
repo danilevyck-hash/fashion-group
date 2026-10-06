@@ -102,7 +102,7 @@ function Encabezado({
         className={`inline-flex items-center gap-1 uppercase tracking-widest transition hover:text-black ${activa ? "text-black" : ""}`}
       >
         {children}
-        <span aria-hidden className="text-gray-400">{flecha}</span>
+        <span aria-hidden className="inline-block w-2 text-xs leading-none text-gray-400">{flecha}</span>
       </button>
     </th>
   );

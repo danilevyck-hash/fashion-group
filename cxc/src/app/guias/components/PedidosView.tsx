@@ -14,6 +14,7 @@ import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, ChipSelector, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { descargarArchivo } from "@/lib/compartir-archivo";
 import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe, hoyPanama } from "@/lib/fecha-panama";
@@ -95,6 +96,12 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
   const hoy = hoyPanama();
   const deLaEmpresa = (pedidos ?? []).filter((p) => !NUEVO || empresa === "todas" || p.empresa_key === empresa);
   const visibles = deLaEmpresa.filter((p) => p.estado === filtro);
+  // 6-oct-2026: cada encabezado ordena DENTRO de su empresa; sin tocar, del más viejo al más nuevo.
+  const orden = useOrdenTabla<"antiguedad" | "cliente" | "vendedor">("guias-pedidos", {
+    columnas: ["antiguedad", "cliente", "vendedor"], textos: ["cliente", "vendedor"],
+  });
+  const ordenarGrupo = (ps: PedidoBodega[]) => orden.ordenar(ps, (p, c) =>
+    c === "antiguedad" ? -Date.parse(p.fecha) : c === "cliente" ? p.cliente_nombre : vendedorEnPantalla(p.vendedor_nombre));
   const OPCIONES_EMPRESA = [
     { valor: "todas", etiqueta: "Todas" },
     ...B2B_EMPRESA_KEYS.map((k) => ({ valor: k, etiqueta: nombreCortoEmpresa(k) })),
@@ -207,9 +214,9 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
         <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
           <tr>
             {CIRCULO && <th className="w-11 py-2 pl-1.5 sm:pl-2"><span className="sr-only">Preparado</span></th>}
-            <th className={`py-2 pr-1 sm:px-3 ${CIRCULO ? "pl-1" : "pl-3"}`}><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></th>
-            <th className="px-1 py-2 sm:px-3">Cliente</th>
-            <th className={`py-2 sm:px-3 ${CIRCULO ? "pl-1 pr-3" : "px-1"}`}>Vendedor</th>
+            <ThOrden col="antiguedad" api={orden} className={`py-2 pr-1 sm:px-3 ${CIRCULO ? "pl-1" : "pl-3"}`}><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></ThOrden>
+            <ThOrden col="cliente" api={orden} className="px-1 py-2 sm:px-3">Cliente</ThOrden>
+            <ThOrden col="vendedor" api={orden} className={`py-2 sm:px-3 ${CIRCULO ? "pl-1 pr-3" : "px-1"}`}>Vendedor</ThOrden>
             {!CIRCULO && <th className="py-2 pl-0.5 pr-3 text-right sm:px-3">Estado</th>}
           </tr>
         </thead>
@@ -220,7 +227,7 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
                 {nombreCortoEmpresa(g.empresa_key)} · {g.pedidos.length}
               </th>
             </tr>
-            {g.pedidos.map((p) => (
+            {ordenarGrupo(g.pedidos).map((p) => (
               <tr key={clave(p)}>
                 {CIRCULO && <td className="py-0 pl-1.5 align-top sm:pl-2">{circulo(p)}</td>}
                 <td className={`whitespace-nowrap py-2 pr-1 text-gray-700 sm:px-3 ${CIRCULO ? "pl-1 pt-3" : "pl-3"}`}>

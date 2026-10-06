@@ -26,7 +26,7 @@
 // `ClientesView`, con los mismos montos y los mismos deltas de la computadora.
 // ============================================================================
 
-import { BuscarEnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
+import { BuscarEnLaBarra, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { useState } from "react";
 import { Search } from "lucide-react";
 import type { Cliente } from "../types";
@@ -61,6 +61,8 @@ interface Props {
   accion?: React.ReactNode;
   /** «Actualizado 9:41 ↻» (`FRESCURA_VISIBLE_2026_10`), al final de la línea gris. */
   frescura?: React.ReactNode;
+  /** «Ordenar ▾» (6-oct-2026): en la barra, a la derecha de su renglón. */
+  ordenar?: React.ReactNode;
   /** Lo que está pasando abajo del todo (los sin compras, «Otros»…). */
   pie?: React.ReactNode;
 }
@@ -77,6 +79,7 @@ export function ClientesCelular({
   onTocarCliente,
   accion,
   frescura,
+  ordenar,
   pie,
 }: Props) {
   const [buscando, setBuscando] = useState(busqueda.length > 0);
@@ -86,6 +89,7 @@ export function ClientesCelular({
 
   return (
     <PantallaVentas>
+      {hayBarra && ordenar && <EnLaBarra filaDer={ordenar} />}
       <TituloVentas
         enLaBarra
         titulo="Clientes"
@@ -114,6 +118,7 @@ export function ClientesCelular({
             >
               <Search className="h-[18px] w-[18px]" />
             </button>
+            {ordenar}
             {accion}
           </div>
         )}

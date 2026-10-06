@@ -28,6 +28,7 @@
 import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { SkeletonTable } from "@/components/ui";
 import { Coins } from "lucide-react";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -93,6 +94,10 @@ interface Props {
   /** Cambia cuando "Actualizar ahora" termina: fuerza re-pedir los datos. */
   refreshKey?: number;
 }
+
+const COLUMNAS_EMPRESA = ["vendedor", "base", "comision", "base_cobro", "comision_cobro", "comision_total"] as const;
+type ColOrdenEmpresa = (typeof COLUMNAS_EMPRESA)[number];
+const TH_EMP = "px-3 py-2 font-medium xl:px-4";
 
 export function ComisionesPorEmpresaView({
   empresa = EMPRESAS_COMISIONAN[0],
@@ -165,6 +170,14 @@ export function ComisionesPorEmpresaView({
   const activos = conActividad.filter((v) => v.se_paga !== false);
   const noSePagan = conActividad.filter((v) => v.se_paga === false);
   const visibles = verNoSePagan ? [...activos, ...noSePagan] : activos;
+  // 🔴 6-oct-2026: la tabla ordena por cualquier columna (abre como siempre).
+  // Los que no se pagan siguen DEBAJO de los que sí, cada grupo en su orden.
+  const orden = useOrdenTabla<ColOrdenEmpresa>("comisiones-empresa", { columnas: COLUMNAS_EMPRESA, textos: ["vendedor"] });
+  const valorOrden = (v: ComisionVendedor, c: ColOrdenEmpresa) =>
+    c === "vendedor" ? nombreVendedorEnPantalla(v.vendedor) : (v[c] ?? 0);
+  const filasTabla = verNoSePagan
+    ? [...orden.ordenar(activos, valorOrden), ...orden.ordenar(noSePagan, valorOrden)]
+    : orden.ordenar(activos, valorOrden);
 
   // 🔴 Queda rastro de cada descarga (22-sep-2026); nunca la frena.
   const anotar = (formato: "pdf" | "excel") =>
@@ -292,16 +305,16 @@ export function ComisionesPorEmpresaView({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                <th className="px-3 py-2 font-medium xl:px-4">Vendedor</th>
-                <th className="px-3 py-2 text-right font-medium xl:px-4">Ventas</th>
-                <th className="px-3 py-2 text-right font-medium xl:px-4">Com. venta</th>
-                <th className="px-3 py-2 text-right font-medium xl:px-4">Cobros</th>
-                <th className="px-3 py-2 text-right font-medium xl:px-4">Com. cobro</th>
-                <th className="px-3 py-2 text-right font-medium xl:px-4">Com. total</th>
+                <ThOrden col="vendedor" api={orden} className={TH_EMP}>Vendedor</ThOrden>
+                <ThOrden col="base" api={orden} derecha className={TH_EMP}>Ventas</ThOrden>
+                <ThOrden col="comision" api={orden} derecha className={TH_EMP}>Com. venta</ThOrden>
+                <ThOrden col="base_cobro" api={orden} derecha className={TH_EMP}>Cobros</ThOrden>
+                <ThOrden col="comision_cobro" api={orden} derecha className={TH_EMP}>Com. cobro</ThOrden>
+                <ThOrden col="comision_total" api={orden} derecha className={TH_EMP}>Com. total</ThOrden>
               </tr>
             </thead>
             <tbody>
-              {visibles.map((v) => (
+              {filasTabla.map((v) => (
                 <tr
                   key={v.vendedor}
                   data-se-paga={v.se_paga === false ? "no" : "si"}

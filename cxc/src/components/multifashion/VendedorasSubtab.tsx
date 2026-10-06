@@ -56,6 +56,7 @@ import { ROTULO_TOTAL_MULTIFASHION } from "@/lib/comisiones/celular";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { BonosSection, ChipBono, REGLA_BONO_RETAIL } from "./BonosSection";
 import {
   MULTIFASHION_TOTAL_PERSONA_2026_10,
@@ -102,8 +103,10 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
 /** Lo que dice la columna Bono mientras el mes no cierre. */
 export const BONO_AL_CIERRE = "al cierre";
 
-type SortKey = "tickets" | "ventas" | "delta_ventas" | "comision";
-type SortDir = "asc" | "desc";
+// 🔴 6-oct-2026: el orden común (`OrdenTabla`), recordado en el aparato. Abre
+// como siempre: por Ventas, de mayor a menor.
+const COLUMNAS_ORDEN = ["nombre", "ventas", "tickets", "ticket_promedio", "delta_ventas", "comision", "bono", "total"] as const;
+type SortKey = (typeof COLUMNAS_ORDEN)[number];
 type ChipKey = ChipVendedoras;
 
 // Badge info por vendedora, derivado del RPC de bonos (sin fórmulas nuevas).
@@ -202,8 +205,11 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   const [bonos, setBonos] = useState<BonosMultifashion | null>(null);
   const onBonosData = useCallback((r: BonosMultifashion | null) => setBonos(r), []);
 
-  const [sortBy, setSortBy] = useState<SortKey>("ventas");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const orden = useOrdenTabla<SortKey>("mf-vendedoras", {
+    columnas: COLUMNAS_ORDEN,
+    textos: ["nombre"],
+    inicial: { col: "ventas", dir: "desc" },
+  });
 
   // Querystring del ranking — MISMOS params que antes: year + periodo; mes solo
   // en "mes"; n+mes en "ultimos". El querystring ES la clave SWR.
@@ -263,36 +269,15 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
     return m;
   }, [resp, anioPasado]);
 
-  const sortedVendedoras = useMemo(() => {
+  const filasConDelta = useMemo(() => {
     if (!resp) return [];
-    const arr = anioPasado
+    return anioPasado
       ? resp.vendedoras.map((v) => {
           const d = deltasAnio.get(v.nombre);
           return { ...v, delta_ventas_pct: d?.tipo === "pct" ? d.ratio : null };
         })
       : resp.vendedoras.slice();
-    const sign = sortDir === "asc" ? 1 : -1;
-    arr.sort((a, b) => {
-      switch (sortBy) {
-        case "tickets":  return (a.tickets - b.tickets) * sign;
-        case "ventas":   return (a.ventas - b.ventas) * sign;
-        case "comision": return (a.comision - b.comision) * sign;
-        case "delta_ventas": {
-          const av = a.delta_ventas_pct, bv = b.delta_ventas_pct;
-          if (av == null && bv == null) return 0;
-          if (av == null) return 1;
-          if (bv == null) return -1;
-          return (av - bv) * sign;
-        }
-      }
-    });
-    return arr;
-  }, [resp, sortBy, sortDir, anioPasado, deltasAnio]);
-
-  const onSort = (col: SortKey) => {
-    if (sortBy === col) setSortDir(sortDir === "asc" ? "desc" : "asc");
-    else { setSortBy(col); setSortDir("desc"); }
-  };
+  }, [resp, anioPasado, deltasAnio]);
 
   // Contra qué compara la Δ en el período activo (ver el encabezado del archivo).
   const rotuloDelta = anioPasado ? rotuloDeltaAnioPasado(year, rpcMes) : rotuloDeltaVendedoras(chip, rpcMes, year);
@@ -312,6 +297,19 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   const ordenada = MULTIFASHION_TOTAL_PERSONA_2026_10 && conTotalAPagar === true && !conBono;
   const totalPersona =
     ordenada && !!bonosDelChip && !bonosDelChip.sin_data && bonosDelChip.es_elegible;
+  // La Δ sin base («Nueva») va al final en los dos sentidos.
+  const sortedVendedoras = useMemo(
+    () => orden.ordenar(filasConDelta, (v, col) => {
+      switch (col) {
+        case "nombre": return nombreEnPantalla(v.nombre);
+        case "delta_ventas": return v.delta_ventas_pct;
+        case "bono": return totalPersona ? bonoDeFila(v, bonosDelChip) : null;
+        case "total": return totalPersona ? totalDeFila(v, bonosDelChip) : null;
+        default: return v[col];
+      }
+    }),
+    [orden, filasConDelta, totalPersona, bonosDelChip],
+  );
   /** Con la tabla ordenada, todo número en la fuente del sistema (sin monoespaciada). */
   const MONO = ordenada ? "" : "tabular-nums";
   const esUnMes = rpcPeriodo === "mes";
@@ -421,9 +419,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
               filas={sortedVendedoras}
               bonos={totalPersona ? bonosDelChip : null}
               rotuloDelta={rotuloDelta.columna}
-              ordenarPor={sortBy}
-              dir={sortDir}
-              onOrdenar={onSort}
+              orden={orden}
               deltas={anioPasado ? deltasAnio : undefined}
               ventasTotal={resp?.ventas_total}
             />
@@ -434,12 +430,12 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
                 <thead>
                   <tr className="bg-gray-100">
                     <th className="w-10 border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">#</th>
-                    <th className="border-b border-gray-200 px-3.5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Vendedora</th>
-                    <SortHeader col="tickets"      sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Tickets</SortHeader>
-                    <SortHeader col="ventas"       sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Ventas</SortHeader>
-                    <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Ticket promedio</th>
-                    <SortHeader col="delta_ventas" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>{rotuloDelta.columna}</SortHeader>
-                    <SortHeader col="comision"     sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Comisión</SortHeader>
+                    <ThOrden col="nombre" api={orden} className={TH_ORDEN}>Vendedora</ThOrden>
+                    <ThOrden col="tickets" api={orden} derecha className={TH_ORDEN}>Tickets</ThOrden>
+                    <ThOrden col="ventas" api={orden} derecha className={TH_ORDEN}>Ventas</ThOrden>
+                    <ThOrden col="ticket_promedio" api={orden} derecha className={TH_ORDEN}>Ticket promedio</ThOrden>
+                    <ThOrden col="delta_ventas" api={orden} derecha className={TH_ORDEN}>{rotuloDelta.columna}</ThOrden>
+                    <ThOrden col="comision" api={orden} derecha className={TH_ORDEN}>Comisión</ThOrden>
                     {/* El bono, donde le corresponde: una columna, no una barra.
                         (Con `RETAIL_AL_FRENTE`, una línea debajo de la tabla.) */}
                     {conBono && (
@@ -762,30 +758,4 @@ function EmptyState() {
   );
 }
 
-function SortHeader({
-  col, children, sortBy, sortDir, onClick,
-}: {
-  col: SortKey;
-  children: React.ReactNode;
-  sortBy: SortKey;
-  sortDir: SortDir;
-  onClick: (c: SortKey) => void;
-}) {
-  const active = sortBy === col;
-  return (
-    <th
-      onClick={() => onClick(col)}
-      className={cn(
-        "cursor-pointer select-none whitespace-nowrap border-b border-gray-200 bg-gray-100 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide transition",
-        active ? "text-gray-950" : "text-gray-500 hover:text-gray-700"
-      )}
-    >
-      <span className="inline-flex items-center gap-1">
-        {children}
-        <span className={cn("text-xs", active ? "opacity-100" : "opacity-35")}>
-          {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
-        </span>
-      </span>
-    </th>
-  );
-}
+const TH_ORDEN = "border-b border-gray-200 bg-gray-100 px-3.5 py-2.5 text-xs font-medium uppercase tracking-wide text-gray-500 whitespace-nowrap";

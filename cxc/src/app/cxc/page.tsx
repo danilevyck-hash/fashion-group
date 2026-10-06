@@ -24,6 +24,7 @@ import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
 import PanelCxcCelular from "./components/PanelCxcCelular";
 import { CXC_CELULAR } from "@/lib/cxc/celular";
+import { flecha } from "@/lib/orden-tabla";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import TabsCartera from "./components/TabsCartera";
 import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
@@ -68,6 +69,8 @@ import {
   type RiskFilter,
   type SortKey,
   type OrdenOverride,
+  leerOrdenDeLaVisita,
+  guardarOrdenDeLaVisita,
 } from "@/lib/cxc-orden";
 import { vidrioSobre } from "@/lib/ui/vidrio";
 import { CXC_APPLE_2026_10, opcionesActualizarCxc } from "@/lib/cxc/apple-2026-10";
@@ -158,6 +161,7 @@ function textoUltimoPagoDe(client: ConsolidatedClient, hoy: string): string {
 
 // ── Main Component ───────────────────────────────────────
 
+
 export default function AdminDashboard() {
   return (
     <Suspense>
@@ -241,6 +245,10 @@ function AdminDashboardInner() {
   // por monto, y tocar una píldora de tramo sigue ordenando por SU tramo — el
   // override está anclado a «Total pendiente», así que se descarta solo.
   const [ordenOverride, setOrdenOverride] = useState<OrdenOverride | null>(ORDEN_AL_ABRIR);
+  useEffect(() => {
+    const guardado = leerOrdenDeLaVisita("fg_orden_cxc");
+    if (guardado) setOrdenOverride(guardado);
+  }, []);
   const orden = ordenEfectivo(riskFilter, ordenOverride);
   const { key: sortKey, dir: sortDir } = orden;
   const [toast, setToast] = useState<string | null>(null);
@@ -518,13 +526,15 @@ function AdminDashboardInner() {
   // ── Sorting ──────────────────────────────────────────
 
   function toggleSort(key: SortKey) {
-    setOrdenOverride({ risk: riskFilter, ...ordenAlTocarTitulo(orden, key) });
+    const nuevo: OrdenOverride = { risk: riskFilter, ...ordenAlTocarTitulo(orden, key) };
+    setOrdenOverride(nuevo);
+    // 🔴 Se recuerda SOLO durante la visita (sessionStorage): la próxima vez la
+    // lista vuelve a abrir por «más viejo sin pagar» (`ORDEN_AL_ABRIR`).
+    guardarOrdenDeLaVisita("fg_orden_cxc", nuevo);
   }
 
-  const sortArrow = (key: SortKey) => {
-    if (sortKey !== key) return " ↕";
-    return sortDir === "desc" ? " ↓" : " ↑";
-  };
+  // ▲/▼ chico, la MISMA flecha de todas las tablas (`lib/orden-tabla.ts`).
+  const sortArrow = (key: SortKey) => flecha({ col: sortKey, dir: sortDir }, key);
 
   // ── Actions ──────────────────────────────────────────
 

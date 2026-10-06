@@ -22,13 +22,22 @@
 // con `CXC_CELULAR` en `false`, y conserva todos sus candados.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { formatCompactCurrency } from "@/lib/ventas/format";
 import { AGING_ORDER, type AgingKey } from "@/lib/cxc-aging";
-import { ordenarClientes, type RiskFilter } from "@/lib/cxc-orden";
+import {
+  guardarOrdenDeLaVisita,
+  leerOrdenDeLaVisita,
+  ordenAlTocarTitulo,
+  ordenarClientes,
+  type OrdenOverride,
+  type RiskFilter,
+  type SortKey,
+} from "@/lib/cxc-orden";
+import { OrdenarEnLaBarra } from "@/components/ui/OrdenTabla";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import {
@@ -53,6 +62,14 @@ import { ChevronDown, MoreHorizontal, Search } from "lucide-react";
 import { CLASE_TITULO_BARRA, IconoBarra } from "@/components/celular/BarraDeControles";
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR, SegmentadoCelular } from "@/components/celular/CabeceraCompacta";
 import { CXC_APPLE_2026_10, opcionesActualizarCxc, partirPorAtencion, saldoMas90 } from "@/lib/cxc/apple-2026-10";
+
+const CLAVE_ORDEN_CELULAR = "fg_orden_cxc_celular";
+/** Las mismas columnas de la computadora que tienen sentido en una lista: los tramos ya son los chips. */
+const OPCIONES_ORDEN_CELULAR: readonly { col: SortKey; rotulo: string }[] = [
+  { col: "total", rotulo: "Total" },
+  { col: "sinPagar", rotulo: "Días sin pagar" },
+  { col: "name", rotulo: "Cliente" },
+];
 
 /** El color de la rayita de la izquierda, por tramo dominante. */
 const RAYA: Record<AgingKey, string> = {
@@ -127,9 +144,25 @@ export default function PanelCxcCelular({
 
   // 🔴 EL ORDEN DEL CELULAR: por plata. Sin chip, el que más debe arriba; con un
   // chip tocado, el que más debe EN ESE TRAMO. Una sola regla (`cxc-orden`).
+  // 🔴 6-oct-2026: «Ordenar ▾» elige otro orden, ANCLADO al chip con el que
+  // se eligió (como el encabezado de la computadora): tocar un chip vuelve a su
+  // plata. Se recuerda solo durante la visita; una nueva abre por plata.
+  const [ordenElegido, setOrdenElegido] = useState<OrdenOverride | null>(null);
+  useEffect(() => { setOrdenElegido(leerOrdenDeLaVisita(CLAVE_ORDEN_CELULAR)); }, []);
+  const orden = ordenElegido && ordenElegido.risk === riskFilter
+    ? { key: ordenElegido.key, dir: ordenElegido.dir }
+    : ordenDelCelular(riskFilter);
+  const apiOrden = {
+    orden: { col: orden.key, dir: orden.dir },
+    tocar: (col: SortKey) => {
+      const nuevo: OrdenOverride = { risk: riskFilter, ...ordenAlTocarTitulo(orden, col) };
+      setOrdenElegido(nuevo);
+      guardarOrdenDeLaVisita(CLAVE_ORDEN_CELULAR, nuevo);
+    },
+  };
   const lista = useMemo(
-    () => ordenarClientes(filtered, { orden: ordenDelCelular(riskFilter) }),
-    [filtered, riskFilter],
+    () => ordenarClientes(filtered, { orden, diasSinPagar: diasSinPagarDe }),
+    [filtered, orden.key, orden.dir, diasSinPagarDe], // `orden` se rehace en cada pintada: manda su clave
   );
 
   // Apple: «Clientes +90 días» arriba y «Otros clientes» debajo, sin repetir a
@@ -356,6 +389,12 @@ export default function PanelCxcCelular({
           onBlur={() => { if (search === "") setBuscando(false); }}
         />
       </div>
+      )}
+
+      {lista.length > 1 && (
+        <div data-ordenar-cxc className="flex justify-end px-4 pt-3">
+          <OrdenarEnLaBarra api={apiOrden} opciones={OPCIONES_ORDEN_CELULAR} />
+        </div>
       )}
 
       {/* ── La lista ──────────────────────────────────────────────────────── */}

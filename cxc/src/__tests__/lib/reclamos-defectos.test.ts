@@ -168,8 +168,8 @@ describe("7 · el orden lo elige quien mira", () => {
 
   it("🔴 la flecha solo la lleva la columna ordenada", () => {
     const orden: Orden = { columna: "total", sentido: "desc" };
-    expect(flechaDeColumna(orden, "total")).toBe("↓");
-    expect(flechaDeColumna({ ...orden, sentido: "asc" }, "total")).toBe("↑");
+    expect(flechaDeColumna(orden, "total")).toBe("▼");
+    expect(flechaDeColumna({ ...orden, sentido: "asc" }, "total")).toBe("▲");
     expect(flechaDeColumna(orden, "dias")).toBe("");
   });
 

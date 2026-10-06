@@ -201,7 +201,8 @@ describe("Comisiones — la tabla ancha son TARJETAS bajo lg", () => {
     // El ajuste que hace entrar la tabla a 1024/1180 va SOLO bajo `xl` (1280).
     // A 1440 el min-content sigue siendo 985px, idéntico al de antes del PR.
     // Encabezados de empresa: nowrap sólo en xl.
-    expect(consolidado).toContain('className="px-2 py-2 text-right font-medium xl:whitespace-nowrap xl:px-3"');
+    // (6-oct-2026: el encabezado es `ThOrden derecha`, que pone el text-right.)
+    expect(consolidado).toContain('derecha className="px-2 py-2 font-medium xl:whitespace-nowrap xl:px-3"');
     // Nombre del vendedor: en xl vuelve a una sola línea.
     expect(consolidado).toMatch(/xl:whitespace-nowrap xl:px-4/);
     // Y no puede quedar ningún `whitespace-nowrap` incondicional en la tabla:

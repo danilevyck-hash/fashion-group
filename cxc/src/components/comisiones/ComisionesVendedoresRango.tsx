@@ -13,6 +13,12 @@ import { CALENDARIO_SIMPLE_2026_10, etiquetaRangoCorta } from "@/lib/ui/calendar
 import { diasDelRango, porVendedor, ventaDelAmbito, type FilaRango, type FilaVendedor, type RangoConsulta } from "@/lib/comisiones/vendedores-rango";
 import { esVistaDeEmpresa, esVistaMultifashion } from "@/lib/comisiones/vistas";
 import { variacionPct } from "@/lib/variacion";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+
+/** 🔴 6-oct-2026: cada columna ordena; abre como siempre. «Nuevo» va al final. */
+const COLUMNAS_ORDEN = ["vendedor", "ventas", "variacion", "comision"] as const;
+type ColOrden = (typeof COLUMNAS_ORDEN)[number];
+const valorOrden = (f: FilaVendedor, c: ColOrden) => (c === "vendedor" ? nombreVendedorEnPantalla(f.vendedor) : f[c]);
 
 interface Respuesta {
   anterior: { desde: string; hasta: string };
@@ -51,6 +57,7 @@ export function ComisionesVendedoresRango({ vista, rango }: { vista: string; ran
     return () => { vivo = false; };
   }, [rango.desde, rango.hasta, rango.atajo, multifashion]);
 
+  const orden = useOrdenTabla<ColOrden>("comisiones-rango", { columnas: COLUMNAS_ORDEN, textos: ["vendedor"] });
   if (error) return <p className="mt-4 rounded-lg border border-gray-200 p-4 text-sm text-gray-700">{error}</p>;
   if (!datos) return <div className="mt-4 h-72 w-full animate-pulse rounded-lg bg-gray-100" aria-hidden />;
 
@@ -91,14 +98,14 @@ export function ComisionesVendedoresRango({ vista, rango }: { vista: string; ran
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-xs text-gray-500">
               <tr>
-                <th className="px-3 py-2 text-left font-medium">{multifashion ? "Vendedora" : "Vendedor"}</th>
-                <th className="px-3 py-2 text-right font-medium">Ventas</th>
-                <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Variación</th>
-                <th className="px-3 py-2 text-right font-medium">Comisión bruta</th>
+                <ThOrden col="vendedor" api={orden} className="px-3 py-2 text-left font-medium">{multifashion ? "Vendedora" : "Vendedor"}</ThOrden>
+                <ThOrden col="ventas" api={orden} derecha className="px-3 py-2 font-medium">Ventas</ThOrden>
+                <ThOrden col="variacion" api={orden} derecha className="hidden px-3 py-2 font-medium sm:table-cell">Variación</ThOrden>
+                <ThOrden col="comision" api={orden} derecha className="px-3 py-2 font-medium">Comisión bruta</ThOrden>
               </tr>
             </thead>
             <tbody>
-              {pagables.map(fila)}
+              {orden.ordenar(pagables, valorOrden).map(fila)}
               {noPagables.length > 0 && (
                 <tr className="border-t border-gray-100">
                   <td colSpan={4} className="px-3">
@@ -112,7 +119,7 @@ export function ComisionesVendedoresRango({ vista, rango }: { vista: string; ran
                   </td>
                 </tr>
               )}
-              {verNoPagables && noPagables.map(fila)}
+              {verNoPagables && orden.ordenar(noPagables, valorOrden).map(fila)}
             </tbody>
             <tfoot>
               <tr className="border-t border-gray-200 bg-gray-50 font-medium text-gray-900">

@@ -107,7 +107,9 @@ describe("1 · 🩸 el «#» solo existe cuando el orden ES por compras", () => 
     pintar();
     fireEvent.click(screen.getByText(/Compras · Año 2026/));
     expect([...tabla().querySelectorAll("thead th")][0].textContent?.trim()).toBe("#");
-    fireEvent.click(screen.getByText(/Última compra/));
+    // 6-oct-2026: «Última compra» también es una opción de la hoja «Ordenar»
+    // del celular; se toca la del ENCABEZADO.
+    fireEvent.click(within(tabla()).getByText(/Última compra/));
     expect([...tabla().querySelectorAll("thead th")][0].textContent?.trim()).not.toBe("#");
   });
 });

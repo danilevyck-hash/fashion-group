@@ -201,3 +201,26 @@ export function etiquetaOrden(key: SortKey): string {
   if (key === "sinPagar") return "días sin pagar";
   return "total";
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL ORDEN ELEGIDO SE RECUERDA SOLO DURANTE LA VISITA (6-oct-2026).
+// `sessionStorage`: volver a la pantalla en la misma pestaña conserva lo que se
+// tocó; una visita nueva abre como decidió Daniel (`ORDEN_AL_ABRIR` en la
+// computadora, por plata en el celular). Basura o sin almacén → `null`.
+// ─────────────────────────────────────────────────────────────────────────────
+const CLAVES_ORDEN: readonly SortKey[] = ["name", "current", "watch", "overdue", "total", "sinPagar"];
+const RIESGOS: readonly RiskFilter[] = ["all", "current", "watch", "overdue"];
+
+export function leerOrdenDeLaVisita(clave: string): OrdenOverride | null {
+  try {
+    const o = JSON.parse(window.sessionStorage.getItem(clave) ?? "null");
+    if (o && CLAVES_ORDEN.includes(o.key) && RIESGOS.includes(o.risk) && (o.dir === "asc" || o.dir === "desc")) {
+      return { risk: o.risk, key: o.key, dir: o.dir };
+    }
+  } catch { /* sin almacén o basura */ }
+  return null;
+}
+
+export function guardarOrdenDeLaVisita(clave: string, o: OrdenOverride): void {
+  try { window.sessionStorage.setItem(clave, JSON.stringify(o)); } catch { /* sin almacén */ }
+}

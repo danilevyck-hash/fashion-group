@@ -25,6 +25,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Lo mínimo que la lista necesita saber de un cliente para contar y ordenar. */
+import { flecha } from "@/lib/orden-tabla";
 export interface ClienteDeLista {
   codigo: string;
   nombre: string;
@@ -143,10 +144,9 @@ export function ordenAlTocar(actual: Orden, columna: ColumnaOrden): Orden {
   return { columna, sentido: columna === "cliente" ? "asc" : "desc" };
 }
 
-/** La flecha del encabezado. `↕` en las columnas que no mandan hoy. */
+/** La flecha del encabezado: ▲/▼ en la que manda, nada en las demás (la de todo el sistema, 6-oct-2026). */
 export function flechaOrden(orden: Orden, columna: ColumnaOrden): string {
-  if (orden.columna !== columna) return "↕";
-  return orden.sentido === "desc" ? "↓" : "↑";
+  return flecha({ col: orden.columna, dir: orden.sentido }, columna);
 }
 
 /**

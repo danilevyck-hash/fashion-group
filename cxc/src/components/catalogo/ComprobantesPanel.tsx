@@ -76,6 +76,7 @@ import {
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import { ID_ACCIONES_EN_LA_BARRA } from "@/lib/catalogo/catalogos-2026-10";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 
 // La fila que se pinta. Su forma vive en `lib/catalogo/fila-comprobante.ts`.
 export type { FilaComprobante, FilaDeOrders };
@@ -360,6 +361,14 @@ export default function ComprobantesPanel({
   // Agrupar por mes (el feed viene por fecha desc → los grupos salen del más
   // nuevo al más viejo).
   const grupos = agruparPorMes(visibles);
+  // 6-oct-2026: en la computadora cada encabezado ordena DENTRO de su mes; sin
+  // tocar, lo más reciente arriba como siempre.
+  const orden = useOrdenTabla<"origen" | "cliente" | "vendedor" | "total" | "fecha">("catalogo-comprobantes", {
+    columnas: ["origen", "cliente", "vendedor", "total", "fecha"], textos: ["origen", "cliente", "vendedor"],
+  });
+  const ordenarMes = (items: FilaComprobante[]) => orden.ordenar(items, (p, c) =>
+    c === "origen" ? p.origen : c === "cliente" ? (p.cliente?.trim() && p.cliente !== "Sin nombre" ? p.cliente : null)
+      : c === "vendedor" ? p.vendor : c === "total" ? Number(p.total) : p.created_at);
   // 🔴 Abre el mes MÁS RECIENTE CON COMPROBANTES, no el del calendario: Joybees
   // no vende todos los meses y abría con tres encabezados y cero filas.
   const mesAbierto = mesQueAbre(grupos);
@@ -660,16 +669,16 @@ export default function ComprobantesPanel({
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className={puedeAdministrar ? "w-8 pl-4 pr-1 py-3" : "w-0 p-0"}></th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-500">Origen</th>
-                      <th className="text-left px-2 lg:px-4 py-3 font-medium text-gray-500">Cliente</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-500">Vendedor</th>
-                      <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-500">Fecha</th>
+                      <ThOrden col="origen" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Origen</ThOrden>
+                      <ThOrden col="cliente" api={orden} className="text-left px-2 lg:px-4 py-3 font-medium text-gray-500">Cliente</ThOrden>
+                      <ThOrden col="vendedor" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Vendedor</ThOrden>
+                      <ThOrden col="total" api={orden} derecha className="text-right px-4 py-3 font-medium text-gray-500">Total</ThOrden>
+                      <ThOrden col="fecha" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Fecha</ThOrden>
                       <th className="text-right px-4 py-3 font-medium text-gray-500"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {grupo.items.map((pedido) => (
+                    {ordenarMes(grupo.items).map((pedido) => (
                       <FilaTabla key={`${pedido.fuente ?? pedido.origen}-${pedido.id_natural}`} {...propsDeFila(pedido)} />
                     ))}
                   </tbody>

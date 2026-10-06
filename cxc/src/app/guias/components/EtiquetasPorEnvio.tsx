@@ -25,6 +25,7 @@
 // (`EtiquetasView.tsx`), que no se tocó.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
@@ -113,6 +114,11 @@ function pdfDelEnvio(filas: readonly EtiquetaFila[], formato: FormatoEtiquetas, 
   };
 }
 
+type ColEnvio = "facturas" | "cliente" | "destino" | "bultos" | "estado" | "fecha";
+const COLS_ENVIO: readonly (readonly [ColEnvio, string])[] = [
+  ["facturas", "Facturas"], ["cliente", "Cliente"], ["destino", "Destino"], ["bultos", "Bultos"], ["estado", "Estado"], ["fecha", "Fecha"],
+];
+
 export default function EtiquetasPorEnvio() {
   const [etiquetas, setEtiquetas] = useState<EtiquetaFila[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -147,6 +153,15 @@ export default function EtiquetasPorEnvio() {
   const envios = useMemo(() => agruparEnEnvios(etiquetas), [etiquetas]);
   const pendientes = envios.filter((v) => v.guia_numero === null).length;
   const visibles = useMemo(() => filtrarEnvios(envios, filtro, buscar), [envios, filtro, buscar]);
+  // Computadora: cada encabezado ordena (6-oct-2026); abre en el orden de siempre, lo más reciente arriba.
+  const orden = useOrdenTabla<ColEnvio>("guias-etiquetas", { columnas: COLS_ENVIO.map(([c]) => c), textos: ["facturas", "cliente", "destino", "estado"] });
+  const ordenados = useMemo(() => orden.ordenar(visibles, (v, c) =>
+    c === "facturas" ? v.filas[0]?.secuencial
+      : c === "cliente" ? v.cliente_nombre
+      : c === "destino" ? v.destino
+      : c === "bultos" ? v.total
+      : c === "estado" ? rotuloEstado(v)
+      : v.creado_en), [orden, visibles]);
   // 🔴 GUIAS_LISTA_APPLE_2026_10 (4-oct-2026, propuesta): «4 envíos hoy · 1
   // pendiente de guía» arriba (los chips dejan de contar) y tarjetas en el celular.
   const apple = GUIAS_LISTA_APPLE_2026_10;
@@ -298,18 +313,22 @@ export default function EtiquetasPorEnvio() {
             <table className={`w-full text-sm${apple ? " hidden md:table" : ""}`} style={{ minWidth: 720 }}>
               <thead>
                 <tr className="border-b border-gray-200">
-                  {["Facturas", "Cliente", "Destino", "Bultos", "Estado", "Fecha", ""].map((h, i) => (
-                    <th
-                      key={h || `acc-${i}`}
-                      className={`px-3 py-2.5 text-[12px] uppercase tracking-[0.06em] text-gray-400 font-semibold whitespace-nowrap ${h === "Bultos" ? "text-right" : "text-left"}`}
+                  {COLS_ENVIO.map(([c, h]) => (
+                    <ThOrden
+                      key={c}
+                      col={c}
+                      api={orden}
+                      derecha={c === "bultos"}
+                      className={`px-3 py-2.5 text-[12px] uppercase tracking-[0.06em] text-gray-400 font-semibold whitespace-nowrap ${c === "bultos" ? "text-right" : "text-left"}`}
                     >
                       {h}
-                    </th>
+                    </ThOrden>
                   ))}
+                  <th className="px-3 py-2.5" />
                 </tr>
               </thead>
               <tbody>
-                {visibles.map((v) => {
+                {ordenados.map((v) => {
                   const enGuia = v.guia_numero !== null;
                   const { rangos } = rangosDelEnvio(v.filas);
                   return (

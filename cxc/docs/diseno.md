@@ -89,6 +89,11 @@ Daniel, 2-oct-2026: *«cada vez que encontramos algo así de detalle, para que s
   - Todo lo que se toca DENTRO de un chip o un botón con `::before` va posicionado encima (`relative z-[1]`).
   - Quitar o cambiar un chip suelta los que dependían de él y quedan sin opción (`podarElegidos`); los que siguen siendo válidos se quedan.
   - Arreglado en la pantalla común (`ChipLista`): Ventas › Productos y Multifashion › Productos, en celular y computadora. Candado `productos-chip-quitar.test.tsx`.
+- **Toda tabla de datos se ordena tocando el encabezado** (Daniel, 6-oct-2026, en Multifashion › Productos: *«Quiero poder ordenar por Descripción, Unidades, Venta, Margen y Stock. No solo en esta pantalla, sino en todo lo que tenga sentido»*). UN núcleo: `lib/orden-tabla.ts` (la regla) y `components/ui/OrdenTabla.tsx` (`useOrdenTabla` · `ThOrden` · `OrdenarEnLaBarra`).
+  - Tocar ordena, tocar otra vez invierte, y al lado va ▲/▼ chico. Los números empiezan de mayor a menor y el texto de la A a la Z; sin dato va al final.
+  - Abre en el orden de siempre de la pantalla, sin flecha. El orden elegido se recuerda en el aparato; donde Daniel fijó cómo ABRE una lista, solo durante la visita.
+  - En el celular, sin encabezados, va «Ordenar ▾» en la barra con las mismas opciones, solo en las listas largas (Productos, Clientes, CxC).
+  - Donde Daniel decidió que una lista NO se ordena o tiene un orden fijo, se respeta. Candado `orden-tabla.test.tsx`, con las dos listas.
 
 ## Mockup: siempre, con capturas reales
 

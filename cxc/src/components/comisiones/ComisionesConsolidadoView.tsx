@@ -57,6 +57,7 @@
 import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { SkeletonTable } from "@/components/ui";
 import { Coins } from "lucide-react";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -96,6 +97,10 @@ import { ComisionesTarjetasConsolidado } from "./ComisionesTarjetas";
 // Las 6 empresas con CXC — joystep incluida desde el 14-ago-2026. La lista
 // vive en `lib/comisiones/empresas`, nunca se filtra acá.
 const EMPRESAS = EMPRESAS_COMISIONAN;
+/** 🔴 6-oct-2026: cada columna ordena (abre como siempre: por total). */
+const COLUMNAS_ORDEN: readonly string[] = ["vendedor", ...EMPRESAS, "total"];
+const valorOrden = (r: Row, c: string) =>
+  c === "vendedor" ? nombreVendedorEnPantalla(r.vendedor) : c === "total" ? r.total : (r.porEmpresa[c] ?? null);
 // El usuario DEFAULT de Switch (la oficina). Desde v6 cobra: sus recibos
 // comisionan y se muestran en su propia fila, rotulada ETIQUETA_DEFAULT.
 const DEFAULT_VENDEDOR = "DEFAULT";
@@ -258,6 +263,8 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
     () => [...conActividad.filter((r) => r.se_paga === false), ...(sinAsignar ? [sinAsignar] : [])],
     [conActividad, sinAsignar],
   );
+
+  const orden = useOrdenTabla<string>("comisiones-consolidado", { columnas: COLUMNAS_ORDEN, textos: ["vendedor"] });
 
   // Totales por columna: SOLO lo pagable. La fila de la oficina y la de Daniel
   // se ven con su número (al abrirlas), pero no suman al pie («no me autopago»).
@@ -526,15 +533,15 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                  <th className="px-3 py-2 font-medium xl:px-4">Vendedor</th>
+                  <ThOrden col="vendedor" api={orden} className="px-3 py-2 font-medium xl:px-4">Vendedor</ThOrden>
                   {EMPRESAS.map((k) => (
-                    <th key={k} className="px-2 py-2 text-right font-medium xl:whitespace-nowrap xl:px-3">{nombreCortoEmpresa(k)}</th>
+                    <ThOrden key={k} col={k} api={orden} derecha className="px-2 py-2 font-medium xl:whitespace-nowrap xl:px-3">{nombreCortoEmpresa(k)}</ThOrden>
                   ))}
-                  <th className="bg-gray-100 px-3 py-2 text-right font-semibold text-gray-700 xl:px-4">Total</th>
+                  <ThOrden col="total" api={orden} derecha className="bg-gray-100 px-3 py-2 font-semibold text-gray-700 xl:px-4">Total</ThOrden>
                 </tr>
               </thead>
               <tbody>
-                {activos.map((r) => filaVendedor(r))}
+                {orden.ordenar(activos, valorOrden).map((r) => filaVendedor(r))}
                 {/* 🔴 Lo que se ve suma EXACTAMENTE el «Total a pagar»: Oficina y
                     Daniel Levy están detrás de este enlace. */}
                 {noSePagan.length > 0 && (
@@ -552,7 +559,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
                     </td>
                   </tr>
                 )}
-                {verNoSePagan && noSePagan.map((r) => filaVendedor(r, r.vendedor === ETIQUETA_DEFAULT))}
+                {verNoSePagan && orden.ordenar(noSePagan, valorOrden).map((r) => filaVendedor(r, r.vendedor === ETIQUETA_DEFAULT))}
               </tbody>
               <tfoot>
                 <tr className="border-t border-gray-200 bg-gray-50 font-medium text-gray-900">

@@ -43,4 +43,6 @@ configure({ asyncUtilTimeout: 10_000 });
 import { beforeEach } from "vitest";
 beforeEach(() => {
   try { globalThis.localStorage?.clear(); } catch { /* entorno sin storage */ }
+  // 6-oct-2026: el orden de algunas tablas se recuerda durante la visita (sessionStorage).
+  try { globalThis.sessionStorage?.clear(); } catch { /* entorno sin storage */ }
 });

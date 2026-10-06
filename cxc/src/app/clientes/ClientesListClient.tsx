@@ -31,14 +31,13 @@ import { telHref, mailtoHref } from "@/lib/contact-links";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import { dinero } from "@/lib/clientes/ficha";
 import { CLIENTES_APPLE_2026_10 } from "@/lib/clientes/apple-2026-10";
+import { OrdenarEnLaBarra, ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import {
   contarChips,
   contarClientes,
   comoContactarlo,
   filtrarPorChip,
-  flechaOrden,
   ordenar,
-  ordenAlTocar,
   ORDEN_INICIAL,
   type ChipId,
   type ColumnaOrden,
@@ -101,7 +100,16 @@ export default function ClientesListClient({
     return () => clearTimeout(t);
   }, [q, qUrl, setQUrl]);
 
-  const [orden, setOrden] = useState<Orden>(ORDEN_INICIAL);
+  // 🔴 6-oct-2026: el orden elegido se recuerda en el aparato (`useOrdenTabla`);
+  // abre como siempre, por nombre de la A a la Z.
+  const ordenTabla = useOrdenTabla<ColumnaOrden>("clientes-directorio", {
+    columnas: ["cliente", "compras", "debe"],
+    textos: ["cliente"],
+    inicial: { col: ORDEN_INICIAL.columna, dir: ORDEN_INICIAL.sentido },
+  });
+  const orden: Orden = ordenTabla.orden
+    ? { columna: ordenTabla.orden.col, sentido: ordenTabla.orden.dir }
+    : ORDEN_INICIAL;
 
   // Compras del año: se piden APARTE, con TODOS los códigos de la lista. Va en
   // su propia llamada a propósito — leer las facturas del año de 150 clientes
@@ -156,9 +164,6 @@ export default function ClientesListClient({
     return ordenar(buscados, orden);
   }, [conCompras, chip, q, orden]);
 
-  const tocarColumna = useCallback((columna: ColumnaOrden) => {
-    setOrden((actual) => ordenAlTocar(actual, columna));
-  }, []);
 
   const onRefresh = useCallback(async () => {
     await mutate();
@@ -214,6 +219,13 @@ export default function ClientesListClient({
               );
             })}
           </div>
+          <div className="mt-2 flex justify-end lg:hidden">
+            <OrdenarEnLaBarra api={ordenTabla} opciones={[
+              { col: "cliente", rotulo: "Cliente" },
+              { col: "compras", rotulo: `Compras ${anio}` },
+              { col: "debe", rotulo: "Saldo" },
+            ]} />
+          </div>
 
           {/* 🔴 Apple (5-oct-2026): «150 clientes» arriba repetía el chip «Todos
               150». Se va; al buscar, «12 de 150» baja al pie. */}
@@ -235,9 +247,9 @@ export default function ClientesListClient({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
-                        <Encabezado columna="cliente" orden={orden} onClick={tocarColumna}>Cliente</Encabezado>
-                        <Encabezado columna="compras" orden={orden} onClick={tocarColumna} derecha>Compras {anio}</Encabezado>
-                        <Encabezado columna="debe" orden={orden} onClick={tocarColumna} derecha>Saldo</Encabezado>
+                        <ThOrden col="cliente" api={ordenTabla} className={TH_ORDEN}>Cliente</ThOrden>
+                        <ThOrden col="compras" api={ordenTabla} derecha className={TH_ORDEN}>Compras {anio}</ThOrden>
+                        <ThOrden col="debe" api={ordenTabla} derecha className={TH_ORDEN}>Saldo</ThOrden>
                         <th className="py-2 px-1.5 xl:px-3 font-normal">Contacto</th>
                         {apple && <th className="w-4" aria-hidden />}
                       </tr>
@@ -369,29 +381,7 @@ export default function ClientesListClient({
   );
 }
 
-function Encabezado({
-  columna, orden, onClick, derecha, children,
-}: {
-  columna: ColumnaOrden;
-  orden: Orden;
-  onClick: (c: ColumnaOrden) => void;
-  derecha?: boolean;
-  children: React.ReactNode;
-}) {
-  const activo = orden.columna === columna;
-  return (
-    <th className={`py-2 px-1.5 xl:px-3 font-normal ${derecha ? "text-right" : ""}`} aria-sort={activo ? (orden.sentido === "desc" ? "descending" : "ascending") : "none"}>
-      <button
-        type="button"
-        onClick={() => onClick(columna)}
-        className={`inline-flex min-h-[32px] items-center gap-1 uppercase tracking-[0.05em] transition hover:text-gray-700 ${activo ? "text-gray-700" : ""}`}
-      >
-        {children}
-        <span aria-hidden="true" className="text-[10px]">{flechaOrden(orden, columna)}</span>
-      </button>
-    </th>
-  );
-}
+const TH_ORDEN = "py-2 px-1.5 xl:px-3 font-normal [&>button]:min-h-[32px]";
 
 /** «…» mientras el monto no llegó; gris cuando de verdad es cero — un cliente en
  *  cero es un dato, no un hueco. */

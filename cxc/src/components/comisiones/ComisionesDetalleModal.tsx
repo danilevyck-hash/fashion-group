@@ -48,6 +48,7 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
 import { exportComisionDetalle, comisionLinea, type ComisionDetalle, type ComisionDescuento } from "@/lib/ventas/comisionExcel";
 import { ModalOverlay } from "@/components/ui";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { sePagaComision } from "@/lib/comisiones/sin-pago";
@@ -116,6 +117,11 @@ function COLUMNAS_COBRO_EN_ORDEN(enCelular: boolean) {
       ] as const);
 }
 
+// 🔴 6-oct-2026: en la computadora cada columna del detalle ordena (abre en el
+// orden de siempre). En el celular no hay encabezados que tocar: se deja igual.
+const COLS_VENTA = ["fecha", "cliente", "factura", "subtotal", "utilidad", "comision"] as const;
+const COLS_COBRO = ["fecha", "cliente", "monto", "comision"] as const;
+
 export const ROLES_EDITAR_DESCUENTOS = ["admin", "secretaria"];
 
 interface Props {
@@ -153,6 +159,8 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const [mandando, setMandando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const enCelular = useEsCelularComisiones();
+  const ordenVenta = useOrdenTabla<(typeof COLS_VENTA)[number]>("comisiones-detalle-ventas", { columnas: COLS_VENTA, textos: ["cliente", "factura"] });
+  const ordenCobro = useOrdenTabla<(typeof COLS_COBRO)[number]>("comisiones-detalle-cobros", { columnas: COLS_COBRO, textos: ["cliente"] });
   const [error, setError] = useState<string | null>(null);
   // 🔄 9-SEP-2026 — se fue el `mounted`: existía porque la hoja impresa iba en un
   // portal y `document` no existe en SSR. Sin portal, el detalle se dibuja en el
@@ -381,16 +389,25 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                         columna y no se recalcula ni un número**: es el MISMO
                         renglón, en otro orden, y solo hasta `sm`. */}
                     {COLUMNAS_VENTA_EN_ORDEN(enCelular).map((c) => (
-                      <th key={c.clave} className={`px-3 py-2 font-medium ${c.alineado === "der" ? "text-right" : ""}`}>
-                        {c.rotulo}
-                      </th>
+                      enCelular ? (
+                        <th key={c.clave} className={`px-3 py-2 font-medium ${c.alineado === "der" ? "text-right" : ""}`}>
+                          {c.rotulo}
+                        </th>
+                      ) : (
+                        <ThOrden key={c.clave} col={c.clave} api={ordenVenta} derecha={c.alineado === "der"} className="px-3 py-2 font-medium">
+                          {c.rotulo}
+                        </ThOrden>
+                      )
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {data.ventas.length === 0 ? (
                     <tr><td colSpan={6} className="px-3 py-4 text-center text-gray-400">Sin ventas comisionables.</td></tr>
-                  ) : data.ventas.map((v, i) => (
+                  ) : ordenVenta.ordenar(data.ventas, (v, c) =>
+                    c === "fecha" ? v.fecha : c === "cliente" ? v.cliente : c === "factura" ? v.secuencial
+                    : c === "utilidad" ? (v.tipo === "Nota de Crédito" ? null : v.pct_utilidad) : v.subtotal,
+                  ).map((v, i) => (
                     // Facturas con utilidad ≤20% no comisionan: se listan con
                     // $0.00 (atribuidas al vendedor de la factura) pero en gris.
                     // La NOTA DE CRÉDITO se reconoce por el rojo y el negativo:
@@ -460,16 +477,24 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                     {/* 🔴 La MISMA regla de la «3h»: en el celular la plata va
                         primero. Medido: la columna COMISIÓN se veía 32 px de 93. */}
                     {COLUMNAS_COBRO_EN_ORDEN(enCelular).map((c) => (
-                      <th key={c.clave} className={`px-3 py-2 font-medium ${c.alineado === "der" ? "text-right" : ""}`}>
-                        {c.rotulo}
-                      </th>
+                      enCelular ? (
+                        <th key={c.clave} className={`px-3 py-2 font-medium ${c.alineado === "der" ? "text-right" : ""}`}>
+                          {c.rotulo}
+                        </th>
+                      ) : (
+                        <ThOrden key={c.clave} col={c.clave} api={ordenCobro} derecha={c.alineado === "der"} className="px-3 py-2 font-medium">
+                          {c.rotulo}
+                        </ThOrden>
+                      )
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {data.cobros.length === 0 ? (
                     <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">Sin cobros comisionables.</td></tr>
-                  ) : data.cobros.map((c, i) => (
+                  ) : ordenCobro.ordenar(data.cobros, (c, col) =>
+                    col === "fecha" ? c.fecha : col === "cliente" ? c.cliente : c.monto,
+                  ).map((c, i) => (
                     <tr key={i} className="border-b border-gray-100 last:border-0 text-gray-800">
                       {COLUMNAS_COBRO_EN_ORDEN(enCelular).map((col) => (
                         <td

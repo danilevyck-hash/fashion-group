@@ -24,6 +24,12 @@ import { SkeletonTable } from "@/components/ui";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import type { VisitaDeModulo, VisitaDePersona } from "@/lib/visitas/resumen";
 import { Aviso } from "@/components/ui/Aviso";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+
+/** 6-oct-2026: la tabla «Por usuario» ordena por encabezado (abre como siempre). */
+const COLUMNAS_ORDEN = ["modulo", "usuario", "rol", "visitas", "ultima"] as const;
+type ColOrden = (typeof COLUMNAS_ORDEN)[number];
+const TH = "px-3 py-2 font-medium";
 
 interface Respuesta {
   tablaLista: boolean;
@@ -61,6 +67,7 @@ function dondeEntra(celular: number, computadora: number): string {
 export default function VisitasTab() {
   const [datos, setDatos] = useState<Respuesta | null>(null);
   const [fallo, setFallo] = useState(false);
+  const orden = useOrdenTabla<ColOrden>("usuarios-visitas", { columnas: COLUMNAS_ORDEN, textos: ["modulo", "usuario", "rol"] });
 
   useEffect(() => {
     let vivo = true;
@@ -129,16 +136,18 @@ export default function VisitasTab() {
             <table className="w-full min-w-[34rem] text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs text-gray-500">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Módulo</th>
-                  <th className="px-3 py-2 font-medium">Usuario</th>
-                  <th className="px-3 py-2 font-medium">Rol</th>
-                  <th className="px-3 py-2 text-right font-medium">Visitas</th>
-                  <th className="px-3 py-2 font-medium">Dispositivo</th>
-                  <th className="px-3 py-2 font-medium">Último acceso</th>
+                  <ThOrden col="modulo" api={orden} className={TH}>Módulo</ThOrden>
+                  <ThOrden col="usuario" api={orden} className={TH}>Usuario</ThOrden>
+                  <ThOrden col="rol" api={orden} className={TH}>Rol</ThOrden>
+                  <ThOrden col="visitas" api={orden} derecha className={TH}>Visitas</ThOrden>
+                  <th className={TH}>Dispositivo</th>
+                  <ThOrden col="ultima" api={orden} className={TH}>Último acceso</ThOrden>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {datos.personas.map((p) => (
+                {orden.ordenar(datos.personas, (p, c) =>
+                  c === "modulo" ? p.moduloLabel : c === "usuario" ? p.nombre : c === "rol" ? etiquetaDeRol(p.rol) : c === "visitas" ? p.visitas : p.ultimaEn,
+                ).map((p) => (
                   <tr key={`${p.modulo}-${p.userId}`}>
                     <td className="px-3 py-2 text-gray-900">{p.moduloLabel}</td>
                     <td className="px-3 py-2 text-gray-900">{p.nombre}</td>

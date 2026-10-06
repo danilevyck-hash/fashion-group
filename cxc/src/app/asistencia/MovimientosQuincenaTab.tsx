@@ -1,5 +1,6 @@
 "use client";
 import { Aviso } from "@/components/ui/Aviso";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MOVIMIENTOS DE LA QUINCENA — la pantalla de LECTURA de Préstamos.
@@ -217,7 +218,14 @@ function Dato(props: { rotulo: string; valor: string }) {
 }
 
 function Bloque(props: { titulo: string; filas: readonly FilaMovimiento[]; total: number }) {
-  const { titulo, filas, total } = props;
+  const { titulo, total } = props;
+  // 6-oct-2026: en la computadora cada encabezado ordena; sin tocar, como siempre.
+  const orden = useOrdenTabla<"colaborador" | "concepto" | "monto" | "fecha" | "origen">(`asistencia-movimientos-${titulo}`, {
+    columnas: ["colaborador", "concepto", "monto", "fecha", "origen"], textos: ["colaborador", "concepto", "origen"],
+  });
+  const filas = useMemo(() => orden.ordenar(props.filas, (f, c) =>
+    c === "colaborador" ? capitalizarNombre(f.nombre) : c === "concepto" ? f.etiqueta
+      : c === "monto" ? f.monto : c === "fecha" ? f.fecha : f.origenEtiqueta), [props.filas, orden]);
   return (
     <section className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -242,11 +250,11 @@ function Bloque(props: { titulo: string; filas: readonly FilaMovimiento[]; total
             <table className="w-full text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Colaborador</th>
-                  <th className="px-3 py-2 font-medium">Concepto</th>
-                  <th className="px-3 py-2 text-right font-medium">Monto</th>
-                  <th className="px-3 py-2 text-right font-medium">Fecha</th>
-                  <th className="px-3 py-2 font-medium">Origen</th>
+                  <ThOrden col="colaborador" api={orden} className="px-3 py-2 font-medium">Colaborador</ThOrden>
+                  <ThOrden col="concepto" api={orden} className="px-3 py-2 font-medium">Concepto</ThOrden>
+                  <ThOrden col="monto" api={orden} derecha className="px-3 py-2 text-right font-medium">Monto</ThOrden>
+                  <ThOrden col="fecha" api={orden} derecha className="px-3 py-2 text-right font-medium">Fecha</ThOrden>
+                  <ThOrden col="origen" api={orden} className="px-3 py-2 font-medium">Origen</ThOrden>
                 </tr>
               </thead>
               <tbody>

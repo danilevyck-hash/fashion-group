@@ -74,6 +74,7 @@ import ElegirPersonaModal from "@/app/prestamos/components/ElegirPersonaModal";
 import NuevoMovimientoModal from "@/app/prestamos/components/NuevoMovimientoModal";
 import { useMovimientoForm } from "@/app/prestamos/components/useMovimientoForm";
 import { vidrioSobre } from "@/lib/ui/vidrio";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import CampoFecha from "@/components/ui/CampoFecha";
 
 interface FichaDeuda {
@@ -289,6 +290,21 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
     () => visibles.reduce((a, f) => a + f.saldo, 0),
     [visibles],
   );
+  // 6-oct-2026: en la computadora cada encabezado ordena; sin tocar, como siempre.
+  const orden = useOrdenTabla<"colaborador" | "prestamo" | "dano" | "terceros" | "saldo" | "cuota" | "quincena">("asistencia-prestamos", {
+    columnas: ["colaborador", "prestamo", "dano", "terceros", "saldo", "cuota", "quincena"], textos: ["colaborador"],
+  });
+  const ordenadas = useMemo(() => orden.ordenar(visibles, (f, c) => {
+    switch (c) {
+      case "colaborador": return capitalizarNombre(f.nombre);
+      case "prestamo": return f.saldoPrestamo;
+      case "dano": return f.saldoDano;
+      case "terceros": return f.saldoTerceros ?? 0;
+      case "saldo": return f.saldo;
+      case "cuota": return cuotaPorQuincena(f);
+      case "quincena": return f.yaDescontado;
+    }
+  }), [visibles, orden]);
 
   if (fichas === null) {
     return <p className="text-sm text-gray-500">Cargando…</p>;
@@ -473,21 +489,21 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-3 py-2 font-medium">Colaborador</th>
-              <th className="px-3 py-2 text-right font-medium">Préstamo</th>
+              <ThOrden col="colaborador" api={orden} className="px-3 py-2 font-medium">Colaborador</ThOrden>
+              <ThOrden col="prestamo" api={orden} derecha className="px-3 py-2 text-right font-medium">Préstamo</ThOrden>
               {/* 🔴 ENCABEZADOS DE UNA PALABRA (29-sep-2026, audit visual aprobado
                   por Daniel): «Daño de mercancía» y «Descuento a terceros» se
                   partían en dos renglones. El nombre largo queda en el `title`. */}
-              <th className="whitespace-nowrap px-3 py-2 text-right font-medium" title={NOMBRE_CUENTA.dano}>Mercancía</th>
-              {hayTerceros && <th className="whitespace-nowrap px-3 py-2 text-right font-medium" title={NOMBRE_CUENTA.terceros}>Terceros</th>}
-              <th className="px-3 py-2 text-right font-medium">Saldo</th>
-              <th className="px-3 py-2 text-right font-medium">Cuota</th>
-              {hayEstaQuincena && <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Esta quincena</th>}
+              <ThOrden col="dano" api={orden} derecha className="whitespace-nowrap px-3 py-2 text-right font-medium"><span title={NOMBRE_CUENTA.dano}>Mercancía</span></ThOrden>
+              {hayTerceros && <ThOrden col="terceros" api={orden} derecha className="whitespace-nowrap px-3 py-2 text-right font-medium"><span title={NOMBRE_CUENTA.terceros}>Terceros</span></ThOrden>}
+              <ThOrden col="saldo" api={orden} derecha className="px-3 py-2 text-right font-medium">Saldo</ThOrden>
+              <ThOrden col="cuota" api={orden} derecha className="px-3 py-2 text-right font-medium">Cuota</ThOrden>
+              {hayEstaQuincena && <ThOrden col="quincena" api={orden} derecha className="whitespace-nowrap px-3 py-2 text-right font-medium">Esta quincena</ThOrden>}
               {puedeAnotar && <th className="px-3 py-2" />}
             </tr>
           </thead>
           <tbody>
-            {visibles.map((f) => (
+            {ordenadas.map((f) => (
               <tr key={f.id} className="border-b border-gray-100 last:border-0">
                 <td className="px-3 py-2">
                   {nombre(f, "text-gray-900")}

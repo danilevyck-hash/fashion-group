@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowUpDown, Download, Search } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import type { Clientes, Cliente } from "./types";
 import { fmtMoney } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 import { ClienteSheet } from "./ClienteSheet";
-import { SortSheet } from "./SortSheet";
+import { OrdenarEnLaBarra, ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { ControlSegmentado } from "./ControlSegmentado";
 import { useEsCelularVentas } from "./celular/useEsCelularVentas";
 import { ClientesCelular } from "./celular/ClientesCelular";
@@ -39,8 +39,11 @@ import { textoFrescura } from "@/lib/ventas/frescura";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import { esMostrador } from "@/lib/clientes/mostrador";
 
-type SortKey = "rank" | "nombre" | "empresa" | "ytd" | "delta" | "ultima";
-type SortDir = "asc" | "desc";
+// 🔴 6-oct-2026: el orden por encabezado es el COMÚN (`OrdenTabla`); se
+// recuerda solo durante la visita, porque cómo ABRE la lista es decisión de
+// Daniel (abajo).
+const COLUMNAS_ORDEN = ["nombre", "empresa", "ytd", "delta", "ultima"] as const;
+type SortKey = (typeof COLUMNAS_ORDEN)[number];
 
 // Mapping de tono semántico → clase Tailwind para celdas con bg claro.
 // Histórico de Clientes usa red-600 para negativos (no orange-600 como Resumen).
@@ -51,7 +54,7 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
 };
 
 // (SORT_LABELS se retiró con el subtítulo "ordenados por X": el encabezado de
-// columna activo ya muestra el criterio, y en celular lo dice el SortSheet.)
+// columna activo ya muestra el criterio, y en celular lo dice «Ordenar ▾».)
 
 // 🔴 EL FILTRO DE EMPRESA ES UN DESPLEGABLE, NO SIETE PÍLDORAS (11-sep-2026).
 // Daniel: «B». Siete chips en una fila —en el celular, cuatro líneas antes del
@@ -211,17 +214,18 @@ export function ClientesView({
   //
   // ⚠️ En la computadora no cambia: un año cerrado sigue abriendo por compras y
   // el año en curso por última compra, con su columna «ÚLTIMA COMPRA ↓».
-  const [sortBy, setSortBy] = useState<SortKey>(
-    isClosedYear || esPantallaDeCelularVentas() ? "ytd" : "ultima",
-  );
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const orden = useOrdenTabla<SortKey>("ventas-clientes", {
+    columnas: COLUMNAS_ORDEN,
+    textos: ["nombre", "empresa"],
+    inicial: { col: isClosedYear || esPantallaDeCelularVentas() ? "ytd" : "ultima", dir: "desc" },
+    recordar: "visita",
+  });
   // ⛔ ACÁ VIVÍA `vista` («Clientes: últimos 12 meses / con compras en 2026»),
   // el desplegable que decidía el UNIVERSO. Se retiró el 11-sep-2026: en los
   // modos Utilidad y Margen no hacía nada, y en Ventas su segunda opción era
   // lo mismo que no abrir los «N clientes sin compras en 2026» plegados al
   // final. El período lo manda el selector único de arriba.
   const [sheetCliente, setSheetCliente] = useState<Cliente | null>(null);
-  const [sortOpen, setSortOpen] = useState(false);
   // 🔴 LOS CLIENTES EN $0.00 SE AGRUPAN AL FINAL (5-sep-2026). Desde ~la fila 92
   // casi todo era «$0.00 / −100%»: 100 renglones idénticos entre los que no se
   // encuentra nada, y que además hacían parecer que la lista se había roto. No
@@ -450,25 +454,12 @@ export function ClientesView({
       // módulo Clientes: "multifashion" y "Multi Fashion" son la misma búsqueda.
       r = r.filter(c => coincideBusqueda(search, [c.nombre, c.id]));
     }
-    r.sort((a, b) => {
-      const sign = sortDir === "asc" ? 1 : -1;
-      switch (sortBy) {
-        case "rank":    return (a.rank - b.rank) * sign;
-        case "nombre":  return a.nombre.localeCompare(b.nombre) * sign;
-        case "empresa": return a.empresa.localeCompare(b.empresa) * sign;
-        case "ytd":     return (a.ytd - b.ytd) * sign;
-        // «Nuevo» (sin base) va al final en los dos sentidos: no es un cambio.
-        case "delta": {
-          if (a.delta == null && b.delta == null) return 0;
-          if (a.delta == null) return 1;
-          if (b.delta == null) return -1;
-          return (a.delta - b.delta) * sign;
-        }
-        case "ultima":  return a.ultimaIso.localeCompare(b.ultimaIso) * sign;
-      }
-    });
+    // «Nuevo» (sin base, `delta: null`) va al final en los dos sentidos: no es un cambio.
+    r = orden.ordenar(r, (c, col) =>
+      col === "nombre" ? c.nombre : col === "empresa" ? c.empresa : col === "ytd" ? c.ytd : col === "delta" ? c.delta : c.ultimaIso,
+    );
     return r;
-  }, [universe, search, sortBy, sortDir]);
+  }, [universe, search, orden]);
 
   /**
    * 🔴 LOS TRES BLOQUES DE LA LISTA, en el orden en que se ven.
@@ -496,13 +487,21 @@ export function ClientesView({
     [bloques, ceroAbierto],
   );
 
-  const onSort = (col: SortKey) => {
-    if (sortBy === col) setSortDir(sortDir === "asc" ? "desc" : "asc");
-    else { setSortBy(col); setSortDir(col === "nombre" || col === "empresa" ? "asc" : "desc"); }
-  };
-
   /** 🔴 El «#» SOLO cuando el orden es por compras. Ver el encabezado. */
-  const mostrarRanking = sortBy === "ytd";
+  const ordenarCelular = (
+    <OrdenarEnLaBarra
+      api={orden}
+      opciones={[
+        { col: "ytd", rotulo: "Compras del año" },
+        { col: "ultima", rotulo: "Última compra" },
+        { col: "delta", rotulo: "Variación vs año anterior" },
+        { col: "nombre", rotulo: "Cliente" },
+        { col: "empresa", rotulo: "Empresas" },
+      ]}
+    />
+  );
+
+  const mostrarRanking = orden.orden?.col === "ytd";
   const colSpanTabla = mostrarRanking ? 6 : 5;
 
   /** Cuántos clientes se están viendo. En Utilidad/Margen la cuenta la manda
@@ -568,6 +567,7 @@ export function ClientesView({
           empresaRotulo={rotuloEmpresa}
           onEmpresa={() => setEmpresaAbierta(true)}
           onTocarCliente={setSheetCliente}
+          ordenar={ordenarCelular}
           frescura={FRESCURA_VISIBLE_2026_10 ? <FrescuraVentasCel onActualizado={() => { void reloadData(); onReloadData?.(); }} /> : undefined}
           accion={
             <MenuVentasCelular
@@ -698,20 +698,10 @@ export function ClientesView({
           {/* Sort button — visible sólo en mobile (md-). En desktop se usan
               los headers de columna clickeables. Texto fijo "Ordenar" para
               dejar más ancho al buscador; la opción actual + dirección se
-              muestran adentro del SortSheet al abrirlo.
+              muestran adentro de la hoja «Ordenar por» al abrirla.
               ⚠️ Solo en el modo Ventas: Utilidad y Margen traen su propia tira
               de chips, que es el control de orden de ESAS columnas. */}
-          {!enUtilidad && (
-            <button
-              type="button"
-              onClick={() => setSortOpen(true)}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 active:bg-gray-100 lg:hidden"
-              aria-label="Ordenar lista"
-            >
-              <ArrowUpDown className="h-3.5 w-3.5 text-gray-500" />
-              <span>Ordenar</span>
-            </button>
-          )}
+          {!enUtilidad && <span className="contents lg:hidden">{ordenarCelular}</span>}
 
           {/* "Actualizar ahora" (admin/secretaria) — la data de este tab sale
               del vw clientes_empresa_12m: misma secuencia completa que Resumen
@@ -811,7 +801,7 @@ export function ClientesView({
                 {mostrarRanking && (
                   <th className="border-b border-gray-200 bg-gray-100 px-2.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">#</th>
                 )}
-                <SortHeader col="nombre"  align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Cliente</SortHeader>
+                <ThOrden col="nombre" api={orden} className={TH_ORDEN}>Cliente</ThOrden>
                 {/* 🔴 «Empresa» DICE SIEMPRE EL NÚMERO (5-sep-2026). La columna
                     mezclaba dos cosas: a veces «6 empresas» (cuántas le compran)
                     y a veces «Vistana International» (cuál). Dos preguntas
@@ -819,16 +809,16 @@ export function ClientesView({
                     decide cómo se entiende la fila entera. Ahora la columna
                     contesta UNA: cuántas. Cuáles, y con cuánto en cada una, sale
                     al abrir la fila. */}
-                <SortHeader col="empresa" align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Empresas</SortHeader>
+                <ThOrden col="empresa" api={orden} className={TH_ORDEN}>Empresas</ThOrden>
                 {/* 🔴 LA COLUMNA DICE QUÉ PERÍODO SUMA (11-sep-2026): «Compras ·
                     Año 2026» o «Compras · Últimos 12 meses», el que el servidor
                     SIRVIÓ. Decía «Compras 2026» a secas. */}
-                <SortHeader col="ytd"     align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>{rotuloCompras(periodoServido)}</SortHeader>
+                <ThOrden col="ytd" api={orden} derecha className={TH_ORDEN}>{rotuloCompras(periodoServido)}</ThOrden>
                 {/* Sin la "Δ": es notación de matemática y esta columna la lee gente
                     que no la conoce. "vs 2025" con las flechas de cada celda se
                     entiende solo, y el año es el REAL. */}
-                <SortHeader col="delta"   align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>{rotuloVs(periodoServido, anioComparativo)}</SortHeader>
-                <SortHeader col="ultima"  align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Última compra</SortHeader>
+                <ThOrden col="delta" api={orden} derecha className={TH_ORDEN}>{rotuloVs(periodoServido, anioComparativo)}</ThOrden>
+                <ThOrden col="ultima" api={orden} derecha className={TH_ORDEN}>Última compra</ThOrden>
               </tr>
             </thead>
             <tbody>
@@ -1022,14 +1012,6 @@ export function ClientesView({
         }}
       />
 
-      {/* Sort picker mobile — abre desde el botón "Ordenar" arriba. */}
-      <SortSheet
-        open={sortOpen}
-        onClose={() => setSortOpen(false)}
-        sortBy={sortBy === "rank" ? "ultima" : sortBy}
-        sortDir={sortDir}
-        onChange={(key, dir) => { setSortBy(key); setSortDir(dir); }}
-      />
     </div>
   );
 }
@@ -1320,34 +1302,6 @@ function ClienteCard({
   );
 }
 
-function SortHeader({
-  col, align, children, sortBy, sortDir, onClick,
-}: {
-  col: SortKey; align: "left" | "right"; children: React.ReactNode;
-  sortBy: SortKey; sortDir: SortDir; onClick: (c: SortKey) => void;
-}) {
-  const active = sortBy === col;
-  return (
-    // SIN `whitespace-nowrap`: "Compras 2026" y "Última compra" ahora pueden
-    // partirse en dos líneas cuando el ancho aprieta. Es la mitad de lo que le
-    // bajó el mínimo a la tabla (la otra mitad es el relleno px-3.5 → px-2.5).
-    // Partir un encabezado en dos renglones no es abreviarlo: dice lo mismo.
-    <th
-      onClick={() => onClick(col)}
-      className={cn(
-        "cursor-pointer select-none border-b border-gray-200 bg-gray-100 px-2.5 py-2.5 text-xs font-medium uppercase tracking-wide transition",
-        align === "right" ? "text-right" : "text-left",
-        active ? "text-gray-950" : "text-gray-500 hover:text-gray-700"
-      )}
-    >
-      {/* 44 px táctiles: el iPad horizontal (1194) también cae del lado de la
-          tabla y ordenar se hace con el dedo. */}
-      <span className="inline-flex min-h-[44px] items-center gap-1">
-        {children}
-        <span className={cn("text-xs", active ? "opacity-100" : "opacity-35")}>
-          {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
-        </span>
-      </span>
-    </th>
-  );
-}
+/** El encabezado de la tabla: 44 px táctiles (el iPad horizontal también cae
+ *  del lado de la tabla y ordenar se hace con el dedo). */
+const TH_ORDEN = "border-b border-gray-200 bg-gray-100 px-2.5 py-2.5 text-xs font-medium uppercase tracking-wide text-gray-500 [&>button]:min-h-[44px]";

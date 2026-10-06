@@ -138,12 +138,12 @@ describe("la página de una empresa", () => {
     // Más plata primero.
     expect(filasTabla().map((tr) => tr.querySelector("td")!.textContent))
       .toEqual(["FW-0001", "FW-0007", "REC-0020", "SINFECHA"]);
-    expect(porTotal.textContent).toContain("↓");
+    expect(porTotal.textContent).toContain("▼");
     // Otro toque, menos plata primero.
     fireEvent.click(porTotal);
     expect(filasTabla().map((tr) => tr.querySelector("td")!.textContent))
       .toEqual(["SINFECHA", "REC-0020", "FW-0007", "FW-0001"]);
-    expect(porTotal.textContent).toContain("↑");
+    expect(porTotal.textContent).toContain("▲");
   });
 
   it("🔴 «Días» ordena por la fecha de la factura, y lo que no la tiene sigue al final", () => {

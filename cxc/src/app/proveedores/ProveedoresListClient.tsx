@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -20,6 +20,8 @@ import {
   type ProveedorEnEmpresa,
 } from "@/lib/proveedores/por-empresa";
 import { Aviso } from "@/components/ui/Aviso";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+import type { TramoKey } from "@/lib/proveedores/tramos";
 
 // Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
 // ⚠️ Boston NO está: `cxp: false`, 0 filas, excluida a propósito.
@@ -35,6 +37,15 @@ const SYNC_PROVEEDORES_OPCIONES = EMPRESAS.map((k) => ({
 
 // Cuántas columnas tiene la tabla: Empresa + los cuatro tramos + Por pagar.
 const COLUMNAS = TRAMOS.length + 2;
+
+// 🔴 6-oct-2026 (Daniel: «ordenar … en todo lo que tenga sentido»): tocar un
+// encabezado ordena las empresas Y, adentro de la abierta, sus proveedores por
+// la misma columna. Sin tocar nada, el orden de siempre (lo que más se debe).
+type ColProveedores = "nombre" | TramoKey | "por_pagar";
+const COLUMNAS_ORDEN: readonly ColProveedores[] = ["nombre", ...TRAMOS_KEYS, "por_pagar"];
+function valorOrden(f: { nombre: string; tramos: Record<TramoKey, number>; saldo: { por_pagar: number } }, c: ColProveedores) {
+  return c === "nombre" ? f.nombre : c === "por_pagar" ? f.saldo.por_pagar : f.tramos[c];
+}
 
 const CARTERA_VACIA: CarteraCxp = {
   empresas: [],
@@ -129,7 +140,16 @@ function ProveedoresList() {
     }
   };
 
-  const { empresas, total } = cartera;
+  const { total } = cartera;
+  const orden = useOrdenTabla<ColProveedores>("proveedores", { columnas: COLUMNAS_ORDEN, textos: ["nombre"] });
+  const empresas = useMemo(
+    () => orden.ordenar(cartera.empresas, valorOrden).map((e) => ({
+      ...e,
+      proveedores: orden.ordenar(e.proveedores, valorOrden),
+      sin_saldo: orden.ordenar(e.sin_saldo, valorOrden),
+    })),
+    [cartera.empresas, orden],
+  );
   const fraseTotal = frasePartida(total.saldo, fmt);
 
   return (
@@ -203,11 +223,11 @@ function ProveedoresList() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
-                        <th className="py-2 px-1.5 xl:px-3">Empresa</th>
+                        <ThOrden col="nombre" api={orden} className="py-2 px-1.5 xl:px-3">Empresa</ThOrden>
                         {TRAMOS.map((t) => (
-                          <th key={t.key} className="py-2 px-1.5 xl:px-3 text-right">{t.label}</th>
+                          <ThOrden key={t.key} col={t.key} api={orden} derecha className="py-2 px-1.5 xl:px-3">{t.label}</ThOrden>
                         ))}
-                        <th className="py-2 px-1.5 xl:px-3 text-right">Por pagar</th>
+                        <ThOrden col="por_pagar" api={orden} derecha className="py-2 px-1.5 xl:px-3">Por pagar</ThOrden>
                       </tr>
                     </thead>
                     {empresas.map((e) => (

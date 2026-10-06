@@ -351,9 +351,9 @@ describe("🔴 ORDENAR TOCANDO EL ENCABEZADO: DE MAYOR A MENOR PRIMERO", () => {
 
   it("la flecha dice cuál manda", () => {
     const o = { columna: "compras", sentido: "desc" } as const;
-    expect(flechaOrden(o, "compras")).toBe("↓");
-    expect(flechaOrden({ ...o, sentido: "asc" }, "compras")).toBe("↑");
-    expect(flechaOrden(o, "debe")).toBe("↕");
+    expect(flechaOrden(o, "compras")).toBe("▼");
+    expect(flechaOrden({ ...o, sentido: "asc" }, "compras")).toBe("▲");
+    expect(flechaOrden(o, "debe")).toBe("");
   });
 
   it("ordena SIN MUTAR y con desempate ESTABLE por código", () => {

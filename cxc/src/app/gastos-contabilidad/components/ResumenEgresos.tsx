@@ -18,6 +18,17 @@ import { ETIQUETA_ESTADO_EGRESOS, type EstadoEgresos } from "@/lib/egresos/regla
 import type { AlDia } from "@/lib/egresos/al-dia";
 import type { EmpresaEgresosResumen } from "./tipos";
 import { mesLargo, usd } from "./tipos";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+
+// 🔴 6-oct-2026: tocar un encabezado ordena las empresas (solo el ORDEN: ningún
+// monto se suma entre empresas). Sin monto del mes, al final.
+type ColEgresos = "empresa" | "salida" | "gasto" | "pagos";
+function valorEgresos(f: Fila, c: ColEgresos) {
+  if (c === "empresa") return f.empresa.nombre;
+  if (!f.hayMonto) return null;
+  const r = f.empresa.resumen;
+  return c === "salida" ? r.totalSalidaCent : c === "gasto" ? r.totalGastoCent : r.renglones;
+}
 
 /**
  * HASTA QUÉ MES ESTÁ AL DÍA esta empresa — el avance de la contadora, en una
@@ -308,7 +319,8 @@ interface Props {
 }
 
 export default function ResumenEgresos({ empresas, onAbrir }: Props) {
-  const filas = armarFilas(empresas);
+  const orden = useOrdenTabla<ColEgresos>("gastos-resumen", { columnas: ["empresa", "salida", "gasto", "pagos"], textos: ["empresa"] });
+  const filas = orden.ordenar(armarFilas(empresas), valorEgresos);
 
   return (
     <div>
@@ -324,10 +336,10 @@ export default function ResumenEgresos({ empresas, onAbrir }: Props) {
         <table className="w-full min-w-[720px]">
           <thead>
             <tr className="bg-gray-50 text-sm text-gray-600">
-              <th className="px-3 py-2 text-left font-medium">Empresa</th>
-              <th className="px-3 py-2 text-right font-medium">Total egresos</th>
-              <th className="px-3 py-2 text-right font-medium">Gastos</th>
-              <th className="px-3 py-2 text-right font-medium">Pagos</th>
+              <ThOrden col="empresa" api={orden} className="px-3 py-2 text-left font-medium">Empresa</ThOrden>
+              <ThOrden col="salida" api={orden} derecha className="px-3 py-2 font-medium">Total egresos</ThOrden>
+              <ThOrden col="gasto" api={orden} derecha className="px-3 py-2 font-medium">Gastos</ThOrden>
+              <ThOrden col="pagos" api={orden} derecha className="px-3 py-2 font-medium">Pagos</ThOrden>
               <th className="px-3 py-2" />
             </tr>
           </thead>

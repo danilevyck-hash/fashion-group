@@ -157,6 +157,7 @@ import { formatoTiempo, tiempoDelDia, type ModoTiempo } from "@/lib/asistencia/f
 import { useFormatoTiempo } from "@/components/asistencia/FormatoTiempoSelector";
 import { PLACEHOLDER_COLABORADOR } from "@/lib/buscar-en-lista";
 import { vidrioSobre } from "@/lib/ui/vidrio";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -186,6 +187,9 @@ const t = (v: number, modo: ModoTiempo) =>
 // de la ficha, no ser servicio profesional (Daniel: *«solo yulissa no cobra»*).
 const SIN_EXTRA_TITULO = "No cobra horas extra (casilla de su ficha): solo se le cuentan tardanzas y ausencias.";
 const sinExtra = () => <span className="text-gray-300" title={SIN_EXTRA_TITULO}>—</span>;
+
+type ColReporte = "colaborador" | "dias" | "ausencias" | "tardanzas" | "tardanza" | "almuerzo" | "salida" | "noTrabajado" | "extras";
+const COLS_REPORTE: readonly ColReporte[] = ["colaborador", "dias", "ausencias", "tardanzas", "tardanza", "almuerzo", "salida", "noTrabajado", "extras"];
 
 export default function ReporteTab({ empresa = "" }: {
   /** El selector de arriba de las pestañas (10-sep-2026). «todas» o vacío = todas. */
@@ -508,6 +512,24 @@ export default function ReporteTab({ empresa = "" }: {
     () => (filtradas === null ? null : conAnclados(filtradas, personas ?? [], anclados)),
     [filtradas, personas, anclados],
   );
+  // 🔴 6-oct-2026: en la computadora cada encabezado ordena a los colaboradores.
+  // Solo cambia el orden de las FILAS: el detalle de días de adentro (columnas
+  // posicionales, arrastrar horas) no se toca, ni el pie, ni el Excel.
+  const orden = useOrdenTabla<ColReporte>("asistencia-reporte", { columnas: COLS_REPORTE, textos: ["colaborador"] });
+  const ordenadas = useMemo(() => (visibles === null ? null : orden.ordenar(visibles, (x, c) => {
+    const r = x.resumen;
+    switch (c) {
+      case "colaborador": return x.nombre ? capitalizarNombre(x.nombre) : x.codigo;
+      case "dias": return r.diasTrabajados;
+      case "ausencias": return r.ausenciasSinJustificar;
+      case "tardanzas": return r.vecesTarde;
+      case "tardanza": return r.minutosTarde;
+      case "almuerzo": return r.excesoAlmuerzoMin;
+      case "salida": return r.salidaTempranaMin;
+      case "noTrabajado": return r.tiempoNoTrabajadoMin;
+      case "extras": return cuentaHorasExtra(x) ? r.extraMin : null;
+    }
+  })), [visibles, orden]);
   /** Los que se quedan SOLO porque se los ancló: llevan el chip «listo». */
   const seQuedanAncladas = useMemo(
     () => ancladosQueSeQuedan(filtradas, anclados),
@@ -1033,20 +1055,20 @@ export default function ReporteTab({ empresa = "" }: {
           <table className="w-full text-sm">
             <thead className={celular ? "hidden" : undefined}>
               <tr className="border-b border-gray-200 text-[10.5px] uppercase tracking-wide text-gray-400">
-                <th className="px-3 py-2.5 text-left font-medium">Colaborador</th>
+                <ThOrden col="colaborador" api={orden} className="px-3 py-2.5 text-left font-medium">Colaborador</ThOrden>
                 {/* 🔴 LA COLUMNA «SALE» SE RETIRÓ (24-sep-2026). Daniel: *«pone
                     salida como en una burbuja al lado del nombre, y el código a
                     la izquierda del nombre»*. Once columnas pasan a diez. */}
                 {!ASISTENCIA_PANTALLA_2026_09 && <th className="px-2 py-2.5 text-center font-medium">Sale</th>}
-                <th className="px-2 py-2.5 text-right font-medium">Días</th>
-                <th className="px-2 py-2.5 text-right font-medium">Ausencias</th>
-                <th className="px-2 py-2.5 text-right font-medium">Tardanzas</th>
+                <ThOrden col="dias" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Días</ThOrden>
+                <ThOrden col="ausencias" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Ausencias</ThOrden>
+                <ThOrden col="tardanzas" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Tardanzas</ThOrden>
                 {/* 🔴 29-sep-2026: sin «Min»; la unidad la dice el número (h:mm o minutos). */}
-                <th className="px-2 py-2.5 text-right font-medium">Tardanza</th>
-                <th className="px-2 py-2.5 text-right font-medium">Exceso de<br />almuerzo</th>
-                <th className="px-2 py-2.5 text-right font-medium">Salida<br />temprana</th>
-                <th className="px-2 py-2.5 text-right font-medium">Tiempo no<br />trabajado</th>
-                <th className="px-2 py-2.5 text-right font-medium">Extras</th>
+                <ThOrden col="tardanza" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Tardanza</ThOrden>
+                <ThOrden col="almuerzo" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Exceso de<br />almuerzo</ThOrden>
+                <ThOrden col="salida" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Salida<br />temprana</ThOrden>
+                <ThOrden col="noTrabajado" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Tiempo no<br />trabajado</ThOrden>
+                <ThOrden col="extras" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Extras</ThOrden>
                 {/* ══════════════════════════════════════════════════════════
                     🔴 «SOLO A REVISAR» VIVE EN SU COLUMNA (25-sep-2026)
                     Daniel, textual, sobre la fila de mandos: *«quita el Solo a
@@ -1062,7 +1084,7 @@ export default function ReporteTab({ empresa = "" }: {
               </tr>
             </thead>
             <tbody>
-              {visibles.map((p) => (
+              {(ordenadas ?? visibles).map((p) => (
                 <FilaPersona key={p.codigo} p={p}
                   celular={celular}
                   anchoCodigo={anchoCodigo}

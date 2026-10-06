@@ -7,6 +7,7 @@
 // Se guarda por RANGO: unas vacaciones son UNA fila, no diez.
 
 import { useCallback, useEffect, useState } from "react";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directorio";
@@ -37,6 +38,10 @@ const hoyPanama = () => new Date(Date.now() - 5 * 3600_000).toISOString().slice(
 export default function JustificacionesTab() {
   const { toast } = useToast();
   const [lista, setLista] = useState<Justificacion[] | null>(null);
+  // 6-oct-2026: cada encabezado ordena; sin tocar, como llega.
+  const orden = useOrdenTabla<"colaborador" | "dias" | "motivo" | "registrado">("asistencia-justificaciones", {
+    columnas: ["colaborador", "dias", "motivo", "registrado"], textos: ["colaborador", "motivo", "registrado"],
+  });
   const [personas, setPersonas] = useState<PersonaListada[]>([]);
   const [motivos, setMotivos] = useState<string[]>([]);
   const [codigo, setCodigo] = useState("");
@@ -231,15 +236,17 @@ export default function JustificacionesTab() {
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-[10.5px] uppercase tracking-wide text-gray-400">
-              <th className="px-3 py-2.5 text-left font-medium">Colaborador</th>
-              <th className="px-3 py-2.5 text-left font-medium">Días</th>
-              <th className="px-3 py-2.5 text-left font-medium">Motivo</th>
+              <ThOrden col="colaborador" api={orden} className="px-3 py-2.5 text-left font-medium">Colaborador</ThOrden>
+              <ThOrden col="dias" api={orden} className="px-3 py-2.5 text-left font-medium">Días</ThOrden>
+              <ThOrden col="motivo" api={orden} className="px-3 py-2.5 text-left font-medium">Motivo</ThOrden>
               <th className="px-3 py-2.5 text-left font-medium">Nota</th>
-              <th className="px-3 py-2.5 text-left font-medium">Registrado por</th>
+              <ThOrden col="registrado" api={orden} className="px-3 py-2.5 text-left font-medium">Registrado por</ThOrden>
               <th></th>
             </tr></thead>
             <tbody>
-              {lista.map((j) => (
+              {orden.ordenar(lista, (j, c) =>
+                c === "colaborador" ? nombreDe(j.empleado_codigo) : c === "dias" ? j.desde
+                  : c === "motivo" ? j.motivo : j.registrado_por).map((j) => (
                 <tr key={j.id} className="border-b border-gray-100 last:border-0">
                   <td className="px-3 py-2 text-gray-900">{nombreDe(j.empleado_codigo)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-gray-700">

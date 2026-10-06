@@ -20,6 +20,17 @@ import {
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { accionesDelGasto, fotosSoloVer } from "@/lib/caja/menu-del-gasto";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+
+// 🔴 6-oct-2026: tocar un encabezado ordena; sin tocar, el más nuevo arriba
+// (como siempre). La fecha arranca de la más nueva, como un número.
+type ColCaja = "fecha" | "observaciones" | "proveedor" | "categoria" | "subtotal" | "itbms" | "total";
+const COLUMNAS_CAJA: readonly ColCaja[] = ["fecha", "observaciones", "proveedor", "categoria", "subtotal", "itbms", "total"];
+function valorCaja(g: CajaGasto, c: ColCaja) {
+  if (c === "observaciones") return g.descripcion || g.nombre;
+  if (c === "categoria") return g.categoria || "Varios";
+  return g[c];
+}
 
 interface Props {
   gastos: CajaGasto[];
@@ -185,7 +196,8 @@ export default function GastoTable({
   const totalDelFiltro = totalGastado(filteredGastos);
 
   // Display newest first so a freshly entered gasto lands on top.
-  const sortedGastos = [...filteredGastos].reverse();
+  const orden = useOrdenTabla<ColCaja>("caja-gastos", { columnas: COLUMNAS_CAJA, textos: ["observaciones", "proveedor", "categoria"] });
+  const sortedGastos = orden.ordenar([...filteredGastos].reverse(), valorCaja);
 
   function startEdit(g: CajaGasto) {
     setEditingGastoId(g.id);
@@ -354,19 +366,19 @@ export default function GastoTable({
                   borderBottom: "1px solid var(--caja-border-subtle)",
                 }}
               >
-                <th className="text-left py-2.5 px-4 font-medium">Fecha</th>
+                <ThOrden col="fecha" api={orden} className="text-left py-2.5 px-4 font-medium">Fecha</ThOrden>
                 {/* 🔴 «Descripción» pasó a «Nota», opcional (20-sep-2026); y a
                     «Observaciones» el 1-oct-2026 (Daniel: nombres normales de ERP). */}
-                <th className="text-left py-2.5 px-4 font-medium">Observaciones</th>
-                <th className="text-left py-2.5 px-4 font-medium">Proveedor</th>
-                <th className="text-left py-2.5 px-4 font-medium">Categoría</th>
+                <ThOrden col="observaciones" api={orden} className="text-left py-2.5 px-4 font-medium">Observaciones</ThOrden>
+                <ThOrden col="proveedor" api={orden} className="text-left py-2.5 px-4 font-medium">Proveedor</ThOrden>
+                <ThOrden col="categoria" api={orden} className="text-left py-2.5 px-4 font-medium">Categoría</ThOrden>
                 {showFiscal && (
                   <>
-                    <th className="text-right py-2.5 px-4 font-medium">Subtotal</th>
-                    <th className="text-right py-2.5 px-4 font-medium">ITBMS</th>
+                    <ThOrden col="subtotal" api={orden} derecha className="py-2.5 px-4 font-medium">Subtotal</ThOrden>
+                    <ThOrden col="itbms" api={orden} derecha className="py-2.5 px-4 font-medium">ITBMS</ThOrden>
                   </>
                 )}
-                <th className="text-right py-2.5 px-4 font-medium">Total</th>
+                <ThOrden col="total" api={orden} derecha className="py-2.5 px-4 font-medium">Total</ThOrden>
                 {/* 🔴 La columna del «···» existe SIEMPRE: con el período
                     cerrado el menú sigue ahí (solo la foto del recibo), y un
                     encabezado que aparece y desaparece descuadra la tabla. */}

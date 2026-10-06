@@ -20,6 +20,7 @@ import {
 } from "@/lib/depurador/corridas-repetidas";
 import { TRES_DETALLES } from "@/lib/depurador/tres-detalles";
 import { Aviso } from "@/components/ui/Aviso";
+import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 
 interface CargaRow {
   id: string;
@@ -56,6 +57,11 @@ interface HistorialViewProps {
    *  de la caja de soltar el archivo). Sin él, el Historial de siempre. */
   limite?: number;
 }
+
+type ColHistorial = "fecha" | "usuario" | "empresa" | "marca" | "estilos" | "cantidad";
+const COLS_HISTORIAL: readonly (readonly [ColHistorial, string])[] = [
+  ["fecha", "Fecha"], ["usuario", "Usuario"], ["empresa", "Empresa"], ["marca", "Marca"], ["estilos", "Estilos"], ["cantidad", "Cantidad"],
+];
 
 export default function HistorialView({ refreshKey = 0, limite }: HistorialViewProps) {
   const [rows, setRows] = useState<CargaRow[] | null>(null);
@@ -113,6 +119,11 @@ export default function HistorialView({ refreshKey = 0, limite }: HistorialViewP
 
   // Las recientes: el chip se calculó arriba sobre TODAS, así que no cambia.
   const filas = limite ? (rows ?? []).slice(0, limite) : visibles;
+  // 6-oct-2026: en la computadora cada encabezado ordena; sin tocar, la más reciente arriba.
+  const orden = useOrdenTabla<ColHistorial>("depurador-historial", { columnas: COLS_HISTORIAL.map(([c]) => c), textos: ["usuario", "empresa", "marca"] });
+  const ordenadas = orden.ordenar(filas, (r, c) =>
+    c === "fecha" ? r.created_at : c === "usuario" ? r.usuario : c === "empresa" ? empresaCanonica(r.empresa)
+      : c === "marca" ? r.marca : c === "estilos" ? r.cantidad_estilos : r.total_unidades);
 
   const chipDe = (r: CargaRow): MarcaDeRepeticion => repetidas.get(r.id) ?? null;
 
@@ -215,20 +226,24 @@ export default function HistorialView({ refreshKey = 0, limite }: HistorialViewP
             <table className="w-full border-collapse whitespace-nowrap text-[13px] tabular-nums">
               <thead>
                 <tr>
-                  {["Fecha", "Usuario", "Empresa", "Marca", "Estilos", "Cantidad", ""].map((h, i) => (
-                    <th
-                      key={i}
+                  {COLS_HISTORIAL.map(([c, h]) => (
+                    <ThOrden
+                      key={c}
+                      col={c}
+                      api={orden}
+                      derecha={c === "estilos" || c === "cantidad"}
                       className={`sticky top-0 border-b-[1.5px] border-gray-300 bg-gray-100 px-1.5 xl:px-3 py-2.5 text-[12px] font-semibold uppercase tracking-wide text-gray-600 ${
-                        i === 4 || i === 5 ? "text-right" : "text-left"
+                        c === "estilos" || c === "cantidad" ? "text-right" : "text-left"
                       }`}
                     >
                       {h}
-                    </th>
+                    </ThOrden>
                   ))}
+                  <th className="sticky top-0 border-b-[1.5px] border-gray-300 bg-gray-100 px-1.5 xl:px-3 py-2.5" />
                 </tr>
               </thead>
               <tbody>
-                {filas.map((r) => (
+                {ordenadas.map((r) => (
                   <tr
                     key={r.id}
                     data-repeticion={chipDe(r) ?? ""}
