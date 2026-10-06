@@ -232,7 +232,8 @@ const CARTERA = [
   clienteCxc("VIVA PANAMA DUTTY FREE", { vistana: empresaCxc("D-139", "Viva Panama Dutty Free", { d0_30: -1147.52 }) }),
 ];
 const DOS = B2B_COMPANIES.filter((c) => c.key === "vistana" || c.key === "fashion_wear");
-const OPTS_CXC = { subtitulo: "Todas las empresas · al 20 sep 2026", archivo: "cartera.pdf", hoy: "2026-09-20" };
+// ⚠️ El papel de Cartera también se GUARDA (`doc.save`): va a la carpeta temporal, nunca al repo.
+const OPTS_CXC = { subtitulo: "Todas las empresas · al 20 sep 2026", archivo: `${process.env.TMPDIR ?? "/tmp"}/revisar-papeles-cartera.pdf`, hoy: "2026-09-20" };
 
 // ── Reclamos ─────────────────────────────────────────────────────────────────
 
