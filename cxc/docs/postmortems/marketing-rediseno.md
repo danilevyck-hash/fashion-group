@@ -963,3 +963,7 @@ O sea: **3 de las 4 tiendas con gastos abiertos hoy necesitan la pregunta**. No 
   Daniel quiere que una foto viaje en los dos ZIP, es otra conversación y otro grano.
 - **No se corrió el rescate con `--aplicar`.** Las 4 huérfanas de D-118 siguen en el cajón,
   esperando que Daniel diga a qué marca van: `npx tsx scripts/marketing-rescatar-fotos-huerfanas.ts --tienda D-118 --marca=TH --aplicar`.
+
+## Marketing V2 (6-oct-2026) — `MARKETING_APPLE_V2_2026_10`, prendido
+
+Daniel aprobó las capturas el 6-oct-2026. Registrar pago: período en chips (1ª quincena · 2ª quincena · Mes completo · Rango), distribución y concepto en gris, sin asterisco y lo que falta se dice al tocar «Guardar pago» (misma regla de `puedeGuardar`). Galería: «Fotos de la tienda · N» y las ✕ solo con «Editar» también en la computadora. ⚠️ Proyecto y facturas (`ProyectoOverlay` · `FacturasSection`) traen su V2 detrás de `MARKETING_V2_PROYECTO = false`: esa ventana no tiene puerta desde el 23-sep y se dejó como estaba. La galería pública no cambia. Candado `marketing-apple-v2-2026-10`.

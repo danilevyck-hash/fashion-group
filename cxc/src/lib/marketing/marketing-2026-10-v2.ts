@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // MARKETING ESTILO APPLE · V2 (`MARKETING_APPLE_V2_2026_10`, 6-oct-2026).
-// Propuesta del mockup «hoy vs recomendación», APAGADA hasta el «sí» de Daniel.
+// Propuesta del mockup «hoy vs recomendación»; Daniel la aprobó el 6-oct-2026.
 // Va ENCIMA de `MARKETING_APPLE_2026_10` (prendido): no deshace nada aprobado.
 // Reglas en docs/diseno.md. 🔴 SOLO CAMBIA LA PANTALLA: lo que se guarda y lo
 // que se envía es idéntico, y ningún número cambia (se leen los de siempre).
@@ -43,8 +43,15 @@
 // 🔴 `false` = las pantallas de hoy. Candado `marketing-apple-v2-2026-10`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** 🔴 El interruptor. `false` = la pantalla de hoy. */
-export const MARKETING_APPLE_V2_2026_10 = false;
+/** 🔴 El interruptor. `false` = la pantalla de antes.
+ *  Daniel aprobó las capturas el 6-oct-2026: prendido. Proyecto y facturas
+ *  (la ventana sin puerta desde el 23-sep) quedan como están. */
+export const MARKETING_APPLE_V2_2026_10 = true;
+
+/** Proyecto y facturas: su ventana no tiene puerta desde el 23-sep-2026 (un
+ *  enlace de proyecto lleva a la ficha de la tienda). Su V2 queda escrita y
+ *  APAGADA hasta que Daniel decida si pasa a la ficha (6-oct-2026). */
+export const MARKETING_V2_PROYECTO = false;
 
 type Fmt = (n: number) => string;
 

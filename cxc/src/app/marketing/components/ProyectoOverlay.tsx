@@ -45,7 +45,7 @@ import FotosSection from "./FotosSection";
 import EntregasSection from "./EntregasSection";
 import EditarProyectoModal from "./EditarProyectoModal";
 import {
-  MARKETING_APPLE_V2_2026_10,
+  MARKETING_V2_PROYECTO,
   lineaDelProyecto,
   lineaTotalesProyecto,
 } from "@/lib/marketing/marketing-2026-10-v2";
@@ -262,7 +262,7 @@ export default function ProyectoOverlay({
     marcasDelProyecto,
   ]);
 
-  const v2 = MARKETING_APPLE_V2_2026_10;
+  const v2 = MARKETING_V2_PROYECTO;
 
   if (loading || !proyecto) {
     return (

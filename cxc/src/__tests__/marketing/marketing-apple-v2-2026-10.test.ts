@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 CANDADO · Marketing estilo Apple V2 (`MARKETING_APPLE_V2_2026_10`,
 // 6-oct-2026). Solo cambia la pantalla:
-//   1. Apagado hasta el «sí» de Daniel; la v1 sigue prendida.
+//   1. Prendido desde el 6-oct-2026 (Daniel aprobó); la v1 sigue prendida.
 //   2. Las líneas grises dicen los MISMOS números de las celdas de hoy.
 //   3. Lo que se guarda no cambia: el cuerpo del POST del pago, la regla de
 //      «Guardar pago» y la galería PÚBLICA quedan como hoy.
@@ -12,6 +12,7 @@ import fs from "fs";
 import path from "path";
 import {
   MARKETING_APPLE_V2_2026_10,
+  MARKETING_V2_PROYECTO,
   atajoPrendido,
   faltaParaGuardarPago,
   lineaDelProyecto,
@@ -28,9 +29,11 @@ const leer = (p: string) => fs.readFileSync(path.join(RAIZ, p), "utf8");
 const $ = (n: number) => `$${n.toFixed(2)}`;
 
 describe("1 · el interruptor", () => {
-  it("V2 apagado; la v1 sigue prendida", () => {
-    expect(MARKETING_APPLE_V2_2026_10).toBe(false);
+  it("V2 prendido (Daniel, 6-oct-2026); la v1 sigue prendida", () => {
+    expect(MARKETING_APPLE_V2_2026_10).toBe(true);
     expect(MARKETING_APPLE_2026_10).toBe(true);
+    // Proyecto y facturas, sin puerta: su V2 sigue apagada.
+    expect(MARKETING_V2_PROYECTO).toBe(false);
   });
 });
 

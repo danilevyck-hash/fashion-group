@@ -23,7 +23,7 @@ import {
 } from "./uploadHelpers";
 import { useBulkUploadFacturas } from "@/lib/marketing/useBulkUploadFacturas";
 import { MARKETING_PUERTA_GASTO } from "@/lib/marketing/puerta-gasto";
-import { MARKETING_APPLE_V2_2026_10 } from "@/lib/marketing/marketing-2026-10-v2";
+import { MARKETING_V2_PROYECTO } from "@/lib/marketing/marketing-2026-10-v2";
 import {
   useBackdropDismiss,
   useEscapeClose,
@@ -500,7 +500,7 @@ export default function FacturasSection({
 
   // v2: «+ Agregar factura» es la única acción principal; subir varios PDFs
   // es un enlace a su lado y arrastrar sobre la sección entera sigue subiendo.
-  const v2 = MARKETING_APPLE_V2_2026_10;
+  const v2 = MARKETING_V2_PROYECTO;
   const entradaPdfs = (
     <input
       ref={fileInputRef}

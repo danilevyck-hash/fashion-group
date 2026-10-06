@@ -25,6 +25,7 @@
  *      MUESTRA en español.
  * ============================================================================
  */
+import { MARKETING_APPLE_V2_2026_10 } from "@/lib/marketing/marketing-2026-10-v2";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   render,
@@ -261,7 +262,10 @@ describe("🔴 desde el celular SÍ se puede borrar una foto subida por error", 
     const x = await screen.findByRole("button", { name: "Eliminar foto" });
     // El hover sigue SIN ser la puerta del celular: el `opacity-0` que queda
     // lleva prefijo `sm:`, o sea que es de la computadora.
-    expect(x.className).toMatch(/sm:group-hover:opacity-100/);
+    // Marketing V2 (6-oct-2026): en la computadora tampoco hay hover; la ×
+    // sale solo con «Editar», como en el celular.
+    if (MARKETING_APPLE_V2_2026_10) expect(x.className).not.toMatch(/group-hover/);
+    else expect(x.className).toMatch(/sm:group-hover:opacity-100/);
     expect(/(?:^|\s)(?:w-11|h-11)(?:\s|$)/.test(x.className)).toBe(true);
 
     // Antes de tocar «Editar» la × no se puede tocar; después, sí.

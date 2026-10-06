@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 CANDADO · Catálogos estilo Apple V2 (`CATALOGOS_APPLE_V2_2026_10`,
 // 6-oct-2026). Solo cambia la pantalla:
-//   1. Apagado hasta el «sí» de Daniel, y lo aprobado antes sigue prendido.
+//   1. Prendido desde el 6-oct-2026 (Daniel aprobó), y lo aprobado antes sigue prendido.
 //   2. El carrito, el checkout, el precio y el catálogo PÚBLICO no leen el
 //      interruptor; el cuerpo del POST del checkout es letra por letra el de hoy.
 //   3. Prendido, «Confirmar pedido» pone los datos arriba y manda LO MISMO.
@@ -22,8 +22,8 @@ const leer = (p: string) => fs.readFileSync(path.join(RAIZ, p), "utf8");
 afterEach(() => cleanup());
 
 describe("1 · el interruptor", () => {
-  it("V2 apagado; la v1 y la tercera vuelta siguen prendidas", () => {
-    expect(CATALOGOS_APPLE_V2_2026_10).toBe(false);
+  it("V2 prendido (Daniel, 6-oct-2026); la v1 y la tercera vuelta siguen prendidas", () => {
+    expect(CATALOGOS_APPLE_V2_2026_10).toBe(true);
     expect(CATALOGOS_APPLE_2026_10).toBe(true);
     expect(Object.values(CATALOGOS_APPLE_2026_10_B).every(Boolean)).toBe(true);
   });

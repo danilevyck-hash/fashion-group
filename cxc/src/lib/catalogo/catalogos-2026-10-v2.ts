@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // CATÁLOGOS ESTILO APPLE · V2 (`CATALOGOS_APPLE_V2_2026_10`, 6-oct-2026).
-// Propuesta del mockup «hoy vs recomendación», APAGADA hasta el «sí» de Daniel.
+// Propuesta del mockup «hoy vs recomendación»; Daniel la aprobó el 6-oct-2026.
 // Se construye ENCIMA de la v1 y de la tercera vuelta (las dos prendidas):
 // no deshace nada de lo aprobado. Reglas en docs/diseno.md.
 //
@@ -36,8 +36,9 @@
 // 🔴 `false` = las pantallas de hoy.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** 🔴 El interruptor. `false` = la pantalla de hoy. */
-export const CATALOGOS_APPLE_V2_2026_10 = false;
+/** 🔴 El interruptor. `false` = la pantalla de antes.
+ *  Daniel aprobó las capturas el 6-oct-2026: prendido (Marketing V2 sigue apagado). */
+export const CATALOGOS_APPLE_V2_2026_10 = true;
 
 /** Plural de siempre: «1 producto» · «3 productos». */
 function plural(n: number, uno: string, varios: string): string {
