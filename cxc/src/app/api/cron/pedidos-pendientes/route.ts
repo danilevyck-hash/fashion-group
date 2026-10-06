@@ -3,8 +3,8 @@
 // Daniel con el celular de la empresa que mira bodega), los pedidos
 // «Pendiente» de Guías › Pedidos con más de 7 días. Aprobado el 6-oct-2026.
 //
-// 12:30 UTC = 7:30 a.m. de Panamá, 20 min después del `sync-pedidos` de las
-// 12:10. No toca Switch —lee solo Supabase—, así que la separación de 15 min
+// 14:00 UTC = 9:00 a.m. de Panamá, como los demás avisos (Daniel, 6-oct-2026),
+// después del `sync-pedidos` de las 13:40. No toca Switch —lee solo Supabase—, así que la separación de 15 min
 // no le aplica. Sin ninguno viejo NO manda nada. El texto: `pedidos-aviso.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 

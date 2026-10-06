@@ -342,7 +342,7 @@
     },
     {
       "path": "/api/cron/pedidos-pendientes",
-      "schedule": "30 12 * * *"
+      "schedule": "0 14 * * *"
     },
     {
       "path": "/api/cron/guias-pendientes",

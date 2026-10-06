@@ -154,7 +154,7 @@ describe("🔴 la medición no se tocó", () => {
     // entradas más, ~cada 2 h como facturas).
     // ⚠️ 5-oct-2026: son 90 — `sync-articulo-info` suma Multifashion sola a las
     // 04:00 UTC (Stock en Multifashion › Productos). Ver `cron-sync-articulo-info.test.ts`.
-    // ⚠️ 6-oct-2026: son 91 — `pedidos-pendientes`, el aviso de las 7:30 a.m.
+    // ⚠️ 6-oct-2026: son 91 — `pedidos-pendientes`, el aviso de las 9:00 a.m.
     // de los pedidos pendientes de más de 7 días. Ver `guias/pedidos-aviso.test.ts`.
     // Este candado cambió de número con nota, no de regla: la medición
     // (`integrity-check`) sigue intacta, y el caso de arriba lo comprueba.

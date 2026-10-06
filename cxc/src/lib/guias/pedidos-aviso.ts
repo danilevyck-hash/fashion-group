@@ -18,6 +18,7 @@ export const MAX_PEDIDOS_EN_AVISO = 10;
 /** Desde cuántos pedidos se agrupan por empresa. */
 export const AGRUPAR_DESDE = 5;
 export const URL_GUIAS_PEDIDOS = "https://www.fashiongr.com/guias?vista=pedidos";
+export const NOTA_CANCELADOS = "Si un pedido está cancelado, anúlalo en Switch para que salga de la lista.";
 
 type Fila = Pick<PedidoBodega, "empresa_key" | "secuencial" | "fecha" | "cliente_nombre" | "estado">;
 
@@ -45,5 +46,5 @@ export function mensajePedidosViejos(pedidos: readonly Fila[], hoy: string): str
     cuerpo = visibles.map((p) => linea(p, true));
   }
   const extra = n > MAX_PEDIDOS_EN_AVISO ? [`…y ${n - MAX_PEDIDOS_EN_AVISO} más`] : [];
-  return [titulo, ...cuerpo, ...extra, "", `Ver: ${URL_GUIAS_PEDIDOS}`].join("\n");
+  return [titulo, ...cuerpo, ...extra, "", `Ver: ${URL_GUIAS_PEDIDOS}`, NOTA_CANCELADOS].join("\n");
 }

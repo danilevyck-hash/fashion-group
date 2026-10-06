@@ -19,7 +19,8 @@ describe("aviso de pedidos pendientes de más de 7 días", () => {
       "📦 2 pedidos pendientes de más de 7 días\n" +
         "• Joystep · City Mall Paso Canoa · 16-000000072 · hace 43 d\n" +
         "• Vistana · Tienda X · 11-000000010 · hace 16 d\n" +
-        "\nVer: https://www.fashiongr.com/guias?vista=pedidos",
+        "\nVer: https://www.fashiongr.com/guias?vista=pedidos\n" +
+        "Si un pedido está cancelado, anúlalo en Switch para que salga de la lista.",
     );
   });
 
