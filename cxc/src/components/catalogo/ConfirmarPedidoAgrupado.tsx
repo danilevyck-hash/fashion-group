@@ -150,12 +150,12 @@ export default function ConfirmarPedidoAgrupado(p: Props) {
             <p role="status" data-medir="falta-enviar" className="mb-2 text-center text-xs font-medium text-amber-800">{p.faltaTexto}</p>
           )}
           <div className="flex items-center gap-3">
-            <div className="min-w-0">
+            <div className={p.v2 ? "shrink-0" : "min-w-0"}>
               {p.v2 ? (
                 <>
                   {/* v3.3: el número sin negrita y UNA línea gris. */}
                   <div className="text-lg font-medium tabular-nums leading-tight text-gray-900">${fmt(p.total)}</div>
-                  <div className="truncate text-xs text-gray-500 tabular-nums">{textoProductos(p.lineas.length)} · {p.totalPiezas} u</div>
+                  <div className="whitespace-nowrap text-xs text-gray-500 tabular-nums">{textoProductos(p.lineas.length)} · {p.totalPiezas} u</div>
                 </>
               ) : (
                 <>
