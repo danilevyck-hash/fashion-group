@@ -43,8 +43,10 @@ describe("rango en dos toques", () => {
   it("un atajo aplica y cierra al instante", async () => {
     const onChange = vi.fn();
     abrir(onChange);
-    fireEvent.click(screen.getByRole("button", { name: "Mes pasado" }));
-    expect(onChange).toHaveBeenCalledWith("2026-09-01", "2026-09-30");
+    // 🔄 6-oct-2026: «Mes pasado» se fue (lo hacen las ‹ ›); «Ayer» queda.
+    expect(screen.queryByRole("button", { name: "Mes pasado" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Ayer" }));
+    expect(onChange).toHaveBeenCalledWith("2026-10-04", "2026-10-04");
     await waitFor(() => expect(screen.queryByText("Toca el primer día")).toBeNull());
   });
 });

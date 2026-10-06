@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// EL DETALLE DEL VENDEDOR, v3 (6-oct-2026, PROPUESTA, apagada). Módulo PURO.
+// EL DETALLE DEL VENDEDOR, v3 (6-oct-2026). PRENDIDO: Daniel lo aprobó. Módulo PURO.
 //
 // Daniel, sobre el detalle de la v2: no lo convence. Lo que pidió:
 //   · Arriba «Edwin · Vistana · Octubre 2026», el total grande y en gris
@@ -24,8 +24,12 @@
 
 import { fmtMoney } from "@/lib/ventas/format";
 
-/** `false` = el detalle de la v2. Se prende con el «sí» de Daniel. */
-export const COMISIONES_DETALLE_V3_2026_10 = false;
+/**
+ * 🔴 PRENDIDO el 6-oct-2026: Daniel aprobó el mockup HOY vs RECOMENDACIÓN del
+ * detalle (capturas reales a 390 y 1440, Edwin · Vistana · octubre 2026).
+ * `false` = el detalle de la v2, intacto.
+ */
+export const COMISIONES_DETALLE_V3_2026_10 = true;
 
 /** «Edwin · Vistana · Octubre 2026». */
 export function tituloDelDetalle(vendedor: string, empresa: string, periodo: string): string {

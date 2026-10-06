@@ -7,7 +7,8 @@
 //     «Toca el primer día» → «Ahora el último día»;
 //   · el segundo toque pinta el rango, lo APLICA y CIERRA. Mismo día dos veces
 //     = ese día solo; si el segundo es anterior, se ordenan solos;
-//   · atajos de un toque, en UNA fila: Hoy · Ayer · 7 días · Este mes · Mes pasado;
+//   · atajos de un toque, en UNA fila: Hoy · Ayer · 7 días (6-oct-2026: «Este mes»
+//     y «Mes pasado» se fueron; los hacen las ‹ › del período);
 //   · en el celular, hoja desde abajo con el vidrio de la casa y 44 px.
 // El de un solo día sigue la misma lógica: un toque elige y cierra.
 //
@@ -27,10 +28,12 @@ export type ClaveAtajoFecha = "hoy" | "ayer" | "7d" | "mes" | "mes_pasado";
 export const ATAJOS_FECHA: readonly { clave: ClaveAtajoFecha; rotulo: string }[] = [
   { clave: "hoy", rotulo: "Hoy" },
   { clave: "ayer", rotulo: "Ayer" },
-  // Corto a propósito (Daniel, 5-oct-2026): los cinco van en UNA fila.
+  // Corto a propósito (Daniel, 5-oct-2026): van en UNA fila.
   { clave: "7d", rotulo: "7 días" },
-  { clave: "mes", rotulo: "Este mes" },
-  { clave: "mes_pasado", rotulo: "Mes pasado" },
+  // 🩸 6-oct-2026 — SE FUERON «Este mes» y «Mes pasado». Daniel: con las ‹ ›
+  // del período (Comisiones, Multifashion, Ventas, Guías, Asistencia) esos dos
+  // chips repetían lo que ya hace una flecha. Quedan los que las flechas NO
+  // hacen. Las claves y su cuenta siguen en `rangoDeAtajoFecha` por si vuelven.
 ];
 
 const p2 = (n: number) => String(n).padStart(2, "0");

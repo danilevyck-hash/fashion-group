@@ -19,8 +19,11 @@ describe("el interruptor", () => {
 });
 
 describe("los atajos", () => {
-  it("son los cinco aprobados, en orden", () => {
-    expect(ATAJOS_FECHA.map((a) => a.rotulo)).toEqual(["Hoy", "Ayer", "7 días", "Este mes", "Mes pasado"]);
+  // 🔄 6-oct-2026 — Daniel: con las ‹ › del período, «Este mes» y «Mes pasado»
+  // sobran. Quedan los tres que las flechas no hacen.
+  it("son los tres que las flechas no repiten, en orden", () => {
+    expect(ATAJOS_FECHA.map((a) => a.rotulo)).toEqual(["Hoy", "Ayer", "7 días"]);
+    for (const t of ["Este mes", "Mes pasado"]) expect(ATAJOS_FECHA.map((a) => a.rotulo)).not.toContain(t);
   });
   it("cuentan desde hoy", () => {
     const hoy = "2026-10-05";

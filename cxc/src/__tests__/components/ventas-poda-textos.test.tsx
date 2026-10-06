@@ -22,6 +22,9 @@
 // no habría podado nada.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// 🔄 6-oct-2026 — COMISIONES_DETALLE_V3_2026_10 (Daniel lo aprobó): estos casos
+// cuidan el detalle de ANTES, que sigue detrás del interruptor (`v3={false}`).
+// El detalle nuevo lo cuida `__tests__/comisiones/comisiones-detalle-v3.test.tsx`.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 
@@ -825,7 +828,7 @@ describe("Comisiones detalle · fórmula en el ⓘ, límite del dato en pantalla
     rutas.push((u) => (u.includes("/comisiones/detalle") ? DETALLE : undefined));
     rutas.push((u) => (u.includes("/comisiones/descuentos") ? { descuentos: [] } : undefined));
     render(
-      <ComisionesDetalleModal
+      <ComisionesDetalleModal v3={false}
         empresa="vistana"
         empresaNombre="Vistana International"
         year={2026}

@@ -72,6 +72,33 @@ interface Props {
   panelDelAnchoDelBoton?: boolean;
   /** CALENDARIO_SIMPLE_2026_10: el botón «Rango» lo dibuja el padre (`BotonRangoComisiones`). */
   rangoAparte?: boolean;
+  /**
+   * 🔴 ‹ y › A LOS LADOS (6-oct-2026, igual que Multifashion y Ventas ›
+   * Productos). Daniel: en Comisiones v2 de la computadora no había cómo ir al
+   * mes anterior sin abrir el panel. La › no aparece en el mes (o el año) en
+   * curso: nunca al futuro. `false` solo donde el padre ya dibuja sus flechas
+   * (la portada del celular de Comisiones).
+   */
+  conFlechas?: boolean;
+}
+
+/** El período vecino: un mes (o un año, con «Todo el año»), nunca al futuro ni antes del primer año. */
+export function periodoVecino(
+  year: number,
+  mes: number,
+  paso: -1 | 1,
+  limites: { minAnio: number; anioActual: number; mesActual: number },
+): { year: number; mes: number } | null {
+  if (esTodoElAnio(mes)) {
+    const y = year + paso;
+    return y < limites.minAnio || y > limites.anioActual ? null : { year: y, mes };
+  }
+  const total = year * 12 + (mes - 1) + paso;
+  const y = Math.floor(total / 12);
+  const m = (total % 12) + 1;
+  if (y < limites.minAnio) return null;
+  if (y > limites.anioActual || (y === limites.anioActual && m > limites.mesActual)) return null;
+  return { year: y, mes: m };
 }
 
 /**
@@ -103,7 +130,7 @@ export function etiquetaDeRango(r: RangoConsulta): string {
   return ATAJOS_RANGO.find((a) => a.clave === r.atajo)?.rotulo ?? etiquetaRango(r.desde, r.hasta).split(" · ")[0];
 }
 
-export function ComisionesPeriodo({ mes, year, availableYears, onChange, className, rango = null, onRango, alDerecha = false, rotulo, panelDelAnchoDelBoton = false, rangoAparte = false }: Props) {
+export function ComisionesPeriodo({ mes, year, availableYears, onChange, className, rango = null, onRango, alDerecha = false, rotulo, panelDelAnchoDelBoton = false, rangoAparte = false, conFlechas = true }: Props) {
   const conRango = VENDEDORES_RANGO_2026_10 && !!onRango;
   // 🔴 CALENDARIO_SIMPLE_2026_10 (Daniel, 5-oct-2026): el rango sale del panel
   // y va como botón al lado, igual que en Multifashion. Adentro quedaban
@@ -292,12 +319,43 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
     </div>
   );
 
-  if (!rangoAlLado) return control;
+  const limites = { minAnio, anioActual: currentYear, mesActual: currentMonth };
+  const antes = periodoVecino(year, mes, -1, limites);
+  const despues = periodoVecino(year, mes, 1, limites);
+  const conLasFlechas = conFlechas && !enRango ? (
+    <div data-periodo-con-flechas className={`flex min-w-0 items-center ${panelDelAnchoDelBoton ? "flex-1" : ""}`}>
+      <button
+        type="button"
+        aria-label="Período anterior"
+        data-flecha="anterior"
+        disabled={!antes}
+        onClick={() => antes && onChange(antes.year, antes.mes)}
+        className="inline-flex h-11 w-9 shrink-0 items-center justify-center rounded-md text-lg text-gray-600 transition hover:bg-gray-100 active:scale-[0.97] disabled:pointer-events-none disabled:text-gray-300"
+      >
+        ‹
+      </button>
+      <div className={`min-w-0 ${panelDelAnchoDelBoton ? "flex-1" : ""}`}>{control}</div>
+      {/* Sin período siguiente (el de hoy) la › no se dibuja ni deja hueco. */}
+      {despues && (
+        <button
+          type="button"
+          aria-label="Período siguiente"
+          data-flecha="siguiente"
+          onClick={() => onChange(despues.year, despues.mes)}
+          className="inline-flex h-11 w-9 shrink-0 items-center justify-center rounded-md text-lg text-gray-600 transition hover:bg-gray-100 active:scale-[0.97]"
+        >
+          ›
+        </button>
+      )}
+    </div>
+  ) : control;
+
+  if (!rangoAlLado) return conLasFlechas;
   // 🔴 UN SOLO PERÍODO A LA VEZ: con un rango, el mes se va y queda «15–30 sep ✕».
-  if (rangoAparte) return rango ? null : control;
+  if (rangoAparte) return rango ? null : conLasFlechas;
   return (
     <div className={`flex items-center gap-1.5 ${className ?? ""}`} data-periodo-y-rango>
-      {!rango && control}
+      {!rango && conLasFlechas}
       <BotonRangoComisiones rango={rango} onRango={onRango!} onVolver={() => onChange(year, mes)} />
     </div>
   );

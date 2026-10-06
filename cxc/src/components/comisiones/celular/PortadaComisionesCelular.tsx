@@ -243,6 +243,7 @@ export function PortadaComisionesCelular({
                 onRango={onRango}
                 alDerecha
                 rangoAparte={simple}
+                conFlechas={false}
               />
             ) : (
             <span className="whitespace-nowrap text-[14px] font-medium text-gray-900">

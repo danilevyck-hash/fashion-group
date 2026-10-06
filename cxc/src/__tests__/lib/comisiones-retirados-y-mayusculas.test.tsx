@@ -33,6 +33,9 @@
 //       el título del detalle) — y nada más cambia.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// 🔄 6-oct-2026 — COMISIONES_DETALLE_V3_2026_10 (Daniel lo aprobó): estos casos
+// cuidan el detalle de ANTES, que sigue detrás del interruptor (`v3={false}`).
+// El detalle nuevo lo cuida `__tests__/comisiones/comisiones-detalle-v3.test.tsx`.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, within, fireEvent, waitFor } from "@testing-library/react";
 
@@ -425,7 +428,7 @@ describe("🔴 (b) cada superficie muestra «Reynaldo Espinosa», nunca «REYNAL
 
   it("el modal de detalle: el título en pantalla y el encabezado del papel", async () => {
     render(
-      <ComisionesDetalleModal
+      <ComisionesDetalleModal v3={false}
         empresa="vistana" empresaNombre="Vistana International" year={2026} mes={8}
         vendedor={CANONICO} onClose={() => {}}
       />,

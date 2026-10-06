@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔴 CANDADO — EL DETALLE DEL VENDEDOR, v3 (6-oct-2026). APAGADO.
-// Ver `lib/comisiones/detalle-v3.ts`. Sostiene: el interruptor nace apagado;
+// 🔴 CANDADO — EL DETALLE DEL VENDEDOR, v3 (6-oct-2026). PRENDIDO (Daniel lo aprobó).
+// Ver `lib/comisiones/detalle-v3.ts`. Sostiene: el interruptor está prendido;
 // arriba el título en una línea, el total grande y «Comisión de ventas · de
 // cobros»; cada documento en dos renglones SIN tabla (nada se desliza de lado);
 // la nota de crédito con su chip; «Sin cobros en el período»; la línea del pie;
@@ -48,7 +48,8 @@ const abrir = async () => {
 };
 
 describe("el interruptor", () => {
-  it("nace APAGADO", () => expect(COMISIONES_DETALLE_V3_2026_10).toBe(false));
+  // 6-oct-2026: Daniel aprobó el mockup HOY vs RECOMENDACIÓN → prendido.
+  it("está PRENDIDO (Daniel, 6-oct-2026)", () => expect(COMISIONES_DETALLE_V3_2026_10).toBe(true));
 });
 
 describe("los textos", () => {

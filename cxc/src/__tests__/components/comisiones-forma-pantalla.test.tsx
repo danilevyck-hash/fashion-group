@@ -9,6 +9,9 @@
 // la medición contra producción.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// 🔄 6-oct-2026 — COMISIONES_DETALLE_V3_2026_10 (Daniel lo aprobó): estos casos
+// cuidan el detalle de ANTES, que sigue detrás del interruptor (`v3={false}`).
+// El detalle nuevo lo cuida `__tests__/comisiones/comisiones-detalle-v3.test.tsx`.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 
@@ -160,7 +163,7 @@ describe("🔴 el detalle se abre ABAJO de la tabla, no encima", () => {
 
   it("🔴 el total va ARRIBA, con sus dos componentes debajo en gris", async () => {
     render(
-      <ComisionesDetalleModal
+      <ComisionesDetalleModal v3={false}
         inline
         empresa="vistana"
         empresaNombre="Vistana"
@@ -181,7 +184,7 @@ describe("🔴 el detalle se abre ABAJO de la tabla, no encima", () => {
 
   it("🔴 el modal SE QUEDA, y las dos formas son el MISMO componente", async () => {
     render(
-      <ComisionesDetalleModal
+      <ComisionesDetalleModal v3={false}
         empresa="vistana"
         empresaNombre="Vistana"
         year={2026}
@@ -206,7 +209,7 @@ describe("🔴 el detalle se abre ABAJO de la tabla, no encima", () => {
 
   it("🔴 1 · en pantalla la factura va corta; el papel la lleva completa", async () => {
     render(
-      <ComisionesDetalleModal
+      <ComisionesDetalleModal v3={false}
         inline
         empresa="vistana"
         empresaNombre="Vistana"
@@ -227,7 +230,7 @@ describe("🔴 el detalle se abre ABAJO de la tabla, no encima", () => {
 
   it("🔴 6 · la columna «Tipo» no está en pantalla, y sí en el papel", async () => {
     render(
-      <ComisionesDetalleModal
+      <ComisionesDetalleModal v3={false}
         inline
         empresa="vistana"
         empresaNombre="Vistana"
@@ -249,7 +252,7 @@ describe("🔴 el detalle se abre ABAJO de la tabla, no encima", () => {
 
   it("🔴 19 · el botón dice que descarga EL DETALLE", async () => {
     render(
-      <ComisionesDetalleModal
+      <ComisionesDetalleModal v3={false}
         inline
         empresa="vistana"
         empresaNombre="Vistana"
