@@ -564,7 +564,7 @@ function TarjetasDelMes({
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
           Ventas del mes
         </p>
-        <p className="mt-1 font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+        <p className="mt-1 text-2xl font-semibold leading-tight tabular-nums text-gray-950">
           {fmtMoney(totales.ventas)}
         </p>
         <p className="mt-0.5 text-xs text-gray-500">{headerTitle}</p>
@@ -585,11 +585,11 @@ function TarjetasDelMes({
       {/* 2 · Tickets. */}
       <Card className="p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Tickets</p>
-        <p className="mt-1 font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+        <p className="mt-1 text-2xl font-semibold leading-tight tabular-nums text-gray-950">
           {totales.n_tickets.toLocaleString()}
         </p>
         <p className="mt-0.5 text-xs text-gray-500">
-          ticket promedio <span className="font-mono tabular-nums">${totales.ticket_promedio.toFixed(2)}</span>
+          ticket promedio <span className="tabular-nums">${totales.ticket_promedio.toFixed(2)}</span>
         </p>
       </Card>
 
@@ -598,7 +598,7 @@ function TarjetasDelMes({
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
           {hayProyeccion ? "Proyección de cierre" : "Margen tienda"}
         </p>
-        <p className="mt-1 font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+        <p className="mt-1 text-2xl font-semibold leading-tight tabular-nums text-gray-950">
           {hayProyeccion
             ? fmtMoney(totales.proyeccion_cierre as number)
             : hayMargen
@@ -619,25 +619,25 @@ function TarjetasDelMes({
       {/* 4 · El AÑO. Lo que traía el «Panorama del año», sin esconderlo. */}
       <Card className="p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Año {year}</p>
-        <p className="mt-1 font-mono text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+        <p className="mt-1 text-2xl font-semibold leading-tight tabular-nums text-gray-950">
           {fmtMoney(overview.retail.ytdVentas)}
         </p>
         <p className="mt-0.5 text-xs text-gray-500">{retailYtdSub}</p>
         <div className="mt-2 space-y-0.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
           {overview.proyeccionCierre.tiene_proyeccion ? (
             <p>
-              proyección <span className="font-mono tabular-nums text-gray-700">{fmtMoney(proyRetail)}</span>{" "}
+              proyección <span className="tabular-nums text-gray-700">{fmtMoney(proyRetail)}</span>{" "}
               <span className={deltaToneCierre(deltaCierreRetail)}>{deltaStrCierre(deltaCierreRetail)}</span>{" "}
               vs {year - 1}
             </p>
           ) : (
             <p>
-              acumulado <span className="font-mono tabular-nums text-gray-700">{fmtMoney(cierreActual)}</span>
+              acumulado <span className="tabular-nums text-gray-700">{fmtMoney(cierreActual)}</span>
               {ytdSuffix === "YTD" ? "" : ` de ${ytdSuffix}`}
             </p>
           )}
           <p>
-            margen tienda <span className="font-mono tabular-nums text-gray-700">{fmtMargen(overview.total.margen)}</span>
+            margen tienda <span className="tabular-nums text-gray-700">{fmtMargen(overview.total.margen)}</span>
             {" · "}{margenSub}
           </p>
           {notaMayoreoAnio && <p>{notaMayoreoAnio}</p>}
@@ -763,14 +763,14 @@ function ComparativoInteranualCard({
             {f.label}
             {f.parcial ? <span className="ml-1 text-xs text-gray-400">d{diaActual}</span> : null}
           </span>
-          <span data-col="actual" className="text-right font-mono tabular-nums text-gray-950">{fmtMoney(f.v)}</span>
-          <span data-col="previo" className="text-right font-mono tabular-nums text-gray-500">
+          <span data-col="actual" className="text-right tabular-nums text-gray-950">{fmtMoney(f.v)}</span>
+          <span data-col="previo" className="text-right tabular-nums text-gray-500">
             {f.vPrev != null ? fmtMoney(f.vPrev) : "—"}
           </span>
           {/* En celular los dos datos del Δ van uno al lado del otro en la
               segunda línea (hay ancho de sobra); desde `md` se apilan como
               siempre dentro de su columna de 6rem. */}
-          <span data-col="delta" className={cn(CELDA_DELTA, "flex items-baseline justify-end gap-2 text-right font-mono tabular-nums leading-tight md:block md:gap-0")}>
+          <span data-col="delta" className={cn(CELDA_DELTA, "flex items-baseline justify-end gap-2 text-right tabular-nums leading-tight md:block md:gap-0")}>
             <span className={cn("font-medium", deltaTone(f.pct))}>{fmtPct(f.pct)}</span>
             {f.abs != null && (
               <span className={cn("text-xs md:block", deltaTone(f.abs))}>{fmtAbs(f.abs)}</span>
@@ -780,11 +780,11 @@ function ComparativoInteranualCard({
       ))}
       <div data-fila="mes" className={cn(GRID, "border-t border-gray-300 bg-gray-50 py-2 text-sm font-semibold")}>
         <span data-col="mes" className="text-gray-700">{ROTULO_FILA_ANIO}</span>
-        <span data-col="actual" className="text-right font-mono tabular-nums text-gray-950">{fmtMoney(anio.total)}</span>
-        <span data-col="previo" className="text-right font-mono tabular-nums text-gray-600">
+        <span data-col="actual" className="text-right tabular-nums text-gray-950">{fmtMoney(anio.total)}</span>
+        <span data-col="previo" className="text-right tabular-nums text-gray-600">
           {anio.totalPrev != null ? fmtMoney(anio.totalPrev) : "—"}
         </span>
-        <span data-col="delta" className={cn(CELDA_DELTA, "flex items-baseline justify-end gap-2 text-right font-mono tabular-nums leading-tight md:block md:gap-0")}>
+        <span data-col="delta" className={cn(CELDA_DELTA, "flex items-baseline justify-end gap-2 text-right tabular-nums leading-tight md:block md:gap-0")}>
           <span className={cn("font-medium", deltaTone(anio.pct))}>{fmtPct(anio.pct)}</span>
           {anio.abs != null && (
             <span className={cn("text-xs md:block", deltaTone(anio.abs))}>{fmtAbs(anio.abs)}</span>
@@ -921,7 +921,7 @@ function LineaPatron({
           <p className="text-xs text-gray-500">
             {titulo} <span className="text-gray-400">· {periodo}</span>
           </p>
-          <p className="mt-0.5 font-mono text-base font-medium tabular-nums text-gray-950">{valor}</p>
+          <p className="mt-0.5 text-base font-medium tabular-nums text-gray-950">{valor}</p>
           {detalle && <p className="text-xs text-gray-500">{detalle}</p>}
         </div>
       </div>
@@ -1080,8 +1080,8 @@ function ComparativoStat({
   return (
     <div className="text-right">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
-      <p className={cn("mt-0.5 font-mono text-base font-semibold tabular-nums", tone)}>{pct}</p>
-      <p className="font-mono text-xs tabular-nums text-gray-500">{monto}</p>
+      <p className={cn("mt-0.5 text-base font-semibold tabular-nums", tone)}>{pct}</p>
+      <p className="text-xs tabular-nums text-gray-500">{monto}</p>
     </div>
   );
 }

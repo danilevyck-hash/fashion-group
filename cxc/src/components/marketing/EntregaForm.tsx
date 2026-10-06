@@ -878,7 +878,7 @@ export default function EntregaForm({
                               setMarcaPct(m.marcaId, e.target.value)
                             }
                             disabled={guardando}
-                            className="w-20 rounded-md border border-gray-300 px-2 min-h-[44px] text-sm text-right font-mono tabular-nums focus:border-gray-900 focus:outline-none disabled:bg-gray-50"
+                            className="w-20 rounded-md border border-gray-300 px-2 min-h-[44px] text-sm text-right tabular-nums focus:border-gray-900 focus:outline-none disabled:bg-gray-50"
                           />
                           <span className="text-sm text-gray-500">%</span>
                         </div>
@@ -934,7 +934,7 @@ export default function EntregaForm({
                       value={panelesStr}
                       onChange={(e) => setPaneles(e.target.value)}
                       disabled={guardando}
-                      className="w-full rounded-md border border-gray-300 px-3 py-3 text-lg font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                      className="w-full rounded-md border border-gray-300 px-3 py-3 text-lg tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                       placeholder="0"
                     />
                     <div className="text-xs text-gray-400 mt-0.5">Cantidad</div>
@@ -949,7 +949,7 @@ export default function EntregaForm({
                       onChange={(e) => setBultos("paneles", e.target.value)}
                       disabled={guardando}
                       aria-label="Bultos de paneles"
-                      className="w-full rounded-md border border-gray-300 px-3 py-3 text-lg font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                      className="w-full rounded-md border border-gray-300 px-3 py-3 text-lg tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                       placeholder="—"
                     />
                     <div className="text-xs text-gray-400 mt-0.5">Bultos</div>
@@ -987,7 +987,7 @@ export default function EntregaForm({
                               onChange={(e) => setAccesorio(cat, e.target.value)}
                               disabled={guardando || !prod}
                               aria-label={`Cantidad de ${labelAccesorio(cat)}`}
-                              className="flex-1 min-w-0 rounded-md border border-gray-300 px-3 min-h-[44px] text-sm font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                              className="flex-1 min-w-0 rounded-md border border-gray-300 px-3 min-h-[44px] text-sm tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                               placeholder="0"
                             />
                             <input
@@ -999,7 +999,7 @@ export default function EntregaForm({
                               onChange={(e) => setBultos(cat, e.target.value)}
                               disabled={guardando || !prod}
                               aria-label={`Bultos de ${labelAccesorio(cat)}`}
-                              className="w-20 shrink-0 rounded-md border border-gray-300 px-2 min-h-[44px] text-sm font-mono tabular-nums text-right focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                              className="w-20 shrink-0 rounded-md border border-gray-300 px-2 min-h-[44px] text-sm tabular-nums text-right focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                               placeholder="—"
                             />
                           </div>
@@ -1043,7 +1043,7 @@ export default function EntregaForm({
                             }
                             disabled={guardando}
                             aria-label={`Cantidad de ${p.nombre}`}
-                            className="flex-1 min-w-0 rounded-md border border-gray-300 px-3 min-h-[44px] text-sm font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                            className="flex-1 min-w-0 rounded-md border border-gray-300 px-3 min-h-[44px] text-sm tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                             placeholder="0"
                           />
                           <input
@@ -1060,7 +1060,7 @@ export default function EntregaForm({
                             }
                             disabled={guardando}
                             aria-label={`Bultos de ${p.nombre}`}
-                            className="w-20 shrink-0 rounded-md border border-gray-300 px-2 min-h-[44px] text-sm font-mono tabular-nums text-right focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                            className="w-20 shrink-0 rounded-md border border-gray-300 px-2 min-h-[44px] text-sm tabular-nums text-right focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                             placeholder="—"
                           />
                         </div>
@@ -1118,7 +1118,7 @@ export default function EntregaForm({
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-700">Total entrega</span>
-                  <span className="font-mono tabular-nums font-semibold text-gray-900">
+                  <span className="tabular-nums font-semibold text-gray-900">
                     {formatearMonto(totalEntrega)}
                   </span>
                 </div>
@@ -1127,7 +1127,7 @@ export default function EntregaForm({
                     {desgloseMarcas.map((d) => (
                       <div key={d.marcaId} className="flex justify-between">
                         <span>{marcaById.get(d.marcaId)?.nombre ?? "Marca"}</span>
-                        <span className="font-mono tabular-nums">
+                        <span className="tabular-nums">
                           {formatearMonto(d.monto)}
                         </span>
                       </div>

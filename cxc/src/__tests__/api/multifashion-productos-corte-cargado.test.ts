@@ -55,7 +55,9 @@ function req(url: string) {
 }
 
 const ventanasPedidas = () =>
-  estado.rpc.filter(r => r.fn === "multifashion_articulo_diario_agrupado_v1").map(r => `${r.args.p_desde}→${r.args.p_hasta}`);
+  estado.rpc.filter(r => r.fn === "multifashion_articulo_diario_agrupado_v1").map(r => `${r.args.p_desde}→${r.args.p_hasta}`)
+    // AJUSTES_APPLE_6: la ventana de 90 días («Sin venta en 90 días») no es del período ni del comparativo.
+    .filter(v => { const [d, h] = v.split("→"); return Date.parse(h) - Date.parse(d) !== 89 * 86_400_000; });
 
 describe("el comparativo del mes en curso", () => {
   it("🩸 corta en el último día CARGADO (2-sep), no en hoy (3-sep)", async () => {

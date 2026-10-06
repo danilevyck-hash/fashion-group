@@ -270,7 +270,7 @@ export default function AgregarSinEtiquetas({
                                   onChange={() => alternar(f)}
                                   className="h-4 w-4 shrink-0 accent-black disabled:opacity-60"
                                 />
-                                <span className="shrink-0 font-mono tabular-nums" title={f.secuencial}>{f.secuencial}</span>
+                                <span className="shrink-0 tabular-nums" title={f.secuencial}>{f.secuencial}</span>
                                 <span className="min-w-0 break-words text-gray-500">{f.empresa}</span>
                                 {motivo && (
                                   <span className="shrink-0 rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-xs text-gray-600">

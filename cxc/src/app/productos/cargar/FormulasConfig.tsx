@@ -106,7 +106,7 @@ function mkRow(marca: string, empresa: string | null, saved?: MarcaFormula): Mar
 // altura no mueve una sola columna ni agrega un píxel de arrastre horizontal.
 const selCls = "min-h-[44px] rounded-md border border-gray-300 bg-gray-50 px-1.5 text-[13px] focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 // [appearance:textfield] + sin spin-buttons → el divisor de 2 decimales se ve completo (no lo tapan las flechitas).
-const numCls = "min-h-[44px] rounded-md border border-gray-300 bg-gray-50 px-2 text-right font-mono text-[13px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
+const numCls = "min-h-[44px] rounded-md border border-gray-300 bg-gray-50 px-2 text-right tabular-nums text-[13px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 
 export default function FormulasConfig({ scope = "depurador", apple = false, embebido = false }: {
   scope?: FormulasScope;

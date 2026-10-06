@@ -239,7 +239,7 @@ export function ClienteHoverCard({
           {nombre}
         </Link>
         <div className="text-xs text-gray-600">
-          {empresa} · <span className="font-mono">{codigo}</span>
+          {empresa} · <span className="tabular-nums">{codigo}</span>
         </div>
         <CxcChip state={cxc} />
       </div>
@@ -258,12 +258,12 @@ export function ClienteHoverCard({
             <div className="flex items-end justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Últimos 12 meses</div>
-                <div className="mt-0.5 font-mono text-2xl font-medium leading-none tabular-nums text-gray-950">
+                <div className="mt-0.5 text-2xl font-medium leading-none tabular-nums text-gray-950">
                   {fmtMoneyCompact(ready.total_12m)}
                 </div>
               </div>
               <div className={cn(
-                "font-mono text-sm font-medium tabular-nums",
+                " text-sm font-medium tabular-nums",
                 TONE_LIGHT[delta.tone]
               )}>
                 {delta.arrow && <span className="mr-1">{delta.arrow}</span>}
@@ -272,7 +272,7 @@ export function ClienteHoverCard({
             </div>
             <div className="mt-1.5 flex items-baseline justify-between gap-3 text-xs text-gray-500">
               <span className="uppercase tracking-wide">12 meses anteriores</span>
-              <span className="font-mono tabular-nums">
+              <span className="tabular-nums">
                 {ready.total_12m_prior > 0 ? fmtMoneyCompact(ready.total_12m_prior) : "sin compras"}
               </span>
             </div>
@@ -323,7 +323,7 @@ function UltimasFacturas({ state }: { state: FacturasState }) {
           {state.data.map((f, i) => (
             <li key={i} className="flex items-baseline justify-between gap-3 text-xs">
               <span className="text-gray-600">{f.fecha ? fmtDate(f.fecha) : "—"}</span>
-              <span className="font-mono tabular-nums text-gray-800">{fmtMoney(f.monto)}</span>
+              <span className="tabular-nums text-gray-800">{fmtMoney(f.monto)}</span>
             </li>
           ))}
         </ul>
@@ -373,11 +373,11 @@ function CxcChip({ state }: { state: CxcState }) {
     )}>
       <span>{label}</span>
       <span aria-hidden className="opacity-50">·</span>
-      <span>0-90 d <span className="font-mono tabular-nums">{fmtBucketK(monto_0_90)}</span></span>
+      <span>0-90 d <span className="tabular-nums">{fmtBucketK(monto_0_90)}</span></span>
       <span aria-hidden className="opacity-50">·</span>
-      <span>91-120 d <span className="font-mono tabular-nums">{fmtBucketK(monto_91_120)}</span></span>
+      <span>91-120 d <span className="tabular-nums">{fmtBucketK(monto_91_120)}</span></span>
       <span aria-hidden className="opacity-50">·</span>
-      <span>+120 d <span className="font-mono tabular-nums">{fmtBucketK(monto_121_plus)}</span></span>
+      <span>+120 d <span className="tabular-nums">{fmtBucketK(monto_121_plus)}</span></span>
     </div>
   );
 }

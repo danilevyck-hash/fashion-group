@@ -592,7 +592,7 @@ function ErrorState({
           Reintentar
         </Button>
       )}
-      {detail && <p className="mt-2 font-mono text-xs text-gray-400">{detail}</p>}
+      {detail && <p className="mt-2 tabular-nums text-xs text-gray-400">{detail}</p>}
     </div>
   );
 }

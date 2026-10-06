@@ -174,7 +174,7 @@ export default function ClienteSwitchPicker({ api, directorioLabel, valor, onEle
               >
                 {c.nombre || `Cliente ${c.cliente_switch_id}`}
                 {c.codigo && (
-                  <span className={`text-xs font-mono ml-2 ${activo ? "text-white/60" : "text-gray-400"}`}>{c.codigo}</span>
+                  <span className={`text-xs tabular-nums ml-2 ${activo ? "text-white/60" : "text-gray-400"}`}>{c.codigo}</span>
                 )}
               </button>
             );

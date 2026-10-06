@@ -1,5 +1,5 @@
 // Number / pct / heatmap formatters used across the Ventas module.
-// All numbers are rendered with Geist Mono via tailwind utility `font-mono`.
+// All numbers are rendered with Geist Mono via tailwind utility `tabular-nums`.
 
 export const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"] as const;
 export const QUARTERS = ["Q1","Q2","Q3","Q4"] as const;

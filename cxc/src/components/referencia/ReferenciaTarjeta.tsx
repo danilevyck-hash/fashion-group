@@ -144,7 +144,7 @@ export function TarjetaArticulo({
   return (
     <section className="rounded-xl border border-gray-200 bg-white">
       <header className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-gray-200 px-3.5 py-3">
-        <h4 className="font-mono text-sm font-semibold text-gray-900">{art.codigo}</h4>
+        <h4 className="tabular-nums text-sm font-semibold text-gray-900">{art.codigo}</h4>
         {color && <span className="text-xs text-gray-600">color {color}</span>}
         <span className="text-sm text-gray-700">{art.descripcion || "—"}</span>
         <span className="ml-auto text-xs text-gray-600">{etiquetaEmpresa(art.empresa)}</span>

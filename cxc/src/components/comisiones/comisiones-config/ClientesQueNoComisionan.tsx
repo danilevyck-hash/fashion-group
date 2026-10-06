@@ -511,7 +511,7 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
                   <td className="py-2.5 pr-3.5 text-gray-900">
                     {r.clienteNombre}
                     {r.clienteNombre !== r.clienteCodigo && (
-                      <span className="ml-1 font-mono text-xs text-gray-400">{r.clienteCodigo}</span>
+                      <span className="ml-1 tabular-nums text-xs text-gray-400">{r.clienteCodigo}</span>
                     )}
                   </td>
                   <td className="px-3.5 py-2.5 text-gray-900">{r.vendedor}</td>

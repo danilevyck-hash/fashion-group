@@ -767,13 +767,13 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
                     const amber = d.revisar !== null;
                     return (
                       <tr key={ri} className={amber ? "bg-amber-50/60 hover:bg-amber-50" : "hover:bg-gray-50"} title={d.revisar ?? undefined}>
-                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[12px]">{String(d.cols["Código *"])}</td>
-                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[12px] break-all">{String(d.cols["Código Barra *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 tabular-nums text-[12px]">{String(d.cols["Código *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 tabular-nums text-[12px] break-all">{String(d.cols["Código Barra *"])}</td>
                         <td className="border-b border-gray-100 px-2 py-2">
                           {String(d.cols["Descripción *"])}
                           {amber && <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[12px] font-semibold text-amber-800" title={d.revisar ?? ""}>revisar</span>}
                         </td>
-                        <td className="w-px whitespace-nowrap border-b border-gray-100 px-2 py-2 text-right font-mono text-[12px] text-gray-400">
+                        <td className="w-px whitespace-nowrap border-b border-gray-100 px-2 py-2 text-right tabular-nums text-[12px] text-gray-400">
                           {calcCell(ri, d)}
                         </td>
                         <td className="whitespace-nowrap border-b border-gray-100 px-2 py-2 text-right">
@@ -783,7 +783,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
                           <input
                             value={displayPrice(ri, d)}
                             onChange={(e) => onPriceEdit(ri, e.target.value)}
-                            className={`w-14 rounded-md border px-1 py-0.5 text-right font-mono text-xs ${
+                            className={`w-14 rounded-md border px-1 py-0.5 text-right tabular-nums text-xs ${
                               priceEdited
                                 ? "border-amber-600 bg-amber-50 font-semibold text-amber-800"
                                 : "border-gray-300 bg-white text-gray-900"
@@ -826,7 +826,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const miniInputCls =
-  "h-8 w-20 rounded-md border border-gray-300 bg-gray-50 px-2 text-right font-mono text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
+  "h-8 w-20 rounded-md border border-gray-300 bg-gray-50 px-2 text-right tabular-nums text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const miniSelectCls =
   "h-8 rounded-md border border-gray-300 bg-gray-50 px-2 text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 

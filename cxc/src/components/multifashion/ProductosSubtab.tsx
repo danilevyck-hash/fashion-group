@@ -59,7 +59,7 @@
 // ── DECISIONES DE DISEÑO ────────────────────────────────────────────────────
 // Se trabaja DENTRO del sistema que ya existe (no se inventa uno): tarjetas
 // `rounded-lg` con borde y sin sombra, acento teal, Playfair (`font-display`)
-// en los títulos y Geist Mono (`font-mono tabular-nums`) en TODA cifra. Lo
+// en los títulos y Geist Mono (`tabular-nums`) en TODA cifra. Lo
 // único que se agrega es jerarquía:
 //   · **Escala**: la cifra del pulso a 24 px contra los 13-14 px del resto. Es
 //     lo que hace que los tres números se lean en el primer vistazo.
@@ -513,7 +513,7 @@ export function ProductosSubtab({
     <div className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
       <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span>
-        <span className="font-mono tabular-nums">{resp.sinMarca.articulos.toLocaleString("en-US")}</span> artículos
+        <span className="tabular-nums">{resp.sinMarca.articulos.toLocaleString("en-US")}</span> artículos
         del período ({fmtMoney(resp.sinMarca.venta)}) todavía no tienen marca en el catálogo de la tienda.
       </span>
     </div>
@@ -776,7 +776,7 @@ function Pulso({
           compara un porcentaje contra otro. */}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-gray-200 bg-gray-50 px-4 py-2.5">
         <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Margen</span>
-        <span className="font-mono text-sm font-medium tabular-nums text-gray-950">
+        <span className="text-sm font-medium tabular-nums text-gray-950">
           {fmtMargen(totales.margen)}
         </span>
         {c && (
@@ -785,7 +785,7 @@ function Pulso({
               <>el año pasado {fmtMargen(c.margen)}</>
             ) : (
               <>
-                <span className={cn("font-mono tabular-nums", tonoVariacion(totales.margen - c.margen))}>
+                <span className={cn(" tabular-nums", tonoVariacion(totales.margen - c.margen))}>
                   {flechaVariacion(totales.margen - c.margen)}{" "}
                   {(totales.margen - c.margen >= 0 ? "+" : "−")}
                   {Math.abs((totales.margen - c.margen) * 100).toFixed(1)} puntos
@@ -847,13 +847,13 @@ function ListaTop({
         {filas.map((f, i) => (
           <li key={f.clave} className="px-4 py-2.5">
             <div className="flex items-baseline gap-2">
-              <span className="w-4 shrink-0 font-mono text-xs tabular-nums text-gray-400">{i + 1}</span>
+              <span className="w-4 shrink-0 text-xs tabular-nums text-gray-400">{i + 1}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-gray-950" title={f.etiqueta}>
                 {f.etiqueta}
               </span>
               <span
                 className={cn(
-                  "shrink-0 font-mono text-sm font-medium tabular-nums",
+                  "shrink-0 text-sm font-medium tabular-nums",
                   esPlata ? "text-gray-900" : "text-gray-950",
                 )}
               >
@@ -869,7 +869,7 @@ function ListaTop({
                   style={{ width: `${(f.fraccion * 100).toFixed(1)}%` }}
                 />
               </div>
-              <span className="shrink-0 font-mono text-xs tabular-nums text-gray-500">
+              <span className="shrink-0 text-xs tabular-nums text-gray-500">
                 {fmtPctTotal(f.pctDelTotal)} del total
               </span>
             </div>
@@ -879,12 +879,12 @@ function ListaTop({
               {esPlata ? (
                 <>
                   {fmtUnidades(f.unidades)} unidades · margen{" "}
-                  <span className="font-mono tabular-nums">{fmtMargen(f.margen)}</span>
+                  <span className="tabular-nums">{fmtMargen(f.margen)}</span>
                 </>
               ) : (
                 <>
                   {fmtMoney(f.venta)} de venta · margen{" "}
-                  <span className="font-mono tabular-nums">{fmtMargen(f.margen)}</span>
+                  <span className="tabular-nums">{fmtMargen(f.margen)}</span>
                 </>
               )}
               {vista === "articulo" && f.detalle && <> · {f.detalle}</>}
@@ -956,7 +956,7 @@ function ColumnaMovimiento({
                 <span className="min-w-0 flex-1 truncate text-sm text-gray-950" title={m.etiqueta}>
                   {m.etiqueta}
                 </span>
-                <span className={cn("shrink-0 font-mono text-sm font-medium tabular-nums", tonoVariacion(m.abs))}>
+                <span className={cn("shrink-0 text-sm font-medium tabular-nums", tonoVariacion(m.abs))}>
                   {fmtMontoConSigno(m.abs)}
                 </span>
               </div>
@@ -967,7 +967,7 @@ function ColumnaMovimiento({
                   <>Sin ventas en el período · año anterior {fmtMoney(m.ventaAnterior)}</>
                 ) : (
                   <>
-                    <span className={cn("font-mono tabular-nums", tonoVariacion(m.pct))}>
+                    <span className={cn(" tabular-nums", tonoVariacion(m.pct))}>
                       {fmtVariacionPct(m.pct, true, 1)}
                     </span>{" "}
                     · {fmtMoney(m.ventaAnterior)} → {fmtMoney(m.ventaActual)}
@@ -1107,28 +1107,28 @@ function VistaRanking({
             <tbody>
               {mostradas.map((r, i) => (
                 <tr key={r.clave}>
-                  <td className="border-b border-gray-200 px-1.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums xl:px-3">
+                  <td className="border-b border-gray-200 px-1.5 py-3 text-right text-xs text-gray-500 tabular-nums xl:px-3">
                     {i + 1}
                   </td>
                   <td className="border-b border-gray-200 px-1.5 py-3 text-sm text-gray-950 xl:px-3">
                     <span className="font-medium">{r.etiqueta}</span>
                     {r.detalle && <span className="ml-2 text-xs text-gray-500">{r.detalle}</span>}
                   </td>
-                  <td className="border-b border-gray-200 px-1.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums xl:px-3">
+                  <td className="border-b border-gray-200 px-1.5 py-3 text-right text-sm text-gray-700 tabular-nums xl:px-3">
                     {fmtUnidades(r.unidades)}
                   </td>
-                  <td className="border-b border-gray-200 px-1.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums xl:px-3">
+                  <td className="border-b border-gray-200 px-1.5 py-3 text-right text-sm font-medium text-gray-950 tabular-nums xl:px-3">
                     {fmtMoney(r.venta)}
                   </td>
                   {vista === "categoria" && (
-                    <td className="border-b border-gray-200 px-1.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums xl:px-3">
+                    <td className="border-b border-gray-200 px-1.5 py-3 text-right text-sm text-gray-700 tabular-nums xl:px-3">
                       {fmtMoney(r.costo)}
                     </td>
                   )}
-                  <td className="border-b border-gray-200 px-1.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums xl:px-3">
+                  <td className="border-b border-gray-200 px-1.5 py-3 text-right text-sm text-gray-700 tabular-nums xl:px-3">
                     {fmtMoney(r.utilidad)}
                   </td>
-                  <td className="border-b border-gray-200 px-1.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums xl:px-3">
+                  <td className="border-b border-gray-200 px-1.5 py-3 text-right text-sm text-gray-700 tabular-nums xl:px-3">
                     {fmtMargen(r.margen)}
                   </td>
                 </tr>
@@ -1144,7 +1144,7 @@ function VistaRanking({
         {mostradas.map((r, i) => (
           <Card key={r.clave} className="p-3">
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 font-mono text-xs text-gray-400 tabular-nums">{i + 1}</span>
+              <span className="mt-0.5 text-xs text-gray-400 tabular-nums">{i + 1}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-gray-950">{r.etiqueta}</p>
                 {r.detalle && <p className="truncate text-xs text-gray-500">{r.detalle}</p>}
@@ -1165,8 +1165,8 @@ function VistaRanking({
       <div className="flex flex-wrap items-center gap-3 px-1">
         <p className="text-xs text-gray-500">
           Mostrando{" "}
-          <span className="font-mono tabular-nums">{Math.min(visibles, filas.length).toLocaleString("en-US")}</span>{" "}
-          de <span className="font-mono tabular-nums">{filas.length.toLocaleString("en-US")}</span>
+          <span className="tabular-nums">{Math.min(visibles, filas.length).toLocaleString("en-US")}</span>{" "}
+          de <span className="tabular-nums">{filas.length.toLocaleString("en-US")}</span>
           {filas.length !== totalSinFiltrar && (
             <> (de {totalSinFiltrar.toLocaleString("en-US")} en total)</>
           )}
@@ -1193,7 +1193,7 @@ function Dato({ rotulo, valor, fuerte = false }: { rotulo: string; valor: string
       <p className="text-xs leading-tight text-gray-500">{rotulo}</p>
       <p
         className={cn(
-          "truncate font-mono text-xs tabular-nums",
+          "truncate text-xs tabular-nums",
           fuerte ? "font-medium text-gray-950" : "text-gray-700",
         )}
       >
@@ -1248,16 +1248,16 @@ function VistaMarca({
             <tbody>
               {renglones.map((m, i) => (
                 <tr key={`${m.marcaId ?? "s"}-${m.marca}`}>
-                  <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{i + 1}</td>
+                  <td className="border-b border-gray-200 px-3.5 py-3 text-right text-xs text-gray-500 tabular-nums">{i + 1}</td>
                   <td className="border-b border-gray-200 px-3.5 py-3 text-sm text-gray-950">
                     <span className="font-medium">{m.marca}</span>
                     <span className="ml-2 text-xs text-gray-500">
                       {m.articulos.toLocaleString("en-US")} artículo{m.articulos === 1 ? "" : "s"}
                     </span>
                   </td>
-                  <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums">{fmtUnidades(m.unidades)}</td>
-                  <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(m.venta)}</td>
-                  <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums">{fmtPctTotal(m.pct)}</td>
+                  <td className="border-b border-gray-200 px-3.5 py-3 text-right text-sm text-gray-700 tabular-nums">{fmtUnidades(m.unidades)}</td>
+                  <td className="border-b border-gray-200 px-3.5 py-3 text-right text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(m.venta)}</td>
+                  <td className="border-b border-gray-200 px-3.5 py-3 text-right text-sm text-gray-700 tabular-nums">{fmtPctTotal(m.pct)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1269,16 +1269,16 @@ function VistaMarca({
         {renglones.map((m, i) => (
           <Card key={`${m.marcaId ?? "s"}-${m.marca}`} className="p-3">
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 font-mono text-xs text-gray-400 tabular-nums">{i + 1}</span>
+              <span className="mt-0.5 text-xs text-gray-400 tabular-nums">{i + 1}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-gray-950">{m.marca}</p>
                 <p className="truncate text-xs text-gray-500">
                   {m.articulos.toLocaleString("en-US")} artículo{m.articulos === 1 ? "" : "s"}
                 </p>
                 <div className="mt-2 flex items-baseline justify-between gap-3">
-                  <span className="font-mono text-xs text-gray-600 tabular-nums">{fmtUnidades(m.unidades)} u.</span>
-                  <span className="font-mono text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(m.venta)}</span>
-                  <span className="font-mono text-xs text-gray-500 tabular-nums">{fmtPctTotal(m.pct)}</span>
+                  <span className="text-xs text-gray-600 tabular-nums">{fmtUnidades(m.unidades)} u.</span>
+                  <span className="text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(m.venta)}</span>
+                  <span className="text-xs text-gray-500 tabular-nums">{fmtPctTotal(m.pct)}</span>
                 </div>
               </div>
             </div>
@@ -1342,7 +1342,7 @@ function SelectorMarcas({
         {margenGeneral != null && (
           <Ayuda titulo="Leyenda">
             En <span className="text-amber-700">ámbar</span>, el margen por debajo del general del
-            período (<span className="font-mono tabular-nums">{fmtMargen(margenGeneral)}</span>).
+            período (<span className="tabular-nums">{fmtMargen(margenGeneral)}</span>).
           </Ayuda>
         )}
       </div>
@@ -1428,7 +1428,7 @@ function FilaMarcaFiltro({
           {nombre}
         </span>
         {/* Teal = plata, como en toda la pantalla. */}
-        <span className="shrink-0 font-mono text-sm font-medium tabular-nums text-gray-900">
+        <span className="shrink-0 text-sm font-medium tabular-nums text-gray-900">
           {fmtMoney(venta)}
         </span>
       </div>
@@ -1437,12 +1437,12 @@ function FilaMarcaFiltro({
           es justo lo que la pantalla vino a hacer posible. */}
       <div className="mt-0.5 flex items-baseline justify-between gap-2 text-xs text-gray-500">
         <span className="min-w-0 truncate">
-          <span className="font-mono tabular-nums">{fmtPctTotal(pct)}</span> del total ·{" "}
-          <span className="font-mono tabular-nums">{fmtUnidades(unidades)}</span> unidades
+          <span className="tabular-nums">{fmtPctTotal(pct)}</span> del total ·{" "}
+          <span className="tabular-nums">{fmtUnidades(unidades)}</span> unidades
         </span>
         <span className="shrink-0">
           margen{" "}
-          <span className={cn("font-mono tabular-nums", flojo ? "font-medium text-amber-700" : "text-gray-700")}>
+          <span className={cn(" tabular-nums", flojo ? "font-medium text-amber-700" : "text-gray-700")}>
             {fmtMargen(margen)}
           </span>
         </span>

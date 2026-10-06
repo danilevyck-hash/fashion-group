@@ -269,7 +269,7 @@ function KpiTile({
       {/* 15 px y no 17: con los centavos puestos el monto largo del grupo pide
           ~130 px a 17 px de mono, y la tarjeta tiene ~170 útiles. A 15 entra
           con margen y sigue muy por encima del piso de 12 px de la casa. */}
-      <p className="mt-1 font-mono text-[15px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">
+      <p className="mt-1 text-[15px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">
         {value}
       </p>
       {sub && (
@@ -722,7 +722,7 @@ function TarjetaEmpresa({
           {tarjeta.enCurso && (
             <span className={cn("mt-1 block text-xs leading-tight", oscura ? "text-gray-300" : "text-gray-500")}>
               <span className="uppercase">{tarjeta.enCurso.etiqueta} en curso</span>{" "}
-              <span className="font-mono tabular-nums">{tarjeta.enCurso.valor}</span>
+              <span className="tabular-nums">{tarjeta.enCurso.valor}</span>
               {tarjeta.enCurso.dc && (
                 <span className={cn("ml-1", tono(tarjeta.enCurso.dc))}>{tarjeta.enCurso.dc.texto}</span>
               )}
@@ -732,7 +732,7 @@ function TarjetaEmpresa({
         <span className="shrink-0 text-right">
           <span
             className={cn(
-              "block font-mono text-[15px] font-semibold tabular-nums",
+              "block text-[15px] font-semibold tabular-nums",
               oscura ? "text-white" : "text-gray-950",
             )}
           >
@@ -832,7 +832,7 @@ function RenglonPeriodo({
       )}
       <span
         className={cn(
-          "font-mono text-xs tabular-nums",
+          " text-xs tabular-nums",
           renglon.fuerte && "font-semibold",
           renglon.valor === "—" || renglon.proyectado
             ? oscura ? "text-gray-500" : "text-gray-400"

@@ -313,7 +313,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   const totalPersona =
     ordenada && !!bonosDelChip && !bonosDelChip.sin_data && bonosDelChip.es_elegible;
   /** Con la tabla ordenada, todo número en la fuente del sistema (sin monoespaciada). */
-  const MONO = ordenada ? "" : "font-mono";
+  const MONO = ordenada ? "" : "tabular-nums";
   const esUnMes = rpcPeriodo === "mes";
   const excelDisponible = RETAIL_AL_FRENTE && esUnMes && corte != null && mesCerrado(year, rpcMes, corte);
   const periodoExcel = etiquetaPeriodo({ tipo: "mes", anio: year, mes: rpcMes });
@@ -585,7 +585,7 @@ export function BarraTotalMultifashion({ pagar, desgloseEnLaTabla, mono = true }
   /** `false` = los números en la fuente del sistema, como la tabla ordenada. */
   mono?: boolean;
 }) {
-  const num = mono ? "font-mono tabular-nums" : "tabular-nums";
+  const num = mono ? " tabular-nums" : "tabular-nums";
   return (
     <div className="mt-2">
       {pagar.bonos > 0 && (
@@ -643,7 +643,7 @@ function VendedoraRow({
     // 🔁 1-oct-2026: el fondo ámbar tenue se fue con el interruptor —el chip ya
     // dice quién ganó—; queda solo en la pantalla de antes (con columna).
     <tr className={conBono && rowHighlight(v, badge) ? "bg-amber-50/60" : ""}>
-      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{rank}</td>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right text-xs text-gray-500 tabular-nums">{rank}</td>
       <td className="border-b border-gray-200 px-3.5 py-3 text-sm text-gray-950">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-medium">{nombreEnPantalla(v.nombre)}</span>
@@ -653,20 +653,20 @@ function VendedoraRow({
           <ChipBono chip={chip} />
         </div>
         {desglose && (
-          <p data-desglose-canal className="mt-0.5 font-mono text-xs text-gray-500 tabular-nums">{desglose}</p>
+          <p data-desglose-canal className="mt-0.5 text-xs text-gray-500 tabular-nums">{desglose}</p>
         )}
       </td>
-      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums">{v.tickets.toLocaleString()}</td>
-      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(v.ventas)}</td>
-      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums">${v.ticket_promedio.toFixed(2)}</td>
-      <td className={cn("border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[dv.tone])}>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right text-sm text-gray-700 tabular-nums">{v.tickets.toLocaleString()}</td>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(v.ventas)}</td>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right text-sm text-gray-700 tabular-nums">${v.ticket_promedio.toFixed(2)}</td>
+      <td className={cn("border-b border-gray-200 px-3.5 py-3 text-right text-xs tabular-nums", TONE_LIGHT[dv.tone])}>
         {dv.arrow && <span className="mr-1">{dv.arrow}</span>}{dv.displayValue}
       </td>
-      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">${v.comision.toFixed(2)}</td>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right text-sm font-medium text-gray-950 tabular-nums">${v.comision.toFixed(2)}</td>
       {conBono && (
         <td className={cn(
           "border-b border-gray-200 px-3.5 py-3 text-right text-sm tabular-nums",
-          bono === BONO_AL_CIERRE ? "text-xs text-gray-400" : bono === "—" ? "text-gray-400" : "font-mono font-semibold text-amber-700",
+          bono === BONO_AL_CIERRE ? "text-xs text-gray-400" : bono === "—" ? "text-gray-400" : "tabular-nums font-semibold text-amber-700",
         )}>
           {bono}
         </td>
@@ -691,7 +691,7 @@ function VendedoraCard({
   const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   const bono = textoBono(v, badge, pendiente);
   const desglose = desgloseCanales(v.ventas, v.por_canal, v.nombre);
-  const M = ordenada ? "" : "font-mono";
+  const M = ordenada ? "" : "tabular-nums";
   const bonoFila = totalPersona ? bonoDeFila(v, totalPersona) : 0;
   return (
     <div className={cn(
@@ -721,7 +721,7 @@ function VendedoraCard({
         <span className={cn(M, "tabular-nums")}>{v.tickets.toLocaleString()}</span> {v.tickets === 1 ? "ticket" : "tickets"} ·{" "}
         <span className={cn(M, "tabular-nums")}>${v.ticket_promedio.toFixed(2)}</span> ticket promedio ·{" "}
         <span className={cn(M, "tabular-nums")}>${v.comision.toFixed(2)}</span> comisión
-        {conBono && <> · bono <span className={cn(bono === BONO_AL_CIERRE || bono === "—" ? "text-gray-400" : "font-mono font-semibold text-amber-700")}>{bono}</span></>}
+        {conBono && <> · bono <span className={cn(bono === BONO_AL_CIERRE || bono === "—" ? "text-gray-400" : "tabular-nums font-semibold text-amber-700")}>{bono}</span></>}
       </div>
       {totalPersona && (
         <div data-total-persona className="mt-1.5 flex items-baseline justify-between gap-3 text-xs text-gray-500">

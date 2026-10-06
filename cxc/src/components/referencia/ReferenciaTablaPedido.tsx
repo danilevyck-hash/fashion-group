@@ -199,7 +199,7 @@ export function ReferenciaTablaPedido({
                 aria-expanded={f.clave === abierta}
                 className="flex min-h-[44px] w-full flex-col gap-1 px-3.5 py-2.5 text-left"
               >
-                <span className="font-mono text-[13px] font-semibold text-gray-900">{f.art.codigo}</span>
+                <span className="tabular-nums text-[13px] font-semibold text-gray-900">{f.art.codigo}</span>
                 <span className="truncate text-xs text-gray-600">
                   {f.art.descripcion || "—"} · {etiquetaEmpresa(f.art.empresa)}
                 </span>
@@ -339,7 +339,7 @@ function FilaTabla({
       className={`cursor-pointer border-b border-gray-100 last:border-b-0 ${abierta ? "bg-emerald-50/40" : "hover:bg-gray-50"}`}
     >
       <td className="px-3 py-2.5 align-top">
-        <span className="block truncate font-mono text-[13px] font-semibold text-gray-900">{f.art.codigo}</span>
+        <span className="block truncate tabular-nums text-[13px] font-semibold text-gray-900">{f.art.codigo}</span>
         <span className="block truncate text-xs text-gray-600">
           {f.art.descripcion || "—"}
           {f.color ? ` · ${f.color}` : ""} · {etiquetaEmpresa(f.art.empresa)}

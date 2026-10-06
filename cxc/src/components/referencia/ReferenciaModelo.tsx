@@ -336,7 +336,7 @@ function FilaDeColor({
         onClick={onTocar}
         className="cursor-pointer border-b border-gray-100 last:border-0 hover:bg-gray-50"
       >
-        <td className="py-2.5 pr-2 text-left font-mono text-gray-900">{f.color ?? f.codigo}</td>
+        <td className="py-2.5 pr-2 text-left tabular-nums text-gray-900">{f.color ?? f.codigo}</td>
         <td className="py-2.5 pr-2 text-right text-gray-900">{f.comprado == null ? "—" : fmtInt(f.comprado)}</td>
         <td className="py-2.5 pr-2 text-right text-gray-900">{fmtInt(f.vendido)}</td>
         <td className="py-2.5 pr-2 text-right font-semibold text-gray-900">
@@ -432,7 +432,7 @@ export function ReferenciaModelo({
             recortado al lado de un solo color, que se leería como otro
             artículo. */}
         <header className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-gray-200 px-3.5 py-3">
-          <h2 className="font-mono text-sm font-semibold text-gray-900">
+          <h2 className="tabular-nums text-sm font-semibold text-gray-900">
             {soloColor ? (arts[0]?.codigo ?? t.modelo) : t.modelo}
           </h2>
           {soloColor && arts[0] && arts[0].codigo.length > 3 && (

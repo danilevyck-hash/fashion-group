@@ -214,7 +214,7 @@ function OpcionCliente({
   return (
     <Opcion onElegir={() => onElegir(nombre, hit.codigo)}>
       <span className="truncate">{nombre}</span>
-      <span className="text-xs text-gray-400 font-mono shrink-0">{hit.codigo}</span>
+      <span className="text-xs text-gray-400 tabular-nums shrink-0">{hit.codigo}</span>
     </Opcion>
   );
 }
@@ -342,7 +342,7 @@ export default function ClientePicker({
           amarrada a Switch, y es un dato que el nombre no dice. */}
       {!abierto && vinculado && (
         <span
-          className="absolute right-0 top-1/2 -translate-y-1/2 text-xs px-1.5 py-0.5 rounded font-mono text-emerald-700 bg-emerald-50 pointer-events-none"
+          className="absolute right-0 top-1/2 -translate-y-1/2 text-xs px-1.5 py-0.5 rounded tabular-nums text-emerald-700 bg-emerald-50 pointer-events-none"
           title={`Cliente vinculado (${codigo})`}
         >
           {codigo}

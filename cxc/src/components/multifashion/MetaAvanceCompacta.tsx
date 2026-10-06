@@ -57,7 +57,7 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
             {meta.tipo === "vendedora" && " · meta de cada vendedora"}
             {!meta.activa && " · pausada"}
             {(meta.premio || meta.premioMonto != null) && (
-              <> · 🏆 {meta.premio}{meta.premioMonto != null && <span className="font-mono tabular-nums"> ({fmtMoney(meta.premioMonto)})</span>}</>
+              <> · 🏆 {meta.premio}{meta.premioMonto != null && <span className="tabular-nums"> ({fmtMoney(meta.premioMonto)})</span>}</>
             )}
           </p>
         </div>
@@ -74,9 +74,9 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
 
       {/* Cuánto llevamos · cuánto falta, en UNA línea. */}
       <p className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="font-mono text-2xl font-semibold tabular-nums tracking-tight text-gray-950">{fmtMoney(a.vendido)}</span>
+        <span className="text-2xl font-semibold tabular-nums tracking-tight text-gray-950">{fmtMoney(a.vendido)}</span>
         <span className="text-sm text-gray-600">de {fmtMoney(a.objetivo)}</span>
-        <span className="font-mono text-sm font-medium tabular-nums text-gray-700">· {pct(a.pctVendido)}</span>
+        <span className="text-sm font-medium tabular-nums text-gray-700">· {pct(a.pctVendido)}</span>
         {a.estado === "en-curso" && !a.cumplida && (
           <span className="text-sm text-gray-600">· quedan {a.diasQueFaltan} {a.diasQueFaltan === 1 ? "día" : "días"}</span>
         )}
@@ -97,7 +97,7 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
           <>
             {a.alcanza ? <TrendingUp className="h-4 w-4 shrink-0 text-emerald-700" /> : <TrendingDown className="h-4 w-4 shrink-0 text-amber-700" />}
             <span className="font-medium text-gray-900">{a.estado === "cerrada" ? "Cierre" : "Proyección de cierre"}</span>
-            <span className="font-mono font-semibold tabular-nums text-gray-950">{fmtMoney(a.proyeccion)}</span>
+            <span className="font-semibold tabular-nums text-gray-950">{fmtMoney(a.proyeccion)}</span>
             <span className={a.alcanza ? "text-emerald-800" : "text-amber-800"}>
               · {`${a.alcanza ? "Excedente" : "Faltante"}${a.estado === "cerrada" ? "" : " proyectado"} ${fmtMoney(Math.abs(a.brechaProyectada ?? 0))}`}
             </span>
@@ -117,7 +117,7 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
           {meta.porVendedora.map((v) => (
             <li key={v.clave} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
               <span className="min-w-0 text-sm text-gray-800">{v.nombre}</span>
-              <span className="font-mono text-sm tabular-nums text-gray-700">
+              <span className="text-sm tabular-nums text-gray-700">
                 {fmtMoney(v.vendido)}
                 {meta.tipo === "vendedora" && v.avance ? (
                   <span className={`ml-2 font-medium ${v.avance.cumplida ? "text-emerald-700" : "text-gray-500"}`}>

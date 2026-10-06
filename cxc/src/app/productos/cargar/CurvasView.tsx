@@ -245,7 +245,7 @@ export default function CurvasView() {
                     </span>
                     <span className="flex flex-wrap gap-1.5">
                       {c.tallas.map((t) => (
-                        <span key={t.talla} className="rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 font-mono text-[12px] text-gray-700">
+                        <span key={t.talla} className="rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 tabular-nums text-[12px] text-gray-700">
                           {t.talla}×{t.porBulto}
                         </span>
                       ))}

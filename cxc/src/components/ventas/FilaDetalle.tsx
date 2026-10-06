@@ -146,7 +146,7 @@ function FilaDetalleContenido({
           </p>
           <p
             className={cn(
-              "truncate font-mono leading-tight tabular-nums",
+              "truncate leading-tight tabular-nums",
               compacto ? "text-[11px]" : "text-sm",
               oscura ? "text-white" : "text-gray-950",
             )}

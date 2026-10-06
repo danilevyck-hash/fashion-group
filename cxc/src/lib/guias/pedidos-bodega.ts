@@ -15,6 +15,7 @@
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { DEFAULT_VENDEDOR } from "@/lib/comisiones/vendedor-default";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
+import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 
 /** `false` = la pestaña no existe, la ruta contesta 404 y el cron no hace nada. */
 export const PEDIDOS_BODEGA_2026_10 = true;
@@ -38,12 +39,20 @@ export const PEDIDOS_TABLA_2026_10 = true;
 // 6-oct-2026: PRENDIDO. Daniel vio el mockup v3: «sí» (sin la línea de firmas al pie de cada bloque).
 export const PEDIDOS_POR_EMPRESA_2026_10 = true;
 
-/** Quién MARCA Pendiente ↔ Preparado y dispara «Actualizar» (admin pasa siempre por `requireRole`). */
-export const PEDIDOS_BODEGA_ROLES = ["admin", "bodega"] as const;
+/** Los que entran a Guías (`modules.ts`); contabilidad no. */
+const ROLES_DE_GUIAS = ["admin", "secretaria", "bodega", "vendedor"] as const;
+
+/**
+ * Quién MARCA Pendiente ↔ Preparado y dispara «Actualizar» (admin pasa siempre
+ * por `requireRole`). 6-oct-2026, Daniel al aprobar los seis ajustes: «los
+ * permisos de Pedidos son iguales a los de Guías» → con `AJUSTES_APPLE_6_2026_10`
+ * marcan todos los que ven Guías; apagado, solo admin y bodega.
+ */
+export const PEDIDOS_BODEGA_ROLES: readonly string[] = AJUSTES_APPLE_6_2026_10 ? ROLES_DE_GUIAS : ["admin", "bodega"];
 
 /** Quién VE la pestaña: con v2, los mismos que entran a Guías (`modules.ts`); contabilidad no. */
 export const PEDIDOS_VER_ROLES: readonly string[] = PEDIDOS_TABLA_2026_10
-  ? ["admin", "secretaria", "bodega", "vendedor"]
+  ? ROLES_DE_GUIAS
   : PEDIDOS_BODEGA_ROLES;
 
 export function puedeVerPedidosBodega(role: string | null | undefined): boolean {
@@ -51,7 +60,7 @@ export function puedeVerPedidosBodega(role: string | null | undefined): boolean 
 }
 
 export function puedeMarcarPedidos(role: string | null | undefined): boolean {
-  return !!role && (PEDIDOS_BODEGA_ROLES as readonly string[]).includes(role);
+  return !!role && PEDIDOS_BODEGA_ROLES.includes(role);
 }
 
 /** Los DOS estados. Sin fila en `pedidos_bodega_estado` = «pendiente». */

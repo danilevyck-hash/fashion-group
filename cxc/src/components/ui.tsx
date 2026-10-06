@@ -399,7 +399,7 @@ export function ConfirmTypeNameModal({
         <h3 className="text-base font-semibold mb-1">{title}</h3>
         <p className="text-sm text-gray-500 mb-4">{description}</p>
         <label className="block text-xs text-gray-500 mb-1">
-          {inputLabel}: <span className="font-mono font-semibold text-gray-800">{expectedName}</span>
+          {inputLabel}: <span className="tabular-nums font-semibold text-gray-800">{expectedName}</span>
         </label>
         <input
           type="text"
@@ -407,7 +407,7 @@ export function ConfirmTypeNameModal({
           onChange={(e) => setTyped(e.target.value)}
           disabled={loading}
           autoFocus
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none mb-4 font-mono disabled:opacity-50"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none mb-4 tabular-nums disabled:opacity-50"
           placeholder={expectedName}
         />
         <div className="flex gap-3">
@@ -963,7 +963,7 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
                 {/* `data-label` marca el texto que se LEE (sin el ícono ni el
                     atajo) para que el candado compare exactamente eso. */}
                 <span data-label className="flex-1">{item.label}</span>
-                {item.shortcut && <span className="text-xs text-gray-300 ml-3 font-mono">{item.shortcut}</span>}
+                {item.shortcut && <span className="text-xs text-gray-300 ml-3 tabular-nums">{item.shortcut}</span>}
               </button>
               {item.dividerAfter && <div className="border-t border-gray-100 my-1" />}
             </div>
@@ -979,7 +979,7 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
             >
               {item.icon && <span className="w-4 h-4 shrink-0 flex items-center justify-center">{item.icon}</span>}
               <span className="flex-1">{item.label}</span>
-              {item.shortcut && <span className="text-xs text-red-300 ml-3 font-mono">{item.shortcut}</span>}
+              {item.shortcut && <span className="text-xs text-red-300 ml-3 tabular-nums">{item.shortcut}</span>}
             </button>
           ))}
         </div>

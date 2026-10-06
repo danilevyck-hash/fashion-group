@@ -420,7 +420,7 @@ function MatrizCell({
   return (
     <td
       className={cn(
-        "py-3.5 pl-1 pr-1.5 text-right align-top font-mono text-xs tabular-nums",
+        "py-3.5 pl-1 pr-1.5 text-right align-top text-xs tabular-nums",
         isTotal && "border-l border-gray-200 pl-2",
         v == null ? "text-gray-300" : isCurrent ? "font-medium text-gray-950" : isTotal ? "font-medium text-gray-800" : "font-normal text-gray-700",
       )}

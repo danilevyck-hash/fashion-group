@@ -364,7 +364,7 @@ export default function FacturasDelCliente({
                                 onChange={() => toggle(f)}
                                 className="w-4 h-4 shrink-0 accent-black disabled:opacity-60"
                               />
-                              <span className="font-mono tabular-nums shrink-0">{f.secuencial}</span>
+                              <span className="tabular-nums shrink-0">{f.secuencial}</span>
                               <span className="text-gray-500 truncate">{f.empresa}</span>
                               <span className="tabular-nums text-gray-600 ml-auto shrink-0">
                                 {fmtMonto(f.total)}

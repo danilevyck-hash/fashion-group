@@ -63,7 +63,7 @@ import OverflowMenu from "@/components/ui/OverflowMenu";
 import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 
 /** 🔴 MARKETING_APPLE_2026_10: el resumen usa la misma letra que Productos. */
-const MONO = MARKETING_APPLE_2026_10 ? "" : "font-mono ";
+const MONO = MARKETING_APPLE_2026_10 ? "" : "tabular-nums ";
 
 interface ProductoEditState {
   id: string | null; // null = nuevo
@@ -1350,7 +1350,7 @@ function Dato({
       </dt>
       <dd
         data-fg-campo={campo}
-        className={`text-xs font-mono tabular-nums shrink-0 ${
+        className={`text-xs tabular-nums shrink-0 ${
           oscuro
             ? "font-bold"
             : atenuado
@@ -1415,7 +1415,7 @@ function MetricCard({
         {label}
       </div>
       <div
-        className={`text-base font-semibold font-mono tabular-nums mt-1 ${
+        className={`text-base font-semibold tabular-nums mt-1 ${
           valueClassName ?? "text-gray-900"
         }`}
       >

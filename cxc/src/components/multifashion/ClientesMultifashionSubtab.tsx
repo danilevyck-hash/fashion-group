@@ -300,8 +300,8 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
                   {cobertura.texto}
                   {retail && (retail.ventas_anonimas > 0 || retail.tickets_anonimos > 0) && (
                     <span className="text-gray-500">
-                      {" · "}mostrador <span className="font-mono tabular-nums">{fmtMoney(retail.ventas_anonimas)}</span>
-                      {" · "}<span className="font-mono tabular-nums">{retail.tickets_anonimos.toLocaleString()}</span> tickets, aparte
+                      {" · "}mostrador <span className="tabular-nums">{fmtMoney(retail.ventas_anonimas)}</span>
+                      {" · "}<span className="tabular-nums">{retail.tickets_anonimos.toLocaleString()}</span> tickets, aparte
                     </span>
                   )}
                 </p>
@@ -445,8 +445,8 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
                 </Ayuda>
               </div>
               <div className="text-right">
-                <p className="font-mono text-sm tabular-nums text-gray-950">{fmtMoney(retail.ventas_anonimas)}</p>
-                <p className="font-mono text-xs tabular-nums text-gray-500">{retail.tickets_anonimos.toLocaleString()} tickets</p>
+                <p className="text-sm tabular-nums text-gray-950">{fmtMoney(retail.ventas_anonimas)}</p>
+                <p className="text-xs tabular-nums text-gray-500">{retail.tickets_anonimos.toLocaleString()} tickets</p>
               </div>
             </Card>
           )}
@@ -475,7 +475,7 @@ function SegCard({ icon, tone, valor, label, sub }: {
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="font-mono text-lg font-semibold leading-tight text-gray-950 tabular-nums">{valor}</p>
+          <p className="text-lg font-semibold leading-tight text-gray-950 tabular-nums">{valor}</p>
           {/* 🩸 Iban con `truncate`: a 834 (iPad vertical, la barra lateral se
               lleva 224 px) "Nuevos del mes" quedaba en 62 px de 99 y
               "registrados este mes" en 62 de 129 — la mitad del rótulo. Son
@@ -665,16 +665,16 @@ function ClienteTarjeta({
         aria-expanded={isExpanded}
         className="flex w-full items-start gap-2 px-3 py-3 text-left active:bg-gray-50"
       >
-        <span className="mt-0.5 shrink-0 font-mono text-xs tabular-nums text-gray-400">{rank}</span>
+        <span className="mt-0.5 shrink-0 text-xs tabular-nums text-gray-400">{rank}</span>
         <span className="min-w-0 flex-1">
           {/* El nombre manda: acá SÍ tiene el ancho, que es justo lo que la
               grilla le quitaba. */}
           <span className="block truncate text-sm font-medium text-gray-900">{nombreEnPantalla(cliente.nombre)}</span>
           <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-gray-500">
-            <span className="font-mono tabular-nums text-gray-950">{fmtMoney(cliente.total_ytd)}</span>
-            <span className="font-mono tabular-nums">{cliente.tickets_ytd.toLocaleString()} tickets</span>
-            <span className="font-mono tabular-nums">Ticket promedio ${ticketProm.toFixed(2)}</span>
-            <span className="font-mono tabular-nums">Última compra {formatFechaShort(cliente.ultima_compra)}</span>
+            <span className="tabular-nums text-gray-950">{fmtMoney(cliente.total_ytd)}</span>
+            <span className="tabular-nums">{cliente.tickets_ytd.toLocaleString()} tickets</span>
+            <span className="tabular-nums">Ticket promedio ${ticketProm.toFixed(2)}</span>
+            <span className="tabular-nums">Última compra {formatFechaShort(cliente.ultima_compra)}</span>
           </span>
         </span>
         <ChevronDown className={cn(
@@ -732,7 +732,7 @@ function ClienteMesesLista({
                 )}
               </span>
               <span className={cn(
-                "w-16 shrink-0 text-right font-mono text-xs tabular-nums",
+                "w-16 shrink-0 text-right text-xs tabular-nums",
                 hasData ? "text-gray-700" : "text-gray-300",
               )}>
                 {hasData ? fmtMoneyCompact(m.ventas) : "—"}
@@ -785,12 +785,12 @@ function ClienteRowItem({
           isExpanded && "bg-gray-50/80",
         )}
       >
-        <span className="text-right font-mono text-xs text-gray-500 tabular-nums">{rank}</span>
+        <span className="text-right text-xs text-gray-500 tabular-nums">{rank}</span>
         <span className="truncate font-medium text-gray-900">{nombreEnPantalla(cliente.nombre)}</span>
-        <span className="text-right font-mono text-gray-950 tabular-nums">{fmtMoney(cliente.total_ytd)}</span>
-        <span className="text-right font-mono text-gray-700 tabular-nums">{cliente.tickets_ytd.toLocaleString()}</span>
-        <span className="text-right font-mono text-gray-700 tabular-nums">${ticketProm.toFixed(2)}</span>
-        <span className="text-right font-mono text-xs text-gray-500 tabular-nums">{formatFechaShort(cliente.ultima_compra)}</span>
+        <span className="text-right text-gray-950 tabular-nums">{fmtMoney(cliente.total_ytd)}</span>
+        <span className="text-right text-gray-700 tabular-nums">{cliente.tickets_ytd.toLocaleString()}</span>
+        <span className="text-right text-gray-700 tabular-nums">${ticketProm.toFixed(2)}</span>
+        <span className="text-right text-xs text-gray-500 tabular-nums">{formatFechaShort(cliente.ultima_compra)}</span>
         <ChevronDown className={cn(
           "h-3.5 w-3.5 text-gray-400 transition-transform",
           isExpanded && "rotate-180",
@@ -847,7 +847,7 @@ function ClienteSparkline({
               </div>
               <p className="text-xs font-medium uppercase text-gray-500 whitespace-nowrap">{labelFor(m)}</p>
               <p className={cn(
-                "font-mono text-xs tabular-nums",
+                " text-xs tabular-nums",
                 hasData ? "text-gray-700" : "text-gray-300",
               )}>
                 {hasData ? fmtMoneyCompact(m.ventas) : "—"}

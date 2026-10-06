@@ -39,7 +39,7 @@ describe("el chip dice el NOMBRE del cliente, no solo el código", () => {
     expect(conNombre.indexOf("{codigo}")).toBeGreaterThan(conNombre.indexOf("{nombre}"));
     // 🔴 El código es SECUNDARIO por color y tipografía, nunca por tamaño: en
     // guías nada baja de 12 px (candado `iphone-targets-guias`).
-    expect(conNombre).toMatch(/font-mono/);
+    expect(conNombre).toMatch(/tabular-nums/);
     expect(conNombre).toMatch(/text-emerald-600/);
     expect(conNombre).not.toMatch(/text-\[\d+px\]/);
   });

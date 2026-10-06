@@ -196,7 +196,7 @@ export default function EntregasSection({
                                   {marca.nombre}
                                 </span>
                                 <span className="text-gray-400">→</span>
-                                <span className="font-mono tabular-nums font-semibold">
+                                <span className="tabular-nums font-semibold">
                                   {formatearMonto(Number(monto ?? 0))}
                                 </span>
                               </span>
@@ -206,7 +206,7 @@ export default function EntregasSection({
                       )}
                     </div>
                   </div>
-                  <div className="text-sm font-mono tabular-nums text-gray-900 font-semibold shrink-0">
+                  <div className="text-sm tabular-nums text-gray-900 font-semibold shrink-0">
                     {formatearMonto(e.total)}
                   </div>
                   <svg
@@ -241,7 +241,7 @@ export default function EntregasSection({
                                 <div className="text-xs text-gray-500">
                                   {marca?.nombre ?? "Marca"}
                                 </div>
-                                <div className="text-sm font-mono tabular-nums text-gray-900 font-semibold">
+                                <div className="text-sm tabular-nums text-gray-900 font-semibold">
                                   {formatearMonto(Number(monto ?? 0))}
                                 </div>
                               </div>
@@ -308,7 +308,7 @@ export default function EntregasSection({
                                 <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
                                   {textoPiezasBultos(unidadesTotales, it.bultos)}
                                 </td>
-                                <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-900">
+                                <td className="px-2 py-1.5 text-right tabular-nums text-gray-900">
                                   {formatearMonto(totalLinea)}
                                 </td>
                               </tr>

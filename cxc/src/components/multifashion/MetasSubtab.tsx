@@ -143,7 +143,7 @@ export function MetasSubtab() {
     return (
       <Aviso
         tono="aviso"
-        ayuda={<>Falta correr <code className="font-mono">20260813170000_multifashion_metas.sql</code> en Supabase. Lo demás de Multifashion funciona igual.</>}
+        ayuda={<>Falta correr <code className="tabular-nums">20260813170000_multifashion_metas.sql</code> en Supabase. Lo demás de Multifashion funciona igual.</>}
       >
         Metas sin instalar.
       </Aviso>
@@ -235,7 +235,7 @@ export function MetasSubtab() {
                           {fechaCorta(m.desde)} – {fechaCorta(m.hasta)}
                         </span>
                       </span>
-                      <span className="shrink-0 font-mono text-sm tabular-nums text-gray-700">
+                      <span className="shrink-0 text-sm tabular-nums text-gray-700">
                         {fmtMoney(m.avance.vendido)}
                         <span
                           className={`ml-2 text-xs font-medium ${

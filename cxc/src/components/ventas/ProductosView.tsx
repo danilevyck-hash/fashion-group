@@ -682,11 +682,11 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso, onDescarga
               Se saca en vez de explicarlo — es la decisión más corta y la única
               que no puede malinterpretarse. */}
           <p data-totales-productos className="mb-1 text-sm text-gray-600">
-            Venta <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoney(totalCliente ? totalCliente.venta : data.totales.venta)}</span>
+            Venta <span className="font-semibold tabular-nums text-gray-900">{fmtMoney(totalCliente ? totalCliente.venta : data.totales.venta)}</span>
             {!conCliente && (
               <>
                 <span className="mx-2 text-gray-300">·</span>
-                Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargen(data.totales.margen)}</span>
+                Margen <span className="font-semibold tabular-nums text-gray-900">{fmtMargen(data.totales.margen)}</span>
               </>
             )}
           </p>
@@ -708,9 +708,9 @@ export function ProductosView({ periodo: periodoElegido, anioEnCurso, onDescarga
               períodos relativos— LAS DOS FECHAS. "Últimos 12 meses" sin fechas
               es el rótulo que se malinterpreta. */}
           <p data-resumen-productos className="mb-3 text-xs text-gray-500">
-            <span className="font-mono tabular-nums text-gray-700">{Math.round(unidadesEnPantalla).toLocaleString("en-US")}</span> unidades
+            <span className="tabular-nums text-gray-700">{Math.round(unidadesEnPantalla).toLocaleString("en-US")}</span> unidades
             <span className="mx-1.5 text-gray-300">·</span>
-            Precio prom. <span className="font-mono tabular-nums text-gray-700">{fmtPrecioProm(precioEnPantalla)}</span>
+            Precio prom. <span className="tabular-nums text-gray-700">{fmtPrecioProm(precioEnPantalla)}</span>
             <span className="mx-1.5 text-gray-300">·</span>
             {/* 🩸 SIN `whitespace-nowrap`. Medido a 390 px: "Δ contra 1 ene 2025
                 – 31 dic 2025" en una sola línea llegaba hasta el px 490 y se
@@ -1004,12 +1004,12 @@ function ProductoRow({
         </td>
         {/* 🔴 LAS CINCO, EN EL ORDEN DE LA «4d». Ninguna se esconde bajo un
             corte: la tabla vive de `sm` para arriba y son cinco columnas. */}
-        <td data-col="precio" className="px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-700 lg:px-3">{fmtPrecioProm(precioPromedio(p.venta, p.cantidad))}</td>
+        <td data-col="precio" className="px-1.5 py-2.5 text-right tabular-nums text-gray-700 lg:px-3">{fmtPrecioProm(precioPromedio(p.venta, p.cantidad))}</td>
         {mostrarMargen && (
-          <td data-col="margen" className="px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-700 lg:px-3">{fmtMargen(p.margen)}</td>
+          <td data-col="margen" className="px-1.5 py-2.5 text-right tabular-nums text-gray-700 lg:px-3">{fmtMargen(p.margen)}</td>
         )}
-        <td data-col="cantidad" className="px-1.5 py-2.5 text-right font-mono tabular-nums text-gray-600 lg:px-3">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
-        <td data-col="venta" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-900 sm:px-1.5 lg:px-3">{fmtMoney(p.venta)}</td>
+        <td data-col="cantidad" className="px-1.5 py-2.5 text-right tabular-nums text-gray-600 lg:px-3">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
+        <td data-col="venta" className="px-2 py-2.5 text-right tabular-nums text-gray-900 sm:px-1.5 lg:px-3">{fmtMoney(p.venta)}</td>
       </tr>
       {isOpen && (
         <tr className="bg-gray-50/60">
@@ -1108,7 +1108,7 @@ function ProductoCard({
             <div data-tarjeta-descripcion className="min-w-0 flex-1 truncate text-sm text-gray-800">
               {p.descripcion}
             </div>
-            <div data-tarjeta-col="venta" className="shrink-0 font-mono text-sm tabular-nums text-gray-900">
+            <div data-tarjeta-col="venta" className="shrink-0 text-sm tabular-nums text-gray-900">
               {fmtMoney(p.venta)}
             </div>
           </div>
@@ -1171,7 +1171,7 @@ function Dato({ rotulo, col, children }: { rotulo: string; col: string; children
     <div className="min-w-0">
       {/* 11 px sería letra <12 y el candado táctil lo marca. Va en 12. */}
       <div className="text-xs leading-none text-gray-400">{rotulo}</div>
-      <div data-tarjeta-col={col} className="mt-0.5 font-mono text-sm tabular-nums text-gray-800">{children}</div>
+      <div data-tarjeta-col={col} className="mt-0.5 text-sm tabular-nums text-gray-800">{children}</div>
     </div>
   );
 }
@@ -1270,11 +1270,11 @@ function BloqueClientes({ clientes, conDescargo = true }: {
               <td className="py-1.5 pr-3 text-gray-700">{c.cliente_nombre}</td>
               {/* Mismo corte `sm` que la tabla de arriba: a 390 px sólo entran
                   el nombre, la venta y el %. */}
-              <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-gray-500 sm:table-cell">
+              <td className="hidden py-1.5 pr-3 text-right tabular-nums text-gray-500 sm:table-cell">
                 {Math.round(c.cantidad).toLocaleString("en-US")}
               </td>
-              <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-800">{fmtMoney(c.venta)}</td>
-              <td data-col="participacion" className="py-1.5 text-right font-mono tabular-nums text-gray-500">
+              <td className="py-1.5 pr-3 text-right tabular-nums text-gray-800">{fmtMoney(c.venta)}</td>
+              <td data-col="participacion" className="py-1.5 text-right tabular-nums text-gray-500">
                 {fmtParticipacion(participacion(c.venta, total.venta))}
               </td>
             </tr>
@@ -1285,12 +1285,12 @@ function BloqueClientes({ clientes, conDescargo = true }: {
           de arriba. Se explica UNA vez acá en vez de dejar que se descubra
           sumando y se lea como un descuadre. */}
       <p data-pie-clientes className="mt-1.5 text-xs text-gray-500">
-        <span className="font-mono tabular-nums text-gray-700">{clientes.length}</span>
+        <span className="tabular-nums text-gray-700">{clientes.length}</span>
         {clientes.length === 1 ? " cliente" : " clientes"}
         <span className="mx-1.5 text-gray-300">·</span>
-        <span className="font-mono tabular-nums text-gray-700">{Math.round(total.cantidad).toLocaleString("en-US")}</span> unidades
+        <span className="tabular-nums text-gray-700">{Math.round(total.cantidad).toLocaleString("en-US")}</span> unidades
         <span className="mx-1.5 text-gray-300">·</span>
-        <span className="font-mono tabular-nums text-gray-700">{fmtMoney(total.venta)}</span>
+        <span className="tabular-nums text-gray-700">{fmtMoney(total.venta)}</span>
         {conDescargo && (
           <>
             <span className="mx-1.5 text-gray-300">·</span>
@@ -1324,15 +1324,15 @@ function BloqueCodigos({ codigos }: { codigos: ProductoCodigo[] | undefined }) {
         {codigos.map(c => (
           <tr key={c.codigo} className="border-b border-gray-100 last:border-0">
             <td className="py-1.5 pr-3">
-              <span className="font-mono text-gray-500">{c.codigo}</span>
+              <span className="tabular-nums text-gray-500">{c.codigo}</span>
               {c.descripcion && <span className="ml-2 text-gray-400">{c.descripcion}</span>}
             </td>
-            <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-gray-500 sm:table-cell">{Math.round(c.cantidad).toLocaleString("en-US")}</td>
-            <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-800">{fmtMoney(c.venta)}</td>
+            <td className="hidden py-1.5 pr-3 text-right tabular-nums text-gray-500 sm:table-cell">{Math.round(c.cantidad).toLocaleString("en-US")}</td>
+            <td className="py-1.5 pr-3 text-right tabular-nums text-gray-800">{fmtMoney(c.venta)}</td>
             {/* El precio promedio del código: es el que explica por qué dos
                 códigos de la misma descripción tienen márgenes distintos. */}
-            <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-gray-700 sm:table-cell">{fmtPrecioProm(precioPromedio(c.venta, c.cantidad))}</td>
-            <td className="py-1.5 text-right font-mono tabular-nums text-gray-600">{fmtMargen(c.margen)}</td>
+            <td className="hidden py-1.5 pr-3 text-right tabular-nums text-gray-700 sm:table-cell">{fmtPrecioProm(precioPromedio(c.venta, c.cantidad))}</td>
+            <td className="py-1.5 text-right tabular-nums text-gray-600">{fmtMargen(c.margen)}</td>
           </tr>
         ))}
       </tbody>
@@ -1416,7 +1416,7 @@ function DejoDeComprar({
           {visibles.map(f => (
             <tr key={f.descripcion} className="border-b border-gray-100 last:border-0">
               <td className="py-1.5 pr-3 text-gray-700">{f.descripcion}</td>
-              <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-800">{fmtMoney(f.venta)}</td>
+              <td className="py-1.5 pr-3 text-right tabular-nums text-gray-800">{fmtMoney(f.venta)}</td>
               {/* Dos palabras, no una explicación: ámbar = hay a quién llamar,
                   gris = el producto ya no se vende y no hay nada que reclamar. */}
               <td className="py-1.5 text-right">
@@ -1477,9 +1477,9 @@ function DejoDeVenderse({
       <p className="mb-1.5 text-xs font-medium text-gray-700">
         Sin ventas en el período
         <span className="ml-1.5 font-normal text-gray-500">
-          <span className="font-mono tabular-nums">{filas.length}</span>
+          <span className="tabular-nums">{filas.length}</span>
           {filas.length === 1 ? " descripción · " : " descripciones · "}
-          <span className="font-mono tabular-nums">{fmtMoney(total)}</span>
+          <span className="tabular-nums">{fmtMoney(total)}</span>
         </span>
         {comparativo && (
           <span className="ml-1.5 font-normal text-gray-400">
@@ -1498,7 +1498,7 @@ function DejoDeVenderse({
           {visibles.map(f => (
             <tr key={f.descripcion} className="border-b border-gray-100 last:border-0">
               <td className="py-1.5 pr-3 text-gray-700">{f.descripcion}</td>
-              <td className="py-1.5 text-right font-mono tabular-nums text-gray-800">{fmtMoney(f.ventaAntes)}</td>
+              <td className="py-1.5 text-right tabular-nums text-gray-800">{fmtMoney(f.ventaAntes)}</td>
             </tr>
           ))}
         </tbody>

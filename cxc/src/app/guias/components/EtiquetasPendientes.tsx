@@ -134,7 +134,7 @@ export default function EtiquetasPendientes({
                     onChange={() => alternar(e)}
                     className="h-4 w-4 shrink-0 accent-black disabled:opacity-60"
                   />
-                  <span className="shrink-0 font-mono tabular-nums">{e.secuencial}</span>
+                  <span className="shrink-0 tabular-nums">{e.secuencial}</span>
                   <span className="shrink-0 text-gray-500">{e.empresa}</span>
                   <span className="min-w-0 truncate">{e.cliente_nombre}</span>
                   <span className="ml-auto shrink-0 tabular-nums text-gray-600">
@@ -218,7 +218,7 @@ function PendientesPorEnvio({
                   <span className="min-w-0 truncate font-medium">{v.cliente_nombre}</span>
                   <span className="shrink-0 text-gray-500">{v.empresa}</span>
                   <span className="min-w-0 truncate text-gray-500">→ {v.destino}</span>
-                  <span className="shrink-0 font-mono text-xs tabular-nums text-gray-500">{facturasDelEnvio(v)}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-gray-500">{facturasDelEnvio(v)}</span>
                   <span className="ml-auto shrink-0 tabular-nums text-gray-600">
                     {v.total} {v.total === 1 ? "bulto" : "bultos"}
                   </span>

@@ -442,7 +442,7 @@ export default function ProyectoOverlay({
                 <div className="text-xs uppercase tracking-wide text-gray-400">
                   Subtotal
                 </div>
-                <div className="text-sm font-semibold font-mono tabular-nums text-gray-900">
+                <div className="text-sm font-semibold tabular-nums text-gray-900">
                   {formatearMonto(totales.subtotal)}
                 </div>
               </div>
@@ -454,7 +454,7 @@ export default function ProyectoOverlay({
                   <div className="text-xs uppercase tracking-wide text-gray-400">
                     Entregas
                   </div>
-                  <div className="text-sm font-semibold font-mono tabular-nums text-gray-900">
+                  <div className="text-sm font-semibold tabular-nums text-gray-900">
                     {totales.conteoEntregas} ·{" "}
                     {formatearMonto(totales.totalEntregas)}
                   </div>
@@ -468,7 +468,7 @@ export default function ProyectoOverlay({
                   >
                     Importación {PORCENTAJE_IMPORTACION_ZONA_LIBRE}%
                   </div>
-                  <div className="text-sm font-semibold font-mono tabular-nums text-amber-800">
+                  <div className="text-sm font-semibold tabular-nums text-amber-800">
                     +{formatearMonto(totales.importacion)}
                   </div>
                 </div>
@@ -477,7 +477,7 @@ export default function ProyectoOverlay({
                 <div className="text-xs uppercase tracking-wide text-gray-400">
                   Costo total
                 </div>
-                <div className="text-sm font-semibold font-mono tabular-nums text-gray-900">
+                <div className="text-sm font-semibold tabular-nums text-gray-900">
                   {formatearMonto(totales.total)}
                 </div>
               </div>

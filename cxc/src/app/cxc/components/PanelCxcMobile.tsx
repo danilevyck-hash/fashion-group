@@ -418,7 +418,7 @@ function MobileHero({
       <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
         Total pendiente
       </p>
-      <p className="mt-1 font-mono text-[36px] font-medium leading-none tracking-tight tabular-nums">
+      <p className="mt-1 text-[36px] font-medium leading-none tracking-tight tabular-nums">
         {formatCompactCurrency(total)}
       </p>
 
@@ -438,11 +438,11 @@ function MobileHero({
                 activo ? `${theme.chipActivo} border-white/60` : "border-white/15 bg-white/5",
               ].join(" ")}
             >
-              <span className="flex items-center gap-1 font-mono text-[11px] tabular-nums text-gray-300">
+              <span className="flex items-center gap-1 text-[11px] tabular-nums text-gray-300">
                 <span className={`inline-block w-1.5 h-1.5 rounded-full ${theme.punto}`} />
                 {AGING[key].colLabel}
               </span>
-              <span className="mt-0.5 block font-mono text-sm font-medium tabular-nums text-white">
+              <span className="mt-0.5 block text-sm font-medium tabular-nums text-white">
                 {formatCompactCurrency(value)}
               </span>
             </button>
@@ -465,7 +465,7 @@ function MobileHero({
           <span className="text-xs font-medium text-red-200">
             {rotuloSinPagar(sinPagar.cuantos)}
           </span>
-          <span className="font-mono text-xs font-semibold tabular-nums text-red-100">
+          <span className="text-xs font-semibold tabular-nums text-red-100">
             {formatCompactCurrency(sinPagar.monto)}
           </span>
         </button>
@@ -604,7 +604,7 @@ function MobileClientCard({
           {/* El chevron se eliminó: TODA la fila abre/cierra la card, así que la
               flecha no era una acción sino un adorno — y costaba 22px del ancho
               del nombre. El estado abierto ya se ve por el panel desplegado. */}
-          <span className="shrink-0 font-mono text-base font-semibold tabular-nums text-gray-900">
+          <span className="shrink-0 text-base font-semibold tabular-nums text-gray-900">
             {formatCompactCurrency(client.total)}
           </span>
         </div>
@@ -668,7 +668,7 @@ function BucketChip({
         isZero ? "border-gray-200 bg-gray-50" : `${theme.border} ${theme.bgActive}`,
       ].join(" ")}
     >
-      <p className={`font-mono text-xs font-medium tabular-nums ${isZero ? "text-gray-300" : theme.text}`}>
+      <p className={`text-xs font-medium tabular-nums ${isZero ? "text-gray-300" : theme.text}`}>
         {isZero ? "—" : formatCompactCurrency(value)}
       </p>
       {/* Desglose por tramo DENTRO de la fila de un cliente: acá van los tres
@@ -740,7 +740,7 @@ function MobileClientExpanded({
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
           Desglose por empresa ({rows.length})
         </p>
-        <span className={`shrink-0 font-mono text-xs font-semibold tabular-nums ${client.total < 0 ? "text-gray-500" : "text-gray-900"}`}>
+        <span className={`shrink-0 text-xs font-semibold tabular-nums ${client.total < 0 ? "text-gray-500" : "text-gray-900"}`}>
           ${fmt(client.total)}
         </span>
       </div>
@@ -754,7 +754,7 @@ function MobileClientExpanded({
           <li key={row.key} className="px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <span className="truncate text-xs text-gray-700">{row.nombre}</span>
-              <span className={`shrink-0 font-mono text-xs font-medium tabular-nums ${row.total < 0 ? "text-gray-500" : "text-gray-900"}`}>
+              <span className={`shrink-0 text-xs font-medium tabular-nums ${row.total < 0 ? "text-gray-500" : "text-gray-900"}`}>
                 ${fmt(row.total)}
               </span>
             </div>
@@ -817,7 +817,7 @@ function EmpresaBucketMini({
   const isZero = value === 0;
   return (
     <span
-      className={`flex-1 rounded px-1.5 py-0.5 text-center font-mono text-xs tabular-nums ${theme.bgActive} ${theme.text}`}
+      className={`flex-1 rounded px-1.5 py-0.5 text-center text-xs tabular-nums ${theme.bgActive} ${theme.text}`}
       style={isZero ? { opacity: 0.4 } : undefined}
     >
       {isZero ? "—" : formatCompactCurrency(value)}

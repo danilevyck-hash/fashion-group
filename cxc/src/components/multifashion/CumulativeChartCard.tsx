@@ -117,13 +117,13 @@ function CumulativeTooltip({
         <span className="inline-flex items-center gap-1.5 text-gray-500">
           <span className="inline-block h-0.5 w-3 rounded-full" style={{ backgroundColor: "#185FA5" }} />{year}
         </span>
-        <span className="text-right font-mono tabular-nums text-gray-950">{cell(a?.ventas)}</span>
-        <span className="text-right font-mono tabular-nums text-gray-950">{cell(a?.acumulado)}</span>
+        <span className="text-right tabular-nums text-gray-950">{cell(a?.ventas)}</span>
+        <span className="text-right tabular-nums text-gray-950">{cell(a?.acumulado)}</span>
         <span className="inline-flex items-center gap-1.5 text-gray-500">
           <span className="inline-block h-0.5 w-3 rounded-full" style={{ backgroundColor: "#BA7517" }} />{prevYear}
         </span>
-        <span className="text-right font-mono tabular-nums text-gray-700">{cell(p?.ventas)}</span>
-        <span className="text-right font-mono tabular-nums text-gray-700">{cell(p?.acumulado)}</span>
+        <span className="text-right tabular-nums text-gray-700">{cell(p?.ventas)}</span>
+        <span className="text-right tabular-nums text-gray-700">{cell(p?.acumulado)}</span>
       </div>
     </div>
   );

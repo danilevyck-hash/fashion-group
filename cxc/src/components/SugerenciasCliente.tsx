@@ -126,7 +126,7 @@ export default function SugerenciasCliente({
         {uno ? (
           <>
             ¿Es {uno.nombre}{" "}
-            <span className="font-mono text-xs text-gray-500">({uno.codigo})</span>?
+            <span className="tabular-nums text-xs text-gray-500">({uno.codigo})</span>?
           </>
         ) : (
           "Clientes similares"
@@ -169,7 +169,7 @@ export default function SugerenciasCliente({
                   {/* No se trunca: esconder el nombre sería deshacer lo que esto
                       vino a arreglar. El peor caso real son 47 caracteres. */}
                   <span className="text-sm text-black break-words">{s.nombre}</span>
-                  <span className="text-xs font-mono text-gray-400 shrink-0">{s.codigo}</span>
+                  <span className="text-xs tabular-nums text-gray-400 shrink-0">{s.codigo}</span>
                 </span>
                 <Aviso s={s} />
               </button>

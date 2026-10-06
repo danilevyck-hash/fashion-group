@@ -94,7 +94,7 @@ export function ElegirPapel({ formato, onElegir }: { formato: FormatoEtiquetas; 
 export function Paso({ n, titulo, ayuda }: { n: number; titulo: string; ayuda: string }) {
   return (
     <div className="mb-2.5 flex items-start gap-3">
-      <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-gray-900 font-mono text-[12px] font-semibold text-white">
+      <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-gray-900 tabular-nums text-[12px] font-semibold text-white">
         {n}
       </span>
       <div>

@@ -70,15 +70,15 @@ export function PulsoSinVenta({
         {/* El margen es una proporción: se compara en PUNTOS, no en %. */}
         <div className="px-4 py-3">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Margen</p>
-          <p className="mt-1 font-mono text-2xl font-medium leading-tight tabular-nums text-gray-950">
+          <p className="mt-1 text-2xl font-medium leading-tight tabular-nums text-gray-950">
             {fmtMargen(totales.margen)}
           </p>
           {puntos != null && c && (
             <p className="mt-1 text-xs text-gray-500">
-              <span className={cn("font-mono font-medium tabular-nums", tonoVariacion(puntos))}>
+              <span className={cn(" font-medium tabular-nums", tonoVariacion(puntos))}>
                 {flechaVariacion(puntos)} {puntos >= 0 ? "+" : "−"}{Math.abs(puntos * 100).toFixed(1)} pts
               </span>{" "}
-              contra <span className="font-mono tabular-nums">{fmtMargen(c.margen)}</span> el año pasado
+              contra <span className="tabular-nums">{fmtMargen(c.margen)}</span> el año pasado
             </p>
           )}
         </div>
@@ -136,7 +136,7 @@ export function LineaMarcas({
   return (
     <div data-elemento="marcas" className="space-y-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-700">
-        <span className="font-mono tabular-nums">{texto}</span>
+        <span className="tabular-nums">{texto}</span>
         {elegida && (
           <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700">viendo {elegida}</span>
         )}
@@ -182,15 +182,15 @@ export function TablaTop({
           <tbody>
             {filas.map((f, i) => (
               <tr key={f.clave}>
-                <td className="border-b border-gray-100 px-3 py-2 text-right font-mono text-xs tabular-nums text-gray-400">{i + 1}</td>
+                <td className="border-b border-gray-100 px-3 py-2 text-right text-xs tabular-nums text-gray-400">{i + 1}</td>
                 <td className="border-b border-gray-100 px-3 py-2 text-sm text-gray-950">
                   <span className="block truncate" title={f.etiqueta}>{f.etiqueta}</span>
                   {f.detalle && <span className="block truncate text-xs text-gray-500">{f.detalle}</span>}
                 </td>
-                <td className="border-b border-gray-100 px-3 py-2 text-right font-mono text-sm tabular-nums text-gray-950">{fmtUnidades(f.unidades)}</td>
-                <td className="border-b border-gray-100 px-3 py-2 text-right font-mono text-sm tabular-nums text-gray-700">{fmtMoney(f.venta)}</td>
-                <td className="border-b border-gray-100 px-3 py-2 text-right font-mono text-sm tabular-nums text-gray-950">{fmtMoney(f.utilidad)}</td>
-                <td className="border-b border-gray-100 px-3 py-2 text-right font-mono text-sm tabular-nums text-gray-700">{fmtMargen(f.margen)}</td>
+                <td className="border-b border-gray-100 px-3 py-2 text-right text-sm tabular-nums text-gray-950">{fmtUnidades(f.unidades)}</td>
+                <td className="border-b border-gray-100 px-3 py-2 text-right text-sm tabular-nums text-gray-700">{fmtMoney(f.venta)}</td>
+                <td className="border-b border-gray-100 px-3 py-2 text-right text-sm tabular-nums text-gray-950">{fmtMoney(f.utilidad)}</td>
+                <td className="border-b border-gray-100 px-3 py-2 text-right text-sm tabular-nums text-gray-700">{fmtMargen(f.margen)}</td>
               </tr>
             ))}
           </tbody>

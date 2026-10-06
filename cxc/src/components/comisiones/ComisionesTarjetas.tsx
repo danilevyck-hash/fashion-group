@@ -22,7 +22,7 @@
 // Daniel ya pidió lo mismo en todo el sistema: en el celular, tabla ancha →
 // TARJETAS. El patrón de referencia es `app/cxc/components/PanelCxcMobile.tsx`
 // (las tarjetas de CXC) y esto lo sigue: `<article>` redondeada con borde, el
-// nombre truncado a una línea, el número en `font-mono tabular-nums`, targets
+// nombre truncado a una línea, el número en `tabular-nums`, targets
 // de 44px y el detalle a un toque.
 //
 // **Ningún número cambia.** Se usa el MISMO `fmtMoney` que la tabla (no el
@@ -92,7 +92,7 @@ function TarjetaTotal({ total, aPagar }: { total: number; aPagar?: boolean }) {
         className="flex items-center justify-between gap-2 rounded-xl bg-gray-900 px-3 py-3"
       >
         <span className="text-xs font-medium uppercase tracking-wide text-gray-400">{aPagar ? "Total a pagar" : "Total"}</span>
-        <span className="font-mono text-base font-semibold tabular-nums text-white">
+        <span className="text-base font-semibold tabular-nums text-white">
           {fmtMoney(total)}
         </span>
       </div>
@@ -289,7 +289,7 @@ function TarjetaVendedorMatriz({
             {fila.se_paga === false && <MarcaNoSePaga />}
           </span>
           <span
-            className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${
+            className={`shrink-0 text-sm font-semibold tabular-nums ${
               apagada ? "text-gray-400" : claseMonto(fila.total)
             }`}
           >
@@ -311,7 +311,7 @@ function TarjetaVendedorMatriz({
                     className="flex min-h-[44px] items-center justify-between gap-2 px-3 py-2"
                   >
                     <span className="truncate text-xs text-gray-400">{nombreEmpresa(k)}</span>
-                    <span className="shrink-0 font-mono text-sm tabular-nums text-gray-300">—</span>
+                    <span className="shrink-0 text-sm tabular-nums text-gray-300">—</span>
                   </li>
                 );
               }
@@ -325,13 +325,13 @@ function TarjetaVendedorMatriz({
                   >
                     <span className="truncate text-xs text-gray-600">{nombreEmpresa(k)}</span>
                     <span className="shrink-0 text-right">
-                      <span className={`block font-mono text-sm tabular-nums ${claseMonto(val ?? 0)}`}>
+                      <span className={`block text-sm tabular-nums ${claseMonto(val ?? 0)}`}>
                         {fmtMoney(val ?? 0)}
                       </span>
                       {/* El descuento SE VE: antes había que abrir el detalle
                           para enterarse de que ahí dentro hay plata restada. */}
                       {desglose && (
-                        <span className="block font-mono text-xs tabular-nums text-gray-500">
+                        <span className="block text-xs tabular-nums text-gray-500">
                           {fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}
                         </span>
                       )}
@@ -408,7 +408,7 @@ export function ComisionesTarjetasPorEmpresa({
                   {v.se_paga === false && <MarcaNoSePaga />}
                 </span>
                 <span
-                  className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${claseMonto(
+                  className={`shrink-0 text-sm font-semibold tabular-nums ${claseMonto(
                     v.comision_total,
                   )}`}
                 >
@@ -448,7 +448,7 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: number }) {
   return (
     <div className="flex items-baseline justify-between gap-1.5 py-0.5">
       <dt className="shrink-0 text-xs text-gray-500">{etiqueta}</dt>
-      <dd className={`truncate font-mono text-sm tabular-nums ${claseMonto(valor)}`}>
+      <dd className={`truncate text-sm tabular-nums ${claseMonto(valor)}`}>
         {fmtMoney(valor)}
       </dd>
     </div>

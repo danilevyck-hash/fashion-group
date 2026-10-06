@@ -279,7 +279,7 @@ export default function SubirFotos({
               <p className="text-xs font-medium text-amber-700 mb-1">
                 Códigos del ZIP que no existen en el catálogo:
               </p>
-              <div className="max-h-32 overflow-y-auto text-[11px] font-mono text-gray-500 leading-relaxed">
+              <div className="max-h-32 overflow-y-auto text-[11px] tabular-nums text-gray-500 leading-relaxed">
                 {zipResultado.sinMatch.join(" · ")}
               </div>
             </div>
@@ -308,7 +308,7 @@ export default function SubirFotos({
               <li key={it.clave} className="px-3 py-2 text-sm">
                 <div className="flex items-center gap-3">
                   <Punto estado={it.estado} />
-                  <span className="font-mono text-xs text-gray-500 truncate max-w-[45%]">{it.archivo.name}</span>
+                  <span className="tabular-nums text-xs text-gray-500 truncate max-w-[45%]">{it.archivo.name}</span>
                   {it.nombreProducto ? (
                     <span className="text-gray-900 font-medium truncate">
                       {it.sku} · {it.nombreProducto}
@@ -390,7 +390,7 @@ function ElegirProducto({
                 onClick={() => onElegir(p)}
                 className="w-full min-h-[44px] px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 transition"
               >
-                <span className="font-mono text-xs text-gray-500 mr-2">{p.sku}</span>
+                <span className="tabular-nums text-xs text-gray-500 mr-2">{p.sku}</span>
                 {p.name}
               </button>
             </li>

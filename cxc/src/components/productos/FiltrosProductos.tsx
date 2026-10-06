@@ -295,13 +295,13 @@ export function PantallaProductos(p: PantallaProductosProps) {
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <p data-totales-productos className="text-sm text-gray-600">
               {modo === "sin90" ? (
-                <>Stock <b className="font-mono tabular-nums text-gray-900">{fmtU(existenciaTotal)}</b> u en <b className="font-mono tabular-nums text-gray-900">{fmtU(filtrados.length)}</b> artículos</>
+                <>Stock <b className="tabular-nums text-gray-900">{fmtU(existenciaTotal)}</b> u en <b className="tabular-nums text-gray-900">{fmtU(filtrados.length)}</b> artículos</>
               ) : (
                 <>
-                  <b className="font-mono tabular-nums text-gray-900">{fmtU(totales.unidades)}</b> unidades
-                  <span className="mx-1.5 text-gray-300">·</span>Venta <b className="font-mono tabular-nums text-gray-900">{fmtMoney(totales.venta)}</b>
-                  <span className="mx-1.5 text-gray-300">·</span>Utilidad <b className="font-mono tabular-nums text-gray-900">{fmtMoney(totales.utilidad)}</b>
-                  <span className="mx-1.5 text-gray-300">·</span>Margen <b className="font-mono tabular-nums text-gray-900">{fmtPorcentaje(totales.margen)}</b>
+                  <b className="tabular-nums text-gray-900">{fmtU(totales.unidades)}</b> unidades
+                  <span className="mx-1.5 text-gray-300">·</span>Venta <b className="tabular-nums text-gray-900">{fmtMoney(totales.venta)}</b>
+                  <span className="mx-1.5 text-gray-300">·</span>Utilidad <b className="tabular-nums text-gray-900">{fmtMoney(totales.utilidad)}</b>
+                  <span className="mx-1.5 text-gray-300">·</span>Margen <b className="tabular-nums text-gray-900">{fmtPorcentaje(totales.margen)}</b>
                 </>
               )}
               {!filtro && p.notaTotales}
@@ -311,7 +311,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
           {desglose && (
             <p data-desglose className="text-sm text-gray-600">
               {desglose.map(([k, v], i) => (
-                <span key={k}>{i > 0 && <span className="mx-1.5 text-gray-300">·</span>}{k} <b className="font-mono tabular-nums text-gray-900">{fmtMoney(v)}</b></span>
+                <span key={k}>{i > 0 && <span className="mx-1.5 text-gray-300">·</span>}{k} <b className="tabular-nums text-gray-900">{fmtMoney(v)}</b></span>
               ))}
             </p>
           )}
@@ -343,11 +343,11 @@ function Cifras({ unidades, venta, margen, existencia, conInventario, className 
 }) {
   return (
     <>
-      <td className={cn("px-3 py-2.5 text-right font-mono tabular-nums", className)}>{fmtU(unidades)}</td>
-      <td className={cn("px-3 py-2.5 text-right font-mono tabular-nums", className)}>{fmtMoney(venta)}</td>
-      <td className={cn("px-3 py-2.5 text-right font-mono tabular-nums", className)}>{fmtPorcentaje(margen)}</td>
+      <td className={cn("px-3 py-2.5 text-right tabular-nums", className)}>{fmtU(unidades)}</td>
+      <td className={cn("px-3 py-2.5 text-right tabular-nums", className)}>{fmtMoney(venta)}</td>
+      <td className={cn("px-3 py-2.5 text-right tabular-nums", className)}>{fmtPorcentaje(margen)}</td>
       {conInventario && (
-        <td className={cn("px-3 py-2.5 text-right font-mono tabular-nums", className)}>{existencia == null ? "—" : fmtU(existencia)}</td>
+        <td className={cn("px-3 py-2.5 text-right tabular-nums", className)}>{existencia == null ? "—" : fmtU(existencia)}</td>
       )}
     </>
   );
@@ -364,7 +364,7 @@ function NombreCodigo({ a }: { a: ArticuloVendido }) {
     <span className="flex min-w-0 items-center gap-2">
       <Foto url={a.foto} />
       <span className="min-w-0">
-        <span className="block truncate font-mono text-[13px] text-gray-900">{modelo}</span>
+        <span className="block truncate tabular-nums text-[13px] text-gray-900">{modelo}</span>
         {color && <span className="block text-xs text-gray-500">Color {color}</span>}
       </span>
     </span>
@@ -409,7 +409,7 @@ function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, con
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
                   <span className="truncate text-[15px] text-gray-900">{r.descripcion}</span>
-                  <span className="shrink-0 font-mono text-[15px] tabular-nums text-gray-900">{fmtMoney(r.venta)}</span>
+                  <span className="shrink-0 text-[15px] tabular-nums text-gray-900">{fmtMoney(r.venta)}</span>
                 </span>
                 <span className="block text-xs text-gray-500">
                   {fmtU(r.unidades)} u · margen {fmtPorcentaje(r.margen)}
@@ -423,7 +423,7 @@ function ListaPorDescripcion({ renglones, total, onVerMas, abierta, onAbrir, con
                   <li key={a.codigo} className="flex items-center justify-between gap-2 px-3 py-2">
                     <NombreCodigo a={a} />
                     <span className="shrink-0 text-right text-xs text-gray-500">
-                      <span className="block font-mono text-[13px] tabular-nums text-gray-900">{fmtMoney(a.venta)}</span>
+                      <span className="block text-[13px] tabular-nums text-gray-900">{fmtMoney(a.venta)}</span>
                       {fmtU(a.unidades)} u{conInventario && <> · stock {a.existencia == null ? "—" : fmtU(a.existencia)}</>}
                     </span>
                   </li>

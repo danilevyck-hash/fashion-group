@@ -434,7 +434,7 @@ function UsuariosPageInner() {
                       placeholder={editUserId ? "Dejar vacío para no cambiar" : "La que quieras"}
                       /* text-base en móvil (anti-zoom de Safari) y pr-12 para
                          dejarle 44px al botón del ojo, que antes cabía en 40. */
-                      className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 pr-12 text-base sm:text-sm font-mono placeholder:text-gray-400 placeholder:font-sans focus:outline-none focus:border-gray-900 transition"
+                      className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 pr-12 text-base sm:text-sm tabular-nums placeholder:text-gray-400 placeholder:font-sans focus:outline-none focus:border-gray-900 transition"
                     />
                     {/* iPhone: el ojo medía 28×28 (p-1.5 + ícono de 16) y es de
                         SOLO ícono → IconButton, que garantiza 44×44 y exige
@@ -657,7 +657,7 @@ function UsuariosPageInner() {
                                   {s.ip_address && (
                                     <>
                                       <span className="text-gray-300">·</span>
-                                      <span className="font-mono text-xs">{s.ip_address}</span>
+                                      <span className="tabular-nums text-xs">{s.ip_address}</span>
                                     </>
                                   )}
                                 </div>

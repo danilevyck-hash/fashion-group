@@ -163,7 +163,7 @@ export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false }: Pr
               )}
             >
               {ROTULO_CHIP[c]}
-              <span className={cn("font-mono tabular-nums", chip === c ? "text-white/80" : "text-gray-400")}>
+              <span className={cn(" tabular-nums", chip === c ? "text-white/80" : "text-gray-400")}>
                 {conteos[c].toLocaleString()}
               </span>
             </button>
@@ -239,7 +239,7 @@ function FilaCliente({
               {/* La plata primero (23-sep-2026): llamar a alguien sin saber
                   cuánto gastó era la lista «coja» del inventario. */}
               {conMonto && (
-                <span data-compro className="font-mono tabular-nums text-gray-700">compró {fmtMoney(cliente.total_comprado)} · </span>
+                <span data-compro className="tabular-nums text-gray-700">compró {fmtMoney(cliente.total_comprado)} · </span>
               )}
               {/* Ámbar = la urgencia. Gris = el aviso para no repetir. */}
               <span className="font-medium text-amber-700">{linea.dias}</span>
@@ -296,7 +296,7 @@ function Dato({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div>
       <dt className="text-xs text-gray-400">{rotulo}</dt>
-      <dd className="font-mono text-sm tabular-nums text-gray-900">{valor}</dd>
+      <dd className="text-sm tabular-nums text-gray-900">{valor}</dd>
     </div>
   );
 }

@@ -191,7 +191,7 @@ function EtiquetasUnaALaVez() {
       {/* 🔴 SIN LA MIGRACIÓN NO SE ROMPE NADA: la pestaña se dibuja y lo dice. */}
       {sinTabla && (
         <Aviso className="mb-4" ayuda="Guías sigue funcionando igual.">
-          Etiquetas sin activar: falta correr la migración <span className="font-mono">20261207120000_guias_etiquetas</span>.
+          Etiquetas sin activar: falta correr la migración <span className="tabular-nums">20261207120000_guias_etiquetas</span>.
         </Aviso>
       )}
       {errorLista && (
@@ -283,7 +283,7 @@ function EtiquetasUnaALaVez() {
                   const bloqueo = motivoBloqueo(e);
                   return (
                     <tr key={e.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                      <td className="px-3 py-2.5 font-mono tabular-nums whitespace-nowrap">{e.secuencial}</td>
+                      <td className="px-3 py-2.5 tabular-nums whitespace-nowrap">{e.secuencial}</td>
                       <td className="px-3 py-2.5 font-medium">{e.cliente_nombre}</td>
                       <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap">{e.empresa}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{e.cajas}</td>
@@ -655,7 +655,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
                                     onChange={() => { setElegidaClave(clave); setError(null); }}
                                     className="h-4 w-4 shrink-0 accent-black"
                                   />
-                                  <span className="shrink-0 font-mono tabular-nums">{f.secuencial}</span>
+                                  <span className="shrink-0 tabular-nums">{f.secuencial}</span>
                                   <span className="truncate text-gray-500">{f.empresa}</span>
                                   <span className="ml-auto shrink-0 tabular-nums text-gray-600">{fmtMonto(f.total)}</span>
                                 </label>
@@ -716,7 +716,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
               value={cajas}
               onChange={(e) => { setCajas(e.target.value); setError(null); }}
               aria-label="Bultos"
-              className="w-[130px] rounded-md border border-gray-200 px-3 text-center font-mono text-xl font-semibold outline-none transition focus:border-black min-h-[44px]"
+              className="w-[130px] rounded-md border border-gray-200 px-3 text-center tabular-nums text-xl font-semibold outline-none transition focus:border-black min-h-[44px]"
             />
 
             <div className="mt-4">
@@ -845,7 +845,7 @@ function ModalReimprimir({
               onChange={(e) => setCaja(e.target.value)}
               aria-label="Cuál bulto"
               onClick={(e) => e.stopPropagation()}
-              className="w-[86px] rounded-md border border-gray-200 px-2 text-center font-mono outline-none transition focus:border-black min-h-[44px]"
+              className="w-[86px] rounded-md border border-gray-200 px-2 text-center tabular-nums outline-none transition focus:border-black min-h-[44px]"
             />
             <span className="text-sm text-gray-600">de {etiqueta.cajas}</span>
           </div>
@@ -929,7 +929,7 @@ function ModalCorregir({
           value={cajas}
           onChange={(e) => { setCajas(e.target.value); setError(null); }}
           aria-label="Bultos"
-          className="w-[130px] rounded-md border border-gray-200 px-3 text-center font-mono text-xl font-semibold outline-none transition focus:border-black min-h-[44px]"
+          className="w-[130px] rounded-md border border-gray-200 px-3 text-center tabular-nums text-xl font-semibold outline-none transition focus:border-black min-h-[44px]"
         />
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         <div className="mt-4 flex gap-3">

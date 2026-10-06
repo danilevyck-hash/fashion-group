@@ -80,7 +80,7 @@ export default function ConfirmarEliminar({
         )}
 
         <label htmlFor="mk-eliminar-palabra" className="block text-sm text-gray-600 mb-1">
-          Escribe <span className="font-mono font-semibold text-gray-900">{PALABRA_PARA_ANULAR}</span> para confirmar
+          Escribe <span className="tabular-nums font-semibold text-gray-900">{PALABRA_PARA_ANULAR}</span> para confirmar
         </label>
         <input
           id="mk-eliminar-palabra"
@@ -92,7 +92,7 @@ export default function ConfirmarEliminar({
           autoCorrect="off"
           spellCheck={false}
           placeholder={PALABRA_PARA_ANULAR}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm font-mono tracking-wider focus:border-black focus:outline-none mb-4"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm tabular-nums tracking-wider focus:border-black focus:outline-none mb-4"
         />
 
         <div className="flex gap-3">

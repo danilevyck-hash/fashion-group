@@ -75,9 +75,9 @@ function Fila({ f, nombre, total = false }: { f: FilaResumenRango; nombre: strin
   return (
     <tr className={total ? "font-medium text-gray-900" : "border-b border-gray-100 text-gray-900"}>
       <td className="px-3 py-2.5">{nombre}</td>
-      <td className="px-3 py-2.5 text-right font-mono tabular-nums">{fmtMoney(f.venta)}</td>
+      <td className="px-3 py-2.5 text-right tabular-nums">{fmtMoney(f.venta)}</td>
       <td className={`px-3 py-2.5 text-right tabular-nums ${colorDelSigno(d)}`}>{cambioDeLaTira(d) ?? "Nuevo"}</td>
-      <td className="hidden px-3 py-2.5 text-right font-mono tabular-nums sm:table-cell">{f.utilidad == null ? "—" : fmtMoney(f.utilidad)}</td>
+      <td className="hidden px-3 py-2.5 text-right tabular-nums sm:table-cell">{f.utilidad == null ? "—" : fmtMoney(f.utilidad)}</td>
       <td className="px-3 py-2.5 text-right tabular-nums">{fmtPorcentaje(f.margen)}</td>
     </tr>
   );

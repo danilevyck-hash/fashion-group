@@ -1332,8 +1332,8 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                   <tbody>
                     {catalogo.map((r, i) => (
                       <tr key={i} className="hover:bg-gray-50">
-                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[11px]">{r.po || "—"}</td>
-                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[11px]">{r.newArticle}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 tabular-nums text-[11px]">{r.po || "—"}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 tabular-nums text-[11px]">{r.newArticle}</td>
                         <td className="border-b border-gray-100 px-2 py-2">{r.name}</td>
                         <td className="border-b border-gray-100 px-2 py-2 text-[11px]">{r.department}</td>
                         <td className="border-b border-gray-100 px-2 py-2 text-[11px]">{r.gender}</td>
@@ -1368,11 +1368,11 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                   <tbody>
                     {switchRows.map((r, i) => (
                       <tr key={i} className="hover:bg-gray-50">
-                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[11px]">{num(r.cols["Código *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 tabular-nums text-[11px]">{num(r.cols["Código *"])}</td>
                         <td className={`border-b border-gray-100 px-2 py-2 text-center text-[11px] ${r.fallback ? "bg-amber-50 font-semibold text-amber-800" : ""}`} title={r.fallback ? "No se halló la talla exacta; se usó la más cercana. Revisa." : undefined}>
                           {r.talla || "—"}
                         </td>
-                        <td className="border-b border-gray-100 px-2 py-2 font-mono text-[11px] break-all">{num(r.cols["Código Barra *"])}</td>
+                        <td className="border-b border-gray-100 px-2 py-2 tabular-nums text-[11px] break-all">{num(r.cols["Código Barra *"])}</td>
                         <td className="border-b border-gray-100 px-2 py-2">{num(r.cols["Descripción *"])}</td>
                         <td className="border-b border-gray-100 px-2 py-2 text-[11px]">{num(r.cols["Marca *"])}</td>
                         <td className="border-b border-gray-100 px-2 py-2 text-[11px]">{num(r.cols["rubro *"])}</td>
@@ -1401,7 +1401,7 @@ const inputCls =
   "w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const selectCls = inputCls;
 const miniInputCls =
-  "h-8 w-20 rounded-md border border-gray-300 bg-gray-50 px-2 text-right font-mono text-[13px] text-gray-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
+  "h-8 w-20 rounded-md border border-gray-300 bg-gray-50 px-2 text-right tabular-nums text-[13px] text-gray-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const miniSelectCls =
   "h-8 rounded-md border border-gray-300 bg-gray-50 px-2 text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 

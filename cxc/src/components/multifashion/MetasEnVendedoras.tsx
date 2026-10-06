@@ -101,7 +101,7 @@ export function MetasEnVendedoras() {
           {meta.tipo === "grupal" && (
             <p className="mb-2 text-xs text-gray-600">
               La tienda lleva{" "}
-              <span className="font-mono tabular-nums text-gray-800">
+              <span className="tabular-nums text-gray-800">
                 {fmtMoney(meta.avance.vendido)}
               </span>{" "}
               de {fmtMoney(meta.avance.objetivo)}. Esta meta cuenta toda la venta de la
@@ -114,7 +114,7 @@ export function MetasEnVendedoras() {
               <li key={v.clave}>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                   <span className="min-w-0 text-sm text-gray-800">{v.nombre}</span>
-                  <span className="font-mono text-sm tabular-nums text-gray-700">
+                  <span className="text-sm tabular-nums text-gray-700">
                     {fmtMoney(v.vendido)}
                     {meta.tipo === "grupal" ? (
                       <span className="ml-2 text-gray-500">{pct(v.aporte)} del avance</span>

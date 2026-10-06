@@ -9,13 +9,13 @@ import { atencionMultifashion, articulosMultifashion } from "@/lib/multifashion/
 import type { RenglonRanking } from "@/lib/multifashion/productos-ranking";
 
 describe("AJUSTES_APPLE_6_2026_10", () => {
-  it("nace apagado (se prende con el «sí» de Daniel)", () => {
-    expect(AJUSTES_APPLE_6_2026_10).toBe(false);
+  it("prendido (Daniel aprobó el 6-oct-2026)", () => {
+    expect(AJUSTES_APPLE_6_2026_10).toBe(true);
   });
 
-  it("1 · el círculo no cambia quién marca", () => {
-    expect(["admin", "bodega"].map(puedeMarcarPedidos)).toEqual([true, true]);
-    expect(["secretaria", "vendedor", null].map(puedeMarcarPedidos)).toEqual([false, false, false]);
+  it("1 · marcan todos los que ven Guías; contabilidad no", () => {
+    expect(["admin", "secretaria", "bodega", "vendedor"].map(puedeMarcarPedidos)).toEqual([true, true, true, true]);
+    expect(["contabilidad", "gerente_acs", "gerente_boston", "marcacion", null].map(puedeMarcarPedidos)).toEqual([false, false, false, false, false]);
     const v = fs.readFileSync("src/app/guias/components/PedidosView.tsx", "utf8");
     expect(v).toMatch(/if \(!puedeMarcar\) return <span/); // quien no marca ve el círculo quieto
   });

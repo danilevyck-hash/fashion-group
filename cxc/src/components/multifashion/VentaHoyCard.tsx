@@ -171,10 +171,10 @@ export function VentaHoyCard({ syncTick = 0, habilitado = true }: VentaHoyCardPr
 
       {data.hayVentas ? (
         <>
-          <span className="font-mono text-xl font-semibold tabular-nums tracking-tight text-gray-950">
+          <span className="text-xl font-semibold tabular-nums tracking-tight text-gray-950">
             {fmtMoney(data.ventas)}
           </span>
-          <span className="font-mono text-xs tabular-nums text-gray-600">
+          <span className="text-xs tabular-nums text-gray-600">
             {data.documentos} {data.documentos === 1 ? "ticket" : "tickets"}
           </span>
           {data.semanaPasada && (

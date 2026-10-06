@@ -151,7 +151,7 @@ function HoraTooltip({ active, payload }: {
   return (
     <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-sm">
       <p className="font-medium text-gray-950">{horaPicoLabel(row.hora)}</p>
-      <p className="mt-0.5 font-mono tabular-nums text-gray-700">{fmtMoney(row.ventas)}</p>
+      <p className="mt-0.5 tabular-nums text-gray-700">{fmtMoney(row.ventas)}</p>
       <p className="text-xs text-gray-500">
         {row.n_tickets} {row.n_tickets === 1 ? "ticket" : "tickets"}
       </p>
@@ -206,7 +206,7 @@ function ChartTooltip({
       {rows.map((r, i) => (
         <div key={i} className="flex items-center justify-between gap-4">
           <span className="text-gray-500">{r.label}</span>
-          <span className={cn("font-mono tabular-nums text-gray-950", r.tone)}>{r.value}</span>
+          <span className={cn(" tabular-nums text-gray-950", r.tone)}>{r.value}</span>
         </div>
       ))}
     </div>

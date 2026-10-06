@@ -4,13 +4,14 @@
 // en `globals.css`, que pone `layout.tsx` con el interruptor. Este candado:
 //   1. la palanca existe y cubre `font-mono` y la cifra de Caja menuda;
 //   2. ninguna pantalla trae una monoespaciada por fuera de la palanca;
-//   3. `font-mono` no crece (techo que solo baja; al prender, se barre a 0).
+//   3. `font-mono` no vuelve (barrido a 0 el 6-oct-2026).
 import { readdirSync, readFileSync, statSync } from "fs";
 import { join } from "path";
 import { describe, it, expect } from "vitest";
 import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 
-const TECHO_FONT_MONO = 367;
+// 6-oct-2026: Daniel aprobó; el barrido dejó la clase en CERO (la palanca de globals.css queda de red).
+const TECHO_FONT_MONO = 0;
 // La única definición de monoespaciada permitida: la variable de Caja, que la palanca pisa.
 const MONO_PERMITIDA = ["src/app/caja/skin.css"];
 const MONO = /monospace|ui-monospace|Menlo|Consolas|Courier|font-\[[^\]]*mono/i;
@@ -42,7 +43,7 @@ describe("una sola tipografía", () => {
   });
 
   it(`font-mono no crece (techo ${TECHO_FONT_MONO}, solo baja)`, () => {
-    const n = todos.reduce((s, f) => s + (readFileSync(f, "utf8").match(/\bfont-mono\b/g) ?? []).length, 0);
+    const n = todos.filter((f) => f !== "src/app/globals.css").reduce((s, f) => s + (readFileSync(f, "utf8").match(/(?<![\w-])font-mono\b/g) ?? []).length, 0);
     expect(n).toBeLessThanOrEqual(TECHO_FONT_MONO);
   });
 });

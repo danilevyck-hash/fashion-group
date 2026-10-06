@@ -1140,7 +1140,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                   ))}
                 </div>
                 <div className="mt-2.5 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-[12px] text-gray-600">
-                  precio = <b className="font-mono text-gray-800">{draftFormulaTxt}</b>
+                  precio = <b className="tabular-nums text-gray-800">{draftFormulaTxt}</b>
                 </div>
               </>
             ) : (
@@ -1244,7 +1244,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                   value={massPrice}
                   onChange={(e) => setMassPrice(e.target.value)}
                   placeholder="Precio"
-                  className="w-24 rounded-md border border-gray-300 bg-white px-2 py-1 text-right font-mono text-[13px] focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
+                  className="w-24 rounded-md border border-gray-300 bg-white px-2 py-1 text-right tabular-nums text-[13px] focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
                 />
                 <button
                   type="button"
@@ -1320,7 +1320,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                         {PREVIEW_COLS_RENDER.map((c) => {
                           if (c === "__calc") {
                             return (
-                              <td key="__calc" className="w-px whitespace-nowrap border-b border-gray-100 px-2 py-2 text-right font-mono text-[11px] text-gray-400">
+                              <td key="__calc" className="w-px whitespace-nowrap border-b border-gray-100 px-2 py-2 text-right tabular-nums text-[11px] text-gray-400">
                                 {calcCell(d)}
                               </td>
                             );
@@ -1333,7 +1333,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                                   value={displayPrice(d)}
                                   aria-label={`Precio ${refDe(d)}`}
                                   onChange={(e) => onPriceEdit(d, e.target.value)}
-                                  className={`w-14 rounded-md border px-1 py-0.5 text-right font-mono text-xs ${
+                                  className={`w-14 rounded-md border px-1 py-0.5 text-right tabular-nums text-xs ${
                                     priceEdited
                                       ? "border-amber-600 bg-amber-50 font-semibold text-amber-800"
                                       : "border-gray-300 bg-white text-gray-900"
@@ -1348,9 +1348,9 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                           const isBarcode = c === "Código Barra *";
                           const isCodigo = c === "Código *";
                           const cls = isBarcode
-                            ? "font-mono text-[11px] break-all"
+                            ? "tabular-nums text-[11px] break-all"
                             : isCodigo
-                              ? "font-mono text-[11px]"
+                              ? "tabular-nums text-[11px]"
                               : narrow
                                 ? "whitespace-nowrap text-right"
                                 : "";
@@ -1465,7 +1465,7 @@ const priceLabelCls = "mb-1.5 block text-[11px] font-semibold uppercase tracking
 const priceFieldCls =
   "h-9 w-full rounded-md border border-gray-300 bg-gray-50 px-3 text-sm text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const miniInputCls =
-  "h-8 w-20 rounded-md border border-gray-300 bg-gray-50 px-2 text-right font-mono text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
+  "h-8 w-20 rounded-md border border-gray-300 bg-gray-50 px-2 text-right tabular-nums text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 const miniSelectCls =
   "h-8 rounded-md border border-gray-300 bg-gray-50 px-2 text-[13px] text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20";
 

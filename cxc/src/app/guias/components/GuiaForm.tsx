@@ -1013,7 +1013,7 @@ export default function GuiaForm({
         <button type="button" onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">{etiquetaVolver}</button>
         <div className="flex items-baseline gap-2.5">
           <h1 className="text-[26px] font-semibold tracking-tight">Nueva guía</h1>
-          <span className="text-sm text-gray-400 font-mono">GT-{String(formNumero).padStart(3, "0")}</span>
+          <span className="text-sm text-gray-400 tabular-nums">GT-{String(formNumero).padStart(3, "0")}</span>
         </div>
 
         {dosColumnas(<>
@@ -1157,7 +1157,7 @@ export default function GuiaForm({
           {/* Volver: era una línea de texto de 18 px de alto. -mx-2 para que el
               "←" siga alineado con el borde izquierdo de la barra. */}
           <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2 shrink-0">{etiquetaVolver}</button>
-          <span className="text-sm text-gray-300 font-mono shrink-0">GT-{String(formNumero).padStart(3, "0")}</span>
+          <span className="text-sm text-gray-300 tabular-nums shrink-0">GT-{String(formNumero).padStart(3, "0")}</span>
           {/* En 390px el estado no entra junto al botón: vive abajo, en la
               cabecera de "Detalle de Envío". */}
           <span className="hidden sm:block truncate"><StatusBadge /></span>

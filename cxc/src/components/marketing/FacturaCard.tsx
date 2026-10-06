@@ -93,7 +93,7 @@ export function FacturaCard({
       <div className={`grid grid-cols-3 gap-2 text-xs ${textoSec}`}>
         <div>
           <div className="text-gray-400">Subtotal</div>
-          <div className={`tabular-nums font-mono ${textoBase}`}>
+          <div className={`tabular-nums ${textoBase}`}>
             {formatearMonto(factura.subtotal)}
           </div>
         </div>
@@ -103,7 +103,7 @@ export function FacturaCard({
               ? `Importación ${PORCENTAJE_IMPORTACION_ZONA_LIBRE}%`
               : "ITBMS"}
           </div>
-          <div className={`tabular-nums font-mono ${textoBase}`}>
+          <div className={`tabular-nums ${textoBase}`}>
             {factura.tiene_importacion
               ? formatearMonto(
                   calcularImportacion(factura.subtotal, true),
@@ -113,7 +113,7 @@ export function FacturaCard({
         </div>
         <div>
           <div className="text-gray-400">Total</div>
-          <div className={`tabular-nums font-mono ${textoBase}`}>
+          <div className={`tabular-nums ${textoBase}`}>
             {formatearMonto(factura.total)}
           </div>
         </div>

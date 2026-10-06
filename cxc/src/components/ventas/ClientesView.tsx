@@ -737,7 +737,7 @@ export function ClientesView({
               dice el encabezado «vs 2025» de la columna. */}
           <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-gray-500 lg:flex">
             <p>
-              <span className="font-mono text-gray-950">{cuantosClientes}</span> clientes
+              <span className="tabular-nums text-gray-950">{cuantosClientes}</span> clientes
               {frescura && !enUtilidad && <span data-frescura-clientes> · {frescura}</span>}
               {enUtilidad && <span data-periodo-utilidad> · Año {selectedYear}</span>}
             </p>
@@ -748,7 +748,7 @@ export function ClientesView({
             qué compara van en UNA línea al final (Daniel, 4-oct-2026). */}
         {enUtilidad && (
           <div className="text-xs text-gray-500 lg:hidden">
-            <span className="font-mono text-gray-950">{cuantosClientes}</span> clientes
+            <span className="tabular-nums text-gray-950">{cuantosClientes}</span> clientes
             <span data-periodo-utilidad> · Año {selectedYear}</span>
           </div>
         )}
@@ -882,9 +882,9 @@ export function ClientesView({
                     {mostradorRow.nombre}
                     <span className="ml-2 text-xs font-normal text-gray-500">ventas de contado · fuera del ranking</span>
                   </td>
-                  <td data-col="ytd" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-sm font-medium text-gray-700 tabular-nums">{fmtMoney(mostradorRow.ytd)}</td>
+                  <td data-col="ytd" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right text-sm font-medium text-gray-700 tabular-nums">{fmtMoney(mostradorRow.ytd)}</td>
                   <td className="border-b border-gray-200 px-2.5 py-3 text-right text-gray-400">—</td>
-                  <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{mostradorRow.ultima || "—"}</td>
+                  <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right text-xs text-gray-500 tabular-nums">{mostradorRow.ultima || "—"}</td>
                 </tr>
               )}
 
@@ -899,7 +899,7 @@ export function ClientesView({
                       onClick={() => setCeroAbierto(v => !v)}
                       className="flex min-h-[44px] w-full items-center gap-2 px-2.5 text-left text-xs text-gray-600 hover:bg-gray-100"
                     >
-                      <span className="font-mono tabular-nums text-gray-950">{bloques.enCero.length}</span>
+                      <span className="tabular-nums text-gray-950">{bloques.enCero.length}</span>
                       <span>{textoSinCompras(selectedYear, periodoServido)}</span>
                       <span className="ml-auto font-medium text-blue-600">{ceroAbierto ? "ocultar" : "ver"}</span>
                     </button>
@@ -960,7 +960,7 @@ export function ClientesView({
             </div>
             <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
               <span>ventas de contado · fuera del ranking</span>
-              <span data-col="ytd" className="font-mono tabular-nums text-gray-700">{fmtMoney(mostradorRow.ytd)}</span>
+              <span data-col="ytd" className="tabular-nums text-gray-700">{fmtMoney(mostradorRow.ytd)}</span>
             </div>
           </div>
         )}
@@ -972,7 +972,7 @@ export function ClientesView({
             onClick={() => setCeroAbierto(v => !v)}
             className="flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 text-left text-xs text-gray-600 active:bg-gray-100"
           >
-            <span className="font-mono tabular-nums text-gray-950">{bloques.enCero.length}</span>
+            <span className="tabular-nums text-gray-950">{bloques.enCero.length}</span>
             <span>{textoSinCompras(selectedYear, periodoServido)}</span>
             <span className="ml-auto font-medium text-blue-600">{ceroAbierto ? "ocultar" : "ver"}</span>
           </button>
@@ -993,7 +993,7 @@ export function ClientesView({
         {/* 🔴 UNA línea gris al final (Daniel, 4-oct-2026): cuántos, de cuándo
             y contra qué compara el %. Nada de párrafos arriba de la lista. */}
         <p data-comparativo-clientes className="px-1 pt-1 text-xs text-gray-500">
-          <span className="font-mono text-gray-950">{cuantosClientes}</span> clientes
+          <span className="tabular-nums text-gray-950">{cuantosClientes}</span> clientes
           {frescura && <span data-frescura-clientes> · {frescura}</span>}
           {" · "}{textoComparativo(anioComparativo, periodoServido)}
         </p>
@@ -1074,7 +1074,7 @@ function CambioCelda({ c, className }: { c: Cliente; className?: string }) {
   }
   const fmt = formatDeltaRatio(c.delta);
   return (
-    <span data-col="delta" className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone], className)}>
+    <span data-col="delta" className={cn(" text-xs tabular-nums", TONE_LIGHT[fmt.tone], className)}>
       {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
       {fmt.displayValue}
     </span>
@@ -1125,7 +1125,7 @@ function ClienteRow({
       className={`cursor-pointer transition hover:bg-gray-50 ${resaltado ? "bg-gray-100" : ""}`}
     >
       {mostrarRanking && (
-        <td className="border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{displayRank}</td>
+        <td className="border-b border-gray-200 px-2.5 py-3 text-right text-xs text-gray-500 tabular-nums">{displayRank}</td>
       )}
       <td className="border-b border-gray-200 px-2.5 py-3 text-sm text-gray-950">
         {/* Escritorio (lg+): HoverCard con popover. Debajo de lg el mismo
@@ -1149,7 +1149,7 @@ function ClienteRow({
                 {c.nombre}
                 {c.esDelGrupo && <DelGrupoBadge />}
               </span>
-              <span data-col="codigo" className="font-mono text-xs font-normal leading-tight text-gray-500">{c.id}</span>
+              <span data-col="codigo" className="tabular-nums text-xs font-normal leading-tight text-gray-500">{c.id}</span>
             </Link>
           </HoverCardTrigger>
           <HoverCardContent
@@ -1202,13 +1202,13 @@ function ClienteRow({
                   (c.empresas_breakdown ?? []).map(b => (
                     <div key={b.empresaKey} className="flex justify-between gap-4 text-xs">
                       <span className="text-gray-300">{nombreCortoEmpresa(b.empresaKey)}</span>
-                      <span className="font-mono text-white tabular-nums">{fmtMoney(b.monto)}</span>
+                      <span className="text-white tabular-nums">{fmtMoney(b.monto)}</span>
                     </div>
                   ))
                 ) : (
                   <div className="flex justify-between gap-4 text-xs">
                     <span className="text-gray-300">{c.empresaKey ? nombreCortoEmpresa(c.empresaKey) : c.empresa}</span>
-                    <span className="font-mono text-white tabular-nums">{fmtMoney(c.ytd)}</span>
+                    <span className="text-white tabular-nums">{fmtMoney(c.ytd)}</span>
                   </div>
                 )}
               </div>
@@ -1216,11 +1216,11 @@ function ClienteRow({
           </Tooltip>
         </TooltipProvider>
       </td>
-      <td data-col="ytd" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(c.ytd)}</td>
+      <td data-col="ytd" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(c.ytd)}</td>
       <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right">
         <CambioCelda c={c} />
       </td>
-      <td data-col="ultima" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{c.ultima || "—"}</td>
+      <td data-col="ultima" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right text-xs text-gray-500 tabular-nums">{c.ultima || "—"}</td>
     </tr>
   );
 }
@@ -1284,7 +1284,7 @@ function ClienteCard({
           </Link>
         </div>
         <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">
-          <span data-col="codigo" className="font-mono">{c.id}</span>
+          <span data-col="codigo" className="tabular-nums">{c.id}</span>
           {/* Mismo criterio que la columna del escritorio: el NÚMERO. Cuáles
               son sale al tocar la tarjeta (`ClienteSheet`). */}
           {showEmpresa && (
@@ -1307,7 +1307,7 @@ function ClienteCard({
               `data-col` conserva su nombre: es el ancla del verificador
               (`scripts/_verif-ventas-ipad.mjs`), y ahora las dos vistas dicen
               carácter por carácter lo mismo. */}
-          <div data-col="ytd-compacto" className="font-mono text-base font-medium tabular-nums text-gray-950">
+          <div data-col="ytd-compacto" className="text-base font-medium tabular-nums text-gray-950">
             {fmtMoney(c.ytd)}
           </div>
           <CambioCelda c={c} />

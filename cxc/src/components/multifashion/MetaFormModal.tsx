@@ -315,7 +315,7 @@ export function MetaFormModal({
                 value={objetivo}
                 onChange={(e) => setObjetivo(e.target.value)}
                 placeholder="420000"
-                className={`${CAMPO} font-mono tabular-nums`}
+                className={`${CAMPO} tabular-nums`}
               />
               <p className="mt-1 text-xs text-gray-500">
                 Es toda la venta de mostrador de la tienda, sin ITBMS, con los descuentos ya
@@ -329,7 +329,7 @@ export function MetaFormModal({
               </p>
               <p className="mt-1 text-xs text-gray-500">
                 Entre todas suman{" "}
-                <span className="font-mono tabular-nums text-gray-800">
+                <span className="tabular-nums text-gray-800">
                   {fmtMoney(sumaIndividuales)}
                 </span>
                 . Es la venta de mostrador sin ITBMS, con los descuentos ya aplicados y las
@@ -395,7 +395,7 @@ export function MetaFormModal({
                 value={premioMonto}
                 onChange={(e) => setPremioMonto(e.target.value)}
                 placeholder="2000"
-                className={`${CAMPO} font-mono tabular-nums`}
+                className={`${CAMPO} tabular-nums`}
               />
             </div>
           </div>
@@ -469,7 +469,7 @@ export function MetaFormModal({
                           </span>
                         )}
                       </span>
-                      <span className="shrink-0 font-mono text-xs tabular-nums text-gray-500">
+                      <span className="shrink-0 text-xs tabular-nums text-gray-500">
                         {fmtMoney(v.ventas)}
                       </span>
                     </button>
@@ -492,7 +492,7 @@ export function MetaFormModal({
                           // Mismo motivo que el texto de arriba: el placeholder
                           // decía "el monto de arriba" y ese monto NO se hereda.
                           placeholder="sin esto no tiene meta"
-                          className="min-h-[44px] w-40 rounded-md border border-gray-300 px-2 py-1 font-mono text-sm tabular-nums outline-none focus:border-gray-900"
+                          className="min-h-[44px] w-40 rounded-md border border-gray-300 px-2 py-1 text-sm tabular-nums outline-none focus:border-gray-900"
                         />
                       </div>
                     )}

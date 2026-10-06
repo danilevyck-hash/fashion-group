@@ -256,11 +256,11 @@ export function UtilidadView({
       {data && !loading && (
         <p data-totales-utilidad className="mt-3 flex flex-wrap items-baseline gap-x-2 text-xs text-gray-500">
           <span>
-            Ventas <span className="font-mono tabular-nums text-gray-900">{montoDeLaTabla(data.totales.ventas)}</span>
+            Ventas <span className="tabular-nums text-gray-900">{montoDeLaTabla(data.totales.ventas)}</span>
             <span className="mx-2 text-gray-300">·</span>
-            Utilidad <span className="font-mono tabular-nums text-gray-900">{montoDeLaTabla(data.totales.utilidad)}</span>
+            Utilidad <span className="tabular-nums text-gray-900">{montoDeLaTabla(data.totales.utilidad)}</span>
             <span className="mx-2 text-gray-300">·</span>
-            Margen <span className="font-mono tabular-nums text-gray-900">{fmtMargenPantalla(data.totales.margen)}</span>
+            Margen <span className="tabular-nums text-gray-900">{fmtMargenPantalla(data.totales.margen)}</span>
           </span>
           <span data-alcance-utilidad>
             {alcanceEmpresas(data.empresas)} · Excluye Boston y Multifashion
@@ -336,10 +336,10 @@ function UtilidadRow({ r }: { r: UtilidadClienteRow }) {
         )}
       </td>
       <td data-col="empresa" className="px-3 py-2.5 text-gray-500">{nombreCortoEmpresa(r.empresaKey)}</td>
-      <td data-col="ventas" className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-700">{fmtMoneySigned(r.ventas)}</td>
-      <td data-col="costo" className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-500">{fmtMoneySigned(r.costo)}</td>
-      <td data-col="utilidad" className={`px-3 py-2.5 text-right font-mono font-medium tabular-nums ${utilCls}`}>{fmtMoneySigned(r.utilidad)}</td>
-      <td data-col="margen" className={`px-3 py-2.5 text-right font-mono tabular-nums ${margenCls}`}>{fmtMargenPantalla(r.margen)}</td>
+      <td data-col="ventas" className="px-3 py-2.5 text-right tabular-nums text-gray-700">{fmtMoneySigned(r.ventas)}</td>
+      <td data-col="costo" className="px-3 py-2.5 text-right tabular-nums text-gray-500">{fmtMoneySigned(r.costo)}</td>
+      <td data-col="utilidad" className={`px-3 py-2.5 text-right font-medium tabular-nums ${utilCls}`}>{fmtMoneySigned(r.utilidad)}</td>
+      <td data-col="margen" className={`px-3 py-2.5 text-right tabular-nums ${margenCls}`}>{fmtMargenPantalla(r.margen)}</td>
     </tr>
   );
 }
@@ -373,19 +373,19 @@ function UtilidadCard({ r }: { r: UtilidadClienteRow }) {
       <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
         <div className="flex items-baseline justify-between gap-2">
           <dt className="text-xs text-gray-400">Ventas</dt>
-          <dd data-col="ventas" className="font-mono tabular-nums text-gray-700">{fmtMoneySigned(r.ventas)}</dd>
+          <dd data-col="ventas" className="tabular-nums text-gray-700">{fmtMoneySigned(r.ventas)}</dd>
         </div>
         <div className="flex items-baseline justify-between gap-2">
           <dt className="text-xs text-gray-400">Costo</dt>
-          <dd data-col="costo" className="font-mono tabular-nums text-gray-500">{fmtMoneySigned(r.costo)}</dd>
+          <dd data-col="costo" className="tabular-nums text-gray-500">{fmtMoneySigned(r.costo)}</dd>
         </div>
         <div className="flex items-baseline justify-between gap-2">
           <dt className="text-xs text-gray-400">Utilidad</dt>
-          <dd data-col="utilidad" className={`font-mono font-medium tabular-nums ${utilCls}`}>{fmtMoneySigned(r.utilidad)}</dd>
+          <dd data-col="utilidad" className={`font-medium tabular-nums ${utilCls}`}>{fmtMoneySigned(r.utilidad)}</dd>
         </div>
         <div className="flex items-baseline justify-between gap-2">
           <dt className="text-xs text-gray-400">Margen %</dt>
-          <dd data-col="margen" className={`font-mono tabular-nums ${margenCls}`}>{fmtMargenPantalla(r.margen)}</dd>
+          <dd data-col="margen" className={`tabular-nums ${margenCls}`}>{fmtMargenPantalla(r.margen)}</dd>
         </div>
       </dl>
     </div>

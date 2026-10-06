@@ -745,15 +745,15 @@ function MesVsMesCard({
         {mes}
       </p>
       <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">{fmtMoney(curr)}</span>
+        <span className="text-[26px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">{fmtMoney(curr)}</span>
         {delta !== null && (
-          <span className={cn("font-mono text-sm font-medium tabular-nums", up ? "text-emerald-700" : "text-red-600")}>
+          <span className={cn(" text-sm font-medium tabular-nums", up ? "text-emerald-700" : "text-red-600")}>
             {up ? "▲" : "▼"} {Math.abs(delta * 100).toFixed(0)}%
           </span>
         )}
       </div>
       <p className="mt-1.5 text-xs text-gray-500">
-        vs <span className="font-mono tabular-nums">{fmtMoney(prev)}</span> en {year - 1}
+        vs <span className="tabular-nums">{fmtMoney(prev)}</span> en {year - 1}
       </p>
     </Card>
   );
@@ -783,7 +783,7 @@ function KpiCard({
   const cuerpo = (
     <>
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="mt-1.5 font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">{value}</p>
+      <p className="mt-1.5 text-[26px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">{value}</p>
       {sub && <p className={cn("mt-1.5 text-xs font-medium", tono)} title={title}>{sub}</p>}
     </>
   );
@@ -835,7 +835,7 @@ function EmpresaProjectionCell({
   fondo: string;
 }) {
   const base = cn(
-    "sticky right-0 z-10 whitespace-nowrap border-b border-gray-200 text-right font-mono text-xs tabular-nums transition-colors",
+    "sticky right-0 z-10 whitespace-nowrap border-b border-gray-200 text-right text-xs tabular-nums transition-colors",
     fondo,
   );
   if (!proyeccion) {
@@ -882,7 +882,7 @@ function TotalGroupProjectionCell({ totales }: { totales: ProyeccionGrupo }) {
     <td
       data-col-fija="proyeccion"
       style={{ minWidth: ANCHO_PROYECCION_PX, width: ANCHO_PROYECCION_PX }}
-      className="sticky right-0 z-10 whitespace-nowrap bg-gray-950 px-2 py-3.5 text-right font-mono text-sm font-semibold tabular-nums"
+      className="sticky right-0 z-10 whitespace-nowrap bg-gray-950 px-2 py-3.5 text-right text-sm font-semibold tabular-nums"
     >
       <span className="block text-white">{fmtMoneyCompact(totales.proyeccion_cierre)}</span>
       <p className={cn(
@@ -944,7 +944,7 @@ function HeatCell({
     return (
       <td
         data-mes-proyectado={columna}
-        className="whitespace-nowrap border-b border-gray-200 bg-gray-50 px-1.5 py-3.5 text-right font-mono text-xs tabular-nums text-gray-400"
+        className="whitespace-nowrap border-b border-gray-200 bg-gray-50 px-1.5 py-3.5 text-right text-xs tabular-nums text-gray-400"
       >
         {renderCellValue(proyectado, mode)}
       </td>
@@ -955,7 +955,7 @@ function HeatCell({
   const hasPrev = cell.ventasPrev > 0 || cell.utilidadPrev > 0;
   if (cur == null && !hasPrev) {
     return (
-      <td className="whitespace-nowrap border-b border-gray-200 px-1.5 py-3.5 text-right font-mono text-xs tabular-nums">
+      <td className="whitespace-nowrap border-b border-gray-200 px-1.5 py-3.5 text-right text-xs tabular-nums">
         <span className="text-gray-400">—</span>
       </td>
     );
@@ -970,7 +970,7 @@ function HeatCell({
   // % tiene que estar A LA VISTA (ver DeltaCelda en lib/ventas/celda.ts): con
   // solo la flecha hay que tocar celda por celda para saber cuánto subió.
   return (
-    <td className="whitespace-nowrap border-b border-gray-200 p-0 text-right font-mono text-xs tabular-nums">
+    <td className="whitespace-nowrap border-b border-gray-200 p-0 text-right text-xs tabular-nums">
       <button
         type="button"
         data-celda={foco}
@@ -1060,7 +1060,7 @@ function EmpresaTotalCell({
     <td
       data-col-fija="total"
       style={{ right }}
-      className={cn("sticky z-10 whitespace-nowrap border-b border-gray-200 p-0 text-right font-mono tabular-nums transition-colors", fondo, SOMBRA_FIJA)}
+      className={cn("sticky z-10 whitespace-nowrap border-b border-gray-200 p-0 text-right tabular-nums transition-colors", fondo, SOMBRA_FIJA)}
     >
       <button
         type="button"
@@ -1112,7 +1112,7 @@ function TotalGroupCell({
     return (
       <td
         data-mes-proyectado-grupo={columna}
-        className="whitespace-nowrap bg-white/5 px-1.5 py-3.5 text-right font-mono text-xs tabular-nums text-gray-400"
+        className="whitespace-nowrap bg-white/5 px-1.5 py-3.5 text-right text-xs tabular-nums text-gray-400"
       >
         {renderCellValue(proyectado, mode)}
       </td>
@@ -1120,7 +1120,7 @@ function TotalGroupCell({
   }
   if (cur == null) {
     return (
-      <td className="whitespace-nowrap px-1.5 py-3.5 text-right font-mono text-xs tabular-nums">
+      <td className="whitespace-nowrap px-1.5 py-3.5 text-right text-xs tabular-nums">
         <span className="text-gray-500">—</span>
       </td>
     );
@@ -1132,7 +1132,7 @@ function TotalGroupCell({
   const foco = celdaKey("d", TOTAL_GRUPO_ID, columna);
 
   return (
-    <td className="whitespace-nowrap p-0 text-right font-mono text-xs tabular-nums">
+    <td className="whitespace-nowrap p-0 text-right text-xs tabular-nums">
       <button
         type="button"
         data-celda={foco}
@@ -1186,7 +1186,7 @@ function TotalGroupAnnualCell({
     <td
       data-col-fija="total"
       style={{ right }}
-      className={cn("sticky z-10 whitespace-nowrap bg-gray-950 p-0 text-right font-mono text-sm font-semibold tabular-nums", SOMBRA_FIJA)}
+      className={cn("sticky z-10 whitespace-nowrap bg-gray-950 p-0 text-right text-sm font-semibold tabular-nums", SOMBRA_FIJA)}
     >
       <button
         type="button"

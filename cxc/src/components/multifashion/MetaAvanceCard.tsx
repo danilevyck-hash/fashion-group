@@ -93,13 +93,13 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
 
       {/* ── 1. Cuánto llevamos ─────────────────────────────────────────── */}
       <div className="mt-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-        <span className="font-mono text-3xl font-semibold tabular-nums tracking-tight text-gray-950 md:text-4xl">
+        <span className="text-3xl font-semibold tabular-nums tracking-tight text-gray-950 md:text-4xl">
           {fmtMoney(a.vendido)}
         </span>
         <span className="text-sm text-gray-600">
           de {fmtMoney(a.objetivo)}
         </span>
-        <span className="font-mono text-sm font-medium tabular-nums text-gray-700">
+        <span className="text-sm font-medium tabular-nums text-gray-700">
           · {pct(a.pctVendido)}
         </span>
       </div>
@@ -123,7 +123,7 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
           </span>
         ) : (
           <>
-            Faltan <strong className="font-mono tabular-nums">{fmtMoney(a.falta)}</strong>
+            Faltan <strong className="tabular-nums">{fmtMoney(a.falta)}</strong>
             {a.estado === "en-curso" && (
               <> y quedan <strong>{a.diasQueFaltan}</strong> {a.diasQueFaltan === 1 ? "día" : "días"}</>
             )}
@@ -157,7 +157,7 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
               <span className="font-medium text-gray-900">
                 {a.estado === "cerrada" ? "Cierre" : "Proyección de cierre"}
               </span>
-              <span className="font-mono text-lg font-semibold tabular-nums text-gray-950">
+              <span className="text-lg font-semibold tabular-nums text-gray-950">
                 {fmtMoney(a.proyeccion)}
               </span>
             </p>
@@ -200,7 +200,7 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
           <span className="font-medium">Premio:</span>
           {meta.premio}
           {meta.premioMonto != null && (
-            <span className="font-mono tabular-nums">({fmtMoney(meta.premioMonto)})</span>
+            <span className="tabular-nums">({fmtMoney(meta.premioMonto)})</span>
           )}
         </p>
       )}
@@ -237,7 +237,7 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
             {meta.porVendedora.map((v) => (
               <li key={v.clave} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                 <span className="min-w-0 text-sm text-gray-800">{v.nombre}</span>
-                <span className="font-mono text-sm tabular-nums text-gray-700">
+                <span className="text-sm tabular-nums text-gray-700">
                   {fmtMoney(v.vendido)}
                   {meta.tipo === "vendedora" && v.avance ? (
                     <span

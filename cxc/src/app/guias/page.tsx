@@ -174,7 +174,8 @@ export default function GuiasPage() {
     const v = new URLSearchParams(window.location.search).get("vista");
     if (v === "config" || v === "etiquetas") setVista(v);
     else if (v === "pedidos" && hayPedidos) setVista("pedidos");
-    else if (hayPedidos && puedeMarcarPedidos(role) && v !== "guias") setVista("pedidos");
+    // Abre en Pedidos para bodega y admin, como antes; los demás marcan pero abren en Guías.
+    else if (hayPedidos && (role === "admin" || role === "bodega") && v !== "guias") setVista("pedidos");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
   function cambiarVista(v: Vista) {

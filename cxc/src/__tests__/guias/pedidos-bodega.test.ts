@@ -31,8 +31,10 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     for (const r of ["admin", "bodega", "secretaria", "vendedor"]) expect(puedeVerPedidosBodega(r)).toBe(true);
     expect(puedeVerPedidosBodega("contabilidad")).toBe(false);
     expect(puedeMarcarPedidos("bodega")).toBe(true);
-    expect(puedeMarcarPedidos("secretaria")).toBe(false);
-    expect(puedeMarcarPedidos("vendedor")).toBe(false);
+    // 6-oct-2026: iguales a Guías (AJUSTES_APPLE_6_2026_10).
+    expect(puedeMarcarPedidos("secretaria")).toBe(true);
+    expect(puedeMarcarPedidos("vendedor")).toBe(true);
+    expect(puedeMarcarPedidos("contabilidad")).toBe(false);
   });
 
   it("v2 PRENDIDA con el «sí» de Daniel al mockup (5-oct-2026)", () => {

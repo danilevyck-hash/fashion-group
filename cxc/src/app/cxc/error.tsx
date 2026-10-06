@@ -56,7 +56,7 @@ export default function CxcError({
       </div>
       <p className="text-xs text-gray-400 max-w-sm">
         Si vuelve a pasar, avísale a Daniel
-        {error.digest ? <> y dile este código: <span className="font-mono">{error.digest}</span></> : null}.
+        {error.digest ? <> y dile este código: <span className="tabular-nums">{error.digest}</span></> : null}.
       </p>
     </div>
   );

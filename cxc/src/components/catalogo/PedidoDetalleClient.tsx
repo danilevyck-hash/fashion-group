@@ -910,7 +910,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3" ref={theme.pedido.nameRefEnContenedor ? nameRef : undefined}>
-          <span className="text-sm font-mono text-gray-400">{order.order_number}</span>
+          <span className="text-sm tabular-nums text-gray-400">{order.order_number}</span>
           {/* 🔴 EL TÍTULO ES EL CLIENTE, Y EL CLIENTE LO PONE EL PICKER.
               En los pedidos INTERNOS acá no se teclea nada: el nombre sale de
               lo que se eligió abajo. El campo de texto libre sobrevive SOLO en
@@ -1021,7 +1021,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   <span className="min-w-0 break-words text-sm">{item.name}</span>
                   <span className="shrink-0 text-sm font-medium tabular-nums">${fmt(linea(item).subtotal)}</span>
                 </div>
-                <div className="text-xs text-gray-400 font-mono break-all">{item.sku}</div>
+                <div className="text-xs text-gray-400 tabular-nums break-all">{item.sku}</div>
                 {typeof item.disponible_pzas === "number" && item.disponible_pzas < linea(item).piezas && (
                   <div className="mt-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 tabular-nums">
                     Disponible al confirmar: {formatBultosPiezas(item.disponible_pzas, item.bulto_pzas || bs(item))}
@@ -1126,7 +1126,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   </td>
                   <td className="py-2">
                     <div className="text-sm">{item.name}</div>
-                    <div className="text-xs text-gray-400 font-mono">{item.sku}</div>
+                    <div className="text-xs text-gray-400 tabular-nums">{item.sku}</div>
                     {/* Pedidos del link: cantidad REAL que había al confirmar.
                         Solo se muestra cuando faltaban piezas — que nadie crea
                         que recibe 12 si hay 8. */}
@@ -1216,7 +1216,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                 <div className="text-sm text-gray-800 mt-0.5">
                   {nombreDeCliente(clienteSwitch)}
                   {clienteSwitch?.codigo && clienteSwitch.nombre ? (
-                    <span className="text-gray-400 font-mono text-xs"> · {clienteSwitch.codigo}</span>
+                    <span className="text-gray-400 tabular-nums text-xs"> · {clienteSwitch.codigo}</span>
                   ) : null}
                 </div>
               ) : (
@@ -1306,14 +1306,14 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             switchEnvio && switchEnvio.estado === "verificado" ? (
               <div className="flex items-center gap-2 text-sm text-emerald-700">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                {tituloCreadoEnSwitch(documentoEnSwitch)}: <span className="font-mono">{switchEnvio.numero_interno}</span> · verificado
+                {tituloCreadoEnSwitch(documentoEnSwitch)}: <span className="tabular-nums">{switchEnvio.numero_interno}</span> · verificado
               </div>
             ) : switchEnvio && switchEnvio.estado === "enviado" ? (
               <div className="text-sm text-amber-700">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-amber-500" />
                   {switchEnvio.numero_interno
-                    ? <>{tituloEnviadoASwitch(documentoEnSwitch)}: <span className="font-mono">{switchEnvio.numero_interno}</span> (sin verificar)</>
+                    ? <>{tituloEnviadoASwitch(documentoEnSwitch)}: <span className="tabular-nums">{switchEnvio.numero_interno}</span> (sin verificar)</>
                     : "Envío en revisión — confirma en el panel de Switch si el pedido se creó"}
                 </div>
                 {/* Lo que hay que saber DESPUÉS de mandar una cotización: la
@@ -1512,7 +1512,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     {switchProblema.lineas.map((l, i) => (
                       <tr key={i} className="border-b border-gray-50">
                         <td className="py-1.5">
-                          <span className="font-mono">{l.sku}</span>
+                          <span className="tabular-nums">{l.sku}</span>
                           <span className="block text-gray-400 truncate max-w-[220px]">{l.descripcionSwitch}</span>
                         </td>
                         <td className="py-1.5 text-center tabular-nums">{l.piezas} <span className="text-gray-400">({l.bultos} bultos)</span></td>

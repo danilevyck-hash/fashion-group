@@ -81,7 +81,7 @@ export function CeldaPulso({
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{rotulo}</p>
       <p
         className={cn(
-          "mt-1 font-mono text-2xl font-medium leading-tight tabular-nums",
+          "mt-1 text-2xl font-medium leading-tight tabular-nums",
           tono === "plata" ? "text-gray-900" : "text-gray-950",
         )}
       >
@@ -89,11 +89,11 @@ export function CeldaPulso({
       </p>
       {delta && anterior ? (
         <p className="mt-1 text-xs text-gray-500">
-          <span className={cn("font-mono font-medium tabular-nums", tonoVariacion(delta.pct ?? delta.abs))}>
+          <span className={cn(" font-medium tabular-nums", tonoVariacion(delta.pct ?? delta.abs))}>
             {flechaVariacion(delta.pct ?? delta.abs)}{" "}
             {delta.pct != null ? fmtVariacionPct(delta.pct, true, 1) : fmtAbs(delta.abs)}
           </span>{" "}
-          contra <span className="font-mono tabular-nums">{anterior}</span> el año pasado
+          contra <span className="tabular-nums">{anterior}</span> el año pasado
         </p>
       ) : null}
     </div>

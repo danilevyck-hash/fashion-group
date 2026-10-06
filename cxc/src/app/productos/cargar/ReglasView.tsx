@@ -152,7 +152,7 @@ export default function ReglasView() {
                 <tr key={r.caso} className="hover:bg-gray-50">
                   <td className="border-b border-gray-100 px-3 py-1.5 font-medium text-gray-900">{r.caso}</td>
                   <td className="border-b border-gray-100 px-3 py-1.5 text-gray-500">{r.detecta}</td>
-                  <td className="border-b border-gray-100 px-3 py-1.5 font-mono text-[12px] text-gray-900">{r.talla}</td>
+                  <td className="border-b border-gray-100 px-3 py-1.5 tabular-nums text-[12px] text-gray-900">{r.talla}</td>
                 </tr>
               ))}
             </tbody>
@@ -302,8 +302,8 @@ export default function ReglasView() {
                 <tbody>
                   {correccionesFiltradas.map((r) => (
                     <tr key={r.sucia} className="hover:bg-gray-50">
-                      <td className="border-b border-gray-100 px-3 py-1.5 font-mono text-[12px] text-gray-600">{r.sucia}</td>
-                      <td className="border-b border-gray-100 px-3 py-1.5 font-mono text-[12px] text-gray-900">{r.limpia}</td>
+                      <td className="border-b border-gray-100 px-3 py-1.5 tabular-nums text-[12px] text-gray-600">{r.sucia}</td>
+                      <td className="border-b border-gray-100 px-3 py-1.5 tabular-nums text-[12px] text-gray-900">{r.limpia}</td>
                     </tr>
                   ))}
                 </tbody>

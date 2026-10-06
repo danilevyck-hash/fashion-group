@@ -448,7 +448,7 @@ function Coincidencias({
             onClick={() => onElegir(c.modelo)}
             className="flex min-h-[44px] items-center gap-2 rounded-md border border-gray-200 px-3 text-left text-sm hover:border-gray-400 active:scale-[0.99]"
           >
-            <span className="font-mono font-medium text-gray-900">{c.modelo}</span>
+            <span className="tabular-nums font-medium text-gray-900">{c.modelo}</span>
             <span className="text-gray-700">{c.descripcion || "—"}</span>
             <span className="ml-auto shrink-0 text-xs text-gray-600">
               {c.colores} {c.colores === 1 ? "color" : "colores"}

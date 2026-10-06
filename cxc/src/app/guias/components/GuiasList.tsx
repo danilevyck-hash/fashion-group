@@ -178,10 +178,10 @@ function ChipCliente({
         {nombre ? (
           <>
             <span className="text-emerald-900 break-words">{nombre}</span>
-            <span className="ml-1.5 font-mono text-emerald-600">{codigo}</span>
+            <span className="ml-1.5 tabular-nums text-emerald-600">{codigo}</span>
           </>
         ) : (
-          <span className="font-mono text-emerald-800">{codigo}</span>
+          <span className="tabular-nums text-emerald-800">{codigo}</span>
         )}
       </span>
     </span>
@@ -868,7 +868,7 @@ export default function GuiasList({
                                   día ya la dice) y el ESTADO también: 221 de 222
                                   decían lo mismo, y el color se reserva para lo
                                   que espera algo. */}
-                              <span className={`${COL_GUIA} font-medium font-mono text-xs`}>{fmtGuia(g.numero)}</span>
+                              <span className={`${COL_GUIA} font-medium tabular-nums text-xs`}>{fmtGuia(g.numero)}</span>
                               {/* 🔴 LA FECHA, DE VUELTA COMO COLUMNA
                                   (19-sep-2026). Se había ido el 5-sep porque
                                   «el encabezado del día ya la dice» — pero los
@@ -967,7 +967,7 @@ export default function GuiasList({
                               </div>
                               {/* El número y la fecha, chicos: sirven para nombrar
                                   la guía, no para elegirla. */}
-                              <div className={`mt-1 text-xs text-gray-400 font-mono ${barra ? "whitespace-nowrap" : ""}`}>
+                              <div className={`mt-1 text-xs text-gray-400 tabular-nums ${barra ? "whitespace-nowrap" : ""}`}>
                                 {fmtGuia(g.numero)} · {fmtDate(g.fecha)}
                               </div>
                               {avisosDeLaFila(g).length > 0 && (

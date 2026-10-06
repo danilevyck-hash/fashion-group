@@ -140,16 +140,16 @@ function GerenteLinea({ resp }: { resp: BonosMultifashion }) {
       <span>Tienda completa {mesLabel} (incl. mayoreo):</span>
       {g.tiene_comparacion ? (
         <>
-          <span className="font-mono tabular-nums text-gray-900">{fmtMoney(g.ventas_mes)}</span>
+          <span className="tabular-nums text-gray-900">{fmtMoney(g.ventas_mes)}</span>
           <span className="text-gray-400">vs</span>
-          <span className="font-mono tabular-nums text-gray-600">{fmtMoney(g.ventas_mes_prev)} ({resp.mes_evaluado.year - 1})</span>
-          <span className={cn("font-mono tabular-nums font-medium", TONE_LIGHT[delta.tone])}>
+          <span className="tabular-nums text-gray-600">{fmtMoney(g.ventas_mes_prev)} ({resp.mes_evaluado.year - 1})</span>
+          <span className={cn(" tabular-nums font-medium", TONE_LIGHT[delta.tone])}>
             {delta.arrow && <span className="mr-0.5">{delta.arrow}</span>}{delta.displayValue}
           </span>
         </>
       ) : (
         <>
-          <span className="font-mono tabular-nums text-gray-900">{fmtMoney(g.ventas_mes)}</span>
+          <span className="tabular-nums text-gray-900">{fmtMoney(g.ventas_mes)}</span>
           <span className="text-gray-500">· sin comparativo {resp.mes_evaluado.year - 1}</span>
         </>
       )}

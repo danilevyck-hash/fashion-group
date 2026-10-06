@@ -228,7 +228,7 @@ export default function CatalogosMarcasPage() {
             <div className={`text-sm font-semibold text-gray-900 ${CATALOGO_ORDEN_CELULAR ? "hidden sm:block" : ""}`}>
               Enlace público
             </div>
-            <div className="truncate font-mono text-xs text-gray-500" data-testid="link-catalogos-todos">{URL_CATALOGOS_PUBLICOS}</div>
+            <div className="truncate tabular-nums text-xs text-gray-500" data-testid="link-catalogos-todos">{URL_CATALOGOS_PUBLICOS}</div>
           </div>
           <button
             type="button"

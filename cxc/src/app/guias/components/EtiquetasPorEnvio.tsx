@@ -190,7 +190,7 @@ export default function EtiquetasPorEnvio() {
     <div className={apple && !panel ? `max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}` : "max-w-5xl mx-auto px-4 sm:px-6 py-6"}>
       {sinTabla && (
         <Aviso className="mb-4" ayuda="Guías sigue funcionando igual.">
-          Etiquetas sin activar: falta correr la migración <span className="font-mono">20261207120000_guias_etiquetas</span>.
+          Etiquetas sin activar: falta correr la migración <span className="tabular-nums">20261207120000_guias_etiquetas</span>.
         </Aviso>
       )}
       {errorLista && (
@@ -317,7 +317,7 @@ export default function EtiquetasPorEnvio() {
                       <td className="px-3 py-2.5">
                         {rangos.map((r) => (
                           <div key={r.fila.id} className="whitespace-nowrap">
-                            <span className="font-mono tabular-nums">{r.fila.secuencial}</span>{" "}
+                            <span className="tabular-nums">{r.fila.secuencial}</span>{" "}
                             <span className="text-gray-400 tabular-nums">· {textoRango(r)}</span>
                             {r.fila.nota && (
                               <span className="ml-2 rounded bg-gray-900 px-1.5 py-0.5 text-[12px] font-semibold text-white">{r.fila.nota}</span>
@@ -710,7 +710,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                   min={1}
                   value={trasladoBultos}
                   onChange={(e) => { setTrasladoBultos(e.target.value); setError(null); }}
-                  className="w-[96px] rounded-md border border-gray-300 px-3 text-center font-mono text-lg font-semibold outline-none transition focus:border-black min-h-[44px]"
+                  className="w-[96px] rounded-md border border-gray-300 px-3 text-center tabular-nums text-lg font-semibold outline-none transition focus:border-black min-h-[44px]"
                 />
               </div>
               {/* 🔴 Daniel, 2-oct-2026: la empresa del traslado es el caso raro —
@@ -822,7 +822,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                                       {orden}
                                     </span>
                                   )}
-                                  <span className="shrink-0 font-mono tabular-nums">{f.secuencial}</span>
+                                  <span className="shrink-0 tabular-nums">{f.secuencial}</span>
                                   <span className="ml-auto shrink-0 tabular-nums text-gray-600">{fmtMonto(f.total)}</span>
                                 </label>
                                 {m && (
@@ -836,7 +836,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                                         min={1}
                                         value={m.bultos}
                                         onChange={(e) => cambiar(clave, "bultos", e.target.value)}
-                                        className="w-[96px] rounded-md border border-gray-200 px-3 text-center font-mono text-lg font-semibold outline-none transition focus:border-black min-h-[44px]"
+                                        className="w-[96px] rounded-md border border-gray-200 px-3 text-center tabular-nums text-lg font-semibold outline-none transition focus:border-black min-h-[44px]"
                                       />
                                       {rango && rango.hasta >= rango.desde && (
                                         <div className="mt-1 text-xs tabular-nums text-gray-500">Bultos {textoRango(rango)}</div>
@@ -976,7 +976,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                       </button>
                     </>
                   )}
-                  <span className="font-mono tabular-nums">{f.secuencial}</span>
+                  <span className="tabular-nums">{f.secuencial}</span>
                   <span className="tabular-nums text-gray-500">
                     {r.fila.cajas > 0 ? `bultos ${textoRango(r)} de ${previa.total}` : "faltan los bultos"}
                   </span>
@@ -1199,7 +1199,7 @@ function ModalReimprimirEnvio({ envio, onCerrar }: { envio: Envio; onCerrar: () 
               onChange={(e) => setBulto(e.target.value)}
               aria-label="Bulto"
               onClick={(e) => e.stopPropagation()}
-              className="w-[86px] rounded-md border border-gray-200 px-2 text-center font-mono outline-none transition focus:border-black min-h-[44px]"
+              className="w-[86px] rounded-md border border-gray-200 px-2 text-center tabular-nums outline-none transition focus:border-black min-h-[44px]"
             />
             <span className="text-sm text-gray-600">de {envio.total}</span>
           </div>

@@ -257,7 +257,7 @@ function CategoriasRubroInner() {
             <ul className="flex flex-col gap-2">
               {faltan.map((r) => (
                 <li key={r} className="flex flex-wrap items-center gap-2" data-testid={`rubro-pedido-${r}`}>
-                  <span className="min-w-[120px] font-mono text-sm font-semibold text-gray-900">{r}</span>
+                  <span className="min-w-[120px] tabular-nums text-sm font-semibold text-gray-900">{r}</span>
                   {CATEGORIAS_REEBOK.map((c) => (
                     <button
                       key={c}
@@ -339,7 +339,7 @@ function CategoriasRubroInner() {
               <tbody>
                 {lista.map((f) => (
                   <tr key={f.id} className="border-b border-gray-100 last:border-0" data-testid={`rubro-${f.id}`}>
-                    <td className="py-2 font-mono font-medium text-gray-900">{f.rubro}</td>
+                    <td className="py-2 tabular-nums font-medium text-gray-900">{f.rubro}</td>
                     <td className="py-2 text-gray-700">{ROTULO_CATEGORIA[f.categoria]}</td>
                     <td className="py-2 text-right">
                       <button
