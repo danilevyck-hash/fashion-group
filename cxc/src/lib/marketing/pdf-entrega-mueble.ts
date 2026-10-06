@@ -412,7 +412,8 @@ export function buildComprobanteEntregaDoc(
     doc.text(lineas.slice(0, 4), MARGIN, y + 7);
   }
 
-  if (ESTILO_UNICO) piePapel(doc);
+  // Sin «fashiongr.com»: Daniel pidió este papel «así de simple» (sin pie de página web).
+  if (ESTILO_UNICO) piePapel(doc, undefined, null);
   return doc;
 }
 

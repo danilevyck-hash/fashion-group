@@ -77,6 +77,7 @@ import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { ROLES_BOSTON } from "@/lib/cxc/boston-roles";
 import type { EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
 
 const RAIZ = process.cwd();
 /** El archivo SIN comentarios: un barrido que lee comentarios se cumple a sí
@@ -278,7 +279,7 @@ describe("🔴 el PDF adjunto de Boston", () => {
   it("es el papel de siempre —la forma de Switch— y no dice Fashion Group", async () => {
     const { doc } = buildEstadoCuentaPDF(ESTADO_BOSTON, "Almacen La Fe");
     const texto = await textoDelPdf(doc);
-    expect(texto).toContain("ESTADO DE CUENTA");
+    expect(texto).toContain(ESTILO_UNICO ? "Estado de cuenta" : "ESTADO DE CUENTA");
     expect(texto).toContain("Total General");
     // 🔴 La cabeza trae las cuatro líneas que Daniel dictó de SU papel de Switch
     // (9-sep-2026) — y el correo es el suyo, no el del grupo.

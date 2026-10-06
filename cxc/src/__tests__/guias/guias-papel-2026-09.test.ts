@@ -73,6 +73,11 @@ import {
 } from "@/lib/guias/papel-2026-09";
 import type { Guia, GuiaItem } from "@/app/guias/components/types";
 
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
+/** Con el estilo único el título del papel va sin gritar: «Guía de transporte externo». */
+const enPapel = (t: string) => (ESTILO_UNICO ? t.charAt(0) + t.slice(1).toLowerCase() : t);
+
+
 const raiz = process.cwd();
 const leer = (p: string) => readFileSync(path.join(raiz, p), "utf8");
 
@@ -237,16 +242,16 @@ describe("🔴 1 · el interruptor", () => {
 describe("🔴 2 · el título dice de qué guía se trata, y «TIPO» se va", () => {
   it("transportista externo → «GUÍA DE TRANSPORTE EXTERNO»", async () => {
     const t = textoEntero(await pedazos(construirPdfGuia(GUIA_EXTERNA)));
-    expect(t).toContain(TITULO_EXTERNO);
-    expect(t).not.toContain(TITULO_VIEJO);
-    expect(t).not.toContain(TITULO_DIRECTA);
+    expect(t).toContain(enPapel(TITULO_EXTERNO));
+    expect(t).not.toContain(enPapel(TITULO_VIEJO));
+    expect(t).not.toContain(enPapel(TITULO_DIRECTA));
   });
 
   it("entrega directa → «GUÍA DE ENTREGA DIRECTA»", async () => {
     const t = textoEntero(await pedazos(construirPdfGuia(GUIA_DIRECTA)));
-    expect(t).toContain(TITULO_DIRECTA);
-    expect(t).not.toContain(TITULO_VIEJO);
-    expect(t).not.toContain(TITULO_EXTERNO);
+    expect(t).toContain(enPapel(TITULO_DIRECTA));
+    expect(t).not.toContain(enPapel(TITULO_VIEJO));
+    expect(t).not.toContain(enPapel(TITULO_EXTERNO));
   });
 
   it("la fila «TIPO» ya no se dibuja en ninguno de los dos modos", async () => {
@@ -394,9 +399,11 @@ describe("🔴 6 · el acomodo de la hoja", () => {
     const conViejo = await abajo(false);
     // Menos altura sobre el borde inferior = más abajo en la hoja.
     expect(conNuevo).toBeLessThan(conViejo);
-    expect(conNuevo).toBeLessThan(45);
+    // Con el estilo único sube 4 mm para dejarle lugar al pie común.
+    const subida = ESTILO_UNICO ? 4 : 0;
+    expect(conNuevo).toBeLessThan(45 + subida * (72 / 25.4));
     // Y coincide con la constante del módulo (mm desde arriba → pt desde abajo).
-    expect(conNuevo).toBeCloseTo((279.4 - (PIE_LEGAL_Y + 5)) * (72 / 25.4), 0);
+    expect(conNuevo).toBeCloseTo((279.4 - (PIE_LEGAL_Y - subida + 5)) * (72 / 25.4), 0);
   });
 
   it("🔴 con varias hojas, las firmas y el pie legal van en la ÚLTIMA", async () => {
@@ -437,8 +444,8 @@ describe("🔴 7 · con el interruptor APAGADO, el papel de siempre", () => {
 
   it("vuelve el título, «TIPO» y «DIRECCIÓN»", async () => {
     const t = textoEntero(await pedazos(construirPdfGuia(GUIA_EXTERNA)));
-    expect(t).toContain(TITULO_VIEJO);
-    expect(t).not.toContain(TITULO_EXTERNO);
+    expect(t).toContain(enPapel(TITULO_VIEJO));
+    expect(t).not.toContain(enPapel(TITULO_EXTERNO));
     expect(t).toContain("TIPO:");
     expect(t).toContain("Transportista externo");
     expect(t).toContain("DIRECCIÓN");

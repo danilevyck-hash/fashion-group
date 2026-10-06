@@ -19,6 +19,7 @@
 //      `comprobantesEntrega` (sin eso el navegador no tiene con qué dibujar).
 // ============================================================================
 import { describe, it, expect, vi } from "vitest";
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
 import fs from "fs";
 import path from "path";
 import JSZip from "jszip";
@@ -180,7 +181,7 @@ describe("generarZipProyecto — comprobantes de entrega (el caso Apertura)", ()
   it("el comprobante va SIN bultos: es el papel de la marca, no la nota de envío", async () => {
     const zip = await zipDe(datosBase());
     const ck = await pdfCrudo(zip, "Calvin Klein/2026-08-11 · Entrega de mobiliario ME-0022.pdf");
-    expect(ck).toContain("COMPROBANTE DE ENTREGA");
+    expect(ck).toContain(ESTILO_UNICO ? "Comprobante de entrega" : "COMPROBANTE DE ENTREGA");
     expect(ck).not.toContain("NOTA DE ENTREGA");
     // La columna Bultos no existe en este papel aunque el dato venga (bultos: 3).
     expect(ck).not.toContain("Bultos");

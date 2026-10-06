@@ -130,7 +130,7 @@ describe("PDF de estado de cuenta — barra TOTAL ADEUDADO", () => {
       const paginas = await renglonesPorPagina(doc);
       for (const [i, renglones] of paginas.entries()) {
         const invasores = renglones.filter(
-          (r) => r.mmDesdeAbajo < 14 && !/Confidencial|fashiongr\.com|^\d+ ?\/ ?\d+$/.test(r.str),
+          (r) => r.mmDesdeAbajo < 14 && !/Confidencial|fashiongr\.com|^\d+ ?\/ ?\d+$|^Página \d+ de \d+$/.test(r.str),
         );
         expect(
           invasores.map((r) => `${r.str} @ ${r.mmDesdeAbajo.toFixed(1)}mm`),

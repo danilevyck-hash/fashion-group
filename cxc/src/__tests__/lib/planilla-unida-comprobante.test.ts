@@ -25,6 +25,7 @@ import {
   tituloPeriodo,
 } from "@/lib/asistencia/comprobante";
 import type { DineroLinea, HorasPersona, LineaPlanilla } from "@/lib/asistencia/planilla";
+import { ESTILO_UNICO, sinMayusculas } from "@/lib/pdf-estilo";
 
 // ── Andamios ────────────────────────────────────────────────────────────────
 
@@ -378,10 +379,17 @@ describe("H. EL PAPEL DE VERDAD", () => {
     expect(textos.filter((t) => t === "0.00").length).toBe(enCero.length);
 
     // La cabeza, la ficha y el pie que se firma.
-    expect(textos).toContain("FASHION WEAR");
-    expect(textos).toContain("PLANILLA QUINCENAL");
-    expect(textos).toContain("COMPROBANTE DE PAGO");
-    expect(textos).toContain("II QUINCENA DE JULIO DE 2026");
+    if (ESTILO_UNICO) {
+      // Estilo único: «Comprobante de pago» de título y la empresa y el período de subtítulo.
+      expect(textos).toContain("Comprobante de pago");
+      expect(textos.some((t) => t.startsWith("Fashion Wear"))).toBe(true);
+      expect(textos).toContain("PLANILLA QUINCENAL · II QUINCENA DE JULIO DE 2026");
+    } else {
+      expect(textos).toContain("FASHION WEAR");
+      expect(textos).toContain("PLANILLA QUINCENAL");
+      expect(textos).toContain("COMPROBANTE DE PAGO");
+      expect(textos).toContain("II QUINCENA DE JULIO DE 2026");
+    }
     expect(textos).toContain("Luis Parajón");
     expect(textos).toContain("Asistente de Bodega");
     // 🔄 20-sep-2026: el papel ganó sus acentos («RECIBI», «CEDULA») y la
@@ -412,10 +420,10 @@ describe("H. EL PAPEL DE VERDAD", () => {
     const porEmpresa = (["fashion_wear", "confecciones_boston", "vistana"] as const).map((e) => {
       const c = armarComprobante({ linea: linea({ empresa: e }) }, PERIODO);
       const t = textosDelPdf(construirPdfComprobantes([c]).output("arraybuffer") as ArrayBuffer);
-      return { cabeza: t[0], rotulos: c.renglones.map((r) => r.rotulo) };
+      return { cabeza: ESTILO_UNICO ? t[1].split(" · ")[0] : t[0], rotulos: c.renglones.map((r) => r.rotulo) };
     });
     expect(porEmpresa.map((p) => p.cabeza)).toEqual(
-      ["FASHION WEAR", "CONFECCIONES BOSTON, S.A.", "VISTANA INTERNATIONAL"],
+      ["FASHION WEAR", "CONFECCIONES BOSTON, S.A.", "VISTANA INTERNATIONAL"].map((n) => (ESTILO_UNICO ? sinMayusculas(n) : n)),
     );
     expect(porEmpresa[0].rotulos).toEqual(porEmpresa[1].rotulos);
     expect(porEmpresa[1].rotulos).toEqual(porEmpresa[2].rotulos);

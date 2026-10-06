@@ -51,6 +51,7 @@ import { buildBulkReclamosExcel } from "@/lib/reclamos/excel-bulk";
 import { buildBulkReclamosPdf } from "@/lib/reclamos/pdf-bulk";
 import { fechaDeLaCabecera } from "@/lib/reclamos/papel";
 import { fmtDate } from "@/lib/format";
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
 
 const RAIZ = join(__dirname, "..", "..", "..");
 const sinComentarios = (ruta: string): string =>
@@ -260,6 +261,8 @@ describe("C. UNA SOLA GRAFÍA DE FECHA: LA DE `fmtDate`", () => {
     const malas = cadenas.filter((t) => FECHA_CON_BARRAS.test(t));
     expect(malas).toEqual([]);
     const generado = cadenas.find((t) => t.startsWith("Generado el "));
+    // El estilo único no lleva «Generado el»: la fecha va arriba a la derecha.
+    if (ESTILO_UNICO) return;
     expect(generado).toBeTruthy();
     expect(generado!.replace("Generado el ", "")).toMatch(FECHA_DE_LA_CASA);
   });

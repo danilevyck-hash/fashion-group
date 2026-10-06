@@ -48,6 +48,10 @@ import {
 } from "@/lib/guias/casilla-en-blanco";
 import { esCeroDeFactura, facturasParaElPapel } from "@/lib/guias/numero-factura";
 import type { Guia } from "@/app/guias/components/types";
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
+/** Con el estilo único el título del papel va sin gritar: «Guía de transporte externo». */
+const enPapel = (t: string) => (ESTILO_UNICO ? t.charAt(0) + t.slice(1).toLowerCase() : t);
+
 
 const raiz = process.cwd();
 const leer = (r: string) => readFileSync(path.join(raiz, r), "utf8");
@@ -201,7 +205,7 @@ describe("🔴 los DOS papeles de la guía están escritos con acentos", () => {
     const cadenas = cadenasDelPdf(construirPdfGuia(GUIA).output("arraybuffer"));
     expect(cadenas.length).toBeGreaterThan(10);
     expect(cadenas.filter((c) => c.includes(NUL))).toEqual([]);
-    expect(cadenas.join("\n")).toContain(tituloDelPapel(GUIA));
+    expect(cadenas.join("\n")).toContain(enPapel(tituloDelPapel(GUIA)));
   });
 
   // 🔄 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026, NO SE AFLOJÓ.
@@ -240,7 +244,7 @@ describe("🔴 los DOS papeles de la guía están escritos con acentos", () => {
     expect(pdf).toContain(rotuloDestino());
     // El título.
     expect(hoja.toLowerCase()).toContain("guía de transporte interior");
-    expect(pdf).toContain(tituloDelPapel(GUIA));
+    expect(pdf).toContain(enPapel(tituloDelPapel(GUIA)));
     // Los números: la hoja sigue con «N GUÍA», el PDF con «N° GUÍA».
     expect(hoja).toContain("N GUÍA:");
     expect(hoja).toContain("N GUÍA TRANSP.");

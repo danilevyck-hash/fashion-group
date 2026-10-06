@@ -44,6 +44,8 @@ import {
 import { COLUMNAS } from "@/lib/cxc/pdf-estado-cuenta-hoja";
 import { buildEstadoCuentaPDF, buildEstadoCuentaLotePDF } from "@/lib/pdf-estado-cuenta";
 import type { EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
+const EC = ESTILO_UNICO ? "Estado de cuenta" : "ESTADO DE CUENTA";
 
 const raiz = join(__dirname, "..", "..");
 function leer(rel: string): string {
@@ -220,7 +222,7 @@ describe("🔴 una compañía por hoja", () => {
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(2);
     const texto = await textoDelPdf(doc);
     // Dos «ESTADO DE CUENTA» = dos cabezas = dos hojas de compañía.
-    expect((texto.match(/ESTADO DE CUENTA/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect((texto.match(new RegExp(EC, "g")) ?? []).length).toBeGreaterThanOrEqual(2);
     expect((texto.match(/Total General:/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 
@@ -350,7 +352,7 @@ describe("la forma del papel es la de Switch", () => {
   it("el papel trae la ficha del cliente y el «RECIBIDO CONFORME»", async () => {
     const texto = await textoDelPdf(buildEstadoCuentaPDF(D25, "X").doc);
     for (const t of [
-      "ESTADO DE CUENTA", "Fecha:", "Nombre:", "Teléfono:", "Identificación:", "Email:",
+      EC, ...(ESTILO_UNICO ? [] : ["Fecha:"]), "Nombre:", "Teléfono:", "Identificación:", "Email:",
       "Código:", "Dirección:",
       "1513069-1-650069", "727-7247", "Paso Canoas", "RECIBIDO CONFORME",
     ]) {

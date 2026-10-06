@@ -29,7 +29,13 @@ import { construirPdf } from "@/lib/asistencia/exportar";
 import type { PersonaReporte } from "@/lib/asistencia/reporte";
 import { construirPdfPlanilla, type DatosPlanillaExport } from "@/lib/asistencia/planilla-exportar";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
-import { PIE_ALTO_LINEA_MM, PIE_BASE_MM } from "@/lib/asistencia/pdf-pie";
+import { PIE_ALTO_LINEA_MM, PIE_BASE_MM as PIE_BASE_VIEJO } from "@/lib/asistencia/pdf-pie";
+import { ESTILO_UNICO, Y_NOTA_DESDE_ABAJO, Y_PIE_DESDE_ABAJO } from "@/lib/pdf-estilo";
+
+// Con el estilo único el pie común («Confidencial · Página N de M») va a 10 mm y
+// las notas empiezan a 14 mm, hacia arriba.
+const PIE_BASE_MM = ESTILO_UNICO ? Y_PIE_DESDE_ABAJO : PIE_BASE_VIEJO;
+const PRIMERA_NOTA_MM = ESTILO_UNICO ? Y_NOTA_DESDE_ABAJO : PIE_BASE_VIEJO;
 import { TOTALES_CERO, type LineaPlanilla, type Quincena } from "@/lib/asistencia/planilla";
 // La MISMA función que arma el aviso en producción: el peor caso del candado
 // tiene que ser una frase que el sistema pueda generar de verdad.
@@ -328,16 +334,16 @@ describe("🔴 el pie de los PDF de asistencia cabe en la hoja", () => {
         // alguien corrige la redacción de un aviso — y, sobre todo, un pie que
         // se desbordó hacia arriba se sigue contando como pie, que es justo lo
         // que hace que el choque con la tabla salte.
-        const pagina = dibujos.find((d) => /^Página \d+$/.test(d.texto));
+        const pagina = dibujos.find((d) => /^Página \d+( de \d+)?$/.test(d.texto));
         expect(pagina, "el papel perdió el número de página").toBeDefined();
         expect(pagina!.yDesdeAbajoMm).toBeCloseTo(PIE_BASE_MM, 1);
 
         const enElRenglon = (y: number) =>
           dibujos.filter((d) => Math.abs(d.yDesdeAbajoMm - y) < 0.3);
 
-        const pie: Dibujo[] = [];
+        const pie: Dibujo[] = ESTILO_UNICO ? [...enElRenglon(PIE_BASE_MM)] : [];
         for (let k = 0; ; k++) {
-          const renglon = enElRenglon(PIE_BASE_MM + k * PIE_ALTO_LINEA_MM);
+          const renglon = enElRenglon(PRIMERA_NOTA_MM + k * PIE_ALTO_LINEA_MM);
           if (!renglon.length) break;
           pie.push(...renglon);
         }

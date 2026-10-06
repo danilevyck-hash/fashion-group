@@ -36,6 +36,7 @@ import {
 import { construirPdfComprobantes } from "@/lib/asistencia/comprobante-pdf";
 import type { AjusteDetalle } from "@/lib/asistencia/corte-quincena";
 import type { DineroLinea, HorasPersona, LineaPlanilla } from "@/lib/asistencia/planilla";
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
 
 // ── La tanda real: Fashion Wear, I quincena de septiembre de 2026 ────────────
 
@@ -304,17 +305,22 @@ describe("C. 🔴 NINGÚN TEXTO SIN SU ACENTO", () => {
 describe("D. CADA HOJA DICE DE CUÁL ES", () => {
   it("las ocho llevan «Hoja N de 8» al pie", () => {
     HOJAS.forEach((hoja, i) => {
-      expect(hoja).toContain(`Hoja ${i + 1} de 8`);
+      expect(hoja).toContain(ESTILO_UNICO ? `Página ${i + 1} de 8` : `Hoja ${i + 1} de 8`);
     });
   });
 
   it("una sola hoja dice «Hoja 1 de 1» — no se numera de más", () => {
     const doc = construirPdfComprobantes([COMPROBANTES[0]]);
     const raw = Buffer.from(doc.output("arraybuffer")).toString("latin1");
-    expect(raw).toContain("Hoja 1 de 1");
+    expect(raw).toContain(ESTILO_UNICO ? "Página 1 de 1" : "Hoja 1 de 1");
   });
 
   it("el pie de la casa sigue en su lugar, en todas", () => {
-    for (const hoja of HOJAS) expect(hoja).toContain("Confidencial · fashiongr.com");
+    for (const hoja of HOJAS) {
+      if (ESTILO_UNICO) {
+        expect(hoja).toContain("Confidencial");
+        expect(hoja).toContain("fashiongr.com");
+      } else expect(hoja).toContain("Confidencial · fashiongr.com");
+    }
   });
 });

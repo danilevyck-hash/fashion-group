@@ -44,6 +44,11 @@ import {
 // un texto escrito a mano acá.
 import { TITULO_DIRECTA, TITULO_EXTERNO, tituloDelPapel } from "@/lib/guias/papel-2026-09";
 
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
+/** Con el estilo único el título del papel va sin gritar: «Guía de transporte externo». */
+const enPapel = (t: string) => (ESTILO_UNICO ? t.charAt(0) + t.slice(1).toLowerCase() : t);
+
+
 const leer = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 const sinComentarios = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
@@ -233,8 +238,8 @@ describe("🔴 EL PDF QUE SE COMPARTE, generado de verdad", () => {
     expect(t).not.toContain("Transportista externo");
     // Y el título del papel la nombra por lo que es.
     expect(tituloDelPapel(BASE)).toBe(TITULO_DIRECTA);
-    expect(t).toContain(TITULO_DIRECTA);
-    expect(t).not.toContain(TITULO_EXTERNO);
+    expect(t).toContain(enPapel(TITULO_DIRECTA));
+    expect(t).not.toContain(enPapel(TITULO_EXTERNO));
   });
 
   it("…ni con la placa en cero: no lleva placa", () => {
@@ -253,8 +258,8 @@ describe("🔴 EL PDF QUE SE COMPARTE, generado de verdad", () => {
       numero_guia_transp: "TR-900",
       guia_items: [{ ...BASE.guia_items[0], numero_guia_transp: "TR-900" }],
     });
-    expect(t).toContain(TITULO_EXTERNO);
-    expect(t).not.toContain(TITULO_DIRECTA);
+    expect(t).toContain(enPapel(TITULO_EXTERNO));
+    expect(t).not.toContain(enPapel(TITULO_DIRECTA));
     expect(t).toContain("PLACA");
     expect(t).toContain("EK0700");
     expect(t).toContain("TR-900");
@@ -264,7 +269,7 @@ describe("🔴 EL PDF QUE SE COMPARTE, generado de verdad", () => {
     const g = { ...BASE, estado: "Completada", placa: "DG7115", numero_guia_transp: "TR-4471" };
     const t = texto(g);
     expect(tituloDelPapel(g)).toBe(TITULO_EXTERNO);
-    expect(t).toContain(TITULO_EXTERNO);
+    expect(t).toContain(enPapel(TITULO_EXTERNO));
     expect(t).toContain("DG7115");
   });
 });

@@ -15,6 +15,7 @@
 //      unidades, nota del ITBMS y pie de página.
 // ============================================================================
 import { describe, it, expect } from "vitest";
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
 import fs from "fs";
 import path from "path";
 import {
@@ -149,7 +150,7 @@ describe("buildComprobanteEntregaPdf", () => {
     expect(contiene(buf, "Jerusalem De Panama")).toBe(true);
     expect(contiene(buf, "D-80")).toBe(true);
     expect(contiene(buf, "Remodelacion")).toBe(true);
-    expect(contiene(buf, "22/06/2026")).toBe(true);
+    expect(contiene(buf, ESTILO_UNICO ? "22 jun 2026" : "22/06/2026")).toBe(true);
   });
 
   it("trae el detalle de los muebles y el total", () => {
@@ -329,8 +330,8 @@ describe("nota de entrega — PIEZAS y BULTOS en columnas separadas", () => {
   it("la NOTA de envío (default) lleva Bultos y se titula NOTA DE ENTREGA", () => {
     const buf = buildComprobanteEntregaPdf(conFotoYBultos);
     expect(contiene(buf, "Bultos")).toBe(true);
-    expect(contiene(buf, "NOTA DE ENTREGA")).toBe(true);
-    expect(contiene(buf, "COMPROBANTE DE ENTREGA")).toBe(false);
+    expect(contiene(buf, ESTILO_UNICO ? "Nota de entrega" : "NOTA DE ENTREGA")).toBe(true);
+    expect(contiene(buf, ESTILO_UNICO ? "Comprobante de entrega" : "COMPROBANTE DE ENTREGA")).toBe(false);
   });
 
   it("el COMPROBANTE para la marca (incluirBultos:false) sale SIN Bultos", () => {
@@ -338,7 +339,7 @@ describe("nota de entrega — PIEZAS y BULTOS en columnas separadas", () => {
       incluirBultos: false,
     });
     expect(contiene(buf, "Bultos")).toBe(false);
-    expect(contiene(buf, "COMPROBANTE DE ENTREGA")).toBe(true);
+    expect(contiene(buf, ESTILO_UNICO ? "Comprobante de entrega" : "COMPROBANTE DE ENTREGA")).toBe(true);
     // Y el dato de los bultos (5) tampoco se filtra por otra celda.
     expect(crudo(buf)).not.toMatch(/\(5\)\s*Tj/);
   });

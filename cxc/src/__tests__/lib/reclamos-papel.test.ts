@@ -57,6 +57,7 @@ import { buildReclamoSheet } from "@/lib/excel-reclamo";
 import { buildBulkReclamosPdf } from "@/lib/reclamos/pdf-bulk";
 import { buildBulkReclamosExcel } from "@/lib/reclamos/excel-bulk";
 import { fmt } from "@/lib/format";
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
 
 const RAIZ = join(__dirname, "..", "..", "..");
 const sinComentarios = (ruta: string): string =>
@@ -222,7 +223,8 @@ describe("(4) el papel dice lo que el mockup pide, y en ese orden", () => {
   it("la cabecera lleva FASHION GROUP, la empresa, el reclamo y la fecha de la factura", async () => {
     if (!HAY_PDFTOTEXT) return;
     const texto = await textoDelPdf(REC_0026);
-    expect(texto).toContain("FASHION GROUP");
+    // Con el estilo único, «Fashion Group» lo dice el logo (imagen), no un texto.
+    if (!ESTILO_UNICO) expect(texto).toContain("FASHION GROUP");
     expect(texto).toContain("Vistana International");
     expect(texto).toContain("Reclamo REC-2026-0026");
     expect(texto).toContain("19 jun 2026");
@@ -241,7 +243,11 @@ describe("(4) el papel dice lo que el mockup pide, y en ese orden", () => {
     if (!HAY_PDFTOTEXT) return;
     expect(PIE_PAPEL).toBe("Confidencial · fashiongr.com");
     const texto = await textoDelPdf(REC_0026);
-    expect(texto).toContain(PIE_PAPEL);
+    if (ESTILO_UNICO) {
+      // El pie común: «Confidencial · Página N de M · fashiongr.com», en tres textos.
+      expect(texto).toContain("Confidencial");
+      expect(texto).toContain("fashiongr.com");
+    } else expect(texto).toContain(PIE_PAPEL);
   });
 
   it("se fueron las CUATRO cajas de totales de arriba", async () => {

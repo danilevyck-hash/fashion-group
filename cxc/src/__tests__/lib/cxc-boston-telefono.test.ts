@@ -46,6 +46,7 @@ import { buildCuentasHtml } from "@/lib/cxc/estado-cuenta-email";
 import { casaDeEmpresa, CASA_GRUPO } from "@/lib/cxc/casa-del-papel";
 import { buildEstadoCuentaPDF } from "@/lib/pdf-estado-cuenta";
 import type { EstadoCuenta, EstadoEmpresa } from "@/lib/cxc/estado-cuenta-tipos";
+import { ESTILO_UNICO } from "@/lib/pdf-estilo";
 
 /** 🔴 El número, escrito acá a mano: el candado compara contra lo que Daniel
  *  dictó, nunca contra lo que hoy diga el archivo. */
@@ -150,7 +151,7 @@ describe("🔴 1. el teléfono de Confecciones Boston", () => {
 describe("🔴 2. el cliente de Boston lo ve", () => {
   it("el encabezado del PDF lleva la línea TEL", () => {
     const pdf = papelDe([empresa(BOSTON, NOMBRE_BOSTON)]);
-    expect(pdf).toContain(`TEL: ${TELEFONO_BOSTON}`);
+    expect(pdf).toContain(ESTILO_UNICO ? `Tel. ${TELEFONO_BOSTON}` : `TEL: ${TELEFONO_BOSTON}`);
   });
 
   it("y el recuadro «Dónde pagar» de la hoja también", () => {
