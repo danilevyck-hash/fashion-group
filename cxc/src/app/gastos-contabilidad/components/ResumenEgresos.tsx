@@ -316,11 +316,67 @@ function FilaTabla({ fila, onAbrir }: { fila: Fila; onAbrir: (key: string) => vo
 interface Props {
   empresas: EmpresaEgresosResumen[];
   onAbrir: (empresaKey: string) => void;
+  /** `GASTOS_APPLE_2026_10` (6-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }
 
-export default function ResumenEgresos({ empresas, onAbrir }: Props) {
+/**
+ * 🔴 APPLE (6-oct-2026): UNA lista para celular y computadora. Cada empresa es
+ * una fila de dos renglones —nombre y, en gris, «Gastos $X · N pagos» o la
+ * frase de por qué no hay número—, con el Total egresos a la derecha y la ›
+ * solo si abre algo. La píldora «Al día / No traído» se va: el lugar del monto
+ * ya lo dice (`salidaTexto` es la MISMA etiqueta cuando no hay número).
+ * «Cargado hasta …» sigue en cada fila, en ámbar si es sospecha.
+ * 🔴 Y SIN total al pie: los gastos de dos empresas nunca se suman.
+ */
+function ListaApple({ filas, onAbrir }: { filas: Fila[]; onAbrir: (key: string) => void }) {
+  return (
+    <ul data-lista="gastos-empresas-apple" className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+      {/* El rótulo de la columna: sin él, el monto de la derecha se leería
+          como «gastos», y es TODO lo que salió. */}
+      <li aria-hidden className="flex justify-between gap-4 px-4 py-2 pr-11 text-xs font-medium uppercase tracking-wide text-gray-400">
+        <span>Empresa</span>
+        <span>Total egresos</span>
+      </li>
+      {filas.map((f) => {
+        const { empresa } = f;
+        const segunda = f.hayMonto
+          ? `Gastos ${f.gastoTexto} · ${empresa.resumen.renglones} ${empresa.resumen.renglones === 1 ? "pago" : "pagos"}`
+          : f.explicacion;
+        const contenido = (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-gray-900">{empresa.nombre}</span>
+              {segunda && <span className="mt-0.5 block text-sm text-gray-500 tabular-nums">{segunda}</span>}
+              {f.alDiaTexto && (
+                <span className={`mt-0.5 block text-xs ${f.alDiaDudoso ? "text-amber-700" : "text-gray-400"}`}>{f.alDiaTexto}</span>
+              )}
+            </span>
+            <span className={`shrink-0 text-sm tabular-nums ${f.hayMonto ? "text-gray-900" : "text-gray-400"}`}>{f.salidaTexto}</span>
+            <span aria-hidden className={`shrink-0 ${f.hayMonto ? "text-gray-300" : "invisible"}`}>›</span>
+          </>
+        );
+        const clase = "flex w-full min-h-[56px] items-center gap-4 px-4 py-3 text-left";
+        return (
+          <li key={empresa.empresaKey}>
+            {f.hayMonto ? (
+              <button type="button" onClick={() => onAbrir(empresa.empresaKey)} className={`${clase} transition hover:bg-gray-50 active:bg-gray-50`}>
+                {contenido}
+              </button>
+            ) : (
+              <div className={clase}>{contenido}</div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export default function ResumenEgresos({ empresas, onAbrir, apple = false }: Props) {
   const orden = useOrdenTabla<ColEgresos>("gastos-resumen", { columnas: ["empresa", "salida", "gasto", "pagos"], textos: ["empresa"] });
   const filas = orden.ordenar(armarFilas(empresas), valorEgresos);
+  if (apple) return <ListaApple filas={filas} onAbrir={onAbrir} />;
 
   return (
     <div>

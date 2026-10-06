@@ -9,6 +9,7 @@ import { useCajaState } from "./hooks/useCajaState";
 import PeriodoList from "./components/PeriodoList";
 import CerrarPeriodoModal from "./components/CerrarPeriodoModal";
 import "./skin.css";
+import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
 
 export default function CajaPage() {
   const router = useRouter();
@@ -53,8 +54,10 @@ export default function CajaPage() {
   return (
     <div>
       <AppHeader module="Caja menuda" />
-      <div className="skin-caja min-h-screen">
+      {/* `GASTOS_APPLE_2026_10`: la letra y la paleta del sistema (skin.css). */}
+      <div className="skin-caja min-h-screen" data-caja-apple={GASTOS_APPLE_2026_10 ? "" : undefined}>
         <PeriodoList
+          apple={GASTOS_APPLE_2026_10}
           periodos={periodos}
           loading={loading}
           error={error}

@@ -34,6 +34,8 @@ import ResumenEgresos from "./components/ResumenEgresos";
 import DetalleEgresos from "./components/DetalleEgresos";
 import SaldosBancoTab from "./components/saldos/SaldosBancoTab";
 import { Aviso } from "@/components/ui/Aviso";
+import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
+import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
 
 // Las dos pestañas. `?tab=` en la URL (mismo patrón que Usuarios, Ventas y
 // Multifashion) para que un marcador, un refresh y el back/forward caigan donde
@@ -53,20 +55,24 @@ function fetcher<T>(url: string): Promise<T> {
 }
 
 // useSearchParams (vía useUrlState) exige boundary de Suspense.
-export default function GastosContabilidadClient() {
+export default function GastosContabilidadClient({ apple = GASTOS_APPLE_2026_10 }: { apple?: boolean } = {}) {
   return (
     <Suspense>
-      <GastosContabilidadInner />
+      <GastosContabilidadInner apple={apple} />
     </Suspense>
   );
 }
 
-function GastosContabilidadInner() {
+function GastosContabilidadInner({ apple }: { apple: boolean }) {
   const { authChecked } = useAuth({
     moduleKey: "gastos-contabilidad",
     allowedRoles: ["admin", "contabilidad"],
   });
   const router = useRouter();
+  // 🔴 Apple en el celular (6-oct-2026): la barra v3.3 de la casa —«Gastos ▾»
+  // elige la pestaña y el mes va en su renglón—. Apagado o en la computadora,
+  // nada cambia.
+  const barra = useBarraCelular(apple);
 
   // ?tab= es un filtro del MISMO nivel → replace (no ensucia el historial). Un
   // `?tab=` desconocido cae en "gastos", NUNCA en blanco: Radix no dibuja nada
@@ -142,7 +148,19 @@ function GastosContabilidadInner() {
       <AppHeader
         module="Gastos"
         breadcrumbs={nombreAbierto ? [{ label: nombreAbierto }] : undefined}
+        tituloEnLaPantalla={barra}
       />
+      {barra && (
+        <ProveedorBarraCelular activo activa={tab}>
+          <BarraDeControles
+            titulo="Gastos"
+            pestanas={[{ value: "gastos", label: "Gastos" }, { value: "saldos-banco", label: "Saldos de banco" }]}
+            activa={tab}
+            onPestana={setTab}
+            periodo={enGastos && !empresaParam ? <SelectorMes mes={mes} mesTope={hoyMes} onCambiar={setMesParam} compacto /> : undefined}
+          />
+        </ProveedorBarraCelular>
+      )}
       <main className="mx-auto max-w-5xl px-4 py-6 pb-[env(safe-area-inset-bottom)]">
         {/* Sin título grande: "Gastos" ya lo dicen la barra sticky (celular) y el
             breadcrumb (escritorio). Queda sr-only para no dejar la página sin
@@ -151,7 +169,7 @@ function GastosContabilidadInner() {
         <h1 className="sr-only">Gastos</h1>
 
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="-mx-4 mb-5 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent p-0 px-4 md:mx-0 md:px-0">
+          <TabsList className={`${barra ? "!hidden " : ""}-mx-4 mb-5 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent p-0 px-4 md:mx-0 md:px-0`}>
             <TabsTrigger value="gastos" className={TAB_TRIGGER_CLASS}>
               <Receipt className="hidden h-3.5 w-3.5 sm:block" /> Gastos
             </TabsTrigger>
@@ -164,12 +182,14 @@ function GastosContabilidadInner() {
         {esperandoDeepLink ? (
           <Esqueleto />
         ) : hayEmpresaAbierta ? (
-          empresaEgresos ? <DetalleEgresos empresa={empresaEgresos} onVolver={volver} /> : null
+          empresaEgresos ? <DetalleEgresos empresa={empresaEgresos} onVolver={volver} apple={apple} /> : null
         ) : (
           <>
+            {!barra && (
             <div className="mb-4">
-              <SelectorMes mes={mes} mesTope={hoyMes} onCambiar={setMesParam} />
+              <SelectorMes mes={mes} mesTope={hoyMes} onCambiar={setMesParam} compacto={apple} />
             </div>
+            )}
 
             {isLoading && !data ? (
               <Esqueleto />
@@ -196,7 +216,7 @@ function GastosContabilidadInner() {
                     el aviso de montos imposibles — no se rompió nada acá, el
                     dato está mal del otro lado. Si no hay nada, no se dibuja. */}
                 <AvisoRechazosSwitch texto={egresos.data.avisoNoLeidos} className="mb-4" />
-                <ResumenEgresos empresas={egresos.data.empresas} onAbrir={abrirEmpresa} />
+                <ResumenEgresos empresas={egresos.data.empresas} onAbrir={abrirEmpresa} apple={apple} />
               </>
             ) : null}
           </>
@@ -204,7 +224,7 @@ function GastosContabilidadInner() {
           </TabsContent>
 
           <TabsContent value="saldos-banco" className="mt-0">
-            <SaldosBancoTab />
+            {apple ? <SaldosBancoTab apple /> : <SaldosBancoTab />}
           </TabsContent>
         </Tabs>
       </main>

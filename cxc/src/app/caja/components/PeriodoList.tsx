@@ -5,6 +5,8 @@ import { montoEnPantalla, saldoDelPeriodo, saldoEsNegativo } from "@/lib/caja/di
 import { CajaPeriodo } from "./types";
 import { SkeletonTable, EmptyState } from "@/components/ui";
 import OverflowMenu, { OverflowMenuItem } from "@/components/ui/OverflowMenu";
+import { lineaPeriodoCaja } from "@/lib/egresos/apple-2026-10";
+import { Aviso } from "@/components/ui/Aviso";
 
 interface Props {
   periodos: CajaPeriodo[];
@@ -19,6 +21,8 @@ interface Props {
   onPrintPeriodo: (id: string) => void;
   onClosePeriodo: (id: string) => void;
   onDeletePeriodo: (id: string) => void;
+  /** `GASTOS_APPLE_2026_10` (6-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }
 
 function PlusIcon({ size = 14 }: { size?: number }) {
@@ -110,14 +114,35 @@ export default function PeriodoList({
   onPrintPeriodo,
   onClosePeriodo,
   onDeletePeriodo,
+  apple = false,
 }: Props) {
+  // UN solo h1 en la pantalla, apagado o prendido.
+  const encabezado = <h1 className="sr-only">Caja menuda</h1>;
+  // Lo que ofrece el «···» de un período: lo MISMO que la tarjeta de siempre.
+  const itemsDe = (p: CajaPeriodo): OverflowMenuItem[] => {
+    const items: OverflowMenuItem[] = [{ label: "Imprimir", onClick: () => onPrintPeriodo(p.id) }];
+    if (p.estado === "abierto") items.push({ label: "Cerrar período", onClick: () => onClosePeriodo(p.id) });
+    if (p.estado === "cerrado" && role === "admin" && recibosDe(p) === 0) {
+      items.push({ label: "Eliminar", onClick: () => onDeletePeriodo(p.id), destructive: true });
+    }
+    return items;
+  };
+  if (apple) {
+    return (
+      <ListaApple
+        periodos={periodos} loading={loading} error={error} aviso={aviso}
+        hasOpenPeriod={hasOpenPeriod} onCreatePeriodo={onCreatePeriodo}
+        onLoadDetail={onLoadDetail} itemsDe={itemsDe} encabezado={encabezado}
+      />
+    );
+  }
   return (
     <div className="max-w-6xl mx-auto px-5 sm:px-9 py-8 sm:py-10">
       {/* Sin título grande: "Caja Menuda" ya lo dicen la barra sticky (celular)
           y el breadcrumb (escritorio). Queda sr-only para no dejar la página sin
           encabezado. Sin bajada NO queda un hueco: el bloque de arriba se fue
           entero y el botón se acomoda solo a la derecha. */}
-      <h1 className="sr-only">Caja menuda</h1>
+      {encabezado}
       {!hasOpenPeriod && (
         <div className="flex justify-end mb-5">
           <button
@@ -405,6 +430,98 @@ export default function PeriodoList({
             {periodos.length === 1 ? "período" : "períodos"}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 🔴 «COMO LO HARÍA APPLE» (6-oct-2026, `GASTOS_APPLE_2026_10`). La pregunta
+ * de esta pantalla es «¿cuánto queda en la caja?»: el saldo del período ABIERTO
+ * va grande con UNA línea gris (fondo, gastado, recibos). Abajo, cada período es
+ * una fila de dos renglones con su saldo, su «···» y la ›, en el celular y en la
+ * computadora. Los números son los MISMOS (`saldoDelPeriodo`, `recibosDe`).
+ * 🔴 Nunca se suman períodos entre sí: el número grande es UNO solo.
+ */
+function ListaApple({
+  periodos, loading, error, aviso, hasOpenPeriod, onCreatePeriodo, onLoadDetail, itemsDe, encabezado,
+}: {
+  encabezado: React.ReactNode;
+  periodos: CajaPeriodo[];
+  loading: boolean;
+  error: string | null;
+  aviso?: string | null;
+  hasOpenPeriod: boolean;
+  onCreatePeriodo: () => void;
+  onLoadDetail: (id: string) => void;
+  itemsDe: (p: CajaPeriodo) => OverflowMenuItem[];
+}) {
+  const abierto = periodos.find((p) => p.estado === "abierto") ?? null;
+  const saldoAbierto = abierto ? saldoDelPeriodo(abierto.fondo_inicial, abierto.total_gastado) : 0;
+  return (
+    <div data-caja-apple-lista className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+      {encabezado}
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          {abierto && (
+            <>
+              <p className={`text-[34px] font-normal leading-none tracking-tight tabular-nums ${saldoEsNegativo(saldoAbierto) ? "text-red-600" : "text-gray-800"}`}>
+                {montoEnPantalla(saldoAbierto)}
+              </p>
+              <p className="pt-2 text-sm text-gray-500 tabular-nums">
+                {`Saldo del período Nº ${abierto.numero} · `}
+                {lineaPeriodoCaja(`$${fmt(abierto.fondo_inicial)}`, `$${fmt(abierto.total_gastado)}`, recibosDe(abierto))}
+              </p>
+            </>
+          )}
+        </div>
+        {!hasOpenPeriod && (
+          <button
+            onClick={onCreatePeriodo}
+            className="inline-flex min-h-[44px] items-center rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
+          >
+            Nuevo período
+          </button>
+        )}
+      </div>
+
+      {aviso && !error && <Aviso className="mb-4">{aviso}</Aviso>}
+      {error && <Aviso tono="error" className="mb-4">{error}</Aviso>}
+
+      {loading ? (
+        <SkeletonTable rows={5} cols={4} />
+      ) : periodos.length === 0 ? (
+        <EmptyState title="No hay períodos registrados" actionLabel="+ Nuevo período" onAction={onCreatePeriodo} />
+      ) : (
+        <ul data-lista="caja-periodos-apple" className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+          {periodos.map((p) => {
+            const saldo = saldoDelPeriodo(p.fondo_inicial, p.total_gastado);
+            const n = recibosDe(p);
+            const abiertoP = p.estado === "abierto";
+            return (
+              <li key={p.id} data-periodo-apple={p.id} className="flex min-h-[56px] items-center gap-2 pr-2">
+                <button type="button" onClick={() => onLoadDetail(p.id)} className="flex min-w-0 flex-1 items-center gap-4 py-2.5 pl-4 text-left transition hover:bg-gray-50">
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                      Período Nº {p.numero}
+                      {abiertoP && <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Abierto</span>}
+                    </span>
+                    <span className="mt-0.5 block truncate text-sm text-gray-500 tabular-nums">
+                      {fmtDate(p.fecha_apertura)}
+                      {p.fecha_cierre ? ` — ${fmtDate(p.fecha_cierre)}` : " · en curso"}
+                      {` · Gastado $${fmt(p.total_gastado)} · ${n} ${n === 1 ? "recibo" : "recibos"}`}
+                    </span>
+                  </span>
+                  <span className={`shrink-0 text-sm tabular-nums ${saldoEsNegativo(saldo) ? "text-red-600" : "text-gray-900"}`}>
+                    {montoEnPantalla(saldo)}
+                  </span>
+                  <span aria-hidden className="shrink-0 text-gray-300">›</span>
+                </button>
+                <OverflowMenu items={itemsDe(p)} />
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

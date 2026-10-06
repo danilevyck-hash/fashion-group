@@ -19,7 +19,7 @@ const fetcher = (url: string) =>
     return r.json();
   });
 
-export default function SaldosBancoTab() {
+export default function SaldosBancoTab({ apple = false }: { apple?: boolean } = {}) {
   const { data, error, isLoading, mutate } = useSWR<RespuestaSaldos>(API_BASE, fetcher, {
     revalidateOnFocus: true,
   });
@@ -38,6 +38,7 @@ export default function SaldosBancoTab() {
           historial={data.historial}
           onGuardado={() => mutate()}
           titulo={null}
+          apple={apple}
         />
       ) : null}
     </div>

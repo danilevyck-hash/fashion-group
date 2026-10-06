@@ -22,6 +22,7 @@ import {
 import { Aviso } from "@/components/ui/Aviso";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import type { TramoKey } from "@/lib/proveedores/tramos";
+import { PROVEEDORES_APPLE_2026_10, lineaCartera } from "@/lib/proveedores/apple-2026-10";
 
 // Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
 // ⚠️ Boston NO está: `cxp: false`, 0 filas, excluida a propósito.
@@ -58,10 +59,10 @@ const CARTERA_VACIA: CarteraCxp = {
 };
 
 // useSearchParams exige un boundary de Suspense (misma envoltura que CXC).
-export default function ProveedoresListClient() {
+export default function ProveedoresListClient({ apple = PROVEEDORES_APPLE_2026_10 }: { apple?: boolean } = {}) {
   return (
     <Suspense>
-      <ProveedoresList />
+      <ProveedoresList apple={apple} />
     </Suspense>
   );
 }
@@ -78,7 +79,7 @@ export default function ProveedoresListClient() {
  * Lo que la columna «Empresas» decía ahora se lee donde sirve: en la fila del
  * proveedor, «también en Fashion Shoes», con enlace a esa empresa.
  */
-function ProveedoresList() {
+function ProveedoresList({ apple }: { apple: boolean }) {
   const { authChecked } = useAuth({ moduleKey: "proveedores", allowedRoles: ["admin", "contabilidad"] });
   const router = useRouter();
 
@@ -164,8 +165,45 @@ function ProveedoresList() {
               proveedor si ya está todo en la lista? solo es desplegar»*. Se
               fueron las dos cosas; queda lo que no se podía hacer de ninguna
               otra forma: saber de cuándo es el número y bajarlo. */}
+          {/* 🔴 «COMO LO HARÍA APPLE» (6-oct-2026, `PROVEEDORES_APPLE_2026_10`):
+              lo primero que se lee es la respuesta —cuánto se debe— en UN
+              número grande con su línea gris; a la derecha, de cuándo es el
+              dato y la descarga en texto. Los números son los MISMOS del pie. */}
+          <h1 className="sr-only">Proveedores</h1>
+          {apple && (
+            <div data-cabecera-apple className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+              <div className="min-w-0">
+                {empresas.length > 0 && (
+                  <>
+                    <p className={`text-[34px] font-normal leading-none tracking-tight tabular-nums ${total.saldo.por_pagar < 0 ? "text-blue-600" : "text-gray-800"}`}>
+                      {textoDeMonto(total.saldo.por_pagar, fmt)}
+                    </p>
+                    <p className="pt-2 text-sm text-gray-500 tabular-nums">
+                      {lineaCartera(cartera.proveedores_con_saldo, total.saldo, fmt)}
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <LineaDeFrescura
+                  actualizado={cartera.synced_at}
+                  opciones={SYNC_PROVEEDORES_OPCIONES}
+                  secuencial
+                  roles={ROLES_SYNC_PROVEEDORES}
+                  onSuccess={async () => { await fetchList(); }}
+                />
+                <button
+                  onClick={exportarExcel}
+                  disabled={exportando}
+                  className="inline-flex min-h-[44px] items-center text-sm text-blue-600 transition hover:text-blue-800 disabled:text-gray-400"
+                >
+                  {exportando ? "Preparando…" : "Descargar Excel"}
+                </button>
+              </div>
+            </div>
+          )}
+          {!apple && (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <h1 className="sr-only">Proveedores</h1>
             {/* 🔴 4-oct-2026: la línea de frescura de todo el sistema.
                 Actualiza el CxP de las 7 empresas en secuencia (N/7). */}
             <LineaDeFrescura
@@ -187,6 +225,7 @@ function ProveedoresList() {
               </button>
             </div>
           </div>
+          )}
 
           {/* Qué se quedó AFUERA del total de abajo. Arriba del número, igual
               que en el CXC. Sin rechazos no se dibuja nada. */}
@@ -208,10 +247,10 @@ function ProveedoresList() {
             />
           ) : (
             <>
-              <div className="text-xs text-gray-500 tabular-nums mb-2">
+              {!apple && <div className="text-xs text-gray-500 tabular-nums mb-2">
                 {cartera.proveedores_con_saldo}{" "}
                 {cartera.proveedores_con_saldo === 1 ? "proveedor con saldo" : "proveedores con saldo"}
-              </div>
+              </div>}
 
               {/* ── Escritorio ──────────────────────────────────────────────
                   El corte es `lg` y no `sm` porque lo que decide es el ancho
@@ -228,6 +267,7 @@ function ProveedoresList() {
                           <ThOrden key={t.key} col={t.key} api={orden} derecha className="py-2 px-1.5 xl:px-3">{t.label}</ThOrden>
                         ))}
                         <ThOrden col="por_pagar" api={orden} derecha className="py-2 px-1.5 xl:px-3">Por pagar</ThOrden>
+                        {apple && <th aria-hidden className="w-6" />}
                       </tr>
                     </thead>
                     {empresas.map((e) => (
@@ -238,6 +278,7 @@ function ProveedoresList() {
                         onAlternar={() => alternar(e.empresa_key)}
                         onProveedor={goFicha}
                         onEmpresa={setAbierta}
+                        apple={apple}
                       />
                     ))}
                     <tfoot>
@@ -249,8 +290,9 @@ function ProveedoresList() {
                           <MontoCell key={k} value={total.tramos[k]} viejo={k === "tMas365"} />
                         ))}
                         <MontoCell value={total.saldo.por_pagar} viejo />
+                        {apple && <td />}
                       </tr>
-                      {fraseTotal && (
+                      {fraseTotal && !apple && (
                         <tr>
                           <td colSpan={COLUMNAS} className="pb-2 px-1.5 xl:px-3 text-right text-xs text-gray-500 tabular-nums">
                             {fraseTotal}
@@ -272,6 +314,7 @@ function ProveedoresList() {
                     onAlternar={() => alternar(e.empresa_key)}
                     onProveedor={goFicha}
                     onEmpresa={setAbierta}
+                    apple={apple}
                   />
                 ))}
                 <li className="flex items-baseline justify-between gap-2 border-t-2 border-gray-300 px-1 py-3 text-sm font-medium">
@@ -280,7 +323,7 @@ function ProveedoresList() {
                     {textoDeMonto(total.saldo.por_pagar, fmt)}
                   </span>
                 </li>
-                {fraseTotal && (
+                {fraseTotal && !apple && (
                   <li className="px-1 pb-3 text-xs text-gray-500 tabular-nums">{fraseTotal}</li>
                 )}
               </ul>
@@ -302,16 +345,20 @@ function FilaEmpresa({
   onAlternar,
   onProveedor,
   onEmpresa,
+  apple = false,
 }: {
   empresa: EmpresaCxp;
   abierta: boolean;
   onAlternar: () => void;
   onProveedor: (key: string) => void;
   onEmpresa: (empresaKey: string) => void;
+  apple?: boolean;
 }) {
   const frase = frasePartida(empresa.saldo, fmt);
   const [verSinSaldo, setVerSinSaldo] = useState(false);
   const vacia = empresa.proveedores.length === 0 && empresa.sin_saldo.length === 0;
+  // Apple: una columna más al final, la de la ›.
+  const columnas = COLUMNAS + (apple ? 1 : 0);
 
   return (
     <tbody className="border-b border-gray-200">
@@ -321,22 +368,25 @@ function FilaEmpresa({
         className={`cursor-pointer transition hover:bg-gray-50 ${abierta ? "bg-gray-50" : ""}`}
       >
         <td className="py-3 px-1.5 xl:px-3 font-medium">
+          {apple ? empresa.nombre : (
           <span className="inline-flex items-center gap-2">
             <span aria-hidden className="w-3 inline-block text-gray-400">{abierta ? "▾" : "▸"}</span>
             {empresa.nombre}
           </span>
+          )}
         </td>
         {TRAMOS_KEYS.map((k) => (
           <MontoCell key={k} value={empresa.tramos[k]} viejo={k === "tMas365"} />
         ))}
         <MontoCell value={empresa.saldo.por_pagar} viejo />
+        {apple && <td className="pr-2 text-right"><Flecha abierta={abierta} /></td>}
       </tr>
 
       {/* 🔴 LO QUE ESTÁ A FAVOR SE VE. Solo sale cuando lo hay: una frase de
           tres partes con un cero adentro es ruido. */}
       {abierta && frase && (
         <tr>
-          <td colSpan={COLUMNAS} className="pb-2 pl-6 pr-1.5 xl:pl-9 xl:pr-3 text-xs text-gray-500 tabular-nums">
+          <td colSpan={columnas} className="pb-2 pl-6 pr-1.5 xl:pl-9 xl:pr-3 text-xs text-gray-500 tabular-nums">
             {frase}
           </td>
         </tr>
@@ -344,7 +394,7 @@ function FilaEmpresa({
 
       {abierta && vacia && (
         <tr>
-          <td colSpan={COLUMNAS} className="pb-3 pl-6 pr-1.5 xl:pl-9 xl:pr-3 text-xs text-gray-500">
+          <td colSpan={columnas} className="pb-3 pl-6 pr-1.5 xl:pl-9 xl:pr-3 text-xs text-gray-500">
             Sin proveedores recibidos de Switch para esta empresa.
           </td>
         </tr>
@@ -352,12 +402,12 @@ function FilaEmpresa({
 
       {abierta &&
         empresa.proveedores.map((p) => (
-          <FilaProveedor key={p.key} p={p} onProveedor={onProveedor} onEmpresa={onEmpresa} />
+          <FilaProveedor key={p.key} p={p} onProveedor={onProveedor} onEmpresa={onEmpresa} apple={apple} />
         ))}
 
       {abierta && empresa.sin_saldo.length > 0 && (
         <tr>
-          <td colSpan={COLUMNAS} className="pl-6 pr-1.5 xl:pl-9 xl:pr-3">
+          <td colSpan={columnas} className="pl-6 pr-1.5 xl:pl-9 xl:pr-3">
             <button
               onClick={() => setVerSinSaldo((v) => !v)}
               className="inline-flex min-h-[44px] items-center text-xs text-gray-400 hover:text-gray-600 transition"
@@ -370,7 +420,7 @@ function FilaEmpresa({
       {abierta &&
         verSinSaldo &&
         empresa.sin_saldo.map((p) => (
-          <FilaProveedor key={p.key} p={p} onProveedor={onProveedor} onEmpresa={onEmpresa} />
+          <FilaProveedor key={p.key} p={p} onProveedor={onProveedor} onEmpresa={onEmpresa} apple={apple} />
         ))}
     </tbody>
   );
@@ -380,10 +430,12 @@ function FilaProveedor({
   p,
   onProveedor,
   onEmpresa,
+  apple = false,
 }: {
   p: ProveedorEnEmpresa;
   onProveedor: (key: string) => void;
   onEmpresa: (empresaKey: string) => void;
+  apple?: boolean;
 }) {
   const frase = frasePartida(p.saldo, fmt);
   return (
@@ -404,6 +456,7 @@ function FilaProveedor({
         <MontoCell key={k} value={p.tramos[k]} viejo={k === "tMas365"} />
       ))}
       <MontoCell value={p.saldo.por_pagar} />
+      {apple && <td className="pr-2 text-right"><Flecha /></td>}
     </tr>
   );
 }
@@ -446,14 +499,17 @@ function TarjetaEmpresa({
   onAlternar,
   onProveedor,
   onEmpresa,
+  apple = false,
 }: {
   empresa: EmpresaCxp;
   abierta: boolean;
   onAlternar: () => void;
   onProveedor: (key: string) => void;
   onEmpresa: (empresaKey: string) => void;
+  apple?: boolean;
 }) {
   const frase = frasePartida(empresa.saldo, fmt);
+  if (apple) return <TarjetaEmpresaApple empresa={empresa} abierta={abierta} onAlternar={onAlternar} onProveedor={onProveedor} onEmpresa={onEmpresa} frase={frase} />;
   return (
     <li className="border-b border-gray-100">
       <button
@@ -515,6 +571,100 @@ function TarjetaEmpresa({
               </li>
             )}
           </ul>
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** La › de las filas (Apple). Abierta, gira y apunta abajo. */
+function Flecha({ abierta }: { abierta?: boolean }) {
+  return (
+    <span aria-hidden className={`inline-block text-gray-300 transition-transform ${abierta ? "rotate-90" : ""}`}>›</span>
+  );
+}
+
+/**
+ * 🔴 Apple, celular e iPad (6-oct-2026): la empresa es UNA fila de dos
+ * renglones —nombre y, en gris, cuántos proveedores tiene y lo de +1 año— con
+ * su monto y la ›. Adentro, cada proveedor es una fila tocable de 44 px con su
+ * ›. Los tramos y la frase de lo a favor son los MISMOS de siempre.
+ */
+function TarjetaEmpresaApple({
+  empresa,
+  abierta,
+  onAlternar,
+  onProveedor,
+  onEmpresa,
+  frase,
+}: {
+  empresa: EmpresaCxp;
+  abierta: boolean;
+  onAlternar: () => void;
+  onProveedor: (key: string) => void;
+  onEmpresa: (empresaKey: string) => void;
+  frase: string | null;
+}) {
+  const n = empresa.proveedores.length;
+  const viejo = empresa.tramos.tMas365;
+  return (
+    <li className="border-b border-gray-100">
+      <button
+        type="button"
+        onClick={onAlternar}
+        aria-expanded={abierta}
+        className="flex min-h-[56px] w-full items-center gap-3 px-1 py-2.5 text-left active:bg-gray-50"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-gray-900">{empresa.nombre}</span>
+          <span className="mt-0.5 block truncate text-sm text-gray-500 tabular-nums">
+            {n === 0 ? "Sin proveedores con saldo" : `${n} ${n === 1 ? "proveedor" : "proveedores"}`}
+            {viejo !== 0 && ` · +1 año ${textoDeMonto(viejo, fmt)}`}
+          </span>
+        </span>
+        <span className={`shrink-0 text-sm tabular-nums ${tonoDeMonto(empresa.saldo.por_pagar)}`}>
+          {textoDeMonto(empresa.saldo.por_pagar, fmt)}
+        </span>
+        <Flecha abierta={abierta} />
+      </button>
+      {abierta && (
+        <div className="pb-3 pl-3 pr-1">
+          <div className="mb-2 grid grid-cols-4 gap-2">
+            {TRAMOS.map((t) => (
+              <div key={t.key}>
+                <div className="text-xs text-gray-400">{t.label}</div>
+                <div className={`text-xs tabular-nums ${tonoDeMonto(empresa.tramos[t.key])} ${t.key === "tMas365" && empresa.tramos[t.key] !== 0 ? "font-medium" : ""}`}>
+                  {textoDeMonto(empresa.tramos[t.key], fmt)}
+                </div>
+              </div>
+            ))}
+          </div>
+          <ul>
+            {empresa.proveedores.map((p) => (
+              <li key={p.key} className="border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => onProveedor(p.key)}
+                  className="flex min-h-[44px] w-full items-center gap-3 py-2 text-left active:bg-gray-50"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{p.nombre}</span>
+                  <span className={`shrink-0 text-sm tabular-nums ${tonoDeMonto(p.saldo.por_pagar)}`}>
+                    {textoDeMonto(p.saldo.por_pagar, fmt)}
+                  </span>
+                  <Flecha />
+                </button>
+                {p.tambien_en.length > 0 && (
+                  <div className="-mt-1 pb-2">
+                    <TambienEn empresas={p.tambien_en} onEmpresa={onEmpresa} />
+                  </div>
+                )}
+              </li>
+            ))}
+            {n === 0 && (
+              <li className="py-2 text-xs text-gray-500">Sin proveedores recibidos de Switch para esta empresa.</li>
+            )}
+          </ul>
+          {frase && <p className="mt-1 text-xs text-gray-500 tabular-nums">{frase}</p>}
         </div>
       )}
     </li>

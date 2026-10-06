@@ -16,6 +16,8 @@ import CerrarPeriodoModal from "../components/CerrarPeriodoModal";
 import { useEscapeClose, useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
 import { useState, useCallback } from "react";
 import "../skin.css";
+import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
+import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeControles";
 
 export default function PeriodoDetailPage() {
   const router = useRouter();
@@ -27,6 +29,9 @@ export default function PeriodoDetailPage() {
   });
 
   const [showDeletedModal, setShowDeletedModal] = useState(false);
+  // `GASTOS_APPLE_2026_10`: en el celular «Nuevo gasto» va fijo abajo.
+  const apple = GASTOS_APPLE_2026_10;
+  const celular = useBarraCelular(apple);
 
   // Drawer de nuevo gasto inline. El back del navegador lo cierra (pushState al
   // abrir; popstate listener cierra; cerrar explícito hace history.back()).
@@ -91,8 +96,11 @@ export default function PeriodoDetailPage() {
         module="Caja menuda"
         breadcrumbs={[{ label: `Período N°${current.numero}` }]}
       />
-      <div className="skin-caja min-h-screen">
+      <div className="skin-caja min-h-screen" data-caja-apple={apple ? "" : undefined}>
         <PeriodoDetailHeader
+          apple={apple}
+          onNuevoGasto={apple && detailIsOpen && !celular ? openGastoDrawer : undefined}
+          recibos={detailGastos.length}
           current={current}
           totalGastado={detailTotalGastado}
           saldo={detailSaldo}
@@ -143,10 +151,14 @@ export default function PeriodoDetailPage() {
             onDeleteGasto={requestDeleteGasto}
             onNuevoGasto={detailIsOpen ? openGastoDrawer : undefined}
             onQuickCategoria={quickUpdateCategoria}
+            apple={apple}
           />
         </div>
       </div>
 
+      {apple && celular && detailIsOpen && !drawerOpen && (
+        <BarraAccionFija rotulo="Nuevo gasto" onClick={openGastoDrawer} />
+      )}
       {detailIsOpen && (
         <NuevoGastoDrawer
           open={drawerOpen}

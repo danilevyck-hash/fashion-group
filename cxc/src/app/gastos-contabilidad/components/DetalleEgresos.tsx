@@ -117,9 +117,11 @@ interface Props {
   empresa: EmpresaEgresosResumen;
   /** Sólo cuando se llegó desde la lista. Sin esto no se dibuja "Volver". */
   onVolver?: () => void;
+  /** `GASTOS_APPLE_2026_10` (6-oct-2026). Las pruebas lo fuerzan. */
+  apple?: boolean;
 }
 
-export default function DetalleEgresos({ empresa, onVolver }: Props) {
+export default function DetalleEgresos({ empresa, onVolver, apple = false }: Props) {
   const r = empresa.resumen;
   const hayMonto = muestraMontoEgresos(r.estado);
 
@@ -168,9 +170,41 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
     empresa.descargaAutomatica,
   );
 
+  // 🔴 APPLE (6-oct-2026): «‹ Volver» en la línea del nombre; el Total egresos
+  // grande con UNA línea gris (gastos, otros egresos, pagos); sin la caja de
+  // totales ni el total repetido al pie. Los números son los MISMOS de arriba
+  // (siguen al buscador igual que antes). Una sola empresa: no suma con otra.
+  // Con búsqueda escrita, la línea empieza diciendo de qué es el número
+  // («3 de 41 cuentas»): un total recortado no se lee como el del mes.
+  const lineaApple = [
+    buscando ? conteo : null,
+    `Gastos ${usd(totalGastoCent)}`,
+    totalNoGastoCent !== 0 ? `Otros egresos ${usd(totalNoGastoCent)}` : null,
+    `${renglones} ${renglones === 1 ? "pago" : "pagos"}${!buscando && r.documentos !== r.renglones ? ` en ${r.documentos} documentos` : ""}`,
+  ].filter(Boolean).join(" · ");
+
   return (
     <div>
-      {onVolver && (
+      {apple && (
+        <div data-cabecera-apple className="mb-5">
+          <div className="flex flex-wrap items-baseline gap-x-3">
+            {onVolver && (
+              <button type="button" onClick={onVolver} className="inline-flex min-h-[44px] items-center text-sm text-blue-600 hover:text-blue-800">
+                ‹ Volver
+              </button>
+            )}
+            <h1 className="text-xl font-semibold tracking-tight text-gray-900">{empresa.nombre}</h1>
+            <span className="text-sm text-gray-500">{mesLargo(r.mes).charAt(0).toUpperCase() + mesLargo(r.mes).slice(1)}</span>
+          </div>
+          {hayMonto && (
+            <>
+              <p className="pt-3 text-[34px] font-normal leading-none tracking-tight tabular-nums text-gray-800">{usd(totalSalidaCent)}</p>
+              <p className="pt-2 text-sm text-gray-500 tabular-nums">{lineaApple}</p>
+            </>
+          )}
+        </div>
+      )}
+      {!apple && onVolver && (
         <button
           type="button"
           onClick={onVolver}
@@ -183,10 +217,12 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
         </button>
       )}
 
+      {!apple && (
       <div className="mb-4">
         <h1 className="text-xl font-semibold tracking-tight text-gray-900">{empresa.nombre}</h1>
         <p className="text-sm capitalize text-gray-600">{mesLargo(r.mes)}</p>
       </div>
+      )}
 
       {explicacion && <p className="mb-3 text-sm text-gray-600">{explicacion}</p>}
 
@@ -212,7 +248,7 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
             />
           )}
 
-          <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3">
+          {!apple && <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3">
             <LineaTotal label="Total egresos" cent={totalSalidaCent} fuerte />
             <div className="mt-1 border-t border-gray-100 pt-1">
               <LineaTotal label="Gastos" cent={totalGastoCent} />
@@ -224,7 +260,7 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
               {renglones} {renglones === 1 ? "pago" : "pagos"}
               {!buscando && r.documentos !== r.renglones && ` en ${r.documentos} documentos`}
             </p>
-          </div>
+          </div>}
 
           {sinResultados && (
             <VacioDeBusqueda texto={VACIO_CUENTA} onLimpiar={() => setBusqueda("")} rotulo={LIMPIAR_BUSQUEDA} />
@@ -266,7 +302,7 @@ export default function DetalleEgresos({ empresa, onVolver }: Props) {
             </>
           )}
 
-          {!sinResultados && (
+          {!sinResultados && !apple && (
             <div className="mt-4 rounded-lg border border-gray-200 bg-white px-3 py-1">
               <LineaTotal label="Total egresos" cent={totalSalidaCent} fuerte />
             </div>

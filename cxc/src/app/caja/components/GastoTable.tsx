@@ -47,6 +47,13 @@ interface Props {
   onNuevoGasto?: () => void;
   /** Cambio rápido de categoría desde el chip inline de la fila. */
   onQuickCategoria?: (gastoId: string, categoria: string) => void;
+  /**
+   * `GASTOS_APPLE_2026_10` (6-oct-2026): «Nuevo gasto» sube a la cabecera (o
+   * fijo abajo en el celular) y la línea «N registros · $X total» de arriba se
+   * va —el total ya está al pie y el conteo de la búsqueda, junto al buscador—.
+   * El desglose fiscal pasa de casilla a enlace (9 de 77 recibos lo usan).
+   */
+  apple?: boolean;
 }
 
 /* Curated dot colors per common category — fall back to stone-400 for the rest. */
@@ -138,6 +145,7 @@ export default function GastoTable({
   recentlyAddedIds = new Set(),
   onNuevoGasto,
   onQuickCategoria,
+  apple = false,
 }: Props) {
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [showFiscal, setShowFiscal] = useState(false);
@@ -237,13 +245,14 @@ export default function GastoTable({
   const totalColSpan = 4; // first 4 cols before Sub/ITBMS/Total break
 
   return (
-    <div className="mb-10 mt-8">
-      <div className="flex items-end justify-between mb-3.5 gap-4">
+    <div className={apple ? "mb-10 mt-4" : "mb-10 mt-8"}>
+      {apple && <h2 className="sr-only">Gastos</h2>}
+      <div className={apple ? "hidden" : "flex items-end justify-between mb-3.5 gap-4"}>
         <div>
           {/* El rótulo "Gastos" sobre la única tabla de la pantalla queda
               `sr-only`: no aporta nada a la vista, pero la sección seguiría sin
               encabezado para quien navega con lector de pantalla. */}
-          <h2 className="sr-only">Gastos</h2>
+          {!apple && <h2 className="sr-only">Gastos</h2>}
           <p
             className="text-xs mt-1"
             style={{ color: "var(--caja-fg-muted)" }}
@@ -253,7 +262,7 @@ export default function GastoTable({
             <span className="caja-mono">${fmt(grandTotal)}</span> total
           </p>
         </div>
-        {onNuevoGasto ? (
+        {onNuevoGasto && !apple ? (
           <button
             onClick={onNuevoGasto}
             className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-transform active:scale-[0.97]"
@@ -615,7 +624,19 @@ export default function GastoTable({
       </div>
 
       {/* Fiscal toggle */}
-      {gastos.length > 0 && (
+      {gastos.length > 0 && apple && (
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowFiscal((v) => !v)}
+            aria-pressed={showFiscal}
+            className="inline-flex min-h-[44px] items-center text-sm text-blue-600 hover:text-blue-800"
+          >
+            {showFiscal ? "Ocultar Subtotal e ITBMS" : "Ver Subtotal e ITBMS"}
+          </button>
+        </div>
+      )}
+      {gastos.length > 0 && !apple && (
         <div className="mt-4 flex items-center justify-end">
           {/* El <input type=checkbox> nativo mide 13×13 y no se puede agrandar
               sin que se vea deforme; lo que se toca de verdad es la etiqueta,

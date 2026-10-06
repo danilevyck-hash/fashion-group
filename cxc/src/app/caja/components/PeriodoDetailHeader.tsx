@@ -4,6 +4,8 @@ import { fmt, fmtDate } from "@/lib/format";
 import { CajaPeriodo } from "./types";
 import OverflowMenu, { OverflowMenuItem } from "@/components/ui/OverflowMenu";
 import { etiquetaResponsable } from "@/lib/caja/responsable";
+import { montoEnPantalla, saldoEsNegativo } from "@/lib/caja/dinero";
+import { lineaPeriodoCaja } from "@/lib/egresos/apple-2026-10";
 
 interface Props {
   current: CajaPeriodo;
@@ -18,6 +20,12 @@ interface Props {
   deletedCount?: number;
   /** When provided and deletedCount > 0, the menu entry appears. */
   onViewDeleted?: () => void;
+  /** `GASTOS_APPLE_2026_10` (6-oct-2026). */
+  apple?: boolean;
+  /** Apple: la acción principal en la cabecera (computadora). */
+  onNuevoGasto?: () => void;
+  /** Apple: cuántos recibos tiene, para la línea gris. */
+  recibos?: number;
 }
 
 function StatusPill({ open, fechaCierre }: { open: boolean; fechaCierre: string | null }) {
@@ -150,6 +158,9 @@ export default function PeriodoDetailHeader({
   onExportExcel,
   deletedCount,
   onViewDeleted,
+  apple = false,
+  onNuevoGasto,
+  recibos = 0,
 }: Props) {
   const isOpen = current.estado === "abierto";
   const fondoInicial = current.fondo_inicial;
@@ -181,6 +192,52 @@ export default function PeriodoDetailHeader({
       ? [{ label: `Ver gastos eliminados (${deletedCount})`, onClick: onViewDeleted }]
       : []),
   ];
+
+  // 🔴 «COMO LO HARÍA APPLE» (6-oct-2026, `GASTOS_APPLE_2026_10`): «‹ Períodos»
+  // en la línea del título; el SALDO grande con una línea gris (fondo, gastado,
+  // recibos) en vez de las tres cajas y la barra; «Nuevo gasto» es la acción
+  // principal y «Cerrar período» va al «···» con Imprimir y Excel (medido: 2
+  // cierres en toda la historia contra 77 recibos). Los números son los MISMOS.
+  if (apple) {
+    const items: OverflowMenuItem[] = [
+      ...menuItems,
+      ...(isOpen && onClosePeriodo ? [{ label: "Cerrar período", onClick: onClosePeriodo }] : []),
+    ];
+    const neg = saldoEsNegativo(saldo);
+    return (
+      <div data-cabecera-apple className="max-w-6xl mx-auto px-4 sm:px-9 pt-6 pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
+            <button onClick={onBack} className="inline-flex min-h-[44px] items-center text-sm text-blue-600 hover:text-blue-800">‹ Períodos</button>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Período Nº {current.numero}</h1>
+            {isOpen ? (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Abierto</span>
+            ) : (
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Cerrado{current.fecha_cierre ? ` — ${fmtDate(current.fecha_cierre)}` : ""}</span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            {onNuevoGasto && (
+              <button onClick={onNuevoGasto} className="inline-flex min-h-[44px] items-center rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]">
+                Nuevo gasto
+              </button>
+            )}
+            {items.length > 0 && <OverflowMenu items={items} />}
+          </div>
+        </div>
+        <p className={`pt-3 text-[34px] font-normal leading-none tracking-tight tabular-nums ${neg ? "text-red-600" : "text-gray-800"}`}>
+          {montoEnPantalla(saldo)}
+        </p>
+        <p className="pt-2 text-sm text-gray-500 tabular-nums">
+          {lineaPeriodoCaja(`$${fmt(fondoInicial)}`, `$${fmt(totalGastado)}`, recibos)}
+          {fondoInicial > 0 && ` · ${pctSpent.toFixed(1)}% del fondo`}
+          {` · Apertura ${fmtDate(current.fecha_apertura)}`}
+          {responsableLabel && ` · ${responsableLabel}`}
+        </p>
+        <span style={{ display: "none" }} aria-hidden data-pct-used={pctUsed.toFixed(2)} />
+      </div>
+    );
+  }
 
   return (
     <>

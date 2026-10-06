@@ -46,10 +46,18 @@ interface Props {
   /** Título de la sección plegable. `null` = sin plegable (la pantalla ya
    *  tiene su propio título; repetirlo sería decir dos veces lo mismo). */
   titulo?: string | null;
+  /**
+   * `GASTOS_APPLE_2026_10` (6-oct-2026): una fila por empresa con su saldo y su
+   * ›; el formulario se abre en la fila tocada —un solo «Guardar» a la vista,
+   * no ocho— y «Banco General» va en la línea gris del pie. El guardado es el
+   * MISMO (`guardar` de la fila, el mismo upsert).
+   */
+  apple?: boolean;
 }
 
-export default function SaldosBancarios({ bancos, historial, onGuardado, titulo = "Saldos bancarios" }: Props) {
+export default function SaldosBancarios({ bancos, historial, onGuardado, titulo = "Saldos bancarios", apple = false }: Props) {
   const [abierto, setAbierto] = useState(true);
+  const [filaAbierta, setFilaAbierta] = useState<string | null>(null);
   const porEmpresa = new Map(bancos.map((b) => [b.empresa_key, b]));
   const visible = titulo === null ? true : abierto;
 
@@ -88,7 +96,7 @@ export default function SaldosBancarios({ bancos, historial, onGuardado, titulo 
 
           {/* "una cuenta por empresa" se ve solo: son las 8 filas de abajo. El
               nombre del banco no está en ningún otro lado, así que se queda. */}
-          <p className="text-xs text-gray-500 mb-3">Banco General</p>
+          {!apple && <p className="text-xs text-gray-500 mb-3">Banco General</p>}
           <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
             {ALL_EMPRESA_KEYS.map((key) => (
               <BancoRow
@@ -97,9 +105,13 @@ export default function SaldosBancarios({ bancos, historial, onGuardado, titulo 
                 banco={porEmpresa.get(key)}
                 cargas={historial?.[key] ?? []}
                 onGuardado={onGuardado}
+                plegable={apple}
+                abierta={filaAbierta === key}
+                onAlternar={() => setFilaAbierta(filaAbierta === key ? null : key)}
               />
             ))}
           </div>
+          {apple && <p className="mt-2 text-xs text-gray-500">Banco General · {ALL_EMPRESA_KEYS.length} cuentas</p>}
         </>
       )}
     </section>
@@ -111,11 +123,18 @@ function BancoRow({
   banco,
   cargas,
   onGuardado,
+  plegable = false,
+  abierta = true,
+  onAlternar,
 }: {
   empresaKey: string;
   banco: BancoSaldo | undefined;
   cargas: CargaSaldo[];
   onGuardado: () => Promise<unknown> | void;
+  /** Apple: la fila se toca y el formulario se abre abajo. */
+  plegable?: boolean;
+  abierta?: boolean;
+  onAlternar?: () => void;
 }) {
   const { toast } = useToast();
   const [monto, setMonto] = useState(() => (banco ? montoInputValue(Number(banco.saldo) || 0) : ""));
@@ -160,9 +179,34 @@ function BancoRow({
     setFecha(c.fecha_dato);
   };
 
+  const avisos = [viejo ? "Desactualizado" : null, ultimaRepite ? `igual al ${fechaCorta(cargas[0].fechaAnterior ?? "")}` : null].filter(Boolean);
+  const verFormulario = !plegable || abierta;
+
   return (
-    <div className="p-3">
-      <div className="flex items-center justify-between gap-2">
+    <div className={plegable ? "" : "p-3"}>
+      {plegable && (
+        <button
+          type="button"
+          onClick={onAlternar}
+          aria-expanded={abierta}
+          className="flex min-h-[56px] w-full items-center gap-4 px-4 py-2.5 text-left transition hover:bg-gray-50 active:bg-gray-50"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-gray-900">{empresaNombre(empresaKey)}</span>
+            <span className="mt-0.5 block truncate text-sm text-gray-500">
+              {banco ? `al ${fechaCorta(banco.fecha_dato)}` : "Sin dato"}
+              {avisos.map((a) => <span key={a}> · <span className="text-amber-700">{a}</span></span>)}
+            </span>
+          </span>
+          <span className={`shrink-0 text-sm tabular-nums ${banco ? "text-gray-900" : "text-gray-400"}`}>
+            {banco ? money(Number(banco.saldo) || 0) : "—"}
+          </span>
+          <span aria-hidden className={`shrink-0 text-gray-300 transition-transform ${abierta ? "rotate-90" : ""}`}>›</span>
+        </button>
+      )}
+      {verFormulario && (
+      <div className={plegable ? "px-4 pb-3" : undefined}>
+      <div className={plegable ? "hidden" : "flex items-center justify-between gap-2"}>
         <span className="flex items-center gap-2 min-w-0">
           <span className="text-sm font-medium text-gray-900 truncate">{empresaNombre(empresaKey)}</span>
           {viejo && (
@@ -208,7 +252,7 @@ function BancoRow({
           disabled={guardando || parsed == null || !fecha}
           className="shrink-0 rounded-md bg-black text-white px-3 min-h-[44px] py-2.5 text-sm font-medium active:scale-[0.97] transition disabled:opacity-40"
         >
-          {guardando ? "…" : corrigiendo ? "Corregir" : "Guardar"}
+          {guardando ? "…" : corrigiendo ? "Corregir" : plegable ? "Guardar saldo" : "Guardar"}
         </button>
       </div>
 
@@ -265,6 +309,8 @@ function BancoRow({
             </ul>
           )}
         </>
+      )}
+      </div>
       )}
     </div>
   );
