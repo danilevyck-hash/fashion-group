@@ -94,6 +94,8 @@ import { anotarDescargaComision } from "@/lib/comisiones/rastro";
 import { TITULO_PAPEL_GRUPO } from "@/lib/comisiones/tabla-papel";
 import { ComisionesTarjetasConsolidado } from "./ComisionesTarjetas";
 import type { ResumenDelTotal } from "@/lib/comisiones/apple-v2";
+import { COMISIONES_DETALLE_V3_2026_10 } from "@/lib/comisiones/detalle-v3";
+import { useSeVeLaTablaComisiones } from "./celular/useEsCelularComisiones";
 
 // Las 6 empresas con CXC — joystep incluida desde el 14-ago-2026. La lista
 // vive en `lib/comisiones/empresas`, nunca se filtra acá.
@@ -193,6 +195,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   // El motor de la flechita ↓: los MISMOS archivos que ya bajaban desde adentro
   // del detalle, sin tener que abrirlo. Ver `comisiones-detalle/useDescargaComision`.
   const { descargarExcel, descargarPdf, MENSAJE_ERROR } = useDescargaComision(year, mes);
+  /** v3: en la computadora el detalle se abre DEBAJO DE SU FILA de la tabla. */
+  const seVeLaTabla = useSeVeLaTablaComisiones();
+  const enLaFila = COMISIONES_DETALLE_V3_2026_10 && seVeLaTabla;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -474,7 +479,25 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   const detalleDe = (empresa: string, vendedor: string) =>
     setDetalle({ empresa, vendedor: claveDetalle(vendedor) });
 
-  const filaVendedor = (r: Row, italica = false) => (
+  const detalleEnLaFila = (r: Row) =>
+    enLaFila && detalle && detalle.vendedor === claveDetalle(r.vendedor) ? (
+      <tr key={`${r.vendedor}-detalle`} data-detalle-en-la-fila>
+        <td colSpan={EMPRESAS.length + 2} className="bg-gray-50 p-3">
+          <ComisionesDetalleModal
+            inline
+            v2={v2}
+            empresa={detalle.empresa}
+            empresaNombre={nombreCortoEmpresa(detalle.empresa)}
+            year={year}
+            mes={mes}
+            vendedor={detalle.vendedor}
+            onClose={() => setDetalle(null)}
+          />
+        </td>
+      </tr>
+    ) : null;
+
+  const filaVendedor = (r: Row, italica = false) => [
     <tr
       key={r.vendedor}
       data-se-paga={r.se_paga ? "si" : "no"}
@@ -487,8 +510,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
         {!r.se_paga && <MarcaNoSePaga />}
       </td>
       {renderCells(r)}
-    </tr>
-  );
+    </tr>,
+    detalleEnLaFila(r),
+  ];
 
   return (
     <div className="space-y-4">
@@ -626,7 +650,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
           del modal, en modo `inline`: no hay una segunda pantalla de detalle. Y
           sigue siendo el que se imprime — su hoja de impresión viaja en un
           portal, así que imprimir desde acá sale igual que desde el modal. */}
-      {detalle && (
+      {detalle && !enLaFila && (
         <ComisionesDetalleModal
           inline
           v2={v2}

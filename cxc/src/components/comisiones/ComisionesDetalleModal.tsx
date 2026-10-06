@@ -73,6 +73,16 @@ import { useEsCelularComisiones } from "./celular/useEsCelularComisiones";
 import { MenuDescargaComision } from "./comisiones-detalle/MenuDescargaComision";
 import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
 import { ROTULO_DESCARGAR_V2 } from "@/lib/comisiones/apple-v2";
+import {
+  CHIP_NOTA_DE_CREDITO,
+  COMISIONES_DETALLE_V3_2026_10,
+  SIN_COBROS,
+  SIN_VENTAS,
+  lineaDeComisiones,
+  lineaDelPie,
+  rotuloFactura,
+  tituloDelDetalle,
+} from "@/lib/comisiones/detalle-v3";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -146,9 +156,11 @@ interface Props {
    * «No pagable» como chip junto al nombre. Los papeles son los MISMOS.
    */
   v2?: boolean;
+  /** 🔴 `COMISIONES_DETALLE_V3_2026_10` (apagado): el detalle en renglones. Las pruebas lo fuerzan. */
+  v3?: boolean;
 }
 
-export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vendedor, onClose, inline = false, v2 = false }: Props) {
+export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vendedor, onClose, inline = false, v2 = false, v3 = COMISIONES_DETALLE_V3_2026_10 }: Props) {
   const [data, setData] = useState<ComisionDetalle | null>(null);
   const [descuentos, setDescuentos] = useState<ComisionDescuento[]>([]);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -649,6 +661,185 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
       {aviso}
     </div>
   ) : null;
+
+  // ── 🔴 COMISIONES_DETALLE_V3_2026_10 · el detalle en renglones ───────────
+  if (v3) {
+    const descargar = (
+      <MenuDescargaComision
+        rotulo={ROTULO_DESCARGAR_V2}
+        apagado={!data}
+        titulo={tituloDelDetalle(nombreVendedorEnPantalla(vendedor), empresaNombre, etiquetaPeriodo(year, mes))}
+        mensajeError="No se pudo preparar el reporte. Revisa tu conexión e intenta de nuevo."
+        onPdf={async () => {
+          if (!data) return;
+          descargarPdfComision([{ data, descuentos, empresaNombre, vendedor, year, mes }], nombreArchivo);
+          anotar("pdf");
+        }}
+        onExcel={async () => {
+          if (!data) return;
+          await exportComisionDetalle(data, empresaNombre, descActivos);
+          anotar("excel");
+        }}
+      />
+    );
+    const rojo = (n: number) => (n < 0 ? "text-red-600" : "text-gray-900");
+    const hoja = (
+        <section
+          data-comision-detalle={inline ? "inline" : "modal"}
+          data-detalle-v3
+          aria-label={`Detalle de comisión de ${nombreVendedorEnPantalla(vendedor)} en ${empresaNombre}`}
+          /* Al abrirse debajo de la fila, el encabezado pegajoso no lo tapa. */
+          style={{ scrollMarginTop: "calc(var(--fg-altura-encabezado, 0px) + 12px)" }}
+          ref={(el) => { if (el && inline) el.scrollIntoView?.({ block: "nearest", behavior: "smooth" }); }}
+          className={`rounded-lg border border-gray-200 bg-white print:hidden ${inline ? "" : "my-6 w-full max-w-3xl shadow-lg"}`}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 p-4">
+            <div className="min-w-0">
+              <p className="text-sm text-gray-500">
+                {tituloDelDetalle(nombreVendedorEnPantalla(vendedor), empresaNombre, etiquetaPeriodo(year, mes))}
+                {!sePagaComision(vendedor) && (
+                  <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{ROTULO_NO_SE_PAGA}</span>
+                )}
+              </p>
+              <p data-total-detalle className={`mt-1 text-[36px] font-normal leading-none tracking-tight tabular-nums ${data && totalAPagar < 0 ? "text-red-600" : "text-gray-800"}`}>
+                {data ? fmtMoney(totalAPagar) : "—"}
+              </p>
+              {data && (
+                <p className="mt-1.5 text-sm text-gray-500">
+                  {lineaDeComisiones(data.comision_venta, data.comision_cobro)}
+                  {descActivos.length > 0 && ` · Descuentos −${fmtMoney(descActivos.reduce((a, d) => a + d.monto, 0))}`}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void mandar()}
+                disabled={!data || mandando}
+                data-boton-mandar
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-black px-3 text-sm text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:opacity-40"
+              >
+                <Send className="h-3.5 w-3.5" /> {mandando ? "Preparando…" : ROTULO_MANDAR}
+              </button>
+              {descargar}
+              <button
+                onClick={onClose}
+                aria-label="Cerrar"
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="p-8 text-center text-sm text-gray-500">Cargando…</div>
+          ) : error ? (
+            <div className="p-8 text-center text-sm text-red-600">{error}</div>
+          ) : data ? (
+            <div className="space-y-5 p-4">
+              <section data-ventas-v3>
+                <h3 className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-900">
+                  Ventas
+                  <Ayuda titulo="Cómo se calcula">
+                    <p>Comisión de cada línea = subtotal × {pctTasaV}%.</p>
+                    <p className="mt-2">{NOTA_COMISION_LINEA}</p>
+                  </Ayuda>
+                </h3>
+                {data.ventas.length === 0 ? (
+                  <p className="text-sm text-gray-400">{SIN_VENTAS}</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100">
+                    {data.ventas.map((v, i) => {
+                      const nc = v.tipo === "Nota de Crédito";
+                      const enCero = v.subtotal === 0 && v.tipo === "Factura";
+                      return (
+                        <li key={i} data-renglon-venta className={`flex items-start justify-between gap-3 py-2 ${enCero ? "text-gray-400" : ""}`}>
+                          <div className="min-w-0">
+                            <p className={`truncate text-sm ${enCero ? "" : "text-gray-900"}`}>{v.cliente}</p>
+                            <p className="mt-0.5 text-xs tabular-nums text-gray-500">
+                              {fmtDate(v.fecha)}
+                              {rotuloFactura(facturaParaMostrar(v.secuencial), nc) && ` · ${rotuloFactura(facturaParaMostrar(v.secuencial), nc)}`}
+                              {nc && <span className="ml-1.5 inline-block whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">{CHIP_NOTA_DE_CREDITO}</span>}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right tabular-nums">
+                            <p className={`text-sm ${enCero ? "" : rojo(v.subtotal)}`}>{fmtMoney(v.subtotal)}</p>
+                            <p className={`mt-0.5 text-xs ${v.subtotal < 0 ? "text-red-600" : "text-gray-500"}`}>Comisión {fmtMoney(comisionLinea(v.subtotal, data.tasa_venta))}</p>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+
+              <section data-cobros-v3>
+                <h3 className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-900">
+                  Cobros
+                  {data.cobros.length > 0 && (
+                    <Ayuda titulo="Cómo se calcula">
+                      <p>Comisión de cada línea = monto × {pctTasaC}%.</p>
+                      <p className="mt-2">{NOTA_COMISION_LINEA}</p>
+                    </Ayuda>
+                  )}
+                </h3>
+                {data.cobros.length === 0 ? (
+                  <p className="text-sm text-gray-400">{SIN_COBROS}</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100">
+                    {data.cobros.map((c, i) => (
+                      <li key={i} data-renglon-cobro className="flex items-start justify-between gap-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-gray-900">{c.cliente}</p>
+                          <p className="mt-0.5 text-xs tabular-nums text-gray-500">{fmtDate(c.fecha)}</p>
+                        </div>
+                        <div className="shrink-0 text-right tabular-nums">
+                          <p className={`text-sm ${rojo(c.monto)}`}>{fmtMoney(c.monto)}</p>
+                          <p className="mt-0.5 text-xs text-gray-500">Comisión {fmtMoney(comisionLinea(c.monto, data.tasa_cobro))}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              {/* Los descuentos del mes, solo si hay: se apagan aquí (admin y secretaria). */}
+              {descuentos.length > 0 && (
+                <section data-descuentos-v3>
+                  <h3 className="mb-1 text-sm font-medium text-gray-900">Descuentos</h3>
+                  <ul className="divide-y divide-gray-100">
+                    {descuentos.map((d) => (
+                      <li key={d.id} className="flex min-h-[44px] items-center justify-between gap-3 py-1.5 text-sm">
+                        <span className="flex items-center gap-2 text-gray-700">
+                          {puedeEditarDescuentos && (
+                            <label className="inline-flex cursor-pointer items-center" title={d.activo ? "Activo este mes — clic para desactivar" : "Desactivado este mes — clic para activar"}>
+                              <input type="checkbox" className="peer sr-only" checked={d.activo} disabled={togglingId === d.id} onChange={(e) => toggleDescuento(d.id, e.target.checked)} />
+                              <span className="relative h-4 w-7 rounded-full bg-gray-300 transition peer-checked:bg-gray-900 after:absolute after:left-0.5 after:top-0.5 after:h-3 after:w-3 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-3" />
+                            </label>
+                          )}
+                          <span className={d.activo ? "" : "text-gray-400 line-through"}>{d.concepto}</span>
+                        </span>
+                        <span className={`tabular-nums ${d.activo ? "text-red-600" : "text-gray-300"}`}>−{fmtMoney(d.monto)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              <p data-pie-detalle className="text-xs tabular-nums text-gray-500">{lineaDelPie(data)}</p>
+            </div>
+          ) : null}
+        </section>
+    );
+    return (
+      <>
+        {inline ? hoja : (
+          <ModalOverlay align="start" backdropClassName="bg-black/40" className="overflow-y-auto p-4 print:hidden">{hoja}</ModalOverlay>
+        )}
+        {laHojaDeMandar}
+      </>
+    );
+  }
 
   if (inline) {
     return (

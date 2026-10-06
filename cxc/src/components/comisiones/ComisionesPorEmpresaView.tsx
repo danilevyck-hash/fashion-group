@@ -55,6 +55,8 @@ import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { ComisionesTarjetasPorEmpresa } from "./ComisionesTarjetas";
 import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
 import type { ResumenDelTotal } from "@/lib/comisiones/apple-v2";
+import { COMISIONES_DETALLE_V3_2026_10 } from "@/lib/comisiones/detalle-v3";
+import { useSeVeLaTablaComisiones } from "./celular/useEsCelularComisiones";
 
 interface ComisionVendedor {
   vendedor: string;
@@ -132,6 +134,9 @@ export function ComisionesPorEmpresaView({
   // error crudo del servidor «mes inválido (1..12)», mientras el pie seguía
   // diciendo «Toca para ver el detalle».
   const conDetalle = !esTodoElAnio(mes);
+  /** v3: en la computadora el detalle se abre DEBAJO DE SU FILA de la tabla. */
+  const seVeLaTabla = useSeVeLaTablaComisiones();
+  const enLaFila = COMISIONES_DETALLE_V3_2026_10 && seVeLaTabla;
   const abrirDetalle = conDetalle ? setDetalleVendedor : () => {};
 
   const load = useCallback(async () => {
@@ -339,7 +344,7 @@ export function ComisionesPorEmpresaView({
               </tr>
             </thead>
             <tbody>
-              {filasTabla.map((v) => (
+              {filasTabla.map((v) => [
                 <tr
                   key={v.vendedor}
                   data-se-paga={v.se_paga === false ? "no" : "si"}
@@ -370,8 +375,24 @@ export function ComisionesPorEmpresaView({
                   <td className={`px-3 py-2.5 text-right tabular-nums xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-700"}`}>{fmtMoney(v.base_cobro)}</td>
                   <td className={`px-3 py-2.5 text-right tabular-nums xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-600"}`}>{fmtMoney(v.comision_cobro)}</td>
                   <td className={`px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${v.se_paga === false ? "text-gray-400" : "text-gray-900"}`}>{fmtMoney(v.comision_total)}</td>
-                </tr>
-              ))}
+                </tr>,
+                enLaFila && conDetalle && detalleVendedor === v.vendedor ? (
+                  <tr key={`${v.vendedor}-detalle`} data-detalle-en-la-fila>
+                    <td colSpan={6} className="bg-gray-50 p-3">
+                      <ComisionesDetalleModal
+                        inline
+                        v2={v2}
+                        empresa={empresa}
+                        empresaNombre={nombreEmpresa}
+                        year={year}
+                        mes={mes}
+                        vendedor={detalleVendedor}
+                        onClose={() => setDetalleVendedor(null)}
+                      />
+                    </td>
+                  </tr>
+                ) : null,
+              ])}
               {noSePagan.length > 0 && (
                 <tr className="border-b border-gray-100 last:border-0">
                   <td colSpan={6} className="px-3 py-1.5 xl:px-4">
@@ -417,7 +438,7 @@ export function ComisionesPorEmpresaView({
       </p>
       )}
 
-      {detalleVendedor && conDetalle && (
+      {detalleVendedor && conDetalle && !enLaFila && (
         <ComisionesDetalleModal
           inline={v2}
           v2={v2}

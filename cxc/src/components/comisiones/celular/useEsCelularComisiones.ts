@@ -38,3 +38,27 @@ export function useEsCelularComisiones(): boolean {
   }, []);
   return COMISIONES_CELULAR && celular;
 }
+
+/**
+ * ¿Se ve la TABLA (≥ lg, 1024 px)? Para abrir el detalle debajo de la fila
+ * (`COMISIONES_DETALLE_V3_2026_10`) sin montarlo dos veces. Sin `matchMedia`
+ * (servidor, pruebas) contesta `false`: el detalle va al pie, como hoy.
+ */
+export function useSeVeLaTablaComisiones(): boolean {
+  const [ancha, setAncha] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let mq: MediaQueryList | null = null;
+    try {
+      mq = window.matchMedia?.("(min-width: 1024px)") ?? null;
+    } catch {
+      mq = null;
+    }
+    if (!mq) return;
+    setAncha(mq.matches);
+    const alCambiar = (e: MediaQueryListEvent) => setAncha(e.matches);
+    mq.addEventListener?.("change", alCambiar);
+    return () => mq?.removeEventListener?.("change", alCambiar);
+  }, []);
+  return ancha;
+}
