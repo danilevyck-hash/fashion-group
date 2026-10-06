@@ -26,7 +26,7 @@
 // vendedores activos aunque base=$0; los sin actividad se colapsan al pie.
 
 import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { SkeletonTable } from "@/components/ui";
@@ -54,6 +54,7 @@ import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { ComisionesTarjetasPorEmpresa } from "./ComisionesTarjetas";
 import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
+import type { ResumenDelTotal } from "@/lib/comisiones/apple-v2";
 
 interface ComisionVendedor {
   vendedor: string;
@@ -93,6 +94,12 @@ interface Props {
   onPdf?: (api: ExcelApi | null) => void;
   /** Cambia cuando "Actualizar ahora" termina: fuerza re-pedir los datos. */
   refreshKey?: number;
+  /** 🔴 COMISIONES_APPLE_V2_2026_10: el total y sus bases hacia arriba (las sumas del pie). */
+  onResumen?: (r: ResumenDelTotal | null) => void;
+  /** v2: dos renglones en el celular y el detalle DEBAJO, no encima. */
+  v2?: boolean;
+  /** v2 en la computadora: la línea del pie que manda el shell (con el ⓘ de criterios). */
+  pie?: ReactNode;
 }
 
 const COLUMNAS_EMPRESA = ["vendedor", "base", "comision", "base_cobro", "comision_cobro", "comision_total"] as const;
@@ -107,6 +114,9 @@ export function ComisionesPorEmpresaView({
   onExcel,
   onPdf,
   refreshKey = 0,
+  onResumen,
+  v2 = false,
+  pie,
 }: Props) {
   const nombreEmpresa = empresaNombre ?? nombreCortoEmpresa(empresa);
   const [data, setData] = useState<ComisionResp | null>(null);
@@ -162,6 +172,7 @@ export function ComisionesPorEmpresaView({
   const totalGeneral = sumarPagable(vendedores, (v) => v.comision_total ?? 0);
   const haySinPago = vendedores.some((v) => v.se_paga === false);
 
+
   const isInactivo = (v: ComisionVendedor) =>
     (v.base ?? 0) === 0 && (v.base_cobro ?? 0) === 0 && (v.comision_total ?? 0) === 0;
   // Sin actividad = no se dibuja. La línea «N vendedores sin actividad este mes»
@@ -178,6 +189,19 @@ export function ComisionesPorEmpresaView({
   const filasTabla = verNoSePagan
     ? [...orden.ordenar(activos, valorOrden), ...orden.ordenar(noSePagan, valorOrden)]
     : orden.ordenar(activos, valorOrden);
+
+  // v2: el número grande de arriba dice el MISMO total del pie. Los descuentos
+  // salen de las filas con actividad (un descuento deja la fila en negativo,
+  // así que nunca queda afuera): es lo informativo de «− $X en descuentos».
+  const totalDescuentos = sumarPagable(conActividad, (v) => v.descuento ?? 0);
+  const sinDatos = loading || !!error || vendedores.length === 0;
+  useEffect(() => {
+    onResumen?.(
+      sinDatos
+        ? null
+        : { total: totalGeneral, ventas: totalBase, cobros: totalCobroBase, descuentos: totalDescuentos },
+    );
+  }, [onResumen, sinDatos, totalGeneral, totalBase, totalCobroBase, totalDescuentos]);
 
   // 🔴 Queda rastro de cada descarga (22-sep-2026); nunca la frena.
   const anotar = (formato: "pdf" | "excel") =>
@@ -296,6 +320,7 @@ export function ComisionesPorEmpresaView({
             onVerNoSePagan={() => setVerNoSePagan((v) => !v)}
             total={totalGeneral}
             onDetalle={abrirDetalle}
+            v2={v2}
           />
 
           {/* iPad y escritorio: la tabla. El `overflow-x-auto` es nuevo — sin
@@ -382,6 +407,7 @@ export function ComisionesPorEmpresaView({
           muestran el MISMO neto, así que tienen que explicarlo igual. */}
       {/* AJUSTES_APPLE_6 (punto 5): en el celular la › de la fila ya dice que se abre;
           el «Cómo se calcula» sigue en el ⓘ de «Criterios» del «···». */}
+      {pie ?? (
       <p className={`${AJUSTES_APPLE_6_2026_10 ? "hidden sm:flex" : "flex"} items-center gap-1.5 text-xs text-gray-400`}>
         <Coins className="h-3.5 w-3.5" />
         {conDetalle ? "Toca para ver el detalle" : "Selecciona un mes para ver el detalle"}
@@ -389,9 +415,12 @@ export function ComisionesPorEmpresaView({
           <p>Ya están descontados lo devuelto y los descuentos.</p>
         </Ayuda>
       </p>
+      )}
 
       {detalleVendedor && conDetalle && (
         <ComisionesDetalleModal
+          inline={v2}
+          v2={v2}
           empresa={empresa}
           empresaNombre={nombreEmpresa}
           year={year}

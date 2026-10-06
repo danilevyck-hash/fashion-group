@@ -70,6 +70,9 @@ import {
   ROTULO_MANDAR,
 } from "@/lib/comisiones/celular";
 import { useEsCelularComisiones } from "./celular/useEsCelularComisiones";
+import { MenuDescargaComision } from "./comisiones-detalle/MenuDescargaComision";
+import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
+import { ROTULO_DESCARGAR_V2 } from "@/lib/comisiones/apple-v2";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -137,9 +140,15 @@ interface Props {
    * portal igual, así que imprimir sale idéntico en las dos formas.
    */
   inline?: boolean;
+  /**
+   * 🔴 COMISIONES_APPLE_V2_2026_10: UNA acción principal («Enviar») y UN
+   * «Descargar ▾» (PDF · Excel), en vez de dos botones negros y uno con borde;
+   * «No pagable» como chip junto al nombre. Los papeles son los MISMOS.
+   */
+  v2?: boolean;
 }
 
-export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vendedor, onClose, inline = false }: Props) {
+export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vendedor, onClose, inline = false, v2 = false }: Props) {
   const [data, setData] = useState<ComisionDetalle | null>(null);
   const [descuentos, setDescuentos] = useState<ComisionDescuento[]>([]);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -266,12 +275,17 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const encabezado = (
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 p-4">
       <div className="min-w-0">
-        <h2 className="text-lg font-semibold text-gray-900">Comisión — {nombreVendedorEnPantalla(vendedor)}</h2>
+        <h2 className="text-lg font-semibold text-gray-900">
+          Comisión — {nombreVendedorEnPantalla(vendedor)}
+          {v2 && !sePagaComision(vendedor) && (
+            <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 align-middle text-xs font-normal text-gray-500">{ROTULO_NO_SE_PAGA}</span>
+          )}
+        </h2>
         <p className="text-xs text-gray-500">{empresaNombre} · {etiquetaPeriodo(year, mes)}</p>
         {/* DEFAULT y Daniel: el detalle se calcula igual (para cuadrar qué
             se vendió y qué se cobró), pero esta plata no se paga. Daniel:
             «si yo cobro no le pago a nadie porque no me autopago». */}
-        {!sePagaComision(vendedor) && (
+        {!v2 && !sePagaComision(vendedor) && (
           <p className="mt-1 text-xs text-amber-700">
             Se calcula para cuadrar, pero esta comisión no se paga.
           </p>
@@ -310,6 +324,25 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
         >
           <Send className="h-3.5 w-3.5" /> {mandando ? "Preparando…" : ROTULO_MANDAR}
         </button>
+        {v2 ? (
+          <MenuDescargaComision
+            rotulo={ROTULO_DESCARGAR_V2}
+            apagado={!data}
+            titulo={`${nombreVendedorEnPantalla(vendedor)} · ${empresaNombre} · ${etiquetaPeriodo(year, mes)}`}
+            mensajeError="No se pudo preparar el reporte. Revisa tu conexión e intenta de nuevo."
+            onPdf={async () => {
+              if (!data) return;
+              descargarPdfComision([{ data, descuentos, empresaNombre, vendedor, year, mes }], nombreArchivo);
+              anotar("pdf");
+            }}
+            onExcel={async () => {
+              if (!data) return;
+              await exportComisionDetalle(data, empresaNombre, descActivos);
+              anotar("excel");
+            }}
+          />
+        ) : (
+        <>
         <button
           onClick={() => {
             if (!data) return;
@@ -336,6 +369,8 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
         >
           <FileText className="h-3.5 w-3.5" /> PDF
         </button>
+        </>
+        )}
         <button
           onClick={onClose}
           aria-label="Cerrar"

@@ -48,9 +48,17 @@ interface Props {
   mensajeError: string;
   /** Más chica dentro de la fila del celular. */
   compacta?: boolean;
+  /**
+   * 🔴 COMISIONES_APPLE_V2_2026_10: con rótulo, el disparador es el botón de
+   * texto «Descargar ▾» (el ÚNICO botón de papel de la barra o del detalle) y no
+   * la flechita gris. Sin rótulo, la flechita de siempre.
+   */
+  rotulo?: string;
+  /** Apagado mientras no hay nada que bajar (solo con `rotulo`). */
+  apagado?: boolean;
 }
 
-export function MenuDescargaComision({ titulo, onPdf, onExcel, mensajeError, compacta }: Props) {
+export function MenuDescargaComision({ titulo, onPdf, onExcel, mensajeError, compacta, rotulo, apagado }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +86,21 @@ export function MenuDescargaComision({ titulo, onPdf, onExcel, mensajeError, com
        tocar la flecha no puede abrirlo además. El menú ya no necesita esta
        protección —vive en <body>, fuera de la celda— pero la flecha sí. */
     <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+      {rotulo ? (
+      <button
+        ref={ancla}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+        disabled={apagado}
+        onClick={() => setAbierto((v) => !v)}
+        data-descargar-unico
+        className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 transition hover:border-gray-900 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {rotulo}
+        <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${abierto ? "rotate-180" : ""}`} />
+      </button>
+      ) : (
       <button
         ref={ancla}
         type="button"
@@ -94,6 +117,7 @@ export function MenuDescargaComision({ titulo, onPdf, onExcel, mensajeError, com
       >
         <ChevronDown className="h-3.5 w-3.5" />
       </button>
+      )}
 
       <DesplegableFlotante
         abierto={abierto}

@@ -25,8 +25,15 @@ import { useCallback, useState } from "react";
 import { TasasPorVendedor } from "./comisiones-config/TasasPorVendedor";
 import { ClientesQueNoComisionan } from "./comisiones-config/ClientesQueNoComisionan";
 import { Descuentos } from "./comisiones-config/Descuentos";
+import { Toast } from "@/components/ui";
 
-export function ComisionesConfiguracionView() {
+/**
+ * 🔴 COMISIONES_APPLE_V2_2026_10 (`v2`): el «guardado» sale en el aviso de la
+ * casa, abajo al centro (docs/diseno.md › «Todos los avisos salen en el mismo
+ * lugar»), en vez de una línea verde que empujaba las tres tarjetas; y los
+ * botones dicen lo que agregan («+ Agregar exclusión», «+ Agregar descuento»).
+ */
+export function ComisionesConfiguracionView({ v2 = false }: { v2?: boolean } = {}) {
   const [msg, setMsg] = useState<string | null>(null);
   const avisar = useCallback((m: string) => {
     setMsg(m);
@@ -35,10 +42,11 @@ export function ComisionesConfiguracionView() {
 
   return (
     <div className="space-y-4">
-      {msg && <p className="text-xs text-emerald-700" role="status">{msg}</p>}
+      {!v2 && msg && <p className="text-xs text-emerald-700" role="status">{msg}</p>}
       <TasasPorVendedor onSaved={avisar} />
-      <ClientesQueNoComisionan onSaved={avisar} />
-      <Descuentos onSaved={avisar} />
+      <ClientesQueNoComisionan onSaved={avisar} v2={v2} />
+      <Descuentos onSaved={avisar} v2={v2} />
+      {v2 && <Toast message={msg} />}
     </div>
   );
 }

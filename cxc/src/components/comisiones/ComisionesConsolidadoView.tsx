@@ -55,7 +55,7 @@
 // nueva que nadie cargó en el alias sí aparece partida — es dato, no estructura.
 
 import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { SkeletonTable } from "@/components/ui";
@@ -93,6 +93,7 @@ import { descargarPdfTablaComisiones } from "@/lib/comisiones/pdf-tabla-comision
 import { anotarDescargaComision } from "@/lib/comisiones/rastro";
 import { TITULO_PAPEL_GRUPO } from "@/lib/comisiones/tabla-papel";
 import { ComisionesTarjetasConsolidado } from "./ComisionesTarjetas";
+import type { ResumenDelTotal } from "@/lib/comisiones/apple-v2";
 
 // Las 6 empresas con CXC — joystep incluida desde el 14-ago-2026. La lista
 // vive en `lib/comisiones/empresas`, nunca se filtra acá.
@@ -159,6 +160,16 @@ interface Props {
   onPdf?: (api: ExcelApi | null) => void;
   /** Cambia cuando "Actualizar ahora" termina: fuerza re-pedir los datos. */
   refreshKey?: number;
+  /**
+   * 🔴 COMISIONES_APPLE_V2_2026_10: el total y sus bases, HACIA ARRIBA, para el
+   * número grande. Las MISMAS sumas del pie (`sumarPagable`): acá no se inventa
+   * ninguna cuenta. `null` mientras carga o sin datos.
+   */
+  onResumen?: (r: ResumenDelTotal | null) => void;
+  /** v2: filas de dos renglones en el celular. */
+  v2?: boolean;
+  /** v2 en la computadora: la línea del pie que manda el shell (con el ⓘ de criterios). */
+  pie?: ReactNode;
 }
 
 const moneyClass = (n: number) => (n < 0 ? "text-red-600" : "text-gray-700");
@@ -172,7 +183,7 @@ export function MarcaNoSePaga() {
   );
 }
 
-export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKey = 0, onTotal, totalArriba = false }: Props) {
+export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKey = 0, onTotal, totalArriba = false, onResumen, v2 = false, pie }: Props) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [sinAsignar, setSinAsignar] = useState<Row | null>(null);
   const [loading, setLoading] = useState(false);
@@ -283,6 +294,20 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   useEffect(() => {
     onTotal?.(loading || error || empty ? null : grandTotal);
   }, [onTotal, loading, error, empty, grandTotal]);
+
+  // v2: las bases del número grande, con la MISMA suma del pie.
+  const ventasPagables = sumarPagable(allShown, (r) => r.sumBase);
+  const cobrosPagables = sumarPagable(allShown, (r) => r.sumBaseCobro);
+  const descuentosPagables = sumarPagable(allShown, (r) =>
+    Object.values(r.descuentoPorEmpresa).reduce((a, b) => a + b, 0),
+  );
+  useEffect(() => {
+    onResumen?.(
+      loading || error || empty
+        ? null
+        : { total: grandTotal, ventas: ventasPagables, cobros: cobrosPagables, descuentos: descuentosPagables },
+    );
+  }, [onResumen, loading, error, empty, grandTotal, ventasPagables, cobrosPagables, descuentosPagables]);
 
   // 🔴 Queda rastro de cada descarga de la matriz (22-sep-2026); nunca la frena.
   const anotar = (formato: "pdf" | "excel") =>
@@ -502,6 +527,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
             nombreEmpresa={nombreCortoEmpresa}
             granTotal={grandTotal}
             totalArriba={totalArriba}
+            v2={v2}
             onDetalle={conDetalle ? detalleDe : () => {}}
             menuEmpresa={(k, fila) =>
               conDescarga && hayQueDescargar(fila.porEmpresa[k], fila.descuentoPorEmpresa?.[k] ?? 0) ? (
@@ -586,6 +612,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
           la matriz y el detalle sí los restaba. */}
       {/* AJUSTES_APPLE_6 (punto 5): en el celular la › de la fila ya dice que se abre;
           el «Cómo se calcula» sigue en el ⓘ de «Criterios» del «···». */}
+      {pie ?? (
       <p className={`${AJUSTES_APPLE_6_2026_10 ? "hidden sm:flex" : "flex"} items-center gap-1.5 text-xs text-gray-400`}>
         <Coins className="h-3.5 w-3.5" />
         {conDetalle ? "Toca para ver el detalle" : "Selecciona un mes para ver el detalle"}
@@ -593,6 +620,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
           <p>Ya están descontados lo devuelto y los descuentos.</p>
         </Ayuda>
       </p>
+      )}
 
       {/* 🔴 EL DETALLE VA ABAJO, NO ENCIMA (6-sep-2026). Es el MISMO componente
           del modal, en modo `inline`: no hay una segunda pantalla de detalle. Y
@@ -601,6 +629,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
       {detalle && (
         <ComisionesDetalleModal
           inline
+          v2={v2}
           empresa={detalle.empresa}
           empresaNombre={nombreCortoEmpresa(detalle.empresa)}
           year={year}

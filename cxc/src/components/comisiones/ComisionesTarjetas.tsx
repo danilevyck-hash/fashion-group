@@ -52,6 +52,7 @@ import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_NO_SE_PAGA, ROTULO_VER_MENOS, rotuloVerNoSePagan } from "@/lib/comisiones/sin-pago";
 import { celdaVacia, desgloseDeCelda } from "@/lib/comisiones/matriz-celda";
 import type { ClienteSinComisionConEmpresa } from "./MarcaClientesSinComision";
+import { empresasDeLaFila, segundaLineaEmpresa, segundaLineaMatriz } from "@/lib/comisiones/apple-v2";
 
 /** Rojo para lo negativo, igual que la tabla. */
 const claseMonto = (n: number) => (n < 0 ? "text-red-600" : "text-gray-900");
@@ -180,6 +181,8 @@ interface PropsConsolidado {
    * más importante de la pantalla le faltaban los últimos tres caracteres.
    */
   totalArriba?: boolean;
+  /** 🔴 COMISIONES_APPLE_V2_2026_10: dos renglones con ›, sin barra negra al pie. */
+  v2?: boolean;
 }
 
 export function ComisionesTarjetasConsolidado({
@@ -194,7 +197,23 @@ export function ComisionesTarjetasConsolidado({
   menuEmpresa,
   menuTotal,
   totalArriba = false,
+  v2 = false,
 }: PropsConsolidado) {
+  if (v2) {
+    return (
+      <FilasConsolidadoV2
+        activos={activos}
+        noSePagan={noSePagan}
+        verNoSePagan={verNoSePagan}
+        onVerNoSePagan={onVerNoSePagan}
+        empresas={empresas}
+        nombreEmpresa={nombreEmpresa}
+        onDetalle={onDetalle}
+        menuEmpresa={menuEmpresa}
+        menuTotal={menuTotal}
+      />
+    );
+  }
   return (
     <ListaTarjetas>
       {activos.map((r) => (
@@ -376,6 +395,8 @@ interface PropsPorEmpresa {
   total: number;
   /** Abre el reporte detallado del vendedor (igual que tocar la fila). */
   onDetalle: (vendedor: string) => void;
+  /** 🔴 COMISIONES_APPLE_V2_2026_10: dos renglones con ›; el total ya va arriba. */
+  v2?: boolean;
 }
 
 export function ComisionesTarjetasPorEmpresa({
@@ -385,7 +406,19 @@ export function ComisionesTarjetasPorEmpresa({
   onVerNoSePagan,
   total,
   onDetalle,
+  v2 = false,
 }: PropsPorEmpresa) {
+  if (v2) {
+    return (
+      <FilasPorEmpresaV2
+        activos={activos}
+        noSePagan={noSePagan}
+        verNoSePagan={verNoSePagan}
+        onVerNoSePagan={onVerNoSePagan}
+        onDetalle={onDetalle}
+      />
+    );
+  }
   return (
     <ListaTarjetas>
       {activos.map((v) => (
@@ -451,6 +484,189 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: number }) {
       <dd className={`truncate text-sm tabular-nums ${claseMonto(valor)}`}>
         {fmtMoney(valor)}
       </dd>
+    </div>
+  );
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 🔴 COMISIONES_APPLE_V2_2026_10 — DOS RENGLONES CON ›, como Clientes y CxC.
+//
+// Una lista blanca agrupada (la de iOS) y no una tarjeta con sombra por
+// vendedor. Arriba el nombre y el monto; abajo, en gris, DE DÓNDE sale: las
+// empresas (en «Todas») o «Com. venta · Com. cobro» (en una empresa). El total
+// ya es el número grande de arriba: aquí no hay barra negra al pie.
+// Ningún número se calcula aquí: son los MISMOS campos de las tarjetas de hoy.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const CLASE_GRUPO_V2 = "overflow-hidden rounded-xl border border-gray-200 bg-white";
+
+function FilasConsolidadoV2({
+  activos,
+  noSePagan,
+  verNoSePagan,
+  onVerNoSePagan,
+  empresas,
+  nombreEmpresa,
+  onDetalle,
+  menuEmpresa,
+  menuTotal,
+}: Omit<PropsConsolidado, "granTotal" | "totalArriba" | "v2">) {
+  return (
+    <div data-filas-v2 className="space-y-2 lg:hidden">
+      <ul className={`${CLASE_GRUPO_V2} divide-y divide-gray-100`}>
+        {activos.map((r) => (
+          <FilaVendedorV2 key={r.vendedor} fila={r} empresas={empresas} nombreEmpresa={nombreEmpresa} onDetalle={onDetalle} menuEmpresa={menuEmpresa} menuTotal={menuTotal} />
+        ))}
+      </ul>
+      {noSePagan.length > 0 && (
+        <ul>
+          <LineaNoSePagan cantidad={noSePagan.length} abierto={verNoSePagan} onToggle={onVerNoSePagan} />
+        </ul>
+      )}
+      {verNoSePagan && noSePagan.length > 0 && (
+        <ul className={`${CLASE_GRUPO_V2} divide-y divide-gray-100`}>
+          {noSePagan.map((r) => (
+            <FilaVendedorV2 key={r.vendedor} fila={r} empresas={empresas} nombreEmpresa={nombreEmpresa} onDetalle={onDetalle} menuEmpresa={menuEmpresa} menuTotal={menuTotal} apagada />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Un vendedor en «Todas». Con UNA sola empresa, tocar abre su detalle (debajo);
+ * con varias, se despliegan sus empresas y cada una abre el suyo.
+ */
+function FilaVendedorV2({
+  fila,
+  empresas,
+  nombreEmpresa,
+  onDetalle,
+  menuEmpresa,
+  menuTotal,
+  apagada,
+}: {
+  fila: FilaConsolidado;
+  empresas: readonly string[];
+  nombreEmpresa: (key: string) => string;
+  onDetalle: (empresa: string, vendedor: string) => void;
+  menuEmpresa?: (empresaKey: string, fila: FilaConsolidado) => ReactNode;
+  menuTotal?: (fila: FilaConsolidado) => ReactNode;
+  apagada?: boolean;
+}) {
+  const [abierta, setAbierta] = useState(false);
+  const conAlgo = empresasDeLaFila(fila.porEmpresa, fila.descuentoPorEmpresa, empresas);
+  const unaSola = conAlgo.length === 1;
+  const gris = apagada || fila.se_paga === false;
+  const tocar = () => (unaSola ? onDetalle(conAlgo[0], fila.vendedor) : setAbierta((v) => !v));
+
+  return (
+    <li data-fila-v2>
+      <button
+        type="button"
+        onClick={tocar}
+        aria-expanded={unaSola ? undefined : abierta}
+        className="flex min-h-[44px] w-full items-center gap-3 px-3 py-2.5 text-left active:bg-gray-50"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline justify-between gap-3">
+            <span className={`flex min-w-0 items-center truncate pr-0.5 text-[15px] ${gris ? "text-gray-400" : "font-medium text-gray-900"}`}>
+              <span className="truncate">{nombreVendedorEnPantalla(fila.vendedor)}</span>
+              {fila.se_paga === false && <MarcaNoSePaga />}
+            </span>
+            <span className={`shrink-0 text-[15px] tabular-nums ${gris ? "text-gray-400" : claseMonto(fila.total)}`}>
+              {fmtMoney(fila.total)}
+            </span>
+          </span>
+          <span className="mt-0.5 block truncate text-xs text-gray-500">
+            {segundaLineaMatriz(conAlgo, nombreEmpresa)}
+          </span>
+        </span>
+        <span aria-hidden className={`shrink-0 text-gray-300 transition-transform ${abierta ? "rotate-90" : ""}`}>›</span>
+      </button>
+
+      {abierta && !unaSola && (
+        <ul className="divide-y divide-gray-100 border-t border-gray-100 bg-gray-50">
+          {conAlgo.map((k) => {
+            const desglose = desgloseDeCelda(fila.porEmpresa[k], fila.descuentoPorEmpresa?.[k] ?? 0);
+            return (
+              <li key={k} className="flex items-center">
+                <button
+                  type="button"
+                  onClick={() => onDetalle(k, fila.vendedor)}
+                  className="flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-6 pr-3 text-left active:bg-gray-100"
+                >
+                  <span className="truncate text-sm text-gray-700">{nombreEmpresa(k)}</span>
+                  <span className="shrink-0 text-right">
+                    <span className={`block text-sm tabular-nums ${claseMonto(fila.porEmpresa[k] ?? 0)}`}>{fmtMoney(fila.porEmpresa[k] ?? 0)}</span>
+                    {desglose && (
+                      <span className="block text-xs tabular-nums text-gray-500">
+                        {fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}
+                      </span>
+                    )}
+                  </span>
+                </button>
+                {menuEmpresa && <span className="pr-1">{menuEmpresa(k, fila)}</span>}
+              </li>
+            );
+          })}
+          {/* Lo raro, plegado: el papel de TODAS sus empresas en un archivo
+              solo aparece con la fila abierta. */}
+          {menuTotal && (
+            <li className="flex min-h-[44px] items-center justify-end gap-1 pl-6 pr-1 text-xs text-gray-500">
+              Todas sus empresas {menuTotal(fila)}
+            </li>
+          )}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+function FilasPorEmpresaV2({
+  activos,
+  noSePagan,
+  verNoSePagan,
+  onVerNoSePagan,
+  onDetalle,
+}: Omit<PropsPorEmpresa, "total" | "v2">) {
+  return (
+    <div data-filas-v2 className="space-y-2 lg:hidden">
+      <ul className={`${CLASE_GRUPO_V2} divide-y divide-gray-100`}>
+        {activos.map((v) => {
+          const gris = v.se_paga === false;
+          return (
+            <li key={v.vendedor} data-fila-v2>
+              <button
+                type="button"
+                onClick={() => onDetalle(v.vendedor)}
+                className="flex min-h-[44px] w-full items-center gap-3 px-3 py-2.5 text-left active:bg-gray-50"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className={`flex min-w-0 items-center truncate pr-0.5 text-[15px] ${gris ? "text-gray-400" : "font-medium text-gray-900"}`}>
+                      <span className="truncate">{nombreVendedorEnPantalla(v.vendedor)}</span>
+                      {gris && <MarcaNoSePaga />}
+                    </span>
+                    <span className={`shrink-0 text-[15px] tabular-nums ${gris ? "text-gray-400" : claseMonto(v.comision_total)}`}>
+                      {fmtMoney(v.comision_total)}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs tabular-nums text-gray-500">{segundaLineaEmpresa(v)}</span>
+                </span>
+                <span aria-hidden className="shrink-0 text-gray-300">›</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {noSePagan > 0 && (
+        <ul>
+          <LineaNoSePagan cantidad={noSePagan} abierto={verNoSePagan} onToggle={onVerNoSePagan} />
+        </ul>
+      )}
     </div>
   );
 }

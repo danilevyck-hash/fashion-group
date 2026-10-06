@@ -53,6 +53,9 @@ import {
 import { ComisionesPeriodo, BotonRangoComisiones } from "../ComisionesPeriodo";
 import type { RangoConsulta } from "@/lib/comisiones/vendedores-rango";
 import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
+import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR } from "@/components/celular/CabeceraCompacta";
+import { CLASE_BOTON_TEXTO } from "@/components/celular/BarraDeControles";
+import { ROTULO_DESCARGAR_V2, ROTULO_TOTAL_V2, type ResumenDelTotal } from "@/lib/comisiones/apple-v2";
 
 interface OpcionVista {
   valor: string;
@@ -85,6 +88,14 @@ interface Props {
   rango?: RangoConsulta | null;
   onRango?: (r: RangoConsulta) => void;
   availableYears?: number[];
+  /**
+   * 🔴 COMISIONES_APPLE_V2_2026_10: el total es el número grande DEBAJO de la
+   * fila de empresa y mes (primero se elige, abajo el resultado), con su línea
+   * gris y la frescura; «Descargar» es el botón del título, sin «···».
+   */
+  v2?: boolean;
+  /** v2: el total y sus bases, ya sumados por la vista. */
+  resumen?: ResumenDelTotal | null;
 }
 
 export function PortadaComisionesCelular({
@@ -110,6 +121,8 @@ export function PortadaComisionesCelular({
   rango = null,
   onRango,
   availableYears = [],
+  v2 = false,
+  resumen = null,
 }: Props) {
   const [menu, setMenu] = useState(false);
   /** CALENDARIO_SIMPLE_2026_10 con rango: empresa, mes y «Rango» en una línea. */
@@ -153,8 +166,8 @@ export function PortadaComisionesCelular({
   return (
     <PantallaCel>
       <TituloCel
-        titulo="Comisiones"
-        detalle={
+        titulo={v2 && enConfig ? "Configuración" : "Comisiones"}
+        detalle={v2 ? undefined : 
           /* 🔴 EL TOTAL SE LEE SIN BAJAR. Sale de la vista del grupo; con el ⚙
              abierto o en una empresa no hay total que decir acá. */
           totalTexto || frescura ? (
@@ -177,7 +190,19 @@ export function PortadaComisionesCelular({
               </button>
             )}
             {/* 🔴 Sin nada que ofrecer (Multifashion), no hay «···». */}
-            {conDescarga && <BotonPuntos onClick={() => setMenu(true)} ariaLabel="Más opciones" />}
+            {/* v2: el «···» solo traía «Descargar»: el botón ES «Descargar» y abre la MISMA hoja. */}
+            {conDescarga && v2 && (
+              <button
+                type="button"
+                data-abrir-descargar
+                disabled={pdfDisabled && excelDisabled}
+                onClick={() => setDescarga(true)}
+                className={CLASE_BOTON_TEXTO}
+              >
+                {ROTULO_DESCARGAR_V2}
+              </button>
+            )}
+            {!v2 && <>{conDescarga && <BotonPuntos onClick={() => setMenu(true)} ariaLabel="Más opciones" />}</>}
           </div>
         }
       />
@@ -245,6 +270,23 @@ export function PortadaComisionesCelular({
           </div>
         )}
       </div>
+
+      {/* v2: el número grande (el de Ventas y CxC) y UNA línea gris con la
+          frescura, como CxC («+90 días $X · Actualizado 4:00 pm ↻»). Las bases
+          van solo en la computadora: en 390 px la línea se cortaba y el ↻ —lo
+          que se toca— quedaba fuera. */}
+      {v2 && !enConfig && (resumen || frescura) && (
+        <div data-numero-comisiones className="px-4 pt-3">
+          {resumen && (
+            <span className={`${CLASE_TOTAL_CELULAR} ${resumen.total < 0 ? "!text-red-600" : ""}`}>{fmtMoney(resumen.total)}</span>
+          )}
+          <span className={CLASE_LINEA_TOTAL}>
+            {resumen ? ROTULO_TOTAL_V2 : null}
+            {resumen && frescura ? " · " : null}
+            {frescura}
+          </span>
+        </div>
+      )}
 
       <div className="px-4 pt-2">
         <AvisoRechazosSwitch texto={avisoMontos} />

@@ -34,6 +34,15 @@
 //
 // Verificación en navegador: `node scripts/_medir-comisiones-encabezado.mjs`
 // (solo lectura; ver los gotchas en su encabezado).
+//
+// 🔄 6-oct-2026 · NOTA FECHADA — `COMISIONES_APPLE_V2_2026_10` (apagado). Este
+// candado cuida la pantalla de HOY y sigue igual: con el interruptor en `false`
+// todo lo que mide existe tal cual. Con v2 el total pasa a ser el NÚMERO GRANDE
+// de arriba (la clase de Ventas y CxC) y por eso el «primer número» ES el total:
+// el presupuesto de 200 px se cumple por construcción y lo que se protege allá
+// es que no nazca otra fila de controles ni vuelva la barra negra del pie
+// (`__tests__/comisiones/comisiones-apple-v2.test.tsx` › 7). Cuando Daniel diga
+// «sí», este archivo se re-apunta a la v2 en vez de borrarse.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";

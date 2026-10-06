@@ -116,7 +116,7 @@ function Interruptor({
   );
 }
 
-export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) => void }) {
+export function ClientesQueNoComisionan({ onSaved, v2 = false }: { onSaved: (msg: string) => void; /** COMISIONES_APPLE_V2_2026_10 */ v2?: boolean }) {
   const [datos, setDatos] = useState<ListaExclusiones | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -315,9 +315,13 @@ export function ClientesQueNoComisionan({ onSaved }: { onSaved: (msg: string) =>
             type="button"
             onClick={() => setAgregando(true)}
             disabled={loading || !datos}
-            className="min-h-[44px] shrink-0 rounded-md bg-black px-3 text-sm font-medium text-white transition-all hover:bg-gray-800 active:scale-[0.97] disabled:opacity-50"
+            className={v2
+              /* v2: el botón dice lo que agrega y no compite: dos negros en la
+                 misma pantalla son dos acciones principales. */
+              ? "min-h-[44px] shrink-0 px-1 text-sm font-medium text-blue-600 transition hover:text-blue-800 active:opacity-60 disabled:opacity-50"
+              : "min-h-[44px] shrink-0 rounded-md bg-black px-3 text-sm font-medium text-white transition-all hover:bg-gray-800 active:scale-[0.97] disabled:opacity-50"}
           >
-            + Agregar
+            {v2 ? "+ Agregar exclusión" : "+ Agregar"}
           </button>
         )}
       </div>

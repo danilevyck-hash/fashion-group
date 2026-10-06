@@ -82,6 +82,8 @@ import {
 } from "@/lib/comisiones/vistas";
 import dynamic from "next/dynamic";
 import { VENDEDORES_RANGO_2026_10, type RangoConsulta } from "@/lib/comisiones/vendedores-rango";
+import { COMISIONES_APPLE_V2_2026_10, type ResumenDelTotal } from "@/lib/comisiones/apple-v2";
+import { ComisionesComputadoraV2, PieComisionesV2 } from "./ComisionesComputadoraV2";
 
 // Vistas LAZY: solo la que se está mirando descarga su JS, en su propio chunk →
 // fuera del bundle inicial de /comisiones. Skeleton mientras carga.
@@ -152,6 +154,8 @@ interface ComisionesViewProps {
    * pestañas. Se resuelve con `resolverVista`: un enlace guardado no se rompe.
    */
   vistaPedida?: string | null;
+  /** 🔴 `COMISIONES_APPLE_V2_2026_10` (6-oct-2026, apagado). Las pruebas lo fuerzan. */
+  v2?: boolean;
 }
 
 export function ComisionesView({
@@ -160,6 +164,7 @@ export function ComisionesView({
   conConfiguracion = false,
   conMultifashion = false,
   vistaPedida = null,
+  v2 = COMISIONES_APPLE_V2_2026_10,
 }: ComisionesViewProps) {
   // Panamá, no el reloj del navegador. Y el período de arranque es el ÚLTIMO
   // MES CERRADO (ver el encabezado): la cuenta vive en el módulo puro.
@@ -194,6 +199,8 @@ export function ComisionesView({
    * suma nada. `null` mientras carga o cuando la vista no tiene total.
    */
   const [total, setTotal] = useState<number | null>(null);
+  /** v2: el total con sus bases, para el número grande. Lo REPORTA la vista. */
+  const [resumen, setResumen] = useState<ResumenDelTotal | null>(null);
   const enCelular = useEsCelularComisiones();
 
   // La descarga: la vista hija registra su función; acá solo se dispara. La
@@ -271,8 +278,12 @@ export function ComisionesView({
   const conPapel = conDescarga && !enRango;
 
   /** El cuerpo, uno solo: lo dibujan igual la computadora y el celular. */
+  // v2 en la computadora: el pie (y el ⓘ de criterios) lo dibuja el shell.
+  const pie = v2 && !enCelular ? (
+    <PieComisionesV2 mes={mes} empresas={EMPRESAS} syncStale={syncStale} onStale={setSyncStale} />
+  ) : undefined;
   const cuerpo = enConfig && hayConfig ? (
-    <ComisionesConfiguracionView />
+    <ComisionesConfiguracionView v2={v2} />
   ) : enRango ? (
     <ComisionesVendedoresRango vista={vista} rango={rango!} />
   ) : esVistaMultifashion(vista) ? (
@@ -298,7 +309,10 @@ export function ComisionesView({
       onPdf={registrarPdf}
       refreshKey={refreshKey}
       onTotal={setTotal}
-      totalArriba={enCelular}
+      totalArriba={enCelular || v2}
+      onResumen={setResumen}
+      v2={v2}
+      pie={pie}
     />
   ) : (
     <ComisionesPorEmpresaView
@@ -309,8 +323,13 @@ export function ComisionesView({
       onExcel={registrarExcel}
       onPdf={registrarPdf}
       refreshKey={refreshKey}
+      onResumen={setResumen}
+      v2={v2}
+      pie={pie}
     />
   );
+  /** v2: el número grande solo cuando se mira lo que se paga. */
+  const resumenVisible = v2 && conPapel && !(enConfig && hayConfig) ? resumen : null;
 
   // ── 🔴 EL CELULAR (25-sep-2026): la «1b» y la «8» ─────────────────────────
   //
@@ -345,9 +364,44 @@ export function ComisionesView({
         excelDisabled={excelDisabled}
         onActualizado={() => setRefreshKey((k) => k + 1)}
         avisoMontos={avisoMontos}
+        v2={v2}
+        resumen={resumenVisible}
       >
         {cuerpo}
       </PortadaComisionesCelular>
+    );
+  }
+
+  // ── 🔴 COMISIONES_APPLE_V2_2026_10 · la computadora ──────────────────────
+  // UNA fila (empresa · período · Descargar ▾ · ⚙), debajo el número grande con
+  // su línea gris y la frescura, la tabla, y el ⓘ de criterios en el pie.
+  if (v2) {
+    return (
+      <ComisionesComputadoraV2
+        vista={vista}
+        opciones={opciones}
+        onVista={elegirVista}
+        hayConfig={hayConfig}
+        enConfig={enConfig}
+        onConfig={() => setEnConfig((v) => !v)}
+        conPeriodo={conPeriodo}
+        conPapel={conPapel}
+        year={year}
+        mes={mes}
+        availableYears={availableYears}
+        onPeriodo={handlePeriodo}
+        rango={rango}
+        onRango={onRango}
+        onPdf={() => pdfRef.current?.()}
+        onExcel={() => excelRef.current?.()}
+        papelApagado={pdfDisabled && excelDisabled}
+        resumen={resumenVisible}
+        empresasFrescura={EMPRESAS}
+        onActualizado={() => setRefreshKey((k) => k + 1)}
+        avisoMontos={avisoMontos}
+      >
+        {cuerpo}
+      </ComisionesComputadoraV2>
     );
   }
 
