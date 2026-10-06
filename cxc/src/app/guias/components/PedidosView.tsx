@@ -8,10 +8,12 @@
 // «pedidos»), como Ventas y CxC con «Todas».
 
 import { useEffect, useState } from "react";
+import { Printer } from "lucide-react";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
-import { ChipSelector, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
+import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, ChipSelector, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
+import { descargarArchivo } from "@/lib/compartir-archivo";
 import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe, hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
@@ -19,9 +21,13 @@ import {
   PEDIDOS_BODEGA_ROLES,
   PEDIDOS_TABLA_2026_10 as NUEVO,
   ROTULO_ESTADO,
+  PEDIDOS_POR_EMPRESA_2026_10 as POR_EMPRESA,
   abreviarEmpresa,
+  agruparPorEmpresa,
   haceDias,
+  haceDiasCorto,
   lineaDePendientes,
+  tituloPedidosImpresos,
   vendedorEnPantalla,
   type EstadoPedido,
   type PedidoBodega,
@@ -89,6 +95,24 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
     ...B2B_EMPRESA_KEYS.map((k) => ({ valor: k, etiqueta: nombreCortoEmpresa(k) })),
   ];
 
+  // Imprime lo filtrado (estado + empresa), para bodega sin celular. Pestaña
+  // nueva pidiendo imprimir, como la nota de entrega; si la bloquean, se descarga.
+  async function imprimir() {
+    try {
+      const { construirPdfPedidos } = await import("@/lib/guias/pdf-pedidos");
+      const titulo = tituloPedidosImpresos(filtro, empresa === "todas" ? null : nombreCortoEmpresa(empresa), new Date());
+      const doc = construirPdfPedidos(titulo, visibles, hoy);
+      doc.autoPrint();
+      if (!window.open(doc.output("bloburl") as unknown as string, "_blank")) {
+        descargarArchivo(new File([doc.output("blob")], `pedidos-${filtro}-${hoy}.pdf`, { type: "application/pdf" }));
+        toast("Lista descargada — ábrela para imprimir", "success");
+      }
+    } catch {
+      toast("No se pudo preparar la lista. Intenta de nuevo.", "error");
+    }
+  }
+  const sinNadaQueImprimir = visibles.length === 0;
+
   const chips = (
     <div className="flex min-w-0 items-center gap-1.5">
       <div role="group" aria-label="Estado" className="flex shrink-0 gap-1.5">
@@ -107,6 +131,11 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
         ))}
       </div>
       {NUEVO && <ChipSelector rotulo="Empresa" valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
+      {POR_EMPRESA && !barra && (
+        <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={`${CLASE_BOTON_TEXTO} gap-1.5`}>
+          <Printer size={15} strokeWidth={1.8} aria-hidden /> Imprimir
+        </button>
+      )}
     </div>
   );
 
@@ -127,7 +156,59 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
     );
   };
 
+  // Agrupada por empresa (Daniel, 6-oct-2026): el encabezado del grupo dice la
+  // empresa y la cuenta; las filas ya no la repiten. Con una sola empresa, un solo grupo.
   const tabla = (
+    <div className="-mx-4 border-y border-gray-200 bg-white sm:mx-0 sm:rounded-lg sm:border-x">
+      <table className="w-full text-left text-xs sm:text-sm">
+        <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
+          <tr>
+            <th className="py-2 pl-3 pr-1 sm:px-3"><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></th>
+            <th className="px-1 py-2 sm:px-3">Cliente</th>
+            <th className="px-1 py-2 sm:px-3">Vendedor</th>
+            <th className="py-2 pl-0.5 pr-3 text-right sm:px-3">Estado</th>
+          </tr>
+        </thead>
+        {agruparPorEmpresa(visibles).map((g) => (
+          <tbody key={g.empresa_key} className="divide-y divide-gray-100 align-top">
+            <tr className="bg-gray-50">
+              <th colSpan={4} scope="colgroup" className="px-3 py-2 text-left text-sm font-semibold text-gray-900">
+                {nombreCortoEmpresa(g.empresa_key)} · {g.pedidos.length}
+              </th>
+            </tr>
+            {g.pedidos.map((p) => (
+              <tr key={clave(p)}>
+                <td className="whitespace-nowrap py-2 pl-3 pr-1 text-gray-700 sm:px-3">
+                  <button
+                    type="button"
+                    title={fmtDate(fechaPanamaDe(p.fecha))}
+                    onClick={() => setFechaAbierta((k) => (k === clave(p) ? null : clave(p)))}
+                    className="text-left"
+                  >
+                    {fechaAbierta === clave(p) ? fmtDate(fechaPanamaDe(p.fecha)) : (
+                      <>
+                        <span className="sm:hidden">{haceDiasCorto(p.fecha, hoy)}</span>
+                        <span className="hidden sm:inline">{haceDias(p.fecha, hoy)}</span>
+                      </>
+                    )}
+                  </button>
+                </td>
+                <td className="break-words px-1 py-2 sm:px-3">
+                  <span className="font-medium text-gray-900">{p.cliente_nombre}</span>
+                  <span className="block whitespace-nowrap text-xs text-gray-500">{p.secuencial}</span>
+                </td>
+                <td className="break-words px-1 py-2 text-gray-700 sm:px-3">{vendedorEnPantalla(p.vendedor_nombre)}</td>
+                <td className="py-1.5 pl-0.5 pr-3 text-right sm:px-3">{chipEstado(p)}</td>
+              </tr>
+            ))}
+          </tbody>
+        ))}
+      </table>
+    </div>
+  );
+
+  // v2 (hoy): la empresa apilada debajo del Vendedor en el celular.
+  const tablaV2 = (
     <div className="-mx-4 border-y border-gray-200 bg-white sm:mx-0 sm:rounded-lg sm:border-x">
       <table className="w-full text-left text-xs sm:text-sm">
         <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
@@ -187,7 +268,17 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
 
   return (
     <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
-      {barra && <EnLaBarra pestana="pedidos" filaIzq={chips} />}
+      {barra && (
+        <EnLaBarra
+          pestana="pedidos"
+          filaIzq={chips}
+          menu={POR_EMPRESA ? (
+            <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={CLASE_FILA_MENU}>
+              <Printer size={18} strokeWidth={1.8} aria-hidden /> Imprimir
+            </button>
+          ) : null}
+        />
+      )}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -215,7 +306,7 @@ export default function PedidosView({ puedeMarcar = true }: { puedeMarcar?: bool
           {filtro === "pendiente" ? "Sin pedidos pendientes" : "Sin pedidos preparados"}
         </p>
       ) : NUEVO ? (
-        tabla
+        POR_EMPRESA ? tabla : tablaV2
       ) : barra ? (
         <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
           {visibles.map((p) => (

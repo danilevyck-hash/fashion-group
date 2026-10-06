@@ -29,6 +29,14 @@ export const PEDIDOS_BODEGA_2026_10 = true;
 // 5-oct-2026: PRENDIDO. Daniel vio el mockup v2: «sí, me gustó».
 export const PEDIDOS_TABLA_2026_10 = true;
 
+/**
+ * v3 (6-oct-2026): la lista AGRUPADA por empresa («Compañía debe tener más
+ * protagonismo»), Vendedor solo con el nombre, la antigüedad en «43 d» en el
+ * celular, y el botón «Imprimir» para bodega. `false` = la tabla v2 de hoy.
+ * Se prende con el «sí» de Daniel al mockup.
+ */
+export const PEDIDOS_POR_EMPRESA_2026_10 = false;
+
 /** Quién MARCA Pendiente ↔ Preparado y dispara «Actualizar» (admin pasa siempre por `requireRole`). */
 export const PEDIDOS_BODEGA_ROLES = ["admin", "bodega"] as const;
 
@@ -86,6 +94,24 @@ export function ordenarPedidos<T extends Pick<PedidoBodega, "fecha" | "secuencia
   return [...rows].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.secuencial.localeCompare(b.secuencial));
 }
 
+/**
+ * La empresa manda (Daniel, 6-oct-2026: «Compañía debe tener más protagonismo»):
+ * un grupo por empresa, cada uno del más viejo al más nuevo, y los grupos por su
+ * pedido más viejo. Lo usan la pantalla y el papel.
+ */
+export function agruparPorEmpresa<T extends Pick<PedidoBodega, "fecha" | "secuencial" | "empresa_key">>(
+  rows: readonly T[],
+): { empresa_key: string; pedidos: T[] }[] {
+  const grupos = new Map<string, T[]>();
+  for (const r of ordenarPedidos(rows)) {
+    const g = grupos.get(r.empresa_key);
+    if (g) g.push(r);
+    else grupos.set(r.empresa_key, [r]);
+  }
+  // `ordenarPedidos` ya dejó el más viejo primero: el orden de entrada al Map es el de los grupos.
+  return [...grupos].map(([empresa_key, pedidos]) => ({ empresa_key, pedidos }));
+}
+
 const MS_DIA = 86_400_000;
 
 /** Días enteros entre la fecha del pedido (día de Panamá) y hoy (YYYY-MM-DD de Panamá). */
@@ -98,6 +124,20 @@ export function diasDesde(fechaIso: string, hoy: string): number {
 export function haceDias(fechaIso: string, hoy: string): string {
   const d = diasDesde(fechaIso, hoy);
   return d === 0 ? "hoy" : d === 1 ? "ayer" : `hace ${d} días`;
+}
+
+/** Celular: «hoy» · «ayer» · «43 d», para que la Antigüedad no se parta en dos renglones. */
+export function haceDiasCorto(fechaIso: string, hoy: string): string {
+  const d = diasDesde(fechaIso, hoy);
+  return d === 0 ? "hoy" : d === 1 ? "ayer" : `${d} d`;
+}
+
+/** «Pedidos pendientes · Joystep · impreso 6 oct 2026, 3:15 p. m.» — el encabezado del papel. */
+export function tituloPedidosImpresos(estado: EstadoPedido, empresa: string | null, ahora: Date): string {
+  const cuando = ahora
+    .toLocaleString("es-PA", { timeZone: "America/Panama", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })
+    .replace(".", "");
+  return `Pedidos ${estado === "pendiente" ? "pendientes" : "preparados"} · ${empresa ?? "Todas las empresas"} · impreso ${cuando}`;
 }
 
 /** «N pedidos pendientes · el más viejo, hace X días». */
@@ -129,7 +169,7 @@ export function vendedorEnPantalla(v: string | null | undefined): string {
   return n.toUpperCase() === DEFAULT_VENDEDOR ? "Oficina" : nombreVendedorEnPantalla(n);
 }
 
-/** «Fashion Shoes» → «F. Shoes»; una sola palabra queda igual. Para la columna angosta del celular. */
+/** «Fashion Shoes» → «F. Shoes»; una sola palabra queda igual. Para la columna angosta del celular (v2). */
 export function abreviarEmpresa(nombre: string): string {
   const [a, ...resto] = nombre.trim().split(/\s+/);
   return resto.length ? `${a[0]}. ${resto.join(" ")}` : a;

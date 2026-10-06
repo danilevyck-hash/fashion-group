@@ -7,8 +7,12 @@ import {
   ESTADOS_PEDIDO,
   PEDIDOS_BODEGA_2026_10,
   PEDIDOS_TABLA_2026_10,
+  PEDIDOS_POR_EMPRESA_2026_10,
   abreviarEmpresa,
+  agruparPorEmpresa,
   haceDias,
+  haceDiasCorto,
+  tituloPedidosImpresos,
   vendedorEnPantalla,
   diasDesde,
   fechaSwitchAIso,
@@ -48,12 +52,65 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     expect(leer("src/app/guias/components/PedidosView.tsx")).not.toMatch(/\.total\b|fmt\(/);
   });
 
-  it("DEFAULT se muestra «Oficina»; la empresa se abrevia en el celular", () => {
+  it("DEFAULT se muestra «Oficina»", () => {
     expect(vendedorEnPantalla("DEFAULT")).toBe("Oficina");
     expect(vendedorEnPantalla("EDWIN")).toBe("Edwin");
     expect(vendedorEnPantalla(null)).toBe("—");
     expect(abreviarEmpresa("Fashion Shoes")).toBe("F. Shoes");
     expect(abreviarEmpresa("Vistana")).toBe("Vistana");
+  });
+
+  it("v3 por empresa APAGADA hasta el «sí» de Daniel al mockup (6-oct-2026); apagada, la tabla v2 de hoy y sin Imprimir", () => {
+    expect(PEDIDOS_POR_EMPRESA_2026_10).toBe(false);
+    const src = leer("src/app/guias/components/PedidosView.tsx");
+    expect(src).toContain("POR_EMPRESA ? tabla : tablaV2");
+    expect(src).toContain("POR_EMPRESA && !barra && (");
+    expect(src).toContain("menu={POR_EMPRESA ? (");
+  });
+
+  // Daniel, 6-oct-2026: «Vendedor y empresa se confunden» y «Compañía debe tener más protagonismo».
+  it("agrupada por empresa: grupos por su pedido más viejo, y dentro del más viejo al más nuevo", () => {
+    const g = agruparPorEmpresa([
+      { fecha: "2026-10-02T11:00:00-05:00", secuencial: "J2", empresa_key: "joystep" },
+      { fecha: "2026-09-01T11:00:00-05:00", secuencial: "A1", empresa_key: "active" },
+      { fecha: "2026-08-20T11:00:00-05:00", secuencial: "J1", empresa_key: "joystep" },
+    ]);
+    expect(g.map((x) => x.empresa_key)).toEqual(["joystep", "active"]);
+    expect(g[0].pedidos.map((x) => x.secuencial)).toEqual(["J1", "J2"]);
+    expect(agruparPorEmpresa([])).toEqual([]);
+  });
+
+  it("la pantalla: encabezado «Empresa · N» por grupo; ni columna ni renglón repiten la empresa; Vendedor solo el nombre", () => {
+    const src = leer("src/app/guias/components/PedidosView.tsx");
+    expect(src).toContain("agruparPorEmpresa(visibles)");
+    expect(src).toMatch(/\{nombreCortoEmpresa\(g\.empresa_key\)\} · \{g\.pedidos\.length\}/);
+    const tabla = src.slice(src.indexOf("const tabla = ("), src.indexOf("const tablaV2 = ("));
+    expect(tabla).not.toMatch(/>Empresa</);
+    expect(tabla.match(/nombreCortoEmpresa\(/g)).toHaveLength(1);
+    expect(tabla).toMatch(/<td[^>]*>\{vendedorEnPantalla\(p\.vendedor_nombre\)\}<\/td>/);
+  });
+
+  it("la antigüedad no se parte en el celular: «43 d», con hoy y ayer igual", () => {
+    expect(haceDiasCorto("2026-10-05T08:00:00-05:00", "2026-10-05")).toBe("hoy");
+    expect(haceDiasCorto("2026-10-04T23:00:00-05:00", "2026-10-05")).toBe("ayer");
+    expect(haceDiasCorto("2026-08-23T11:00:00-05:00", "2026-10-05")).toBe("43 d");
+    const src = leer("src/app/guias/components/PedidosView.tsx");
+    expect(src).toMatch(/<td className="whitespace-nowrap py-2 pl-3/);
+  });
+
+  it("Imprimir: lo filtrado, carta en blanco y negro, un bloque por empresa con su entrega firmada, sin montos", () => {
+    const t = tituloPedidosImpresos("pendiente", "Joystep", new Date("2026-10-06T20:15:00Z"));
+    expect(t).toMatch(/^Pedidos pendientes · Joystep · impreso 6 oct 2026, 3:15/);
+    expect(tituloPedidosImpresos("preparado", null, new Date())).toMatch(/^Pedidos preparados · Todas las empresas · impreso /);
+    const pdf = leer("src/lib/guias/pdf-pedidos.ts");
+    expect(pdf).toContain('format: "letter"');
+    expect(pdf).toContain("agruparPorEmpresa(pedidos)");
+    expect(pdf).toMatch(/"Antigüedad", "N° de pedido", "Cliente", "Vendedor", "Entregado por", "Recibido por"/);
+    expect(pdf).toMatch(/PIE_DE_BLOQUE = "Entregado por _+ · Recibido por _+ · Fecha _+"/);
+    expect(pdf).not.toMatch(/NAVY|CEBRA|estilosDeTabla|\.total\b|fmt\(/);
+    const src = leer("src/app/guias/components/PedidosView.tsx");
+    expect(src).toContain("construirPdfPedidos(titulo, visibles, hoy)");
+    expect(src.match(/onClick=\{\(\) => void imprimir\(\)\}/g)).toHaveLength(2); // compu + «···»
   });
 
   it("la primera columna dice la antigüedad: hoy · ayer · hace N días", () => {
