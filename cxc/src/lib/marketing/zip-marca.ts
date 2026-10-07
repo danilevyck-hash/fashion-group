@@ -519,27 +519,6 @@ function limpiarParaLaMarca(gastos: ReadonlyArray<GastoDeMarca>): GastoDeMarca[]
   }));
 }
 
-/**
- * 🔴 LA TIENDA DE UN GASTO: LA DEL GASTO, DESPUÉS LA DEL PROYECTO (6-oct-2026).
- *
- * El gasto nace con su `tienda_codigo` (23-sep-2026) y muchos nacen SIN
- * proyecto: la factura de la tienda nueva, el letrero de Paso Canoas, el panel
- * del outlet. El ZIP leía solo la tienda del PROYECTO, así que todos esos
- * caían en «General» aunque la factura dijera a qué tienda eran — medido en
- * producción el 6-oct-2026: 6 facturas de Tommy y Calvin (D-170, D-118, D-25)
- * y 2 entregas (D-117) en la carpeta equivocada.
- *
- * La precedencia es la MISMA que ya usa el reporte por tienda
- * (`reportes.ts`: `fila.tienda_codigo ?? p?.tienda_codigo`). El ZIP era el
- * único que no la seguía.
- */
-function codigoDeTiendaDelGasto(
-  fila: { tienda_codigo?: string | null },
-  p: ProyectoFila | undefined,
-): string | null {
-  return txt(fila.tienda_codigo) || txt(p?.tienda_codigo) || null;
-}
-
 /** Carpeta de un gasto: el cliente del directorio, su texto, o General. */
 function carpetaDeCliente(
   codigo: string | null,
@@ -800,14 +779,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
     rowsPorFactura.set(fid, arr);
   }
 
-  // 🔴 Los nombres se piden por los códigos de los GASTOS, no solo de los
-  // proyectos: una factura con una tienda que ningún proyecto usa igual tiene
-  // que salir con el nombre del directorio, no en «General».
-  const nombrePorCodigo = await leerNombresDeCliente([
-    ...proyectos.map((p) => p.tienda_codigo),
-    ...facturas.map((f) => f.tienda_codigo),
-    ...entregas.map((e) => e.tienda_codigo),
-  ]);
+  const nombrePorCodigo = await leerNombresDeCliente(proyectos);
 
   const facturasDeMarca: Array<{ f: FacturaFila; monto: number }> = [];
   if (marcaId) {
@@ -869,7 +841,6 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
     gastos = [
       ...facturasDeMarca.map(({ f, monto }) => {
         const p = f.proyecto_id ? proyectoById.get(String(f.proyecto_id)) : undefined;
-        const cod = codigoDeTiendaDelGasto(f, p);
         return {
           tipo: "factura" as const,
           documentoId: String(f.id),
@@ -878,14 +849,13 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
           concepto: txt(f.concepto),
           proveedor: txt(f.proveedor),
           periodoTrabajado: periodoTrabajadoDe(f),
-          carpeta: carpetaDeCliente(cod, p?.tienda ?? null, nombrePorCodigo),
-          clienteCodigo: cod,
+          carpeta: carpetaDeCliente(p?.tienda_codigo ?? null, p?.tienda ?? null, nombrePorCodigo),
+          clienteCodigo: p?.tienda_codigo ?? null,
           monto,
         };
       }),
       ...entregasDeMarca.map(({ e, monto }) => {
         const p = e.proyecto_id ? proyectoById.get(String(e.proyecto_id)) : undefined;
-        const cod = codigoDeTiendaDelGasto(e, p);
         return {
           tipo: "entrega" as const,
           documentoId: String(e.id),
@@ -894,8 +864,8 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
           concepto: txt(e.notas) || "Entrega de muebles",
           proveedor: "Mobiliario",
           periodoTrabajado: "",
-          carpeta: carpetaDeCliente(cod, p?.tienda ?? null, nombrePorCodigo),
-          clienteCodigo: cod,
+          carpeta: carpetaDeCliente(p?.tienda_codigo ?? null, p?.tienda ?? null, nombrePorCodigo),
+          clienteCodigo: p?.tienda_codigo ?? null,
           monto,
         };
       }),
@@ -987,11 +957,7 @@ async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
   const proyectosMf = proyectos.filter((p) => !p.anulado_en && esMultifashion(p));
   const proyectoById = new Map(proyectosMf.map((p) => [String(p.id), p]));
   const facturaById = new Map(facturas.map((f) => [String(f.id), f]));
-  const nombrePorCodigo = await leerNombresDeCliente([
-    ...proyectosMf.map((p) => p.tienda_codigo),
-    ...facturas.map((f) => f.tienda_codigo),
-    ...entregas.map((e) => e.tienda_codigo),
-  ]);
+  const nombrePorCodigo = await leerNombresDeCliente(proyectosMf);
 
   const crudos: GastoDeMarca[] = [];
   for (const f of facturas) {
@@ -1008,8 +974,8 @@ async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
       concepto: txt(f.concepto),
       proveedor: txt(f.proveedor),
       periodoTrabajado: periodoTrabajadoDe(f),
-      carpeta: carpetaDeCliente(codigoDeTiendaDelGasto(f, p), p.tienda ?? null, nombrePorCodigo),
-      clienteCodigo: codigoDeTiendaDelGasto(f, p),
+      carpeta: carpetaDeCliente(p.tienda_codigo ?? null, p.tienda ?? null, nombrePorCodigo),
+      clienteCodigo: p.tienda_codigo ?? null,
       monto: round2(num(f.total)),
     });
   }
@@ -1026,8 +992,8 @@ async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
       concepto: txt(e.notas) || "Entrega de muebles",
       proveedor: "Mobiliario",
       periodoTrabajado: "",
-      carpeta: carpetaDeCliente(codigoDeTiendaDelGasto(e, p), p.tienda ?? null, nombrePorCodigo),
-      clienteCodigo: codigoDeTiendaDelGasto(e, p),
+      carpeta: carpetaDeCliente(p.tienda_codigo ?? null, p.tienda ?? null, nombrePorCodigo),
+      clienteCodigo: p.tienda_codigo ?? null,
       monto: round2(num(e.total)),
     });
   }
@@ -1504,11 +1470,11 @@ export function elegirPeriodo(
 
 /** Nombre de cliente del directorio por código D-XXX. */
 async function leerNombresDeCliente(
-  codigosCrudos: ReadonlyArray<string | null | undefined>,
+  proyectos: ReadonlyArray<ProyectoFila>,
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const codigos = Array.from(
-    new Set(codigosCrudos.map((c) => txt(c)).filter((c) => c.length > 0)),
+    new Set(proyectos.map((p) => txt(p.tienda_codigo)).filter((c) => c.length > 0)),
   );
   if (codigos.length === 0) return out;
   const { data } = await supabaseServer
