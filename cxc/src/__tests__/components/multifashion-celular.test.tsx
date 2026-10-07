@@ -512,7 +512,11 @@ describe("4 · Vendedoras en el celular", () => {
     const { container } = await pintarVendedoras();
     const pie = container.querySelector('[data-celular="vendedoras-subtitulo"]')!;
     expect(pie.textContent).toBe("$32,649 · 690 tickets · contra agosto, mismos días · bono al cierre del mes");
-    expect(pie.querySelector('[aria-label="Regla del bono"]')!.getAttribute("title")).toContain("Bono de septiembre: se define al cerrar el mes");
+    // 🩸 7-oct-2026: la regla del bono ya no va en un `title` (hover-only):
+    // se abre con un toque, igual que «N empresas» en Ventas › Clientes.
+    fireEvent.click(pie.querySelector('[aria-label="Regla del bono"]')!);
+    expect(screen.getByRole("tooltip").textContent)
+      .toContain("Bono de septiembre: se define al cerrar el mes");
     const lista = container.querySelector('[data-celular="vendedoras-lista"]')!;
     expect(lista.compareDocumentPosition(pie) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(container.querySelector('[data-celular="vendedora-detalle"]')).toBeNull();

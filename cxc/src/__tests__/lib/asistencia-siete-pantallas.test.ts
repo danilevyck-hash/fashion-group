@@ -119,8 +119,12 @@ describe("4. sin ficha, la jornada va con guion", () => {
 
 describe("5. 🔴 los avisos del reloj son UNA línea por reloj", () => {
   const e = puro("src/app/asistencia/EstadoReloj.tsx");
-  it("el párrafo explicativo pasó a un «?» con title; el error del reloj sigue a la vista", () => {
-    expect(e).toMatch(/title=\{explicacion\}/);
+  it("el párrafo explicativo pasó a un «?»; el error del reloj sigue a la vista", () => {
+    // 🩸 7-oct-2026: el «?» ya no se explica con un `title` (hover-only) —
+    // Daniel: «quítame el hover que no me gusta». Se abre con un toque, con
+    // el componente `Tooltip` ya tap-enabled (`TooltipContent`).
+    expect(e).toMatch(/<TooltipContent>\{explicacion\}<\/TooltipContent>/);
+    expect(e).not.toMatch(/title=\{explicacion\}/);
     expect(e).toMatch(/const explicacion = reloj\.salud === "con_error" \? null : reloj\.detalle;/);
     expect(e).toMatch(/reloj\.salud === "con_error" && reloj\.detalle && \(/);
     expect(e).not.toMatch(/leading-relaxed/);

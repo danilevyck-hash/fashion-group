@@ -37,6 +37,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import { nombreRelojEnPantalla } from "@/lib/asistencia/agente";
@@ -366,14 +367,22 @@ function TarjetaReloj({
           )}
           <span className="font-medium">{reloj.titulo}</span>
           {explicacion && (
-            <span
-              tabIndex={0}
-              title={explicacion}
-              aria-label={explicacion}
-              className="inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center rounded-full border border-gray-300 text-[11px] text-gray-500"
-            >
-              ?
-            </span>
+            // 🔴 SIN HOVER-ONLY (7-oct-2026): el «?» se abre con un toque,
+            // igual que «N empresas» en Ventas › Clientes.
+            <TooltipProvider delayDuration={120}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={explicacion}
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-gray-300 text-[11px] text-gray-500"
+                  >
+                    ?
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{explicacion}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
           {reloj.salud === "con_error" && reloj.detalle && (
             <span className="text-[12px] text-red-800">{reloj.detalle}</span>

@@ -122,16 +122,6 @@ function fechaCorta(iso: string | null) {
   return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** El detalle fino de un tramo, para el `title`. Sin los tramos finos (la DDL
- *  todavía no corrió) no se dice nada, en vez de inventar un desglose. */
-function detalleFino(c: ClienteBoston, k: "current" | "watch" | "overdue"): string {
-  if (!c.finos) return tramoLabel(k);
-  const f = c.finos;
-  if (k === "current") return `0-30: $${fmt(f.d0_30)} · 31-60: $${fmt(f.d31_60)} · 61-90: $${fmt(f.d61_90)}`;
-  if (k === "watch") return "91-120 días";
-  return `121-180: $${fmt(f.d121_180)} · 181-270: $${fmt(f.d181_270)} · 271-365: $${fmt(f.d271_365)} · +365: $${fmt(f.mas_365)}`;
-}
-
 /** Barrita de color de la fila: el tramo más viejo con deuda manda. */
 function colorFila(c: ClienteBoston) {
   if (c.d121_plus > 0) return "bg-red-500";
@@ -455,13 +445,13 @@ export default function BostonTab() {
                     : "Sin pagos registrados"}
                 </span>
               </div>
-              <div className={`col-span-2 text-right tabular-nums cursor-help ${c.d0_90 ? AGING.current.text : "text-gray-300"}`} title={detalleFino(c, "current")}>
+              <div className={`col-span-2 text-right tabular-nums ${c.d0_90 ? AGING.current.text : "text-gray-300"}`}>
                 {c.d0_90 ? fmt(c.d0_90) : "—"}
               </div>
-              <div className={`col-span-2 text-right tabular-nums cursor-help ${c.d91_120 ? AGING.watch.text : "text-gray-300"}`} title={detalleFino(c, "watch")}>
+              <div className={`col-span-2 text-right tabular-nums ${c.d91_120 ? AGING.watch.text : "text-gray-300"}`}>
                 {c.d91_120 ? fmt(c.d91_120) : "—"}
               </div>
-              <div className={`col-span-2 text-right tabular-nums cursor-help ${c.d121_plus ? AGING.overdue.text : "text-gray-300"}`} title={detalleFino(c, "overdue")}>
+              <div className={`col-span-2 text-right tabular-nums ${c.d121_plus ? AGING.overdue.text : "text-gray-300"}`}>
                 {c.d121_plus ? fmt(c.d121_plus) : "—"}
               </div>
               {/* `flex-wrap` es el candado de verdad: si a algún ancho el monto

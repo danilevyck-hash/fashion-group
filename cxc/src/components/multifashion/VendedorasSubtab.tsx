@@ -56,6 +56,7 @@ import { ROTULO_TOTAL_MULTIFASHION } from "@/lib/comisiones/celular";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { BonosSection, ChipBono, REGLA_BONO_RETAIL } from "./BonosSection";
 import {
@@ -343,10 +344,18 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
     : null;
   const pie = pieSinBono && bonoPie ? `${pieSinBono} · ${bonoPie}` : pieSinBono;
   const detalleBono = bonoPie ? `${lineaBono(bonos)}. ${REGLA_BONO_RETAIL}` : null;
+  // 🔴 SIN HOVER-ONLY (7-oct-2026): el «ⓘ» se abre con un toque.
   const iconoBono = detalleBono ? (
-    <span title={detalleBono} aria-label="Regla del bono" className="ml-1 inline-flex cursor-help align-[-2px] text-gray-400">
-      <Info className="h-3.5 w-3.5" />
-    </span>
+    <TooltipProvider delayDuration={120}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button type="button" aria-label="Regla del bono" className="ml-1 inline-flex align-[-2px] text-gray-400">
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{detalleBono}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   ) : null;
 
   const chipLabel: Record<ChipKey, string> = {

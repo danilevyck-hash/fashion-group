@@ -11,11 +11,15 @@
 // igual que los del grupo. No hubo que inventar ningún bucket.
 //
 // 🔴 LOS TRES TRAMOS QUE SE VEN NO CAMBIARON: 0-90 · 91-120 · 121+, los mismos
-// del grupo y las mismas cifras. Lo que se agregó es el DETALLE del `title`,
-// que el grupo ya mostraba y Boston no podía porque la vista no lo calculaba.
-// Verificado contra producción: `d0_90 = d0_30+d31_60+d61_90` y
-// `d121_plus = d121_180+d181_270+d271_365+mas_365` en los 390 clientes, 0
-// discrepancias; total $190.399,07.
+// del grupo y las mismas cifras. Verificado contra producción:
+// `d0_90 = d0_30+d31_60+d61_90` y `d121_plus = d121_180+d181_270+d271_365+mas_365`
+// en los 390 clientes, 0 discrepancias; total $190.399,07.
+//
+// 🩸 7-oct-2026: el DETALLE del `title` (el desglose fino al pasar el mouse)
+// se retiró — Daniel: «quítame el hover que no me gusta». `detalleFino()` y
+// su fail-open (`c.finos` ausente → el rótulo corto, nunca un número
+// inventado) ya no tienen para quién calcular: la celda solo muestra el
+// monto del tramo, igual en Boston y en el grupo.
 //
 // 🔴 Y BOSTON SIGUE APARTE, en las dos direcciones.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -96,8 +100,9 @@ describe("la pestaña de Boston", () => {
     expect(src).toContain("setDocumentosDe");
   });
 
-  it("⚠️ el detalle fino no se dibuja si la DDL todavía no corrió", () => {
-    expect(src).toMatch(/if \(!c\.finos\) return tramoLabel\(k\)/);
+  it("🩸 7-oct-2026: sin el desglose fino al pasar el mouse (`detalleFino` se retiró)", () => {
+    expect(src).not.toMatch(/detalleFino/);
+    expect(src).not.toContain("cursor-help");
   });
 
   it("la ruta lee la vista con `*` para no quedarse sin los tramos nuevos", () => {

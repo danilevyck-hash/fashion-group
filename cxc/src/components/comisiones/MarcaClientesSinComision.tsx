@@ -23,6 +23,7 @@ import {
   rotuloClientesSinComision,
   type ClienteSinComision,
 } from "@/lib/comisiones/exclusiones";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 /** En la matriz cada cliente trae la empresa en la que no comisiona. */
 export type ClienteSinComisionConEmpresa = ClienteSinComision & { empresa?: string };
@@ -40,12 +41,22 @@ export function MarcaClientesSinComision({ clientes, nombreEmpresa }: Props) {
     return e ? `${e}: ${etiquetaClienteSinComision(c)}` : etiquetaClienteSinComision(c);
   });
   return (
-    <span
-      title={lineas.join("\n")}
-      data-clientes-sin-comision={clientes.length}
-      className="ml-1.5 inline-block shrink-0 cursor-help rounded border border-dashed border-gray-300 px-1.5 py-0.5 align-middle text-[11px] font-normal not-italic text-gray-500"
-    >
-      {rotuloClientesSinComision(clientes.length)}
-    </span>
+    // 🔴 SIN HOVER-ONLY (7-oct-2026): el detalle se abre con un toque.
+    <TooltipProvider delayDuration={120}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            data-clientes-sin-comision={clientes.length}
+            className="ml-1.5 inline-block shrink-0 rounded border border-dashed border-gray-300 px-1.5 py-0.5 align-middle text-[11px] font-normal not-italic text-gray-500"
+          >
+            {rotuloClientesSinComision(clientes.length)}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="whitespace-pre-line">
+          {lineas.join("\n")}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

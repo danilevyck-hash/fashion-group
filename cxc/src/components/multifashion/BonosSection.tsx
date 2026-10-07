@@ -28,6 +28,7 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPct, fmtVariacionPct } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
 import type { ChipDeBono } from "@/lib/multifashion/bono-linea";
 
@@ -153,9 +154,17 @@ function GerenteLinea({ resp }: { resp: BonosMultifashion }) {
           <span className="text-gray-500">· sin comparativo {resp.mes_evaluado.year - 1}</span>
         </>
       )}
-      <span title={tooltipRegla} className="ml-0.5 inline-flex cursor-help text-gray-400" aria-label="Regla del bono">
-        <Info className="h-3.5 w-3.5" />
-      </span>
+      {/* 🔴 SIN HOVER-ONLY (7-oct-2026): el «ⓘ» se abre con un toque. */}
+      <TooltipProvider delayDuration={120}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="ml-0.5 inline-flex text-gray-400" aria-label="Regla del bono">
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{tooltipRegla}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 }

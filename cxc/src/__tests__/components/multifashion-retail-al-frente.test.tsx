@@ -599,7 +599,10 @@ describe("5 · Vendedoras: 4 elementos", () => {
     });
     expect(pie.className).toContain("text-xs");
     expect(pie.textContent).not.toMatch(/\.\d\d\b/); // sin centavos
-    expect(pie.querySelector('[aria-label="Regla del bono"]')!.getAttribute("title"))
+    // 🩸 7-oct-2026: la regla del bono ya no va en un `title` (hover-only):
+    // se abre con un toque, igual que «N empresas» en Ventas › Clientes.
+    fireEvent.click(pie.querySelector('[aria-label="Regla del bono"]')!);
+    expect(screen.getByRole("tooltip").textContent)
       .toContain("Bono de septiembre: se define al cerrar el mes · $50 a la que más venda y $50/$100 a la gerente si la tienda crece ≥5 %/≥10 %");
     const tabla = container.querySelector('[data-elemento="tabla"]')!;
     expect(tabla.compareDocumentPosition(pie) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
