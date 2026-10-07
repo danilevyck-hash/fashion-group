@@ -480,11 +480,17 @@ describe("🔴 lo que Daniel pidió al APROBAR (6-oct-2026)", () => {
     expect(detalle).toContain("marcarTodas");
   });
 
-  it("3b · en el CELULAR no cambia: ahí mandan las casillas y el botón", () => {
+  // 🩸 SUPERADA el 7-oct-2026. Decía «3b · en el CELULAR no cambia: ahí mandan
+  // las casillas y el botón»: la casilla del bulto se dibujaba `hidden … sm:block`
+  // y en el teléfono se veía un chip quieto. Daniel pidió MENOS PASOS («¿pueden
+  // haber menos pasos?») y en el celular eran cuatro para una sola fila. Ahora
+  // la casilla es la MISMA en las dos pantallas; el candado nuevo está en
+  // `pedidos-menos-pasos.test.ts`.
+  it("3b · la casilla del bulto es la MISMA en el celular y en la computadora", () => {
     const detalle = leer("app/guias/components/PedidoBultos.tsx");
-    // La casilla de escribir solo aparece desde `sm`; en el celular, el chip.
-    expect(detalle).toContain('className="hidden h-9 w-16 rounded-md border border-gray-300 px-2 text-right tabular-nums focus:border-gray-900 focus:outline-none sm:block"');
-    expect(detalle).toContain('<span className="sm:hidden">{chip}</span>');
+    expect(detalle).not.toContain('<span className="sm:hidden">{chip}</span>');
+    // 44 px en el celular (regla 10 de `docs/diseno.md`), 36 desde `sm`.
+    expect(detalle).toMatch(/className="h-11 w-14 rounded-md border border-gray-300[^"]*sm:h-9 sm:w-16/);
   });
 });
 

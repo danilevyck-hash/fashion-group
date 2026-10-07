@@ -8,7 +8,8 @@
 // «pedidos»), como Ventas y CxC con «Todas».
 
 import { useEffect, useState } from "react";
-import { Check, Printer } from "lucide-react";
+import { Check, Printer, Undo2 } from "lucide-react";
+import { ConfirmModal } from "@/components/ui";
 import { AJUSTES_APPLE_6_2026_10 as CIRCULO } from "@/lib/ajustes-apple-6-2026-10";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, ChipSelector, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
@@ -25,6 +26,7 @@ import {
   ESTADOS_BULTOS,
   ROTULO_ESTADO_BULTOS,
   estadoLeido,
+  faltaParaVerificar,
   tituloDeFirmas,
   ultimaFirma,
   siguienteEstado,
@@ -101,6 +103,14 @@ export default function PedidosView({
   // AJUSTES_APPLE_6: el círculo se llena (o se vacía) un instante antes de que
   // el pedido pase a la otra lista, como en Recordatorios de iOS.
   const [enTransito, setEnTransito] = useState<ReadonlySet<string>>(new Set());
+  /**
+   * 🔴 CAMBIAR DE ESTADO PIDE CONFIRMAR (Daniel, 7-oct-2026: *«al menos que al
+   * poner, ponga botón de confirmar para que no se le vaya sin querer»*). Era
+   * un toque y con el dedo en la lista se marcaba un pedido ajeno sin querer.
+   * Un pedido marcado por error hace que lo prepare o lo verifique quien no
+   * debía, y la regla de los dos pares de ojos vive de esa firma.
+   */
+  const [porConfirmar, setPorConfirmar] = useState<{ pedido: PedidoBodega; destino: EstadoBultos } | null>(null);
 
   async function cargar() {
     try {
@@ -137,19 +147,67 @@ export default function PedidosView({
         body: JSON.stringify({ empresa_key: p.empresa_key, pedido_switch_id: p.pedido_switch_id, estado: nuevo }),
       });
       const d = (await r.json().catch(() => null)) as
-        | { cambiado_por: string; cambiado_en: string; envio?: { bultos: number }; avisoEnvio?: string; error?: string }
+        | {
+            cambiado_por: string;
+            cambiado_en: string;
+            envio?: { bultos: number };
+            avisoEnvio?: string;
+            envioAnulado?: boolean;
+            error?: string;
+          }
         | null;
       if (!r.ok) throw new Error(d?.error ?? String(r.status));
       setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, cambiado_por: d!.cambiado_por, cambiado_en: d!.cambiado_en } : x)));
       // Regla 6: el envío de Etiquetas nace al recibir. Si no se pudo, se DICE
       // (el pedido quedó recibido igual: el aviso no es un error).
       if (d?.envio) toast(`Envío de Etiquetas creado · ${d.envio.bultos} ${d.envio.bultos === 1 ? "bulto" : "bultos"}`, "success");
-      else if (d?.avisoEnvio) toast(`Recibido. ${d.avisoEnvio}`, "warning");
+      else if (d?.avisoEnvio) toast(`Verificado. ${d.avisoEnvio}`, "warning");
+      // 🔴 Volver a Preparado anula el envío: se dice, no se calla.
+      else if (d?.envioAnulado) toast("Volvió a Preparado · envío de Etiquetas anulado", "success");
     } catch (e) {
       poner(p.estado);
       const msg = e instanceof Error && e.message.length < 90 ? e.message : "No se pudo guardar el estado. Intenta de nuevo.";
       toast(msg, "error");
     }
+  }
+
+  /**
+   * Lo que dice la ventana de confirmar, por destino. El título es el pedido
+   * —para que se vea CUÁL se está marcando, que es justo lo que se marcaba por
+   * error— y el mensaje, la consecuencia.
+   */
+  function textoDeConfirmar(p: PedidoBodega, destino: EstadoBultos) {
+    const titulo = `Pedido ${p.secuencial} · ${p.cliente_nombre}`;
+    if (destino === "verificado") {
+      return { titulo, mensaje: "Queda verificado, con la firma de quien confirma, y nace su envío de Etiquetas.", boton: "Marcar verificado" };
+    }
+    if (estadoLeido(p.estado) === "verificado") {
+      return {
+        titulo,
+        mensaje: "Vuelve a Preparado y se anula su envío de Etiquetas. La firma de quien lo preparó se conserva.",
+        boton: "Volver a Preparado",
+      };
+    }
+    return { titulo, mensaje: "Queda preparado, con la firma de quien confirma, y pasa a la lista de Preparados.", boton: "Marcar preparado" };
+  }
+
+  /** Confirmar y recién entonces mover el pedido. */
+  function confirmar() {
+    const pedir = porConfirmar;
+    setPorConfirmar(null);
+    if (!pedir) return;
+    const { pedido: p, destino } = pedir;
+    // El círculo se llena un instante antes de saltar de lista, como antes.
+    if (destino === "preparado" && estadoLeido(p.estado) === "pendiente") {
+      const k = clave(p);
+      setEnTransito((s) => new Set(s).add(k));
+      setTimeout(() => {
+        setEnTransito((s) => { const n = new Set(s); n.delete(k); return n; });
+        void cambiar(p, destino);
+      }, 450);
+      return;
+    }
+    void cambiar(p, destino);
   }
 
   const hoy = hoyPanama();
@@ -241,7 +299,13 @@ export default function PedidosView({
    *   · Pendiente  → el círculo ○ de siempre, que lo pasa a Preparado.
    *   · Preparado  → «Verificar», y SOLO lo ve quien puede marcarlo: bodega lee
    *     el chip «Preparado» quieto, porque «no se puede confiar solo en bodega».
-   *   · Verificado → ✓ quieto. De ahí salió a Etiquetas.
+   *   · Verificado → ✓ quieto, y al lado «Volver a Preparado» para la
+   *     secretaria y admin (7-oct-2026); bodega solo lee el ✓.
+   *
+   * 🔴 Y «VERIFICAR» ESTÁ APAGADO MIENTRAS FALTEN ARTÍCULOS SIN BULTO
+   * (7-oct-2026). El botón apagado DICE qué falta, como en Préstamos. Lo decide
+   * el SERVIDOR con la misma función (`faltaParaVerificar`); la pantalla solo
+   * deja de ofrecer lo que la ruta va a rechazar.
    */
   const controlBultos = (p: PedidoBodega) => {
     const e = estadoLeido(p.estado);
@@ -249,25 +313,49 @@ export default function PedidosView({
     if (e === "pendiente") return circulo(p);
     const base = "inline-flex h-7 items-center whitespace-nowrap rounded-full border px-2.5 text-xs font-medium";
     if (e === "verificado") {
-      return (
+      const visto = (
         <span className={`${base} border-emerald-200 bg-emerald-50 text-emerald-700`} title={firma}>
           <Check size={13} strokeWidth={3} aria-hidden className="mr-1" />
           {ROTULO_ESTADO_BULTOS.verificado}
+        </span>
+      );
+      if (!puedeRecibir) return visto;
+      return (
+        <span className="inline-flex items-center gap-1.5">
+          {visto}
+          <button
+            type="button"
+            onClick={() => setPorConfirmar({ pedido: p, destino: "preparado" })}
+            title="Volver a Preparado"
+            className="relative inline-flex h-7 items-center gap-1 rounded-full px-1.5 text-xs font-medium text-blue-600 transition hover:text-blue-800 active:scale-[0.97] before:absolute before:-inset-x-1 before:-inset-y-2 before:content-['']"
+          >
+            <Undo2 size={13} strokeWidth={1.8} aria-hidden />
+            <span className="hidden sm:inline">Volver a Preparado</span>
+            <span className="sr-only sm:hidden">Volver a Preparado</span>
+          </button>
         </span>
       );
     }
     if (!puedeRecibir) {
       return <span className={`${base} border-gray-300 bg-white text-gray-700`} title={firma}>{ROTULO_ESTADO_BULTOS.preparado}</span>;
     }
+    // `sin_bulto` en `null` = el servidor todavía no sabe: no se apaga nada.
+    const falta = p.sin_bulto == null ? null : faltaParaVerificar(p.sin_bulto, p.articulos ?? 0);
     return (
-      <button
-        type="button"
-        onClick={() => void cambiar(p, "verificado")}
-        title={firma}
-        className={`${base} relative border-gray-900 bg-gray-900 text-white transition active:scale-[0.97] before:absolute before:-inset-x-1 before:-inset-y-2 before:content-['']`}
-      >
-        Verificar
-      </button>
+      <>
+        <button
+          type="button"
+          onClick={() => setPorConfirmar({ pedido: p, destino: "verificado" })}
+          disabled={!!falta}
+          title={falta ?? firma}
+          className={`${base} relative border-gray-900 bg-gray-900 text-white transition active:scale-[0.97] disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400 before:absolute before:-inset-x-1 before:-inset-y-2 before:content-['']`}
+        >
+          Verificar
+        </button>
+        {/* El botón apagado dice qué falta, visible (como «Falta: la cuota» de
+            Préstamos): un `title` no se ve en el celular. */}
+        {falta && <span className="mt-0.5 block text-xs text-gray-400">{falta}</span>}
+      </>
     );
   };
 
@@ -295,6 +383,10 @@ export default function PedidosView({
         aria-label={`${p.cliente_nombre} · ${p.secuencial}: ${lleno ? "preparado" : "pendiente"}`}
         disabled={enTransito.has(k)}
         onClick={() => {
+          // 🔴 Con bultos, el círculo PIDE CONFIRMAR (7-oct-2026): un toque
+          // suelto marcaba el pedido de la fila de al lado. Apagado, el toque
+          // de siempre.
+          if (BULTOS) return setPorConfirmar({ pedido: p, destino: "preparado" });
           setEnTransito((s) => new Set(s).add(k));
           setTimeout(() => {
             setEnTransito((s) => { const n = new Set(s); n.delete(k); return n; });
@@ -491,10 +583,14 @@ export default function PedidosView({
 
   // Una pantalla, una pregunta: el detalle REEMPLAZA la lista, no la tapa.
   if (BULTOS && abierto) {
+    // 🔴 Verificado = congelado (7-oct-2026): las casillas del bulto no se
+    // dibujan y el servidor rechaza el PATCH con la misma regla.
+    const verificado = estadoLeido((pedidos ?? []).find((p) => clave(p) === clave(abierto))?.estado) === "verificado";
     return (
       <PedidoBultos
         pedido={abierto}
-        puedePoner={puedeMarcar}
+        puedePoner={puedeMarcar && !verificado}
+        verificado={verificado}
         onVolver={() => {
           setAbierto(null);
           void cargar();
@@ -503,8 +599,22 @@ export default function PedidosView({
     );
   }
 
+  const confirmacion = porConfirmar && textoDeConfirmar(porConfirmar.pedido, porConfirmar.destino);
+
   return (
     <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
+      {/* 🔴 Cambiar de estado pide confirmar (7-oct-2026). La MISMA ventana del
+          sistema (`ConfirmModal`), nunca una propia. */}
+      {confirmacion && (
+        <ConfirmModal
+          open
+          onClose={() => setPorConfirmar(null)}
+          onConfirm={confirmar}
+          title={confirmacion.titulo}
+          message={confirmacion.mensaje}
+          confirmLabel={confirmacion.boton}
+        />
+      )}
       {barra && (
         <EnLaBarra
           pestana="pedidos"

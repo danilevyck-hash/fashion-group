@@ -24,7 +24,7 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { createSwitchClient } from "@/lib/switch-api/client";
-import { crearEnvio } from "./etiquetas-server";
+import { anularEnvio, crearEnvio } from "./etiquetas-server";
 import { validarEnvioNuevo } from "./etiquetas-por-envio";
 import { TEXTO_TRASLADO } from "./atajos-facturas";
 import { destinosDefinidosPara } from "./destinos-clientes";
@@ -32,6 +32,8 @@ import { leerDefinidosOVacio } from "./destinos-config-server";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import {
   cuantosBultos,
+  cuantosSinBulto,
+  faltaParaVerificar,
   notaDelPedido,
   todoAsignado,
   type LineaPedido,
@@ -294,6 +296,116 @@ export async function crearEnvioDelPedido(
   if (!r.ok) return { ok: false, motivo: r.error };
   const envio_id = (r.etiquetas[0] as { envio_id?: string } | undefined)?.envio_id;
   return envio_id ? { ok: true, envio_id, bultos } : { ok: false, motivo: "El envío se creó sin número" };
+}
+
+/**
+ * 🔴 QUÉ LE FALTA AL PEDIDO PARA PODER VERIFICARSE (Daniel, 7-oct-2026). Es el
+ * CANDADO del servidor: antes esto solo impedía crear el envío de Etiquetas y
+ * el pedido quedaba «Verificado» igual.
+ *
+ * `null` = no le falta nada. 🔴 FALLA ABIERTA: si la tabla del detalle todavía
+ * no existe, no se puede saber y no se bloquea —el mismo trato que le da toda
+ * la pantalla a la migración que no corrió—.
+ */
+export async function faltaParaVerificarPedido(
+  empresaKey: string,
+  pedidoId: number,
+): Promise<string | null> {
+  const d = await leerLineas(empresaKey, pedidoId);
+  if (d.sinTabla) return null;
+  return faltaParaVerificar(cuantosSinBulto(d.lineas), d.lineas.length);
+}
+
+/** Cuántos artículos tiene el pedido y cuántos siguen sin bulto, por pedido. */
+export interface AsignacionDelPedido {
+  articulos: number;
+  sinBulto: number;
+}
+
+/**
+ * Para TODA la lista en DOS lecturas, no una por pedido: los artículos de
+ * `pedidos_lineas` y los que ya tienen bulto en `pedidos_linea_bulto`.
+ * 🔴 FALLA ABIERTA: sin tabla devuelve un mapa vacío y la pantalla no apaga
+ * nada (`sin_bulto` viaja en `null`).
+ */
+export async function leerAsignacion(empresas: readonly string[]): Promise<Map<string, AsignacionDelPedido>> {
+  const clave = (f: { empresa_key: string; pedido_switch_id: number | string }) => `${f.empresa_key}:${f.pedido_switch_id}`;
+  const [lin, bul] = await Promise.all([
+    supabaseServer
+      .from("pedidos_lineas")
+      .select("empresa_key, pedido_switch_id")
+      .in("empresa_key", [...empresas])
+      .limit(50000),
+    supabaseServer
+      .from("pedidos_linea_bulto")
+      .select("empresa_key, pedido_switch_id, codigo_barra_id")
+      .in("empresa_key", [...empresas])
+      .limit(50000),
+  ]);
+  const salida = new Map<string, AsignacionDelPedido>();
+  if (lin.error || !lin.data) return salida;
+  for (const f of lin.data) {
+    const k = clave(f);
+    const a = salida.get(k) ?? { articulos: 0, sinBulto: 0 };
+    salida.set(k, { ...a, articulos: a.articulos + 1 });
+  }
+  // Una línea está en UN bulto a la vez, pero se cuentan las DISTINTAS por si
+  // algún día se parte: lo asignado nunca puede pasar de los artículos.
+  const conBulto = new Map<string, Set<number>>();
+  if (!bul.error) {
+    for (const f of bul.data ?? []) {
+      const k = clave(f);
+      (conBulto.get(k) ?? conBulto.set(k, new Set()).get(k)!).add(Number(f.codigo_barra_id));
+    }
+  }
+  for (const [k, a] of salida) {
+    salida.set(k, { ...a, sinBulto: Math.max(0, a.articulos - (conBulto.get(k)?.size ?? 0)) });
+  }
+  return salida;
+}
+
+/**
+ * 🔴 EL DETALLE SE CONGELA AL VERIFICAR (Daniel, 7-oct-2026). 🩸 `PATCH
+ * /api/guias/pedidos/detalle` no miraba el estado, así que bodega podía quitarle
+ * bultos a un pedido ya verificado —y el envío de Etiquetas seguía diciendo el
+ * número viejo—. Esta es la lectura que usa la ruta para rechazarlo.
+ *
+ * Devuelve `"pendiente"` cuando no hay fila, que es lo que significa no tenerla,
+ * y falla ABIERTA: sin la tabla, el detalle se comporta como siempre.
+ */
+export async function estadoDelPedido(empresaKey: string, pedidoId: number): Promise<string> {
+  const { data } = await supabaseServer
+    .from("pedidos_bodega_estado")
+    .select("estado")
+    .eq("empresa_key", empresaKey)
+    .eq("pedido_switch_id", pedidoId)
+    .maybeSingle();
+  return (data as { estado?: string | null } | null)?.estado ?? "pendiente";
+}
+
+export type ResultadoDeshacer = { ok: true } | { ok: false; error: string };
+
+/**
+ * 🔴 VOLVER A «PREPARADO» DESHACE EL ENVÍO DE ETIQUETAS QUE NACIÓ AL VERIFICAR
+ * (Daniel, 7-oct-2026: «actualizar el envío… en vez de dejarlo huérfano con el
+ * conteo viejo»).
+ *
+ * 🔑 El envío NO se corrige: la casa ya decidió el 1-oct-2026 que lo impreso no
+ * se cambia —`corregirCajas` lo rechaza a propósito— y que un envío con un
+ * número equivocado SE ANULA Y SE HACE DE NUEVO. Así que volver atrás anula el
+ * envío (soft delete FIRMADO) y al verificar otra vez nace uno nuevo con los
+ * bultos de ese momento, sin conteos viejos dando vueltas.
+ *
+ * 🔴 Y SI NO SE PUEDE ANULAR, SE DICE Y NO SE MUEVE NADA: un envío que ya salió
+ * en una guía significa que esos bultos ya van rotulados y en un camión;
+ * devolver el pedido a «Preparado» dejaría a bodega cambiando bultos que ya
+ * viajaron. El motivo es el de Etiquetas, con su número de guía.
+ * El envío que ya no está (404) no frena nada: no hay qué deshacer.
+ */
+export async function deshacerEnvioDelPedido(envioId: string, quien: string): Promise<ResultadoDeshacer> {
+  const r = await anularEnvio(envioId, quien);
+  if (r.ok || r.status === 404) return { ok: true };
+  return { ok: false, error: r.error };
 }
 
 /** «Fashion Wear» para la pantalla y el papel. */

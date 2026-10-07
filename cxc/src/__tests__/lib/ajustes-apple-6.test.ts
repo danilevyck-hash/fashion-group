@@ -13,8 +13,12 @@ describe("AJUSTES_APPLE_6_2026_10", () => {
     expect(AJUSTES_APPLE_6_2026_10).toBe(true);
   });
 
-  it("1 · marcan todos los que ven Guías; contabilidad no", () => {
-    expect(["admin", "secretaria", "bodega", "vendedor"].map(puedeMarcarPedidos)).toEqual([true, true, true, true]);
+  it("1 · marcan los tres que preparan; el vendedor y contabilidad no", () => {
+    // 🩸 7-oct-2026: el vendedor pasó a `false`. El 6-oct marcaban «todos los
+    // que ven Guías», pero con bultos el servidor ya solo deja a
+    // `ROLES_PREPARADO` (admin · secretaria · bodega) y el vendedor veía el
+    // círculo prendido para recibir un 403.
+    expect(["admin", "secretaria", "bodega", "vendedor"].map(puedeMarcarPedidos)).toEqual([true, true, true, false]);
     expect(["contabilidad", "gerente_acs", "gerente_boston", "marcacion", null].map(puedeMarcarPedidos)).toEqual([false, false, false, false, false]);
     const v = fs.readFileSync("src/app/guias/components/PedidosView.tsx", "utf8");
     expect(v).toMatch(/if \(!puedeMarcar\) return <span/); // quien no marca ve el círculo quieto

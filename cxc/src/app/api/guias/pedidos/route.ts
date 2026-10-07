@@ -30,7 +30,12 @@ import {
   ROLES_PREPARADO,
   type EstadoBultos,
 } from "@/lib/guias/pedidos-bultos";
-import { crearEnvioDelPedido } from "@/lib/guias/pedido-detalle-server";
+import {
+  crearEnvioDelPedido,
+  deshacerEnvioDelPedido,
+  faltaParaVerificarPedido,
+  leerAsignacion,
+} from "@/lib/guias/pedido-detalle-server";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { aplicarAlias } from "@/lib/comisiones/alias";
 import { leerAliasOVacio } from "@/lib/comisiones/exclusiones-server";
@@ -46,13 +51,14 @@ interface EstadoDeBodega {
   estado: string | null;
   cambiado_por: string | null;
   cambiado_en: string | null;
+  envio_id?: string | null;
   preparado_por?: string | null;
   preparado_en?: string | null;
   verificado_por?: string | null;
   verificado_en?: string | null;
 }
 
-const COLUMNAS_BASE = "empresa_key, pedido_switch_id, estado, cambiado_por, cambiado_en";
+const COLUMNAS_BASE = "empresa_key, pedido_switch_id, estado, cambiado_por, cambiado_en, envio_id";
 const COLUMNAS_CON_FIRMAS = `${COLUMNAS_BASE}, preparado_por, preparado_en, verificado_por, verificado_en`;
 
 /**
@@ -62,10 +68,7 @@ const COLUMNAS_CON_FIRMAS = `${COLUMNAS_BASE}, preparado_por, preparado_en, veri
  * hoy—. Se piden; si no están, se vuelve a pedir sin ellas y las firmas
  * simplemente no se dibujan.
  */
-async function leerEstadoPrevio(
-  empresa: string,
-  id: number,
-): Promise<(EstadoDeBodega & { envio_id?: string | null }) | null> {
+async function leerEstadoPrevio(empresa: string, id: number): Promise<EstadoDeBodega | null> {
   const pedir = (cols: string) =>
     supabaseServer
       .from("pedidos_bodega_estado")
@@ -74,12 +77,12 @@ async function leerEstadoPrevio(
       .eq("pedido_switch_id", id)
       .maybeSingle();
   if (PEDIDOS_BULTOS_2026_10) {
-    const con = await pedir(`${COLUMNAS_CON_FIRMAS}, envio_id`);
-    if (!con.error) return con.data as unknown as EstadoDeBodega & { envio_id?: string | null };
+    const con = await pedir(COLUMNAS_CON_FIRMAS);
+    if (!con.error) return con.data as unknown as EstadoDeBodega;
   }
   // Falla ABIERTA igual que la lista: sin las columnas nuevas, se lee lo de siempre.
-  const sin = await pedir(`${COLUMNAS_BASE}, envio_id`);
-  return (sin.data as unknown as (EstadoDeBodega & { envio_id?: string | null }) | null) ?? null;
+  const sin = await pedir(COLUMNAS_BASE);
+  return (sin.data as unknown as EstadoDeBodega | null) ?? null;
 }
 
 async function leerEstadoDeBodega(): Promise<{ data: EstadoDeBodega[] | null; error: unknown }> {
@@ -130,7 +133,7 @@ export async function GET(req: NextRequest) {
 
   // ponytail: sin paginar; los Activo medidos el 5-oct son decenas, no miles.
   // El alias de Comisiones (REINALDO/REYNALDO/REINDALDO → una persona); falla abierto.
-  const [ped, est, alias, bultos] = await Promise.all([
+  const [ped, est, alias, bultos, asignacion] = await Promise.all([
     supabaseServer
       .from("switch_pedidos")
       .select("empresa_key, pedido_switch_id, secuencial, fecha, cliente_codigo, cliente_nombre, vendedor_nombre, synced_at")
@@ -140,6 +143,9 @@ export async function GET(req: NextRequest) {
     leerEstadoDeBodega(),
     leerAliasOVacio(),
     leerCuentaDeBultos([...empresas]),
+    // 🔴 Lo que apaga «Verificar»: cuántos artículos siguen sin bulto
+    // (7-oct-2026). Falla ABIERTA: sin tabla, mapa vacío y no se apaga nada.
+    PEDIDOS_BULTOS_2026_10 ? leerAsignacion([...empresas]) : Promise.resolve(new Map()),
   ]);
   if (ped.error) return NextResponse.json({ error: "No se pudieron leer los pedidos" }, { status: 500 });
   if (est.error) return NextResponse.json({ error: "No se pudo leer el estado de bodega" }, { status: 500 });
@@ -169,6 +175,9 @@ export async function GET(req: NextRequest) {
       // 🔴 Las DOS firmas, una por paso: «Preparado por Julio · 10:42 a. m.».
       // Sin la migración no llegan y la pantalla simplemente no las dibuja.
       bultos: bultos.get(`${p.empresa_key}:${p.pedido_switch_id}`) ?? null,
+      // 🔴 `null` = todavía no se sabe; la pantalla entonces no apaga «Verificar».
+      articulos: asignacion.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.articulos ?? null,
+      sin_bulto: asignacion.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.sinBulto ?? null,
       preparado_por: m?.preparado_por ?? null,
       preparado_en: m?.preparado_en ?? null,
       verificado_por: m?.verificado_por ?? null,
@@ -205,6 +214,12 @@ export async function PATCH(req: NextRequest) {
 
   let envio: { envio_id: string; bultos: number } | null = null;
   let avisoEnvio: string | null = null;
+  // El estado previo y de dónde viene el pedido: los lee el bloque de abajo y
+  // los necesita la FIRMA, que tiene que conservar la de quien lo preparó.
+  let previo: EstadoDeBodega | null = null;
+  let desde: EstadoBultos = "pendiente";
+  // Deshacer un paso borra el envío que había: si no, queda huérfano.
+  let deshacerElEnvio = false;
 
   if (PEDIDOS_BULTOS_2026_10) {
     // 🔴 El pedido tiene que existir Y ser de una empresa de esta persona: si no,
@@ -221,8 +236,8 @@ export async function PATCH(req: NextRequest) {
 
     // 🔑 `cambiado_por` del estado «terminado» ES quien lo terminó: de ahí sale
     // la regla «quien marcó Terminado solo marca Recibido si es admin».
-    const previo = await leerEstadoPrevio(empresa, id);
-    const desde = estadoLeido(previo?.estado);
+    previo = await leerEstadoPrevio(empresa, id);
+    desde = estadoLeido(previo?.estado);
     // Quien lo preparó sale de SU columna; antes de la migración cae a la vieja
     // `cambiado_por`, que con el pedido en «preparado» es la misma persona.
     const preparadoPor = previo?.preparado_por ?? (desde === "preparado" ? (previo?.cambiado_por ?? null) : null);
@@ -232,6 +247,28 @@ export async function PATCH(req: NextRequest) {
       { role: auth.role, userName: auth.userName },
     );
     if (!v.ok) return NextResponse.json({ error: v.error }, { status: 403 });
+
+    // 🔴 «VERIFICAR» ESTÁ BLOQUEADO MIENTRAS QUEDE UNA LÍNEA SIN BULTO
+    // (Daniel, 7-oct-2026). 🩸 Antes solo avisaba: el envío de Etiquetas no se
+    // creaba, pero el pedido quedaba «Verificado» igual. Ahora el toque se
+    // rechaza y dice cuántos artículos faltan.
+    if (estado === "verificado") {
+      const falta = await faltaParaVerificarPedido(empresa, id);
+      if (falta) return NextResponse.json({ error: falta }, { status: 409 });
+    }
+
+    // 🔴 VOLVER A «PREPARADO» DESHACE EL ENVÍO QUE NACIÓ AL VERIFICAR, para que
+    // no quede huérfano con el conteo viejo (Daniel, 7-oct-2026). Si no se
+    // puede anular —ya salió en una guía—, NO se mueve el estado y se DICE.
+    if (desde === "verificado" && previo?.envio_id) {
+      try {
+        const r = await deshacerEnvioDelPedido(previo.envio_id, quienFirma);
+        if (!r.ok) return NextResponse.json({ error: r.error }, { status: 409 });
+        deshacerElEnvio = true;
+      } catch {
+        return NextResponse.json({ error: "No se pudo deshacer el envío de Etiquetas" }, { status: 503 });
+      }
+    }
 
     // Regla 6: al VERIFICAR nace el envío de Etiquetas, con el cliente, los
     // bultos y el contenido ya puestos. 🔴 FALLA ABIERTA: si no se puede crear,
@@ -250,9 +287,23 @@ export async function PATCH(req: NextRequest) {
   const ahora = new Date().toISOString();
   // 🔴 Cada paso firma SU columna, y al deshacer un paso se borra su firma: un
   // pedido que volvió a «Pendiente» no puede seguir diciendo quién lo terminó.
+  //
+  // 🔴 PERO «VOLVER A PREPARADO» CONSERVA LA FIRMA ORIGINAL DE QUIEN PREPARÓ
+  // (Daniel, 7-oct-2026). 🩸 Antes el servidor la pisaba con la de quien
+  // deshacía, y entonces la secretaria que devolvía el pedido quedaba como su
+  // preparadora — con lo que podía verificarlo ella misma y los dos pares de
+  // ojos dejaban de existir. Volver atrás solo borra la firma del paso que se
+  // deshace.
   const firma = PEDIDOS_BULTOS_2026_10
     ? estado === "preparado"
-      ? { preparado_por: quienFirma, preparado_en: ahora, verificado_por: null, verificado_en: null }
+      ? desde === "verificado"
+        ? {
+            preparado_por: previo?.preparado_por ?? null,
+            preparado_en: previo?.preparado_en ?? null,
+            verificado_por: null,
+            verificado_en: null,
+          }
+        : { preparado_por: quienFirma, preparado_en: ahora, verificado_por: null, verificado_en: null }
       : estado === "verificado"
         ? { verificado_por: quienFirma, verificado_en: ahora }
         : { preparado_por: null, preparado_en: null, verificado_por: null, verificado_en: null }
@@ -264,7 +315,9 @@ export async function PATCH(req: NextRequest) {
     cambiado_por: quienFirma,
     cambiado_en: ahora,
     ...firma,
-    ...(envio ? { envio_id: envio.envio_id } : {}),
+    // El envío nuevo se guarda; el que se acaba de anular se suelta, para que
+    // verificar otra vez cree uno con los bultos de ese momento.
+    ...(envio ? { envio_id: envio.envio_id } : deshacerElEnvio ? { envio_id: null } : {}),
   };
   const { error } = await supabaseServer.from("pedidos_bodega_estado").upsert(fila, { onConflict: "empresa_key,pedido_switch_id" });
   if (error) return NextResponse.json({ error: "No se pudo guardar el estado" }, { status: 500 });
@@ -274,5 +327,7 @@ export async function PATCH(req: NextRequest) {
     cambiado_en: fila.cambiado_en,
     ...(envio ? { envio } : {}),
     ...(avisoEnvio ? { avisoEnvio } : {}),
+    // 🔴 Deshacer el envío se DICE en pantalla, nunca en silencio (7-oct-2026).
+    ...(deshacerElEnvio ? { envioAnulado: true } : {}),
   });
 }
