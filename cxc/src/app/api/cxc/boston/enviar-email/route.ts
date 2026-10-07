@@ -221,7 +221,10 @@ export async function POST(req: NextRequest) {
   // sale firmado por Boston porque la casa se deriva de su `empresa_key`.
   const { doc } = buildEstadoCuentaPDF(estadoCuenta, nombre);
   const adjunto = {
-    filename: `${sanitizeFilenamePart(`Estado de cuenta — ${CASA_BOSTON.nombre} — ${nombre} — ${mes}`)}.pdf`,
+    // 🔴 MISMO FORMATO QUE LA DESCARGA (7-oct-2026): el nombre del cliente
+    // primero y la fecha legible; la casa se agrega porque este PDF sale
+    // firmado por Boston, no por el grupo.
+    filename: `${sanitizeFilenamePart(`Estado de cuenta - ${nombre} - ${CASA_BOSTON.nombre} - ${mes}`)}.pdf`,
     content: Buffer.from(doc.output("arraybuffer")).toString("base64"),
   };
 

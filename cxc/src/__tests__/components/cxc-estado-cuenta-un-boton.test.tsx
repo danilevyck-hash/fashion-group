@@ -39,6 +39,14 @@ let pdfRevienta = false;
 let compartido: unknown[];
 /** Qué se descargó (el `<a download>` que arma el navegador). */
 let descargado: string[];
+/**
+ * 🔴 EL APARATO SE SIMULA POR SU CUENTA (7-oct-2026), no por si
+ * `navigator.share` existe: en la computadora real TAMBIÉN existe y contesta
+ * que sí sobre HTTPS/`localhost` (medido con un navegador real), así que la
+ * sola presencia de `navigator.share` ya no distingue el celular de la
+ * computadora. Por omisión, "computadora" — la mayoría de los tests.
+ */
+let aparatoActual: "celular" | "computadora" = "computadora";
 
 vi.mock("@/lib/pdf-estado-cuenta", () => ({
   buildEstadoCuentaPDF: () => {
@@ -48,6 +56,9 @@ vi.mock("@/lib/pdf-estado-cuenta", () => ({
       filename: "EstadoCuenta-D-25.pdf",
     };
   },
+}));
+vi.mock("@/lib/aparato", () => ({
+  aparatoDeQuienMira: () => aparatoActual,
 }));
 
 const CLIENTE = {
@@ -106,6 +117,7 @@ beforeEach(() => {
   pdfRevienta = false;
   compartido = [];
   descargado = [];
+  aparatoActual = "computadora";
   ponerCompartir(false);
   // Este entorno de jsdom no expone `localStorage`, y la hoja se dibuja dentro
   // de `ModalOverlay`, que lo lee para saber si la barra lateral está plegada.
@@ -168,7 +180,24 @@ describe("🔴 hay UNA sola salida para el PDF", () => {
     expect(compartido).toHaveLength(0);
   });
 
+  it("🩸 aunque el navegador DIGA que sabe compartir archivos, en la computadora SIEMPRE descarga", async () => {
+    // 7-oct-2026: medido con un navegador real (Chrome de escritorio, Mac),
+    // `navigator.canShare({files:[pdf]})` contesta TRUE sobre HTTPS y sobre
+    // `localhost` — ya no es una señal de "esto es un celular". Con el código
+    // viejo esto abría la hoja nativa del SISTEMA en la computadora (sin
+    // "guardar" ni WhatsApp entre las opciones) y el botón se quedaba
+    // "ocupado" (gris) todo el tiempo que esa hoja estuviera abierta — que es
+    // exactamente lo que Daniel vio y reportó. Ahora manda el DEDO
+    // (`aparato.ts`), no la capacidad del navegador.
+    ponerCompartir(true);
+    await abrirHoja();
+    fireEvent.click(filaPdf());
+    await waitFor(() => expect(descargado).toEqual(["EstadoCuenta-D-25.pdf"]));
+    expect(compartido).toHaveLength(0);
+  });
+
   it("en un celular que sabe compartir, COMPARTE de verdad (no cae en descarga)", async () => {
+    aparatoActual = "celular";
     ponerCompartir(true);
     await abrirHoja();
     fireEvent.click(filaPdf());
@@ -176,10 +205,11 @@ describe("🔴 hay UNA sola salida para el PDF", () => {
     expect(descargado).toHaveLength(0);
   });
 
-  it("🩸 un navegador que comparte TEXTO pero no ARCHIVOS baja el archivo", async () => {
+  it("🩸 un celular que comparte TEXTO pero no ARCHIVOS baja el archivo", async () => {
     // Es el caso que hace falta preguntar con un File de verdad: `navigator.share`
     // existe, pero `canShare({files})` dice que no. Sin esa pregunta, la hoja se
     // quedaría esperando una hoja de compartir que nunca abre.
+    aparatoActual = "celular";
     Object.defineProperty(navigator, "share", { configurable: true, value: async () => {} });
     Object.defineProperty(navigator, "canShare", { configurable: true, value: () => false });
     await abrirHoja();
@@ -205,6 +235,7 @@ describe("🔴 si el PDF no se puede armar, la pantalla LO DICE", () => {
 
   it("cerrar la hoja de compartir NO se muestra como error", async () => {
     // AbortError = la persona se arrepintió. Un aviso rojo ahí sería mentira.
+    aparatoActual = "celular";
     Object.defineProperty(navigator, "share", {
       configurable: true,
       value: async () => { const e = new Error("abort"); e.name = "AbortError"; throw e; },

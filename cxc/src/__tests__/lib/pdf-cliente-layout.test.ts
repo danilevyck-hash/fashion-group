@@ -143,7 +143,8 @@ describe("PDF de estado de cuenta — barra TOTAL ADEUDADO", () => {
   it("no rompe el caso corto (todo en una página)", () => {
     const { doc, filename } = build(6);
     expect(doc.getNumberOfPages()).toBe(1);
-    expect(filename).toMatch(/^Estado-cuenta-D-170-\d{4}-\d{2}-\d{2}\.pdf$/);
+    // 7-oct-2026: el nombre del archivo es el del cliente, no su código interno.
+    expect(filename).toMatch(/^Estado de cuenta - .+ - \d+ \w+ \d{4}\.pdf$/);
   });
 
   // CONTROL de que el papel sigue paginando: con 120 documentos no cabe en una

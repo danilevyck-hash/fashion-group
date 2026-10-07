@@ -31,6 +31,7 @@ import jsPDF from "jspdf";
 import autoTable from "@/lib/pdf-tabla";
 import { FICHA_CLIENTE_VACIA, type EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
 import { monto, nombreDelPapel } from "@/lib/cxc/estado-cuenta-switch";
+import { nombreArchivoEstadoCuenta } from "@/lib/cxc/estado-cuenta-email";
 import {
   MARGEN,
   FOOTER_RESERVA_MM,
@@ -103,7 +104,13 @@ export function buildEstadoCuentaPDF(data: EstadoCuenta, nombre: string): { doc:
   dibujarPieDeLaCasa(doc, casaDeEmpresas(data.empresas.map((e) => e.empresa_key)));
 
   const iso = new Date().toISOString().slice(0, 10);
-  return { doc, filename: `Estado-cuenta-${data.codigo}-${iso}.pdf` };
+  // 🔴 EL NOMBRE DEL ARCHIVO ES EL DEL CLIENTE, NO SU CÓDIGO INTERNO
+  // (7-oct-2026). «Estado-cuenta-D-98-2026-10-07.pdf» no significa nada para
+  // quien lo recibe; usa el mismo nombre que ya se imprime en el papel
+  // (`nombreDelPapel`) y la fecha legible, sanitizados para no romper la
+  // descarga en Mac ni en Windows.
+  const filename = `${nombreArchivoEstadoCuenta(nombreDelPapel(data.clienteNombre, nombre), iso)}.pdf`;
+  return { doc, filename };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,7 +187,7 @@ export function buildEstadoCuentaLotePDF(clientes: ClienteDelLote[]): { doc: jsP
 
   const iso = new Date().toISOString().slice(0, 10);
   const filename = clientes.length === 1
-    ? `Estado-cuenta-${clientes[0].data.codigo}-${iso}.pdf`
-    : `Estado-cuenta-${clientes.length}-clientes-${iso}.pdf`;
+    ? `${nombreArchivoEstadoCuenta(nombreDelPapel(clientes[0].data.clienteNombre, clientes[0].nombre), iso)}.pdf`
+    : `${nombreArchivoEstadoCuenta(`${clientes.length} clientes`, iso)}.pdf`;
   return { doc, filename };
 }

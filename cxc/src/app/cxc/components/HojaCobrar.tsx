@@ -37,6 +37,8 @@ import { fmt, fmtDate } from "@/lib/format";
 import type { EstadoCuenta } from "./EstadoCuentaDrawer";
 import { cuadrarConSwitch } from "@/lib/cxc/estado-cuenta-switch";
 import { Aviso } from "@/components/ui/Aviso";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
 
 /** El código Switch (D-XXX) es el mismo en todas las empresas del cliente. */
 function codigoDe(client: ConsolidatedClient): string | null {
@@ -151,6 +153,15 @@ export default function HojaCobrar({
     : null;
   const cuadre = datos ? cuadrarConSwitch(datos.total, saldoSwitch) : null;
 
+  // 🔴 EN LA COMPUTADORA SIEMPRE SE DESCARGA (7-oct-2026). Preguntarle al
+  // navegador si "puede compartir archivos" (`canShare`) ya no distingue
+  // celular de computadora: Chrome y Safari de escritorio, sobre HTTPS (y
+  // sobre `localhost`), también contestan que sí. El botón entonces abría la
+  // hoja nativa del SISTEMA —sin "guardar" ni WhatsApp entre las opciones— y
+  // se quedaba «ocupado» (gris) todo el tiempo que esa hoja estuviera abierta,
+  // medido con un navegador real, no solo leyendo el código. Se pregunta por
+  // el DEDO (`lib/aparato.ts`), la misma regla que ya usa «Compartir» de
+  // Guías, y el PDF se entrega con la misma puerta única (`compartirArchivo`).
   async function entregarPdf() {
     if (!datos) return;
     setOcupado(true);
@@ -159,21 +170,17 @@ export default function HojaCobrar({
       const { buildEstadoCuentaPDF } = await import("@/lib/pdf-estado-cuenta");
       const { doc, filename } = buildEstadoCuentaPDF(datos, nombre);
       const blob = doc.output("blob");
-      const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean };
       const file = new File([blob], filename, { type: "application/pdf" });
-      if (typeof nav.share === "function" && nav.canShare?.({ files: [file] })) {
-        await nav.share({ files: [file], title: "Estado de cuenta", text: `Estado de cuenta — ${nombre}` });
-        return;
+      if (aparatoDeQuienMira() === "celular") {
+        const resultado = await compartirArchivo(file, {
+          title: "Estado de cuenta",
+          text: `Estado de cuenta — ${nombre}`,
+        });
+        if (resultado === "cancelado") return;
+      } else {
+        descargarArchivo(file);
       }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
     } catch (e) {
-      // Cerrar la hoja de compartir del sistema no es un error.
-      if ((e as Error)?.name === "AbortError") return;
       console.error("[cxc/cobrar] PDF:", e);
       setError("No se pudo preparar el PDF. Intenta de nuevo en unos segundos.");
     } finally {

@@ -16,6 +16,7 @@
 
 import type { EstadoCuentaDoc, EstadoCuentaEmpresa } from "@/lib/cxc/estado-cuenta-data";
 import { comoPagar, lineasDePago, type ComoPagar } from "@/lib/cxc/empresa-fiscal";
+import { fmtDate } from "@/lib/format";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -46,9 +47,34 @@ export function money(n: number): string {
   return n < 0 ? `-$${abs}` : `$${abs}`;
 }
 
-/** Sanitiza un fragmento para usarlo en el nombre de archivo del PDF. */
+/** Tope defensivo: ni Mac ni Windows se rompen por debajo de esto, y un
+ *  nombre de cliente largo no tiene por qué romper la descarga. */
+const LARGO_MAXIMO_ARCHIVO = 120;
+
+/**
+ * Sanitiza un fragmento para usarlo en el nombre de archivo del PDF: fuera
+ * los caracteres reservados de Windows (`\ / : * ? " < > |`, que además
+ * confunden a macOS), colapsa espacios y recorta sin pasarse del tope. Los
+ * acentos y el resto del nombre del cliente se quedan — no es lo que rompe la
+ * descarga.
+ */
 export function sanitizeFilenamePart(s: string): string {
-  return s.replace(/[/\\]/g, "-").replace(/\s+/g, " ").trim();
+  const limpio = s
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    // Windows rechaza un nombre que termine en punto o espacio.
+    .replace(/[.\s]+$/, "");
+  return limpio.length > LARGO_MAXIMO_ARCHIVO ? limpio.slice(0, LARGO_MAXIMO_ARCHIVO).trim() : limpio;
+}
+
+/**
+ * El nombre del PDF que ve el cliente: su nombre y la fecha, nunca el código
+ * interno (D-98, D-25…) — ese código no significa nada para quien lo recibe.
+ * Mismo formato en la descarga de a uno, el lote y los adjuntos del correo.
+ */
+export function nombreArchivoEstadoCuenta(nombreCliente: string, fechaISO: string): string {
+  return sanitizeFilenamePart(`Estado de cuenta - ${nombreCliente} - ${fmtDate(fechaISO)}`);
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;

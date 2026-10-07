@@ -317,7 +317,11 @@ export async function POST(req: NextRequest) {
     };
     const { doc } = buildEstadoCuentaPDF(pdfData, nombre);
     const base64 = Buffer.from(doc.output("arraybuffer")).toString("base64");
-    const filename = `${sanitizeFilenamePart(`Estado de cuenta — ${emp.empresa_nombre} — ${nombre} — ${mes}`)}.pdf`;
+    // 🔴 MISMO FORMATO QUE LA DESCARGA (7-oct-2026): el nombre del cliente
+    // primero y la fecha legible; la empresa se agrega porque este correo
+    // adjunta UN PDF POR EMPRESA y, sin ella, dos adjuntos del mismo cliente
+    // se llamarían igual.
+    const filename = `${sanitizeFilenamePart(`Estado de cuenta - ${nombre} - ${emp.empresa_nombre} - ${mes}`)}.pdf`;
     attachments.push({ filename, content: base64 });
   }
 
