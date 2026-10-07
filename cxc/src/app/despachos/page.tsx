@@ -20,8 +20,7 @@ import { GUIAS_LISTA_APPLE_2026_10, aniosConGuias, type PeriodoGuias } from "@/l
 import { mesEnCurso } from "@/lib/comisiones/mes-inicial";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
-import { puedeMarcarPedidos, puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
-import { ROLES_VERIFICADO } from "@/lib/guias/pedidos-bultos";
+import { puedeMarcarPedidos, puedeRecibirPedidos, puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
 import { PEDIDOS_FLUJO_SIMPLE_2026_10 } from "@/lib/guias/pedidos-flujo-simple";
 
 // LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
@@ -297,8 +296,9 @@ export default function GuiasPage() {
         {enPedidos ? (
           <PedidosView
             puedeMarcar={puedeMarcarPedidos(role)}
-            // 🔴 «Verificado» lo marca la secretaria (y admin), nunca bodega.
-            puedeRecibir={!!role && ROLES_VERIFICADO.includes(role)}
+            // 🔴 «Recibido» (o «Verificado» con bultos) lo marca la secretaria
+            // y admin, nunca bodega.
+            puedeRecibir={puedeRecibirPedidos(role)}
           />
         ) : enConfig ? (
           <GuiasConfiguracionView />
