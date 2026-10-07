@@ -540,7 +540,7 @@ describe("🔴 EL PAPEL: EL TOTAL AL PIE Y LAS DOS FORMAS (6-oct-2026)", () => {
 
   it("4 · la descripción no se queda con todo el ancho sobrante", () => {
     // Medido en el pedido real: «REEBOK BASE TRAIL MID» es lo más largo.
-    expect(leer("app/guias/components/PedidoBultos.tsx")).toContain('sm:w-[38%]');
+    expect(leer("app/guias/components/PedidoBultos.tsx")).toContain('sm:w-[26%]');
     expect(leer("lib/guias/pdf-pedido-bultos.ts")).toMatch(/2: \{ cellWidth: \d+ \}/);
   });
 
@@ -548,10 +548,13 @@ describe("🔴 EL PAPEL: EL TOTAL AL PIE Y LAS DOS FORMAS (6-oct-2026)", () => {
     expect(totalesDelPedido([L(4.5, null)]).unidades).toBe(4.5);
   });
 
-  it("el papel dibuja el pie con `foot`, que es el que lleva raya y negrita", () => {
+  it("el pie es un BLOQUE aparte, como el de Switch, no un renglón de la tabla", () => {
     const papel = leer("lib/guias/pdf-pedido-bultos.ts");
-    expect(papel).toContain("foot:");
+    expect(papel).toContain("bloqueDeTotales");
     expect(papel).toContain("totalesDelPedido");
+    // 🔴 El total de unidades va UNA sola vez: con `foot:` salía también dentro
+    // de la tabla y quedaba el mismo número dos veces en la misma hoja.
+    expect(papel).not.toContain("foot:");
   });
 
   it("🔴 y existen las DOS formas, con y sin precios", () => {

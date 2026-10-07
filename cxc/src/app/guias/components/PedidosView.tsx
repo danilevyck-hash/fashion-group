@@ -27,7 +27,6 @@ import {
   estadoLeido,
   tituloDeFirmas,
   ultimaFirma,
-  firmasEnOrden,
   siguienteEstado,
   type EstadoBultos,
 } from "@/lib/guias/pedidos-bultos";
@@ -341,12 +340,18 @@ export default function PedidosView({
                 el que dice de un vistazo el tamaño del trabajo. Sin bultos
                 sigue teniendo su columna, como hoy. */}
             {!BULTOS && <ThOrden col="vendedor" api={orden} className={`py-2 sm:px-3 ${conCirculo ? "pl-1 pr-3" : "px-1"}`}>Vendedor</ThOrden>}
-            {BULTOS && <th className={`py-2 text-right sm:px-3 ${conCirculo ? "pl-1 pr-3" : "px-1"}`}>Bultos</th>}
+            {BULTOS && <th className="px-1 py-2 text-right sm:px-3">Bultos</th>}
             {/* 🔴 UNA SOLA columna de firma, con el ÚLTIMO paso (Daniel,
                 6-oct-2026: «Verificado por» ocupaba demasiado y se comía el
                 ancho del cliente). El paso anterior, al tocar. */}
             {BULTOS && <th className="hidden px-3 py-2 sm:table-cell">Firma</th>}
-            {conEstado && <th className="py-2 pl-0.5 pr-3 text-right sm:px-3">Estado</th>}
+            {/* En el celular el rótulo sobra —el botón dice lo que hace— y
+                recortado se veía mal; en la computadora sí va. */}
+            {conEstado && (
+              <th className="py-2 pl-0.5 pr-3 text-right sm:px-3">
+                <span className="sr-only sm:not-sr-only">Estado</span>
+              </th>
+            )}
           </tr>
         </thead>
         {agruparPorEmpresa(visibles).map((g) => (
@@ -386,9 +391,10 @@ export default function PedidosView({
                       </span>
                       {/* En el CELULAR, debajo del pedido; en la computadora
                           tienen su propia columna. */}
-                      <span className="sm:hidden">{firmasEnOrden(firmasDe(p)).map((t) => (
-                        <span key={t} className="block text-xs text-gray-500">{t}</span>
-                      ))}</span>
+                      {/* En el celular, la misma firma corta de la columna:
+                          «Preparado por Julio · 3:20 p. m.» se iba a dos
+                          renglones y empujaba la fila. */}
+                      <span className="block text-xs text-gray-500 sm:hidden">{ultimaFirma(firmasDe(p))}</span>
                     </button>
                   ) : (
                     <>
@@ -401,7 +407,7 @@ export default function PedidosView({
                   <td className={`break-words py-2 text-gray-700 sm:px-3 ${conCirculo ? "pl-1 pr-3 pt-3" : "px-1"}`}>{vendedorEnPantalla(p.vendedor_nombre)}</td>
                 )}
                 {BULTOS && (
-                  <td className={`whitespace-nowrap py-2 text-right tabular-nums text-gray-700 sm:px-3 ${conCirculo ? "pl-1 pr-3 pt-3" : "px-1"}`}>
+                  <td className={`whitespace-nowrap px-1 py-2 text-right tabular-nums text-gray-700 sm:px-3 ${conCirculo ? "pt-3" : ""}`}>
                     {p.bultos ? p.bultos : <span className="text-gray-300">—</span>}
                   </td>
                 )}

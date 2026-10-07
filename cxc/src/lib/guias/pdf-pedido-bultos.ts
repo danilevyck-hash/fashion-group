@@ -77,7 +77,9 @@ export const COLUMNAS_PAPEL_SIN_PRECIOS = COLUMNAS_PAPEL_BULTOS.filter(
 const SIN_BULTO = "—";
 
 const cantidad = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
-const monto = (n: number | null) => (n == null ? "" : n.toFixed(2));
+/** «43,620.00», con el separador de miles que usa el papel de Switch. */
+const monto = (n: number | null) =>
+  n == null ? "" : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export interface PapelDeBultos {
   secuencial: string;
@@ -125,34 +127,37 @@ export function construirPdfPedidoBultos(p: PapelDeBultos): jsPDF {
   // Subtotal · ITBMS · Total a la derecha, y debajo «Cantidad de artículos».
   // Dentro de la tabla queda solo el total de UNIDADES, que es lo que cierra la
   // columna Cant.; los montos van en el bloque, como en el papel de Switch.
+  // 🔑 El total de unidades va UNA sola vez, en el bloque de abajo, como en el
+  // papel de Switch: repetirlo en un pie de tabla sería el mismo número dos veces.
   const totales = totalesDelPedido(p.lineas, p.deSwitch);
-  const pie = conPrecios
-    ? [["", "", "", cantidad(totales.unidades), "", ""]]
-    : [["", "", "", cantidad(totales.unidades)]];
 
   autoTable(doc, {
     startY: y,
     margin: { top: MARGEN_PAPEL, left: MARGEN_PAPEL, right: MARGEN_PAPEL, bottom: PIE_PAPEL },
     head: [conPrecios ? [...COLUMNAS_PAPEL_BULTOS] : [...COLUMNAS_PAPEL_SIN_PRECIOS]],
     body: body.length > 0 ? body : [["", "", "Este pedido no tiene artículos"]],
-    foot: body.length > 0 ? pie : undefined,
     styles: { font: "helvetica", fontSize: 8, cellPadding: 1.6, valign: "middle" },
     // 🔴 La descripción no suele ser larga (Daniel, 6-oct-2026): se le pone un
     // ancho propio y el sobrante se reparte entre las demás, en vez de dejar que
     // se lo quede todo por ser la única columna «auto».
     columnStyles: conPrecios
       ? {
-          0: { cellWidth: 20, halign: "right", fontStyle: "bold" },
-          1: { cellWidth: 34 },
-          2: { cellWidth: 62 },
-          3: { cellWidth: 20, halign: "right" },
-          4: { cellWidth: 23, halign: "right" },
-          5: { cellWidth: 25, halign: "right" },
+          // Suman 184 mm, que es el ancho útil de la hoja con el margen de la
+          // casa (carta, 215.9 menos 16 a cada lado). Es el reparto completo:
+          // dejar de sumarlo hace que jspdf avise y que sobre un hueco.
+          0: { cellWidth: 16, halign: "right", fontStyle: "bold" },
+          1: { cellWidth: 32 },
+          2: { cellWidth: 64 },
+          3: { cellWidth: 18, halign: "right" },
+          4: { cellWidth: 26, halign: "right" },
+          5: { cellWidth: 28, halign: "right" },
         }
       : {
+          // Los mismos 184 mm repartidos entre cuatro: sin Precio ni Total, lo
+          // que sobra va a Bulto y Código, no a la descripción.
           0: { cellWidth: 26, halign: "right", fontStyle: "bold" },
-          1: { cellWidth: 44 },
-          2: { cellWidth: 88 },
+          1: { cellWidth: 46 },
+          2: { cellWidth: 86 },
           3: { cellWidth: 26, halign: "right" },
         },
     didParseCell: (d) => {

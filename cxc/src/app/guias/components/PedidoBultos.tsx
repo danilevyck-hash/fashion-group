@@ -307,7 +307,9 @@ export default function PedidoBultos({
             <>
               {/* Tocar afuera cierra. */}
               <button type="button" aria-label="Cerrar" onClick={() => setImprimirAbierto(false)} className="fixed inset-0 z-10 cursor-default" />
-              <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+              {/* En el celular el botón está a la izquierda: el menú se abre
+                  hacia la derecha o se sale de la pantalla. */}
+              <div className="absolute left-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg sm:left-auto sm:right-0">
                 {[
                   { conPrecios: true, texto: "Con precios" },
                   { conPrecios: false, texto: "Sin precios" },
@@ -363,13 +365,18 @@ export default function PedidoBultos({
                     Código, Cantidad, Precio y Total, que son los que se leen de
                     corrido. */}
                 <th className="w-20 py-2 pl-1 pr-1 sm:px-3">{COLUMNAS_DETALLE[0]}</th>
-                <th className="hidden px-3 py-2 sm:table-cell sm:w-32">{COLUMNAS_DETALLE[1]}</th>
-                <th className="py-2 pl-1 pr-1 sm:w-[38%] sm:px-3">{COLUMNAS_DETALLE[2]}</th>
-                <th className="w-20 px-1 py-2 text-right sm:px-3">{COLUMNAS_DETALLE[3]}</th>
+                <th className="hidden px-3 py-2 sm:table-cell sm:w-44">{COLUMNAS_DETALLE[1]}</th>
+                <th className="py-2 pl-1 pr-1 sm:w-[26%] sm:px-3">{COLUMNAS_DETALLE[2]}</th>
+                <th className="w-16 px-1 py-2 text-right sm:w-28 sm:px-3">
+                  {/* En el celular, «Cant.» —la misma abreviatura del papel—:
+                      «Cantidad» entero quedaba recortado contra el borde. */}
+                  <span className="sm:hidden">Cant.</span>
+                  <span className="hidden sm:inline">{COLUMNAS_DETALLE[3]}</span>
+                </th>
                 {/* 🔴 Precio y Total solo si el SERVIDOR los mandó: a bodega no
                     le llegan, así que la columna ni se dibuja. */}
-                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell sm:w-24">{COLUMNAS_DETALLE[4]}</th>}
-                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell sm:w-28">{COLUMNAS_DETALLE[5]}</th>}
+                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell sm:w-32">{COLUMNAS_DETALLE[4]}</th>}
+                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell sm:w-36">{COLUMNAS_DETALLE[5]}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 align-top">
