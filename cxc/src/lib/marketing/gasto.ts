@@ -52,10 +52,21 @@ export const TABLA_DE_TIPO: Record<TipoGasto, TablaDeGasto> = {
   impulsadora: "mk_facturas",
 };
 
-/** Rótulo de cada tipo, como se le dice a la persona. */
+/**
+ * Rótulo de cada tipo, como se le dice a la persona.
+ *
+ * 🔴 «mueble» dice «Entrega de mobiliario» (7-oct-2026), no «Mueble de la
+ * bodega»: ese nombre no lo atrapó `revisar-nombres.ts` porque es gramatical
+ * —sustantivo corto, nada de pregunta ni imperativo— pero no es un nombre de
+ * ERP, es cómo lo diría alguien hablando, no un sistema. El nombre nuevo hace
+ * pareja con el módulo que ya existe, «Marketing › Mobiliario», y con la
+ * «nota de entrega» que ese módulo imprime (`docs/postmortems/
+ * marketing-mobiliario.md`). Mismo tipo (`"mueble"`), misma tabla
+ * (`mk_entregas_muebles`): solo cambia la palabra.
+ */
 export const ROTULO_DE_TIPO: Record<TipoGasto, string> = {
   factura: "Factura de un proveedor",
-  mueble: "Mueble de la bodega",
+  mueble: "Entrega de mobiliario",
   impulsadora: "Pago de impulsadora",
 };
 

@@ -52,6 +52,7 @@ Antes de nombrar algo nuevo, busca aquí el término. Si el concepto no está, u
 | Estado de algo que ya terminó | Completado · Entregado · Recibido (un solo estado por cosa, nunca «Terminado») | Terminado, Listo, Ya está |
 | Respaldo de un gasto | Comprobante | Foto o factura, Papel |
 | Dónde se gastó | Tienda | De una tienda, La tienda esa |
+| Tipo de gasto: mobiliario que sale de la bodega a una tienda (Marketing) | Entrega de mobiliario | Mueble de la bodega |
 | Agrupar mercancía para despacho | Bultos · Unidades por bulto | Poner en bulto, Embultar |
 | Módulo de envíos a clientes (pedidos + bultos + la guía) | Despachos (adentro: Pedidos · Bultos · Guías de despacho) | Envíos, Logística |
 | Poner una línea del pedido en un bulto | Asignar bulto · Quitar bulto · «N artículos asignados» | Poner en bulto, Poner en el bulto, Quitar del bulto, Marcar artículos |

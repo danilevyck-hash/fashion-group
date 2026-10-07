@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import {
   BorradorFacturaCard,
@@ -63,6 +63,13 @@ export default function FacturasSection({
   // Edición de una factura específica
   const [editando, setEditando] = useState<FacturaConAdjuntos | null>(null);
   const [editandoMarcas, setEditandoMarcas] = useState<MarcaPorcentajeInput[] | null>(null);
+  // El PDF que la factura YA tiene (7-oct-2026, ficha de edición): igual que
+  // `FichaTiendaAcciones.tsx`, solo se busca el adjunto de tipo PDF.
+  const adjuntoPdfDeEditando = useMemo(() => {
+    const pdf = editando?.adjuntos?.find((a) => a.tipo === "pdf_factura");
+    if (!pdf) return null;
+    return { nombre: pdf.nombre_original ?? "Comprobante.pdf", url: pdf.url };
+  }, [editando]);
 
   // Multi-upload (bulk)
   const bulk = useBulkUploadFacturas({ proyectoId: proyecto.id });
@@ -770,6 +777,7 @@ export default function FacturasSection({
                     initial={editando}
                     initialMarcas={editandoMarcas}
                     editarDatosDelGasto={MARKETING_PUERTA_GASTO}
+                    adjuntoPdfExistente={adjuntoPdfDeEditando}
                     onSubmit={handleEditar}
                     onCancel={() => { setEditando(null); setEditandoMarcas(null); }}
                   />

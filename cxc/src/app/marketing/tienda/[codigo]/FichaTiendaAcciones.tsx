@@ -25,7 +25,7 @@
 // Misma validación y mismo freno de duplicados por tienda: el servidor.
 // ============================================================================
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { ModalOverlay } from "@/components/ui";
 import { FacturaForm } from "@/components/marketing";
@@ -117,6 +117,15 @@ function EditarFactura({
     };
   }, [fila.id]);
 
+  // El PDF que la factura YA tiene (7-oct-2026, ficha de edición): la ficha
+  // pide el adjunto completo con `firmarAdjuntos`, así que acá solo se busca
+  // el de tipo PDF. `null` = nunca subió uno y el paso sigue pidiéndolo.
+  const adjuntoPdfExistente = useMemo(() => {
+    const pdf = factura?.adjuntos?.find((a) => a.tipo === "pdf_factura");
+    if (!pdf) return null;
+    return { nombre: pdf.nombre_original ?? "Comprobante.pdf", url: pdf.url };
+  }, [factura]);
+
   // Lo MISMO que `FacturasSection.handleEditar`: el PATCH con las tres del
   // rediseño solo si la pantalla las preguntó, y después las marcas.
   const guardar = useCallback(
@@ -186,6 +195,7 @@ function EditarFactura({
             initial={factura}
             initialMarcas={marcasIniciales}
             editarDatosDelGasto={MARKETING_PUERTA_GASTO}
+            adjuntoPdfExistente={adjuntoPdfExistente}
             onSubmit={guardar}
             onCancel={onCerrar}
           />

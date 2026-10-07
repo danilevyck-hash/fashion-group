@@ -42,6 +42,13 @@ import {
 } from "@/lib/marketing/proveedores-2026-10";
 import { Aviso } from "@/components/ui/Aviso";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { ENLACE } from "@/lib/marketing/marketing-2026-10";
+import {
+  FICHA_GASTO_2026_10,
+  camposDeImpuesto,
+  opcionDeImpuesto,
+  type OpcionDeImpuesto,
+} from "@/lib/marketing/ficha-gasto-2026-10";
 
 export interface FacturaFormValues {
   numeroFactura: string;
@@ -192,6 +199,15 @@ interface FacturaFormProps {
    * se dibujan y no viajan, así que la fila no se pisa.
    */
   editarDatosDelGasto?: boolean;
+  /**
+   * 🔴 FICHA DE EDICIÓN, SOLO EL COMPROBANTE (7-oct-2026, `FICHA_GASTO_2026_10`).
+   * El PDF que la factura YA tiene (nombre + su URL firmada). Con esto puesto
+   * el paso 1 no pide un archivo: dice cuál es el que ya existe, con un
+   * enlace para verlo y «Reemplazar» aparte. `null` = la factura no tiene PDF
+   * todavía y el paso pide uno, igual que siempre. Sin la prop (el resto de
+   * las pantallas), nada cambia.
+   */
+  adjuntoPdfExistente?: { nombre: string; url: string } | null;
 }
 
 type ItbmsOption = "0" | "7";
@@ -248,6 +264,7 @@ export function FacturaForm({
   pdfObligatorio = false,
   historicoProveedores,
   editarDatosDelGasto = false,
+  adjuntoPdfExistente = null,
 }: FacturaFormProps) {
   const { toast } = useToast();
 
@@ -284,7 +301,13 @@ export function FacturaForm({
     datosDeLaFila(initial ?? null),
   );
   const pideDatosDelGasto = editarDatosDelGasto && MARKETING_PUERTA_GASTO;
+  // 🔴 FICHA DE EDICIÓN (7-oct-2026): editar deja de ser un asistente. Ver
+  // docs/diseno.md y lib/marketing/ficha-gasto-2026-10.ts.
+  const modoEdicionApple = FICHA_GASTO_2026_10 && editarDatosDelGasto;
   const [pdfFile, setPdfFile] = useState<File | undefined>(undefined);
+  // El PDF que ya existe no se vuelve a pedir — se dice cuál es, y
+  // «Reemplazar» recién ahí abre el uploader.
+  const [mostrarReemplazoPdf, setMostrarReemplazoPdf] = useState(false);
   const [pdfSubido, setPdfSubido] = useState(false);
   const [leyendoIA, setLeyendoIA] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -362,6 +385,14 @@ export function FacturaForm({
     () => calcularTotalFactura(subtotal, itbmsPct, tieneImportacion),
     [subtotal, itbmsPct, tieneImportacion],
   );
+  // 🔴 FICHA DE EDICIÓN: un control único «Impuesto» en vez de ITBMS +
+  // casilla de zona libre por separado (ver lib/marketing/ficha-gasto-2026-10.ts).
+  const opcionImpuesto: OpcionDeImpuesto = opcionDeImpuesto(itbmsOption, tieneImportacion);
+  const elegirImpuesto = (o: OpcionDeImpuesto) => {
+    const campos = camposDeImpuesto(o);
+    setItbmsOption(campos.itbmsOption);
+    setTieneImportacion(campos.tieneImportacion);
+  };
 
   // Payload final: marcas con su % real (1 marca = 100%; varias = % entre ellas).
   const sumPctMarcas = marcasSel.reduce(
@@ -567,8 +598,153 @@ export function FacturaForm({
     await ejecutarGuardar();
   };
 
+  // 🔴 N° factura · Fecha · Proveedor · Concepto: IDÉNTICO en la pantalla de
+  // hoy y en la ficha de edición — solo cambia lo de abajo (el control de
+  // impuesto y el envoltorio de pasos).
+  const datosComunesDeLaFactura = (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="factura-numero" className="block text-sm text-gray-600 mb-1">
+            Nº factura<span className="text-red-500 ml-0.5">*</span>
+          </label>
+          <input
+            id="factura-numero"
+            type="text"
+            value={numeroFactura}
+            onChange={(e) => setNumeroFactura(e.target.value)}
+            required
+            className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
+          />
+        </div>
+        <div>
+          <label htmlFor="factura-fecha" className="block text-sm text-gray-600 mb-1">
+            Fecha<span className="text-red-500 ml-0.5">*</span>
+          </label>
+          <CampoFecha
+            id="factura-fecha"
+            value={fechaFactura}
+            onChange={(e) => setFechaFactura(e.target.value)}
+            required
+            className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor="factura-proveedor" className="block text-sm text-gray-600 mb-1">
+          Proveedor<span className="text-red-500 ml-0.5">*</span>
+        </label>
+        {historicoProveedores ? (
+          <ProveedorInput
+            id="factura-proveedor"
+            value={proveedor}
+            onChange={setProveedor}
+            historico={historicoProveedores}
+            required
+            className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
+          />
+        ) : (
+          <input
+            id="factura-proveedor"
+            type="text"
+            value={proveedor}
+            onChange={(e) => setProveedor(e.target.value)}
+            required
+            className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
+          />
+        )}
+      </div>
+
+      <div>
+        <label htmlFor="factura-concepto" className="block text-sm text-gray-600 mb-1">
+          Concepto<span className="text-red-500 ml-0.5">*</span>
+        </label>
+        <input
+          id="factura-concepto"
+          type="text"
+          value={concepto}
+          onChange={(e) => setConcepto(e.target.value)}
+          required
+          className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="factura-subtotal" className="block text-sm text-gray-600 mb-1">
+          Subtotal<span className="text-red-500 ml-0.5">*</span>
+        </label>
+        <input
+          id="factura-subtotal"
+          type="number"
+          min={0}
+          step="0.01"
+          value={subtotalStr}
+          onChange={(e) => setSubtotalStr(e.target.value)}
+          required
+          className="w-full max-w-[12rem] rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm tabular-nums focus:border-black focus:outline-none"
+        />
+      </div>
+    </>
+  );
+
+  const iconoLeyendoIA = (
+    <svg
+      className="animate-spin"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {modoEdicionApple ? (
+        // 🔴 FICHA DE EDICIÓN (7-oct-2026): ni «Paso 1» ni el título repetido
+        // del uploader. Si ya hay un PDF, se dice cuál es, con un enlace para
+        // verlo; «Reemplazar» recién ahí abre el campo de subir otro.
+        <div className="rounded-lg border border-gray-200 bg-white p-4" data-testid="comprobante-al-editar">
+          <div className="text-sm font-medium text-gray-700 mb-1">Comprobante</div>
+          {adjuntoPdfExistente && !mostrarReemplazoPdf ? (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 min-h-[44px] py-2">
+              <a
+                href={adjuntoPdfExistente.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`text-sm truncate ${ENLACE}`}
+                data-testid="comprobante-existente"
+              >
+                {adjuntoPdfExistente.nombre}
+              </a>
+              <button
+                type="button"
+                onClick={() => setMostrarReemplazoPdf(true)}
+                className={`shrink-0 text-sm transition min-h-[44px] -my-2 inline-flex items-center ${ENLACE}`}
+              >
+                Reemplazar
+              </button>
+            </div>
+          ) : (
+            <PdfUploader
+              onUpload={handlePdfUpload}
+              label="Adjuntar comprobante"
+              accept="application/pdf"
+              maxSizeMb={MAX_PDF_MB}
+            />
+          )}
+          {leyendoIA && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+              {iconoLeyendoIA}
+              Leyendo factura con IA...
+            </div>
+          )}
+        </div>
+      ) : (
       <PasoInstruccion
         numero={1}
         titulo={pdfInicial ? "La factura ya está" : "Sube el PDF de la factura"}
@@ -591,23 +767,93 @@ export function FacturaForm({
         />
         )}
         {leyendoIA && (
-          <div className={`mt-3 flex items-center gap-2 text-sm ${MARKETING_APPLE_2026_10 ? "text-gray-600" : "text-gray-600"}`}>
-            <svg
-              className="animate-spin"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
+          <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+            {iconoLeyendoIA}
             Leyendo factura con IA...
           </div>
         )}
       </PasoInstruccion>
+      )}
 
+      {modoEdicionApple ? (
+        // 🔴 FICHA DE EDICIÓN: sin «Paso 2» ni visto, y un control único
+        // «Impuesto» (0 % · 7 % · Zona libre 15 %) en vez de dos controles
+        // que se leían como si el 15 % fuera un tercer tramo de ITBMS.
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="text-sm font-medium text-gray-700 mb-3">Datos de la factura</div>
+          <div className="space-y-3">
+            {datosComunesDeLaFactura}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <span id="factura-impuesto-label" className="block text-sm text-gray-600 mb-1">
+                  Impuesto
+                </span>
+                <div
+                  role="radiogroup"
+                  aria-labelledby="factura-impuesto-label"
+                  className="flex flex-wrap rounded-md border border-gray-300"
+                >
+                  {(["0", "7", "zona-libre"] as const).map((o, i) => (
+                    <button
+                      key={o}
+                      type="button"
+                      role="radio"
+                      aria-checked={opcionImpuesto === o}
+                      onClick={() => elegirImpuesto(o)}
+                      className={`flex-1 px-3 min-h-[44px] text-sm transition ${
+                        i > 0 ? "border-l border-gray-300" : ""
+                      } ${
+                        opcionImpuesto === o
+                          ? "bg-black text-white"
+                          : "bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {o === "zona-libre" ? `Zona libre ${PORCENTAJE_IMPORTACION_ZONA_LIBRE}%` : `${o}%`}
+                    </button>
+                  ))}
+                </div>
+                {!tieneImportacion && (
+                  <div className="text-xs text-gray-500 mt-1 tabular-nums">{formatearMonto(itbms)}</div>
+                )}
+              </div>
+              <div>
+                <label htmlFor="factura-total-apple" className="block text-sm text-gray-600 mb-1">
+                  Total
+                </label>
+                <input
+                  id="factura-total-apple"
+                  type="text"
+                  value={formatearMonto(total)}
+                  readOnly
+                  tabIndex={-1}
+                  className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 min-h-[44px] text-base sm:text-sm tabular-nums text-gray-700"
+                />
+                <div className="text-xs text-gray-400 mt-1">
+                  {tieneImportacion
+                    ? `Subtotal + ${PORCENTAJE_IMPORTACION_ZONA_LIBRE}% de importación — la zona libre reemplaza el ITBMS`
+                    : "Subtotal + ITBMS"}
+                </div>
+              </div>
+            </div>
+            {tieneImportacion && subtotal > 0 && (
+              <dl className="rounded-md border border-gray-200 bg-gray-50/60 px-3 py-2 space-y-0.5 text-xs tabular-nums">
+                <div className="flex justify-between text-gray-600">
+                  <dt>Subtotal</dt>
+                  <dd>{formatearMonto(subtotal)}</dd>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <dt>Importación {PORCENTAJE_IMPORTACION_ZONA_LIBRE}%</dt>
+                  <dd>+{formatearMonto(importacion)}</dd>
+                </div>
+                <div className="flex justify-between text-gray-900 font-semibold pt-0.5 border-t border-gray-200 mt-1">
+                  <dt>Costo total</dt>
+                  <dd>{formatearMonto(total)}</dd>
+                </div>
+              </dl>
+            )}
+          </div>
+        </div>
+      ) : (
       <PasoInstruccion
         numero={2}
         titulo="Revisa o llena los datos de la factura"
@@ -819,6 +1065,7 @@ export function FacturaForm({
           </div>
         </div>
       </PasoInstruccion>
+      )}
 
       {duplicados.length > 0 && (
         <Aviso
@@ -847,22 +1094,17 @@ export function FacturaForm({
           `estadoPago` arriba). */}
       {/* Sin `descripcion`: el título ya dice "Marca del gasto" y abajo está el
           campo "Marca(s) *" con los botones a la vista. */}
-      {!marcaFija && (
-      <PasoInstruccion
-        numero={3}
-        titulo={usaDestino ? "Se cobra a" : "Marca del gasto"}
-        completado={marcasValidasFinal}
-      >
-          {usaDestino ? (
-            <BloqueDestinoDelGasto
-              valor={destino}
-              onChange={setDestino}
-              marcaId={marcaIdDestino}
-              onMarcaId={setMarcaIdDestino}
-              marcas={marcasOrdenadas}
-              proveedor={proveedor}
-            />
-          ) : (
+      {!marcaFija && (() => {
+        const contenido = usaDestino ? (
+          <BloqueDestinoDelGasto
+            valor={destino}
+            onChange={setDestino}
+            marcaId={marcaIdDestino}
+            onMarcaId={setMarcaIdDestino}
+            marcas={marcasOrdenadas}
+            proveedor={proveedor}
+          />
+        ) : (
           <div>
             <label className="block text-sm text-gray-600 mb-1">
               Marca(s)<span className="text-red-500 ml-0.5">*</span>
@@ -939,25 +1181,43 @@ export function FacturaForm({
               </>
             )}
           </div>
-          )}
-      </PasoInstruccion>
-      )}
+        );
+        // 🔴 FICHA DE EDICIÓN: sin «Paso 3» ni visto — «Se cobra a» ya se
+        // nombra sola (`BloqueDestinoDelGasto`), así que acá no hace falta
+        // ni un título envolvente.
+        if (modoEdicionApple) {
+          return <div className="rounded-lg border border-gray-200 bg-white p-4">{contenido}</div>;
+        }
+        return (
+          <PasoInstruccion
+            numero={3}
+            titulo={usaDestino ? "Se cobra a" : "Marca del gasto"}
+            completado={marcasValidasFinal}
+          >
+            {contenido}
+          </PasoInstruccion>
+        );
+      })()}
 
       {/* 🔴 LOS TRES DEL REDISEÑO, AL EDITAR. Sin el renglón de la marca: la
-          marca ya tiene su propio paso arriba. */}
+          marca ya tiene su propio paso arriba. Sin título envolvente (7-oct-
+          2026, arreglo de nombres): decía «Tienda, nota y reporte a la
+          marca» — tres cosas en un solo rótulo, y de más, porque cada campo
+          de `BloqueDatosDelGasto` ya se nombra solo («Tienda», el enlace «+
+          Agregar observaciones», la casilla «Se reporta a la marca»):
+          docs/diseno.md regla 8, «sin un título por cada bloque si el bloque
+          se entiende solo». */}
       {pideDatosDelGasto && (
         <div
           className="rounded-lg border border-gray-200 bg-white p-4"
           data-testid="datos-del-gasto-al-editar"
         >
-          <div className="text-sm font-semibold text-gray-900 mb-3">
-            Tienda, nota y reporte a la marca
-          </div>
           <BloqueDatosDelGasto
             datos={datosGasto}
             onChange={setDatosGasto}
             marcas={[]}
             sinMarca
+            tiendaComoBuscador={modoEdicionApple}
           />
         </div>
       )}

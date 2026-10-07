@@ -355,7 +355,7 @@ describe("3. el mueble ofrece foto, y cuelga de la TIENDA", () => {
     invalidarDirectorioClientes();
   }
 
-  it("🔴 «Mueble de la bodega» ofrece adjuntar el comprobante", async () => {
+  it("🔴 «Entrega de mobiliario» ofrece adjuntar el comprobante", async () => {
     instalarFetchDeLaPuerta();
     render(
       <ToastProvider>

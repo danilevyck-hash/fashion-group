@@ -73,6 +73,15 @@ interface Props {
     onChange: (v: DestinoDelGasto) => void;
     proveedor?: string;
   } | null;
+  /**
+   * 🔴 LA TIENDA ES UN BUSCADOR, NO UN PAR DE BOTONES (7-oct-2026, ficha de
+   * edición). Daniel: el par «Tienda» / «Sin tienda» «no es la forma de decir
+   * que un campo está vacío». Con esto puesto, el campo de buscar SIEMPRE se
+   * dibuja —vacío = sin tienda, como «Se cobra a» con «A cargo de la
+   * empresa»— y «Sin tienda» pasa a ser un enlace que lo vacía, no un botón
+   * co-igual. Sin la prop, los dos botones de siempre.
+   */
+  tiendaComoBuscador?: boolean;
 }
 
 const CAMPO =
@@ -87,6 +96,7 @@ export default function BloqueDatosDelGasto({
   tiendaInicial = null,
   sinMarca = false,
   destino = null,
+  tiendaComoBuscador = false,
 }: Props) {
   const [cambiandoMarca, setCambiandoMarca] = useState(false);
   // 🔴 MARKETING_APPLE_2026_10: lo que casi nunca se toca va detrás de un
@@ -196,6 +206,33 @@ export default function BloqueDatosDelGasto({
             <span className="text-gray-900 font-medium truncate">{tiendaInicial.nombre}</span>
             <span className="text-gray-500 tabular-nums">{tiendaInicial.codigo}</span>
           </div>
+        ) : tiendaComoBuscador ? (
+          <>
+            {codigoSinNombre && (
+              <p className="text-sm text-gray-600 mb-2" data-testid="tienda-de-hoy">
+                Hoy: <span className="tabular-nums text-gray-900">{codigoSinNombre}</span>
+              </p>
+            )}
+            <ClientePicker
+              value={datos.tiendaNombre}
+              codigo={datos.tiendaCodigo}
+              onChange={(nombre, codigo) =>
+                cambiar({ esDeTienda: codigo.trim() !== "", tiendaNombre: nombre, tiendaCodigo: codigo })
+              }
+              permitirOtro={false}
+              placeholder={codigoSinNombre ? "Buscar otra…" : "Sin tienda — buscar…"}
+              inputClassName={`${CAMPO} pr-16`}
+            />
+            {datos.esDeTienda && datos.tiendaCodigo.trim() !== "" && (
+              <button
+                type="button"
+                onClick={() => cambiar({ esDeTienda: false, tiendaNombre: "", tiendaCodigo: "" })}
+                className={`mt-1 text-sm min-h-[44px] inline-flex items-center ${ENLACE}`}
+              >
+                Sin tienda
+              </button>
+            )}
+          </>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2 mb-2">
