@@ -132,6 +132,22 @@ COMMENT ON TABLE pedidos_linea_bulto IS
   'quien y cuando. El bulto va en la PK para que una linea pueda partirse entre dos '
   'bultos mas adelante sin migracion nueva. El sync nunca la toca.';
 
+-- ── 2b · El pie del papel sale de SWITCH, no de una suma nuestra ────────────
+--
+-- 🔴 El papel de pedido de Switch cierra con **Subtotal · ITBMS · Total**
+-- (medido en `PEDIDO CITY MALL PASOCANOAS REEBOK.pdf`, última página). Los tres
+-- los manda `/apipedido/lista` en la MISMA fila que ya leemos (`subTotal`,
+-- `impuesto`, `total`), así que se guardan tal cual y NO se recalculan — la
+-- regla de la casa para todo número de Switch.
+-- Sin la pasada del sync quedan en NULL y el papel dice solo lo que sabe.
+ALTER TABLE switch_pedidos
+  ADD COLUMN IF NOT EXISTS subtotal numeric(14,2),
+  ADD COLUMN IF NOT EXISTS impuesto numeric(14,2);
+
+COMMENT ON COLUMN switch_pedidos.impuesto IS
+  'El ITBMS que manda Switch en /apipedido/lista. NULL = el sync todavia no paso; el '
+  'papel no inventa un cero.';
+
 -- ── 3 · Los TRES estados ────────────────────────────────────────────────────
 --
 -- Lo guardado hoy es 'pendiente' | 'preparado'. «Preparado» ES el mismo lugar

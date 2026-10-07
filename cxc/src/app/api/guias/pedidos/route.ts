@@ -91,6 +91,32 @@ async function leerEstadoDeBodega(): Promise<{ data: EstadoDeBodega[] | null; er
   return { data: sin.data as unknown as EstadoDeBodega[] | null, error: sin.error };
 }
 
+/**
+ * 🔴 CUÁNTOS BULTOS LLEVA CADA PEDIDO, para la columna que quedó libre al bajar
+ * el vendedor debajo del cliente (Daniel, 6-oct-2026). Se cuentan los números
+ * de bulto DISTINTOS, que es lo que se carga al camión: 56 líneas pueden ser
+ * 416 bultos (medido).
+ *
+ * FALLA ABIERTA: `pedidos_linea_bulto` es una tabla nueva, así que si la
+ * migración no corrió esto devuelve un mapa vacío y la columna dice «—». La
+ * lista nunca se cae por una tabla que todavía no existe.
+ */
+async function leerCuentaDeBultos(empresas: string[]): Promise<Map<string, number>> {
+  const cuenta = new Map<string, Set<number>>();
+  if (!PEDIDOS_BULTOS_2026_10) return new Map();
+  const { data, error } = await supabaseServer
+    .from("pedidos_linea_bulto")
+    .select("empresa_key, pedido_switch_id, bulto")
+    .in("empresa_key", empresas)
+    .limit(50000);
+  if (error || !data) return new Map();
+  for (const f of data) {
+    const k = `${f.empresa_key}:${f.pedido_switch_id}`;
+    (cuenta.get(k) ?? cuenta.set(k, new Set()).get(k)!).add(Number(f.bulto));
+  }
+  return new Map([...cuenta].map(([k, v]) => [k, v.size]));
+}
+
 export async function GET(req: NextRequest) {
   if (!PEDIDOS_BODEGA_2026_10) return apagado();
   // VER: los de Guías (con v2); MARCAR (PATCH): solo admin y bodega.
@@ -104,7 +130,7 @@ export async function GET(req: NextRequest) {
 
   // ponytail: sin paginar; los Activo medidos el 5-oct son decenas, no miles.
   // El alias de Comisiones (REINALDO/REYNALDO/REINDALDO → una persona); falla abierto.
-  const [ped, est, alias] = await Promise.all([
+  const [ped, est, alias, bultos] = await Promise.all([
     supabaseServer
       .from("switch_pedidos")
       .select("empresa_key, pedido_switch_id, secuencial, fecha, cliente_codigo, cliente_nombre, vendedor_nombre, synced_at")
@@ -113,6 +139,7 @@ export async function GET(req: NextRequest) {
       .limit(1000),
     leerEstadoDeBodega(),
     leerAliasOVacio(),
+    leerCuentaDeBultos([...empresas]),
   ]);
   if (ped.error) return NextResponse.json({ error: "No se pudieron leer los pedidos" }, { status: 500 });
   if (est.error) return NextResponse.json({ error: "No se pudo leer el estado de bodega" }, { status: 500 });
@@ -141,6 +168,7 @@ export async function GET(req: NextRequest) {
       cambiado_en: m?.cambiado_en ?? null,
       // 🔴 Las DOS firmas, una por paso: «Preparado por Julio · 10:42 a. m.».
       // Sin la migración no llegan y la pantalla simplemente no las dibuja.
+      bultos: bultos.get(`${p.empresa_key}:${p.pedido_switch_id}`) ?? null,
       preparado_por: m?.preparado_por ?? null,
       preparado_en: m?.preparado_en ?? null,
       verificado_por: m?.verificado_por ?? null,

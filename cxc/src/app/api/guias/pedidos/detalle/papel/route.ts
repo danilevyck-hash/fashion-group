@@ -52,12 +52,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Ese pedido no existe" }, { status: 404 });
   }
 
-  const { data: pedido } = await supabaseServer
-    .from("switch_pedidos")
-    .select("empresa_key, pedido_switch_id, secuencial, cliente_nombre")
-    .eq("empresa_key", empresa)
-    .eq("pedido_switch_id", id)
-    .maybeSingle();
+  // 🔴 El pie del papel (Subtotal · ITBMS · Total) lo manda SWITCH; acá solo se
+  // lee. `subtotal` e `impuesto` son columnas nuevas, así que esto FALLA
+  // ABIERTO: si la migración todavía no corrió, se reintenta sin ellas y el
+  // papel escribe solo lo que sabe, sin inventar un ITBMS.
+  const pedido = await leerPedido(empresa, id);
   if (!pedido) return NextResponse.json({ error: "Ese pedido no existe" }, { status: 404 });
 
   // Las dos firmas, si la migración ya corrió. Falla ABIERTA: sin ellas el pie
@@ -73,11 +72,12 @@ export async function GET(req: NextRequest) {
     // 🔴 SIEMPRE con plata: es la regla del papel.
     const { lineas } = await leerLineas(empresa, id, true);
     const doc = construirPdfPedidoBultos({
-      secuencial: pedido.secuencial,
+      secuencial: String(pedido.secuencial ?? ""),
       empresa: nombreCortoEmpresa(pedido.empresa_key),
-      cliente: pedido.cliente_nombre,
+      cliente: pedido.cliente_nombre ?? "",
       conPrecios,
       lineas,
+      deSwitch: { subtotal: pedido.subtotal, impuesto: pedido.impuesto, total: pedido.total },
       firmas: estado
         ? {
             preparado_por: estado.preparado_por ?? null,
@@ -98,4 +98,33 @@ export async function GET(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "No se pudo preparar el papel" }, { status: 500 });
   }
+}
+
+/**
+ * El pedido con su pie de Switch, tolerante a que la migración no haya corrido.
+ * (Mismo patrón que `leerEstadoDeBodega`: pedir de más y reintentar, nunca
+ * dejar la pantalla en 500 por una columna que todavía no existe.)
+ */
+async function leerPedido(empresa: string, id: number) {
+  const base = "empresa_key, pedido_switch_id, secuencial, cliente_nombre, total";
+  const pide = (cols: string) =>
+    supabaseServer
+      .from("switch_pedidos")
+      .select(cols)
+      .eq("empresa_key", empresa)
+      .eq("pedido_switch_id", id)
+      .maybeSingle();
+
+  const conPie = await pide(`${base}, subtotal, impuesto`);
+  const fila = (conPie.error ? (await pide(base)).data : conPie.data) as Record<string, unknown> | null;
+  if (!fila) return null;
+  const num = (v: unknown) => (v == null ? null : Number(v));
+  return {
+    empresa_key: String(fila.empresa_key),
+    secuencial: fila.secuencial as string | number | null,
+    cliente_nombre: fila.cliente_nombre as string | null,
+    subtotal: num(fila.subtotal),
+    impuesto: num(fila.impuesto),
+    total: num(fila.total),
+  };
 }

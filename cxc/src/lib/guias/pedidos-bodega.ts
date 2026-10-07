@@ -106,6 +106,12 @@ export interface PedidoBodega {
   cambiado_por: string | null;
   cambiado_en: string | null;
   /**
+   * 🔴 CUÁNTOS BULTOS lleva armados (números de bulto distintos). `null` =
+   * ninguno todavía, o la migración no corrió. Es la columna que quedó libre
+   * al bajar el vendedor debajo del cliente (Daniel, 6-oct-2026).
+   */
+  bultos?: number | null;
+  /**
    * 🔴 Las dos firmas, una por paso (6-oct-2026, `PEDIDOS_BULTOS_2026_10`):
    * «Preparado por Julio · 10:42 a. m.» · «Verificado por Angela · 11:15 a. m.».
    * Opcionales: sin la migración no llegan y la pantalla no las dibuja.

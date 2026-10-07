@@ -22,7 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, ChevronDown, Printer } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
@@ -69,6 +69,7 @@ export default function PedidoBultos({
   const [error, setError] = useState(false);
   const [marcadas, setMarcadas] = useState<ReadonlySet<number>>(new Set());
   const [pidiendoBulto, setPidiendoBulto] = useState(false);
+  const [imprimirAbierto, setImprimirAbierto] = useState(false);
   const [numero, setNumero] = useState("");
   const [guardando, setGuardando] = useState(false);
   // Lo tecleado en cada celda mientras no se guarda (la verdad sigue en `lineas`).
@@ -287,26 +288,42 @@ export default function PedidoBultos({
           </p>
           {resumen && <p className="text-xs text-gray-500">{resumen}</p>}
         </div>
-        {/* 🔴 Las DOS formas a la vista, ninguna escondida en un «···»
-            (Daniel, 6-oct-2026: «a veces el cliente pide con precio y sin
-            precio»). Las dos las puede usar cualquiera que entre a Pedidos:
-            el papel se arma en el servidor. */}
-        <div className="flex items-center gap-2">
-          <span className="hidden text-xs text-gray-500 sm:inline">Imprimir</span>
-          {[
-            { conPrecios: true, texto: "Con precios" },
-            { conPrecios: false, texto: "Sin precios" },
-          ].map((o) => (
-            <button
-              key={o.texto}
-              type="button"
-              onClick={() => void imprimir(o.conPrecios)}
-              disabled={!lineas || lineas.length === 0}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 text-[13px] font-medium text-gray-700 transition active:scale-[0.97] disabled:opacity-40"
-            >
-              <Printer size={15} strokeWidth={1.8} aria-hidden /> {o.texto}
-            </button>
-          ))}
+        {/* 🔴 UN SOLO BOTÓN «Imprimir» (Daniel, 6-oct-2026): al tocarlo
+            aparecen las dos formas. Antes estaban las dos a la vista y pesaban
+            demasiado para una acción que es la misma. Las dos las puede usar
+            cualquiera que entre a Pedidos: el papel se arma en el servidor. */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setImprimirAbierto((v) => !v)}
+            disabled={!lineas || lineas.length === 0}
+            aria-expanded={imprimirAbierto}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 text-[13px] font-medium text-gray-700 transition active:scale-[0.97] disabled:opacity-40"
+          >
+            <Printer size={15} strokeWidth={1.8} aria-hidden /> Imprimir
+            <ChevronDown size={14} strokeWidth={1.8} aria-hidden />
+          </button>
+          {imprimirAbierto && (
+            <>
+              {/* Tocar afuera cierra. */}
+              <button type="button" aria-label="Cerrar" onClick={() => setImprimirAbierto(false)} className="fixed inset-0 z-10 cursor-default" />
+              <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                {[
+                  { conPrecios: true, texto: "Con precios" },
+                  { conPrecios: false, texto: "Sin precios" },
+                ].map((o) => (
+                  <button
+                    key={o.texto}
+                    type="button"
+                    onClick={() => { setImprimirAbierto(false); void imprimir(o.conPrecios); }}
+                    className="block w-full px-3 py-2 text-left text-[13px] text-gray-700 hover:bg-gray-50"
+                  >
+                    {o.texto}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -339,14 +356,20 @@ export default function PedidoBultos({
                     las 7 columnas a 390 px el chip del Bulto quedaba CORTADO
                     («41» en vez de 416). El código va bajo la descripción, como
                     el n.º de pedido va bajo el cliente en la lista. */}
+                {/* 🔴 ANCHOS REPARTIDOS (Daniel, 6-oct-2026: «la descripción
+                    casi nunca es larga, no le reserves tanto ancho»). Medido en
+                    el pedido real: «REEBOK BASE TRAIL MID» es lo más largo. Así
+                    que la descripción lleva un ancho propio y lo que sobra va a
+                    Código, Cantidad, Precio y Total, que son los que se leen de
+                    corrido. */}
                 <th className="w-20 py-2 pl-1 pr-1 sm:px-3">{COLUMNAS_DETALLE[0]}</th>
-                <th className="hidden px-3 py-2 sm:table-cell">{COLUMNAS_DETALLE[1]}</th>
-                <th className="py-2 pl-1 pr-1 sm:px-3">{COLUMNAS_DETALLE[2]}</th>
-                <th className="px-1 py-2 text-right sm:px-3">{COLUMNAS_DETALLE[3]}</th>
+                <th className="hidden px-3 py-2 sm:table-cell sm:w-32">{COLUMNAS_DETALLE[1]}</th>
+                <th className="py-2 pl-1 pr-1 sm:w-[38%] sm:px-3">{COLUMNAS_DETALLE[2]}</th>
+                <th className="w-20 px-1 py-2 text-right sm:px-3">{COLUMNAS_DETALLE[3]}</th>
                 {/* 🔴 Precio y Total solo si el SERVIDOR los mandó: a bodega no
                     le llegan, así que la columna ni se dibuja. */}
-                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell">{COLUMNAS_DETALLE[4]}</th>}
-                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell">{COLUMNAS_DETALLE[5]}</th>}
+                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell sm:w-24">{COLUMNAS_DETALLE[4]}</th>}
+                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell sm:w-28">{COLUMNAS_DETALLE[5]}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 align-top">

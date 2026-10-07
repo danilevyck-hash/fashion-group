@@ -1001,6 +1001,9 @@ export interface SwitchPedidoListaRow {
   id: number;
   secuencial: string | number | null;
   fecha: string | null;
+  /** El pie del papel de Switch: Subtotal · ITBMS · Total. */
+  subTotal: string | number | null;
+  impuesto: string | number | null;
   total: string | number | null;
   cliente: string | null;
   clienteId: number | null;

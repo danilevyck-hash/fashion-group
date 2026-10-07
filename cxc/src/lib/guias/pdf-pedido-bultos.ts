@@ -47,9 +47,11 @@ import {
   piePapel,
   sinMayusculas,
 } from "@/lib/pdf-estilo";
+import { asegurarEspacio, finDeTabla } from "@/lib/comisiones/pdf-chrome";
 import {
   descripcionCompleta,
   firmasEnOrden,
+  renglonesDelPie,
   resumenAsignacion,
   tituloPapelBultos,
   totalesDelPedido,
@@ -85,6 +87,11 @@ export interface PapelDeBultos {
   /** Quién marcó cada paso. Sin firmas, el pie no se dibuja. */
   firmas?: FirmasPedido;
   /**
+   * 🔴 Subtotal · ITBMS · Total **como los manda Switch**. Lo que falte no se
+   * dibuja: un ITBMS inventado sería un número fiscal falso.
+   */
+  deSwitch?: { subtotal?: number | null; impuesto?: number | null; total?: number | null };
+  /**
    * 🔴 Las DOS formas de imprimir (Daniel, 6-oct-2026): *«a veces el cliente
    * pide con precio y sin precio»*. `false` saca las columnas Precio y Total y
    * deja solo el total de unidades.
@@ -114,13 +121,14 @@ export function construirPdfPedidoBultos(p: PapelDeBultos): jsPDF {
     return conPrecios ? [...fila, monto(l.precio), monto(l.total)] : fila;
   });
 
-  // 🔴 EL TOTAL AL PIE, en negrita y con raya arriba, como el resto de los
-  // papeles de la casa (Daniel, al ver el papel): unidades y dinero. Sin precios
-  // va solo el de unidades — un cero en dinero no significaría nada.
-  const totales = totalesDelPedido(p.lineas);
+  // 🔴 EL PIE VA COMO EL DE SWITCH (Daniel mandó el PDF real): el bloque
+  // Subtotal · ITBMS · Total a la derecha, y debajo «Cantidad de artículos».
+  // Dentro de la tabla queda solo el total de UNIDADES, que es lo que cierra la
+  // columna Cant.; los montos van en el bloque, como en el papel de Switch.
+  const totales = totalesDelPedido(p.lineas, p.deSwitch);
   const pie = conPrecios
-    ? [["", "", "Total", cantidad(totales.unidades), "", monto(totales.dinero)]]
-    : [["", "", "Total", cantidad(totales.unidades)]];
+    ? [["", "", "", cantidad(totales.unidades), "", ""]]
+    : [["", "", "", cantidad(totales.unidades)]];
 
   autoTable(doc, {
     startY: y,
@@ -129,12 +137,24 @@ export function construirPdfPedidoBultos(p: PapelDeBultos): jsPDF {
     body: body.length > 0 ? body : [["", "", "Este pedido no tiene artículos"]],
     foot: body.length > 0 ? pie : undefined,
     styles: { font: "helvetica", fontSize: 8, cellPadding: 1.6, valign: "middle" },
-    columnStyles: {
-      0: { cellWidth: 16, halign: "right", fontStyle: "bold" },
-      1: { cellWidth: 26 },
-      3: { cellWidth: 16, halign: "right" },
-      ...(conPrecios ? { 4: { cellWidth: 18, halign: "right" as const }, 5: { cellWidth: 20, halign: "right" as const } } : {}),
-    },
+    // 🔴 La descripción no suele ser larga (Daniel, 6-oct-2026): se le pone un
+    // ancho propio y el sobrante se reparte entre las demás, en vez de dejar que
+    // se lo quede todo por ser la única columna «auto».
+    columnStyles: conPrecios
+      ? {
+          0: { cellWidth: 20, halign: "right", fontStyle: "bold" },
+          1: { cellWidth: 34 },
+          2: { cellWidth: 62 },
+          3: { cellWidth: 20, halign: "right" },
+          4: { cellWidth: 23, halign: "right" },
+          5: { cellWidth: 25, halign: "right" },
+        }
+      : {
+          0: { cellWidth: 26, halign: "right", fontStyle: "bold" },
+          1: { cellWidth: 44 },
+          2: { cellWidth: 88 },
+          3: { cellWidth: 26, halign: "right" },
+        },
     didParseCell: (d) => {
       // El bulto en el azul de la casa; lo que falta por asignar, en rojo, que
       // es el color de lo que hay que mirar.
@@ -143,9 +163,42 @@ export function construirPdfPedidoBultos(p: PapelDeBultos): jsPDF {
     },
   });
 
+  bloqueDeTotales(doc, totales, conPrecios);
   firmasAlPie(doc, p.firmas);
   piePapel(doc);
   return doc;
+}
+
+/**
+ * El bloque de totales, copiado del papel de Switch: los montos alineados a la
+ * derecha con su rótulo, y debajo «Cantidad de artículos».
+ *
+ * 🔴 Un renglón sin dato NO se dibuja. Si Switch todavía no mandó el ITBMS, el
+ * papel no escribe «ITBMS: 0.00»: eso sería un número fiscal inventado.
+ */
+function bloqueDeTotales(doc: jsPDF, t: ReturnType<typeof totalesDelPedido>, conPrecios: boolean): void {
+  const w = doc.internal.pageSize.getWidth();
+  let y = finDeTabla(doc) + 7;
+  y = asegurarEspacio(doc, y, 24);
+
+  if (conPrecios) {
+    doc.setFontSize(9);
+    for (const r of renglonesDelPie(t)) {
+      const ultimo = r.rotulo === "Total:";
+      doc.setFont("helvetica", ultimo ? "bold" : "normal");
+      doc.setTextColor(...(ultimo ? PAPEL.tinta : PAPEL.grisOscuro));
+      doc.text(r.rotulo, w - MARGEN_PAPEL - 34, y, { align: "right" });
+      doc.text(monto(r.monto), w - MARGEN_PAPEL, y, { align: "right" });
+      y += 5;
+    }
+    y += 1;
+  }
+
+  // El mismo rótulo que usa Switch.
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...PAPEL.grisOscuro);
+  doc.text(`Cantidad de artículos: ${cantidad(t.unidades)}`, MARGEN_PAPEL, y);
 }
 
 /**

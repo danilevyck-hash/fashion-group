@@ -61,7 +61,10 @@ import {
   siguienteEstado,
   sinBulto,
   todoAsignado,
+  renglonesDelPie,
+  tituloDeFirmas,
   totalesDelPedido,
+  ultimaFirma,
   validarBulto,
   veLaEmpresa,
   veLaPlata,
@@ -411,11 +414,41 @@ describe("🔴 lo que Daniel pidió al APROBAR (6-oct-2026)", () => {
     expect(papel).not.toContain('"Referencia"');
   });
 
-  it("2 · «Preparado por» y «Verificado por» son COLUMNAS, no una línea suelta", () => {
+  it("2 · la firma es UNA columna angosta con el ÚLTIMO paso, no dos anchas", () => {
     const lista = leer("app/guias/components/PedidosView.tsx");
-    expect(lista).toContain("Preparado por</th>");
-    expect(lista).toContain("Verificado por</th>");
-    expect(lista).toContain("firmaEnColumna");
+    // 🔴 Daniel, 6-oct-2026: «Verificado por» ocupaba demasiado y se comía el
+    // ancho del cliente. Quedó una columna «Firma» con el último paso.
+    expect(lista).toContain("Firma</th>");
+    expect(lista).not.toContain("Verificado por</th>");
+    expect(lista).toContain("ultimaFirma");
+    // Lo que no entra, al tocar: las DOS firmas en el `title`.
+    expect(lista).toContain("tituloDeFirmas");
+  });
+
+  it("2c · la columna muestra el último paso dado, y el anterior queda al tocar", () => {
+    const f = {
+      preparado_por: "Julio",
+      preparado_en: "2026-10-06T10:42:00-05:00",
+      verificado_por: "Angela",
+      verificado_en: "2026-10-06T16:15:00-05:00",
+    };
+    expect(ultimaFirma(f)).toBe("Verificado · Angela · 4:15 p. m.");
+    expect(tituloDeFirmas(f)).toContain("Preparado por Julio");
+    expect(tituloDeFirmas(f)).toContain("Verificado por Angela");
+    // Con un solo paso dado, se muestra ese.
+    expect(ultimaFirma({ ...f, verificado_por: null, verificado_en: null })).toBe("Preparado · Julio · 10:42 a. m.");
+    // Sin ninguno, nada — no se inventa una firma.
+    expect(ultimaFirma({ preparado_por: null, preparado_en: null, verificado_por: null, verificado_en: null })).toBeNull();
+    expect(tituloDeFirmas({ preparado_por: null, preparado_en: null, verificado_por: null, verificado_en: null })).toBeUndefined();
+  });
+
+  it("1c · el VENDEDOR baja debajo del cliente y su columna la toma Bultos", () => {
+    const lista = leer("app/guias/components/PedidosView.tsx");
+    // Daniel, 6-oct-2026: el vendedor no merece columna propia en el celular.
+    expect(lista).toContain(">Bultos</th>");
+    expect(lista).toMatch(/\{!BULTOS && <ThOrden col="vendedor"/);
+    // Y el dato lo cuenta el SERVIDOR, no el navegador.
+    expect(leer("app/api/guias/pedidos/route.ts")).toContain("leerCuentaDeBultos");
   });
 
   it("2b · la columna dice «quién · hora»; el rótulo ya lo pone el encabezado", () => {
@@ -453,12 +486,62 @@ describe("🔴 EL PAPEL: EL TOTAL AL PIE Y LAS DOS FORMAS (6-oct-2026)", () => {
   const L = (cant: number, total: number | null) =>
     linea({ codigo_barra_id: cant, cantidad: cant, total, precio: total == null ? null : 1 });
 
-  it("el total suma UNIDADES y DINERO", () => {
-    expect(totalesDelPedido([L(12, 180.6), L(6, 90.3)])).toEqual({ unidades: 18, dinero: 270.9 });
+  it("el pie va como el de SWITCH: Subtotal · ITBMS · Total, en ese orden", () => {
+    // Los tres montos los MANDA Switch; acá solo se acomodan.
+    const pie = totalesDelPedido([L(12, 180.6), L(6, 90.3)], { subtotal: 271, impuesto: 18.97, total: 289.97 });
+    expect(pie).toEqual({ subtotal: 271, impuesto: 18.97, total: 289.97, unidades: 18 });
+    expect(renglonesDelPie(pie).map((r) => r.rotulo)).toEqual(["Subtotal:", "ITBMS:", "Total:"]);
+  });
+
+  it("🔴 SIN el dato de Switch, el ITBMS no se inventa: ese renglón no sale", () => {
+    // Mientras el sync no pase, subtotal e impuesto llegan vacíos. Un
+    // «ITBMS: 0.00» inventado sería un número fiscal falso.
+    const pie = totalesDelPedido([L(12, 180.6), L(6, 90.3)]);
+    expect(pie.impuesto).toBeNull();
+    expect(pie.subtotal).toBeNull();
+    expect(renglonesDelPie(pie).map((r) => r.rotulo)).toEqual(["Total:"]);
+    // El total cae a la suma de las líneas solo si Switch no lo mandó.
+    expect(pie.total).toBe(270.9);
+  });
+
+  it("🔴 el ITBMS nunca se deriva de una resta nuestra: sale tal cual de Switch", () => {
+    // 43,620.00 + 3,053.40 = 46,673.40 (el PDF real de Switch). Si el total que
+    // manda Switch no cuadrara con sus partes, se reportan las tres como vinieron.
+    const pie = totalesDelPedido([L(1, 1)], { subtotal: 43620, impuesto: 3053.4, total: 99999 });
+    expect(pie.impuesto).toBe(3053.4);
+    expect(pie.total).toBe(99999);
   });
 
   it("🔴 sin precios va SOLO el de unidades: un cero en dinero no diría nada", () => {
-    expect(totalesDelPedido([L(12, null), L(6, null)])).toEqual({ unidades: 18, dinero: null });
+    expect(totalesDelPedido([L(12, null), L(6, null)]).total).toBeNull();
+    expect(totalesDelPedido([L(12, null), L(6, null)]).unidades).toBe(18);
+  });
+
+  it("el papel escribe «Cantidad de artículos», el mismo rótulo que Switch", () => {
+    expect(leer("lib/guias/pdf-pedido-bultos.ts")).toContain("Cantidad de artículos:");
+  });
+
+  it("🔴 el subtotal y el ITBMS se GUARDAN de Switch, no se calculan", () => {
+    const sync = leer("lib/switch-api/sync-pedidos.ts");
+    expect(sync).toContain("subtotal: dinero(r.subTotal)");
+    expect(sync).toContain("impuesto: dinero(r.impuesto)");
+    // Y la ruta del papel falla ABIERTA si la migración todavía no corrió.
+    expect(leer("app/api/guias/pedidos/detalle/papel/route.ts")).toContain("leerPedido");
+  });
+
+  it("3 · «Imprimir» es UN botón; las dos formas aparecen al tocarlo", () => {
+    const pant = leer("app/guias/components/PedidoBultos.tsx");
+    expect(pant).toContain("imprimirAbierto");
+    expect(pant).toContain("Con precios");
+    expect(pant).toContain("Sin precios");
+    // Una sola acción a la vista: el botón no repite el texto de las opciones.
+    expect(pant.match(/<Printer size=\{15\}/g) ?? []).toHaveLength(1);
+  });
+
+  it("4 · la descripción no se queda con todo el ancho sobrante", () => {
+    // Medido en el pedido real: «REEBOK BASE TRAIL MID» es lo más largo.
+    expect(leer("app/guias/components/PedidoBultos.tsx")).toContain('sm:w-[38%]');
+    expect(leer("lib/guias/pdf-pedido-bultos.ts")).toMatch(/2: \{ cellWidth: \d+ \}/);
   });
 
   it("las unidades admiten decimales (Switch manda 4.5) y no se redondean a entero", () => {

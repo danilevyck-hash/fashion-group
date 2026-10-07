@@ -291,19 +291,55 @@ export const COLUMNAS_DETALLE_SIN_PLATA = COLUMNAS_DETALLE.filter(
 );
 
 /**
- * El pie del papel: **total de unidades** y **total en dinero** (Daniel, al ver
- * el papel, 6-oct-2026). Sin precios se suman solo las unidades, y el dinero
- * queda en `null` — no se escribe un cero que no significa nada.
+ * 🔴 EL PIE DEL PAPEL VA COMO EL DE SWITCH (medido en el PDF real que mandó
+ * Daniel, `PEDIDO CITY MALL PASOCANOAS REEBOK.pdf`, última página):
+ *
+ *     Subtotal:   43,620.00
+ *      ITBMS:      3,053.40
+ *        Total:   46,673.40
+ *
+ *     Cantidad de artículos: 984.00
+ *
+ * 🔑 Los tres montos los MANDA Switch (`/apipedido/lista`: `subTotal`,
+ * `impuesto`, `total`) y se guardan tal cual: **no se recalculan ni se derivan
+ * uno del otro**. Si el sync todavía no pasó llegan en `null`, y entonces el
+ * papel calla ese renglón en vez de inventar un cero —un ITBMS inventado es un
+ * número fiscal falso—. Las unidades sí se suman de las líneas: ésas las
+ * tenemos completas.
  */
+export interface PieDelPedido {
+  /** De Switch. `null` = todavía no se sabe. */
+  subtotal: number | null;
+  /** El ITBMS de Switch. `null` = todavía no se sabe; NUNCA un cero inventado. */
+  impuesto: number | null;
+  total: number | null;
+  /** Sumadas de las líneas, que sí están completas. */
+  unidades: number;
+}
+
 export function totalesDelPedido(
   lineas: readonly Pick<LineaPedido, "cantidad" | "total">[],
-): { unidades: number; dinero: number | null } {
-  const unidades = lineas.reduce((a, l) => a + l.cantidad, 0);
+  deSwitch?: { subtotal?: number | null; impuesto?: number | null; total?: number | null },
+): PieDelPedido {
+  const unidades = Math.round(lineas.reduce((a, l) => a + l.cantidad, 0) * 100) / 100;
   const conDinero = lineas.filter((l) => l.total != null);
+  // El total cae a la suma de las líneas solo si Switch no lo mandó.
+  const sumado = conDinero.length === 0 ? null : Math.round(conDinero.reduce((a, l) => a + (l.total ?? 0), 0) * 100) / 100;
   return {
-    unidades: Math.round(unidades * 100) / 100,
-    dinero: conDinero.length === 0 ? null : Math.round(conDinero.reduce((a, l) => a + (l.total ?? 0), 0) * 100) / 100,
+    subtotal: deSwitch?.subtotal ?? null,
+    impuesto: deSwitch?.impuesto ?? null,
+    total: deSwitch?.total ?? sumado,
+    unidades,
   };
+}
+
+/** Los renglones del pie, en el ORDEN de Switch; sin dato, el renglón no sale. */
+export function renglonesDelPie(p: PieDelPedido): { rotulo: string; monto: number }[] {
+  return [
+    { rotulo: "Subtotal:", monto: p.subtotal },
+    { rotulo: "ITBMS:", monto: p.impuesto },
+    { rotulo: "Total:", monto: p.total },
+  ].filter((r): r is { rotulo: string; monto: number } => r.monto != null);
 }
 
 export const MIN_BULTO = 1;
@@ -423,6 +459,33 @@ export function firmaDelPaso(
 export function firmaEnColumna(por: string | null | undefined, en: string | null | undefined): string | null {
   const quien = (por ?? "").trim();
   return quien && en ? `${quien} · ${horaPanama(en)}` : null;
+}
+
+/**
+ * 🔴 UNA SOLA COLUMNA DE FIRMA (Daniel, 6-oct-2026: *«Verificado por ocupa
+ * mucho… que no se coma el ancho de la descripción»*). Se muestra el ÚLTIMO
+ * paso dado —«Verificado · Angela · 4:15 p. m.»— porque es el que contesta la
+ * pregunta de la lista: ¿en qué va este pedido? El paso anterior sigue
+ * disponible al tocar (`tituloDeFirmas`), así que no se pierde nada.
+ *
+ * `null` = nadie marcó nada todavía.
+ */
+export function ultimaFirma(f: FirmasPedido): string | null {
+  const [, ultimo] = [firmaDelPaso("preparado", f.preparado_por, f.preparado_en), firmaDelPaso("verificado", f.verificado_por, f.verificado_en)];
+  const compacta = (paso: "preparado" | "verificado", por: string | null, en: string | null) => {
+    const t = firmaEnColumna(por, en);
+    return t ? `${ROTULO_ESTADO_BULTOS[paso]} · ${t}` : null;
+  };
+  return (
+    (ultimo && compacta("verificado", f.verificado_por, f.verificado_en)) ||
+    compacta("preparado", f.preparado_por, f.preparado_en)
+  );
+}
+
+/** Las dos firmas para el `title`: lo que no entra en la columna, al tocar. */
+export function tituloDeFirmas(f: FirmasPedido): string | undefined {
+  const t = firmasEnOrden(f);
+  return t.length ? t.join("\n") : undefined;
 }
 
 /** Las firmas que haya, de arriba abajo. Vacío = nadie marcó nada todavía. */

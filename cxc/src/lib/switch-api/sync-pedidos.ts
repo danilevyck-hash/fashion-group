@@ -32,6 +32,9 @@ export interface PedidosSyncResult {
   error?: string;
 }
 
+/** «27,431.0000» → 27431. Los números de Switch no se recalculan, solo se leen. */
+const dinero = (v: unknown) => Math.round(Number(String(v ?? 0).replace(/,/g, "")) * 100) / 100 || 0;
+
 const sumarDias = (ymd: string, d: number) => new Date(Date.parse(ymd) + d * 86_400_000).toISOString().slice(0, 10);
 
 async function codigosConFicha(): Promise<Set<string>> {
@@ -92,7 +95,11 @@ async function syncEmpresa(empresaKey: string, fichas: Set<string>, triggeredBy:
         cliente_codigo: codigoDe.get(Number(r.clienteId))!.trim().toUpperCase(),
         cliente_nombre: String(r.cliente ?? "").trim() || "—",
         vendedor_nombre: r.vendedor ? String(r.vendedor).trim() : null,
-        total: Math.round(Number(String(r.total ?? 0).replace(/,/g, "")) * 100) / 100 || 0, // Switch a veces manda «27,431.0000»
+        total: dinero(r.total), // Switch a veces manda «27,431.0000»
+        // 🔴 El pie del papel sale de AQUÍ, no de una suma nuestra: Switch ya
+        // manda subtotal e impuesto en la misma fila.
+        subtotal: dinero(r.subTotal),
+        impuesto: dinero(r.impuesto),
         synced_at: now,
       }));
 
