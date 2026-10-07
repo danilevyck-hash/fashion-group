@@ -379,6 +379,91 @@ describe("ZIP por marca — el corte por marca y por período", () => {
   });
 });
 
+// ────────────────────────────────────────────────────────────────────────────
+// 🔴 CANDADO — LA CARPETA SALE DE LA TIENDA DE LA FACTURA (6-oct-2026).
+//
+// 🩸 Medido en producción el 6-oct-2026: el ZIP leía la tienda del PROYECTO,
+// así que SEIS facturas de Tommy y Calvin con `tienda_codigo` pero sin proyecto
+// (D-170 Nova Lux, D-118 Outlet Duty Free N3, D-25 City Mall Paso Canoa) y DOS
+// entregas de mobiliario (D-117) caían en «General» aunque la factura dijera a
+// qué tienda eran. Ninguna había salido todavía en un ZIP (`zips_bajados`
+// estaba vacío en los seis períodos), así que se arregló antes de mandarlas.
+// ────────────────────────────────────────────────────────────────────────────
+describe("ZIP por marca — la carpeta sale de la tienda del GASTO", () => {
+  it("una factura SIN proyecto pero CON tienda cae en la carpeta de su tienda, no en General", async () => {
+    // D-170 no lo usa NINGÚN proyecto: el nombre tiene que salir igual del
+    // directorio, o la factura volvería a caer en «General».
+    tablas.clientes_master.push({ codigo: "D-170", nombre: "Nova Lux, S.A." });
+    tablas.mk_facturas.push(
+      fact("f9", null, "0000008124", "2026-08-25", "pintura tienda nueva", 81.32, {
+        tienda_codigo: "D-170",
+      }),
+    );
+    tablas.mk_factura_marcas.push({ factura_id: "f9", marca_id: M_TH, porcentaje: 100 });
+    tablas.mk_periodo_documentos.push(sello(P_ABIERTO, "factura", "f9"));
+    tablas.mk_adjuntos.push(
+      adj("a9", "pdf_factura", "f9", null, "fact/f9.pdf", "pintura.pdf"),
+    );
+    storage["fact/f9.pdf"] = Buffer.from("bytes");
+
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    const paths = await rutas(r.buffer);
+    expect(paths).toContain(
+      "Nova Lux, S.A./facturas/2026-08-25 · Tommy Hilfiger · pintura tienda nueva.pdf",
+    );
+    expect(paths.some((p) => p.includes("pintura tienda nueva") && p.startsWith("General/"))).toBe(
+      false,
+    );
+    expect(r.carpetas).toContain("Nova Lux, S.A.");
+    // La hoja Resumen la nombra igual, y el total sí sube con el gasto nuevo.
+    const filas = await hojaResumen(r.buffer);
+    expect(filas.map((f) => String(f[0] ?? ""))).toContain("Nova Lux, S.A.");
+    expect(r.total).toBe(171.32);
+  });
+
+  it("una ENTREGA sin proyecto pero con tienda también va a su carpeta", async () => {
+    // D-117 no lo usa ningún proyecto: es el caso de las dos entregas reales.
+    tablas.clientes_master.push({ codigo: "D-117", nombre: "Outlet Duty Free N2, S.A." });
+    tablas.mk_entregas_muebles.push({
+      id: "e9",
+      proyecto_id: null,
+      total: 500,
+      total_por_marca: { [M_TH]: 500 },
+      total_por_empresa_interna: {},
+      notas: "Remodelacion",
+      created_at: "2026-09-29T18:34:58Z",
+      tienda_codigo: "D-117",
+    });
+    tablas.mk_periodo_documentos.push(sello(P_ABIERTO, "entrega", "e9"));
+
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    expect(r.carpetas).toContain("Outlet Duty Free N2, S.A.");
+    const filas = await hojaResumen(r.buffer);
+    expect(filas.map((f) => String(f[0] ?? ""))).toContain("Outlet Duty Free N2, S.A.");
+  });
+
+  it("la tienda de la factura le GANA a la del proyecto: el gasto es de donde dice la factura", async () => {
+    tablas.clientes_master.push({ codigo: "D-170", nombre: "Nova Lux, S.A." });
+    // f1 vive en el proyecto "Letreros" (D-24) pero la factura dice D-170.
+    tablas.mk_facturas.find((f) => f.id === "f1")!.tienda_codigo = "D-170";
+
+    const r = await buildZipDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    expect(r.carpetas).toContain("Nova Lux, S.A.");
+    expect(await rutas(r.buffer)).toContain(
+      "Nova Lux, S.A./facturas/2026-03-04 · Tommy Hilfiger · letrero.pdf",
+    );
+    // 🔑 El monto NO se mueve por cambiar de carpeta.
+    expect(r.total).toBe(100);
+  });
+
+  it("sin tienda en el gasto sigue mandando la del proyecto, y sin ninguna, General", async () => {
+    const r = await buildZipDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    expect(r.carpetas).toEqual(["City Mall David"]);
+    const abierto = await buildZipDeMarca({ marcaCodigo: "TH" });
+    expect(abierto.carpetas).toContain("General");
+  });
+});
+
 describe("ZIP por marca — General: los gastos SIN cliente", () => {
   it("el comprobante de CADA gasto sin cliente va a General/facturas/", async () => {
     const r = await buildZipDeMarca({ marcaCodigo: "TH" });
