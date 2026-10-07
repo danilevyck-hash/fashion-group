@@ -35,7 +35,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 🔴 Ficha de edición estilo Apple. `false` = como el 6-oct-2026. */
-export const FICHA_GASTO_2026_10 = false;
+export const FICHA_GASTO_2026_10 = true;
 
 /**
  * El control único «Impuesto» solo tiene sentido reemplazando los DOS de
