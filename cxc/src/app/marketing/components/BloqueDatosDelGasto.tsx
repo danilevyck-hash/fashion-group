@@ -177,7 +177,7 @@ export default function BloqueDatosDelGasto({
                     : "border-gray-200 hover:border-gray-400"
                 }`}
               >
-                De una tienda
+                Tienda
               </button>
               <button
                 type="button"

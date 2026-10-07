@@ -5,6 +5,8 @@
 > 🔴 Obligatorio al diseñar o rediseñar **cualquier** pantalla, modal, PDF o etiqueta del sistema.
 > Daniel, 1-oct-2026: *«ten mentalidad steve jobs, estilo apple»* · *«quiero que se diseñe así cualquier cosa en el futuro»*.
 > Los nombres siguen [nombres-erp.md](nombres-erp.md): simple no es coloquial.
+>
+> 🔴 **Ningún agente reporta una pantalla sin haber corrido `revisar-nombres` en verde** (6-oct-2026): `npx tsx scripts/revisar-nombres.ts` (o solo su carpeta) y `npx vitest run src/__tests__/lib/revisar-nombres.test.ts`. Daniel: *«¿cómo hago para que apliques nombres como ERP profesional sin tener que decírtelo cada vez?»*.
 
 ## Las reglas
 
@@ -75,6 +77,12 @@ Daniel, 2-oct-2026: *«cada vez que encontramos algo así de detalle, para que s
   - CxC con una empresa actualiza esa empresa; con «Todas», las 6 una tras otra, como Ventas.
   - Los avisos («Relojes sin señal · hace 2 días», «Vistana sin actualizar desde…») siguen siendo avisos, aparte de la línea.
   - Candado `frescura-unica.test.ts`: un `SyncNowButton` suelto, un ↻ o un `RefreshCw` a mano, o un texto de los de antes fuera de `LineaDeFrescura` ponen el build rojo (excepciones con su porqué y un tope que solo baja).
+- **Los nombres los revisa una máquina, no la memoria de nadie** (6-oct-2026, `scripts/revisar-nombres.ts`). Daniel: *«¿cómo hago para que apliques nombres como ERP profesional sin tener que decírtelo cada vez?»*. El candado de antes solo conocía una lista de palabras, así que cada coloquialismo nuevo se colaba («A quién se le pasa», «mi costo», «Avísale a Roxana», «Poner en bulto», «¿Cómo calcular los precios?»). El revisor saca los textos que se VEN —rótulos de campo, botones, encabezados de tabla, títulos, chips, estados y los encabezados de PDF y de Excel— y frena por FORMA, no por palabra:
+  - **Pregunta** («¿…?»), **primera o segunda persona** («mi costo», «te avisa»), **verbo con el pronombre pegado** («Avísale», «Borrarlos»), **imperativo** («Sube la foto»).
+  - Y en un **RÓTULO** (campo, columna, estado, encabezado de papel), que no sea un **sustantivo corto**: más de 4 palabras, o empieza por verbo, preposición o artículo.
+  - **Dos varas**: el rótulo es el nombre de una cosa (vara dura); un aviso o una ayuda puede ser una frase (vara blanda), pero sin preguntas ni hablarle a nadie.
+  - **El glosario crece solo**: la única fuente es [nombres-erp.md](nombres-erp.md). Se agrega una fila «mal → bien» al documento y el revisor la hace cumplir, sin tocar código; `nombres-erp-prohibidos` lee la misma tabla.
+  - 🔴 **Paso obligatorio**: ningún agente reporta una pantalla sin `revisar-nombres` en verde. Candado `revisar-nombres.test.ts`, con un techo por archivo que **solo baja** (6-oct-2026: 112 textos en 70 archivos).
 - **Las tarjetas de una lista dicen lo esencial en dos líneas.** El detalle va al tocarlas, no en una pared de chips (por ejemplo, 23 meses pendientes dibujados uno por uno).
 - **Nada de párrafos explicativos arriba del contenido: lo que aporta va en UNA línea gris al final** (Daniel, 4-oct-2026, desde su iPhone en Comisiones › Multifashion: *«Quítame estos mensajes que no son necesarios. No solo aquí sino en todo el sistema. O bien resumido abajo en una línea.»*). Arriba de la lista había tres: «4 vendedoras · $16,795.58 ventas · 270 tickets», «La Δ compara contra octubre 2025, los mismos días (del 1 al 4).» y la regla del bono entera.
   - Arriba de una lista o tabla no va ninguna aclaración: cómo se calcula, contra qué compara, reglas, «Toca una empresa para…».
@@ -116,5 +124,5 @@ Daniel, 1-oct-2026: *«siempre mockup»* y *«dejamos fijo que las propuestas se
 - [ ] ¿Lo escondido se usa poco, según datos medidos?
 - [ ] ¿Cada botón dice lo que hace o agrega?
 - [ ] ¿Algún campo queda solo en su fila, o hay tablas vacías o asteriscos?
-- [ ] ¿Los nombres cumplen [nombres-erp.md](nombres-erp.md)?
+- [ ] ¿Los nombres cumplen [nombres-erp.md](nombres-erp.md)? ¿Corrió `revisar-nombres` en VERDE?
 - [ ] ¿Funciona en el celular, sin scroll horizontal y con todo lo tocable de al menos 44 px?

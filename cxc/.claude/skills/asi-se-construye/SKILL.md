@@ -7,6 +7,15 @@ user-invocable: true
 # Así se construye aquí
 
 > 🔴 Esta skill dice **cómo funciona por dentro**. **Cómo se VE** lo manda [docs/diseno.md](../../../docs/diseno.md) (estilo Apple) y **cómo se NOMBRA**, [docs/nombres-erp.md](../../../docs/nombres-erp.md). Las tres van juntas, siempre.
+>
+> 🔴 **NINGÚN AGENTE REPORTA UNA PANTALLA SIN HABER CORRIDO `revisar-nombres` EN VERDE** (6-oct-2026). Antes de decir que una pantalla está lista —mockup, captura, resumen a Daniel o commit—:
+>
+> ```
+> npx tsx scripts/revisar-nombres.ts src/app/<modulo>    # lo que se tocó
+> npx vitest run src/__tests__/lib/revisar-nombres.test.ts
+> ```
+>
+> Si sale rojo, se arregla el texto, no el candado. Daniel, 6-oct-2026: *«¿cómo hago para que apliques nombres como ERP profesional sin tener que decírtelo cada vez?»*.
 
 Daniel, textual (7-sep-2026):
 
@@ -116,6 +125,14 @@ Nunca `$0.00` en letra grande. Se dice qué pasó, con nombres de ERP ([docs/nom
 ⚠️ Y **un cero con algo adentro sí muestra su número**: tapar una celda en cero que tiene un descuento adentro esconde plata.
 
 ## 12. Una palabra por cosa
+
+🔴 **Los nombres se revisan con una máquina, no con la memoria de nadie** (6-oct-2026, `scripts/revisar-nombres.ts`). El candado de antes solo conocía una lista de palabras prohibidas, así que cada coloquialismo NUEVO se colaba: «A quién se le pasa», «mi costo», «Terminado/Recibido» como estados, «Avísale a Roxana», «Poner en bulto», «Foto o factura», «De una tienda», «¿Cómo calcular los precios?», «Borrarlos todos», «Revocar». El revisor saca los textos que se VEN en pantalla y frena por FORMA:
+
+- **pregunta** · **primera o segunda persona** · **verbo con el pronombre pegado** · **imperativo de 2.ª persona**;
+- y en un **RÓTULO** (campo, columna, estado, encabezado de PDF o Excel), lo que no sea un **sustantivo corto**: más de 4 palabras, o que empiece por verbo, preposición o artículo.
+- **Dos varas**: el rótulo es el nombre de una cosa (dura); un aviso o una ayuda puede ser una frase (blanda), pero sin preguntas ni hablarle a nadie.
+- 🔴 **El glosario crece sin tocar código**: la ÚNICA fuente es `docs/nombres-erp.md`. Se agrega una fila «mal → bien» y el revisor y `nombres-erp-prohibidos` la hacen cumplir solos. Un nombre nuevo se escribe ahí, no en una lista dentro de un test.
+- Candado `revisar-nombres.test.ts` (entra en «pruebas» de GitHub), con un techo por archivo que **solo baja**.
 
 `docs/diccionario.md` manda. **Descargar** (no bajar ni exportar) · **Correo** (no email) · **período** con tilde · nombre de empresa **corto** · plata negativa `−$100.00` con menos tipográfico y con centavos · porcentajes sin decimal.
 

@@ -44,7 +44,7 @@ describe("🔴 el interruptor nació APAGADO y Daniel lo prendió el 10-sep-2026
 
   it("encendido, el campo acepta la factura en PDF y lo dice", () => {
     expect(aceptaDeLaPuerta(true)).toBe("image/*,application/pdf");
-    expect(rotuloDeLaPuerta(true)).toBe("Foto o factura");
+    expect(rotuloDeLaPuerta(true)).toBe("Comprobante");
     expect(rotuloBotonDeLaPuerta(true)).toBe("Subir foto o factura");
   });
 

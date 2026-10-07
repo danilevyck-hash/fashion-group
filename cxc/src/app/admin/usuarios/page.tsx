@@ -667,10 +667,10 @@ function UsuariosPageInner() {
                                   <button
                                     onClick={() => revokeAllSessions(s.user_name)}
                                     disabled={revokingSession === s.user_name}
-                                    title={`Revocar todas las sesiones de ${s.user_name}`}
+                                    title={`Cerrar todas las sesiones de ${s.user_name}`}
                                     className="text-xs text-gray-500 hover:text-red-600 px-2 py-1 transition disabled:opacity-50"
                                   >
-                                    Revocar todas ({userTotal})
+                                    Cerrar todas ({userTotal})
                                   </button>
                                 )}
                                 <button
@@ -678,7 +678,7 @@ function UsuariosPageInner() {
                                   disabled={revokingSession === s.id}
                                   className="text-xs text-red-600 hover:underline disabled:opacity-50 px-2 py-1"
                                 >
-                                  {revokingSession === s.id ? "Revocando..." : "Revocar"}
+                                  {revokingSession === s.id ? "Cerrando…" : "Cerrar sesión"}
                                 </button>
                               </div>
                             </div>
@@ -728,9 +728,9 @@ function UsuariosPageInner() {
         open={!!revokeTarget}
         onClose={() => setRevokeTarget(null)}
         onConfirm={() => { if (revokeTarget) { revokeSession(revokeTarget.id); setRevokeTarget(null); } }}
-        title={`¿Revocar sesión de ${revokeTarget?.userName ?? ""}?`}
+        title={`Cerrar la sesión de ${revokeTarget?.userName ?? ""}`}
         message="El usuario tendrá que iniciar sesión de nuevo. Si esta es tu sesión actual, te cerrará la sesión."
-        confirmLabel="Revocar"
+        confirmLabel="Cerrar sesión"
         destructive
       />
 

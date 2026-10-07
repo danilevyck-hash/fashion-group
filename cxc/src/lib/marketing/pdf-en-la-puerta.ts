@@ -61,7 +61,7 @@ export function aceptaDeLaPuerta(encendido: boolean = MARKETING_PDF_EN_LA_PUERTA
 
 /** El rótulo del campo. */
 export function rotuloDeLaPuerta(encendido: boolean = MARKETING_PDF_EN_LA_PUERTA): string {
-  return encendido ? "Foto o factura" : "Foto";
+  return encendido ? "Comprobante" : "Foto";
 }
 
 /** El rótulo del botón que abre el selector de archivos. */

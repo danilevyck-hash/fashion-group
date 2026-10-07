@@ -189,7 +189,7 @@ describe("🔴 el campo de la puerta acepta la factura en PDF", () => {
     abrir();
     fireEvent.click(document.querySelector('[data-camino="factura"]')!);
     expect(campoArchivo().accept).toBe("image/*,application/pdf");
-    expect(screen.getByText("Foto o factura")).toBeTruthy();
+    expect(screen.getByText("Comprobante")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Subir foto o factura" })).toBeTruthy();
   });
 
@@ -494,7 +494,7 @@ describe("🔴 CONTROL — con MARKETING_PDF_EN_LA_PUERTA en false", () => {
     expect(campoArchivo().accept).toBe("image/*");
     expect(screen.getByText("Foto")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Subir foto" })).toBeTruthy();
-    expect(screen.queryByText("Foto o factura")).toBeNull();
+    expect(screen.queryByText("Comprobante")).toBeNull();
   });
 
   it("un PDF forzado no entra, y se dice el camino de hoy", async () => {

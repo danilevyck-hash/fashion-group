@@ -6,6 +6,8 @@
 
 Complementa [docs/diccionario.md](diccionario.md) (formatos y las diez decisiones del 5-sep-2026: fechas, plata, porcentajes, nombres de empresa). Decidido el 1-oct-2026: el rótulo de frescura es «Actualizado hace X» (diccionario §1.7), nunca «sincronizar». ⚠️ Queda un choque por confirmar: Marketing › Mobiliario «Tienda» (audit 1-oct) vs «Cliente» (diccionario §0 n.º 2).
 
+🔴 **Esto se revisa con una máquina** (6-oct-2026). `npx tsx scripts/revisar-nombres.ts [carpeta]` saca todos los textos que se VEN en pantalla y frena por FORMA —pregunta · primera o segunda persona · verbo con el pronombre pegado · imperativo · y un rótulo que no sea un sustantivo corto— además de hacer cumplir las dos tablas de abajo. **Este documento es la única fuente**: se agrega una fila «mal → bien» y el revisor la hace cumplir sola, sin tocar código. 🔴 **Ningún agente reporta una pantalla sin `revisar-nombres` en verde** (candado `src/__tests__/lib/revisar-nombres.test.ts`, con un techo por archivo que solo baja). Daniel: *«¿cómo hago para que apliques nombres como ERP profesional sin tener que decírtelo cada vez?»*.
+
 Antes de nombrar algo nuevo, busca aquí el término. Si el concepto no está, usa el nombre que usaría SAP/Odoo en español y agrégalo a esta tabla.
 
 ## Un término por concepto
@@ -23,7 +25,7 @@ Antes de nombrar algo nuevo, busca aquí el término. Si el concepto no está, u
 | Texto libre / razón | Observaciones · Motivo (también en Caja menuda; la columna de la base no cambia) | Nota, Por qué, Qué pasó |
 | Columna de cantidad | Cantidad (en texto: «unidades»; junto a bultos: «Bultos · Cantidad», «Unidades por bulto», «Bulto de 12») | Piezas, Pzas, Unidades (como encabezado). Excepción: la línea del Telegram del pedido sigue «12 piezas» (Daniel: «deja piezas») |
 | Mandar algo | Enviar | Mandar |
-| Escoger filas, opciones o fechas | Seleccionar · N seleccionados · en avisos y validaciones «Selecciona …» (tuteo) · placeholder «Seleccionar período» | Elegir, Elige, N elegidos |
+| Escoger filas, opciones o fechas | Seleccionar · Seleccionar período · Seleccionar empresa · N seleccionados · Selecciona … (en avisos y validaciones, tuteo) | Elegir, Elige, N elegidos |
 | Quitar un registro | Eliminar (Anular: documentos con número y metas · «Anular / Sí, anular») | Borrar, Retirar |
 | Correo electrónico / URL | Correo · Enlace | email, link |
 | Relacionar dos registros | Vincular · Sin vincular | Atar, Sin atar |
@@ -41,11 +43,21 @@ Antes de nombrar algo nuevo, busca aquí el término. Si el concepto no está, u
 | Título del ⓘ de ayuda | Cómo se calcula · Información · Leyenda · Contenido del correo · Prioridad de precios · Origen de… | Frases o preguntas («Qué hace esta lista», «De dónde salen…», «Para qué sirve») |
 | Antigüedad de saldos (CxC, Boston, ficha, PDF, Excel) | Solo rangos: 0-90 días · 91-120 días · +120 días (angosto: 0-90 d · 91-120 d · +120 d) | Por vencer, Vencido reciente, Vencido crítico, Al día (en cartera) |
 | Zona de borrado definitivo | Acciones irreversibles | Zona de acciones peligrosas |
+| Rango de fechas | Desde · Hasta | A partir de, Entre |
+| Destinatario de un correo | Para · Copia | A quién, Enviar a |
+| Cambiar un registro | Editar | Modificar, Arreglar |
+| Bajar un archivo | Descargar (Descargar Excel · Descargar PDF) | Bajar, Exportar |
+| Lo que se le debe a un proveedor | Por pagar (CLAUDE.md › Proveedores: «Pendiente X · Saldo a favor Y · Por pagar Z») | Deuda, Falta pagar |
+| Quitar un acceso, un permiso o una sesión | Quitar acceso · Quitar permiso · Cerrar sesión | Revocar |
+| Estado de algo que ya terminó | Completado · Entregado · Recibido (un solo estado por cosa, nunca «Terminado») | Terminado, Listo, Ya está |
+| Respaldo de un gasto | Comprobante | Foto o factura, Papel |
+| Dónde se gastó | Tienda | De una tienda, La tienda esa |
+| Agrupar mercancía para despacho | Bultos · Unidades por bulto | Poner en bulto, Embultar |
 | Rótulos de formulario | Sustantivo («Pago por planilla», «Marcación en reloj») | Preguntas («¿Qué…?», «¿Quién…?», «¿A quién…?»), salvo «¿Es X (D-25)?», que Daniel aprobó textual |
 
 ## Palabras prohibidas en textos visibles
 
-Candado: `src/__tests__/lib/nombres-erp-prohibidos.test.ts` (barre los `.tsx` de `src/app` y `src/components`, y los textos entre comillas de `src/lib` y de los `.ts` de `src/app` y `src/components`, sin comentarios).
+Candado: `src/__tests__/lib/nombres-erp-prohibidos.test.ts`, que **lee esta tabla** (barre los `.tsx` de `src/app` y `src/components`, y los textos entre comillas de `src/lib` y de los `.ts` de `src/app` y `src/components`, sin comentarios). Aquí la regla es **CERO en todo el código**; lo que admite un techo va en «Formas coloquiales», al final.
 
 | Prohibido | Reemplazo |
 |---|---|
@@ -69,3 +81,25 @@ Candado: `src/__tests__/lib/nombres-erp-prohibidos.test.ts` (barre los `.tsx` de
 | Ya le avisé · Entró sola · Lo despedimos · Escribirle a · Llenar la ficha · Editando su información | Notificado a Daniel · Alta automática · Despido · Enviar correo a · Crear ficha · Editar colaborador |
 | No encontré · No pude · No detecté (primera persona) | No se encontró · No se pudo · No se detectó |
 | a medias · se llena solo | Parcial · Productos con existencia en Switch |
+| Guías de Despacho · Asistencia y Planilla · Estado de Cuenta · Guardar Cambios | mayúscula solo en la primera palabra |
+| `titulo="(Qué\|De dónde\|Cada cuánto\|Para qué\|Por qué)` | Cómo se calcula · Información |
+| `(del\|el\|próximo) sync\b` | la próxima actualización de Switch |
+| Terminado (como estado) | Completado · Entregado |
+| Foto o factura | Comprobante |
+| De una tienda | Tienda |
+| Poner en bulto | Bultos |
+| Revocar | Quitar acceso |
+
+## Formas coloquiales (techo por archivo)
+
+Misma idea, vara más blanda: estas las hace cumplir `scripts/revisar-nombres.ts`
+sobre los textos que se VEN en pantalla, con un techo por archivo que solo baja
+(`src/__tests__/lib/revisar-nombres.test.ts`). Van aquí y no arriba porque la
+palabra puede aparecer legítimamente en un identificador, en un color del
+catálogo o en un mensaje interno; arriba la regla es CERO en todo el código.
+
+| Prohibido | Reemplazo |
+|---|---|
+| flechita · ratito · cosita · numerito · cuadrito · poquito · rapidito · ahorita (diminutivos) | la palabra entera |
+| chance · vaina · bulla · regado · un rato · al rato · jalar · pelado (coloquialismos; «plata» ya está arriba en «Pierde plata», y «Plata» a secas es un COLOR del catálogo) | el término del glosario (Oportunidad · Error · un momento…) |
+| mi costo · mi plata · mis cosas (posesivos en un rótulo) | Costo · Monto · el sustantivo solo |

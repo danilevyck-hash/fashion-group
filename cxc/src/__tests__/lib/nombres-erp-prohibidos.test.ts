@@ -19,46 +19,20 @@
  */
 import { describe, it, expect } from "vitest";
 import fs from "fs";
+import { glosario } from "../../../scripts/revisar-nombres";
 import path from "path";
 
 const RAIZ = process.cwd();
 
-const PROHIBIDAS: [RegExp, string][] = [
-  [/\bMandar\b/, "Enviar"],
-  [/\b[Aa]tar cliente\b/, "Vincular cliente"],
-  [/\b[Ss]in atar\b/, "Sin vincular"],
-  [/\bAnotar (un )?abono\b/, "Registrar abono"],
-  [/\bRebotado\b/, "Devuelto"],
-  [/Quiénes deben/, "Saldos"],
-  [/Solo los que deben/, "Solo con saldo"],
-  [/No deben nada/, "Sin saldo"],
-  [/Elegir algunos|Dejar de elegir/, "Seleccionar · Cancelar selección"],
-  [/Pierde plata/, "Pérdida"],
-  [/\bMejor no\b/, "Cancelar"],
-  [/Nada por aquí/, "Sin registros"],
-  [
-    /Cuentas por Cobrar|Caja Menuda|Vista General|Nuevo Usuario|Guías de Despacho|Asistencia y Planilla|Estado de Cuenta|Guardar Cambios/,
-    "mayúscula solo en la primera palabra",
-  ],
-  // ── 1-oct-2026, Daniel: nombres normales de ERP ──────────────────────────
-  [/No encontramos nada para/, "Sin resultados para"],
-  [/Tal vez buscas/, "Ir a"],
-  [/Algo salió mal/, "Ocurrió un error"],
-  [/Ya lo intentamos/, "Intenta de nuevo"],
-  [/Nada vencido|Nada abierto|Nada es gasto/, "Sin saldos a +90 días · Sin gastos abiertos · Sin gastos"],
-  [/\bOjo:/, "Atención:"],
-  [/Tú decides|Sí a todo|Sin nada pendiente|Nunca ha (entrado|pagado)/, "Pago por definir · Aprobar pendientes · Sin saldo · Sin sesiones"],
-  [/Ya le avisé|Entró sola|Lo despedimos|Escribirle a|Llenar la ficha|Editando su información/, "nombre de ERP (ver docs/nombres-erp.md)"],
-  [/No encontré|No pude\b|No detecté/, "No se encontró · No se pudo · No se detectó"],
-  [/Por vencer|Vencido reciente|Vencido crítico/, "0-90 días · 91-120 días · +120 días"],
-  [/[Ss]incronizaci[oó]n|sincronizad[oa]s?\b|se sincronizan/, "Actualizado hace X"],
-  [/(del|el|próximo) sync\b/, "la próxima actualización de Switch"],
-  [/a medias|se llena sol[oa]/, "Parcial · Productos con existencia en Switch"],
-  [/(^|["'`>])\s*Listo[,—]/, "«<Cosa> guardado / cobrado / …»"],
-  [/\bElige\b/, "Selecciona"],
-  [/¿(Qué|Quién|A quién|Para quién)\b/, "un sustantivo, no una pregunta"],
-  [/titulo="(Qué|De dónde|Cada cuánto|Para qué|Por qué)/, "Cómo se calcula · Información"],
-];
+/**
+ * 🔴 6-oct-2026: la lista ya NO vive aquí. Se lee de la tabla «Palabras
+ * prohibidas en textos visibles» de `docs/nombres-erp.md`, que es la ÚNICA
+ * fuente (`scripts/revisar-nombres.ts` › `glosario()`). Agregar una fila
+ * «mal → bien» en el documento alcanza para que este candado la haga cumplir:
+ * no se toca código. Daniel, 6-oct-2026: «¿cómo hago para que apliques nombres
+ * como ERP profesional sin tener que decírtelo cada vez?».
+ */
+const PROHIBIDAS: [RegExp, string][] = glosario();
 
 /**
  * archivo relativo a la raíz → qué patrón se tolera ahí y por qué.
