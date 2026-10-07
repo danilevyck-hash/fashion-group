@@ -967,3 +967,16 @@ O sea: **3 de las 4 tiendas con gastos abiertos hoy necesitan la pregunta**. No 
 ## Marketing V2 (6-oct-2026) — `MARKETING_APPLE_V2_2026_10`, prendido
 
 Daniel aprobó las capturas el 6-oct-2026. Registrar pago: período en chips (1ª quincena · 2ª quincena · Mes completo · Rango), distribución y concepto en gris, sin asterisco y lo que falta se dice al tocar «Guardar pago» (misma regla de `puedeGuardar`). Galería: «Fotos de la tienda · N» y las ✕ solo con «Editar» también en la computadora. ⚠️ Proyecto y facturas (`ProyectoOverlay` · `FacturasSection`) traen su V2 detrás de `MARKETING_V2_PROYECTO = false`: esa ventana no tiene puerta desde el 23-sep y se dejó como estaba. La galería pública no cambia. Candado `marketing-apple-v2-2026-10`.
+
+## Solo lo cobrable (7-oct-2026) — APAGADO hasta el «sí» de Daniel
+
+Interruptor `MKT_SOLO_COBRABLE_2026_10` (`src/lib/marketing/solo-cobrable-2026-10.ts`). Daniel: *«Quiero poder registrar todo lo cobrable a las marcas, de manera ordenada, minimalista. Solo lo cobrable»* · *«cada factura va a una tienda, no a varias»* · sobre la 7766 de Boston: *«no debería ni ir, es no cobrable, solo registrado»*.
+
+- **Registrar**: la factura en UNA pantalla — comprobante (la IA llena) → Marca → Tienda (obligatoria) → Se cobra 100 % · 50 %. Sin «A cargo de la empresa», sin «Se reporta», sin pedir el PDF dos veces, sin asteriscos; lo que falta se dice todo junto al guardar. Multi Fashion (tienda propia) no entra por aquí.
+- **Editar**: «Se cobra» suma **No recuperable** = `pct_a_la_marca` 0 + `se_reporta` false, en el guardado de quien edita. La marca se conserva. «Reemplazar» el PDF guarda el nuevo y quita el viejo (antes se descartaba).
+- **ZIP**: la carpeta sale de la tienda; ya no se adivina por «mueble/tazas/barras planas». Las facturas viejas sin tienda no se tocan: las 4 de Confecciones Boston siguen en «Mobiliario y exhibición» por id (`FACTURAS_SIN_TIENDA_DE_MOBILIARIO`), otra cualquiera en «General».
+- **Portada**: abre en Marcas — lo pendiente del período abierto por marca, con el 50 % aplicado y sin lo no recuperable; sin las marcas vacías; «desde» = apertura del período. En el celular Marcas es la portada y Tiendas pasa a sección.
+- **No recuperable**: pestaña al final, solo de consulta (Multi Fashion, la #145 y lo que Daniel pase). No suma a ninguna marca ni entra al ZIP.
+- **Cerrar período**: aviso con las tiendas sin foto, sin frenar. Quién cierra no cambió.
+- **Proveedores**: Recobrado = lo sellado a un período cerrado (Daniel: lo cerrado sí está cobrado); «Por cobrar» aparte en la ficha.
+- 🔴 **No mueve filas.** Candados `marketing-solo-cobrable-2026-10` (prendido) · `marketing-solo-cobrable-apagado` (apagado = byte por byte, fotos sacadas del código de antes).
