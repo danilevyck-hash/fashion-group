@@ -38,6 +38,7 @@ import {
   ordenarPedidos,
   pedidoEntra,
   puedeMarcarPedidos,
+  puedeRecibirPedidos,
   puedeVerPedidosBodega,
 } from "@/lib/guias/pedidos-bodega";
 
@@ -49,13 +50,28 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     for (const r of ["admin", "bodega", "secretaria", "vendedor"]) expect(puedeVerPedidosBodega(r)).toBe(true);
     expect(puedeVerPedidosBodega("contabilidad")).toBe(false);
     expect(puedeMarcarPedidos("bodega")).toBe(true);
-    // 6-oct-2026: iguales a Guías (AJUSTES_APPLE_6_2026_10).
-    expect(puedeMarcarPedidos("secretaria")).toBe(true);
+    // 🔴 7-oct-2026, SEGUNDA VUELTA — Daniel: «¿por qué Ángela puede preparar
+    // un pedido en su sistema? Ya habíamos hablado del tema». Con el flujo
+    // simplificado prendido (hoy en producción), `puedeMarcarPedidos` mira
+    // `ROLES_PREPARA_FLUJO_SIMPLE` (admin+bodega), no la lista del otro flujo:
+    // la secretaria ya NO puede marcar «Preparado».
+    expect(puedeMarcarPedidos("secretaria")).toBe(false);
     // 🩸 7-oct-2026: EL VENDEDOR SOLO MIRA. Lo del 6-oct lo dejaba marcando, y
     // con bultos eso era una promesa falsa: veía el círculo y la casilla del
     // bulto prendidos y el servidor le contestaba 403 (`ROLES_PREPARADO`).
     expect(puedeMarcarPedidos("vendedor")).toBe(false);
     expect(puedeMarcarPedidos("contabilidad")).toBe(false);
+  });
+
+  // 🔑 El candado de los dos rechazos que pidió Daniel, a nivel de la pantalla:
+  // bodega no ve el botón de Recibir, secretaria no ve el de Preparar. El
+  // rechazo del SERVIDOR (quien manda de verdad) está en
+  // `pedidos-flujo-simple.test.ts` › «🔴 4 · quién marca cada paso».
+  it("puedeRecibirPedidos: SOLO secretaria o admin, nunca bodega ni vendedor", () => {
+    expect(puedeRecibirPedidos("secretaria")).toBe(true);
+    expect(puedeRecibirPedidos("admin")).toBe(true);
+    expect(puedeRecibirPedidos("bodega")).toBe(false);
+    expect(puedeRecibirPedidos("vendedor")).toBe(false);
   });
 
   it("v2 PRENDIDA con el «sí» de Daniel al mockup (5-oct-2026)", () => {

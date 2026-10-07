@@ -21,10 +21,13 @@
 //      Etiquetas, no en Pedidos.
 //   3. 🔴 UN SOLO NÚMERO DE BULTOS POR PEDIDO, nunca por artículo: se va la
 //      asignación de bulto por línea de `pedidos_linea_bulto`.
-//   4. 🔴 «Preparado» lo marca bodega o la secretaria; «Recibido», SOLO la
-//      secretaria o admin — nunca bodega.
-//   5. 🔴 SIN la regla de «otra persona»: Recibido no es una auditoría del
-//      trabajo de bodega, es la secretaria confirmando que lo tiene en mano.
+//   4. 🔴 SEGUNDA VUELTA (7-oct-2026, Daniel: «¿por qué Ángela puede preparar
+//      un pedido en su sistema? Ya habíamos hablado del tema»): «Preparado»
+//      lo marca SOLO bodega (y admin); «Recibido», SOLO la secretaria o
+//      admin — nunca bodega. Doble firma real: cada paso, otra persona.
+//   5. 🔴 SIN la regla EXPLÍCITA de «otra persona» (no se compara quién
+//      preparó contra quién recibe): en la práctica ya son distintos, porque
+//      las dos listas de arriba no se superponen salvo en admin.
 //   6. 🔴 La pestaña «Bultos» vuelve a decir «Etiquetas» con el flujo
 //      prendido (Daniel: «que diga etiqueta, no bultos»); apagado, no cambia.
 //   7. 🔴 UN «PREPARADO» VIEJO SE VE: a los `PREPARADO_VIEJO_DIAS` (2) días
@@ -44,6 +47,7 @@ import {
   estadoAnteriorFlujoSimple,
   ROLES_PREPARA_FLUJO_SIMPLE,
   ROLES_RECIBE_FLUJO_SIMPLE,
+  ROLES_FLUJO_SIMPLE_TODAS,
   rolesDelEstadoFlujoSimple,
   puedeMoverFlujoSimple,
   validarCantidadBultos,
@@ -128,8 +132,12 @@ describe("🔴 3 · un solo número de bultos por pedido", () => {
 });
 
 describe("🔴 4 · quién marca cada paso", () => {
-  it("«Preparado»: bodega, secretaria o admin", () => {
-    expect([...ROLES_PREPARA_FLUJO_SIMPLE]).toEqual(["admin", "secretaria", "bodega"]);
+  // 🔴 7-oct-2026, SEGUNDA VUELTA — Daniel: «¿por qué Ángela puede preparar un
+  // pedido en su sistema? Ya habíamos hablado del tema». Ángela es secretaria.
+  // Se va de la lista: ahora SOLO bodega (y admin) prepara.
+  it("«Preparado»: SOLO bodega o admin, nunca la secretaria", () => {
+    expect([...ROLES_PREPARA_FLUJO_SIMPLE]).toEqual(["admin", "bodega"]);
+    expect(ROLES_PREPARA_FLUJO_SIMPLE).not.toContain("secretaria");
     expect([...rolesDelEstadoFlujoSimple("preparado")]).toEqual([...ROLES_PREPARA_FLUJO_SIMPLE]);
   });
 
@@ -142,12 +150,18 @@ describe("🔴 4 · quién marca cada paso", () => {
   it("puedeMoverFlujoSimple: bodega SÍ prepara, NO recibe", () => {
     const bodega = { role: "bodega", userName: "julio" };
     expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, bodega).ok).toBe(true);
-    expect(puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: "fashion_wear" }, bodega).ok).toBe(false);
+    const rechazo = puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: "fashion_wear" }, bodega);
+    expect(rechazo).toEqual({ ok: false, error: "Ese paso lo marca la secretaria" });
   });
 
-  it("puedeMoverFlujoSimple: la secretaria SÍ recibe, no se salta pasos", () => {
+  // 🔑 El candado de los DOS rechazos que pidió Daniel: ni bodega marca
+  // Recibido (arriba) ni la secretaria marca Preparado (abajo) — el servidor
+  // los rechaza aunque los llame directo, no solo la pantalla.
+  it("puedeMoverFlujoSimple: la secretaria SÍ recibe, NO prepara, no se salta pasos", () => {
     const secretaria = { role: "secretaria", userName: "angela" };
     expect(puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: "fashion_wear" }, secretaria).ok).toBe(true);
+    const rechazo = puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, secretaria);
+    expect(rechazo).toEqual({ ok: false, error: "Ese paso lo marca bodega" });
     // No se salta Preparado.
     expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "recibido", empresa_key: "fashion_wear" }, secretaria).ok).toBe(false);
   });
@@ -157,13 +171,21 @@ describe("🔴 4 · quién marca cada paso", () => {
     expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "vistana" }, julio).ok).toBe(false);
     expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, julio).ok).toBe(true);
   });
+
+  it("el guard ANCHO del PATCH es la UNIÓN de las dos listas, no solo la de Preparado", () => {
+    // Si fuera solo ROLES_PREPARA_FLUJO_SIMPLE (admin+bodega), la secretaria
+    // quedaría afuera también para marcar Recibido.
+    expect([...ROLES_FLUJO_SIMPLE_TODAS].sort()).toEqual(["admin", "bodega", "secretaria"]);
+    expect(ROLES_FLUJO_SIMPLE_TODAS).toContain("secretaria");
+    expect(ROLES_FLUJO_SIMPLE_TODAS).toContain("bodega");
+  });
 });
 
 describe("🔴 5 · sin la regla de «otra persona»", () => {
-  it("la secretaria que preparó también puede recibir el mismo pedido", () => {
-    const secretaria = { role: "secretaria", userName: "angela" };
-    expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, secretaria).ok).toBe(true);
-    expect(puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: "fashion_wear" }, secretaria).ok).toBe(true);
+  it("admin puede preparar Y recibir el mismo pedido: no hace falta que sea otra persona", () => {
+    const admin = { role: "admin", userName: "daniel" };
+    expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, admin).ok).toBe(true);
+    expect(puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: "fashion_wear" }, admin).ok).toBe(true);
   });
 });
 

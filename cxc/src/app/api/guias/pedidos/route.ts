@@ -32,7 +32,7 @@ import {
 } from "@/lib/guias/pedidos-bultos";
 import {
   PEDIDOS_FLUJO_SIMPLE_2026_10,
-  ROLES_PREPARA_FLUJO_SIMPLE,
+  ROLES_FLUJO_SIMPLE_TODAS,
   esEstadoFlujoSimple,
   estadoFlujoSimpleLeido,
   puedeMoverFlujoSimple,
@@ -302,11 +302,13 @@ async function patchFlujoSimple(
 
 export async function PATCH(req: NextRequest) {
   if (!PEDIDOS_BODEGA_2026_10) return apagado();
-  // Con bultos, quién puede marcar QUÉ lo decide `puedeMover` abajo (que mira el
-  // estado destino, quién terminó el pedido y de qué empresa es): aquí solo se
-  // exige estar en la lista más ANCHA de las dos, que es la de «Preparado».
+  // Quién puede marcar QUÉ lo decide `puedeMover`/`puedeMoverFlujoSimple` abajo
+  // (que miran el estado DESTINO, no esta puerta): aquí solo se exige estar en
+  // ALGUNA de las listas del flujo activo —con el simplificado, bodega
+  // (Preparado) o secretaria (Recibido), nunca una sola de las dos, o la
+  // secretaria quedaría sin poder ni entrar a marcar Recibido—.
   const auth = requireRole(req, [
-    ...(PEDIDOS_FLUJO_SIMPLE_2026_10 ? ROLES_PREPARA_FLUJO_SIMPLE : BULTOS_ACTIVO ? ROLES_PREPARADO : PEDIDOS_BODEGA_ROLES),
+    ...(PEDIDOS_FLUJO_SIMPLE_2026_10 ? ROLES_FLUJO_SIMPLE_TODAS : BULTOS_ACTIVO ? ROLES_PREPARADO : PEDIDOS_BODEGA_ROLES),
   ]);
   if (auth instanceof NextResponse) return auth;
 
