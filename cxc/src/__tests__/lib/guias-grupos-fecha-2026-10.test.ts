@@ -15,6 +15,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { groupByTimePeriod } from "@/lib/group-by-time";
+import { GUIAS_GRUPOS_FECHA_2026_10 } from "@/lib/guias/grupos-fecha-2026-10";
 
 // Jueves 22-oct-2026: semana actual = lun 19 a hoy; semana pasada = lun 12 a
 // dom 18; «historial» = todo antes del 12-oct.
@@ -39,6 +40,12 @@ const FECHAS = {
 };
 
 const TODAS: Fila[] = Object.entries(FECHAS).map(([k, f]) => fila(k, f));
+
+describe("el interruptor", () => {
+  it("está prendido (Daniel, 7-oct-2026, sobre el mockup final: «dale así»)", () => {
+    expect(GUIAS_GRUPOS_FECHA_2026_10).toBe(true);
+  });
+});
 
 describe("groupByTimePeriod — modo guias, con y sin opts", () => {
   it("sin opts: los CUATRO grupos de siempre, sin tocar una fecha", () => {

@@ -24,9 +24,12 @@
 //      `TimeGroupHeader` que usa el resto del sistema, con un prop que nadie
 //      más pasa; su pantalla no cambia.
 //
+// 🔴 PRENDIDO el 7-oct-2026. Daniel vio el mockup final (cinco grupos, línea
+// tenue, el aire de arriba) y dijo «dale así».
+//
 // `false` = los CUATRO grupos de hoy, con el encabezado de siempre, byte por
 // byte. Candado `guias-grupos-fecha-2026-10`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 🔴 El interruptor. `false` = los cuatro grupos de hoy. */
-export const GUIAS_GRUPOS_FECHA_2026_10 = false;
+export const GUIAS_GRUPOS_FECHA_2026_10 = true;
