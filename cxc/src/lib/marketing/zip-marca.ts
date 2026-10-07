@@ -13,14 +13,17 @@
 //   resumen_gastos.xlsx          hoja "Resumen" + una hoja por cliente
 //   <Cliente>/facturas/          los comprobantes
 //   <Cliente>/fotos/             las fotos de instalación
-//   General/facturas/            ← gastos SIN cliente (impulsadoras, catálogos,
-//   General/fotos/                 eventos): comprobantes Y fotos
+//   Impulsadoras/…               ← pago mensual de quien cubre TODA la marca
+//   Mobiliario y exhibición/…    ← compra al proveedor antes de repartirse
+//   General/facturas/            ← el resto sin cliente (eventos, catálogos):
+//   General/fotos/                 comprobantes Y fotos
 //
 // Lo único que cambia respecto del ZIP global: el contenido va filtrado a UNA
-// marca y UN período, el nombre de cada comprobante lleva la marca, y la
-// carpeta/fila **General** reemplaza a la vieja "Impulsadoras" — porque el
-// lugar de los gastos sin cliente no es solo de las impulsadoras: un evento o
-// una tanda de catálogos tampoco tienen cliente, y tienen su papel igual.
+// marca y UN período, el nombre de cada comprobante lleva la marca, y el
+// gasto SIN cliente se agrupa por CONCEPTO antes de caer a **General**
+// (Daniel, 1-oct-2026: 28 gastos · $40.337,50 medidos, dos conceptos limpios:
+// Impulsadoras y Mobiliario y exhibición). La meta es que General quede
+// vacía — se queda como última red, no como destino.
 //
 // ────────────────────────────────────────────────────────────────────────────
 // 🔴 LA PLATA SE CONGELA, LOS PAPELES NO.
@@ -556,6 +559,47 @@ function carpetaDeCliente(
   return sanitizeName(t, CARPETA_GENERAL);
 }
 
+/**
+ * Carpetas por CONCEPTO para el gasto sin tienda — Daniel aprobó separarlas
+ * de «General» (28 gastos · $40.337,50 medidos en producción, 1-oct-2026).
+ *
+ *   · Impulsadoras (`impulsadora_id`): el pago mensual de la persona que
+ *     cubre TODA la marca — nunca tiene una tienda que mirar.
+ *   · Mobiliario y exhibición (`tipo === "entrega"`): la compra al PROVEEDOR
+ *     antes de repartirse entre varias tiendas — por eso nace sin proyecto.
+ *     (El mueble que YA se repartió entra por su código, antes de llegar
+ *     aquí: esta regla solo corre cuando no hay tienda que lo reciba.)
+ *
+ * Lo demás (eventos, catálogos…) sigue en General — la meta es que ahí no
+ * quede nada, pero se queda como última red.
+ */
+export const CARPETA_IMPULSADORAS = "Impulsadoras";
+export const CARPETA_MOBILIARIO_Y_EXHIBICION = "Mobiliario y exhibición";
+
+function carpetaSinClientePorConcepto(ctx: {
+  tipo: "factura" | "entrega";
+  impulsadoraId?: string | null;
+}): string {
+  if (ctx.tipo === "entrega") return CARPETA_MOBILIARIO_Y_EXHIBICION;
+  if (txt(ctx.impulsadoraId)) return CARPETA_IMPULSADORAS;
+  return CARPETA_GENERAL;
+}
+
+/**
+ * Carpeta de un gasto DE MARCA (en vivo o congelado): si `carpetaDeCliente`
+ * cayó en General por falta de tienda, pregunta el CONCEPTO antes de
+ * resignarse. Multifashion no la necesita: ahí todo gasto YA tiene tienda.
+ */
+function carpetaDeGasto(
+  codigo: string | null,
+  texto: string | null,
+  nombrePorCodigo: ReadonlyMap<string, string>,
+  concepto: { tipo: "factura" | "entrega"; impulsadoraId?: string | null },
+): string {
+  const base = carpetaDeCliente(codigo, texto, nombrePorCodigo);
+  return base === CARPETA_GENERAL ? carpetaSinClientePorConcepto(concepto) : base;
+}
+
 // ----------------------------------------------------------------------------
 // Construcción
 // ----------------------------------------------------------------------------
@@ -879,7 +923,10 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
           concepto: txt(f.concepto),
           proveedor: txt(f.proveedor),
           periodoTrabajado: periodoTrabajadoDe(f),
-          carpeta: carpetaDeCliente(p?.tienda_codigo ?? null, p?.tienda ?? null, nombrePorCodigo),
+          carpeta: carpetaDeGasto(p?.tienda_codigo ?? null, p?.tienda ?? null, nombrePorCodigo, {
+            tipo: "factura",
+            impulsadoraId: f.impulsadora_id,
+          }),
           clienteCodigo: p?.tienda_codigo ?? null,
           monto,
         };
@@ -894,7 +941,9 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
           concepto: txt(e.notas) || "Entrega de muebles",
           proveedor: "Mobiliario",
           periodoTrabajado: "",
-          carpeta: carpetaDeCliente(p?.tienda_codigo ?? null, p?.tienda ?? null, nombrePorCodigo),
+          carpeta: carpetaDeGasto(p?.tienda_codigo ?? null, p?.tienda ?? null, nombrePorCodigo, {
+            tipo: "entrega",
+          }),
           clienteCodigo: p?.tienda_codigo ?? null,
           monto,
         };
@@ -1559,6 +1608,9 @@ function congelarEnFilas(
   return lineas.map((l) => {
     let documentoId: string | null = null;
     let periodoTrabajado = "";
+    // Solo las FACTURAS tienen impulsadora; se lee del documento vivo
+    // apareado — una línea sin par no se inventa el dato, cae a General.
+    let impulsadoraId: string | null = null;
     if (l.tipo === "factura") {
       const arr = porFactura.get(
         claveFacturaCongelada(l.fecha, l.numero, l.concepto, l.proveedor),
@@ -1566,6 +1618,7 @@ function congelarEnFilas(
       const f = arr?.shift();
       documentoId = f ? String(f.id) : null;
       periodoTrabajado = ctx.periodoTrabajadoDe(f);
+      impulsadoraId = f?.impulsadora_id ?? null;
     } else {
       const arr = porEntrega.get(claveEntregaCongelada(l.fecha, l.notas));
       const e = arr?.shift();
@@ -1580,7 +1633,10 @@ function congelarEnFilas(
         l.tipo === "entrega" ? l.notas?.trim() || "Entrega de muebles" : l.concepto,
       proveedor: l.tipo === "entrega" ? "Mobiliario" : l.proveedor,
       periodoTrabajado,
-      carpeta: carpetaDeCliente(l.clienteCodigo, l.cliente, ctx.nombrePorCodigo),
+      carpeta: carpetaDeGasto(l.clienteCodigo, l.cliente, ctx.nombrePorCodigo, {
+        tipo: l.tipo,
+        impulsadoraId,
+      }),
       clienteCodigo: l.clienteCodigo,
       // 🔴 EL MONTO SALE TAL CUAL DEL REPORTE. No se recalcula, no se redondea
       //    de vuelta, no se compara contra el documento vivo.

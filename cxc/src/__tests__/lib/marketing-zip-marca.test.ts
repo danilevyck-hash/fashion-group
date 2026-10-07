@@ -380,14 +380,17 @@ describe("ZIP por marca — el corte por marca y por período", () => {
 });
 
 describe("ZIP por marca — General: los gastos SIN cliente", () => {
-  it("el comprobante de CADA gasto sin cliente va a General/facturas/", async () => {
+  // 🔄 1-oct-2026: Daniel aprobó sacar Impulsadoras y Mobiliario y
+  // exhibición de General — ver el describe "carpetas por concepto" más
+  // abajo. Lo que queda en General es lo que no es ninguno de los dos.
+  it("el comprobante de un gasto sin cliente y SIN concepto propio (evento) va a General/facturas/", async () => {
     const r = await buildZipDeMarca({ marcaCodigo: "TH" });
     const paths = await rutas(r.buffer);
     const enGeneral = paths.filter((p) => p.startsWith("General/facturas/"));
-    // impulsadora (comprobante FOTO) + evento (PDF)
-    expect(enGeneral).toHaveLength(2);
-    expect(enGeneral.some((p) => p.endsWith(".jpg"))).toBe(true);
-    expect(enGeneral.some((p) => p.includes("pago impulsadora junio"))).toBe(true);
+    // solo el evento: la impulsadora (f3) ya se fue a Impulsadoras/.
+    expect(enGeneral).toHaveLength(1);
+    expect(enGeneral.some((p) => p.includes("evento apertura"))).toBe(true);
+    expect(enGeneral.some((p) => p.includes("pago impulsadora junio"))).toBe(false);
   });
 
   it("las FOTOS de un gasto sin cliente van a General/fotos/ — un evento tiene fotos igual", async () => {
@@ -396,16 +399,19 @@ describe("ZIP por marca — General: los gastos SIN cliente", () => {
     expect(paths).toContain("General/fotos/evento.jpg");
   });
 
-  it("la hoja Resumen tiene una fila General (no 'Impulsadoras') y va al final", async () => {
+  it("la hoja Resumen tiene una fila General, con Impulsadoras aparte, y General va al final", async () => {
     const r = await buildZipDeMarca({ marcaCodigo: "TH" });
     const filas = await hojaResumen(r.buffer);
     const etiquetas = filas.map((f) => String(f[0] ?? ""));
     expect(etiquetas).toContain("General");
-    expect(etiquetas.some((e) => /impulsadora/i.test(e))).toBe(false);
+    expect(etiquetas).toContain("Impulsadoras");
     const iGeneral = etiquetas.indexOf("General");
     const iCliente = etiquetas.indexOf("City Mall David");
+    const iImpulsadoras = etiquetas.indexOf("Impulsadoras");
     expect(iCliente).toBeGreaterThan(0);
+    expect(iImpulsadoras).toBeGreaterThan(0);
     expect(iGeneral).toBeGreaterThan(iCliente);
+    expect(iGeneral).toBeGreaterThan(iImpulsadoras);
   });
 
   it("la columna de dinero dice lo que muestra, y el total es el de ESA marca", async () => {
@@ -416,6 +422,8 @@ describe("ZIP por marca — General: los gastos SIN cliente", () => {
     // El encabezado del ZIP global no puede filtrarse acá: los montos llevan ITBMS.
     expect(head).not.toContain("Subtotal (sin ITBMS)");
     const total = filas.find((f) => String(f[0] ?? "") === "TOTAL");
+    // impulsadora 30 + evento 20 + muebles 40 — el total NO se mueve por la
+    // carpeta nueva, solo cambia DÓNDE cae cada gasto.
     expect(Number(total![total!.length - 1])).toBe(90);
   });
 
@@ -427,9 +435,11 @@ describe("ZIP por marca — General: los gastos SIN cliente", () => {
   // del GASTO; eso movía 10 gastos vivos ($6.361,92) de «General» a la
   // carpeta de su tienda. Daniel encontró 2 con la tienda mal puesta y pidió
   // revertirlo hasta revisar gasto por gasto. Mientras no haya revisión, un
-  // gasto SIN proyecto cae en «General» aunque traiga `tienda_codigo`.
+  // gasto SIN proyecto IGNORA su `tienda_codigo` — igual que antes del
+  // 1-oct-2026 — y solo entra por CONCEPTO (Impulsadoras · Mobiliario y
+  // exhibición) o, si no es ninguno, por General.
   // ──────────────────────────────────────────────────────────────────────────
-  it("un gasto SIN proyecto pero CON tienda_codigo sigue cayendo en General", async () => {
+  it("un gasto SIN proyecto pero CON tienda_codigo IGNORA esa tienda (General o su concepto)", async () => {
     // Igual que los 10 reales: la tienda está guardada y el directorio la
     // conoce, pero el gasto no tiene proyecto.
     tablas.clientes_master.push({ codigo: "D-170", nombre: "Nova Lux, S.A." });
@@ -457,16 +467,172 @@ describe("ZIP por marca — General: los gastos SIN cliente", () => {
     tablas.mk_periodo_documentos.push(sello(P_ABIERTO, "entrega", "e9"));
 
     const r = await buildZipDeMarca({ marcaCodigo: "TH" });
-    expect(await rutas(r.buffer)).toContain(
+    const paths = await rutas(r.buffer);
+    // f9 (factura, sin concepto propio) sigue en General, ignorando D-170.
+    expect(paths).toContain(
       "General/facturas/2026-08-25 · Tommy Hilfiger · pintura tienda nueva.pdf",
+    );
+    // e9 (entrega SIN proyecto) es mobiliario antes de repartirse: su propio
+    // concepto, ignorando D-117 — NUNCA la carpeta de "Outlet Duty Free N2".
+    expect(paths.some((p) => p.startsWith("Mobiliario y exhibición/facturas/"))).toBe(
+      true,
     );
     expect(r.carpetas).not.toContain("Nova Lux, S.A.");
     expect(r.carpetas).not.toContain("Outlet Duty Free N2, S.A.");
     const etiquetas = (await hojaResumen(r.buffer)).map((f) => String(f[0] ?? ""));
     expect(etiquetas).toContain("General");
+    expect(etiquetas).toContain("Mobiliario y exhibición");
     expect(etiquetas).not.toContain("Nova Lux, S.A.");
+    expect(etiquetas).not.toContain("Outlet Duty Free N2, S.A.");
     // 🔑 La plata no se mueve por revertir la carpeta: 90 de antes + 581,32.
     expect(r.total).toBe(671.32);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// 🔴 CARPETAS POR CONCEPTO (1-oct-2026). Daniel aprobó separar de «General»
+// los 28 gastos sin tienda ($40.337,50 medidos en producción) en dos
+// conceptos limpios: Impulsadoras (pago mensual de quien cubre TODA la
+// marca) y Mobiliario y exhibición (compra al proveedor antes de repartirse
+// entre tiendas). El chequeo vive en los DOS lugares donde nace un
+// `GastoDeMarca`: en vivo (`prepararDescargaDeMarca`) y congelado
+// (`congelarEnFilas`) — por eso cada candado se prueba en los dos períodos.
+// ────────────────────────────────────────────────────────────────────────────
+describe("ZIP por marca — carpetas por concepto (Impulsadoras y Mobiliario y exhibición)", () => {
+  it("EN VIVO: una factura de impulsadora (`impulsadora_id`) va a Impulsadoras, no a General", async () => {
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" }); // período abierto
+    const paths = await rutas(r.buffer);
+    expect(paths.some((p) => p.startsWith("Impulsadoras/facturas/"))).toBe(true);
+    expect(
+      paths.some((p) => p.startsWith("Impulsadoras/facturas/") && p.endsWith(".jpg")),
+    ).toBe(true);
+    expect(r.carpetas).toContain("Impulsadoras");
+  });
+
+  it("EN VIVO: una entrega de mobiliario SIN proyecto (antes de repartirse) va a 'Mobiliario y exhibición'", async () => {
+    // Un mueble comprado al proveedor que todavía no se asignó a ninguna
+    // tienda — nace sin `proyecto_id`, igual que "la puerta nueva".
+    tablas.mk_entregas_muebles.push({
+      id: "e2",
+      proyecto_id: null,
+      total: 15,
+      total_por_marca: { [M_TH]: 15 },
+      total_por_empresa_interna: {},
+      notas: "muebles sin repartir todavía",
+      created_at: "2026-06-15T10:00:00Z",
+    });
+    tablas.mk_periodo_documentos.push(sello(P_ABIERTO, "entrega", "e2"));
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    const paths = await rutas(r.buffer);
+    expect(paths.some((p) => p.startsWith("Mobiliario y exhibición/facturas/"))).toBe(
+      true,
+    );
+    expect(r.carpetas).toContain("Mobiliario y exhibición");
+    // El total SIGUE sumando todo: 30 (impulsadora) + 20 (evento) + 40 (e1) + 15 (e2).
+    expect(r.total).toBe(105);
+  });
+
+  it("EN VIVO: un mueble YA repartido a una tienda entra por SU código — nunca por 'Mobiliario y exhibición'", async () => {
+    // e1 (fixture base) tiene proyecto_id "p1" → City Mall David, y su
+    // comprobante generado lleva "mobiliario" en el nombre igual (viene del
+    // mock de `nombreArchivoComprobante`) — lo que importa es LA CARPETA.
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    const paths = await rutas(r.buffer);
+    expect(
+      paths.some(
+        (p) => p.startsWith("City Mall David/facturas/") && /mobiliario/i.test(p),
+      ),
+    ).toBe(true);
+    expect(paths.some((p) => p.startsWith("Mobiliario y exhibición/"))).toBe(false);
+  });
+
+  it("CONGELADO: la factura de impulsadora del reporte (apareada con el documento vivo) va a Impulsadoras", async () => {
+    // f3 nace sellada al período ABIERTO; para este candado se re-sella al
+    // CERRADO (es el documento vivo que `congelarEnFilas` usa para leer su
+    // `impulsadora_id` — la plata sigue saliendo del reporte, no de f3).
+    tablas.mk_periodo_documentos.push(sello(P_CERRADO, "factura", "f3"));
+    tablas.mk_periodos.find((p) => p.id === P_CERRADO)!.reporte = {
+      version: 1,
+      facturas: [
+        linea("2026-03-04", "A-1", "letrero", "Tommy Hilfiger", 100, "D-24", "City Mall David"),
+        linea("2026-06-01", "IMP-1", "pago impulsadora junio", "Tommy Hilfiger", 999, null, ""),
+      ],
+      entregas: [],
+    };
+    const r = await buildZipDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    const paths = await rutas(r.buffer);
+    expect(paths.some((p) => p.startsWith("Impulsadoras/facturas/"))).toBe(true);
+    // 🔑 LA PLATA SE CONGELA: el monto es el del reporte (999), no el de f3 (30).
+    expect(r.total).toBe(100 + 999);
+  });
+
+  it("CONGELADO: sin un documento vivo apareado, una línea de impulsadora NO se inventa el concepto — cae a General", async () => {
+    // f3 se queda sellada al ABIERTO: para el CERRADO no hay par, así que
+    // `congelarEnFilas` no tiene de dónde leer `impulsadora_id` y no lo
+    // inventa. Sin par tampoco hay comprobante que bajar (es cosmético, la
+    // plata ya se reportó igual) — por eso se verifica en la hoja Resumen.
+    tablas.mk_periodos.find((p) => p.id === P_CERRADO)!.reporte = {
+      version: 1,
+      facturas: [
+        linea("2026-03-04", "A-1", "letrero", "Tommy Hilfiger", 100, "D-24", "City Mall David"),
+        linea("2026-06-01", "IMP-1", "pago impulsadora junio", "Tommy Hilfiger", 999, null, ""),
+      ],
+      entregas: [],
+    };
+    const r = await buildZipDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    const paths = await rutas(r.buffer);
+    expect(paths.some((p) => p.startsWith("Impulsadoras/"))).toBe(false);
+    const etiquetas = (await hojaResumen(r.buffer)).map((f) => String(f[0] ?? ""));
+    expect(etiquetas).not.toContain("Impulsadoras");
+    expect(etiquetas).toContain("General");
+    expect(r.total).toBe(100 + 999);
+  });
+
+  it("CONGELADO: una línea de ENTREGA sin cliente va a Mobiliario y exhibición — el tipo ya lo dice el reporte", async () => {
+    // Sin necesitar un documento vivo: `tipo === "entrega"` alcanza. Para que
+    // el ZIP también lleve el comprobante, se empareja con uno vivo (e2).
+    tablas.mk_entregas_muebles.push({
+      id: "e2",
+      proyecto_id: null,
+      total: 500,
+      total_por_marca: { [M_TH]: 500 },
+      total_por_empresa_interna: {},
+      notas: null,
+      created_at: "2026-03-10T10:00:00Z",
+    });
+    tablas.mk_periodo_documentos.push(sello(P_CERRADO, "entrega", "e2"));
+    tablas.mk_periodos.find((p) => p.id === P_CERRADO)!.reporte = {
+      version: 1,
+      facturas: [],
+      entregas: [linea("2026-03-10", "", "", "Tommy Hilfiger", 500, null, "")],
+    };
+    const r = await buildZipDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    const paths = await rutas(r.buffer);
+    expect(paths.some((p) => p.startsWith("Mobiliario y exhibición/facturas/"))).toBe(
+      true,
+    );
+    expect(r.total).toBe(500);
+  });
+
+  it("el nombre de la hoja del Excel y el de la carpeta del ZIP COINCIDEN para las dos carpetas nuevas", async () => {
+    tablas.mk_entregas_muebles.push({
+      id: "e2",
+      proyecto_id: null,
+      total: 15,
+      total_por_marca: { [M_TH]: 15 },
+      total_por_empresa_interna: {},
+      notas: "muebles sin repartir todavía",
+      created_at: "2026-06-15T10:00:00Z",
+    });
+    tablas.mk_periodo_documentos.push(sello(P_ABIERTO, "entrega", "e2"));
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    const paths = await rutas(r.buffer);
+    const xlsx = await xlsxDelZip(r.buffer);
+    const wb = XLSX.read(xlsx, { type: "buffer" });
+    for (const carpeta of ["Impulsadoras", "Mobiliario y exhibición"]) {
+      expect(paths.some((p) => p.startsWith(`${carpeta}/`))).toBe(true);
+      expect(Object.keys(wb.Sheets)).toContain(carpeta);
+    }
   });
 });
 
