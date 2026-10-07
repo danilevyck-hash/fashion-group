@@ -428,20 +428,17 @@ describe("ZIP por marca — General: los gastos SIN cliente", () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 🔴 CANDADO — LA CARPETA LA MANDA EL PROYECTO, NO LA TIENDA DEL GASTO
-  //    (7-oct-2026, revertido a pedido de Daniel).
+  // 🔴 CANDADO — LA CARPETA SALE DE LA TIENDA DEL GASTO (6-oct-2026; revertido
+  //    el 7-oct para revisar gasto por gasto, y vuelto a poner el 7-oct tras
+  //    la revisión).
   //
-  // El 6-oct se cambió el ZIP para que la carpeta saliera de `tienda_codigo`
-  // del GASTO; eso movía 10 gastos vivos ($6.361,92) de «General» a la
-  // carpeta de su tienda. Daniel encontró 2 con la tienda mal puesta y pidió
-  // revertirlo hasta revisar gasto por gasto. Mientras no haya revisión, un
-  // gasto SIN proyecto IGNORA su `tienda_codigo` — igual que antes del
-  // 1-oct-2026 — y solo entra por CONCEPTO (Impulsadoras · Mobiliario y
-  // exhibición) o, si no es ninguno, por General.
+  // Precedencia: tienda del GASTO → tienda del PROYECTO → carpeta por
+  // CONCEPTO (Impulsadoras · Mobiliario y exhibición) → General. Los 10
+  // gastos vivos ($6.361,92) que antes caían mal ya se revisaron uno por uno.
   // ──────────────────────────────────────────────────────────────────────────
-  it("un gasto SIN proyecto pero CON tienda_codigo IGNORA esa tienda (General o su concepto)", async () => {
-    // Igual que los 10 reales: la tienda está guardada y el directorio la
-    // conoce, pero el gasto no tiene proyecto.
+  it("una factura SIN proyecto pero CON tienda cae en la carpeta de su tienda, no en General", async () => {
+    // D-170 no lo usa NINGÚN proyecto: el nombre tiene que salir igual del
+    // directorio, o la factura volvería a caer en «General».
     tablas.clientes_master.push({ codigo: "D-170", nombre: "Nova Lux, S.A." });
     tablas.mk_facturas.push(
       fact("f9", null, "0000008124", "2026-08-25", "pintura tienda nueva", 81.32, {
@@ -453,6 +450,23 @@ describe("ZIP por marca — General: los gastos SIN cliente", () => {
     tablas.mk_adjuntos.push(adj("a9", "pdf_factura", "f9", null, "fact/f9.pdf", "pintura.pdf"));
     storage["fact/f9.pdf"] = Buffer.from("bytes");
 
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    const paths = await rutas(r.buffer);
+    expect(paths).toContain(
+      "Nova Lux, S.A./facturas/2026-08-25 · Tommy Hilfiger · pintura tienda nueva.pdf",
+    );
+    expect(paths.some((p) => p.includes("pintura tienda nueva") && p.startsWith("General/"))).toBe(
+      false,
+    );
+    expect(r.carpetas).toContain("Nova Lux, S.A.");
+    const filas = await hojaResumen(r.buffer);
+    expect(filas.map((f) => String(f[0] ?? ""))).toContain("Nova Lux, S.A.");
+  });
+
+  it("una ENTREGA sin proyecto pero con tienda va a SU carpeta, no a Mobiliario y exhibición", async () => {
+    // D-117 no lo usa ningún proyecto, y SIN la tienda esta entrega caería en
+    // el concepto «Mobiliario y exhibición»: la tienda del gasto le gana.
+    tablas.clientes_master.push({ codigo: "D-117", nombre: "Outlet Duty Free N2, S.A." });
     tablas.mk_entregas_muebles.push({
       id: "e9",
       proyecto_id: null,
@@ -463,29 +477,34 @@ describe("ZIP por marca — General: los gastos SIN cliente", () => {
       created_at: "2026-09-29T18:34:58Z",
       tienda_codigo: "D-117",
     });
-    tablas.clientes_master.push({ codigo: "D-117", nombre: "Outlet Duty Free N2, S.A." });
     tablas.mk_periodo_documentos.push(sello(P_ABIERTO, "entrega", "e9"));
 
     const r = await buildZipDeMarca({ marcaCodigo: "TH" });
-    const paths = await rutas(r.buffer);
-    // f9 (factura, sin concepto propio) sigue en General, ignorando D-170.
-    expect(paths).toContain(
-      "General/facturas/2026-08-25 · Tommy Hilfiger · pintura tienda nueva.pdf",
+    expect(r.carpetas).toContain("Outlet Duty Free N2, S.A.");
+    expect(r.carpetas).not.toContain("Mobiliario y exhibición");
+    const filas = await hojaResumen(r.buffer);
+    expect(filas.map((f) => String(f[0] ?? ""))).toContain("Outlet Duty Free N2, S.A.");
+  });
+
+  it("la tienda de la factura le GANA a la del proyecto: el gasto es de donde dice la factura", async () => {
+    tablas.clientes_master.push({ codigo: "D-170", nombre: "Nova Lux, S.A." });
+    // f1 vive en el proyecto "Letreros" (D-24) pero la factura dice D-170.
+    tablas.mk_facturas.find((f) => f.id === "f1")!.tienda_codigo = "D-170";
+
+    const r = await buildZipDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    expect(r.carpetas).toContain("Nova Lux, S.A.");
+    expect(await rutas(r.buffer)).toContain(
+      "Nova Lux, S.A./facturas/2026-03-04 · Tommy Hilfiger · letrero.pdf",
     );
-    // e9 (entrega SIN proyecto) es mobiliario antes de repartirse: su propio
-    // concepto, ignorando D-117 — NUNCA la carpeta de "Outlet Duty Free N2".
-    expect(paths.some((p) => p.startsWith("Mobiliario y exhibición/facturas/"))).toBe(
-      true,
-    );
-    expect(r.carpetas).not.toContain("Nova Lux, S.A.");
-    expect(r.carpetas).not.toContain("Outlet Duty Free N2, S.A.");
-    const etiquetas = (await hojaResumen(r.buffer)).map((f) => String(f[0] ?? ""));
-    expect(etiquetas).toContain("General");
-    expect(etiquetas).toContain("Mobiliario y exhibición");
-    expect(etiquetas).not.toContain("Nova Lux, S.A.");
-    expect(etiquetas).not.toContain("Outlet Duty Free N2, S.A.");
-    // 🔑 La plata no se mueve por revertir la carpeta: 90 de antes + 581,32.
-    expect(r.total).toBe(671.32);
+    // 🔑 El monto NO se mueve por cambiar de carpeta.
+    expect(r.total).toBe(100);
+  });
+
+  it("sin tienda en el gasto sigue mandando la del proyecto, y sin ninguna, su concepto o General", async () => {
+    const r = await buildZipDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    expect(r.carpetas).toEqual(["City Mall David"]);
+    const abierto = await buildZipDeMarca({ marcaCodigo: "TH" });
+    expect(abierto.carpetas).toContain("General");
   });
 });
 
