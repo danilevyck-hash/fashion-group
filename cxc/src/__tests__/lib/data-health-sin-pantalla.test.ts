@@ -166,7 +166,10 @@ describe("🔴 la medición no se tocó", () => {
     // ⚠️ 6-oct-2026: bajan a 88 — se retiró `pedidos-pendientes`, el aviso de las
     // 9:00 a.m., el mismo día que nació. Daniel: «quita el aviso de pedidos de
     // las 9 am». Se fueron el cron, su texto y su prueba.
-    expect(vercel.crons).toHaveLength(88);
+    // ⚠️ 7-oct-2026: bajan a 87 — se retiró `sync-egresos-varios` (Daniel:
+    // «Apaga gasto»; ver `docs/gastos-pausado.md`). Se fue de `vercel.json` Y
+    // de `cron-telemetry.ts`, los dos.
+    expect(vercel.crons).toHaveLength(87);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

@@ -81,9 +81,18 @@ export interface GastoEgresosMostrable {
 
 /** Etiqueta corta para la píldora. Tiene que caber al lado del nombre. */
 export const ETIQUETA_SIN_GASTO_EGRESOS: Record<MotivoSinGastoEgresos, string> = {
-  // 1-oct-2026, Daniel: nombres normales de ERP.
-  sin_movimientos: "Sin movimientos",
-  sin_datos: "Sin datos",
+  // 7-oct-2026, Daniel («Apaga gasto»): el registro de egresos en Switch está
+  // pausado — nadie lo alimenta desde el 31-jul-2026 (Fashion Wear desde el
+  // 27-may-2026). Antes `sin_movimientos` y `sin_datos` decían "Sin
+  // movimientos"/"Sin datos" y la frase de abajo agregaba "Último mes con
+  // movimientos: julio 2026" PARA SIEMPRE, lo que con el cron ya apagado
+  // (`cron-telemetry.ts`) iba a envejecer mal: una fecha fija que nunca avanza
+  // se lee como una carga atascada, no como una pausa. Las dos pasan a decir lo
+  // mismo porque hoy comparten la misma causa de fondo.
+  // 🔑 Reactivar las dos líneas (y `textoSinGastoEgresos` más abajo) el día que
+  // Yulissa retome el registro en Switch.
+  sin_movimientos: "Gastos pausado",
+  sin_datos: "Módulo pausado",
   no_automatico: "Carga manual",
   sin_gasto: "Sin gastos",
 };
@@ -132,8 +141,18 @@ function motivoDeEstado(estado: EstadoEgresos): MotivoSinGastoEgresos {
  * contable, y **diciendo la verdad de ESTA fuente**.
  *
  * `hastaMes` es el último mes con movimientos de ESA empresa, ya formateado
- * ("julio 2026"), o `null` si nunca tuvo ninguno. Es el dato que más sirve: no
- * dice sólo que falta, dice hasta dónde llegó.
+ * ("julio 2026"), o `null` si nunca tuvo ninguno. Hasta el 7-oct-2026 era el
+ * dato que más servía: decía hasta dónde había llegado la carga.
+ *
+ * 🔴 7-oct-2026, Daniel («Apaga gasto»): el registro de egresos en Switch
+ * quedó pausado — nadie lo alimenta desde el 31-jul-2026 (Fashion Wear desde
+ * el 27-may-2026). `sin_movimientos` y `sin_datos` ya NO citan `hastaMes`: no
+ * es una falla de carga que vaya a resolverse sola, es una pausa indefinida, y
+ * repetir "Último mes con movimientos: julio 2026" para siempre envejecía mal
+ * — se leía como un atasco, no como una decisión de negocio. `hastaMes` sigue
+ * en la firma porque `no_automatico` (Confecciones Boston) todavía lo usa.
+ * 🔑 Reactivar devolviendo las dos ramas de abajo a su forma con `hastaMes` el
+ * día que Yulissa retome el registro en Switch.
  */
 export function textoSinGastoEgresos(
   motivo: MotivoSinGastoEgresos,
@@ -141,13 +160,8 @@ export function textoSinGastoEgresos(
 ): string {
   switch (motivo) {
     case "sin_movimientos":
-      return hastaMes
-        ? `Sin egresos este mes. Último mes con movimientos: ${hastaMes}.`
-        : "Sin egresos registrados.";
     case "sin_datos":
-      return hastaMes
-        ? `Este mes todavía no se ha traído de Switch. Lo último que hay es de ${hastaMes}.`
-        : "Este mes todavía no se ha traído de Switch.";
+      return "Registro de gastos pausado.";
     case "no_automatico":
       return hastaMes
         ? `Carga manual: no se actualiza automáticamente. Última carga: ${hastaMes}.`

@@ -33,6 +33,7 @@ import {
   esHorarioDeOficinaPanama,
   SWITCH_CRON_ENTRADAS,
   SEPARACION_MINIMA_MIN,
+  esCronRetirado,
 } from "@/lib/cron-telemetry";
 
 const SRC = path.join(process.cwd(), "src");
@@ -170,15 +171,38 @@ describe("B2. el reporte se baja como manda SU JS, no como el del mayor", () => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("C. la hora es la MADRUGADA DE PANAMÁ, no la de UTC", () => {
-  const entrada = SWITCH_CRON_ENTRADAS.find((e) => e.cron === "sync-egresos-varios");
-
-  it("está declarada en el cronograma de Switch", () => {
-    expect(entrada, "sync-egresos-varios falta en SWITCH_CRON_ENTRADAS").toBeTruthy();
-    expect(entrada!.hhmmUtc).toBe("1035");
+// 🔄 EL BLOQUE C CAMBIÓ DE DIRECCIÓN el 7-oct-2026 (Daniel: «Apaga gasto»).
+//
+// Hasta ese día exigía que `sync-egresos-varios` corriera de madrugada en
+// Panamá, declarada en `SWITCH_CRON_ENTRADAS` y en vercel.json con el MISMO
+// horario. Nadie registra egresos en Switch desde el 31-jul-2026 (Fashion Wear
+// desde el 27-may-2026), así que Daniel apagó el cron: abría 7 sesiones web al
+// día (una por empresa) que botaban a Daniel del panel, solo para reescribir el
+// año entero con filas idénticas. El candado no se afloja: se da vuelta.
+// Antes protegía que el cron corriera a salvo de horario de oficina; ahora
+// protege que NO vuelva a programarse sin decisión, en los DOS lugares a la vez
+// (vercel.json y el cronograma), igual que `sync-mayor`.
+describe("C. el cron se RETIRÓ del cronograma — ya no corre solo", () => {
+  it("sync-egresos-varios se fue de vercel.json Y de SWITCH_CRON_ENTRADAS, los dos", () => {
+    // `cron-registro.test.ts` exige la biyección: tocar uno solo pone el build
+    // rojo. Acá se verifica que se tocaron los dos (mismo candado que
+    // `vista-general-gasto-egresos.test.ts` usa para `sync-mayor`).
+    const vercel = fs.readFileSync(path.join(process.cwd(), "vercel.json"), "utf8");
+    expect(vercel).not.toContain("sync-egresos-varios");
+    expect(SWITCH_CRON_ENTRADAS.find((e) => e.cron === "sync-egresos-varios")).toBeUndefined();
   });
 
-  it("10:35 UTC son las 5:35 a.m. de Panamá — fuera de horario de oficina", () => {
+  it("y el vigía de crons lo trata como RETIRADO, no como caído", () => {
+    // `esCronRetirado` deriva de `CRONS_CONOCIDOS` (= `CRONS_FAIL_CLOSED` ∪
+    // `SEED_TOLERANT_CRONS` ∪ vigías externos): al salir de `SEED_TOLERANT_CRONS`
+    // deja de estar "conocido" y el watchdog Telegram deja de exigirle un
+    // success reciente, sin que nadie tenga que tocar una lista aparte.
+    expect(esCronRetirado("sync-egresos-varios")).toBe(true);
+  });
+
+  it("10:35 UTC seguían siendo las 5:35 a.m. de Panamá — fuera de horario de oficina", () => {
+    // El cálculo de horas no cambió con el retiro: queda documentado para quien
+    // reactive el cron el día que Yulissa retome Switch.
     expect(horaPanamaDeUtc(10)).toBe(5);
     expect(esHorarioDeOficinaPanama(10)).toBe(false);
   });
@@ -188,40 +212,23 @@ describe("C. la hora es la MADRUGADA DE PANAMÁ, no la de UTC", () => {
     expect(horaPanamaDeUtc(2)).toBe(21);
   });
 
-  it("y está en vercel.json con el MISMO horario", () => {
-    const vercel = JSON.parse(
-      fs.readFileSync(path.join(process.cwd(), "vercel.json"), "utf8"),
-    ) as { crons: Array<{ path: string; schedule: string }> };
-    const entradas = vercel.crons.filter((c) => c.path === "/api/cron/sync-egresos-varios");
-    expect(entradas).toHaveLength(1); // 1×/día
-    expect(entradas[0].schedule).toBe("35 10 * * *");
-  });
-
-  it("respeta la separación mínima con TODA entrada que comparta empresa", () => {
-    // Es la red que protege la sesión única de Switch: un 2º login mata al 1º.
+  it("al reactivarlo tendría que seguir a ≥15 min de toda entrada que comparta empresa", () => {
+    // La red que protege la sesión única de Switch sigue viva para las demás
+    // entradas; se deja la cuenta hecha para quien reactive sync-egresos-varios
+    // a las 10:35 UTC con las 7 empresas que no son Boston.
     const min = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(2));
-    const yo = entrada!;
+    const HHMM_EGRESOS = "1035";
+    const EMPRESAS_EGRESOS = [...ALL_EMPRESA_KEYS].filter((e) => e !== "confecciones_boston");
     for (const otra of SWITCH_CRON_ENTRADAS) {
-      if (otra === yo) continue;
-      const comparte = otra.empresas.some((e) => yo.empresas.includes(e));
+      const comparte = otra.empresas.some((e) => EMPRESAS_EGRESOS.includes(e));
       if (!comparte) continue;
-      const d = Math.abs(min(otra.hhmmUtc) - min(yo.hhmmUtc));
+      const d = Math.abs(min(otra.hhmmUtc) - min(HHMM_EGRESOS));
       const dist = Math.min(d, 24 * 60 - d);
       expect(
         dist,
-        `${otra.cron} ${otra.hhmmUtc} queda a ${dist} min de sync-egresos-varios`,
+        `${otra.cron} ${otra.hhmmUtc} quedaría a ${dist} min de sync-egresos-varios`,
       ).toBeGreaterThanOrEqual(SEPARACION_MINIMA_MIN);
     }
-  });
-
-  it("queda a 35 min de la reconciliación, que puede tardar 12", () => {
-    // Es la vecina crítica: RECOVERY_BUDGET_MS = 740 s y puede abrir la sesión
-    // de cualquier empresa. 35 − 12 = 23 min de aire real.
-    const recon = SWITCH_CRON_ENTRADAS.find(
-      (e) => e.cron === "switch-reconciliacion" && e.hhmmUtc === "1000",
-    );
-    expect(recon).toBeTruthy();
-    expect(10 * 60 + 35 - (10 * 60)).toBe(35);
   });
 });
 
@@ -355,9 +362,11 @@ describe("F. si la base no contesta, NO se toca Switch — y ya no hay 'no insta
     expect(sonda.slice(0, 300)).toMatch(/if \(error\) throw new Error\(error\.message\)/);
   });
 
-  it("está en SEED_TOLERANT_CRONS, no en los fail-closed", async () => {
+  // 🔄 7-oct-2026, Daniel («Apaga gasto»): el cron se retiró del cronograma
+  // (ver el bloque "C." más arriba) y con él salió de `SEED_TOLERANT_CRONS`.
+  it("ya no está en SEED_TOLERANT_CRONS ni en los fail-closed: está RETIRADO", async () => {
     const { CRONS_FAIL_CLOSED, SEED_TOLERANT_CRONS } = await import("@/lib/cron-telemetry");
-    expect(SEED_TOLERANT_CRONS).toContain("sync-egresos-varios");
+    expect(SEED_TOLERANT_CRONS).not.toContain("sync-egresos-varios");
     expect(CRONS_FAIL_CLOSED).not.toContain("sync-egresos-varios");
   });
 });

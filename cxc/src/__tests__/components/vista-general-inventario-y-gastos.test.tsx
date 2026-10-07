@@ -223,7 +223,7 @@ describe("🩸 a la empresa sin gasto NO se le pinta $0: se le pinta el MOTIVO",
 
     const shoes = document.querySelector('[data-fila-gasto="fashion_shoes"]')!;
     expect(shoes.querySelector('[data-col="gasto"]')).toBeNull();
-    expect(shoes.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Sin movimientos"); // 1-oct-2026, Daniel: nombres normales de ERP
+    expect(shoes.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Gastos pausado"); // 7-oct-2026, Daniel: «Apaga gasto»
     expect(shoes.textContent).toContain("llegan hasta abril 2026");
     expect(shoes.textContent).not.toContain("$0");
 

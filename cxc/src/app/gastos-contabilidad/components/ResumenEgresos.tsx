@@ -76,16 +76,15 @@ export function fraseAlDia(alDia: AlDia | undefined, descargaAutomatica: boolean
 export const muestraMontoEgresos = (e: EstadoEgresos): boolean => e === "con_movimientos";
 
 /**
- * La frase de abajo. `sin_movimientos` y `sin_datos` NO pueden verse iguales:
- * el primero dice "no salió plata" (un hecho), el segundo "no sabemos".
+ * La frase de abajo.
  *
- * 🔴 Y hay un tercer caso que no puede verse como ninguno de los dos: la empresa
- * que **no se baja sola**. Confecciones Boston quedó fuera de la descarga
- * automática por pedido de Daniel (su usuario del panel es el de él), así que su
- * fila va a decir "No traído" mes tras mes. **Una empresa vacía sin explicación
- * se lee como un error del sistema** — y peor: como que esa empresa no gastó
- * nada. Por eso, cuando no hay descarga automática, la frase lo DICE y termina
- * con lo único que se puede hacer al respecto: traerlos a mano otra vez.
+ * 🔴 Y hay un caso que no puede verse como "sin cargar": la empresa que **no se
+ * baja sola**. Confecciones Boston quedó fuera de la descarga automática por
+ * pedido de Daniel (su usuario del panel es el de él), así que su fila va a
+ * decir "No traído" mes tras mes. **Una empresa vacía sin explicación se lee
+ * como un error del sistema** — y peor: como que esa empresa no gastó nada.
+ * Por eso, cuando no hay descarga automática, la frase lo DICE y termina con lo
+ * único que se puede hacer al respecto: traerlos a mano otra vez.
  *
  * 🩸 EL FINAL DE ESA FRASE MANDABA A UNA PESTAÑA QUE YA NO EXISTE. Decía *"En
  * 'Lo que cerró la contadora' sí se ven"*, y esa perilla se fue con el mayor
@@ -93,6 +92,17 @@ export const muestraMontoEgresos = (e: EstadoEgresos): boolean => e === "con_mov
  * que no está: **hoy Egresos Varios es la única**, así que la frase no puede
  * seguir prometiendo otra. Un texto que manda a un lugar inexistente es peor
  * que uno que no dice nada, porque hace perder el tiempo con confianza.
+ *
+ * 🔴 7-oct-2026, Daniel («Apaga gasto»): el registro de egresos en Switch
+ * quedó pausado — nadie lo alimenta desde el 31-jul-2026 (Fashion Wear desde
+ * el 27-may-2026). `sin_movimientos` y `sin_datos` dejaron de distinguirse
+ * ("no salió plata" vs. "no sabemos") porque dejaron de importar: ninguna de
+ * las dos va a resolverse con el paso de los días, las dos son la misma pausa.
+ * Antes decían "Sin egresos este mes." / "Este mes todavía no se ha traído de
+ * Switch." — frases que, repetidas mes tras mes sin que nada cambie, se leen
+ * como una carga atascada, no como una decisión de negocio.
+ * 🔑 Reactivar devolviendo las dos ramas a sus frases de antes el día que
+ * Yulissa retome el registro en Switch.
  */
 export function explicacionEgresos(
   estado: EstadoEgresos,
@@ -111,13 +121,8 @@ export function explicacionEgresos(
     case "con_movimientos":
       return "";
     case "sin_movimientos":
-      return "Sin egresos este mes.";
     case "sin_datos":
-      // 🔴 La coletilla "Lo último que hay es de …" SE FUE (13-ago-2026): la
-      // línea de "Cargado hasta …" que ahora lleva cada empresa dice exactamente
-      // eso, y decía DOS VECES el mismo mes en la misma tarjeta. El parámetro
-      // se queda porque la rama de "no se baja sola" (arriba) sí lo usa.
-      return "Este mes todavía no se ha traído de Switch.";
+      return "Registro de gastos pausado.";
   }
 }
 

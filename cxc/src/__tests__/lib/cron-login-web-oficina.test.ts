@@ -52,6 +52,7 @@ import {
   recoveryStillComingToday,
   cronStaleThresholdHours,
   CRON_STALE_HOURS_DEFAULT,
+  esCronRetirado,
 } from "@/lib/cron-telemetry";
 
 const SRC = path.join(process.cwd(), "src");
@@ -364,6 +365,15 @@ describe("E. un cron que abre el login web NO corre en horario de oficina", () =
   it("🔴 todos corren fuera del horario de oficina de Panamá", () => {
     const enOficina: string[] = [];
     for (const cron of cronsConLoginWeb()) {
+      // 🔄 7-oct-2026, Daniel («Apaga gasto»): `sync-egresos-varios` se retiró
+      // del cronograma (SWITCH_CRON_ENTRADAS y vercel.json, los dos) pero su
+      // route sigue existiendo para una corrida manual el día que Yulissa
+      // retome Switch — por eso el barrido estático de `cronsConLoginWeb()`
+      // (que mira `app/api/cron/*/route.ts`, no el cronograma) todavía lo
+      // encuentra. Un cron RETIRADO no puede violar horario de oficina porque
+      // ya no corre solo: se exime acá, igual que la reconciliación se exime
+      // más abajo por aplicar la regla ella misma.
+      if (esCronRetirado(cron)) continue;
       const entradas = SWITCH_CRON_ENTRADAS.filter((e) => e.cron === cron);
       expect(
         entradas.length,

@@ -283,23 +283,34 @@ describe("D. ninguna fila de cron_heartbeats sobrevive a su cron", () => {
   // Packing Lists (Daniel: «packing list no se usa, eliminar»), así que su fila
   // —viva hasta el 10-sep-2026 03:00 UTC— pasa a ser el SEGUNDO huérfano. La
   // barre la migración 20261110120000, el mismo camino de `sync-mayor`.
-  it("sobre la foto del 3-sep-2026 los huérfanos de hoy son sync-mayor y cleanup-packing-lists", () => {
+  //
+  // 7-oct-2026 · OTRA NOTA FECHADA — se retiró `sync-egresos-varios` del
+  // cronograma (Daniel: «Apaga gasto»; ver `docs/gastos-pausado.md`), así que
+  // su fila —viva hasta esa fecha— pasa a ser el TERCER huérfano. Todavía no
+  // tiene migración de limpieza (queda pendiente, igual que `sync-mayor` y
+  // `cleanup-packing-lists` la tuvieron suya): la fila sigue en la base, pero
+  // `esCronRetirado` ya impide que el watchdog la reporte como caída.
+  it("sobre la foto del 3-sep-2026 los huérfanos de hoy son sync-mayor, cleanup-packing-lists y sync-egresos-varios", () => {
     expect(heartbeatsHuerfanos(FOTO_3_SEP_2026, PROGRAMADOS)).toEqual([
       "cleanup-packing-lists",
+      "sync-egresos-varios",
       "sync-mayor",
     ]);
   });
 
-  it("después de las migraciones 20260914120000 y 20261110120000 no queda ninguno", () => {
+  it("después de las migraciones 20260914120000 y 20261110120000 solo queda sync-egresos-varios (sin migración todavía)", () => {
     const barridos = FOTO_3_SEP_2026.filter(
       (n) => n !== "sync-mayor" && n !== "cleanup-packing-lists",
     );
-    expect(heartbeatsHuerfanos(barridos, PROGRAMADOS)).toEqual([]);
+    expect(heartbeatsHuerfanos(barridos, PROGRAMADOS)).toEqual(["sync-egresos-varios"]);
   });
 
-  it("🔴 CONTROL · barrer solo uno de los dos deja el otro denunciado", () => {
+  it("🔴 CONTROL · barrer solo uno de los tres deja a los otros dos denunciados", () => {
     const soloMayor = FOTO_3_SEP_2026.filter((n) => n !== "sync-mayor");
-    expect(heartbeatsHuerfanos(soloMayor, PROGRAMADOS)).toEqual(["cleanup-packing-lists"]);
+    expect(heartbeatsHuerfanos(soloMayor, PROGRAMADOS)).toEqual([
+      "cleanup-packing-lists",
+      "sync-egresos-varios",
+    ]);
   });
 
   it("CONTROL: cada cron de vercel.json tiene derecho a su fila", () => {

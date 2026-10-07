@@ -142,12 +142,16 @@ export const SYNCS_DE_UNIVERSO_COMPLETO: Readonly<Record<string, string>> = {
   articulo_info: "Ventas › Referencia",
   // El mapa artículo → marca completo de Multifashion.
   articulo_marca: "Multifashion",
-  // El catálogo de cuentas contables entero.
-  cuentas_contables: "Gastos",
-  // El MES de egresos, reemplazado entero (`egresos_reemplazar_mes`). El mes que
-  // se carga viene con más de un mes de atraso, o sea que ya está CERRADO: no
-  // crece de un día para el otro y por eso su volumen es estable al renglón.
-  egresos_varios: "Gastos",
+  // ⚠️ `cuentas_contables: "Gastos"` y `egresos_varios: "Gastos"` vivieron acá
+  // hasta el 7-oct-2026. Las traía `sync-egresos-varios`, retirado ese día por
+  // decisión de Daniel («Apaga gasto») — nadie registra egresos en Switch desde
+  // el 31-jul-2026 (Fashion Wear desde el 27-may-2026). Hoy están calladas por
+  // casualidad: el cron bajaba el año ENTERO cada día y renovaba `created_at`,
+  // así que nunca se veían "sin datos". Con el cron ya apagado (ver
+  // `SWITCH_CRON_ENTRADAS` en `cron-telemetry.ts`) y el año nuevo en camino
+  // (1-ene-2027), las dos se iban a disparar solas por un cero que ya no es una
+  // señal — es la pausa. Se retiran de la vigilancia AHORA, antes de que suenen.
+  // 🔑 Reactivar las dos líneas el día que Yulissa retome el registro en Switch.
   // Toda la cuenta por pagar de la empresa.
   proveedores: "Proveedores",
   // Los cuatro catálogos públicos, completos, en cada pasada.
@@ -280,21 +284,17 @@ export const HORAS_SIN_ESCRIBIR = 40;
 export const HORAS_SIN_ESCRIBIR_SEMANAL = 165;
 
 export const TABLAS_VIGILADAS: readonly TablaVigilada[] = [
-  {
-    tabla: "egresos_varios",
-    // `egresos_reemplazar_mes` borra e inserta el mes entero en una transacción,
-    // así que `created_at` se renueva en cada corrida: es literalmente «cuándo
-    // reescribimos este mes».
-    //
-    // 🔴 NO se mira `egresos_importaciones`: esa fila se escribe aunque el
-    // reporte venga vacío. Medido el 2-sep-2026, con el módulo muerto hacía dos
-    // días: `egresos_importaciones` decía 4,9 h y `egresos_varios` 52,9 h. Una
-    // mide el mecanismo, la otra el dato — y esta alerta existe para mirar el dato.
-    columna: "created_at",
-    modulo: "Gastos",
-    que: "los gastos de caja y banco",
-    horas: HORAS_SIN_ESCRIBIR,
-  },
+  // ⚠️ La entrada de `egresos_varios` (columna `created_at`, módulo "Gastos")
+  // vivió acá hasta el 7-oct-2026. `egresos_reemplazar_mes` borraba e insertaba
+  // el mes ENTERO en cada corrida de `sync-egresos-varios`, así que `created_at`
+  // se renovaba todos los días — y por eso esta alerta nunca había sonado.
+  // Se retiró por decisión de Daniel («Apaga gasto», 7-oct-2026): nadie
+  // registra egresos en Switch desde el 31-jul-2026 (Fashion Wear desde el
+  // 27-may-2026), el cron que renovaba `created_at` ya se apagó (ver
+  // `SWITCH_CRON_ENTRADAS` en `cron-telemetry.ts`), y sin él esta tabla se iba
+  // a quedar quieta para siempre y a disparar un aviso que no significa nada.
+  // 🔑 Reactivar devolviendo el objeto completo (tabla, columna, módulo, qué,
+  // horas: HORAS_SIN_ESCRIBIR) el día que Yulissa retome el registro en Switch.
   {
     tabla: "switch_articulo_info",
     // El upsert manda `synced_at: ahoraIso` en TODAS las filas del catálogo.

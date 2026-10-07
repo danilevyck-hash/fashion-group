@@ -48,18 +48,33 @@ function corridas(volumenes: number[]): CorridaDeSync[] {
 const rep = (v: number, n: number): number[] => Array.from({ length: n }, () => v);
 
 describe("ALERTA A — un sync trajo cero donde siempre trae cientos", () => {
-  it("dispara: vistana/egresos_varios traía 378 todos los días y hoy trajo cero", () => {
-    const h = evaluarSyncEnCero("vistana", "egresos_varios", corridas([0, ...rep(378, 15)]));
+  // 🔄 CAMBIÓ DE DIRECCIÓN el 7-oct-2026 (Daniel: «Apaga gasto»). Este describe
+  // nació del incidente de `egresos_varios`, y por años fue su ejemplo
+  // motivador: "dispara: vistana/egresos_varios traía 378 todos los días...".
+  // Con el cron `sync-egresos-varios` retirado (nadie registra egresos en
+  // Switch desde el 31-jul-2026; Fashion Wear desde el 27-may-2026) ese cero
+  // deja de ser una señal — es la normalidad. `egresos_varios` se retiró de
+  // `SYNCS_DE_UNIVERSO_COMPLETO` el mismo día, así que el ejemplo motivador de
+  // abajo usa `estadocuenta`, que sigue vigilado: el mecanismo no cambió, solo
+  // dejó de tener sentido demostrarlo con un par que ya no se vigila.
+  it("egresos_varios se retiró de la lista: ya no puede disparar, sea lo que sea que traiga", () => {
+    expect(SYNCS_DE_UNIVERSO_COMPLETO.egresos_varios).toBeUndefined();
+    expect(SYNCS_DE_UNIVERSO_COMPLETO.cuentas_contables).toBeUndefined();
+    expect(evaluarSyncEnCero("vistana", "egresos_varios", corridas([0, ...rep(378, 15)]))).toBeNull();
+  });
+
+  it("dispara: vistana/estadocuenta traía 378 todos los días y hoy trajo cero", () => {
+    const h = evaluarSyncEnCero("vistana", "estadocuenta", corridas([0, ...rep(378, 15)]));
     expect(h).not.toBeNull();
     expect(h?.clase).toBe("sync-en-cero");
     if (h?.clase === "sync-en-cero") {
-      expect(h.modulo).toBe("Gastos");
+      expect(h.modulo).toBe("Cuentas por cobrar");
       expect(h.mediana).toBe(378);
     }
   });
 
   it("dispara aunque la racha de ceros lleve varios días: el 'desde' es el PRIMER cero", () => {
-    const h = evaluarSyncEnCero("vistana", "egresos_varios", corridas([0, 0, 0, ...rep(378, 15)]));
+    const h = evaluarSyncEnCero("vistana", "estadocuenta", corridas([0, 0, 0, ...rep(378, 15)]));
     expect(h?.clase).toBe("sync-en-cero");
     if (h?.clase === "sync-en-cero") {
       // El tercer cero hacia atrás = 31-ago, no el de hoy.
@@ -68,11 +83,6 @@ describe("ALERTA A — un sync trajo cero donde siempre trae cientos", () => {
   });
 
   // ── LOS CEROS LEGÍTIMOS, MEDIDOS EN PRODUCCIÓN ────────────────────────────
-
-  it("CERO LEGÍTIMO · joystep y american_classic no tienen egresos varios: 0 todos los días desde el 13-ago", () => {
-    expect(evaluarSyncEnCero("joystep", "egresos_varios", corridas(rep(0, 20)))).toBeNull();
-    expect(evaluarSyncEnCero("american_classic", "egresos_varios", corridas(rep(0, 20)))).toBeNull();
-  });
 
   it("CERO LEGÍTIMO · el 1-jul-2026 seis pares de recibos trajeron 0: era el primero de mes", () => {
     // vistana/recibos venía en 31, 31, 35 y el 1-jul cargó julio, que estaba vacío.
@@ -91,12 +101,12 @@ describe("ALERTA A — un sync trajo cero donde siempre trae cientos", () => {
     expect(evaluarSyncEnCero("vistana", "ventas_tipos", corridas(rep(0, 41)))).toBeNull();
   });
 
-  it("CERO LEGÍTIMO · active_shoes/egresos_varios tuvo 4 ceros reales entre el 13 y el 16-ago", () => {
+  it("CERO LEGÍTIMO · active_shoes/estadocuenta tuvo 4 ceros reales entre el 13 y el 16-ago", () => {
     // Está en la lista de universo completo, así que lo que lo salva es el
     // candado estadístico: un cero en la historia y el par no se vigila.
     const h = evaluarSyncEnCero(
       "active_shoes",
-      "egresos_varios",
+      "estadocuenta",
       corridas([0, ...rep(47, 10), 0, 0, 0, 0, ...rep(47, 3)]),
     );
     expect(h).toBeNull();
@@ -111,8 +121,8 @@ describe("ALERTA A — un sync trajo cero donde siempre trae cientos", () => {
   it("SIN HISTORIA no se opina: un par nuevo con 9 corridas se calla", () => {
     // Los conteos van LITERALES a propósito: escritos como `A_MIN_HISTORIA - 1`
     // se moverían junto con la constante y el candado no protegería nada.
-    expect(evaluarSyncEnCero("vistana", "egresos_varios", corridas([0, ...rep(378, 9)]))).toBeNull();
-    expect(evaluarSyncEnCero("vistana", "egresos_varios", corridas([0, ...rep(378, 10)]))).not.toBeNull();
+    expect(evaluarSyncEnCero("vistana", "estadocuenta", corridas([0, ...rep(378, 9)]))).toBeNull();
+    expect(evaluarSyncEnCero("vistana", "estadocuenta", corridas([0, ...rep(378, 10)]))).not.toBeNull();
   });
 
   it("🔴 los dos pisos están clavados: 10 corridas de historia y mediana 10", () => {
@@ -153,28 +163,38 @@ describe("ALERTA A — un sync trajo cero donde siempre trae cientos", () => {
   });
 });
 
+// 🔄 CAMBIÓ DE DIRECCIÓN el 7-oct-2026 (Daniel: «Apaga gasto»). `egresos_varios`
+// era el ejemplo motivador de esta alerta y hoy está retirado de
+// `TABLAS_VIGILADAS` (el cron que renovaba su `created_at` ya no corre, así
+// que la tabla se iba a quedar quieta para siempre por una pausa, no por una
+// falla). El ejemplo pasa a `switch_articulo_info`, que sigue vigilado con el
+// MISMO umbral (`HORAS_SIN_ESCRIBIR`): el mecanismo no cambió.
 describe("ALERTA B — un módulo dejó de recibir datos", () => {
-  const gastos = TABLAS_VIGILADAS.find((t) => t.tabla === "egresos_varios")!;
+  const vigilada = TABLAS_VIGILADAS.find((t) => t.tabla === "switch_articulo_info")!;
   const AHORA = Date.UTC(2026, 8, 2, 10, 0); // pasada de las 10:00 UTC del 2-sep
   const haceHoras = (h: number) => new Date(AHORA - h * 3_600_000).toISOString();
 
+  it("egresos_varios se retiró de TABLAS_VIGILADAS: ya no puede disparar", () => {
+    expect(TABLAS_VIGILADAS.find((t) => t.tabla === "egresos_varios")).toBeUndefined();
+  });
+
   it("dispara con dos días perdidos: 47 h sin una sola escritura", () => {
-    const h = evaluarTablaQuieta(gastos, "vistana", haceHoras(47), AHORA);
+    const h = evaluarTablaQuieta(vigilada, "vistana", haceHoras(47), AHORA);
     expect(h?.clase).toBe("tabla-quieta");
-    if (h?.clase === "tabla-quieta") expect(h.modulo).toBe("Gastos");
+    if (h?.clase === "tabla-quieta") expect(h.modulo).toBe("Ventas › Referencia");
   });
 
   it("NO dispara con UN día perdido (31 h): la corrida de mañana lo repara sola", () => {
-    expect(evaluarTablaQuieta(gastos, "vistana", haceHoras(31), AHORA)).toBeNull();
+    expect(evaluarTablaQuieta(vigilada, "vistana", haceHoras(31), AHORA)).toBeNull();
   });
 
   it("NO dispara sano: en la pasada de las 10:00 el dato del día anterior ya tiene 23,5 h", () => {
-    expect(evaluarTablaQuieta(gastos, "vistana", haceHoras(23.5), AHORA)).toBeNull();
+    expect(evaluarTablaQuieta(vigilada, "vistana", haceHoras(23.5), AHORA)).toBeNull();
   });
 
-  it("🔴 NUNCA TUVO DATOS no es un problema: joystep y Boston no tienen egresos varios", () => {
-    expect(evaluarTablaQuieta(gastos, "joystep", null, AHORA)).toBeNull();
-    expect(evaluarTablaQuieta(gastos, "confecciones_boston", null, AHORA)).toBeNull();
+  it("🔴 NUNCA TUVO DATOS no es un problema: una fila ausente nunca es un problema", () => {
+    expect(evaluarTablaQuieta(vigilada, "joystep", null, AHORA)).toBeNull();
+    expect(evaluarTablaQuieta(vigilada, "confecciones_boston", null, AHORA)).toBeNull();
   });
 
   it("🔴 se mira CUÁNDO SE ESCRIBIÓ, nunca la fecha del dato", () => {

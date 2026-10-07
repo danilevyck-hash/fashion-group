@@ -133,6 +133,7 @@
 
 ### Gastos, mayor y banco — [docs/postmortems/gastos-mayor-banco.md](docs/postmortems/gastos-mayor-banco.md)
 
+- 🔴 **EL REGISTRO DE EGRESOS ESTÁ PAUSADO (7-oct-2026, Daniel: «Apaga gasto»).** Nadie registra egresos en Switch desde el 31-jul-2026 (Fashion Wear desde el 27-may-2026): no es una falla del sistema, es una decisión de negocio. El cron `sync-egresos-varios` se apagó, las dos alertas de Telegram que vigilaban esta fuente se retiraron y la pantalla dice "pausado" en vez de citar un mes fijo. Qué se tocó, por qué y cómo reactivar todo: [docs/gastos-pausado.md](../gastos-pausado.md).
 - **Un solo módulo «Gastos»** (`gastos-contabilidad`) con dos pestañas: *Gastos* (Egresos Varios, **fuente ÚNICA** desde el 13-ago-2026) y *Saldos de banco*.
 - 🔴 **Las 8 empresas se ven, pero sus gastos NUNCA se suman entre sí.** No existe un total de grupo en este módulo, ni al pie de una tabla, ni en un export. Hay candado que pinta la lista y exige que la suma no aparezca.
 - El **mayor contable se retiró**; `mayor_lineas` y `mayor_importaciones` **no se borran** y un test pone el build rojo si una migración las dropea.

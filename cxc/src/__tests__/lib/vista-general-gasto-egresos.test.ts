@@ -177,18 +177,32 @@ describe("🔴 el vocabulario es el de la FUENTE NUEVA", () => {
     }
   });
 
-  it("el texto DICE hasta qué mes llegan los gastos de esa empresa", () => {
-    // 1-oct-2026, Daniel: nombres normales de ERP.
+  // 🔄 CAMBIÓ DE DIRECCIÓN el 7-oct-2026 (Daniel: «Apaga gasto»). Hasta ese día
+  // el texto decía hasta qué mes llegaban los gastos de la empresa, y era el
+  // dato que más servía. Con el registro de egresos en Switch pausado — nadie
+  // lo alimenta desde el 31-jul-2026 (Fashion Wear desde el 27-may-2026) — citar
+  // ese mes para siempre habría envejecido mal: se lee como una carga atascada,
+  // no como una pausa. Ahora el texto es el mismo para los dos motivos, CON o
+  // SIN `hastaMes`, porque el mes deja de ser información útil.
+  it("el texto dice que el registro está pausado, sin citar el mes", () => {
     expect(textoSinGastoEgresos("sin_movimientos", "julio 2026")).toBe(
-      "Sin egresos este mes. Último mes con movimientos: julio 2026.",
+      "Registro de gastos pausado.",
     );
-    expect(textoSinGastoEgresos("sin_movimientos", null)).toBe("Sin egresos registrados.");
+    expect(textoSinGastoEgresos("sin_movimientos", null)).toBe("Registro de gastos pausado.");
+    expect(textoSinGastoEgresos("sin_datos", "julio 2026")).toBe("Registro de gastos pausado.");
+    expect(textoSinGastoEgresos("sin_datos", null)).toBe("Registro de gastos pausado.");
   });
 
-  it("las cuatro etiquetas se distinguen entre sí", () => {
+  it("las cuatro etiquetas ya no son cuatro palabras distintas: `sin_movimientos` y `sin_datos` comparten la pausa", () => {
+    // Antes las cuatro se distinguían entre sí. Desde el 7-oct-2026 dos de
+    // ellas dicen la misma causa de fondo con dos palabras distintas (ambas
+    // "pausado"), así que solo quedan TRES conceptos, no cuatro.
     const labels = Object.values(ETIQUETA_SIN_GASTO_EGRESOS);
-    expect(new Set(labels).size).toBe(labels.length);
     for (const l of labels) expect(l.length).toBeLessThanOrEqual(16);
+    expect(ETIQUETA_SIN_GASTO_EGRESOS.sin_movimientos).toContain("pausado");
+    expect(ETIQUETA_SIN_GASTO_EGRESOS.sin_datos).toContain("pausado");
+    expect(ETIQUETA_SIN_GASTO_EGRESOS.sin_movimientos).not.toBe(ETIQUETA_SIN_GASTO_EGRESOS.sin_datos);
+    expect(new Set([ETIQUETA_SIN_GASTO_EGRESOS.no_automatico, ETIQUETA_SIN_GASTO_EGRESOS.sin_gasto]).size).toBe(2);
   });
 });
 

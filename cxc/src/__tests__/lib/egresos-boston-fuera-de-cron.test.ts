@@ -88,19 +88,22 @@ describe("🔴 pero Boston NO se retira del módulo", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 y el vigía no la reporta como caída", () => {
-  it("el cronograma de sesión única declara las 7 que corre, no las 8", () => {
-    const tel = leer("src/lib/cron-telemetry.ts");
-    // Se DERIVA. Declarar una empresa que la entrada no corre le reservaría a
-    // Boston una ventana de sesión única que nadie usa — y este cronograma es
-    // lo que decide si un sync manual se rechaza.
-    expect(tel).toMatch(/const CRON_EMPRESAS_EGRESOS = empresasConEgresosEnCron\(\);/);
-    expect(tel).toMatch(/cron: "sync-egresos-varios",[^}]*empresas: CRON_EMPRESAS_EGRESOS/);
-  });
-
-  it("el cronograma NO vuelve a decir 'todas' para esa entrada", () => {
-    const tel = leer("src/lib/cron-telemetry.ts");
-    expect(tel).not.toMatch(/cron: "sync-egresos-varios",[^}]*empresas: CRON_EMPRESAS_TODAS/);
+// 🔄 CAMBIÓ DE DIRECCIÓN el 7-oct-2026 (Daniel: «Apaga gasto»). El cronograma de
+// sesión única YA NO declara ninguna entrada para `sync-egresos-varios`: el
+// cron entero se retiró (vercel.json y `SWITCH_CRON_ENTRADAS`, los dos — ver
+// `sync-egresos-varios.test.ts` › "C."). No hace falta distinguir 7 de 8
+// empresas en un cronograma que ya no corre. `empresasConEgresosEnCron()`
+// sigue viva en `switch-api/empresas.ts` para el sync MANUAL.
+describe("🔴 y el cron ya no existe en el cronograma", () => {
+  it("sync-egresos-varios se fue de vercel.json Y de cron-telemetry.ts, los dos", () => {
+    // SIN COMENTARIOS: la nota que documenta el retiro nombra justo lo
+    // retirado (dice cómo reactivarlo), así que el barrido los borra primero.
+    const tel = leer("src/lib/cron-telemetry.ts")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    expect(tel).not.toMatch(/cron: "sync-egresos-varios"/);
+    const vercel = leer("vercel.json");
+    expect(vercel).not.toContain("sync-egresos-varios");
   });
 });
 
@@ -137,7 +140,9 @@ describe("🩸 la PANTALLA lo dice — una empresa vacía sin explicación es un
     const boston = explicacionEgresos("sin_datos", null, false);
     const normal = explicacionEgresos("sin_datos", null, true);
     expect(boston).not.toBe(normal);
-    expect(normal).toMatch(/todavía no se ha traído de Switch/i);
+    // 🔄 7-oct-2026, Daniel («Apaga gasto»): decía "todavía no se ha traído de
+    // Switch" — con el registro pausado para siempre, no "todavía".
+    expect(normal).toMatch(/pausado/i);
     expect(normal).not.toMatch(/Carga manual/i);
   });
 
@@ -148,8 +153,8 @@ describe("🩸 la PANTALLA lo dice — una empresa vacía sin explicación es un
 
   it("las otras 7 NO cambian ni una palabra", () => {
     expect(explicacionEgresos("con_movimientos", "2026-03", true)).toBe("");
-    // 1-oct-2026, Daniel: nombres normales de ERP.
-    expect(explicacionEgresos("sin_movimientos", null, true)).toBe("Sin egresos este mes.");
+    // 7-oct-2026, Daniel («Apaga gasto»): decía "Sin egresos este mes."
+    expect(explicacionEgresos("sin_movimientos", null, true)).toBe("Registro de gastos pausado.");
     // Y el default es "sí se baja sola": una empresa nueva no nace muda.
     expect(explicacionEgresos("sin_movimientos", null)).toBe(
       explicacionEgresos("sin_movimientos", null, true),

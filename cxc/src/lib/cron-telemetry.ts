@@ -21,7 +21,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 import {
   empresasConCxc,
   empresasConCxp,
-  empresasConEgresosEnCron,
   empresasConFacturas,
   empresasConRecibos,
   empresasConUtilidad,
@@ -568,14 +567,15 @@ export const SEED_TOLERANT_CRONS = [
   // Mayor contable de las 8 empresas (09:05 UTC = 04:05 a.m. Panamá).
   // Desplegado el 10-ago-2026: seed-tolerante hasta que siembre su fila.
   // Promover a CRONS_FAIL_CLOSED cuando lleve días corriendo.
-  // Egresos varios (caja y banco) de las 8 empresas (10:35 UTC = 05:35 a.m.
-  // Panamá). Desplegado el 13-ago-2026: seed-tolerante DOBLE, igual que
-  // calvin-catalogo — además de la siembra normal, mientras la DDL
-  // 20260813120000 no corra el cron se omite limpio (503, sin heartbeat y sin
-  // tocar Switch): fila ausente = pendiente, no caído. Promover a
-  // CRONS_FAIL_CLOSED cuando la DDL esté corrida y el heartbeat lleve días
-  // sembrado (el mismo camino que recorrió Tommy).
-  "sync-egresos-varios",
+  // ⚠️ `sync-egresos-varios` vivió acá del 13-ago al 7-oct-2026: egresos varios
+  // (caja y banco) de las 8 empresas, 10:35 UTC = 05:35 a.m. Panamá. Se APAGÓ
+  // por decisión de Daniel («Apaga gasto», 7-oct-2026) — nadie registra egresos
+  // en Switch desde el 31-jul-2026 (Fashion Wear desde el 27-may-2026), así que
+  // ya no es una falla de siembra, es que no hay nada que sembrar. Se retiró de
+  // acá Y de `vercel.json` Y de `SWITCH_CRON_ENTRADAS` (más abajo) el mismo día.
+  // 🔑 Reactivar el día que Yulissa retome el registro en Switch: devolver la
+  // entrada a `vercel.json` (`/api/cron/sync-egresos-varios`, "35 10 * * *"),
+  // devolver esta línea acá, y devolver la entrada de `SWITCH_CRON_ENTRADAS`.
   // COMPRAS (ingreso de mercancia) de las 6 empresas de Fashion Group (09:05
   // UTC = 04:05 a.m. Panamá — la franja que dejó libre `sync-mayor`). Desplegado
   // el 25-ago-2026: seed-tolerante hasta que siembre su fila. La DDL
@@ -626,8 +626,10 @@ const CRON_EMPRESAS_UTILIDAD = empresasConUtilidad();
 const CRON_EMPRESAS_RECIBOS = empresasConRecibos();
 /** Empresas del cron sync-proveedores (09:30). */
 const CRON_EMPRESAS_CXP = empresasConCxp();
-/** Empresas del cron sync-egresos-varios (10:35): las 7 que no son Boston. */
-const CRON_EMPRESAS_EGRESOS = empresasConEgresosEnCron();
+// ⚠️ `CRON_EMPRESAS_EGRESOS` (las 7 que no son Boston) vivió acá hasta el
+// 7-oct-2026: era de `sync-egresos-varios` (10:35), retirado del cronograma con
+// el cron (Daniel: «Apaga gasto»). `empresasConEgresosEnCron()` sigue viva en
+// `switch-api/empresas.ts` para el sync MANUAL.
 /** Empresas del cron sync-ingresos-mercancia (09:05): las 6 de Fashion Group.
  *  DERIVADA de la misma capability que define el universo de Ventas ›
  *  Referencia — es la pantalla que consume esas compras. Escribir acá un array
@@ -733,8 +735,9 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // COMPRAS (ingreso de mercancía) de las 6 de Fashion Group. Abre sesión web
   // con changesession=SI, o sea que EXPULSA a quien esté en el panel — por eso
   // va en la franja de madrugada de Panamá (06:00-11:00 UTC), la misma donde ya
-  // viven sync-utilidad (07:00), boston-cartera (08:10) y sync-egresos-varios
-  // (10:35), y NO en la 00:20-05:20 UTC, que en Panamá es la tarde-noche.
+  // viven sync-utilidad (07:00) y boston-cartera (08:10) — y antes también
+  // sync-egresos-varios (10:35), retirado el 7-oct-2026 — y NO en la
+  // 00:20-05:20 UTC, que en Panamá es la tarde-noche.
   //
   // 09:05 es la franja que dejó libre `sync-mayor` al retirarse el 13-ago-2026
   // — ya era de un cron de login web. Queda a 25 min de switch-articulos (08:40,
@@ -742,24 +745,19 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // sync-proveedores (09:30); la reconciliación de las 10:00 (hasta 740 s) a 55.
   { cron: "sync-ingresos-mercancia", hhmmUtc: "0905", empresas: CRON_EMPRESAS_INGRESOS },
   { cron: "sync-proveedores", hhmmUtc: "0930", empresas: CRON_EMPRESAS_CXP },
-  // EGRESOS VARIOS de las 8 empresas (10:35 UTC = 05:35 a.m. Panamá). Abre
-  // sesión web con changesession=SI, o sea que EXPULSA a quien esté en el panel
-  // — por eso va en la franja de madrugada de Panamá (06:00-11:00 UTC), la misma
-  // donde ya viven sync-utilidad y boston-cartera (sync-mayor se retiró el
-  // 13-ago-2026 y liberó su franja de las 09:05).
-  //
-  // Toca SIETE empresas, y la vecina que manda es `switch-reconciliacion` 10:00:
-  // puede abrir la sesión de cualquiera hasta 12 min (RECOVERY_BUDGET_MS 740 s),
-  // así que los 35 min de separación dejan 23 de aire real. Por delante,
-  // joybees-catalogo 11:00 (solo joystep) a 25 min. Los otros crons de las 8
-  // queda a 65 min de sync-proveedores (09:30).
-  //
-  // 🔴 SIN `confecciones_boston`, y por eso se DERIVA en vez de escribir
-  // CRON_EMPRESAS_TODAS: Daniel pidió que su usuario no se toque solo
-  // (`EMPRESAS_EGRESOS_FUERA_DE_CRON`). Declarar acá una empresa que la entrada
-  // no corre le reservaría a Boston una ventana de sesión única que nadie usa —
-  // y este cronograma es justamente lo que decide si un sync manual se rechaza.
-  { cron: "sync-egresos-varios", hhmmUtc: "1035", empresas: CRON_EMPRESAS_EGRESOS },
+  // ⚠️ `sync-egresos-varios` vivió acá del 13-ago al 7-oct-2026: EGRESOS VARIOS
+  // de las 7 empresas que no son Boston (10:35 UTC = 05:35 a.m. Panamá), abriendo
+  // sesión web con changesession=SI (expulsaba a quien estuviera en el panel) y
+  // liberando por delante la franja de joybees-catalogo (11:00) a 25 min.
+  // Se RETIRÓ por decisión de Daniel («Apaga gasto», 7-oct-2026) — nadie
+  // registra egresos en Switch desde el 31-jul-2026 (Fashion Wear desde el
+  // 27-may-2026) — y liberó su franja de las 10:35, igual que `sync-mayor` con
+  // la de las 09:05. Se sacó de acá Y de `vercel.json` Y de `SEED_TOLERANT_CRONS`
+  // el mismo día. 🔑 Para reactivarlo el día que Yulissa retome Switch: devolver
+  // la entrada `{ cron: "sync-egresos-varios", hhmmUtc: "1035", empresas:
+  // empresasConEgresosEnCron() }` acá (con `CRON_EMPRESAS_EGRESOS` otra vez
+  // declarada arriba), la entrada de `vercel.json` y la línea de
+  // `SEED_TOLERANT_CRONS`.
   // La reconciliación puede recuperar pares faltantes de CUALQUIER empresa.
   { cron: "switch-reconciliacion", hhmmUtc: "1000", empresas: CRON_EMPRESAS_TODAS },
   { cron: "acs-fidelizacion", hhmmUtc: "1130", empresas: ["american_classic"] },
@@ -891,7 +889,11 @@ export const SYNC_TYPES_POR_CRON: Readonly<Record<string, readonly string[]>> = 
   "switch-articulos": ["articulos", "articulo_marca"],
   "sync-ingresos-mercancia": ["ingresos_mercancia"],
   "sync-proveedores": ["proveedores"],
-  "sync-egresos-varios": ["egresos_varios", "cuentas_contables"],
+  // ⚠️ `"sync-egresos-varios": ["egresos_varios", "cuentas_contables"]` vivió
+  // acá hasta el 7-oct-2026: se fue con el cron (Daniel: «Apaga gasto») —
+  // `corridasPorDiaDelPar` ya no tiene de qué entrada leerlo, porque la entrada
+  // de `SWITCH_CRON_ENTRADAS` también se retiró. Reactivar las tres líneas
+  // juntas el día que Yulissa retome Switch.
   "acs-fidelizacion": [],
   "tommy-catalogo": ["catalogo_tommy"],
   "calvin-catalogo": ["catalogo_calvin"],

@@ -381,11 +381,12 @@ describe("4) qué NO entra a la alerta B, y por qué (medido el 7-sep-2026)", ()
     expect(vigiladas).not.toContain("switch_ingresos_mercancia");
   });
 
-  it("las que SÍ vigila B siguen siendo las tres de siempre", () => {
-    expect(vigiladas.sort()).toEqual([
-      "egresos_varios",
-      "switch_articulo_info",
-      "switch_clientes",
-    ]);
+  // 🔄 CAMBIÓ DE DIRECCIÓN el 7-oct-2026 (Daniel: «Apaga gasto»). `egresos_varios`
+  // era una de las tres: se retiró de `TABLAS_VIGILADAS` el mismo día que su
+  // cron (`sync-egresos-varios`) se retiró del cronograma — con el cron
+  // apagado, `created_at` iba a dejar de renovarse y la alerta iba a disparar
+  // sola por un cero que ya no es una señal. Quedan DOS, no tres.
+  it("las que SÍ vigila B quedaron en dos: `egresos_varios` se retiró", () => {
+    expect(vigiladas.sort()).toEqual(["switch_articulo_info", "switch_clientes"]);
   });
 });
