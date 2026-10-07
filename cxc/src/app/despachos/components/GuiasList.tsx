@@ -33,6 +33,7 @@ import { CHIP_SOLO_PENDIENTES, urlSinPendientes } from "@/lib/guias/filtro-pendi
 import { planParaLlegar } from "@/lib/guias/llegar-a-la-guia";
 import { Aviso } from "@/components/ui/Aviso";
 import { GUIAS_LISTA_APPLE_2026_10, enElPeriodo, resumenDeGuias, type PeriodoGuias } from "@/lib/guias/lista-apple-2026-10";
+import { GUIAS_GRUPOS_FECHA_2026_10, incluirGruposDeMes } from "@/lib/guias/grupos-fecha-2026-10";
 import { hoyPanama } from "@/lib/fecha-panama";
 
 /**
@@ -746,7 +747,16 @@ export default function GuiasList({
                 const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id));
 
                 // 🔴 SIEMPRE agrupado por fecha: ya no hay forma de apagarlo.
-                const _gg = groupByTimePeriod(visible, "fecha" as keyof Guia, "guias");
+                // 🔴 GUIAS_GRUPOS_FECHA_2026_10: Hoy · Ayer · Esta semana ·
+                // Semana pasada · Este mes · Mes pasado · Anteriores, con los
+                // dos grupos de mes afuera si la lista ya está recortada a UN
+                // mes por el selector de arriba (ver `grupos-fecha-2026-10.ts`).
+                // `false` = los cuatro grupos de siempre, sin tocar la llamada.
+                const _gg = GUIAS_GRUPOS_FECHA_2026_10
+                  ? groupByTimePeriod(visible, "fecha" as keyof Guia, "guias", {
+                      incluirMeses: incluirGruposDeMes(periodo, !!search.trim()),
+                    })
+                  : groupByTimePeriod(visible, "fecha" as keyof Guia, "guias");
                 const _rc = (g: Guia) => {
                       const isExpanded = expandedId === g.id;
                       // Fuente ÚNICA del "ya salió". Escribirlo a mano acá era
@@ -1333,7 +1343,7 @@ export default function GuiasList({
                         los grupos y nada más. */}
                     <div className="space-y-0">
                       {_gg.map((group) => (
-                        <TimeGroupHeader key={group.key} label={group.label} count={group.items.length} color={group.color} bgColor={group.bgColor}>
+                        <TimeGroupHeader key={group.key} label={group.label} count={group.items.length} color={group.color} bgColor={group.bgColor} separado={GUIAS_GRUPOS_FECHA_2026_10}>
                           <div className="space-y-1 p-1">{group.items.map(_rc)}</div>
                         </TimeGroupHeader>
                       ))}
