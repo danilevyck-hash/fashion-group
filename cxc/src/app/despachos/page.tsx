@@ -22,6 +22,7 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
 import { puedeMarcarPedidos, puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
 import { ROLES_VERIFICADO } from "@/lib/guias/pedidos-bultos";
+import { PEDIDOS_FLUJO_SIMPLE_2026_10 } from "@/lib/guias/pedidos-flujo-simple";
 
 // LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
 // celular y la configuración es de admin/secretaria — su JS solo se descarga
@@ -197,7 +198,12 @@ export default function GuiasPage() {
     // 🔴 «Bultos» (era «Etiquetas», 7-oct-2026): es el nombre del glosario de
     // `docs/nombres-erp.md` para esta pantalla (se escriben los bultos y
     // salen las hojas); la `key` de la pestaña («etiquetas») no cambia.
-    ...(hayEtiquetas ? ([["etiquetas", "Bultos"]] as Array<[Vista, string]>) : []),
+    // 🔴 Y vuelve a «Etiquetas» con el flujo simplificado (7-oct-2026, mismo
+    // día): Daniel, al rediseñar Pedidos, pidió «que diga etiqueta, no
+    // bultos». Detrás de `PEDIDOS_FLUJO_SIMPLE_2026_10`; apagado, el nombre
+    // de hoy no cambia. Pendiente actualizar `docs/nombres-erp.md` el día que
+    // esto se prenda.
+    ...(hayEtiquetas ? ([["etiquetas", PEDIDOS_FLUJO_SIMPLE_2026_10 ? "Etiquetas" : "Bultos"]] as Array<[Vista, string]>) : []),
     ...(hayConfig ? ([["config", "Configuración"]] as Array<[Vista, string]>) : []),
   ];
 

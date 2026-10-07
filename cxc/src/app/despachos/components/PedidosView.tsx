@@ -33,6 +33,17 @@ import {
   type EstadoBultos,
 } from "@/lib/guias/pedidos-bultos";
 import {
+  PEDIDOS_FLUJO_SIMPLE_2026_10 as SIMPLE,
+  ESTADOS_FLUJO_SIMPLE,
+  ROTULO_ESTADO_FLUJO_SIMPLE,
+  estadoFlujoSimpleLeido,
+  siguienteEstadoFlujoSimple,
+  validarCantidadBultos,
+  ultimaFirmaFlujoSimple,
+  type EstadoFlujoSimple,
+  type FirmasFlujoSimple,
+} from "@/lib/guias/pedidos-flujo-simple";
+import {
   PEDIDOS_BODEGA_ROLES,
   PEDIDOS_TABLA_2026_10 as NUEVO,
   ROTULO_ESTADO,
@@ -49,13 +60,16 @@ import {
   type PedidoBodega,
 } from "@/lib/guias/pedidos-bodega";
 
-type Filtro = EstadoPedido | EstadoBultos;
+type Filtro = EstadoPedido | EstadoBultos | EstadoFlujoSimple;
 /**
- * 🔴 Con bultos son TRES chips, los tres estados del flujo (6-oct-2026):
+ * 🔴 Con el flujo SIMPLIFICADO (7-oct-2026) son CUATRO chips: Pendiente →
+ * Preparado → Facturado → Despachado. Con bultos (lo de hoy) son tres:
  * Pendiente → Terminado (bodega) → Recibido (la secretaria) → Etiquetas.
- * Apagado, los dos de hoy.
+ * Apagados los dos, quedan los de siempre.
  */
-const CHIPS: { value: Filtro; label: string }[] = BULTOS
+const CHIPS: { value: Filtro; label: string }[] = SIMPLE
+  ? ESTADOS_FLUJO_SIMPLE.map((e) => ({ value: e, label: `${ROTULO_ESTADO_FLUJO_SIMPLE[e]}s` }))
+  : BULTOS
   ? ESTADOS_BULTOS.map((e) => ({ value: e, label: `${ROTULO_ESTADO_BULTOS[e]}s` }))
   : [
       { value: "pendiente", label: "Pendientes" },
@@ -65,9 +79,13 @@ const CHIPS: { value: Filtro; label: string }[] = BULTOS
 const clave = (p: Pick<PedidoBodega, "empresa_key" | "pedido_switch_id">) => `${p.empresa_key}:${p.pedido_switch_id}`;
 
 /** Lo que el detalle con bultos necesita de la fila. */
-/** El rótulo del estado, con los dos juegos: los 2 de hoy y los 3 con bultos. */
+/** El rótulo del estado, con los tres juegos: los 2 de hoy, los 3 con bultos y los 4 del flujo simple. */
 const rotuloDe = (e: PedidoBodega["estado"]): string =>
-  e === "pendiente" || e === "preparado" ? ROTULO_ESTADO[e] : ROTULO_ESTADO_BULTOS[e];
+  e === "pendiente" || e === "preparado"
+    ? ROTULO_ESTADO[e]
+    : e === "facturado" || e === "despachado"
+    ? ROTULO_ESTADO_FLUJO_SIMPLE[e]
+    : ROTULO_ESTADO_BULTOS[e];
 
 const detalleDe = (p: PedidoBodega): PedidoDelDetalle => ({
   empresa_key: p.empresa_key,
@@ -209,6 +227,75 @@ export default function PedidosView({
     }
     void cambiar(p, destino);
   }
+
+  // ── FLUJO SIMPLIFICADO (7-oct-2026) ─────────────────────────────────────
+  // Lo que anota bodega en la fila, mientras no se envía: la verdad sigue en
+  // `pedidos` hasta que se confirma.
+  const [bultoEnFila, setBultoEnFila] = useState<Record<string, string>>({});
+  // «Facturado» y «Despachado» SÍ piden confirmar (son el trabajo de la
+  // secretaria, con el mismo riesgo de marcar la fila de al lado); «Preparado»
+  // no: escribir el número y tocar el botón YA es la confirmación, y Daniel
+  // pidió menos pasos, no más.
+  const [porConfirmarSimple, setPorConfirmarSimple] = useState<{ pedido: PedidoBodega; destino: EstadoFlujoSimple } | null>(null);
+
+  /** Mueve el pedido, con los bultos si los hay. Optimista, revierte si falla. */
+  async function moverSimple(p: PedidoBodega, destino: EstadoFlujoSimple, bultos?: number) {
+    const antes = { estado: p.estado, bultos: p.bultos };
+    setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado: destino, bultos: bultos ?? x.bultos } : x)));
+    try {
+      const r = await fetch("/api/guias/pedidos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          empresa_key: p.empresa_key,
+          pedido_switch_id: p.pedido_switch_id,
+          estado: destino,
+          ...(bultos != null ? { bultos } : {}),
+        }),
+      });
+      const d = (await r.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!r.ok) throw new Error(typeof d?.error === "string" ? d.error : String(r.status));
+      setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, ...d } : x)));
+      setBultoEnFila((m) => { const n = { ...m }; delete n[clave(p)]; return n; });
+    } catch (e) {
+      setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, ...antes } : x)));
+      const msg = e instanceof Error && e.message.length < 90 ? e.message : "No se pudo guardar el estado. Intenta de nuevo.";
+      toast(msg, "error");
+    }
+  }
+
+  /** Bodega marca «Preparado»: valida el número de bultos y lo manda de una vez. */
+  function marcarPreparadoSimple(p: PedidoBodega) {
+    const v = validarCantidadBultos(bultoEnFila[clave(p)] ?? "");
+    if (!v.ok) return toast(v.error, "warning");
+    void moverSimple(p, "preparado", v.valor);
+  }
+
+  function confirmarSimple() {
+    const pedir = porConfirmarSimple;
+    setPorConfirmarSimple(null);
+    if (pedir) void moverSimple(pedir.pedido, pedir.destino);
+  }
+
+  function textoDeConfirmarSimple(p: PedidoBodega, destino: EstadoFlujoSimple) {
+    const titulo = `Pedido ${p.secuencial} · ${p.cliente_nombre}`;
+    if (destino === "facturado") {
+      return { titulo, mensaje: "Queda facturado: la secretaria ya lo facturó en Switch.", boton: "Marcar facturado" };
+    }
+    if (destino === "despachado") {
+      return { titulo, mensaje: "Queda despachado y se cierra: salió con sus etiquetas.", boton: "Marcar despachado" };
+    }
+    return { titulo, mensaje: `Vuelve a ${ROTULO_ESTADO_FLUJO_SIMPLE[destino]}.`, boton: `Volver a ${ROTULO_ESTADO_FLUJO_SIMPLE[destino]}` };
+  }
+
+  const firmasSimpleDe = (p: PedidoBodega): FirmasFlujoSimple => ({
+    preparado_por: p.preparado_por ?? null,
+    preparado_en: p.preparado_en ?? null,
+    facturado_por: p.facturado_por ?? null,
+    facturado_en: p.facturado_en ?? null,
+    despachado_por: p.despachado_por ?? null,
+    despachado_en: p.despachado_en ?? null,
+  });
 
   const hoy = hoyPanama();
   const deLaEmpresa = (pedidos ?? []).filter((p) => !NUEVO || empresa === "todas" || p.empresa_key === empresa);
@@ -408,6 +495,164 @@ export default function PedidosView({
     verificado_en: p.verificado_en ?? null,
   });
 
+  // ── El control de la fila, flujo simplificado ───────────────────────────
+  // UN control por fila, que dice lo que hace (docs/diseno.md, regla 6):
+  //   · Pendiente  → la casilla del número de bultos + «Marcar preparado»,
+  //     apagado hasta que el número sea válido (bodega o la secretaria).
+  //   · Preparado  → los bultos que anotó bodega, quietos, + «Marcar
+  //     facturado» (solo la secretaria o admin; bodega solo lee el chip).
+  //   · Facturado  → + «Marcar despachado» y, al lado, «Volver a Preparado»
+  //     por si se marcó por error.
+  //   · Despachado → el pedido ya se cerró: un chip quieto y nada más.
+  const controlSimple = (p: PedidoBodega) => {
+    const e = estadoFlujoSimpleLeido(p.estado);
+    const base = "inline-flex h-7 items-center whitespace-nowrap rounded-full border px-2.5 text-xs font-medium";
+    // En el celular los controles se APILAN (nunca de lado, regla de
+    // `docs/diseno.md`: «nada se desliza de lado en el celular»): el botón de
+    // abajo quedaba cortado contra el borde a 390 px.
+    const fila = "flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5";
+    if (e === "pendiente") {
+      if (!puedeMarcar) return <span className="text-gray-400">—</span>;
+      const valor = bultoEnFila[clave(p)] ?? "";
+      return (
+        <div className={fila}>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={9999}
+            value={valor}
+            placeholder="N.°"
+            aria-label={`Bultos del pedido ${p.secuencial}`}
+            onChange={(ev) => setBultoEnFila((m) => ({ ...m, [clave(p)]: ev.target.value }))}
+            // 44 px de alto en el celular (regla 10 de docs/diseno.md).
+            className="h-11 w-16 rounded-md border border-gray-300 px-1.5 text-right tabular-nums focus:border-gray-900 focus:outline-none sm:h-9"
+          />
+          <button
+            type="button"
+            onClick={() => marcarPreparadoSimple(p)}
+            disabled={!valor.trim()}
+            className="h-9 whitespace-nowrap rounded-md bg-black px-3 text-xs font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
+          >
+            Preparado
+          </button>
+        </div>
+      );
+    }
+    const chipBultos = (
+      <span className={`${base} border-gray-300 bg-white text-gray-700`}>
+        {p.bultos ? `${p.bultos} ${p.bultos === 1 ? "bulto" : "bultos"}` : "—"}
+      </span>
+    );
+    if (e === "preparado") {
+      if (!puedeRecibir) return chipBultos;
+      return (
+        <div className={fila}>
+          {chipBultos}
+          <button
+            type="button"
+            onClick={() => setPorConfirmarSimple({ pedido: p, destino: "facturado" })}
+            className="h-7 whitespace-nowrap rounded-full border border-gray-900 bg-gray-900 px-2.5 text-xs font-medium text-white transition active:scale-[0.97]"
+          >
+            Facturar
+          </button>
+        </div>
+      );
+    }
+    if (e === "facturado") {
+      if (!puedeRecibir) return chipBultos;
+      return (
+        <div className={fila}>
+          {chipBultos}
+          <span className="inline-flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setPorConfirmarSimple({ pedido: p, destino: "preparado" })}
+              title="Volver a Preparado"
+              className="relative inline-flex h-7 items-center rounded-full px-1 text-xs font-medium text-blue-600 transition hover:text-blue-800 active:scale-[0.97] before:absolute before:-inset-x-1 before:-inset-y-2 before:content-['']"
+            >
+              <Undo2 size={13} strokeWidth={1.8} aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPorConfirmarSimple({ pedido: p, destino: "despachado" })}
+              className="h-7 whitespace-nowrap rounded-full border border-gray-900 bg-gray-900 px-2.5 text-xs font-medium text-white transition active:scale-[0.97]"
+            >
+              Despachar
+            </button>
+          </span>
+        </div>
+      );
+    }
+    // despachado: cerrado.
+    return (
+      <span className={`${base} border-emerald-200 bg-emerald-50 text-emerald-700`}>
+        <Check size={13} strokeWidth={3} aria-hidden className="mr-1" />
+        {ROTULO_ESTADO_FLUJO_SIMPLE.despachado}
+      </span>
+    );
+  };
+
+  const tablaSimple = (
+    <div className="-mx-4 border-y border-gray-200 bg-white sm:mx-0 sm:rounded-lg sm:border-x">
+      <table className="w-full text-left text-xs sm:text-sm">
+        <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
+          <tr>
+            <ThOrden col="antiguedad" api={orden} className="py-2 pl-3 pr-1 sm:px-3"><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></ThOrden>
+            <ThOrden col="cliente" api={orden} className="px-1 py-2 sm:px-3">Cliente</ThOrden>
+            <th className="hidden px-3 py-2 sm:table-cell">Firma</th>
+            <th className="py-2 pl-0.5 pr-3 text-right sm:px-3"><span className="sr-only sm:not-sr-only">Estado</span></th>
+          </tr>
+        </thead>
+        {agruparPorEmpresa(visibles).map((g) => (
+          <tbody key={g.empresa_key} className="divide-y divide-gray-100 align-top">
+            <tr className="bg-gray-50">
+              <th colSpan={4} scope="colgroup" className="px-3 py-2 text-left text-sm font-semibold text-gray-900">
+                {nombreCortoEmpresa(g.empresa_key)} · {g.pedidos.length}
+              </th>
+            </tr>
+            {ordenarGrupo(g.pedidos).map((p) => (
+              <tr key={clave(p)}>
+                <td className="whitespace-nowrap py-2 pl-3 pr-1 text-gray-700 sm:px-3">
+                  <button
+                    type="button"
+                    title={fmtDate(fechaPanamaDe(p.fecha))}
+                    onClick={() => setFechaAbierta((k) => (k === clave(p) ? null : clave(p)))}
+                    className="text-left"
+                  >
+                    {fechaAbierta === clave(p) ? fmtDate(fechaPanamaDe(p.fecha)) : (
+                      <>
+                        <span className="sm:hidden">{haceDiasCorto(p.fecha, hoy)}</span>
+                        <span className="hidden sm:inline">{haceDias(p.fecha, hoy)}</span>
+                      </>
+                    )}
+                  </button>
+                </td>
+                <td className="break-words px-1 py-2 sm:px-3">
+                  <button type="button" onClick={() => setAbierto(detalleDe(p))} className="text-left">
+                    <span className="font-medium text-blue-600 hover:text-blue-800">{p.cliente_nombre}</span>
+                    <span className="block whitespace-nowrap text-xs text-gray-500">
+                      {p.secuencial}
+                      {vendedorEnPantalla(p.vendedor_nombre) ? ` · ${vendedorEnPantalla(p.vendedor_nombre)}` : ""}
+                    </span>
+                    <span className="block text-xs text-gray-500 sm:hidden">{ultimaFirmaFlujoSimple(firmasSimpleDe(p))}</span>
+                  </button>
+                </td>
+                <td
+                  title={ultimaFirmaFlujoSimple(firmasSimpleDe(p)) ?? undefined}
+                  className="hidden whitespace-nowrap px-3 py-2 text-xs text-gray-600 sm:table-cell"
+                >
+                  {ultimaFirmaFlujoSimple(firmasSimpleDe(p)) ?? <span className="text-gray-300">—</span>}
+                </td>
+                <td className="py-1.5 pl-0.5 pr-3 text-right sm:px-3">{controlSimple(p)}</td>
+              </tr>
+            ))}
+          </tbody>
+        ))}
+      </table>
+    </div>
+  );
+
   // 🔴 CADA LISTA MUESTRA UN SOLO TIPO DE CONTROL, porque se filtra por UN
   // estado: en «Pendientes» va el círculo a la izquierda, como hoy; en
   // «Terminados» y «Recibidos» va la columna Estado a la derecha, donde cabe
@@ -582,6 +827,21 @@ export default function PedidosView({
   );
 
   // Una pantalla, una pregunta: el detalle REEMPLAZA la lista, no la tapa.
+  // 🔴 Flujo simplificado: el detalle es de SOLO MIRAR —sin columna Bulto, sin
+  // casillas, sin barra de abajo—, porque el número se anota desde la lista.
+  if (SIMPLE && abierto) {
+    return (
+      <PedidoBultos
+        pedido={abierto}
+        puedePoner={false}
+        ocultarBulto
+        onVolver={() => {
+          setAbierto(null);
+          void cargar();
+        }}
+      />
+    );
+  }
   if (BULTOS && abierto) {
     // 🔴 Verificado = congelado (7-oct-2026): las casillas del bulto no se
     // dibujan y el servidor rechaza el PATCH con la misma regla.
@@ -600,6 +860,7 @@ export default function PedidosView({
   }
 
   const confirmacion = porConfirmar && textoDeConfirmar(porConfirmar.pedido, porConfirmar.destino);
+  const confirmacionSimple = porConfirmarSimple && textoDeConfirmarSimple(porConfirmarSimple.pedido, porConfirmarSimple.destino);
 
   return (
     <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
@@ -613,6 +874,19 @@ export default function PedidosView({
           title={confirmacion.titulo}
           message={confirmacion.mensaje}
           confirmLabel={confirmacion.boton}
+        />
+      )}
+      {/* 🔴 Flujo simplificado: «Facturado» y «Despachado» también piden
+          confirmar —son el trabajo de la secretaria—; «Preparado» no (ver el
+          porqué arriba de `moverSimple`). */}
+      {confirmacionSimple && (
+        <ConfirmModal
+          open
+          onClose={() => setPorConfirmarSimple(null)}
+          onConfirm={confirmarSimple}
+          title={confirmacionSimple.titulo}
+          message={confirmacionSimple.mensaje}
+          confirmLabel={confirmacionSimple.boton}
         />
       )}
       {barra && (
@@ -652,10 +926,10 @@ export default function PedidosView({
         <p className="py-10 text-center text-sm text-gray-500">Cargando…</p>
       ) : visibles.length === 0 ? (
         <p className="py-10 text-center text-sm text-gray-500">
-          {BULTOS
-            ? `Sin pedidos ${CHIPS.find((c) => c.value === filtro)?.label.toLowerCase() ?? ""}`.trim()
-            : filtro === "pendiente" ? "Sin pedidos pendientes" : "Sin pedidos preparados"}
+          {`Sin pedidos ${CHIPS.find((c) => c.value === filtro)?.label.toLowerCase() ?? ""}`.trim()}
         </p>
+      ) : SIMPLE ? (
+        tablaSimple
       ) : NUEVO ? (
         POR_EMPRESA ? tabla : tablaV2
       ) : barra ? (

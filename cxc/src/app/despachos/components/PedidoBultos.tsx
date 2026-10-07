@@ -74,6 +74,12 @@ export default function PedidoBultos({
   pedido,
   puedePoner,
   verificado = false,
+  // 🔴 FLUJO SIMPLIFICADO (7-oct-2026, `PEDIDOS_FLUJO_SIMPLE_2026_10`): ahí ya
+  // no se asigna bulto por línea —bodega anota UN número por pedido, desde la
+  // lista—, así que esta pantalla queda de solo mirar: sin casillas, sin
+  // columna Bulto y sin la barra de abajo. `false` = el detalle de hoy,
+  // intacto.
+  ocultarBulto = false,
   onVolver,
 }: {
   pedido: PedidoDelDetalle;
@@ -85,8 +91,11 @@ export default function PedidoBultos({
   puedePoner: boolean;
   /** 🔴 Verificado = congelado: el detalle ya no se toca (7-oct-2026). */
   verificado?: boolean;
+  ocultarBulto?: boolean;
   onVolver: () => void;
 }) {
+  // Con `ocultarBulto`, nadie pone nada en esta pantalla: es de solo mirar.
+  const puedePonerAqui = puedePoner && !ocultarBulto;
   const { toast } = useToast();
   const barraCelular = useHayBarraCelular();
   const [lineas, setLineas] = useState<LineaPedido[] | null>(null);
@@ -101,7 +110,7 @@ export default function PedidoBultos({
   // La barra de abajo publica su alto para que el ☰ redondo del celular se le
   // suba encima (`useBarraFijaAbajo`), como las otras cinco barras negras.
   const barraRef = useRef<HTMLDivElement | null>(null);
-  usePublicarAltoBarraFija(barraRef, puedePoner && marcadas.size > 0);
+  usePublicarAltoBarraFija(barraRef, puedePonerAqui && marcadas.size > 0);
 
   const clave = `empresa_key=${encodeURIComponent(pedido.empresa_key)}&pedido_switch_id=${pedido.pedido_switch_id}`;
 
@@ -261,7 +270,7 @@ export default function PedidoBultos({
    * —el vendedor, o cualquiera con el pedido ya verificado— ve el chip quieto.
    */
   const celdaBulto = (l: LineaPedido) => {
-    if (!puedePoner) {
+    if (!puedePonerAqui) {
       return l.bulto == null ? (
         <span className="text-gray-400">—</span>
       ) : (
@@ -313,47 +322,51 @@ export default function PedidoBultos({
           <p className="text-base font-semibold text-gray-900">
             Pedido {pedido.secuencial} · {pedido.cliente_nombre}
           </p>
-          {resumen && <p className="text-xs text-gray-500">{resumen}</p>}
+          {!ocultarBulto && resumen && <p className="text-xs text-gray-500">{resumen}</p>}
         </div>
         {/* 🔴 UN SOLO BOTÓN «Imprimir» (Daniel, 6-oct-2026): al tocarlo
             aparecen las dos formas. Antes estaban las dos a la vista y pesaban
             demasiado para una acción que es la misma. Las dos las puede usar
-            cualquiera que entre a Pedidos: el papel se arma en el servidor. */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setImprimirAbierto((v) => !v)}
-            disabled={!lineas || lineas.length === 0}
-            aria-expanded={imprimirAbierto}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 text-[13px] font-medium text-gray-700 transition active:scale-[0.97] disabled:opacity-40"
-          >
-            <Printer size={15} strokeWidth={1.8} aria-hidden /> Imprimir
-            <ChevronDown size={14} strokeWidth={1.8} aria-hidden />
-          </button>
-          {imprimirAbierto && (
-            <>
-              {/* Tocar afuera cierra. */}
-              <button type="button" aria-label="Cerrar" onClick={() => setImprimirAbierto(false)} className="fixed inset-0 z-10 cursor-default" />
-              {/* En el celular el botón está a la izquierda: el menú se abre
-                  hacia la derecha o se sale de la pantalla. */}
-              <div className="absolute left-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg sm:left-auto sm:right-0">
-                {[
-                  { conPrecios: true, texto: "Con precios" },
-                  { conPrecios: false, texto: "Sin precios" },
-                ].map((o) => (
-                  <button
-                    key={o.texto}
-                    type="button"
-                    onClick={() => { setImprimirAbierto(false); void imprimir(o.conPrecios); }}
-                    className="block w-full px-3 py-2 text-left text-[13px] text-gray-700 hover:bg-gray-50"
-                  >
-                    {o.texto}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+            cualquiera que entre a Pedidos: el papel se arma en el servidor.
+            🔑 Con `ocultarBulto` (flujo simplificado) el papel por bulto no
+            existe: esta pantalla es de solo mirar, sin acción de imprimir. */}
+        {!ocultarBulto && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setImprimirAbierto((v) => !v)}
+              disabled={!lineas || lineas.length === 0}
+              aria-expanded={imprimirAbierto}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-gray-300 px-3 text-[13px] font-medium text-gray-700 transition active:scale-[0.97] disabled:opacity-40"
+            >
+              <Printer size={15} strokeWidth={1.8} aria-hidden /> Imprimir
+              <ChevronDown size={14} strokeWidth={1.8} aria-hidden />
+            </button>
+            {imprimirAbierto && (
+              <>
+                {/* Tocar afuera cierra. */}
+                <button type="button" aria-label="Cerrar" onClick={() => setImprimirAbierto(false)} className="fixed inset-0 z-10 cursor-default" />
+                {/* En el celular el botón está a la izquierda: el menú se abre
+                    hacia la derecha o se sale de la pantalla. */}
+                <div className="absolute left-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg sm:left-auto sm:right-0">
+                  {[
+                    { conPrecios: true, texto: "Con precios" },
+                    { conPrecios: false, texto: "Sin precios" },
+                  ].map((o) => (
+                    <button
+                      key={o.texto}
+                      type="button"
+                      onClick={() => { setImprimirAbierto(false); void imprimir(o.conPrecios); }}
+                      className="block w-full px-3 py-2 text-left text-[13px] text-gray-700 hover:bg-gray-50"
+                    >
+                      {o.texto}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {error ? (
@@ -369,7 +382,7 @@ export default function PedidoBultos({
           <table className="w-full text-left text-xs sm:text-sm">
             <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
               <tr>
-                {puedePoner && (
+                {puedePonerAqui && (
                   <th className="w-11 py-2 pl-1.5 sm:pl-2">
                     <input
                       type="checkbox"
@@ -391,7 +404,7 @@ export default function PedidoBultos({
                     que la descripción lleva un ancho propio y lo que sobra va a
                     Código, Cantidad, Precio y Total, que son los que se leen de
                     corrido. */}
-                <th className="w-20 py-2 pl-1 pr-1 sm:px-3">{COLUMNAS_DETALLE[0]}</th>
+                {!ocultarBulto && <th className="w-20 py-2 pl-1 pr-1 sm:px-3">{COLUMNAS_DETALLE[0]}</th>}
                 <th className="hidden px-3 py-2 sm:table-cell sm:w-44">{COLUMNAS_DETALLE[1]}</th>
                 <th className="py-2 pl-1 pr-1 sm:w-[26%] sm:px-3">{COLUMNAS_DETALLE[2]}</th>
                 <th className="w-16 px-1 py-2 text-right sm:w-28 sm:px-3">
@@ -409,7 +422,7 @@ export default function PedidoBultos({
             <tbody className="divide-y divide-gray-100 align-top">
               {lineas.map((l) => (
                 <tr key={l.codigo_barra_id} className={marcadas.has(l.codigo_barra_id) ? "bg-gray-50" : undefined}>
-                  {puedePoner && (
+                  {puedePonerAqui && (
                     <td className="py-2 pl-1.5 sm:pl-2">
                       <label className="flex h-11 w-9 items-center justify-center">
                         <span className="sr-only">{l.descripcion}</span>
@@ -422,7 +435,7 @@ export default function PedidoBultos({
                       </label>
                     </td>
                   )}
-                  <td className="whitespace-nowrap py-2 pl-1 pr-1 tabular-nums sm:px-3">{celdaBulto(l)}</td>
+                  {!ocultarBulto && <td className="whitespace-nowrap py-2 pl-1 pr-1 tabular-nums sm:px-3">{celdaBulto(l)}</td>}
                   <td className="hidden whitespace-nowrap px-3 py-2 tabular-nums text-gray-700 sm:table-cell">{l.codigo}</td>
                   {/* La categoría de Switch, con su talla y su color si los manda. */}
                   <td className="break-words py-2 pl-1 pr-1 font-medium text-gray-900 sm:px-3">
@@ -461,7 +474,7 @@ export default function PedidoBultos({
 
       {/* UNA sola acción principal, abajo, con el resultado en vivo y apagada
           hasta que haya algo que guardar (docs/diseno.md, regla 3). */}
-      {puedePoner && marcadas.size > 0 && (
+      {puedePonerAqui && marcadas.size > 0 && (
         <div
           ref={barraRef}
           className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6"

@@ -100,8 +100,11 @@ export function pedidoEntra(codigo: string | null | undefined, codigosConFicha: 
  * los TRES valores que la pantalla puede recibir: los dos de hoy —`pendiente` y
  * `preparado`, que NO cambian de nombre— más `verificado`. Así el tipo no miente durante la transición (los `estado` viejos
  * siguen llegando mientras la migración no corra, y se LEEN con `estadoLeido`).
+ *
+ * 🔴 Y con `PEDIDOS_FLUJO_SIMPLE_2026_10` (7-oct-2026) se suman `facturado` y
+ * `despachado` — ver `pedidos-flujo-simple.ts`. Ningún valor viejo se renombra.
  */
-export type EstadoPedidoCualquiera = EstadoPedido | "verificado";
+export type EstadoPedidoCualquiera = EstadoPedido | "verificado" | "facturado" | "despachado";
 
 export interface PedidoBodega {
   empresa_key: string;
@@ -129,6 +132,11 @@ export interface PedidoBodega {
   preparado_en?: string | null;
   verificado_por?: string | null;
   verificado_en?: string | null;
+  /** 🔴 Flujo simplificado (7-oct-2026): las firmas de Facturado y Despachado. */
+  facturado_por?: string | null;
+  facturado_en?: string | null;
+  despachado_por?: string | null;
+  despachado_en?: string | null;
   /**
    * 🔴 Cuántos artículos le faltan por poner en un bulto, y cuántos tiene en
    * total (7-oct-2026): es lo que apaga «Verificar» y dice QUÉ falta. Los cuenta

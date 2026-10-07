@@ -10,7 +10,7 @@
  * a nadie del panel. El quién sale de la cookie FIRMADA, nunca del cuerpo.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/requireRole";
+import { requireRole, type SessionPayload } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
   PEDIDOS_BODEGA_2026_10,
@@ -31,6 +31,15 @@ import {
   type EstadoBultos,
 } from "@/lib/guias/pedidos-bultos";
 import {
+  PEDIDOS_FLUJO_SIMPLE_2026_10,
+  ROLES_PREPARA_FLUJO_SIMPLE,
+  esEstadoFlujoSimple,
+  estadoFlujoSimpleLeido,
+  puedeMoverFlujoSimple,
+  validarCantidadBultos,
+  type EstadoFlujoSimple,
+} from "@/lib/guias/pedidos-flujo-simple";
+import {
   crearEnvioDelPedido,
   deshacerEnvioDelPedido,
   faltaParaVerificarPedido,
@@ -44,7 +53,12 @@ export const dynamic = "force-dynamic";
 
 const apagado = () => NextResponse.json({ error: "No disponible" }, { status: 404 });
 
-/** Lo que marcó bodega, con las dos firmas si la migración ya corrió. */
+// 🔴 El flujo SIMPLIFICADO (7-oct-2026) REEMPLAZA al de bulto-por-línea: con
+// los dos interruptores prendidos a la vez, manda el simplificado. Así no
+// hace falta apagar `PEDIDOS_BULTOS_2026_10` a mano el día que éste se prenda.
+const BULTOS_ACTIVO = PEDIDOS_BULTOS_2026_10 && !PEDIDOS_FLUJO_SIMPLE_2026_10;
+
+/** Lo que marcó bodega, con las firmas si la migración ya corrió. */
 interface EstadoDeBodega {
   empresa_key: string;
   pedido_switch_id: number;
@@ -56,10 +70,17 @@ interface EstadoDeBodega {
   preparado_en?: string | null;
   verificado_por?: string | null;
   verificado_en?: string | null;
+  /** 🔴 Flujo simplificado: el número de bultos y las dos firmas que faltaban. */
+  bultos?: number | null;
+  facturado_por?: string | null;
+  facturado_en?: string | null;
+  despachado_por?: string | null;
+  despachado_en?: string | null;
 }
 
 const COLUMNAS_BASE = "empresa_key, pedido_switch_id, estado, cambiado_por, cambiado_en, envio_id";
 const COLUMNAS_CON_FIRMAS = `${COLUMNAS_BASE}, preparado_por, preparado_en, verificado_por, verificado_en`;
+const COLUMNAS_FLUJO_SIMPLE = `${COLUMNAS_BASE}, preparado_por, preparado_en, bultos, facturado_por, facturado_en, despachado_por, despachado_en`;
 
 /**
  * 🔴 FALLA ABIERTA SOBRE LAS COLUMNAS NUEVAS. 🩸 Pedirlas a secas devolvía un
@@ -76,7 +97,10 @@ async function leerEstadoPrevio(empresa: string, id: number): Promise<EstadoDeBo
       .eq("empresa_key", empresa)
       .eq("pedido_switch_id", id)
       .maybeSingle();
-  if (PEDIDOS_BULTOS_2026_10) {
+  if (PEDIDOS_FLUJO_SIMPLE_2026_10) {
+    const simple = await pedir(COLUMNAS_FLUJO_SIMPLE);
+    if (!simple.error) return simple.data as unknown as EstadoDeBodega;
+  } else if (BULTOS_ACTIVO) {
     const con = await pedir(COLUMNAS_CON_FIRMAS);
     if (!con.error) return con.data as unknown as EstadoDeBodega;
   }
@@ -86,7 +110,10 @@ async function leerEstadoPrevio(empresa: string, id: number): Promise<EstadoDeBo
 }
 
 async function leerEstadoDeBodega(): Promise<{ data: EstadoDeBodega[] | null; error: unknown }> {
-  if (PEDIDOS_BULTOS_2026_10) {
+  if (PEDIDOS_FLUJO_SIMPLE_2026_10) {
+    const simple = await supabaseServer.from("pedidos_bodega_estado").select(COLUMNAS_FLUJO_SIMPLE).limit(5000);
+    if (!simple.error) return { data: simple.data as unknown as EstadoDeBodega[], error: null };
+  } else if (BULTOS_ACTIVO) {
     const con = await supabaseServer.from("pedidos_bodega_estado").select(COLUMNAS_CON_FIRMAS).limit(5000);
     if (!con.error) return { data: con.data as unknown as EstadoDeBodega[], error: null };
   }
@@ -106,7 +133,7 @@ async function leerEstadoDeBodega(): Promise<{ data: EstadoDeBodega[] | null; er
  */
 async function leerCuentaDeBultos(empresas: string[]): Promise<Map<string, number>> {
   const cuenta = new Map<string, Set<number>>();
-  if (!PEDIDOS_BULTOS_2026_10) return new Map();
+  if (!BULTOS_ACTIVO) return new Map();
   const { data, error } = await supabaseServer
     .from("pedidos_linea_bulto")
     .select("empresa_key, pedido_switch_id, bulto")
@@ -129,7 +156,7 @@ export async function GET(req: NextRequest) {
   // 🔴 El RECORTE POR EMPRESA lo decide el SERVIDOR (6-oct-2026): Julio no ve
   // Vistana y Rodrigo/Jorman solo ven Vistana, pidan lo que pidan. Es duro,
   // como el de Boston. Admin y los no listados siguen viendo las 6.
-  const empresas = PEDIDOS_BULTOS_2026_10 ? empresasQueVe(auth.userName, auth.role) : B2B_EMPRESA_KEYS;
+  const empresas = PEDIDOS_FLUJO_SIMPLE_2026_10 || PEDIDOS_BULTOS_2026_10 ? empresasQueVe(auth.userName, auth.role) : B2B_EMPRESA_KEYS;
 
   // ponytail: sin paginar; los Activo medidos el 5-oct son decenas, no miles.
   // El alias de Comisiones (REINALDO/REYNALDO/REINDALDO → una persona); falla abierto.
@@ -144,8 +171,9 @@ export async function GET(req: NextRequest) {
     leerAliasOVacio(),
     leerCuentaDeBultos([...empresas]),
     // 🔴 Lo que apaga «Verificar»: cuántos artículos siguen sin bulto
-    // (7-oct-2026). Falla ABIERTA: sin tabla, mapa vacío y no se apaga nada.
-    PEDIDOS_BULTOS_2026_10 ? leerAsignacion([...empresas]) : Promise.resolve(new Map()),
+    // (7-oct-2026). Solo aplica al flujo de bulto-por-línea. Falla ABIERTA:
+    // sin tabla, mapa vacío y no se apaga nada.
+    BULTOS_ACTIVO ? leerAsignacion([...empresas]) : Promise.resolve(new Map()),
   ]);
   if (ped.error) return NextResponse.json({ error: "No se pudieron leer los pedidos" }, { status: 500 });
   if (est.error) return NextResponse.json({ error: "No se pudo leer el estado de bodega" }, { status: 500 });
@@ -163,31 +191,119 @@ export async function GET(req: NextRequest) {
       cliente_codigo: p.cliente_codigo,
       cliente_nombre: p.cliente_nombre,
       vendedor_nombre: p.vendedor_nombre ? aplicarAlias(p.vendedor_nombre, alias) : null,
-      // Con bultos son TRES estados y «preparado» se LEE como «terminado»
-      // (falla abierta mientras la migración no corra).
-      estado: PEDIDOS_BULTOS_2026_10
-        ? estadoLeido(m?.estado)
-        : m && esEstadoPedido(m.estado)
-          ? m.estado
-          : "pendiente",
+      // Flujo simplificado: CUATRO estados. Con bultos (lo de hoy) son TRES y
+      // «preparado» se LEE como «terminado». Los dos fallan abierto mientras
+      // su migración no corra.
+      estado: PEDIDOS_FLUJO_SIMPLE_2026_10
+        ? estadoFlujoSimpleLeido(m?.estado)
+        : PEDIDOS_BULTOS_2026_10
+          ? estadoLeido(m?.estado)
+          : m && esEstadoPedido(m.estado)
+            ? m.estado
+            : "pendiente",
       cambiado_por: m?.cambiado_por ?? null,
       cambiado_en: m?.cambiado_en ?? null,
-      // 🔴 Las DOS firmas, una por paso: «Preparado por Julio · 10:42 a. m.».
-      // Sin la migración no llegan y la pantalla simplemente no las dibuja.
-      bultos: bultos.get(`${p.empresa_key}:${p.pedido_switch_id}`) ?? null,
+      // 🔴 Flujo simplificado: el número que anotó bodega es SU PROPIA
+      // columna (`pedidos_bodega_estado.bultos`), no una cuenta de líneas.
+      bultos: PEDIDOS_FLUJO_SIMPLE_2026_10
+        ? m?.bultos ?? null
+        : bultos.get(`${p.empresa_key}:${p.pedido_switch_id}`) ?? null,
       // 🔴 `null` = todavía no se sabe; la pantalla entonces no apaga «Verificar».
-      articulos: asignacion.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.articulos ?? null,
-      sin_bulto: asignacion.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.sinBulto ?? null,
+      // Solo aplica al flujo de bulto-por-línea.
+      articulos: BULTOS_ACTIVO ? asignacion.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.articulos ?? null : null,
+      sin_bulto: BULTOS_ACTIVO ? asignacion.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.sinBulto ?? null : null,
       preparado_por: m?.preparado_por ?? null,
       preparado_en: m?.preparado_en ?? null,
       verificado_por: m?.verificado_por ?? null,
       verificado_en: m?.verificado_en ?? null,
+      facturado_por: m?.facturado_por ?? null,
+      facturado_en: m?.facturado_en ?? null,
+      despachado_por: m?.despachado_por ?? null,
+      despachado_en: m?.despachado_en ?? null,
     };
   });
   return NextResponse.json({
     pedidos: ordenarPedidos(pedidos),
     actualizado,
-    ...(PEDIDOS_BULTOS_2026_10 ? { empresas } : {}),
+    ...(PEDIDOS_FLUJO_SIMPLE_2026_10 || PEDIDOS_BULTOS_2026_10 ? { empresas } : {}),
+  });
+}
+
+/**
+ * 🔴 Flujo simplificado (7-oct-2026): PATCH propio, SIN crear envío de
+ * Etiquetas (ese enlace no se programó — Daniel, 7-oct-2026: «se usa la
+ * factura, no el pedido») y sin la regla de «otra persona»: el porqué, en
+ * `pedidos-flujo-simple.ts`.
+ */
+async function patchFlujoSimple(
+  auth: SessionPayload,
+  empresa: string,
+  id: number,
+  estado: EstadoFlujoSimple,
+  body: Record<string, unknown> | null,
+): Promise<NextResponse> {
+  const quienFirma = auth.userName || auth.userId;
+  if (!quienFirma) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+
+  const { data: pedido } = await supabaseServer
+    .from("switch_pedidos")
+    .select("empresa_key")
+    .eq("empresa_key", empresa)
+    .eq("pedido_switch_id", id)
+    .maybeSingle();
+  if (!pedido || !empresasQueVe(auth.userName, auth.role).includes(empresa)) {
+    return NextResponse.json({ error: "Ese pedido no existe" }, { status: 404 });
+  }
+
+  const previo = await leerEstadoPrevio(empresa, id);
+  const desde = estadoFlujoSimpleLeido(previo?.estado);
+  const v = puedeMoverFlujoSimple({ desde, hasta: estado, empresa_key: empresa }, { role: auth.role, userName: auth.userName });
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 403 });
+
+  // El número de bultos SOLO se pide (y se exige) al preparar DESDE pendiente:
+  // volver a «Preparado» desde «Facturado» conserva el que ya había.
+  let bultosNuevos: number | null = null;
+  if (estado === "preparado" && desde === "pendiente") {
+    const val = validarCantidadBultos(body?.bultos);
+    if (!val.ok) return NextResponse.json({ error: val.error }, { status: 400 });
+    bultosNuevos = val.valor!;
+  }
+
+  const ahora = new Date().toISOString();
+  // Cada paso firma SU columna; retroceder a «Preparado» borra SOLO la firma
+  // de Facturado (la de Preparado, de bodega, se conserva).
+  const firma: { preparado_por?: string | null; preparado_en?: string | null; facturado_por?: string | null; facturado_en?: string | null; despachado_por?: string | null; despachado_en?: string | null } =
+    estado === "preparado"
+      ? desde === "facturado"
+        ? { facturado_por: null, facturado_en: null }
+        : { preparado_por: quienFirma, preparado_en: ahora }
+      : estado === "facturado"
+        ? { facturado_por: quienFirma, facturado_en: ahora }
+        : { despachado_por: quienFirma, despachado_en: ahora };
+
+  const fila = {
+    empresa_key: empresa,
+    pedido_switch_id: id,
+    estado,
+    cambiado_por: quienFirma,
+    cambiado_en: ahora,
+    ...(bultosNuevos != null ? { bultos: bultosNuevos } : {}),
+    ...firma,
+  };
+  const { error } = await supabaseServer.from("pedidos_bodega_estado").upsert(fila, { onConflict: "empresa_key,pedido_switch_id" });
+  if (error) return NextResponse.json({ error: "No se pudo guardar el estado" }, { status: 500 });
+  return NextResponse.json({
+    ok: true,
+    estado,
+    bultos: bultosNuevos ?? previo?.bultos ?? null,
+    cambiado_por: fila.cambiado_por,
+    cambiado_en: fila.cambiado_en,
+    preparado_por: firma.preparado_por ?? previo?.preparado_por ?? null,
+    preparado_en: firma.preparado_en ?? previo?.preparado_en ?? null,
+    facturado_por: "facturado_por" in firma ? firma.facturado_por : previo?.facturado_por ?? null,
+    facturado_en: "facturado_en" in firma ? firma.facturado_en : previo?.facturado_en ?? null,
+    despachado_por: firma.despachado_por ?? null,
+    despachado_en: firma.despachado_en ?? null,
   });
 }
 
@@ -196,7 +312,9 @@ export async function PATCH(req: NextRequest) {
   // Con bultos, quién puede marcar QUÉ lo decide `puedeMover` abajo (que mira el
   // estado destino, quién terminó el pedido y de qué empresa es): aquí solo se
   // exige estar en la lista más ANCHA de las dos, que es la de «Preparado».
-  const auth = requireRole(req, [...(PEDIDOS_BULTOS_2026_10 ? ROLES_PREPARADO : PEDIDOS_BODEGA_ROLES)]);
+  const auth = requireRole(req, [
+    ...(PEDIDOS_FLUJO_SIMPLE_2026_10 ? ROLES_PREPARA_FLUJO_SIMPLE : BULTOS_ACTIVO ? ROLES_PREPARADO : PEDIDOS_BODEGA_ROLES),
+  ]);
   if (auth instanceof NextResponse) return auth;
 
   // El CHECK de la tabla exige la firma; una inventada es peor que ninguna.
@@ -207,9 +325,13 @@ export async function PATCH(req: NextRequest) {
   const empresa = String(body?.empresa_key ?? "");
   const id = Number(body?.pedido_switch_id);
   const estado = body?.estado;
-  const valido = PEDIDOS_BULTOS_2026_10 ? esEstadoBultos(estado) : esEstadoPedido(estado);
+  const valido = PEDIDOS_FLUJO_SIMPLE_2026_10 ? esEstadoFlujoSimple(estado) : BULTOS_ACTIVO ? esEstadoBultos(estado) : esEstadoPedido(estado);
   if (!(B2B_EMPRESA_KEYS as readonly string[]).includes(empresa) || !Number.isInteger(id) || !valido) {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+  }
+
+  if (PEDIDOS_FLUJO_SIMPLE_2026_10) {
+    return patchFlujoSimple(auth, empresa, id, estado as EstadoFlujoSimple, body);
   }
 
   let envio: { envio_id: string; bultos: number } | null = null;
