@@ -203,7 +203,6 @@ export default function PortadaTiendasYMarcas({
                           data-fila="puerta"
                           titulo={p.titulo}
                           detalle={p.detalle}
-                          monto="›"
                           onClick={() => router.push(p.href)}
                           ariaLabel={`Abrir ${p.titulo}`}
                         />

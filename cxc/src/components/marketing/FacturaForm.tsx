@@ -648,7 +648,8 @@ export function FacturaForm({
   // hoy y en la ficha de edición — solo cambia lo de abajo (el control de
   // impuesto y el envoltorio de pasos).
   // 🔴 SOLO LO COBRABLE: sin asteriscos (diseno.md, regla 8). Sin la prop, el de siempre.
-  const asterisco = cargo ? null : <span className="text-red-500 ml-0.5">*</span>;
+  const asterisco =
+    cargo || (MKT_SOLO_COBRABLE_2026_10 && modoEdicionApple) ? null : <span className="text-red-500 ml-0.5">*</span>;
   const datosComunesDeLaFactura = (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

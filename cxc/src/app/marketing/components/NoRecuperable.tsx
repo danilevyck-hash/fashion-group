@@ -147,7 +147,7 @@ export default function NoRecuperable({
                 </td>
                 <td className="px-4 py-2.5 text-gray-600">{tiendaDe(f)}</td>
                 <td className="px-4 py-2.5">
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{ROTULO_MOTIVO[f.motivo]}</span>
+                  <span className="whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{ROTULO_MOTIVO[f.motivo]}</span>
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-gray-900">{formatearMonto(f.total)}</td>
               </tr>

@@ -350,7 +350,10 @@ function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado, tie
 
   if (!mounted) return null;
 
-  const hayPendientes = pendientes.sinComprobante > 0 || pendientes.sinFoto > 0;
+  // 🔴 SOLO LO COBRABLE: si ya se dice QUÉ tiendas no tienen foto, el conteo
+  // de «gastos sin foto» sobra (un solo aviso por cosa).
+  const sinFotoEnElAviso = MKT_SOLO_COBRABLE_2026_10 && tiendasSinFoto.length > 0 ? 0 : pendientes.sinFoto;
+  const hayPendientes = pendientes.sinComprobante > 0 || sinFotoEnElAviso > 0;
 
   // 🔴 10a — LA MISMA PANTALLA, VESTIDA DE HOJA DE iOS (24-sep-2026). Daniel:
   // *«No hay nada que arreglar»* en el cierre — cabe entera en un iPhone, dice
@@ -414,7 +417,7 @@ function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado, tie
               <span className="font-medium">Documentación pendiente:</span>{" "}
               {[
                 pendientes.sinComprobante > 0 ? `${plural(pendientes.sinComprobante, "gasto", "gastos")} sin comprobante` : null,
-                pendientes.sinFoto > 0 ? `${plural(pendientes.sinFoto, "gasto", "gastos")} sin foto` : null,
+                sinFotoEnElAviso > 0 ? `${plural(sinFotoEnElAviso, "gasto", "gastos")} sin foto` : null,
               ].filter(Boolean).join(" · ")}.
             </Aviso>
           )}
