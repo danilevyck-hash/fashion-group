@@ -10,6 +10,11 @@
 // habría sido una segunda que mantener igual a mano — que es exactamente lo que
 // el rediseño del CXC acaba de terminar de borrar (había SEIS puertas).
 //
+// 🔴 UN SOLO BOTÓN: «ESTADO DE CUENTA» (7-oct-2026, propuesta). PRENDIDO,
+// `EstadoCuentaDrawer` se deja de abrir desde acá —era el mismo trabajo
+// partido en dos, en la MISMA pantalla— y ClienteDetail abre directo la hoja.
+// Interruptor `ESTADO_CUENTA_UN_BOTON_2026_10`.
+//
 // 🔴 SOLO SE MUESTRA A QUIEN TIENE CUENTAS POR COBRAR. La ficha la abre TODO el
 // mundo —es su gracia: es la única página sobre un cliente que ven todos los
 // roles— pero las tres rutas que hay detrás (`/api/cxc/enviar-email`,
@@ -27,6 +32,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import HojaCobrar, { type CorreoProgramado } from "@/app/cxc/components/HojaCobrar";
 import EstadoCuentaDrawer from "@/app/cxc/components/EstadoCuentaDrawer";
+import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 import UndoToast from "@/components/UndoToast";
 import { Toast } from "@/components/ui";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
@@ -41,7 +47,7 @@ export interface CobrarEnFichaProps {
   /** ¿Está abierta la hoja «Cobrar»? Lo maneja quien dibuja el botón. */
   hojaAbierta: boolean;
   onCerrarHoja: () => void;
-  /** ¿Está abierto el cajón de documentos? */
+  /** ¿Está abierto el cajón de documentos? Solo con el interruptor APAGADO. */
   cajonAbierto: boolean;
   onCerrarCajon: () => void;
   /** Abre la hoja desde el pie del cajón («Cobrar»). */
@@ -118,12 +124,14 @@ export default function CobrarEnFicha({
 
   return (
     <>
-      <EstadoCuentaDrawer
-        client={cajonAbierto ? client : null}
-        companyFilter="all"
-        onClose={onCerrarCajon}
-        onCobrar={() => { onCerrarCajon(); onAbrirHoja(); }}
-      />
+      {!ESTADO_CUENTA_UN_BOTON_2026_10 && (
+        <EstadoCuentaDrawer
+          client={cajonAbierto ? client : null}
+          companyFilter="all"
+          onClose={onCerrarCajon}
+          onCobrar={() => { onCerrarCajon(); onAbrirHoja(); }}
+        />
+      )}
 
       <HojaCobrar
         client={hojaAbierta ? client : null}

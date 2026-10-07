@@ -68,6 +68,7 @@ import { Aviso } from "@/components/ui/Aviso";
 import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeControles";
 import { CLIENTES_APPLE_2026_10 } from "@/lib/clientes/apple-2026-10";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
+import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
 /** Tipo c (2-oct-2026): detalle por empresa (3 partes) y últimos pagos (2), lado a lado desde 1024 px. */
 const DETALLE_Y_PAGOS = "lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4 lg:items-start";
@@ -152,6 +153,7 @@ export default function ClienteDetail({
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hojaCobrar, setHojaCobrar] = useState(false);
+  // Solo con el interruptor APAGADO: el cajón de solo lectura.
   const [cajonDocs, setCajonDocs] = useState(false);
   const [guiasAbiertas, setGuiasAbiertas] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
@@ -339,7 +341,7 @@ export default function ClienteDetail({
                 onClick={() => setHojaCobrar(true)}
                 className="inline-flex min-h-[44px] items-center justify-center bg-black text-white text-sm font-medium rounded-md px-4 py-2 transition active:scale-[0.97]"
               >
-                Enviar estado de cuenta
+                {ESTADO_CUENTA_UN_BOTON_2026_10 ? "Estado de cuenta" : "Enviar estado de cuenta"}
               </button>
             )}
           </div>
@@ -508,8 +510,13 @@ export default function ClienteDetail({
         </section>
 
         {/* ── 6. EL PIE: ENLACES, NO BOTONES ──────────────────────────────── */}
+        {/* 🔴 UN SOLO BOTÓN: «ESTADO DE CUENTA» (7-oct-2026, propuesta).
+            PRENDIDO, el enlace «Estado de cuenta (N) ›» de abajo —que abre el
+            cajón de solo lectura— se retira: es el mismo trabajo partido en
+            dos, esta vez en la MISMA pantalla que ya tiene el botón negro de
+            arriba. Interruptor `ESTADO_CUENTA_UN_BOTON_2026_10`. */}
         <nav aria-label="Más sobre este cliente" className="border-t border-gray-100 pt-4 space-y-1">
-          {veCxc && initialData.documentos_con_saldo > 0 && (
+          {!ESTADO_CUENTA_UN_BOTON_2026_10 && veCxc && initialData.documentos_con_saldo > 0 && (
             <button
               type="button"
               onClick={() => setCajonDocs(true)}
@@ -569,7 +576,10 @@ export default function ClienteDetail({
         {barraAbajo && (
           <>
             <div aria-hidden className="h-24" />
-            <BarraAccionFija rotulo="Enviar estado de cuenta" onClick={() => setHojaCobrar(true)} />
+            <BarraAccionFija
+              rotulo={ESTADO_CUENTA_UN_BOTON_2026_10 ? "Estado de cuenta" : "Enviar estado de cuenta"}
+              onClick={() => setHojaCobrar(true)}
+            />
           </>
         )}
       </main>

@@ -46,6 +46,7 @@ import type { FormatoDescarga } from "../hooks/useDescargasCartera";
 import type { Cartera } from "@/lib/cxc/cartera";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 import { vidrioSobre } from "@/lib/ui/vidrio";
+import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
 // 🩸 Acá vivían `haceCuanto`, `ultimoPagoLabel` y `ultimaCompraLabel`: las tres
 // líneas de texto que llevaba CADA empresa dentro de la tarjeta abierta. Con
@@ -62,9 +63,17 @@ interface PanelCxcMobileProps {
   setRiskFilter: (v: RiskFilter) => void;
   companyFilter: string;
   setCompanyFilter: (v: string) => void;
-  onOpenEstado: (client: ConsolidatedClient) => void;
-  /** Abre la hoja «Cobrar» — en celular sube desde abajo (BottomSheet). */
+  /**
+   * 🔴 UN SOLO BOTÓN: «ESTADO DE CUENTA» (7-oct-2026, propuesta). PRENDIDO,
+   * abre la hoja «Cobrar» —en celular sube desde abajo (BottomSheet)— con las
+   * cuatro salidas (correo · WhatsApp · copiar · descargar PDF) y es el
+   * único botón. 🩸 Hasta hoy hay un segundo botón outline «Estado de
+   * cuenta» (`onOpenEstado`) que abre el cajón de solo lectura: el mismo
+   * trabajo partido en dos. Interruptor `ESTADO_CUENTA_UN_BOTON_2026_10`.
+   */
   onCobrar: (client: ConsolidatedClient) => void;
+  /** Abre el cajón de solo lectura. Solo con el interruptor APAGADO. */
+  onOpenEstado: (client: ConsolidatedClient) => void;
   /** El aviso «N sin pagar hace +90 d», dentro de la tarjeta negra. */
   sinPagar: { cuantos: number; monto: number } | null;
   sinPagarActivo: boolean;
@@ -105,8 +114,8 @@ export default function PanelCxcMobile({
   setRiskFilter,
   companyFilter,
   setCompanyFilter,
-  onOpenEstado,
   onCobrar,
+  onOpenEstado,
   sinPagar,
   sinPagarActivo,
   onToggleSinPagar,
@@ -234,8 +243,8 @@ export default function PanelCxcMobile({
                     cxcCompanies={cxcCompanies}
                     isExpanded={isExpanded}
                     onToggle={() => setExpandedName(prev => prev === client.nombre_normalized ? null : client.nombre_normalized)}
-                    onOpenEstado={() => onOpenEstado(client)}
                     onCobrar={() => onCobrar(client)}
+                    onOpenEstado={() => onOpenEstado(client)}
                     avisoSinPagar={avisoSinPagarDe(client)}
                     marcaEnvio={marcaEnvioDe(client)}
                     cartera={cartera}
@@ -549,8 +558,8 @@ function MobileClientCard({
   cxcCompanies,
   isExpanded,
   onToggle,
-  onOpenEstado,
   onCobrar,
+  onOpenEstado,
   avisoSinPagar,
   marcaEnvio,
   cartera,
@@ -559,8 +568,8 @@ function MobileClientCard({
   cxcCompanies: Company[];
   isExpanded: boolean;
   onToggle: () => void;
-  onOpenEstado: () => void;
   onCobrar: () => void;
+  onOpenEstado: () => void;
   /** «no paga hace 298 d» — solo con el filtro encendido. */
   avisoSinPagar: string | null;
   /** «Le enviaste el estado de cuenta hace 3 días», o `null`. */
@@ -616,8 +625,9 @@ function MobileClientCard({
         </div>
       </div>
 
-      {/* Tarjeta CERRADA: los dos botones que se usan. «Cobrar» abre la hoja de
-          las cuatro salidas; «Ver detalle» expande la tarjeta.
+      {/* Tarjeta CERRADA: los dos botones que se usan. «Estado de cuenta» abre
+          la hoja de las cuatro salidas (correo · WhatsApp · copiar · descargar
+          PDF); «Ver detalle» expande la tarjeta.
           🔴 Al que tiene saldo A FAVOR no se le cobra, así que no lleva botón
           (`lib/cxc/cobrable.ts`): le pedía que pagara una plata que le debemos. */}
       <div className="flex gap-2 px-3 pb-3">
@@ -627,7 +637,7 @@ function MobileClientCard({
           onClick={e => { e.stopPropagation(); onCobrar(); }}
           className="flex-1 inline-flex min-h-[44px] items-center justify-center rounded-md bg-black px-3 text-xs font-medium text-white active:scale-[0.97]"
         >
-          Enviar estado de cuenta
+          {ESTADO_CUENTA_UN_BOTON_2026_10 ? "Estado de cuenta" : "Enviar estado de cuenta"}
         </button>
         )}
         <button
@@ -643,8 +653,8 @@ function MobileClientCard({
         <MobileClientExpanded
           client={client}
           cxcCompanies={cxcCompanies}
-          onOpenEstado={onOpenEstado}
           onCobrar={onCobrar}
+          onOpenEstado={onOpenEstado}
           cartera={cartera}
         />
       )}
@@ -688,14 +698,14 @@ function BucketChip({
 function MobileClientExpanded({
   client,
   cxcCompanies,
-  onOpenEstado,
   onCobrar,
+  onOpenEstado,
   cartera,
 }: {
   client: ConsolidatedClient;
   cxcCompanies: Company[];
-  onOpenEstado: () => void;
   onCobrar: () => void;
+  onOpenEstado: () => void;
   cartera: Cartera;
 }) {
   // 🔴 En la cartera de Boston los últimos pagos NO se piden a la ruta del
@@ -774,15 +784,20 @@ function MobileClientExpanded({
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        {/* 🔴 UN SOLO BOTÓN (7-oct-2026, propuesta): PRENDIDO, «Estado de
+            cuenta» abre la hoja con las cuatro salidas y es el único. 🩸 Hasta
+            hoy hay un segundo botón outline que abre el cajón de solo
+            lectura — el mismo trabajo partido en dos. */}
         {seLeCobra(client.total) && (
         <button
           type="button"
           onClick={onCobrar}
           className="inline-flex min-h-[44px] items-center rounded-md bg-black px-3 text-xs font-medium text-white active:scale-[0.97]"
         >
-          Enviar estado de cuenta
+          {ESTADO_CUENTA_UN_BOTON_2026_10 ? "Estado de cuenta" : "Enviar estado de cuenta"}
         </button>
         )}
+        {!ESTADO_CUENTA_UN_BOTON_2026_10 && (
         <button
           type="button"
           onClick={onOpenEstado}
@@ -790,6 +805,7 @@ function MobileClientExpanded({
         >
           Estado de cuenta
         </button>
+        )}
         {codigo && esGrupo && (
           <Link
             href={`/clientes/${encodeURIComponent(codigo)}`}

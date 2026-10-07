@@ -252,6 +252,7 @@ function AdminDashboardInner() {
   const orden = ordenEfectivo(riskFilter, ordenOverride);
   const { key: sortKey, dir: sortDir } = orden;
   const [toast, setToast] = useState<string | null>(null);
+  // Solo con el interruptor APAGADO: el cajón de solo lectura.
   const [estadoClient, setEstadoClient] = useState<ConsolidatedClient | null>(null);
   const openEstadoCuenta = useCallback((client: ConsolidatedClient) => setEstadoClient(client), []);
   const [emailClient, setEmailClient] = useState<ConsolidatedClient | null>(null);
@@ -955,6 +956,9 @@ function AdminDashboardInner() {
       </>
       )}
 
+      {/* Solo con el interruptor APAGADO (`ESTADO_CUENTA_UN_BOTON_2026_10`):
+          el cajón de solo lectura. PRENDIDO, el botón único abre directo
+          `HojaCobrar` — ver `ContactPanel` y `PanelCxcMobile`. */}
       <EstadoCuentaDrawer
         client={estadoClient}
         companyFilter={companyFilter}
@@ -975,6 +979,7 @@ function AdminDashboardInner() {
 
       <HojaCobrar
         client={cobrarClient}
+        companyFilter={companyFilter}
         onClose={() => setCobrarClient(null)}
         onProgramarCorreo={programarCorreo}
         onWhatsApp={openWhatsApp}

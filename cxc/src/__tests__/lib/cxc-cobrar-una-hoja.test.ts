@@ -168,7 +168,11 @@ describe("🩸 las seis puertas viejas ya no existen", () => {
 
   it("y también en la tarjeta del celular", () => {
     const movil = leer("src/app/cxc/components/PanelCxcMobile.tsx");
-    expect(movil).toMatch(/>\s*Enviar estado de cuenta\s*</);
+    // 7-oct-2026, propuesta («Estado de cuenta», un solo botón, interruptor
+    // `ESTADO_CUENTA_UN_BOTON_2026_10`, hoy apagado): el rótulo queda detrás
+    // de un `? :` en vez de ser texto fijo, por eso se busca el LITERAL en
+    // vez del patrón `>texto<` de siempre.
+    expect(movil).toContain('"Enviar estado de cuenta"');
   });
 
   it("🩸 se fue la línea «N de M clientes · ordenados por …»", () => {
