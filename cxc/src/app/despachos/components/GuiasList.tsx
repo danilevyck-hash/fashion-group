@@ -947,11 +947,6 @@ export default function GuiasList({
                                     {clientesSummary(g.guia_items || []) || "Sin cliente"}
                                   </span>
                                 </div>
-                                {/* Barra v3.1: «Despachar» y el borde ámbar ya dicen que está
-                                    pendiente; el chip tapaba el nombre del cliente. */}
-                                {!isDispatched && !barra && (
-                                  <span className="shrink-0"><StatusBadge estado="pendiente" /></span>
-                                )}
                                 <svg
                                   className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${apple ? "-rotate-90" : isExpanded ? "rotate-180" : ""}`}
                                   fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -959,11 +954,23 @@ export default function GuiasList({
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                               </div>
-                              {/* `destino · N bultos · transportista`, en gris. */}
-                              <div className="mt-1 text-xs text-gray-500 truncate">
-                                {[destinosSummary(g.guia_items || []), `${g.total_bultos} bultos`, g.transportista]
-                                  .filter(Boolean)
-                                  .join(" · ")}
+                              {/* `destino · N bultos · transportista`, en gris, con el chip
+                                  «Pendiente» AL FINAL (7-oct-2026). Antes vivía junto al
+                                  nombre del cliente y la barra v3.1 lo escondió ahí porque
+                                  lo tapaba (2-oct-2026) — con `BARRA_CELULAR_2026_10`
+                                  prendido en producción, el celular SIEMPRE tiene `barra`,
+                                  así que el chip no se veía NUNCA y quedaba solo el borde
+                                  ámbar como señal. Acá no compite con nada. Una despachada
+                                  sigue sin chip: el verde que sobraba en 221 de 222 no vuelve. */}
+                              <div className="mt-1 flex items-center gap-2 min-w-0">
+                                <span className="text-xs text-gray-500 truncate">
+                                  {[destinosSummary(g.guia_items || []), `${g.total_bultos} bultos`, g.transportista]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </span>
+                                {!isDispatched && (
+                                  <span className="shrink-0"><StatusBadge estado="pendiente" /></span>
+                                )}
                               </div>
                               {/* El número y la fecha, chicos: sirven para nombrar
                                   la guía, no para elegirla. */}
