@@ -588,6 +588,15 @@ function carpetaDeCliente(
  *     antes de repartirse entre varias tiendas — por eso nace sin proyecto.
  *     (El mueble que YA se repartió entra por su código, antes de llegar
  *     aquí: esta regla solo corre cuando no hay tienda que lo reciba.)
+ *   · Mobiliario y exhibición, también por el CONCEPTO (7-oct-2026): las 26
+ *     entregas vivas YA tienen tienda y nunca llegan aquí, pero quedaban 5
+ *     FACTURAS del proveedor ($22.416,50 medidos) que tampoco tienen tienda ni
+ *     impulsadora — compras de mobiliario que todavía no se repartieron. La
+ *     tabla no tiene columna de categoría y el proveedor no sirve de ancla
+ *     (4 son de Confecciones Boston, 1 es de otra persona): lo único firme
+ *     que las junta es el CONCEPTO. Lista a mano en
+ *     `PALABRAS_MOBILIARIO_SIN_TIENDA`, abajo — agregar una palabra ahí no
+ *     toca esta función.
  *
  * Lo demás (eventos, catálogos…) sigue en General — la meta es que ahí no
  * quede nada, pero se queda como última red.
@@ -595,12 +604,30 @@ function carpetaDeCliente(
 export const CARPETA_IMPULSADORAS = "Impulsadoras";
 export const CARPETA_MOBILIARIO_Y_EXHIBICION = "Mobiliario y exhibición";
 
+/**
+ * 🔴 ÚLTIMO RECURSO, SIN OTRO DATO FIRME (7-oct-2026). Medido contra las 5
+ * facturas vivas sin tienda ni impulsadora: «Muebles» (×3) · «Tazas» (×1,
+ * mismo pedido de mobiliario que trae tazas de exhibición) · «Barras Planas»
+ * (×1, varillas para armar la estructura). Comparación normalizada (sin
+ * acentos, minúsculas, `norm()`), por `includes` — así «Muebles para la
+ * vitrina» también cae. Agregar un término nuevo es editar ESTA lista, nunca
+ * la función de abajo.
+ */
+export const PALABRAS_MOBILIARIO_SIN_TIENDA = ["mueble", "tazas", "barras planas"];
+
+function esConceptoDeMobiliario(concepto: string | null | undefined): boolean {
+  const c = norm(concepto);
+  return !!c && PALABRAS_MOBILIARIO_SIN_TIENDA.some((palabra) => c.includes(palabra));
+}
+
 function carpetaSinClientePorConcepto(ctx: {
   tipo: "factura" | "entrega";
   impulsadoraId?: string | null;
+  concepto?: string | null;
 }): string {
   if (ctx.tipo === "entrega") return CARPETA_MOBILIARIO_Y_EXHIBICION;
   if (txt(ctx.impulsadoraId)) return CARPETA_IMPULSADORAS;
+  if (esConceptoDeMobiliario(ctx.concepto)) return CARPETA_MOBILIARIO_Y_EXHIBICION;
   return CARPETA_GENERAL;
 }
 
@@ -613,7 +640,11 @@ function carpetaDeGasto(
   codigo: string | null,
   texto: string | null,
   nombrePorCodigo: ReadonlyMap<string, string>,
-  concepto: { tipo: "factura" | "entrega"; impulsadoraId?: string | null },
+  concepto: {
+    tipo: "factura" | "entrega";
+    impulsadoraId?: string | null;
+    concepto?: string | null;
+  },
 ): string {
   const base = carpetaDeCliente(codigo, texto, nombrePorCodigo);
   return base === CARPETA_GENERAL ? carpetaSinClientePorConcepto(concepto) : base;
@@ -953,6 +984,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
           carpeta: carpetaDeGasto(cod, p?.tienda ?? null, nombrePorCodigo, {
             tipo: "factura",
             impulsadoraId: f.impulsadora_id,
+            concepto: f.concepto,
           }),
           clienteCodigo: cod,
           monto,
@@ -1670,6 +1702,7 @@ function congelarEnFilas(
       carpeta: carpetaDeGasto(l.clienteCodigo, l.cliente, ctx.nombrePorCodigo, {
         tipo: l.tipo,
         impulsadoraId,
+        concepto: l.concepto,
       }),
       clienteCodigo: l.clienteCodigo,
       // 🔴 EL MONTO SALE TAL CUAL DEL REPORTE. No se recalcula, no se redondea

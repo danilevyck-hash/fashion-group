@@ -653,6 +653,48 @@ describe("ZIP por marca — carpetas por concepto (Impulsadoras y Mobiliario y e
       expect(Object.keys(wb.Sheets)).toContain(carpeta);
     }
   });
+
+  // 🔴 7-oct-2026: las 26 entregas vivas YA tienen tienda y nunca llegan a
+  // `carpetaSinClientePorConcepto` — quedaban 5 FACTURAS sin tienda ni
+  // impulsadora (compras de mobiliario, $22.416,50 medidos) cayendo a
+  // General porque la regla solo miraba `tipo === "entrega"`. Ahora también
+  // mira el CONCEPTO (`PALABRAS_MOBILIARIO_SIN_TIENDA`).
+  it("EN VIVO: una FACTURA sin tienda ni impulsadora cuyo concepto es «Muebles» va a Mobiliario y exhibición", async () => {
+    tablas.mk_facturas.push(fact("f6", null, "MOB-1", "2026-06-12", "Muebles", 300));
+    tablas.mk_factura_marcas.push({ factura_id: "f6", marca_id: M_TH, porcentaje: 100 });
+    tablas.mk_periodo_documentos.push(sello(P_ABIERTO, "factura", "f6"));
+    tablas.mk_adjuntos.push(adj("a8", "pdf_factura", "f6", null, "fact/f6.pdf", "factura-muebles.pdf"));
+    storage["fact/f6.pdf"] = Buffer.from("bytes");
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    const paths = await rutas(r.buffer);
+    expect(paths.some((p) => p.startsWith("Mobiliario y exhibición/facturas/"))).toBe(true);
+    expect(r.carpetas).toContain("Mobiliario y exhibición");
+  });
+
+  it("EN VIVO: la misma factura, con «Tazas» o «Barras Planas» (normalizado, sin acentos), también va a Mobiliario y exhibición", async () => {
+    tablas.mk_facturas.push(
+      fact("f6", null, "MOB-1", "2026-06-12", "Tazas", 50),
+      fact("f7", null, "MOB-2", "2026-06-13", "Barras Planas (60 unidades a 8.50 c/u)", 545.7),
+    );
+    tablas.mk_factura_marcas.push(
+      { factura_id: "f6", marca_id: M_TH, porcentaje: 100 },
+      { factura_id: "f7", marca_id: M_TH, porcentaje: 100 },
+    );
+    tablas.mk_periodo_documentos.push(
+      sello(P_ABIERTO, "factura", "f6"),
+      sello(P_ABIERTO, "factura", "f7"),
+    );
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    const etiquetas = (await hojaResumen(r.buffer)).map((f) => String(f[0] ?? ""));
+    expect(etiquetas).toContain("Mobiliario y exhibición");
+  });
+
+  it("EN VIVO: un evento sin tienda cuyo concepto NO es de mobiliario sigue en General", async () => {
+    // f4 (fixture base) es "evento apertura", sin cliente ni impulsadora.
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    const etiquetas = (await hojaResumen(r.buffer)).map((f) => String(f[0] ?? ""));
+    expect(etiquetas).toContain("General");
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────────
