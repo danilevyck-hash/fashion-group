@@ -18,6 +18,7 @@
 //     (24-sep-2026, `MARKETING_CELULAR`).
 // ============================================================================
 
+import { MKT_SOLO_COBRABLE_2026_10 } from "@/lib/marketing/solo-cobrable-2026-10";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Aviso } from "@/components/ui/Aviso";
@@ -234,7 +235,9 @@ function Ficha({
   cel: boolean;
   onVolver: () => void;
 }) {
-  const propio = ficha.pagado - ficha.recobrado;
+  // 🔴 SOLO LO COBRABLE: lo de un período abierto no es «a cargo de la
+  // empresa», es lo que falta cobrar. Apagado, `porCobrar` es 0.
+  const propio = ficha.pagado - ficha.recobrado - (MKT_SOLO_COBRABLE_2026_10 ? ficha.porCobrar : 0);
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -326,6 +329,16 @@ function Ficha({
                   {formatearMonto(ficha.recobrado)}
                 </td>
               </tr>
+              {MKT_SOLO_COBRABLE_2026_10 && (
+                <tr>
+                  <td colSpan={4} className="px-3 py-2 text-gray-700">
+                    Por cobrar
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-gray-900">
+                    {formatearMonto(ficha.porCobrar)}
+                  </td>
+                </tr>
+              )}
             </tfoot>
           </table>
         </div>
@@ -336,6 +349,7 @@ function Ficha({
           {ficha.renglones.length}{" "}
           {ficha.renglones.length === 1 ? "factura" : "facturas"} · pagado{" "}
           {formatearMonto(ficha.pagado)} · recobrado {formatearMonto(ficha.recobrado)} ·{" "}
+          {MKT_SOLO_COBRABLE_2026_10 && <>por cobrar {formatearMonto(ficha.porCobrar)} ·{" "}</>}
           {ROTULO_A_CARGO_EMPRESA.toLowerCase()} {formatearMonto(propio)}
         </p>
       )}

@@ -16,6 +16,10 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import {
+  MKT_SOLO_COBRABLE_2026_10,
+  facturasEnPeriodoCerrado,
+} from "@/lib/marketing/solo-cobrable-2026-10";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ROLES_MARKETING } from "@/lib/marketing/roles";
@@ -88,6 +92,23 @@ export async function GET(req: NextRequest) {
     ]);
     if (marcasRes.error) throw new Error(marcasRes.error.message);
 
+    // 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): lo que está en un período
+    // CERRADO está cobrado (Daniel). Dos lecturas chicas: los cerrados y sus
+    // sellos de factura. Apagado, no se lee nada de esto.
+    let cobradas: Set<string> | null = null;
+    if (MKT_SOLO_COBRABLE_2026_10) {
+      const [perRes, selRes] = await Promise.all([
+        supabaseServer.from("mk_periodos").select("id, estado"),
+        supabaseServer.from("mk_periodo_documentos").select("periodo_id, tipo, documento_id"),
+      ]);
+      if (perRes.error) throw new Error(perRes.error.message);
+      if (selRes.error) throw new Error(selRes.error.message);
+      cobradas = facturasEnPeriodoCerrado(
+        (perRes.data ?? []) as Array<{ id: string; estado: string | null }>,
+        (selRes.data ?? []) as Array<{ periodo_id: string; tipo: string | null; documento_id: string }>,
+      );
+    }
+
     const nombreMarca = new Map<string, string>();
     for (const m of (marcasRes.data ?? []) as Array<{ id: string; nombre: string }>) {
       nombreMarca.set(String(m.id), String(m.nombre ?? ""));
@@ -128,6 +149,7 @@ export async function GET(req: NextRequest) {
         tiendaNombre: codigo.length > 0 ? (nombreTienda.get(codigo) ?? codigo) : null,
         pctALaMarca: pctALaMarcaDe(f.pct_a_la_marca),
         seReporta: f.se_reporta !== false,
+        ...(cobradas ? { cobrado: cobradas.has(String(f.id)) } : {}),
       };
     });
 

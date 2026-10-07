@@ -32,6 +32,8 @@ import { FacturaForm } from "@/components/marketing";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import { MARKETING_PUERTA_GASTO } from "@/lib/marketing/puerta-gasto";
 import { DIAS_PARA_BORRAR_ANULADOS } from "@/lib/marketing/periodo-manda";
+import { MKT_SOLO_COBRABLE_2026_10 } from "@/lib/marketing/solo-cobrable-2026-10";
+import { adjuntarPdfDeFactura } from "../../components/uploadHelpers";
 import ConfirmarEliminar from "./ConfirmarEliminar";
 import type {
   EntregaConItems,
@@ -129,7 +131,7 @@ function EditarFactura({
   // Lo MISMO que `FacturasSection.handleEditar`: el PATCH con las tres del
   // rediseño solo si la pantalla las preguntó, y después las marcas.
   const guardar = useCallback(
-    async (data: FacturaFormValues) => {
+    async (data: FacturaFormValues, pdfFile?: File) => {
       const { marcasSeleccionadas, gasto, permitirDuplicado: _p, ...payload } = data;
       void _p;
       const res = await fetch(`/api/marketing/facturas/${fila.id}`, {
@@ -158,11 +160,23 @@ function EditarFactura({
           throw new Error(err?.error ?? "No se pudieron actualizar las marcas");
         }
       }
+      // 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): «Reemplazar» guarda el PDF
+      // nuevo. 🩸 Antes el archivo se descartaba aquí. Primero entra el nuevo
+      // y recién después se quita el viejo: si algo falla, no queda sin PDF.
+      if (MKT_SOLO_COBRABLE_2026_10 && pdfFile) {
+        const viejo = factura?.adjuntos?.find((a) => a.tipo === "pdf_factura") ?? null;
+        try {
+          await adjuntarPdfDeFactura({ facturaId: fila.id, file: pdfFile });
+          if (viejo?.id) await fetch(`/api/marketing/adjuntos/${viejo.id}`, { method: "DELETE" });
+        } catch {
+          toast("Factura actualizada, pero el PDF nuevo no subió. Vuelve a intentarlo.", "warning");
+        }
+      }
       toast("Factura actualizada", "success");
       onCambio();
       onCerrar();
     },
-    [fila.id, onCambio, onCerrar, toast],
+    [fila.id, factura, onCambio, onCerrar, toast],
   );
 
   return (

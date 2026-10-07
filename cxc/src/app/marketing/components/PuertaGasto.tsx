@@ -100,6 +100,14 @@ import type {
   MkMarca,
 } from "@/lib/marketing/types";
 import { ENLACE, MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
+import {
+  MKT_SOLO_COBRABLE_2026_10,
+  faltaEnElDestino,
+  tiendaQueSeGuarda,
+  type DestinoDelCargo,
+} from "@/lib/marketing/solo-cobrable-2026-10";
+import { esTiendaMultifashion } from "@/lib/marketing/tiendas-y-marcas";
+import { ComprobanteDelCargo, DestinoDelCargoBloque } from "./RegistroDelCargo";
 
 type Paso = "tipo" | "datos" | "form";
 
@@ -163,6 +171,20 @@ export default function PuertaGasto({
   const [destino, setDestino] = useState<DestinoDelGasto>(destinoInicial);
   const [tipo, setTipo] = useState<TipoGasto | null>(null);
   const [datos, setDatos] = useState<DatosDelGasto>(() => datosPorDefecto("factura"));
+  // 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): Marca · Tienda · Se cobra del
+  // registro de una pantalla. Apagado, nunca se lee.
+  const [destinoCargo, setDestinoCargo] = useState<DestinoDelCargo>(() => ({
+    marcaId: marcaInicial?.id ?? "",
+    tienda: tiendaInicialProp
+      ? { codigo: tiendaInicialProp.codigo, nombre: tiendaInicialProp.nombre }
+      : String(tiendaCodigo ?? "").trim()
+        ? {
+            codigo: String(tiendaCodigo).trim().toUpperCase(),
+            nombre: String(tiendaNombre ?? "").trim() || String(tiendaCodigo).trim().toUpperCase(),
+          }
+        : null,
+    pct: null,
+  }));
 
   const [impulsadoras, setImpulsadoras] = useState<ImpulsadoraConEstado[] | null>(null);
   const [impulsadoraSel, setImpulsadoraSel] = useState<ImpulsadoraConEstado | null>(null);
@@ -199,7 +221,9 @@ export default function PuertaGasto({
   const marcaEfectiva: MkMarca | null =
     tipo === "impulsadora"
       ? marcaDeImpulsadora
-      : (marcasOrdenadas.find((m) => m.id === datos.marcaId) ?? null);
+      : MKT_SOLO_COBRABLE_2026_10 && tipo === "factura"
+        ? (marcasOrdenadas.find((m) => m.id === destinoCargo.marcaId) ?? null)
+        : (marcasOrdenadas.find((m) => m.id === datos.marcaId) ?? null);
 
   // Cada lectura se pide solo cuando hace falta: el camino más usado no paga
   // lo que no mira.
@@ -247,8 +271,11 @@ export default function PuertaGasto({
           : {}),
       }),
     );
-    setPaso("datos");
+    // 🔴 SOLO LO COBRABLE: la factura va directo a su pantalla única, que
+    // empieza por el comprobante. Mueble e impulsadora, como siempre.
+    setPaso(MKT_SOLO_COBRABLE_2026_10 && t === "factura" ? "form" : "datos");
   };
+  const esCargo = MKT_SOLO_COBRABLE_2026_10 && tipo === "factura";
 
   // 🔴 PROVEEDORES (6-oct-2026): con un destino que no es «una marca», la
   // marca NO se exige: el gasto queda a cargo de la empresa.
@@ -414,6 +441,17 @@ export default function PuertaGasto({
   ) => {
     const { marcasSeleccionadas: _sinUso, ...payload } = data;
     void _sinUso;
+    // 🔴 SOLO LO COBRABLE: marca, tienda y porcentaje salen del destino del
+    // cargo; siempre se reporta (lo no cobrable ya no entra por aquí).
+    const cuerpoDelCargo = esCargo
+      ? {
+          marcaId: marcaEfectiva?.id ?? "",
+          pctALaMarca: destinoCargo.pct,
+          tiendaCodigo: tiendaQueSeGuarda(destinoCargo.tienda),
+          seReporta: true,
+          nota: comun.nota,
+        }
+      : null;
     const res = await fetch("/api/marketing/facturas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -428,6 +466,7 @@ export default function PuertaGasto({
         tiendaCodigo: comun.tiendaCodigo,
         seReporta: comun.seReporta,
         nota: comun.nota,
+        ...(cuerpoDelCargo ?? {}),
       }),
     });
     if (!res.ok) {
@@ -769,8 +808,80 @@ export default function PuertaGasto({
           </>
         )}
 
+        {/* ─── SOLO LO COBRABLE — la factura en UNA pantalla ───────────────── */}
+        {paso === "form" && esCargo && (
+          <div className="p-5 space-y-4" data-testid="registro-del-cargo">
+            <input
+              ref={camaraRef}
+              type="file"
+              accept={ACCEPT_DE_LA_CAMARA}
+              capture={CAPTURE_DE_LA_CAMARA}
+              className="hidden"
+              onChange={(e) => {
+                const archivo = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                if (archivo) void escanearFactura(archivo);
+              }}
+            />
+            <input
+              ref={fotoRef}
+              type="file"
+              accept={aceptaDeLaPuerta()}
+              className="hidden"
+              onChange={(e) => {
+                const archivo = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                if (!archivo) return;
+                // Una foto se lee igual que el escaneo; un PDF lo lee el formulario.
+                const cual = clasificarArchivoDeLaPuerta(archivo);
+                if (cual.ok && cual.clase !== "pdf") void escanearFactura(archivo);
+                else elegirArchivo(archivo);
+              }}
+            />
+            <ComprobanteDelCargo
+              archivo={(foto ?? pdfPuerta)?.name ?? null}
+              leyendo={leyendo}
+              enCelular={enCelular}
+              onAdjuntar={() => fotoRef.current?.click()}
+              onEscanear={() => camaraRef.current?.click()}
+              onQuitar={() => {
+                setFoto(null);
+                setPdfPuerta(null);
+                setPdfPathPreSubido(null);
+                setLectura(null);
+              }}
+            />
+            <FacturaForm
+              key={`${pdfPuerta?.name ?? ""}|${lectura ? "leida" : ""}`}
+              proyecto={{ id: "", marcas: [] }}
+              marcasCatalogo={marcasOrdenadas}
+              {...(initialDeLaLectura(lectura) ? { initial: initialDeLaLectura(lectura) } : {})}
+              marcaFija={marcaEfectiva}
+              onSubmit={guardarFactura}
+              onCancel={onClose}
+              historicoProveedores={historicoProveedores}
+              onUploadPdfForIA={subirPdfParaIA}
+              {...(pdfPuerta ? { pdfInicial: pdfPuerta } : {})}
+              cargo={{
+                hayComprobante: !!pdfPuerta || !!foto,
+                faltaDestino: faltaEnElDestino(destinoCargo, esTiendaMultifashion),
+                destino: (
+                  <DestinoDelCargoBloque
+                    marcas={marcasOrdenadas}
+                    valor={destinoCargo}
+                    onChange={setDestinoCargo}
+                    tiendaFija={tiendaInicial}
+                    nota={datos.nota}
+                    onNota={(nota) => setDatos({ ...datos, nota })}
+                  />
+                ),
+              }}
+            />
+          </div>
+        )}
+
         {/* ─── PASO 3 — la FACTURA, el formulario que ya existía ─────────── */}
-        {paso === "form" && tipo === "factura" && (
+        {paso === "form" && tipo === "factura" && !esCargo && (
           <div className="p-5 space-y-4">
             <div
               className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"

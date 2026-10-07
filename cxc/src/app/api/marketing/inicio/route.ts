@@ -5,6 +5,7 @@ import { esMultifashion, MULTIFASHION_CODIGOS } from "@/lib/marketing/multifashi
 import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { MKT_SOLO_COBRABLE_2026_10, montoCobrable } from "@/lib/marketing/solo-cobrable-2026-10";
 import {
   agregarPorBloques,
   type AdjuntoResumen,
@@ -53,6 +54,10 @@ const COLS_FACTURA = "id, proyecto_id, total, grupo_legacy, impulsadora_id";
 const COLS_ENTREGA = "id, proyecto_id, total, total_por_marca, total_por_empresa_interna";
 const COLS_PERIODO = "id, proveedor_key, nombre, estado, cerrado_en";
 const avisarColumna = (m: string) => console.error(`[marketing/inicio] ${m}`);
+// 🔴 SOLO LO COBRABLE (apagado): también el porcentaje que se le cobra a la marca.
+const COLS_FACTURA_LEIDAS: string = MKT_SOLO_COBRABLE_2026_10
+  ? `${COLS_FACTURA}, se_reporta, tienda_codigo, pct_a_la_marca`
+  : `${COLS_FACTURA}, se_reporta, tienda_codigo`;
 
 interface PeriodoLeido extends PeriodoRow {
   abierto_en?: string | null;
@@ -81,8 +86,8 @@ export async function GET(req: NextRequest) {
           () =>
             supabaseServer
               .from("mk_facturas")
-              .select(`${COLS_FACTURA}, se_reporta, tienda_codigo`)
-              .is("anulado_en", null),
+              .select(COLS_FACTURA_LEIDAS)
+              .is("anulado_en", null) as never,
           () => supabaseServer.from("mk_facturas").select(COLS_FACTURA).is("anulado_en", null),
           avisarColumna,
         ).then((r) => r.resultado),
@@ -135,8 +140,23 @@ export async function GET(req: NextRequest) {
       proyectos.filter((p) => esMultifashion(p)).map((p) => String(p.id)),
     );
 
+    // 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): la marca suma lo que se le
+    // COBRA — el 50 % a la mitad, y lo «a cargo de la empresa» fuera del total
+    // (va a No recuperable). Solo en memoria: la base no se toca.
+    const facturasLeidas = (facturasRes.data ?? []) as unknown as Array<Record<string, unknown>>;
+    const facturasParaSumar = MKT_SOLO_COBRABLE_2026_10
+      ? facturasLeidas.map((f) => {
+          const pct = f.pct_a_la_marca as number | null | undefined;
+          return {
+            ...f,
+            total: montoCobrable(Number(f.total ?? 0), pct),
+            se_reporta: pct === 0 ? false : f.se_reporta,
+          };
+        })
+      : facturasLeidas;
+
     const resumen = agregarPorBloques({
-      facturas: (facturasRes.data ?? []) as never,
+      facturas: facturasParaSumar as never,
       facturaMarcas: (fmRes.data ?? []) as never,
       entregas: (entregasRes.data ?? []) as never,
       marcas: (marcasRes.data ?? []) as never,

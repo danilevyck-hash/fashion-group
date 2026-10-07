@@ -38,6 +38,7 @@ import { hrefDePestana, type TiendaDeSeccion } from "@/lib/marketing/tiendas-y-m
 import { ZIP_E_IMPULSADORAS_NUEVO } from "@/lib/marketing/zip-e-impulsadoras";
 import type { BloqueResumen } from "./InicioMarketing";
 import CerrarPeriodoModal from "./CerrarPeriodoModal";
+import { MKT_SOLO_COBRABLE_2026_10 } from "@/lib/marketing/solo-cobrable-2026-10";
 import LoQueFalta from "./LoQueFalta";
 import ZipsBajados from "./ZipsBajados";
 import { ChipEstado, FilaNivel, ListaCard } from "./FilaNivel";
@@ -222,6 +223,7 @@ export default function PaginaMarca({
         <CerrarPeriodoModal
           bloque={bloqueResumen}
           periodoId={abierta.id}
+          {...(MKT_SOLO_COBRABLE_2026_10 ? { tiendas: abierta.tiendas ?? [] } : {})}
           onClose={() => setCerrando(false)}
           onCerrado={() => {
             setCerrando(false);

@@ -82,6 +82,11 @@ interface Props {
    * co-igual. Sin la prop, los dos botones de siempre.
    */
   tiendaComoBuscador?: boolean;
+  /**
+   * 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): sin «Se reporta a la marca».
+   * Lo dice «Se cobra › No recuperable». Sin la prop, como siempre.
+   */
+  sinSeReporta?: boolean;
 }
 
 const CAMPO =
@@ -97,13 +102,15 @@ export default function BloqueDatosDelGasto({
   sinMarca = false,
   destino = null,
   tiendaComoBuscador = false,
+  sinSeReporta = false,
 }: Props) {
   const [cambiandoMarca, setCambiandoMarca] = useState(false);
   // 🔴 MARKETING_APPLE_2026_10: lo que casi nunca se toca va detrás de un
   // enlace (medido: «se reporta» prendido en 104 de 104; nota en 4 de 103).
   const [abrioSeReporta, setAbrioSeReporta] = useState(false);
   const [abrioObservaciones, setAbrioObservaciones] = useState(false);
-  const verSeReporta = !MARKETING_APPLE_2026_10 || seReportaAbierto(datos.seReporta, abrioSeReporta);
+  const verSeReporta =
+    !sinSeReporta && (!MARKETING_APPLE_2026_10 || seReportaAbierto(datos.seReporta, abrioSeReporta));
   const verNota = !MARKETING_APPLE_2026_10 || observacionesAbiertas(datos.nota, abrioObservaciones);
   const esImpulsadora = marcaDeImpulsadora !== undefined;
   const marcaElegida = marcas.find((m) => m.id === datos.marcaId) ?? null;
@@ -291,7 +298,7 @@ export default function BloqueDatosDelGasto({
       </div>
 
       {/* ─── SE REPORTA ────────────────────────────────────────────────── */}
-      {!verSeReporta || !verNota ? (
+      {(!verSeReporta && !sinSeReporta) || !verNota ? (
         <div className="flex flex-wrap gap-x-5">
           {!verNota && (
             <button
@@ -302,7 +309,7 @@ export default function BloqueDatosDelGasto({
               + Agregar observaciones
             </button>
           )}
-          {!verSeReporta && (
+          {!verSeReporta && !sinSeReporta && (
             <button
               type="button"
               onClick={() => setAbrioSeReporta(true)}
