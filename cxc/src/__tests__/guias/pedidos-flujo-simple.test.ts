@@ -13,8 +13,9 @@
 // Etiquetas— no es parte de Pedidos. Tampoco programes la detección
 // automática de la factura: sale del alcance.»
 //
-//   1. 🔴 APAGADO = LA PANTALLA DE HOY (`PEDIDOS_BULTOS_2026_10`, bulto por
-//      línea, tres estados). Nace `false`: el mockup va primero.
+//   1. 🔴 PRENDIDO el 7-oct-2026 con el «sí» de Daniel al mockup. `false`
+//      sigue siendo la pantalla de antes (`PEDIDOS_BULTOS_2026_10`, bulto
+//      por línea, tres estados) — la vuelta atrás.
 //   2. 🔴 TRES ESTADOS, nombres de ERP: Pendiente → Preparado → Recibido.
 //      NINGÚN «Facturado» ni «Despachado»: eso vive en Switch y en
 //      Etiquetas, no en Pedidos.
@@ -60,12 +61,12 @@ const detalle = () => leer("app/despachos/components/PedidoBultos.tsx");
 const rutaLista = () => leer("app/api/guias/pedidos/route.ts");
 const pagina = () => leer("app/despachos/page.tsx");
 
-describe("🔴 1 · apagado = la pantalla de hoy", () => {
-  it("el interruptor nace false", () => {
-    expect(PEDIDOS_FLUJO_SIMPLE_2026_10).toBe(false);
+describe("🔴 1 · prendido — Daniel aprobó el mockup", () => {
+  it("el interruptor está en true", () => {
+    expect(PEDIDOS_FLUJO_SIMPLE_2026_10).toBe(true);
   });
 
-  it("apagado, la ruta no cambia el nombre de la pestaña «Bultos»", () => {
+  it("la pestaña puede decir «Etiquetas» o «Bultos» según el interruptor (el código sigue teniendo las dos ramas)", () => {
     expect(pagina()).toContain('["etiquetas", PEDIDOS_FLUJO_SIMPLE_2026_10 ? "Etiquetas" : "Bultos"]');
   });
 });

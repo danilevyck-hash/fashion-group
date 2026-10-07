@@ -67,13 +67,14 @@ import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { empresasQueVe, horaPanama, MAX_BULTO, MIN_BULTO, veLaEmpresa, type Veredicto } from "./pedidos-bultos";
 
 /**
- * `false` = la pantalla de hoy: asignación de bulto por artículo, TRES
- * estados del otro flujo (`PEDIDOS_BULTOS_2026_10`). Nace APAGADO — el
- * mockup va primero. Mismo escape que `PAPELES_ESTILO_UNICO` para sacar
- * capturas en LOCAL sin publicar nada: `NEXT_PUBLIC_PEDIDOS_FLUJO_SIMPLE=1`.
- * En producción manda la constante: la variable no existe en Vercel.
+ * 🔴 PRENDIDO el 7-oct-2026 con el «sí» de Daniel, después de ver el mockup
+ * HOY vs RECOMENDACIÓN con capturas reales. `false` sigue siendo la pantalla
+ * de antes: asignación de bulto por artículo, tres estados del otro flujo
+ * (`PEDIDOS_BULTOS_2026_10`) — es la vuelta atrás, con el mismo escape que
+ * `PAPELES_ESTILO_UNICO` para sacar capturas en LOCAL sin publicar nada:
+ * `NEXT_PUBLIC_PEDIDOS_FLUJO_SIMPLE=1`. En producción manda esta constante.
  */
-export const PEDIDOS_FLUJO_SIMPLE_EN_CODIGO = false;
+export const PEDIDOS_FLUJO_SIMPLE_EN_CODIGO = true;
 
 export const PEDIDOS_FLUJO_SIMPLE_2026_10: boolean =
   PEDIDOS_FLUJO_SIMPLE_EN_CODIGO ||
