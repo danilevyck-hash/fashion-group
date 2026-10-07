@@ -108,4 +108,3 @@ function conEstiloUnico(o: UserOptions): UserOptions {
     },
   };
 }
-export const __pruebaChequeoTipos: number = "esto no es un número";
