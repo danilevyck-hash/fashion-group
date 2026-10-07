@@ -539,7 +539,11 @@ describe("🔴 10. nada que no se pueda volver a conseguir se queda sin copia", 
 describe("🔴 11. la pestaña «Etiquetas» tiene su propia puerta", () => {
   it("se dibuja para los tres roles que escriben guías", () => {
     expect(paginaGuias).toContain("puedeEtiquetar(role)");
-    expect(paginaGuias).toContain('["etiquetas", "Bultos"]');
+    // 🔄 7-oct-2026: el rótulo es «Bultos», y vuelve a «Etiquetas» detrás de
+    // `PEDIDOS_FLUJO_SIMPLE_2026_10` (Daniel, al simplificar Pedidos: «que
+    // diga etiqueta, no bultos»). Lo que no cambia es que la pestaña
+    // («etiquetas», la key) sigue en el array de pestañas.
+    expect(paginaGuias).toMatch(/\["etiquetas", PEDIDOS_FLUJO_SIMPLE_2026_10 \? "Etiquetas" : "Bultos"\]/);
   });
 
   it("🔴 NO cuelga de `GUIAS_ATAJOS_NUEVOS` (ése es la reversión de Nueva guía)", () => {
