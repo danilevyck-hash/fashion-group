@@ -144,6 +144,13 @@ export interface PedidoBodega {
    */
   articulos?: number | null;
   sin_bulto?: number | null;
+  /**
+   * 🔴 LAS PIEZAS DEL PEDIDO (7-oct-2026, Daniel: «¿puedes poner la cantidad
+   * de pieza?»): la suma de `cantidad` de sus líneas, en los DOS flujos.
+   * `null` = nadie abrió todavía el detalle de este pedido (no hay líneas
+   * bajadas): la fila dice «—», nunca un 0 inventado.
+   */
+  piezas?: number | null;
 }
 
 /** Del más viejo al más nuevo; empate por número. */

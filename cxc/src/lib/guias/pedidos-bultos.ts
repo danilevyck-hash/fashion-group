@@ -397,6 +397,20 @@ export function todoAsignado(lineas: readonly Pick<LineaPedido, "bulto">[]): boo
 }
 
 /**
+ * «1.224 unidades» (Daniel, 7-oct-2026: «¿puedes poner la cantidad de pieza?»).
+ * 🔴 EN TEXTO SIEMPRE «unidades», NUNCA «piezas» (`docs/nombres-erp.md`): la
+ * única excepción del glosario es la línea del Telegram del pedido, que no es
+ * ésta. Una línea cancelada o en cero no infla nada: ya suma 0 desde
+ * `totalesDelPedido`, que es quien calcula `n`.
+ */
+export function textoUnidades(n: number): string {
+  const texto = Number.isInteger(n)
+    ? n.toLocaleString("es")
+    : n.toLocaleString("es", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${texto} ${n === 1 ? "unidad" : "unidades"}`;
+}
+
+/**
  * 🔴 «VERIFICAR» ESTÁ BLOQUEADO MIENTRAS QUEDE UNA LÍNEA SIN BULTO
  * (Daniel, 7-oct-2026). 🩸 Hasta hoy solo avisaba: el envío de Etiquetas no se
  * creaba, pero el pedido quedaba «Verificado» igual y nadie se enteraba de que
