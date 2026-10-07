@@ -57,7 +57,11 @@ export const COLUMNAS_DE_PROVEEDORES = {
 export function completarProveedores<T extends Record<string, unknown>>(
   fila: T,
 ): T & { pct_a_la_marca: number | null } {
-  const n = Number(fila.pct_a_la_marca);
+  // 🩸 `Number(null)` es **0**, no NaN: convertir primero volvía un NULL
+  // guardado en «cero por ciento» —«A cargo de la empresa»— y el gasto se
+  // caía del ZIP y del reporte de su marca. El null se mira ANTES de convertir.
+  const crudo = fila.pct_a_la_marca;
+  const n = crudo === null || crudo === undefined ? NaN : Number(crudo);
   return {
     ...fila,
     pct_a_la_marca: Number.isFinite(n) ? n : null,

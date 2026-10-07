@@ -280,6 +280,34 @@ export function montoDeLaMarca(total: number, pctALaMarca: number | null | undef
   return round2((t * Math.max(0, Math.min(100, pct))) / 100);
 }
 
+/**
+ * 🔴 ¿ESTE GASTO QUEDÓ A CARGO DE LA EMPRESA? Solo un **0 escrito** lo dice.
+ *
+ * 🩸 SEGUNDA MORDIDA DEL MISMO PATRÓN (7-oct-2026). `Number(null) === 0`, así
+ * que `Number(fila.pct_a_la_marca) === 0` leía toda factura SIN valor escrito
+ * —las de antes de esta pieza, que son casi todas— como «cero por ciento», y el
+ * ZIP de la marca salía **sin una sola factura**. Un gasto sin valor escrito
+ * NO es cero por ciento: es «se cobra completo» (igual que `montoDeLaMarca`),
+ * salvo que esté marcado «A cargo de la empresa», que es el 0 explícito.
+ *
+ * El `null` se mira ANTES de convertir. Nada de `Number(x) || 0`.
+ */
+export function aCargoDeLaEmpresa(pctALaMarca: number | null | undefined): boolean {
+  if (pctALaMarca === null || pctALaMarca === undefined) return false;
+  return Number(pctALaMarca) === 0;
+}
+
+/**
+ * El porcentaje tal como se LEE de una fila: un número, o `null` cuando no hay
+ * valor escrito. Mismo corte que `aCargoDeLaEmpresa`: `null` y `undefined` se
+ * miran ANTES de convertir, para que un NULL de la base no se vuelva un 0.
+ */
+export function pctALaMarcaDe(valor: unknown): number | null {
+  if (valor === null || valor === undefined) return null;
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Lo que queda a cargo de la empresa. */
 export function montoACargoDeLaEmpresa(
   total: number,

@@ -4,7 +4,10 @@ import { anularFactura, createFactura } from "@/lib/marketing/mutations";
 import { setMarcasDeFactura } from "@/lib/marketing/factura-marcas";
 import { exigirUnaMarca } from "@/lib/marketing/gasto";
 import { esErrorDeDuplicado } from "@/lib/marketing/puerta-gasto";
-import { MKT_PROVEEDORES_2026_10 } from "@/lib/marketing/proveedores-2026-10";
+import {
+  aCargoDeLaEmpresa,
+  MKT_PROVEEDORES_2026_10,
+} from "@/lib/marketing/proveedores-2026-10";
 import { logActivity } from "@/lib/log-activity";
 import { logAudit } from "@/lib/marketing/audit";
 import type { CreateFacturaInput } from "@/lib/marketing/types";
@@ -48,7 +51,7 @@ export async function POST(req: NextRequest) {
     // a ninguna (`pctALaMarca` = 0). `false`, o sin ese 0, deja todo
     // exactamente como el 5-oct-2026.
     const esSinMarca =
-      MKT_PROVEEDORES_2026_10 && Number(body?.pctALaMarca) === 0;
+      MKT_PROVEEDORES_2026_10 && aCargoDeLaEmpresa(body?.pctALaMarca);
     const traeMarca = body?.marcaId !== undefined && !esSinMarca;
     if (traeMarca) {
       try {

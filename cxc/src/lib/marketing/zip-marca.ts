@@ -84,7 +84,11 @@ import { seReportaDe, TIENDA_GENERAL } from "./gasto";
 import { MARKETING_FOTOS_CON_PERIODO } from "./fotos-periodo";
 import { conRespaldoSinColumnas, type ResultadoPg } from "./columnas-opcionales";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "./zip-e-impulsadoras";
-import { MKT_PROVEEDORES_2026_10, montoDeLaMarca } from "./proveedores-2026-10";
+import {
+  aCargoDeLaEmpresa,
+  MKT_PROVEEDORES_2026_10,
+  montoDeLaMarca,
+} from "./proveedores-2026-10";
 import {
   grafiasUnicasDeProveedor,
   limpiarTextoParaLaMarca,
@@ -456,7 +460,7 @@ function vaEnElPapel(fila: {
   se_reporta?: boolean | null;
   pct_a_la_marca?: number | null;
 }): boolean {
-  if (MKT_PROVEEDORES_2026_10 && Number(fila.pct_a_la_marca) === 0) return false;
+  if (MKT_PROVEEDORES_2026_10 && aCargoDeLaEmpresa(fila.pct_a_la_marca)) return false;
   if (!ZIP_E_IMPULSADORAS_NUEVO) return true;
   return seReportaDe(fila.se_reporta);
 }
