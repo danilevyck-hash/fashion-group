@@ -33,7 +33,7 @@ import { CHIP_SOLO_PENDIENTES, urlSinPendientes } from "@/lib/guias/filtro-pendi
 import { planParaLlegar } from "@/lib/guias/llegar-a-la-guia";
 import { Aviso } from "@/components/ui/Aviso";
 import { GUIAS_LISTA_APPLE_2026_10, enElPeriodo, resumenDeGuias, type PeriodoGuias } from "@/lib/guias/lista-apple-2026-10";
-import { GUIAS_GRUPOS_FECHA_2026_10, incluirGruposDeMes } from "@/lib/guias/grupos-fecha-2026-10";
+import { GUIAS_GRUPOS_FECHA_2026_10 } from "@/lib/guias/grupos-fecha-2026-10";
 import { hoyPanama } from "@/lib/fecha-panama";
 
 /**
@@ -748,14 +748,12 @@ export default function GuiasList({
 
                 // 🔴 SIEMPRE agrupado por fecha: ya no hay forma de apagarlo.
                 // 🔴 GUIAS_GRUPOS_FECHA_2026_10: Hoy · Ayer · Esta semana ·
-                // Semana pasada · Este mes · Mes pasado · Anteriores, con los
-                // dos grupos de mes afuera si la lista ya está recortada a UN
-                // mes por el selector de arriba (ver `grupos-fecha-2026-10.ts`).
+                // Semana pasada · Historial — «historial» es todo lo más
+                // viejo que la semana pasada, sin distinguir mes (Daniel:
+                // «quiero hasta semana pasada, después es historial»).
                 // `false` = los cuatro grupos de siempre, sin tocar la llamada.
                 const _gg = GUIAS_GRUPOS_FECHA_2026_10
-                  ? groupByTimePeriod(visible, "fecha" as keyof Guia, "guias", {
-                      incluirMeses: incluirGruposDeMes(periodo, !!search.trim()),
-                    })
+                  ? groupByTimePeriod(visible, "fecha" as keyof Guia, "guias", { extendido: true })
                   : groupByTimePeriod(visible, "fecha" as keyof Guia, "guias");
                 const _rc = (g: Guia) => {
                       const isExpanded = expandedId === g.id;

@@ -39,10 +39,10 @@ type GroupDef = {
   label: string;
   color: string;
   bgColor: string;
-  // 🔴 GUIAS_GRUPOS_FECHA_2026_10: `lastWeekStart` y `lastMonthStart` se
-  // agregan AL FINAL a propósito — los presets que no los usan (pendiente ·
-  // depositado · el "guias" de 4 grupos) no cambian una letra.
-  match: (dateStr: string, today: string, weekStart: string, weekEnd: string, nextWeekStart: string, nextWeekEnd: string, monthStart: string, monthEnd: string, yesterday: string, lastWeekStart: string, lastMonthStart: string) => boolean;
+  // 🔴 GUIAS_GRUPOS_FECHA_2026_10: `lastWeekStart` se agrega AL FINAL a
+  // propósito — los presets que no lo usan (pendiente · depositado · el
+  // "guias" de 4 grupos) no cambian una letra.
+  match: (dateStr: string, today: string, weekStart: string, weekEnd: string, nextWeekStart: string, nextWeekEnd: string, monthStart: string, monthEnd: string, yesterday: string, lastWeekStart: string) => boolean;
 };
 
 const GROUP_DEFS: Record<PresetMode, GroupDef[]> = {
@@ -146,13 +146,15 @@ const GROUP_DEFS: Record<PresetMode, GroupDef[]> = {
   ],
 };
 
-// 🔴 GUIAS_GRUPOS_FECHA_2026_10 (7-oct-2026, propuesta): Hoy · Ayer · Esta
-// semana · Semana pasada · Este mes · Mes pasado · Anteriores, en vez de los
-// cuatro de siempre (Hoy · Ayer · Esta semana · Anteriores). `anteriores`
-// cae al LARGO del resto de grupos: con los meses afuera, "anteriores"
-// empieza donde termina "semana pasada", no donde termina "mes pasado".
-function defsGuiasExtendido(incluirMeses: boolean): GroupDef[] {
-  const defs: GroupDef[] = [
+// 🔴 GUIAS_GRUPOS_FECHA_2026_10 (7-oct-2026): Hoy · Ayer · Esta semana ·
+// Semana pasada · Historial, en vez de los cuatro de siempre (Hoy · Ayer ·
+// Esta semana · Anteriores). Daniel: «quiero hasta semana pasada, después es
+// historial» — se probó con «Este mes»/«Mes pasado» en el mockup y los
+// sacó: con esos dos afuera no hay mes que pueda contradecir al selector de
+// arriba, así que esa lógica (`incluirGruposDeMes`) tampoco hacía falta y
+// se quitó entera, no se dejó sin usar.
+function defsGuiasExtendido(): GroupDef[] {
+  return [
     { key: "hoy", label: "Hoy", color: "text-gray-700", bgColor: "bg-gray-50",
       match: (d, today) => d === today },
     { key: "ayer", label: "Ayer", color: "text-gray-700", bgColor: "bg-gray-50",
@@ -161,21 +163,9 @@ function defsGuiasExtendido(incluirMeses: boolean): GroupDef[] {
       match: (d, _today, weekStart, _we, _nws, _nwe, _ms, _me, yesterday) => d < yesterday && d >= weekStart },
     { key: "semana_pasada", label: "Semana pasada", color: "text-gray-700", bgColor: "bg-gray-50",
       match: (d, _today, weekStart, _we, _nws, _nwe, _ms, _me, _y, lastWeekStart) => d < weekStart && d >= lastWeekStart },
+    { key: "historial", label: "Historial", color: "text-gray-400", bgColor: "bg-gray-50/50",
+      match: (d, _today, _ws, _we, _nws, _nwe, _ms, _me, _y, lastWeekStart) => d < lastWeekStart },
   ];
-  if (incluirMeses) {
-    defs.push(
-      { key: "este_mes", label: "Este mes", color: "text-gray-700", bgColor: "bg-gray-50",
-        match: (d, _today, _ws, _we, _nws, _nwe, monthStart, _me, _y, lastWeekStart) => d < lastWeekStart && d >= monthStart },
-      { key: "mes_pasado", label: "Mes pasado", color: "text-gray-700", bgColor: "bg-gray-50",
-        match: (d, _today, _ws, _we, _nws, _nwe, monthStart, _me, _y, _lws, lastMonthStart) => d < monthStart && d >= lastMonthStart },
-    );
-  }
-  defs.push({
-    key: "anteriores", label: "Anteriores", color: "text-gray-400", bgColor: "bg-gray-50/50",
-    match: (d, _today, _ws, _we, _nws, _nwe, _ms, _me, _y, lastWeekStart, lastMonthStart) =>
-      incluirMeses ? d < lastMonthStart : d < lastWeekStart,
-  });
-  return defs;
 }
 
 export function groupByTimePeriod<T>(
@@ -184,7 +174,7 @@ export function groupByTimePeriod<T>(
   mode: PresetMode,
   // Solo lo usa el modo "guias", y solo si GUIAS_GRUPOS_FECHA_2026_10 está
   // prendido: sin `opts`, el preset de 4 grupos de siempre.
-  opts?: { incluirMeses?: boolean },
+  opts?: { extendido?: boolean },
 ): TimeGroup<T>[] {
   const now = new Date();
   const today = toDateStr(now);
@@ -208,14 +198,13 @@ export function groupByTimePeriod<T>(
   yd.setDate(yd.getDate() - 1);
   const yesterday = toDateStr(yd);
 
-  // 🔴 Solo los usa `defsGuiasExtendido` (GUIAS_GRUPOS_FECHA_2026_10); los
-  // demás presets ni los reciben en su firma.
+  // 🔴 Solo lo usa `defsGuiasExtendido` (GUIAS_GRUPOS_FECHA_2026_10); los
+  // demás presets ni lo reciben en su firma.
   const lws = new Date(ws);
   lws.setDate(lws.getDate() - 7);
   const lastWeekStart = toDateStr(lws);
-  const lastMonthStart = toDateStr(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
-  const defs = mode === "guias" && opts ? defsGuiasExtendido(opts.incluirMeses ?? true) : GROUP_DEFS[mode];
+  const defs = mode === "guias" && opts?.extendido ? defsGuiasExtendido() : GROUP_DEFS[mode];
   const groups: TimeGroup<T>[] = defs.map((def) => ({
     key: def.key,
     label: def.label,
@@ -227,7 +216,7 @@ export function groupByTimePeriod<T>(
   for (const item of items) {
     const dateVal = String(item[dateField] ?? "").slice(0, 10);
     for (const [i, def] of defs.entries()) {
-      if (def.match(dateVal, today, weekStart, weekEnd, nextWeekStart, nextWeekEnd, monthStart, monthEnd, yesterday, lastWeekStart, lastMonthStart)) {
+      if (def.match(dateVal, today, weekStart, weekEnd, nextWeekStart, nextWeekEnd, monthStart, monthEnd, yesterday, lastWeekStart)) {
         groups[i].items.push(item);
         break;
       }

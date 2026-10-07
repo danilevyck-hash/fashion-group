@@ -20,7 +20,10 @@ interface TimeGroupHeaderProps {
    * arriba, y más jerarquía en la etiqueta — para que el grupo se lea como
    * un bloque aparte, no como una lista continua con títulos intercalados.
    * Daniel, tras ver el mockup: «quisiera una pequeña separación entre los
-   * grupos». Cheques nunca pasa este prop — su pantalla no cambia un píxel.
+   * grupos», y después de verla: «quiero ver un poco más separación entre
+   * cada grupo» — el aire creció, la línea y la regla de bordes-sin-sombra
+   * se quedan igual. Cheques nunca pasa este prop — su pantalla no cambia
+   * un píxel.
    */
   separado?: boolean;
 }
@@ -37,7 +40,7 @@ export default function TimeGroupHeader({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className={separado ? "mt-6 border-t border-gray-100 pt-5 first:mt-0 first:border-t-0 first:pt-0" : undefined}>
+    <div className={separado ? "mt-10 border-t border-gray-100 pt-7 first:mt-0 first:border-t-0 first:pt-0" : undefined}>
       <button
         onClick={() => setOpen(!open)}
         // 358×38 medidos en Guías. Es la cabecera que colapsa el grupo entero
