@@ -131,6 +131,10 @@ export interface MkFactura {
   tienda_codigo?: string | null;
   // Qué fue («Apertura», «Remodelación»). Libre.
   nota?: string | null;
+  // PROVEEDORES (6-oct-2026, `MKT_PROVEEDORES_2026_10`). Qué porcentaje se le
+  // cobra a la marca asignada: 100, 50 o 0. `null`/ausente = entera para su
+  // marca, como antes de esta pieza. Ver `lib/marketing/proveedores-2026-10.ts`.
+  pct_a_la_marca?: number | null;
   anulado_en: string | null;
   anulado_motivo: string | null;
   created_at: string;
@@ -278,6 +282,13 @@ export interface UpdateFacturaInput {
   seReporta?: boolean;
   tiendaCodigo?: string | null;
   nota?: string | null;
+  /**
+   * PROVEEDORES (6-oct-2026, `MKT_PROVEEDORES_2026_10`). OPCIONAL, igual que
+   * en `CreateFacturaInput`: qué porcentaje se le cobra a la marca — 100, 50
+   * o 0. Sin esto, editar un gasto por otro motivo no le pisa el valor que
+   * ya tiene. Ver `lib/marketing/proveedores-2026-10.ts`.
+   */
+  pctALaMarca?: number | null;
 }
 
 export interface CreateAdjuntoInput {

@@ -57,7 +57,13 @@ function abrirForm(props: { marcaFija?: MkMarca | null } = {}) {
 describe("⛔ el toggle Creado|Pagado no existe más en el formulario", () => {
   it("sin marcaFija: hay paso de Marca, pero NINGÚN control de estado", () => {
     abrirForm();
-    expect(screen.getByText("Marca del gasto")).toBeTruthy();
+    // 🔴 PROVEEDORES (6-oct-2026, `MKT_PROVEEDORES_2026_10`): con el
+    // interruptor prendido, este paso 3 es «Se cobra a» (ver
+    // `marketing-proveedores-2026-10.test.ts`), no el título viejo «Marca
+    // del gasto». Lo que este test cuida —sin `marcaFija` el paso 3 SIGUE
+    // ahí, y nunca el toggle Creado|Pagado— no cambió.
+    // ("Se cobra a" aparece 2 veces: título del paso + rótulo del campo.)
+    expect(screen.getAllByText("Se cobra a").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByRole("radio", { name: "Creado" })).toBeNull();
     expect(screen.queryByRole("radio", { name: "Pagado" })).toBeNull();
     expect(screen.queryByText("Estado del gasto")).toBeNull();
@@ -66,6 +72,7 @@ describe("⛔ el toggle Creado|Pagado no existe más en el formulario", () => {
   it("con marcaFija: el paso 3 desaparece ENTERO (nada que preguntar)", () => {
     abrirForm({ marcaFija: TOMMY });
     expect(screen.queryByText("Marca del gasto")).toBeNull();
+    expect(screen.queryByText("Se cobra a")).toBeNull();
     expect(screen.queryByText("Estado del gasto")).toBeNull();
     expect(screen.queryByRole("radio", { name: "Pagado" })).toBeNull();
     // Los pasos 1 y 2 siguen ahí — el formulario no perdió nada más.

@@ -18,7 +18,7 @@ import {
   sinColumnasDelRediseno,
 } from "./columnas-opcionales";
 import { columnasDelGasto, traeColumnasDelGasto } from "./puerta-gasto";
-import { columnasDeProveedores } from "./proveedores-2026-10";
+import { columnasDeProveedores, traeColumnasDeProveedores } from "./proveedores-2026-10";
 import {
   exigirTiendaDelDirectorio,
   frenarFacturaDuplicada,
@@ -396,6 +396,11 @@ export async function updateFactura(
   const cols = columnasDelGasto(input);
   await exigirTiendaDelDirectorio(cols.tienda_codigo);
   Object.assign(payload, cols);
+  // 🔴 PROVEEDORES (6-oct-2026): «Se cobra a / Se cobra» también al EDITAR,
+  // no solo al crear. Mismo patrón que `cols`: con el interruptor apagado o
+  // sin la pantalla mandar el campo, `colsProveedores` es `{}` y nada cambia.
+  const colsProveedores = columnasDeProveedores(input as { pctALaMarca?: unknown });
+  Object.assign(payload, colsProveedores);
 
   // Si cambia subtotal, itbms o tieneImportacion, recalcular total.
   const hasSubtotal = input.subtotal !== undefined;
@@ -452,7 +457,7 @@ export async function updateFactura(
 
   const actualizar = (p: Record<string, unknown>) =>
     supabaseServer.from("mk_facturas").update(p).eq("id", id).select("*").single();
-  const { resultado } = traeColumnasDelGasto(cols)
+  const { resultado } = traeColumnasDelGasto(cols) || traeColumnasDeProveedores(colsProveedores)
     ? await conRespaldoSinColumnas(
         () => actualizar(payload),
         () => actualizar(sinColumnasDelRediseno(payload)),

@@ -20,6 +20,9 @@ import { PasoInstruccion } from "./PasoInstruccion";
 import { PdfUploader, UploadResult } from "./PdfUploader";
 import { ProveedorInput } from "./ProveedorInput";
 import BloqueDatosDelGasto from "@/app/marketing/components/BloqueDatosDelGasto";
+import BloqueDestinoDelGasto, {
+  type DestinoDelGasto,
+} from "@/app/marketing/components/BloqueDestinoDelGasto";
 import { MARKETING_PUERTA_GASTO, type DatosDelGasto } from "@/lib/marketing/puerta-gasto";
 import { cuerpoDeLaEdicion, datosDeLaFila } from "@/lib/marketing/editar-gasto";
 import { MAX_PDF_MB, faltaLaFactura } from "@/lib/marketing/pdf-en-la-puerta";
@@ -32,6 +35,11 @@ import {
   calcularTotalFactura,
 } from "@/lib/marketing-calc";
 import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
+import {
+  CUANTO_POR_OMISION,
+  MKT_PROVEEDORES_2026_10,
+  pctQueSeGuarda,
+} from "@/lib/marketing/proveedores-2026-10";
 import { Aviso } from "@/components/ui/Aviso";
 import CampoFecha from "@/components/ui/CampoFecha";
 
@@ -54,6 +62,13 @@ export interface FacturaFormValues {
    * guardada conserva su tienda, su «se reporta» y su nota.
    */
   gasto?: { tiendaCodigo: string | null; seReporta: boolean; nota: string | null };
+  /**
+   * 🔴 PROVEEDORES (6-oct-2026, `MKT_PROVEEDORES_2026_10`). Solo cuando el
+   * paso 3 es «Se cobra a / Se cobra» (sin `marcaFija`): qué porcentaje se le
+   * cobra a la marca elegida — 100, 50 o 0 («A cargo de la empresa»).
+   * Ausente = la pantalla vieja de varias marcas, nada cambia.
+   */
+  pctALaMarca?: number | null;
 }
 
 // Orden fijo del dropdown de marca (registro de gastos): por código conocido,
@@ -316,6 +331,22 @@ export function FacturaForm({
     [marcasCatalogo],
   );
 
+  // ── PROVEEDORES (6-oct-2026): «Se cobra a / Se cobra», EDITANDO ──────────
+  // 🔴 Con `marcaFija` la marca ya la eligió la puerta («Registrar gasto») y
+  // este paso 3 no se dibuja (ver más abajo); el destino de ESE caso vive en
+  // la pantalla que llama. Acá solo aplica cuando el paso 3 SÍ se dibuja —
+  // editar o crear sin puerta—, que es donde vivía el selector viejo de
+  // varias marcas con %.
+  const usaDestino = MKT_PROVEEDORES_2026_10 && !marcaFija;
+  const [destino, setDestino] = useState<DestinoDelGasto>(() => {
+    const pct = initial?.pct_a_la_marca;
+    if (pct === 0) return { aCargoDeLaEmpresa: true, cuanto: CUANTO_POR_OMISION };
+    return { aCargoDeLaEmpresa: false, cuanto: pct === 50 ? "mitad" : CUANTO_POR_OMISION };
+  });
+  const [marcaIdDestino, setMarcaIdDestino] = useState<string>(
+    () => marcasIniciales[0]?.marcaId ?? "",
+  );
+
   const subtotal = Number(subtotalStr) || 0;
   // Zona libre y ITBMS son mutuamente excluyentes (helper compartido single/bulk).
   const itbmsPct = itbmsOption === "7" ? 7 : 0;
@@ -350,6 +381,19 @@ export function FacturaForm({
     marcasSel.every((m) => (Number(m.porcentajeStr) || 0) > 0) &&
     Math.abs(sumPctMarcas - 100) < 0.01;
 
+  // 🔴 Con «Se cobra a / Se cobra» (6-oct-2026): válido con «A cargo de la
+  // empresa» o con UNA marca elegida — nunca varias, nunca porcentajes libres.
+  const marcasValidasDestino = destino.aCargoDeLaEmpresa || marcaIdDestino !== "";
+  const marcasValidasFinal = usaDestino ? marcasValidasDestino : marcasValidas;
+  // `[]` cuando queda «a cargo de la empresa»: el caller NO llama al PUT de
+  // marcas con la lista vacía (la deja intacta — ver `zip-marca.ts ›
+  // vaEnElPapel`, que ya corta por `pct_a_la_marca = 0` sin mirar la marca).
+  const marcasPayloadFinal: MarcaPorcentajeInput[] = usaDestino
+    ? destino.aCargoDeLaEmpresa || marcaIdDestino === ""
+      ? []
+      : [{ marcaId: marcaIdDestino, porcentaje: 100 }]
+    : marcasPayload;
+
   const multiMarca = marcasSel.length > 1;
   const toggleMarca = (id: string) => {
     setMarcasSel((prev) => {
@@ -377,7 +421,7 @@ export function FacturaForm({
   // 🔴 Sin factura no se guarda el gasto — pero solo donde SE PIDE (compras),
   // y la pantalla dice QUÉ falta en vez de apagar el botón sin explicación.
   const falta = faltaLaFactura(Boolean(pdfFile), pdfObligatorio);
-  const puedeGuardar = pasoDatos && marcasValidas && !enviando && falta === null;
+  const puedeGuardar = pasoDatos && marcasValidasFinal && !enviando && falta === null;
 
   // Check de duplicados con debounce 500ms. Se activa cuando cambian
   // numero_factura o proveedor. Excluye la factura en edición actual.
@@ -495,9 +539,10 @@ export function FacturaForm({
           itbms,
           tieneImportacion,
           estadoPago,
-          marcasSeleccionadas: marcasPayload,
+          marcasSeleccionadas: marcasPayloadFinal,
           permitirDuplicado,
           ...(pideDatosDelGasto ? { gasto: cuerpoDeLaEdicion(datosGasto) } : {}),
+          ...(usaDestino ? { pctALaMarca: pctQueSeGuarda(destino) } : {}),
         },
         pdfFile,
       );
@@ -805,9 +850,19 @@ export function FacturaForm({
       {!marcaFija && (
       <PasoInstruccion
         numero={3}
-        titulo="Marca del gasto"
-        completado={marcasValidas}
+        titulo={usaDestino ? "Se cobra a" : "Marca del gasto"}
+        completado={marcasValidasFinal}
       >
+          {usaDestino ? (
+            <BloqueDestinoDelGasto
+              valor={destino}
+              onChange={setDestino}
+              marcaId={marcaIdDestino}
+              onMarcaId={setMarcaIdDestino}
+              marcas={marcasOrdenadas}
+              proveedor={proveedor}
+            />
+          ) : (
           <div>
             <label className="block text-sm text-gray-600 mb-1">
               Marca(s)<span className="text-red-500 ml-0.5">*</span>
@@ -884,6 +939,7 @@ export function FacturaForm({
               </>
             )}
           </div>
+          )}
       </PasoInstruccion>
       )}
 

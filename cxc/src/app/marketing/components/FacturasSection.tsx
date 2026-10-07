@@ -252,24 +252,29 @@ export default function FacturasSection({
 
     // Asignar marcas a nivel factura (Fase 2). Si falla, eliminar la factura
     // recién creada para no dejar huérfana sin marcas.
-    try {
-      const mRes = await fetch(`/api/marketing/facturas/${factura.id}/marcas`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marcas: marcasSeleccionadas }),
-      });
-      if (!mRes.ok) {
-        const err = await mRes.json().catch(() => null);
-        // Rollback best-effort
-        await fetch(`/api/marketing/facturas/${factura.id}/anular`, {
-          method: "POST",
+    // 🔴 PROVEEDORES (6-oct-2026): «A cargo de la empresa» manda la lista
+    // VACÍA — no hay marca que asignar, y el PUT con `[]` solo tira «Debe
+    // especificar al menos una marca».
+    if (marcasSeleccionadas.length > 0) {
+      try {
+        const mRes = await fetch(`/api/marketing/facturas/${factura.id}/marcas`, {
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ motivo: "Rollback: fallo al asignar marcas" }),
-        }).catch(() => {});
-        throw new Error(err?.error ?? "No se pudieron asignar las marcas");
+          body: JSON.stringify({ marcas: marcasSeleccionadas }),
+        });
+        if (!mRes.ok) {
+          const err = await mRes.json().catch(() => null);
+          // Rollback best-effort
+          await fetch(`/api/marketing/facturas/${factura.id}/anular`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ motivo: "Rollback: fallo al asignar marcas" }),
+          }).catch(() => {});
+          throw new Error(err?.error ?? "No se pudieron asignar las marcas");
+        }
+      } catch (err) {
+        throw err;
       }
-    } catch (err) {
-      throw err;
     }
 
     // Si ya pre-subimos el PDF para IA, reusamos el path y solo registramos el adjunto.
@@ -379,18 +384,24 @@ export default function FacturasSection({
       throw new Error(err?.error ?? "No se pudo actualizar la factura");
     }
 
-    // Actualizar marcas de la factura
-    const mRes = await fetch(
-      `/api/marketing/facturas/${editando.id}/marcas`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marcas: marcasSeleccionadas }),
-      },
-    );
-    if (!mRes.ok) {
-      const err = await mRes.json().catch(() => null);
-      throw new Error(err?.error ?? "No se pudieron actualizar las marcas");
+    // Actualizar marcas de la factura.
+    // 🔴 PROVEEDORES (6-oct-2026): «A cargo de la empresa» manda la lista
+    // VACÍA — no se llama al PUT y lo que ya tenía la factura queda intacto
+    // (`zip-marca.ts › vaEnElPapel` ya la saca del papel por
+    // `pct_a_la_marca = 0`, sin mirar la marca).
+    if (marcasSeleccionadas.length > 0) {
+      const mRes = await fetch(
+        `/api/marketing/facturas/${editando.id}/marcas`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ marcas: marcasSeleccionadas }),
+        },
+      );
+      if (!mRes.ok) {
+        const err = await mRes.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudieron actualizar las marcas");
+      }
     }
 
     toast("Factura actualizada", "success");

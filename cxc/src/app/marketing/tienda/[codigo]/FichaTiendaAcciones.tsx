@@ -132,14 +132,22 @@ function EditarFactura({
         const err = await res.json().catch(() => null);
         throw new Error(err?.error ?? "No se pudo actualizar la factura");
       }
-      const mRes = await fetch(`/api/marketing/facturas/${fila.id}/marcas`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marcas: marcasSeleccionadas }),
-      });
-      if (!mRes.ok) {
-        const err = await mRes.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudieron actualizar las marcas");
+      // 🔴 PROVEEDORES (6-oct-2026): «A cargo de la empresa» llega con la
+      // lista VACÍA — no se llama al PUT de marcas y lo que ya tenía la
+      // factura en `mk_factura_marcas` queda intacto (`zip-marca.ts ›
+      // vaEnElPapel` ya la saca del papel por `pct_a_la_marca = 0`, sin
+      // mirar la marca). Llamar con `[]` solo tira «Debe especificar al
+      // menos una marca».
+      if (marcasSeleccionadas.length > 0) {
+        const mRes = await fetch(`/api/marketing/facturas/${fila.id}/marcas`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ marcas: marcasSeleccionadas }),
+        });
+        if (!mRes.ok) {
+          const err = await mRes.json().catch(() => null);
+          throw new Error(err?.error ?? "No se pudieron actualizar las marcas");
+        }
       }
       toast("Factura actualizada", "success");
       onCambio();
