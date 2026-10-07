@@ -6,6 +6,7 @@ import { exigirUnaMarca } from "@/lib/marketing/gasto";
 import { esErrorDeDuplicado } from "@/lib/marketing/puerta-gasto";
 import { MKT_PROVEEDORES_2026_10 } from "@/lib/marketing/proveedores-2026-10";
 import { logActivity } from "@/lib/log-activity";
+import { logAudit } from "@/lib/marketing/audit";
 import type { CreateFacturaInput } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
@@ -106,6 +107,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: message }, { status: 400 });
       }
     }
+
+    // Queda registrado quién creó el gasto, con la fila completa (antes = nada).
+    await logAudit({
+      action: "create",
+      entityType: "mk_facturas",
+      entityId: factura.id,
+      userRole: auth.role,
+      userName: auth.userName,
+      after: factura,
+    });
 
     // Si el usuario decidió guardar a sabiendas un duplicado, dejamos rastro
     // en el log de actividad para auditoría.

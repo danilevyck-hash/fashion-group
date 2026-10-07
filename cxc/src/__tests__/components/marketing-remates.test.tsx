@@ -110,12 +110,16 @@ vi.mock("@/lib/log-activity", () => ({ logActivity: vi.fn(async () => {}) }));
 // AFIRMAR qué le pasa la ruta de edición, que es lo que este candado cuida.
 const entregaRecibida = vi.hoisted(() => ({ input: null as unknown }));
 vi.mock("@/lib/marketing/inventario", () => ({
+  getEntregaById: vi.fn(async () => ({ id: "e-1" })),
   updateEntrega: vi.fn(async (_id: string, input: unknown) => {
     entregaRecibida.input = input;
     return { id: "e-1" };
   }),
   deleteEntrega: vi.fn(async () => {}),
 }));
+// El PATCH ahora también deja rastro en activity_logs (auditoría de
+// gastos de marketing) — doblado acá para no depender de supabase real.
+vi.mock("@/lib/marketing/audit", () => ({ logAudit: vi.fn(async () => {}) }));
 
 // Los formularios propios de la puerta se doblan: acá se prueba el PASO 2.
 vi.mock("@/components/marketing/EntregaForm", () => ({

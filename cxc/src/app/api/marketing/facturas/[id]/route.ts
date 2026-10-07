@@ -4,6 +4,7 @@ import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { getFacturaById } from "@/lib/marketing/queries";
 import { updateFactura } from "@/lib/marketing/mutations";
 import { firmarAdjuntos } from "@/lib/marketing/storage";
+import { logAudit } from "@/lib/marketing/audit";
 import type { UpdateFacturaInput } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,20 @@ export async function PATCH(
   }
   try {
     const body = (await req.json()) as UpdateFacturaInput;
+    // Antes de escribir: sin esta foto no hay con qué comparar qué cambió.
+    const before = await getFacturaById(params.id);
     const updated = await updateFactura(params.id, body);
+
+    await logAudit({
+      action: "update",
+      entityType: "mk_facturas",
+      entityId: params.id,
+      userRole: auth.role,
+      userName: auth.userName,
+      before,
+      after: updated,
+    });
+
     return NextResponse.json(updated);
   } catch (err) {
     const message =

@@ -8,6 +8,7 @@ import {
   listEntregasByProyecto,
   listEntregasPendientes,
 } from "@/lib/marketing/inventario";
+import { logAudit } from "@/lib/marketing/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +98,16 @@ export async function POST(req: NextRequest) {
       tiendaCodigo: body.tiendaCodigo,
       nota: body.nota,
     });
+
+    await logAudit({
+      action: "create",
+      entityType: "mk_entregas_muebles",
+      entityId: entrega.id,
+      userRole: auth.role,
+      userName: auth.userName,
+      after: entrega,
+    });
+
     return NextResponse.json(entrega);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error";

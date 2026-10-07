@@ -6,6 +6,7 @@ import {
   BorradorFacturaCard,
   FacturaCard,
   FacturaForm,
+  UltimoCambio,
 } from "@/components/marketing";
 import type {
   EstadoPagoFactura,
@@ -733,9 +734,16 @@ export default function FacturasSection({
                   className="rounded-lg border-2 border-black bg-white p-4"
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-900">
-                      Editar factura {editando.numero_factura}
-                    </h3>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Editar factura {editando.numero_factura}
+                      </h3>
+                      <UltimoCambio
+                        entityType="mk_facturas"
+                        entityId={editando.id}
+                        className="mt-0.5"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => { setEditando(null); setEditandoMarcas(null); }}

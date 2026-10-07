@@ -11,9 +11,11 @@ export type AuditEntityType =
   | "mk_facturas"
   | "mk_factura_marcas"
   | "mk_proyecto_marcas"
-  | "mk_adjuntos";
+  | "mk_adjuntos"
+  | "mk_entregas_muebles";
 
 export type AuditAction =
+  | "create"
   | "update"
   | "delete"
   | "delete_definitivo"

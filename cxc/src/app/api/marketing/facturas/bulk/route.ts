@@ -6,6 +6,7 @@ import {
 } from "@/lib/marketing/mutations";
 import { setMarcasDeFactura } from "@/lib/marketing/factura-marcas";
 import { logActivity } from "@/lib/log-activity";
+import { logAudit } from "@/lib/marketing/audit";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -231,7 +232,18 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 4. Log de duplicado consciente
+      // 4. Queda registrado quién creó el gasto (carga múltiple = origen "bulk").
+      await logAudit({
+        action: "create",
+        entityType: "mk_facturas",
+        entityId: factura.id,
+        userRole: auth.role,
+        userName: auth.userName,
+        after: factura,
+        extra: { origen: "bulk" },
+      });
+
+      // 5. Log de duplicado consciente
       if (norm.permitirDuplicado) {
         await logActivity(
           auth.role,

@@ -9,6 +9,7 @@ export type { UploadResult } from "./PdfUploader";
 export { FotoUploader } from "./FotoUploader";
 export { FacturaCard } from "./FacturaCard";
 export { FacturaForm } from "./FacturaForm";
+export { UltimoCambio } from "./UltimoCambio";
 export { BorradorFacturaCard } from "./BorradorFacturaCard";
 export type {
   BorradorFactura,

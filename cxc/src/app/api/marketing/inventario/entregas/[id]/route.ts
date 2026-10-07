@@ -7,6 +7,7 @@ import {
   columnasQueVinieron,
   traeAlgoDelGasto,
 } from "@/lib/marketing/editar-gasto";
+import { logAudit } from "@/lib/marketing/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -101,12 +102,24 @@ export async function PATCH(
     // nunca. Lo que no viaja queda `undefined` y `columnasDelGasto` no lo
     // escribe — un `null` acá BORRARÍA la tienda.
     const delGasto = columnasQueVinieron(body);
+    const before = await getEntregaById(params.id);
     const entrega = await updateEntrega(params.id, {
       items,
       marcas: normalizarMarcasBody(body.marcas),
       notas: body.notas,
       ...(traeAlgoDelGasto(delGasto) ? delGasto : {}),
     });
+
+    await logAudit({
+      action: "update",
+      entityType: "mk_entregas_muebles",
+      entityId: params.id,
+      userRole: auth.role,
+      userName: auth.userName,
+      before,
+      after: entrega,
+    });
+
     return NextResponse.json(entrega);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error";
@@ -125,7 +138,22 @@ export async function DELETE(
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
   try {
+    // `mk_entregas_muebles` no tiene soft delete: el borrado es DEFINITIVO
+    // (ver `anulados-caducos.ts`). Por eso la foto de "antes" es la ÚNICA
+    // que queda — sin ella, este borrado no deja ningún rastro de qué se fue.
+    const before = await getEntregaById(params.id);
     await deleteEntrega(params.id);
+
+    await logAudit({
+      action: "delete_definitivo",
+      entityType: "mk_entregas_muebles",
+      entityId: params.id,
+      userRole: auth.role,
+      userName: auth.userName,
+      before,
+      after: null,
+    });
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error";

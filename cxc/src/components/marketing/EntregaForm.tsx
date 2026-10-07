@@ -54,6 +54,7 @@ import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import NotaEntregaAcciones from "@/components/marketing/NotaEntregaAcciones";
+import { UltimoCambio } from "@/components/marketing/UltimoCambio";
 import { Aviso } from "@/components/ui/Aviso";
 import {
   bultosParaInput,
@@ -705,6 +706,13 @@ export default function EntregaForm({
                   : "Nueva entrega de muebles"}
             </h3>
             <p className="text-xs text-gray-500 truncate">{proyectoNombre}</p>
+            {initial && (
+              <UltimoCambio
+                entityType="mk_entregas_muebles"
+                entityId={initial.id}
+                className="mt-0.5"
+              />
+            )}
           </div>
           <button
             type="button"
