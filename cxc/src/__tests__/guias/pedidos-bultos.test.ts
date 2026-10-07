@@ -85,9 +85,19 @@ const linea = (p: Partial<LineaPedido> & { codigo_barra_id: number }): LineaPedi
   ...p,
 });
 
-describe("🔴 10 · el interruptor nace apagado", () => {
-  it("`PEDIDOS_BULTOS_EN_CODIGO` es false hasta el «sí» de Daniel", () => {
-    expect(PEDIDOS_BULTOS_EN_CODIGO).toBe(false);
+describe("🔴 10 · el interruptor, prendido el 6-oct-2026", () => {
+  it("`PEDIDOS_BULTOS_EN_CODIGO` está prendido, con las dos migraciones aplicadas", () => {
+    // Daniel dio el «sí» el 6-oct-2026 después de ver las capturas y el papel.
+    // Este candado deja de exigir `false` y pasa a exigir que, si está
+    // prendido, la migración que la pantalla necesita EXISTA en el repo: nunca
+    // se prende la pantalla sin su tabla.
+    expect(PEDIDOS_BULTOS_EN_CODIGO).toBe(true);
+    const sql = fs.readFileSync(
+      path.join(__dirname, "../../../supabase/migrations/20261231120000_pedidos_bultos.sql"),
+      "utf8",
+    );
+    expect(sql).toContain("pedidos_lineas");
+    expect(sql).toContain("pedidos_linea_bulto");
   });
 });
 

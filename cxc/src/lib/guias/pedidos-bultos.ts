@@ -60,10 +60,15 @@
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
 /**
- * 🔴 `false` = la pantalla de hoy: dos estados (Pendiente/Preparado), sin
- * detalle, sin bultos, sin enlace a Etiquetas. Se prende con el «sí» de Daniel.
+ * 🔴 PRENDIDO el 6-oct-2026 con el «sí» de Daniel, después de ver las capturas
+ * y el papel con el pie de Switch. Las dos migraciones (`20261231120000` y
+ * `20261231130000`) quedaron aplicadas antes de prenderlo.
+ *
+ * `false` devuelve la pantalla de antes: dos estados (Pendiente/Preparado), sin
+ * detalle, sin bultos, sin enlace a Etiquetas. Es la vuelta atrás, y sigue
+ * funcionando porque los lectores de la lista toleran que falten las columnas.
  */
-export const PEDIDOS_BULTOS_EN_CODIGO = false;
+export const PEDIDOS_BULTOS_EN_CODIGO = true;
 
 /**
  * El mismo escape que `PAPELES_ESTILO_UNICO`: se puede prender en LOCAL con

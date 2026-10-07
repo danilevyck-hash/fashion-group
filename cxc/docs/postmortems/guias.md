@@ -2428,7 +2428,9 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
 
 ## Pedidos con bultos — TRES estados y el detalle (6-oct-2026)
 
-> Interruptor `PEDIDOS_BULTOS_2026_10` (`src/lib/guias/pedidos-bultos.ts`), hoy **`false`**. `false` = la pantalla publicada del 5-oct, intacta. Candado `src/__tests__/guias/pedidos-bultos.test.ts` (39 pruebas). Se prende con el «sí» de Daniel.
+> Interruptor `PEDIDOS_BULTOS_2026_10` (`src/lib/guias/pedidos-bultos.ts`), **prendido el 6-oct-2026** con el «sí» de Daniel, después de ver las capturas y el papel con el pie de Switch. `false` sigue siendo la vuelta atrás: devuelve la pantalla publicada del 5-oct, intacta, porque los lectores de la lista toleran que falten las columnas nuevas. Candado `src/__tests__/guias/pedidos-bultos.test.ts`.
+>
+> 🔴 **Lo que quedó pendiente: la cantidad que de verdad se empacó.** Daniel preguntó el 6-oct-2026 qué pasa si el pedido dice 12 unidades y en bodega hay 11. **Switch no lo deja corregir**: toda su API de pedidos son cuatro endpoints —`/apipedido/info`, `/apipedido/lista`, `/apipedido/correo` y `/apipedido/terminar`— y `terminar` CREA un pedido, no modifica uno existente; no hay `modificar` ni `editar` para ninguna entidad. Así que la cantidad del pedido es intocable desde acá, y la salida es la que él mismo dio: una columna **«Empacado»** aparte, que escribe bodega, sin tocar lo que pidió el cliente, con el papel mostrando las dos («Pedido 12 · Empacado 11») y un aviso de la diferencia. **No entró en este push**: necesita su migración y su «hoy vs propuesta», y no frena nada hoy —ninguna línea se bloquea por la diferencia—.
 
 **Las siete decisiones de Daniel, 6-oct-2026.**
 
