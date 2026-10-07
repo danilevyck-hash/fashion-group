@@ -113,10 +113,10 @@ describe("candado estático — el alias no puede vivir en dos lados", () => {
     const enModulo = leer("src/lib/clientes/nombre-display.ts");
     expect(enModulo).toContain("American Classics Store");
     for (const p of [
-      "src/app/guias/components/GuiasList.tsx",
-      "src/app/guias/components/AtarClienteModal.tsx",
+      "src/app/despachos/components/GuiasList.tsx",
+      "src/app/despachos/components/AtarClienteModal.tsx",
       "src/components/ClientePicker.tsx",
-      "src/app/guias/page.tsx",
+      "src/app/despachos/page.tsx",
     ]) {
       expect(leer(p)).not.toContain("American Classics Store");
     }

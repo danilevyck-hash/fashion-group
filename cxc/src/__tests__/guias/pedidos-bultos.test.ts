@@ -425,7 +425,7 @@ describe("🔴 lo que Daniel pidió al APROBAR (6-oct-2026)", () => {
   });
 
   it("2 · la firma es UNA columna angosta con el ÚLTIMO paso, no dos anchas", () => {
-    const lista = leer("app/guias/components/PedidosView.tsx");
+    const lista = leer("app/despachos/components/PedidosView.tsx");
     // 🔴 Daniel, 6-oct-2026: «Verificado por» ocupaba demasiado y se comía el
     // ancho del cliente. Quedó una columna «Firma» con el último paso.
     expect(lista).toContain("Firma</th>");
@@ -453,7 +453,7 @@ describe("🔴 lo que Daniel pidió al APROBAR (6-oct-2026)", () => {
   });
 
   it("1c · el VENDEDOR baja debajo del cliente y su columna la toma Bultos", () => {
-    const lista = leer("app/guias/components/PedidosView.tsx");
+    const lista = leer("app/despachos/components/PedidosView.tsx");
     // Daniel, 6-oct-2026: el vendedor no merece columna propia en el celular.
     expect(lista).toContain(">Bultos</th>");
     expect(lista).toMatch(/\{!BULTOS && <ThOrden col="vendedor"/);
@@ -470,7 +470,7 @@ describe("🔴 lo que Daniel pidió al APROBAR (6-oct-2026)", () => {
   });
 
   it("3 · el bulto se ESCRIBE en la celda, sin abrir ninguna ventana", () => {
-    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    const detalle = leer("app/despachos/components/PedidoBultos.tsx");
     // Una casilla por línea que guarda al salir o con Enter — no en cada tecla.
     expect(detalle).toContain("guardarUna");
     expect(detalle).toContain("onBlur");
@@ -487,7 +487,7 @@ describe("🔴 lo que Daniel pidió al APROBAR (6-oct-2026)", () => {
   // la casilla es la MISMA en las dos pantallas; el candado nuevo está en
   // `pedidos-menos-pasos.test.ts`.
   it("3b · la casilla del bulto es la MISMA en el celular y en la computadora", () => {
-    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    const detalle = leer("app/despachos/components/PedidoBultos.tsx");
     expect(detalle).not.toContain('<span className="sm:hidden">{chip}</span>');
     // 44 px en el celular (regla 10 de `docs/diseno.md`), 36 desde `sm`.
     expect(detalle).toMatch(/className="h-11 w-14 rounded-md border border-gray-300[^"]*sm:h-9 sm:w-16/);
@@ -546,7 +546,7 @@ describe("🔴 EL PAPEL: EL TOTAL AL PIE Y LAS DOS FORMAS (6-oct-2026)", () => {
   });
 
   it("3 · «Imprimir» es UN botón; las dos formas aparecen al tocarlo", () => {
-    const pant = leer("app/guias/components/PedidoBultos.tsx");
+    const pant = leer("app/despachos/components/PedidoBultos.tsx");
     expect(pant).toContain("imprimirAbierto");
     expect(pant).toContain("Con precios");
     expect(pant).toContain("Sin precios");
@@ -556,7 +556,7 @@ describe("🔴 EL PAPEL: EL TOTAL AL PIE Y LAS DOS FORMAS (6-oct-2026)", () => {
 
   it("4 · la descripción no se queda con todo el ancho sobrante", () => {
     // Medido en el pedido real: «REEBOK BASE TRAIL MID» es lo más largo.
-    expect(leer("app/guias/components/PedidoBultos.tsx")).toContain('sm:w-[26%]');
+    expect(leer("app/despachos/components/PedidoBultos.tsx")).toContain('sm:w-[26%]');
     expect(leer("lib/guias/pdf-pedido-bultos.ts")).toMatch(/2: \{ cellWidth: \d+ \}/);
   });
 
@@ -583,7 +583,7 @@ describe("🔴 EL PAPEL: EL TOTAL AL PIE Y LAS DOS FORMAS (6-oct-2026)", () => {
   });
 
   it("🔴 las dos están A LA VISTA, ninguna escondida en un «···»", () => {
-    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    const detalle = leer("app/despachos/components/PedidoBultos.tsx");
     expect(detalle).toContain("Con precios");
     expect(detalle).toContain("Sin precios");
     // Y las dos las puede pedir cualquiera que entre a Pedidos: la ruta del
@@ -594,7 +594,7 @@ describe("🔴 EL PAPEL: EL TOTAL AL PIE Y LAS DOS FORMAS (6-oct-2026)", () => {
   });
 
   it("🔴 nombres de ERP, no palabras de la casa (docs/nombres-erp.md)", () => {
-    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    const detalle = leer("app/despachos/components/PedidoBultos.tsx");
     expect(detalle).toContain("Asignar bulto");
     expect(detalle).not.toContain("Poner en bulto");
     expect(detalle).not.toContain("artículos marcados");
@@ -638,13 +638,13 @@ describe("🔴 LA PLATA DEPENDE DE QUIÉN MIRA, Y LO DECIDE EL SERVIDOR (6-oct-2
     expect(papel).toContain("leerLineas(empresa, id, true)");
     expect(papel).toContain("application/pdf");
     // Y la pantalla ya NO arma el PDF: lo pide.
-    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    const detalle = leer("app/despachos/components/PedidoBultos.tsx");
     expect(detalle).toContain("/api/guias/pedidos/detalle/papel");
     expect(detalle).not.toContain("construirPdfPedidoBultos");
   });
 
   it("la pantalla dibuja las columnas de plata SOLO si llegaron", () => {
-    const detalle = leer("app/guias/components/PedidoBultos.tsx");
+    const detalle = leer("app/despachos/components/PedidoBultos.tsx");
     expect(detalle).toContain("const conPlata = !!lineas?.some((l) => l.precio != null)");
     expect([...COLUMNAS_DETALLE_SIN_PLATA]).toEqual(["Bulto", "Código", "Descripción", "Cantidad"]);
   });

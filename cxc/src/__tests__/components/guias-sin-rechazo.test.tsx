@@ -31,12 +31,12 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, cleanup, fireEvent } from "@testing-library/react";
-import GuiasList from "@/app/guias/components/GuiasList";
+import GuiasList from "@/app/despachos/components/GuiasList";
 // 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
 // El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
 import "@/lib/guias/papel-de-la-guia";
 import { guiaYaDespachada } from "@/lib/guias/modo-despacho";
-import type { Guia, GuiaItem } from "@/app/guias/components/types";
+import type { Guia, GuiaItem } from "@/app/despachos/components/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🩸 EL RELOJ VA FIJO — nota del 11-sep-2026.
@@ -290,7 +290,7 @@ describe("la base NO se toca", () => {
     // Daniel: las columnas NO se borran. El tipo la sigue declarando para que
     // una fila heredada no se lea como dato desconocido.
     const src = await import("node:fs").then((fs) =>
-      fs.readFileSync(process.cwd() + "/src/app/guias/components/types.ts", "utf8"),
+      fs.readFileSync(process.cwd() + "/src/app/despachos/components/types.ts", "utf8"),
     );
     expect(src).toContain("motivo_rechazo");
   });

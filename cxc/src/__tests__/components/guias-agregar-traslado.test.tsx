@@ -10,10 +10,10 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { useState } from "react";
-import EnviosApple, { BOTON_AGREGAR_FACTURA, BOTON_AGREGAR_TRASLADO, CHIP_TRASLADO } from "@/app/guias/components/EnviosApple";
-import { armarTraslado } from "@/app/guias/components/AgregarTraslado";
-import { emptyItem } from "@/app/guias/components/constants";
-import type { GuiaItem } from "@/app/guias/components/types";
+import EnviosApple, { BOTON_AGREGAR_FACTURA, BOTON_AGREGAR_TRASLADO, CHIP_TRASLADO } from "@/app/despachos/components/EnviosApple";
+import { armarTraslado } from "@/app/despachos/components/AgregarTraslado";
+import { emptyItem } from "@/app/despachos/components/constants";
+import type { GuiaItem } from "@/app/despachos/components/types";
 import { lineaDeTraslado, observacionesConTraslado } from "@/lib/guias/etiquetas-por-envio";
 
 vi.mock("@/components/ClientePicker", () => ({

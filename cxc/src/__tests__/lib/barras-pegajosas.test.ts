@@ -73,8 +73,8 @@ const ENCABEZADOS = [
  */
 const NO_SON_BARRAS_DE_PAGINA: { archivo: string; motivo: string }[] = [
   // `<thead>` / `<th>` — se pegan al contenedor con scroll de SU tabla.
-  { archivo: "app/guias/components/GuiaForm.tsx", motivo: "thead de la tabla de renglones" },
-  { archivo: "app/guias/components/GuiasList.tsx", motivo: "thead del detalle de la guía" },
+  { archivo: "app/despachos/components/GuiaForm.tsx", motivo: "thead de la tabla de renglones" },
+  { archivo: "app/despachos/components/GuiasList.tsx", motivo: "thead del detalle de la guía" },
   { archivo: "app/reclamos/components/EmpresaList.tsx", motivo: "thead de la lista de reclamos" },
   { archivo: "app/reclamos/components/ReclamoDetail.tsx", motivo: "thead de artículos y de liquidaciones" },
   // 22-sep-2026 · NOTA FECHADA — `ReportePorProyectoView.tsx` salió de esta
@@ -202,7 +202,7 @@ describe("BARRIDO — ninguna barra de contenido escribe su tope a mano", () => 
   it("las cuatro barras del arreglo usan la clase y perdieron su número", () => {
     const barras = [
       "components/ventas/ClientesView.tsx",
-      "app/guias/components/GuiaForm.tsx",
+      "app/despachos/components/GuiaForm.tsx",
       "components/TimeGroupHeader.tsx",
       "components/catalogo/BarraModoPedido.tsx",
     ];
@@ -215,7 +215,7 @@ describe("BARRIDO — ninguna barra de contenido escribe su tope a mano", () => 
     }
     // Los números exactos que causaron el defecto, uno por uno.
     expect(leer("components/ventas/ClientesView.tsx")).not.toContain("sticky top-0 z-20");
-    expect(leer("app/guias/components/GuiaForm.tsx")).not.toContain("sticky top-0 z-20");
+    expect(leer("app/despachos/components/GuiaForm.tsx")).not.toContain("sticky top-0 z-20");
     expect(leer("components/TimeGroupHeader.tsx")).not.toContain("top-14");
     expect(leer("components/catalogo/BarraModoPedido.tsx")).not.toContain("sticky top-0 z-30");
   });

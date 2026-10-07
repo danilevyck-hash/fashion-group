@@ -79,7 +79,7 @@ describe("en pantalla: una línea YA atada también se puede corregir", () => {
   // al cliente EQUIVOCADO no se podía arreglar nunca desde la pantalla. Y hay
   // una así en producción — GT-183, atada a `111380`, que es un código de
   // Confecciones Boston. El chip tiene que ser un botón.
-  const lista = leer("src/app/guias/components/GuiasList.tsx");
+  const lista = leer("src/app/despachos/components/GuiasList.tsx");
   const codigo = soloCodigo(lista);
 
   it("el chip del código es un botón que abre la ventana, no texto muerto", () => {

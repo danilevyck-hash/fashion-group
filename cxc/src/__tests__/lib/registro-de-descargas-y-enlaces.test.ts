@@ -282,7 +282,7 @@ describe("CONTROL: lo que sí funcionaba no se tocó", () => {
 
   it("los otros atajos de la búsqueda global siguen en pie", () => {
     const barra = plano("src/components/SearchBar.tsx");
-    for (const destino of ["/recordatorios", "/reclamos?empresa=", "/guias?pendientes=1", "/caja"]) {
+    for (const destino of ["/recordatorios", "/reclamos?empresa=", "/despachos?pendientes=1", "/caja"]) {
       expect(barra, `se perdió el atajo a ${destino}`).toContain(destino);
     }
   });

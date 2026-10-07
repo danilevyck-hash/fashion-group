@@ -45,7 +45,7 @@ interface Props {
 
 export default function EdicionGuia({ id, guia, onSalir, onGuardado }: Props) {
   // 🔴 `alGuardar` es lo que evita que guardar te saque de la guía. Sin esto el
-  // hook hace `router.push("/guias")` —lo correcto cuando el formulario ES la
+  // hook hace `router.push("/despachos")` —lo correcto cuando el formulario ES la
   // pantalla entera— y quien estaba por despachar terminaba en el listado.
   const s = useGuiaFormState({ editingId: id, alGuardar: onGuardado, guiaInicial: guia });
 

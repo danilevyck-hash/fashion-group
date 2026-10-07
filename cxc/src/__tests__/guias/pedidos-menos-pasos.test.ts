@@ -43,8 +43,8 @@ import {
 import { puedeMarcarPedidos } from "@/lib/guias/pedidos-bodega";
 
 const leer = (f: string) => fs.readFileSync(path.resolve(__dirname, "../..", f), "utf8");
-const vista = () => leer("app/guias/components/PedidosView.tsx");
-const detalle = () => leer("app/guias/components/PedidoBultos.tsx");
+const vista = () => leer("app/despachos/components/PedidosView.tsx");
+const detalle = () => leer("app/despachos/components/PedidoBultos.tsx");
 const rutaLista = () => leer("app/api/guias/pedidos/route.ts");
 const rutaDetalle = () => leer("app/api/guias/pedidos/detalle/route.ts");
 

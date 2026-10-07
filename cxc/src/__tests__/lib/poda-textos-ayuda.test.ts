@@ -216,12 +216,12 @@ describe("🔴 lo que FRENA una acción sigue en pantalla, nunca adentro de un �
   const EN_PANTALLA: Array<[string, string]> = [
     // Guía cerrada: sin esto, un chip tocable se lee como "el despacho entero
     // se puede editar".
-    ["app/guias/components/GuiasList.tsx", "Solo se puede cambiar el cliente"],
+    ["app/despachos/components/GuiasList.tsx", "Solo se puede cambiar el cliente"],
     // La ventana de sugerencias, cuando no hay ningún parecido.
     ["components/SugerenciasCliente.tsx", "No hay ningún cliente parecido en el directorio"],
     ["components/SugerenciasCliente.tsx", "Hay que darlo de alta en Switch"],
     // Borrar una guía no se deshace.
-    ["app/guias/page.tsx", "Esta acción no se puede deshacer"],
+    ["app/despachos/page.tsx", "Esta acción no se puede deshacer"],
     // 10-sep-2026 · NOTA FECHADA — las dos filas de Packing Lists (el aviso de
     // «valida contra el PDF» y el de la retención del historial) se fueron con la
     // PANTALLA: el módulo se retiró (Daniel: «packing list no se usa,

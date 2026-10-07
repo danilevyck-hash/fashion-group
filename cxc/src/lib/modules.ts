@@ -191,7 +191,11 @@ export const ALL_MODULES: AppModule[] = [
   { key: "catalogos",     label: "Catálogos",          href: "/catalogos/marcas", icon: BookOpen,         roles: catalogoRoles(),                               group: "ventas-clientes" },
 
   // Operación
-  { key: "guias",          label: "Guías de despacho", href: "/guias",            icon: Truck,         roles: ["admin", "secretaria", "bodega", "vendedor"], group: "operacion" },
+  // 🔴 «Despachos» (era «Guías de despacho», 7-oct-2026): ese nombre era el
+  // del ÚLTIMO documento del módulo, no el del conjunto — adentro viven
+  // Pedidos · Bultos · Guías de despacho. La `key` NO cambia (vive en
+  // `role_permissions` y en overrides); solo el rótulo y la dirección.
+  { key: "guias",          label: "Despachos",         href: "/despachos",        icon: Truck,         roles: ["admin", "secretaria", "bodega", "vendedor"], group: "operacion" },
   // 🩸 "Packing Lists" (key `packing-lists`) se RETIRÓ el 10-sep-2026. Daniel,
   // textual: *«packing list no se usa, eliminar»*. Medido contra producción ese
   // día: `packing_lists` y `pl_items` con **0 filas** (vacías desde el

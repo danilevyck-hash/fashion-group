@@ -51,10 +51,10 @@ const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
 
 const antiDoble = leer("src/lib/guias/anti-doble-captura.ts");
 const pestana = leer("src/lib/guias/pdf-en-pestana.ts");
-const vista = leer("src/app/guias/components/EtiquetasView.tsx");
-const panelSelector = leer("src/app/guias/components/FacturasDelCliente.tsx");
-const panelEtiquetas = leer("src/app/guias/components/EtiquetasPendientes.tsx");
-const formulario = leer("src/app/guias/components/GuiaForm.tsx");
+const vista = leer("src/app/despachos/components/EtiquetasView.tsx");
+const panelSelector = leer("src/app/despachos/components/FacturasDelCliente.tsx");
+const panelEtiquetas = leer("src/app/despachos/components/EtiquetasPendientes.tsx");
+const formulario = leer("src/app/despachos/components/GuiaForm.tsx");
 
 /** La etiqueta real de la medición: Nova Lux, Fashion Shoes, 14 cajas. */
 function etq(over: Partial<EtiquetaFila> = {}): EtiquetaFila {
@@ -411,7 +411,7 @@ describe("🔴 8. los archivos nuevos cumplen las reglas de la casa", () => {
     expect(antiDoble).not.toMatch(/from "react"|fetch\(|new Date\(/);
     // Nadie más escribe su propia versión de la regla.
     const otros = barrer(/tomada-por-el-selector/).filter(
-      (f) => f !== "src/lib/guias/anti-doble-captura.ts" && f !== "src/app/guias/components/EtiquetasPendientes.tsx",
+      (f) => f !== "src/lib/guias/anti-doble-captura.ts" && f !== "src/app/despachos/components/EtiquetasPendientes.tsx",
     );
     expect(otros).toEqual([]);
   });

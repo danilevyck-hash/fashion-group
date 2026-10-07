@@ -108,7 +108,7 @@ describe("2 · la pantalla, las rutas API y el lector de PDF no existen", () => 
   }
 
   it("🔴 CONTROL · las rutas de Guías —el módulo que SÍ usa bodega— siguen ahí", () => {
-    expect(existsSync(path.join(SRC, "app", "guias"))).toBe(true);
+    expect(existsSync(path.join(SRC, "app", "despachos"))).toBe(true);
     expect(existsSync(path.join(SRC, "app", "api", "guias"))).toBe(true);
   });
 });

@@ -14,9 +14,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
-import GuiaForm from "@/app/guias/components/GuiaForm";
-import DespachoForm from "@/app/guias/components/DespachoForm";
-import type { GuiaItem } from "@/app/guias/components/types";
+import GuiaForm from "@/app/despachos/components/GuiaForm";
+import DespachoForm from "@/app/despachos/components/DespachoForm";
+import type { GuiaItem } from "@/app/despachos/components/types";
 import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 
 const DIRECCIONES_BASE = ["David", "Paso Canoas", "Santiago", "Changinola"];

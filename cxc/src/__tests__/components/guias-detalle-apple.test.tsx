@@ -42,7 +42,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useParams: () => ({ id: "22222222-2222-4222-8222-222222222222" }),
 }));
-vi.mock("@/app/guias/components/DespachoForm", () => ({
+vi.mock("@/app/despachos/components/DespachoForm", () => ({
   default: (p: Record<string, (...a: unknown[]) => void>) => (
     <div>
       <button
@@ -63,7 +63,7 @@ vi.mock("@/app/guias/components/DespachoForm", () => ({
   ),
 }));
 
-import GuiaPage from "@/app/guias/[id]/page";
+import GuiaPage from "@/app/despachos/[id]/page";
 import "@/lib/guias/papel-de-la-guia";
 
 const GUIA_ID = "22222222-2222-4222-8222-222222222222";

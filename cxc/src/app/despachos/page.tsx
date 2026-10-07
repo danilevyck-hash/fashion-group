@@ -193,8 +193,11 @@ export default function GuiasPage() {
   /** Las pestañas que de verdad existen para este rol. Con una sola, no se dibuja la fila. */
   const pestanas: Array<[Vista, string]> = [
     ...(hayPedidos ? ([["pedidos", "Pedidos"]] as Array<[Vista, string]>) : []),
-    ["guias", "Guías"],
-    ...(hayEtiquetas ? ([["etiquetas", "Etiquetas"]] as Array<[Vista, string]>) : []),
+    ["guias", "Guías de despacho"],
+    // 🔴 «Bultos» (era «Etiquetas», 7-oct-2026): es el nombre del glosario de
+    // `docs/nombres-erp.md` para esta pantalla (se escriben los bultos y
+    // salen las hojas); la `key` de la pestaña («etiquetas») no cambia.
+    ...(hayEtiquetas ? ([["etiquetas", "Bultos"]] as Array<[Vista, string]>) : []),
     ...(hayConfig ? ([["config", "Configuración"]] as Array<[Vista, string]>) : []),
   ];
 
@@ -250,11 +253,11 @@ export default function GuiasPage() {
   return (
     <PullToRefresh onRefresh={s.loadGuias}>
       <div>
-        <AppHeader module="Guías de despacho" tituloEnLaPantalla={barra} />
+        <AppHeader module="Despachos" tituloEnLaPantalla={barra} />
         <ProveedorBarraCelular activo={barra} activa={vista}>
         {barra && (
           <BarraDeControles
-            titulo="Guías"
+            titulo="Despachos"
             pestanas={pestanas.map(([value, label]) => ({ value, label }))}
             activa={vista}
             onPestana={(v) => cambiarVista(v as Vista)}
@@ -316,8 +319,8 @@ export default function GuiasPage() {
           expandedGuia={s.expandedGuia}
           expandedLoading={s.expandedLoading}
           onToggleExpand={s.toggleExpand}
-          onEditar={(id) => router.push(`/guias/${id}?editar=1`)}
-          onDespachar={(id) => router.push(`/guias/${id}`)}
+          onEditar={(id) => router.push(`/despachos/${id}?editar=1`)}
+          onDespachar={(id) => router.push(`/despachos/${id}`)}
           onDelete={s.requestDeleteGuia}
           onAtarCliente={s.abrirAtarCliente}
           nombresPorCodigo={nombresPorCodigo}

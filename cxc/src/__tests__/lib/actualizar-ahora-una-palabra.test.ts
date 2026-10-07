@@ -35,8 +35,8 @@ const sinComentarios = (src: string) =>
   src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 const BOTON = "src/components/shared/SyncNowButton.tsx";
-const FACTURAS = "src/app/guias/components/FacturasDelCliente.tsx";
-const ETIQUETAS = "src/app/guias/components/EtiquetasView.tsx";
+const FACTURAS = "src/app/despachos/components/FacturasDelCliente.tsx";
+const ETIQUETAS = "src/app/despachos/components/EtiquetasView.tsx";
 
 /** Todo `src/**` menos los tests y el módulo que define las palabras. */
 function fuentesDeLaApp(): string[] {
@@ -134,18 +134,18 @@ describe("🔴 E. la frase de Etiquetas es la de Daniel, y no cambió", () => {
   it("🔄 4-oct-2026: el aviso se volvió la línea de frescura de todo el sistema", () => {
     // Daniel: «tiene que estar así en TODO el sistema». El aviso con
     // «Actualizar ahora» en azul se fue; la constante queda sin dibujar.
-    const src = leer("app/guias/components/EtiquetasView.tsx");
+    const src = leer("app/despachos/components/EtiquetasView.tsx");
     expect(src).not.toMatch(/>\s*\{TEXTO_TRAER_DE_SWITCH\}\s*<\/Aviso>/);
     expect(src).toContain("<LineaDeFrescura");
   });
 
   it("CONTROL: el botón de Etiquetas sigue usando la MISMA ruta de siempre", () => {
-    const src = leer("app/guias/components/EtiquetasView.tsx");
+    const src = leer("app/despachos/components/EtiquetasView.tsx");
     expect(src).toContain('fetch("/api/guias/facturas-hoy", { method: "POST" })');
   });
 
   it("CONTROL: el de Nueva guía también, y sigue recargando la lista", () => {
-    const src = leer("app/guias/components/FacturasDelCliente.tsx");
+    const src = leer("app/despachos/components/FacturasDelCliente.tsx");
     expect(src).toContain('fetch("/api/guias/facturas-hoy", { method: "POST" })');
     expect(src).toContain("await cargarFacturas(cliente.codigo);");
   });

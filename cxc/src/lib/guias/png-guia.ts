@@ -50,7 +50,7 @@ import {
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "./modo-despacho";
-import type { Guia } from "@/app/guias/components/types";
+import type { Guia } from "@/app/despachos/components/types";
 
 /** Ancho de la imagen. 1080 px es lo que WhatsApp deja pasar sin recomprimir feo. */
 const ANCHO = 1080;

@@ -57,7 +57,7 @@ const FORMULAS = "src/app/productos/cargar/FormulasConfig.tsx";
 const DATAHEALTH = "src/app/admin/usuarios/DataHealthTab.tsx";
 const RECLAMO_DETALLE = "src/app/reclamos/components/ReclamoDetail.tsx";
 const EMPRESA_LIST = "src/app/reclamos/components/EmpresaList.tsx";
-const GUIA_DETAIL = "src/app/guias/components/GuiaDetail.tsx";
+const GUIA_DETAIL = "src/app/despachos/components/GuiaDetail.tsx";
 
 describe("Depurador — las pestañas son un desplegable en angosto", () => {
   it("usa el DesplegableFlotante de la casa, no un panel absolute a mano", () => {
@@ -226,7 +226,7 @@ describe("Guías › Imprimir — el arrastre deja de ser de la PÁGINA", () => 
   // 0.733) y en modo ampliado sigue scrolleando en su marco, no la página. El
   // detalle vive en `guia-imprimir-escala.test.ts`.
   it("el documento scrollea dentro de su propio marco, y al imprimir no hay scroller", () => {
-    const src = leer("src/app/guias/components/HojaEscalada.tsx");
+    const src = leer("src/app/despachos/components/HojaEscalada.tsx");
     expect(src).toContain("overflow-x-auto");
     expect(src).toContain("print:overflow-visible");
     expect(src).toContain("print:mx-0");

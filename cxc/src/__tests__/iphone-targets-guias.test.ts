@@ -28,7 +28,7 @@ import { globSync } from "glob";
 
 const src = join(__dirname, "..");
 const read = (...p: string[]) => readFileSync(join(src, ...p), "utf8");
-const guias = (f: string) => read("app", "guias", "components", f);
+const guias = (f: string) => read("app", "despachos", "components", f);
 
 const form = guias("GuiaForm.tsx");
 /**
@@ -283,7 +283,7 @@ describe("Cliente · el desplegable, no solo el campo que lo abre", () => {
     // en pie (Marketing › Editar proyecto), y con texto libre. Sus 44 px ya no
     // hay que vigilarlos porque el control es `ClientePicker`, que se vigila
     // arriba. Lo que sí hay que vigilar es que no vuelva.
-    expect(existsSync(join(src, "app", "guias", "components", "ClienteTypeahead.tsx"))).toBe(false);
+    expect(existsSync(join(src, "app", "despachos", "components", "ClienteTypeahead.tsx"))).toBe(false);
     expect(read("app", "marketing", "components", "EditarProyectoModal.tsx")).toContain(
       'import ClientePicker from "@/components/ClientePicker"',
     );
@@ -367,7 +367,7 @@ describe("Los botones de solo texto del formulario siguen siendo táctiles", () 
 
 describe("Tamaño de letra · nada por debajo de text-xs (13px) en guías", () => {
   it("ningún archivo de guías usa clases arbitrarias sub-12px", () => {
-    const files = globSync(join(src, "app/guias", "**", "*.tsx"));
+    const files = globSync(join(src, "app/despachos", "**", "*.tsx"));
     expect(files.length).toBeGreaterThan(0);
     const ofensores: string[] = [];
     for (const f of files) {

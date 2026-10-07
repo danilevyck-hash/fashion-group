@@ -20,7 +20,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 
-const nav = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), ruta: "/guias" }));
+const nav = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), ruta: "/despachos" }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: nav.push, replace: nav.replace }),
   usePathname: () => nav.ruta,
@@ -78,7 +78,7 @@ beforeEach(() => {
   sw.apple = false;
   nav.push.mockClear();
   nav.replace.mockClear();
-  nav.ruta = "/guias";
+  nav.ruta = "/despachos";
   sessionStorage.clear();
   Object.defineProperty(window, "localStorage", { value: almacen(), configurable: true, writable: true });
   fetchMock.mockClear();
@@ -103,7 +103,7 @@ describe("🔴 el interruptor está prendido (2-oct-2026) y apagado todo queda c
 
   it("encabezado de hoy: campana, llave, «Cerrar sesión» y la tira del camino", () => {
     sesion("admin");
-    render(<AppHeader module="Guías de despacho" />);
+    render(<AppHeader module="Despachos" />);
     expect(document.querySelector("[data-campana]")).not.toBeNull();
     expect(screen.getAllByLabelText("Cambiar mi contraseña").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Cerrar sesión")).toBeTruthy();
@@ -155,29 +155,29 @@ describe("🔴 prendido, SOLO cambia la pantalla", () => {
     sesion("admin");
     render(<Sidebar />);
     await waitFor(() => expect(document.querySelector("[data-barra-lateral-2026]")).not.toBeNull());
-    fireEvent.click(document.querySelector('[data-barra-lateral-2026] a[href="/guias"]')!);
+    fireEvent.click(document.querySelector('[data-barra-lateral-2026] a[href="/despachos"]')!);
     expect(JSON.parse(localStorage.getItem("fg_module_clicks_daniel") || "{}")).toEqual({ guias: 1 });
   });
 
   it("encabezado: sin campana ni botones sueltos; el camino lleva a los mismos lugares", () => {
     sesion("admin");
-    render(<AppHeader module="Guías de despacho" breadcrumbs={[{ label: "GT-271" }]} />);
+    render(<AppHeader module="Despachos" breadcrumbs={[{ label: "GT-271" }]} />);
     expect(document.querySelector("[data-campana]")).toBeNull();
     expect(screen.queryByLabelText("Cambiar mi contraseña")).toBeNull();
     expect(screen.queryByLabelText("Cerrar sesión")).toBeNull();
     const camino = document.querySelector("[data-camino-arriba]") as HTMLElement;
-    expect(camino.textContent).toBe("Inicio›Guías de despacho›GT-271");
+    expect(camino.textContent).toBe("Inicio›Despachos›GT-271");
     const boton = (t: string) => [...camino.querySelectorAll("button")].find((b) => b.textContent === t)!;
     fireEvent.click(boton("Inicio"));
     expect(nav.push).toHaveBeenLastCalledWith("/home");
-    fireEvent.click(boton("Guías de despacho"));
-    expect(nav.push).toHaveBeenLastCalledWith("/guias");
+    fireEvent.click(boton("Despachos"));
+    expect(nav.push).toHaveBeenLastCalledWith("/despachos");
   });
 
   it("el botón del usuario: dos opciones, y «Cerrar sesión» hace lo mismo que hoy", async () => {
     expect(OPCIONES_DEL_USUARIO).toEqual(["Cambiar contraseña", "Cerrar sesión"]);
     sesion("admin");
-    render(<AppHeader module="Guías de despacho" />);
+    render(<AppHeader module="Despachos" />);
     fireEvent.click(document.querySelector("[data-menu-usuario] button")!);
     const opciones = screen.getAllByRole("menuitem").map((b) => b.textContent);
     expect(opciones).toEqual([...OPCIONES_DEL_USUARIO]);
@@ -191,7 +191,7 @@ describe("🔴 prendido, SOLO cambia la pantalla", () => {
   // del encabezado (sticky + transform + z-index 10). Tiene que vivir en <body>.
   it("«Cambiar contraseña» se abre en un portal, fuera del encabezado", () => {
     sesion("admin");
-    render(<AppHeader module="Guías de despacho" />);
+    render(<AppHeader module="Despachos" />);
     fireEvent.click(document.querySelector("[data-menu-usuario] button")!);
     fireEvent.click(screen.getByRole("menuitem", { name: "Cambiar contraseña" }));
     const titulo = screen.getByRole("heading", { name: "Cambiar mi contraseña" });

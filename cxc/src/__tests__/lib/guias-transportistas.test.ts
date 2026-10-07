@@ -52,11 +52,11 @@ const migracion = leer(MIGRACION);
 const puro = leer("src/lib/guias/transportistas.ts");
 const servidor = leer("src/lib/guias/transportistas-server.ts");
 const ruta = leer("src/app/api/transportistas/route.ts");
-const tarjeta = leer("src/app/guias/components/TransportistasConfig.tsx");
-const formulario = leer("src/app/guias/components/GuiaForm.tsx");
-const hook = leer("src/app/guias/components/useGuiaFormState.ts");
-const masMas = leer("src/app/guias/components/AddNewInline.tsx");
-const configView = leer("src/app/guias/components/GuiasConfiguracionView.tsx");
+const tarjeta = leer("src/app/despachos/components/TransportistasConfig.tsx");
+const formulario = leer("src/app/despachos/components/GuiaForm.tsx");
+const hook = leer("src/app/despachos/components/useGuiaFormState.ts");
+const masMas = leer("src/app/despachos/components/AddNewInline.tsx");
+const configView = leer("src/app/despachos/components/GuiasConfiguracionView.tsx");
 
 // ─── 1 · quién puede qué ─────────────────────────────────────────────────────
 

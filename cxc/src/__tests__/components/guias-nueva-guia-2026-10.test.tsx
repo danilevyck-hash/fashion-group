@@ -19,8 +19,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { useState } from "react";
-import NuevaGuiaClient from "@/app/guias/nueva/NuevaGuiaClient";
-import DespachoForm from "@/app/guias/components/DespachoForm";
+import NuevaGuiaClient from "@/app/despachos/nueva/NuevaGuiaClient";
+import DespachoForm from "@/app/despachos/components/DespachoForm";
 import type { EtiquetaFila } from "@/lib/guias/etiquetas";
 import { hoyPanama } from "@/lib/fecha-panama";
 
@@ -202,7 +202,7 @@ describe("🔴 UNA tabla: envíos etiquetados + renglones sin etiqueta", () => {
     // Guardar: tres renglones, y se atan las etiquetas de los DOS envíos.
     fireEvent.change(document.getElementById("guia-transportista") as HTMLSelectElement, { target: { value: "t1" } });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Guardar guía" })); });
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/guias/g-nueva"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/despachos/g-nueva"));
     const guia = posts.find((p) => p.url === "/api/guias")!.body;
     expect((guia.items as unknown[]).length).toBe(3);
     expect(guia.entregado_por).toBe("");

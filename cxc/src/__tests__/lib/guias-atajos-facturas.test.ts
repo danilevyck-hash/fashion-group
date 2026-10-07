@@ -325,7 +325,7 @@ describe("el destino autollenado al marcar", () => {
 
 describe("🔴 «Traslado» y la validación del formulario", () => {
   it("un renglón con facturas = «Traslado» es VÁLIDO, y la empresa se sigue pidiendo", async () => {
-    const { validarGuia, claveCampo } = await import("@/app/guias/components/guia-form-logic");
+    const { validarGuia, claveCampo } = await import("@/app/despachos/components/guia-form-logic");
     const item = {
       uid: "t1", orden: 1, cliente: "Multi Fashion Holding", cliente_codigo: "D-108",
       direccion: "Albrook", empresa: "", facturas: "Traslado", bultos: 3, numero_guia_transp: "",

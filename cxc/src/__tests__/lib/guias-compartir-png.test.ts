@@ -88,9 +88,9 @@ describe("🩸 el archivo se arma SÍNCRONO — iOS exige el gesto del toque", (
     // botón»), y era cierto mientras «Compartir» dibujaba una imagen síncrona.
     // El PDF pinta las firmas desde el `data:` guardado sin esperar nada.
     for (const p of [
-      "src/app/guias/components/GuiasList.tsx",
-      "src/app/guias/[id]/page.tsx",
-      "src/app/guias/components/GuiaDetail.tsx",
+      "src/app/despachos/components/GuiasList.tsx",
+      "src/app/despachos/[id]/page.tsx",
+      "src/app/despachos/components/GuiaDetail.tsx",
     ]) {
       expect(leer(p), p).not.toContain("precargarFirmasGuia(");
     }
@@ -106,8 +106,8 @@ describe("🩸 el archivo se arma SÍNCRONO — iOS exige el gesto del toque", (
 describe("⚠️ lo que NO cambió", () => {
   it("el botón se sigue llamando «Compartir» y decide solo", () => {
     for (const p of [
-      "src/app/guias/components/GuiasList.tsx",
-      "src/app/guias/[id]/page.tsx",
+      "src/app/despachos/components/GuiasList.tsx",
+      "src/app/despachos/[id]/page.tsx",
     ]) {
       const src = leer(p);
       expect(src).toContain("Compartir");
@@ -125,7 +125,7 @@ describe("⚠️ lo que NO cambió", () => {
   });
 
   it("hay UNA sola puerta de compartir: la pantalla de imprimir no arma su propio PDF", () => {
-    const detalle = leer("src/app/guias/components/GuiaDetail.tsx");
+    const detalle = leer("src/app/despachos/components/GuiaDetail.tsx");
     expect(detalle).toContain("compartirGuia(guia)");
     expect(detalle).not.toContain("construirPdfGuia(");
   });

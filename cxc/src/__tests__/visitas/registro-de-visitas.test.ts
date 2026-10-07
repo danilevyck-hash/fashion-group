@@ -185,13 +185,13 @@ describe("2 · Qué módulo es cada dirección", () => {
   it("las direcciones de siempre caen en su módulo", () => {
     expect(moduloDeLaRuta("/cxc")).toBe("cxc");
     expect(moduloDeLaRuta("/cxc/cliente/D-25")).toBe("cxc");
-    expect(moduloDeLaRuta("/guias/123")).toBe("guias");
+    expect(moduloDeLaRuta("/despachos/123")).toBe("guias");
     expect(moduloDeLaRuta("/recordatorios")).toBe("cheques");
     expect(moduloDeLaRuta("/productos/cargar")).toBe("cargar");
     expect(moduloDeLaRuta("/clientes/D-25")).toBe("directorio");
     expect(moduloDeLaRuta("/admin/usuarios")).toBe("usuarios");
     expect(moduloDeLaRuta("/asistencia?tab=planilla")).toBe("asistencia");
-    expect(moduloDeLaRuta("/guias/")).toBe("guias");
+    expect(moduloDeLaRuta("/despachos/")).toBe("guias");
   });
 
   it("🔴 los cuatro que `getModuleKeyFromPath` deja afuera SÍ cuentan acá", () => {

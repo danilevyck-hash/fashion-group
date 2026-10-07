@@ -18,13 +18,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act, within, waitFor } from "@testing-library/react";
-import GuiaForm from "@/app/guias/components/GuiaForm";
-import DestinosListaConfig from "@/app/guias/components/DestinosListaConfig";
+import GuiaForm from "@/app/despachos/components/GuiaForm";
+import DestinosListaConfig from "@/app/despachos/components/DestinosListaConfig";
 import {
   AYUDA_DIRECCIONES_QUE_SUGIERE,
   ROTULO_DIRECCIONES_QUE_SUGIERE,
 } from "@/lib/guias/rotulos-configuracion";
-import type { GuiaItem } from "@/app/guias/components/types";
+import type { GuiaItem } from "@/app/despachos/components/types";
 import { invalidarDirectorioClientes } from "@/lib/hooks/useBusquedaClientes";
 
 const DESTINOS_HISTORICOS = { "D-77": ["David", "Santiago"] };

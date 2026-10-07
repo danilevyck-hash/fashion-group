@@ -82,9 +82,9 @@ describe("🔴 el NOMBRE de D-108 lo decide UN solo módulo", () => {
 
 describe("🔴 las TRES puertas al cliente de una guía filtran al retirado", () => {
   const puertas: Array<[string, string]> = [
-    ["el renglón del formulario", "src/app/guias/components/GuiaForm.tsx"],
-    ["el panel de facturas", "src/app/guias/components/FacturasDelCliente.tsx"],
-    ["la ventana de atar cliente", "src/app/guias/components/AtarClienteModal.tsx"],
+    ["el renglón del formulario", "src/app/despachos/components/GuiaForm.tsx"],
+    ["el panel de facturas", "src/app/despachos/components/FacturasDelCliente.tsx"],
+    ["la ventana de atar cliente", "src/app/despachos/components/AtarClienteModal.tsx"],
   ];
 
   it.each(puertas)("%s le pasa codigosOcultos al selector", (_n, ruta) => {

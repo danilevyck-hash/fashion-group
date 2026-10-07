@@ -92,7 +92,10 @@ export function getModuleColorByKey(key: string | null | undefined): ModuleColor
 /** Map pathname to module key */
 export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/cxc"))             return "cxc";
-  if (pathname.startsWith("/guias"))           return "guias";
+  // «Despachos» (era «Guías de despacho», 7-oct-2026): la dirección cambió,
+  // la key no. Se aceptan las DOS por si llega un enlace viejo antes de que
+  // el middleware alcance a redirigirlo.
+  if (pathname.startsWith("/despachos") || pathname.startsWith("/guias")) return "guias";
   if (pathname.startsWith("/recordatorios")) return "cheques"; // la key sigue siendo `cheques` (role_permissions)
   if (pathname.startsWith("/reclamos"))        return "reclamos";
   if (pathname.startsWith("/caja"))            return "caja";

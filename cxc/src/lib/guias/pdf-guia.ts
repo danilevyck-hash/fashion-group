@@ -42,7 +42,7 @@ import { tintaDeLaCasilla } from "./casilla-en-blanco";
 import { ESTILO_UNICO, MARGEN_PAPEL, PAPEL, Y_CONTENIDO, cabeceraPapel, piePapel } from "@/lib/pdf-estilo";
 import { cedulaParaMostrar } from "./cedula";
 import { observacionesVisibles } from "./observaciones";
-import type { Guia } from "@/app/guias/components/types";
+import type { Guia } from "@/app/despachos/components/types";
 import {
   ETIQUETA_TIPO_DESPACHO,
   esEntregaDirecta,

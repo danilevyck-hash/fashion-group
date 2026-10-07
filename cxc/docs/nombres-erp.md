@@ -53,6 +53,7 @@ Antes de nombrar algo nuevo, busca aquí el término. Si el concepto no está, u
 | Respaldo de un gasto | Comprobante | Foto o factura, Papel |
 | Dónde se gastó | Tienda | De una tienda, La tienda esa |
 | Agrupar mercancía para despacho | Bultos · Unidades por bulto | Poner en bulto, Embultar |
+| Módulo de envíos a clientes (pedidos + bultos + la guía) | Despachos (adentro: Pedidos · Bultos · Guías de despacho) | Envíos, Logística |
 | Poner una línea del pedido en un bulto | Asignar bulto · Quitar bulto · «N artículos asignados» | Poner en bulto, Poner en el bulto, Quitar del bulto, Marcar artículos |
 | A quién se le cobra un gasto (Marketing) | Se cobra a (las 5 marcas, o «A cargo de la empresa») · Se cobra (Completo · Mitad) | A quién se le pasa, mi costo, costo propio, inventario propio, porcentajes en pantalla |
 | Adjunto de un gasto | Comprobante · Adjuntar comprobante | Foto o factura, Subir foto o factura |

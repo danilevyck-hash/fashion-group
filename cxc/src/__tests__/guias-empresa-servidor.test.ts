@@ -85,7 +85,7 @@ describe("PUT · una guía VIEJA se tiene que poder editar y guardar", () => {
 
 describe("una sola fuente de empresas", () => {
   it("el servidor y el formulario validan contra la MISMA lista", async () => {
-    const { EMPRESAS_CANONICAS } = await import("@/app/guias/components/guia-form-logic");
+    const { EMPRESAS_CANONICAS } = await import("@/app/despachos/components/guia-form-logic");
     expect(EMPRESAS_GUIA).toEqual(EMPRESAS_CANONICAS);
   });
 

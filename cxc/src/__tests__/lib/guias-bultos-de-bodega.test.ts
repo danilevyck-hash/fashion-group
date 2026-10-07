@@ -189,7 +189,7 @@ describe("candado estático — el servidor", () => {
 
 describe("candado estático — la pantalla y el papel", () => {
   it("la caja vive en la lista de envíos, al lado de la del N° del transportista", () => {
-    const lista = leer("src/app/guias/components/ListaEnvios.tsx");
+    const lista = leer("src/app/despachos/components/ListaEnvios.tsx");
     expect(lista).toContain('id={`despacho-bultos-${idx}`}');
     expect(lista).toContain("const puedeContar = editable && Boolean(setBultos)");
     expect(lista).toContain("textoCorreccionEnVivo");
@@ -197,7 +197,7 @@ describe("candado estático — la pantalla y el papel", () => {
   });
 
   it("la página de la guía le pasa el estado y el rol", () => {
-    const pagina = leer("src/app/guias/[id]/page.tsx");
+    const pagina = leer("src/app/despachos/[id]/page.tsx");
     expect(pagina).toContain("bultosPorLinea={s.bultosPorLinea}");
     expect(pagina).toContain("setBultos={s.setBultos}");
     expect(pagina).toContain("editable={!s.despachada && puedeDespachar}");
@@ -205,9 +205,9 @@ describe("candado estático — la pantalla y el papel", () => {
 
   it("🔴 en el papel, el PDF y el Excel sale el número FINAL, sin el rastro", () => {
     for (const p of [
-      "src/app/guias/components/PrintDocument.tsx",
+      "src/app/despachos/components/PrintDocument.tsx",
       "src/lib/guias/pdf-guia.ts",
-      "src/app/guias/components/excel-guias.ts",
+      "src/app/despachos/components/excel-guias.ts",
       "src/lib/guias/png-guia.ts",
     ]) {
       const src = leer(p);

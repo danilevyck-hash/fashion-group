@@ -12,7 +12,7 @@
 // kB a 344 kB**. Una pregunta de una línea no puede costar el generador de PDF.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { Guia } from "@/app/guias/components/types";
+import type { Guia } from "@/app/despachos/components/types";
 
 export function tieneRenglones(g: Guia | null | undefined): boolean {
   return Boolean(g && Array.isArray(g.guia_items) && g.guia_items.length > 0);

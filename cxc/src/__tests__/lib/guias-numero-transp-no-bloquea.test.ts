@@ -43,7 +43,7 @@ const sinComentarios = (s: string) =>
 const leer = (p: string) => sinComentarios(readFileSync(join(process.cwd(), p), "utf8"));
 const RUTA = leer("src/app/api/guias/[id]/route.ts");
 const MODULO = leer("src/lib/guias/falta-para-despachar.ts");
-const FORM = leer("src/app/guias/components/DespachoForm.tsx");
+const FORM = leer("src/app/despachos/components/DespachoForm.tsx");
 
 const lleno: EstadoDespacho = {
   tipoDespacho: "externo",
@@ -195,8 +195,8 @@ describe("🔴 lo que falta queda MARCADO", () => {
     // que es lo que la lista dibuja. Daniel: *«que la falta no se vea tan
     // ruidosa»* — lo que NO cambió es que se siga marcando.
     const avisos = leer("src/lib/guias/avisos-de-la-fila.ts");
-    const lista = leer("src/app/guias/components/GuiasList.tsx");
-    const pagina = leer("src/app/guias/[id]/page.tsx");
+    const lista = leer("src/app/despachos/components/GuiasList.tsx");
+    const pagina = leer("src/app/despachos/[id]/page.tsx");
     expect(avisos).toContain("guiaSinNumeroTransp(g)");
     expect(avisos).toContain("Falta N° transportista");
     expect(lista).toContain("avisosDeLaFila(g)");

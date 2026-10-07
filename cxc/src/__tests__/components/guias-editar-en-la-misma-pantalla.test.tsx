@@ -137,7 +137,7 @@ async function esperarLaPantallaDeLectura() {
 }
 
 async function abrirLaGuia() {
-  const Page = (await import("@/app/guias/[id]/page")).default;
+  const Page = (await import("@/app/despachos/[id]/page")).default;
   render(<Page />);
   await esperarLaPantallaDeLectura();
 }
@@ -441,10 +441,10 @@ describe("C · el botón apagado dice POR QUÉ está apagado", () => {
 
 describe("el camino viejo no se pierde", () => {
   it("`/guias/[id]/editar` redirige a la guía con la edición abierta", async () => {
-    const Vieja = (await import("@/app/guias/[id]/editar/page")).default;
+    const Vieja = (await import("@/app/despachos/[id]/editar/page")).default;
     render(<Vieja />);
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/guias/guia-777?editar=1"));
-    expect(replace).toHaveBeenCalledWith("/guias/guia-777?editar=1");
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/despachos/guia-777?editar=1"));
+    expect(replace).toHaveBeenCalledWith("/despachos/guia-777?editar=1");
   });
 });
 
@@ -462,7 +462,7 @@ describe("el camino viejo no se pierde", () => {
 describe("«Editar» de la fila aterriza con el formulario ABIERTO", () => {
   async function abrirConQuery(query: string) {
     window.history.replaceState({}, "", `/guias/guia-777${query}`);
-    const Page = (await import("@/app/guias/[id]/page")).default;
+    const Page = (await import("@/app/despachos/[id]/page")).default;
     render(<Page />);
     // Con `?editar=1` la pantalla que termina de cargar es el FORMULARIO; sin
     // query, la de lectura. En los dos casos se espera a la pantalla.

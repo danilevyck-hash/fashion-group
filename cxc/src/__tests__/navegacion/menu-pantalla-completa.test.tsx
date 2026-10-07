@@ -105,10 +105,10 @@ describe("el modo del cajón", () => {
     expect(cuantosModulos(filtrarGruposPorTexto(grupos, ""))).toBe(cuantosModulos(grupos));
     expect(cuantosModulos(filtrarGruposPorTexto(grupos, "   "))).toBe(cuantosModulos(grupos));
 
-    // Sin acentos y sin mayúsculas: «guias», «GUÍAS» y «Guías» son lo mismo.
-    for (const texto of ["guias", "GUÍAS", "Guías"]) {
+    // Sin acentos y sin mayúsculas: «despachos», «DESPACHOS» y «Despachos» son lo mismo.
+    for (const texto of ["despachos", "DESPACHOS", "Despachos"]) {
       const r = filtrarGruposPorTexto(grupos, texto);
-      expect(r.flatMap((g) => g.modulos.map((m) => m.label))).toEqual(["Guías de despacho"]);
+      expect(r.flatMap((g) => g.modulos.map((m) => m.label))).toEqual(["Despachos"]);
       // 🔴 Un grupo que se queda sin módulos NO se dibuja.
       expect(r.map((g) => g.key)).toEqual(["operacion"]);
     }
@@ -172,7 +172,7 @@ describe("AppHeader · el menú a pantalla completa", () => {
     expect(aqui.getAttribute("aria-current")).toBe("page");
     expect(aqui.textContent).toContain("Actual");
 
-    const otro = within(menu).getByRole("button", { name: /^Guías de despacho/ });
+    const otro = within(menu).getByRole("button", { name: /^Despachos/ });
     expect(otro.getAttribute("aria-current")).toBeNull();
   });
 
@@ -185,7 +185,7 @@ describe("AppHeader · el menú a pantalla completa", () => {
         .querySelector("svg")?.getAttribute("class") ?? "";
 
     // Uno de los de siempre…
-    expect(claseDelIcono("Guías de despacho")).toContain(getModuleColorByKey("guias")!.text);
+    expect(claseDelIcono("Despachos")).toContain(getModuleColorByKey("guias")!.text);
     // …y los cuatro que hasta hoy salían en gris.
     expect(claseDelIcono("Vista general")).toContain(getModuleColorByKey("vista-general")!.text);
     // 1-oct-2026, Daniel: nombres normales de ERP — «Referencia» se llama «Consulta de artículos».
@@ -200,11 +200,11 @@ describe("AppHeader · el menú a pantalla completa", () => {
     montarComoAdmin("/asistencia");
     const menu = await abrirElMenu();
 
-    fireEvent.change(within(menu).getByLabelText("Buscar un módulo"), { target: { value: "guía" } });
+    fireEvent.change(within(menu).getByLabelText("Buscar un módulo"), { target: { value: "despacho" } });
     await waitFor(() => {
       expect(within(menu).queryByRole("button", { name: /^Proveedores/ })).toBeNull();
     });
-    within(menu).getByRole("button", { name: /^Guías de despacho/ });
+    within(menu).getByRole("button", { name: /^Despachos/ });
     expect([...menu.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["Operación"]);
     expect(nav.push).not.toHaveBeenCalled();
 
@@ -249,7 +249,7 @@ describe("AppHeader · el menú a pantalla completa", () => {
   it("el menú abre siempre en limpio: no se hereda lo que se escribió antes", async () => {
     montarComoAdmin("/asistencia");
     const menu = await abrirElMenu();
-    fireEvent.change(within(menu).getByLabelText("Buscar un módulo"), { target: { value: "guía" } });
+    fireEvent.change(within(menu).getByLabelText("Buscar un módulo"), { target: { value: "despacho" } });
     await waitFor(() => {
       expect(within(menu).queryByRole("button", { name: /^Proveedores/ })).toBeNull();
     });
@@ -271,6 +271,6 @@ describe("AppHeader · el menú a pantalla completa", () => {
     expect([...menu.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["Ventas y clientes"]);
     const suyo = within(menu).getByRole("button", { name: /^Multifashion/ });
     expect(suyo.getAttribute("aria-current")).toBe("page");
-    expect(within(menu).queryByRole("button", { name: /^Guías de despacho/ })).toBeNull();
+    expect(within(menu).queryByRole("button", { name: /^Despachos/ })).toBeNull();
   });
 });

@@ -22,11 +22,11 @@
 // Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
-import GuiasList from "@/app/guias/components/GuiasList";
+import GuiasList from "@/app/despachos/components/GuiasList";
 // 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
 // El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
 import "@/lib/guias/papel-de-la-guia";
-import type { Guia } from "@/app/guias/components/types";
+import type { Guia } from "@/app/despachos/components/types";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -246,7 +246,7 @@ describe("🔴 13 · la guía que salió incompleta queda MARCADA", () => {
 // `NuevaGuiaClient`. Lo que este bloque mide —que al guardar te quedás EN la
 // guía— es del formulario, así que monta el cliente. El guard tiene su propio
 // candado en `guias-filtro-y-aviso.test.ts`.
-import GuiaNuevaPage from "@/app/guias/nueva/NuevaGuiaClient";
+import GuiaNuevaPage from "@/app/despachos/nueva/NuevaGuiaClient";
 
 describe("🔴 12 · al guardar una guía nueva, te quedás EN la guía", () => {
   const ID_CREADA = "77777777-7777-4777-8777-777777777777";
@@ -326,8 +326,8 @@ describe("🔴 12 · al guardar una guía nueva, te quedás EN la guía", () => 
   it("🔴 aterriza en la guía recién creada, lista para imprimir", async () => {
     stubCrear(true);
     await crearYGuardar();
-    expect(push).toHaveBeenCalledWith(`/guias/${ID_CREADA}`);
-    expect(push).not.toHaveBeenCalledWith("/guias");
+    expect(push).toHaveBeenCalledWith(`/despachos/${ID_CREADA}`);
+    expect(push).not.toHaveBeenCalledWith("/despachos");
   });
 
   it("🔴 la guía nueva manda a la cabecera el N° de su PRIMERA línea", async () => {
@@ -344,6 +344,6 @@ describe("🔴 12 · al guardar una guía nueva, te quedás EN la guía", () => 
   it("⚠️ si el servidor no devuelve el id, se vuelve al listado — quedarse quieto sería peor", async () => {
     stubCrear(false);
     await crearYGuardar();
-    expect(push).toHaveBeenCalledWith("/guias");
+    expect(push).toHaveBeenCalledWith("/despachos");
   });
 });

@@ -17,10 +17,10 @@ vi.mock("@/lib/guias/lista-apple-2026-10", async (orig) => {
   return { ...real, get GUIAS_LISTA_APPLE_2026_10() { return flags.apple; } };
 });
 
-import GuiasList from "@/app/guias/components/GuiasList";
-import EtiquetasPorEnvio from "@/app/guias/components/EtiquetasPorEnvio";
+import GuiasList from "@/app/despachos/components/GuiasList";
+import EtiquetasPorEnvio from "@/app/despachos/components/EtiquetasPorEnvio";
 import "@/lib/guias/papel-de-la-guia";
-import type { Guia, GuiaItem } from "@/app/guias/components/types";
+import type { Guia, GuiaItem } from "@/app/despachos/components/types";
 import type { EtiquetaFila } from "@/lib/guias/etiquetas";
 import * as real from "@/lib/guias/lista-apple-2026-10";
 

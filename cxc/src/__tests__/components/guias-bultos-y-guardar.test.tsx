@@ -22,7 +22,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
-import { useDespachoGuia } from "@/app/guias/components/useDespachoGuia";
+import { useDespachoGuia } from "@/app/despachos/components/useDespachoGuia";
 
 const push = vi.fn();
 const ROUTER = { push, replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() };
@@ -104,7 +104,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
  *  cargada, donde la afirmación llegaba con la guía todavía viajando. Se
  *  espera a que el esqueleto se vaya y los datos estén. */
 async function abrirLaGuia() {
-  const Page = (await import("@/app/guias/[id]/page")).default;
+  const Page = (await import("@/app/despachos/[id]/page")).default;
   render(<Page />);
   await waitFor(() => {
     expect(document.querySelector(".animate-pulse")).toBeNull();

@@ -32,9 +32,9 @@ const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
 
 /** Las tres pantallas desde las que se comparte o se imprime una guía. */
 const PANTALLAS = [
-  "src/app/guias/components/GuiasList.tsx",
-  "src/app/guias/[id]/page.tsx",
-  "src/app/guias/components/GuiaDetail.tsx",
+  "src/app/despachos/components/GuiasList.tsx",
+  "src/app/despachos/[id]/page.tsx",
+  "src/app/despachos/components/GuiaDetail.tsx",
 ];
 
 /** Todos los archivos del módulo Guías (código y rutas). */
@@ -47,7 +47,7 @@ function archivosDeGuias(): string[] {
       else if (/\.tsx?$/.test(e.name)) out.push(rel);
     }
   };
-  for (const d of ["src/app/guias", "src/lib/guias", "src/app/api/guias"]) recorrer(d);
+  for (const d of ["src/app/despachos", "src/lib/guias", "src/app/api/guias"]) recorrer(d);
   return out;
 }
 
@@ -159,7 +159,7 @@ describe("⚠️ 3. imprimir y el Ctrl+P siguen igual", () => {
   });
 
   it("el bloque @media print de HojaEscalada se queda", () => {
-    const hoja = leer("src/app/guias/components/HojaEscalada.tsx");
+    const hoja = leer("src/app/despachos/components/HojaEscalada.tsx");
     expect(hoja).toContain("@media print");
     expect(hoja).toMatch(/transform:\s*none\s*!important/);
   });

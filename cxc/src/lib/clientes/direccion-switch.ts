@@ -49,7 +49,7 @@ export const ROTULO_DIRECCION_SWITCH = "Dirección en Switch";
  */
 export const GUIAS_NO_LA_TOCAN = [
   "src/lib/guias",
-  "src/app/guias",
+  "src/app/despachos",
   "src/app/api/guias",
 ] as const;
 

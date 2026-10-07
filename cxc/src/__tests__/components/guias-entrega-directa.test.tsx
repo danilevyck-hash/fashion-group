@@ -33,15 +33,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
-import PrintDocument from "@/app/guias/components/PrintDocument";
+import PrintDocument from "@/app/despachos/components/PrintDocument";
 // 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
 // El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
 import "@/lib/guias/papel-de-la-guia";
-import DespachoForm from "@/app/guias/components/DespachoForm";
-import ListaEnvios from "@/app/guias/components/ListaEnvios";
-import GuiasList from "@/app/guias/components/GuiasList";
-import GuiaForm from "@/app/guias/components/GuiaForm";
-import type { Guia, GuiaItem, ModoEntrega } from "@/app/guias/components/types";
+import DespachoForm from "@/app/despachos/components/DespachoForm";
+import ListaEnvios from "@/app/despachos/components/ListaEnvios";
+import GuiasList from "@/app/despachos/components/GuiasList";
+import GuiaForm from "@/app/despachos/components/GuiaForm";
+import type { Guia, GuiaItem, ModoEntrega } from "@/app/despachos/components/types";
 import type { TipoDespacho } from "@/lib/guias/falta-para-despachar";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
 

@@ -49,8 +49,8 @@ import * as real from "@/lib/navegacion/contenido-ancho";
 
 const SRC = join(__dirname, "../..");
 const CSS = readFileSync(join(SRC, "app/globals.css"), "utf8");
-const GUIA_FORM = readFileSync(join(SRC, "app/guias/components/GuiaForm.tsx"), "utf8");
-const GUIA_DETALLE = readFileSync(join(SRC, "app/guias/[id]/page.tsx"), "utf8");
+const GUIA_FORM = readFileSync(join(SRC, "app/despachos/components/GuiaForm.tsx"), "utf8");
+const GUIA_DETALLE = readFileSync(join(SRC, "app/despachos/[id]/page.tsx"), "utf8");
 
 function envoltorio(): HTMLElement {
   const { container } = render(<SidebarAwareMain><p>contenido</p></SidebarAwareMain>);

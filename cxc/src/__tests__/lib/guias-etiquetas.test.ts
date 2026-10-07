@@ -75,8 +75,8 @@ const pdf = leer("src/lib/guias/pdf-etiquetas.ts");
 const rutaLista = leer("src/app/api/guias/etiquetas/route.ts");
 const rutaUno = leer("src/app/api/guias/etiquetas/[id]/route.ts");
 const rutaImportar = leer("src/app/api/guias/etiquetas/importar/route.ts");
-const vista = leer("src/app/guias/components/EtiquetasView.tsx");
-const paginaGuias = leer("src/app/guias/page.tsx");
+const vista = leer("src/app/despachos/components/EtiquetasView.tsx");
+const paginaGuias = leer("src/app/despachos/page.tsx");
 
 /** Una etiqueta de ejemplo — datos REALES medidos el 18-sep-2026 (GT-256). */
 function etq(over: Partial<EtiquetaFila> = {}): EtiquetaFila {
@@ -539,7 +539,7 @@ describe("🔴 10. nada que no se pueda volver a conseguir se queda sin copia", 
 describe("🔴 11. la pestaña «Etiquetas» tiene su propia puerta", () => {
   it("se dibuja para los tres roles que escriben guías", () => {
     expect(paginaGuias).toContain("puedeEtiquetar(role)");
-    expect(paginaGuias).toContain('["etiquetas", "Etiquetas"]');
+    expect(paginaGuias).toContain('["etiquetas", "Bultos"]');
   });
 
   it("🔴 NO cuelga de `GUIAS_ATAJOS_NUEVOS` (ése es la reversión de Nueva guía)", () => {
@@ -548,7 +548,7 @@ describe("🔴 11. la pestaña «Etiquetas» tiene su propia puerta", () => {
   });
 
   it("⚠️ la sección de Nueva guía SÍ cuelga de ese interruptor", () => {
-    const form = leer("src/app/guias/components/GuiaForm.tsx");
+    const form = leer("src/app/despachos/components/GuiaForm.tsx");
     // 🔄 1-oct-2026: con `GUIA_NUEVA_2026_10` la sección vieja se apaga y los
     // envíos viven en la tabla única (`DetalleDeEnvio`), que cuelga del MISMO
     // `GUIAS_ATAJOS_NUEVOS` por `atajosDeLaGuiaNueva`.

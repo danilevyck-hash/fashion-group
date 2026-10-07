@@ -44,8 +44,8 @@ const MIGRACION = "supabase/migrations/20261014120000_guias_destino_lista.sql";
 const migracion = leer(MIGRACION);
 const servidor = leer("src/lib/guias/destinos-lista-server.ts");
 const ruta = leer("src/app/api/guias/destinos-lista/route.ts");
-const hook = leer("src/app/guias/components/useGuiaFormState.ts");
-const constantes = leer("src/app/guias/components/constants.ts");
+const hook = leer("src/app/despachos/components/useGuiaFormState.ts");
+const constantes = leer("src/app/despachos/components/constants.ts");
 
 // ─── 1 · la lista vive en la base, no en un navegador ────────────────────────
 
@@ -87,7 +87,7 @@ describe("🔴 1. lo que alguien agrega queda para TODOS", () => {
     // agregar nombre debe de guardarse para todos los navegadores, o más
     // fácil ponlo en configuraciones nada más»*. El ejemplo se cambió por uno
     // que SÍ es una comodidad personal; la regla no cambió.
-    const estado = leer("src/app/guias/components/useGuiaFormState.ts");
+    const estado = leer("src/app/despachos/components/useGuiaFormState.ts");
     expect(estado).toContain("fg_last_transportista_id");
     expect(estado).toContain("fg_last_modo_entrega");
   });
@@ -176,7 +176,7 @@ describe("🔴 3. quitar existe, y es SOFT DELETE FIRMADO", () => {
   it("quién agrega y quién quita: agregar es de quien arma la guía; quitar, de quien administra", () => {
     expect([...DESTINOS_LISTA_ROLES_ESCRITURA]).toEqual(["admin", "secretaria", "bodega"]);
     // Es la MISMA lista que crea guías: no se escribe a mano dos veces.
-    const lista = leer("src/app/guias/components/GuiasList.tsx");
+    const lista = leer("src/app/despachos/components/GuiasList.tsx");
     expect(lista).toContain('export const CREATE_ROLES = ["admin", "secretaria", "bodega"]');
     // Quitar va con los roles de Configuración (admin y secretaria).
     expect(ruta).toContain("CONFIG_GUIAS_ROLES");
@@ -278,14 +278,14 @@ describe("🔴 6. un botón que dice lo mismo que el campo NO se dibuja", () => 
   });
 
   it("la regla vive en el módulo puro y la pantalla la usa", () => {
-    const comp = leer("src/app/guias/components/DestinosDelCliente.tsx");
+    const comp = leer("src/app/despachos/components/DestinosDelCliente.tsx");
     expect(comp).toContain("botonesQueSeDibujan(");
     // CONTROL: el que decide QUÉ botones hay sigue siendo el de siempre.
     expect(botonesDeDestino("D-81", [], undefined)).toEqual(["Paso Canoas"]);
   });
 
   it("⚠️ la fila de TIENDAS no se pierde: es otra pregunta", () => {
-    const comp = leer("src/app/guias/components/DestinosDelCliente.tsx");
+    const comp = leer("src/app/despachos/components/DestinosDelCliente.tsx");
     expect(comp).toContain("botones.length === 0 && tiendas.length === 0");
   });
 });

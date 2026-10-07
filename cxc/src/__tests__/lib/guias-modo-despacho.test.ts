@@ -173,11 +173,11 @@ describe("🔴 las MISMAS palabras en todas las pantallas", () => {
     // Barrido estático: los comentarios se borran PRIMERO — este repo ya pagó
     // cuatro veces el candado que se cumple con su propia explicación.
     const archivos = [
-      "src/app/guias/components/PrintDocument.tsx",
-      "src/app/guias/components/DespachoForm.tsx",
-      "src/app/guias/components/GuiasList.tsx",
-      "src/app/guias/components/GuiaForm.tsx",
-      "src/app/guias/[id]/page.tsx",
+      "src/app/despachos/components/PrintDocument.tsx",
+      "src/app/despachos/components/DespachoForm.tsx",
+      "src/app/despachos/components/GuiasList.tsx",
+      "src/app/despachos/components/GuiaForm.tsx",
+      "src/app/despachos/[id]/page.tsx",
       "src/lib/guias/pdf-guia.ts",
     ];
     for (const a of archivos) {
@@ -189,11 +189,11 @@ describe("🔴 las MISMAS palabras en todas las pantallas", () => {
 
   it("y ninguna decide el modo mirando `tipo_despacho` a mano", () => {
     const archivos = [
-      "src/app/guias/components/PrintDocument.tsx",
-      "src/app/guias/components/GuiasList.tsx",
-      "src/app/guias/[id]/page.tsx",
+      "src/app/despachos/components/PrintDocument.tsx",
+      "src/app/despachos/components/GuiasList.tsx",
+      "src/app/despachos/[id]/page.tsx",
       "src/lib/guias/pdf-guia.ts",
-      "src/app/guias/components/useDespachoGuia.ts",
+      "src/app/despachos/components/useDespachoGuia.ts",
     ];
     for (const a of archivos) {
       const cuerpo = sinComentarios(leer(a));
@@ -275,7 +275,7 @@ describe("🔴 EL PDF QUE SE COMPARTE, generado de verdad", () => {
 });
 
 describe("🔴 en entrega directa no se ESCRIBE placa ni N° de transportista", () => {
-  const hook = sinComentarios(leer("src/app/guias/components/useDespachoGuia.ts"));
+  const hook = sinComentarios(leer("src/app/despachos/components/useDespachoGuia.ts"));
 
   it("el despacho manda la placa VACÍA, no la omite", () => {
     // Omitirla dejaría pegada la placa de un tercero si alguien empezó en modo

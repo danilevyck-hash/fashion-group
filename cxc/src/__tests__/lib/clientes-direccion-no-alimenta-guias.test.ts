@@ -100,7 +100,7 @@ describe("🔴 EL BARRIDO: Guías no toca esta columna", () => {
     // Si este control fallara, el barrido de arriba estaría pasando por vacío.
     const todos = GUIAS_NO_LA_TOCAN.flatMap(archivosDe);
     expect(todos.some((a) => a.endsWith("destinos-clientes.ts"))).toBe(true);
-    expect(todos.some((a) => a.includes(path.join("app", "guias")))).toBe(true);
+    expect(todos.some((a) => a.includes(path.join("app", "despachos")))).toBe(true);
   });
 });
 

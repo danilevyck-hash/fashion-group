@@ -33,7 +33,7 @@ import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import fs from "fs";
 import path from "path";
 
-import EtiquetasView from "@/app/guias/components/EtiquetasView";
+import EtiquetasView from "@/app/despachos/components/EtiquetasView";
 
 // 🔄 1-oct-2026 — Daniel: las etiquetas pasan a ser POR ENVÍO
 // (`ETIQUETAS_POR_ENVIO`, prendido). Las pruebas de PANTALLA de este archivo
@@ -58,8 +58,8 @@ import { fmtDate } from "@/lib/format";
 const raiz = process.cwd();
 const leer = (p: string): string => fs.readFileSync(path.join(raiz, p), "utf8");
 const PDF = leer("src/lib/guias/pdf-etiquetas.ts");
-const VISTA = leer("src/app/guias/components/EtiquetasView.tsx");
-const LISTA_GUIAS = leer("src/app/guias/components/GuiasList.tsx");
+const VISTA = leer("src/app/despachos/components/EtiquetasView.tsx");
+const LISTA_GUIAS = leer("src/app/despachos/components/GuiasList.tsx");
 
 /** La etiqueta del ejemplo real: Nova Lux, 14 cajas, Paso Canoas. */
 const ETQ: EtiquetaFila = {
@@ -423,13 +423,13 @@ describe("🔴 5. las dos pestañas se sienten familia", () => {
    * orden sigue lo que más se abre, y hoy son 257 guías contra una etiqueta.
    */
   it("⚠️ el ORDEN de las pestañas NO cambió: Guías sigue primero", () => {
-    const pagina = leer("src/app/guias/page.tsx");
+    const pagina = leer("src/app/despachos/page.tsx");
     const lista = pagina.slice(
       pagina.indexOf("const pestanas: Array<[Vista, string]> = ["),
       pagina.indexOf("// Al TOCAR Guías"),
     );
-    expect(lista).toContain('["guias", "Guías"]');
-    expect(lista.indexOf('"Guías"')).toBeLessThan(lista.indexOf('"Etiquetas"'));
-    expect(lista.indexOf('"Etiquetas"')).toBeLessThan(lista.indexOf('"Configuración"'));
+    expect(lista).toContain('["guias", "Guías de despacho"]');
+    expect(lista.indexOf('"Guías de despacho"')).toBeLessThan(lista.indexOf('"Bultos"'));
+    expect(lista.indexOf('"Bultos"')).toBeLessThan(lista.indexOf('"Configuración"'));
   });
 });

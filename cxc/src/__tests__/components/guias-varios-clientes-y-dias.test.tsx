@@ -25,8 +25,8 @@ import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { readFileSync } from "fs";
 import { join } from "path";
-import GuiaForm from "@/app/guias/components/GuiaForm";
-import type { GuiaItem } from "@/app/guias/components/types";
+import GuiaForm from "@/app/despachos/components/GuiaForm";
+import type { GuiaItem } from "@/app/despachos/components/types";
 
 // El interruptor de reversión, controlable por test; el resto del módulo es el REAL.
 let atajosEncendidos = true;
@@ -483,7 +483,7 @@ describe("🔴 con el dedo son 44 px; lo que se aprieta es la computadora", () =
   // jsdom no calcula layout: se congela la CAUSA (las clases), como en los
   // demás candados de iPhone del repo.
   const fuente = readFileSync(
-    join(__dirname, "..", "..", "app", "guias", "components", "FacturasDelCliente.tsx"),
+    join(__dirname, "..", "..", "app", "despachos", "components", "FacturasDelCliente.tsx"),
     "utf8",
   );
 

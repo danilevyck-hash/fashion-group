@@ -171,7 +171,7 @@ describe("4 · quién escribe una guía: UNA sola lista", () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const page = fs.readFileSync(
-      path.join(process.cwd(), "src/app/guias/nueva/page.tsx"),
+      path.join(process.cwd(), "src/app/despachos/nueva/page.tsx"),
       "utf8",
     );
     expect(page).not.toContain('"use client"');

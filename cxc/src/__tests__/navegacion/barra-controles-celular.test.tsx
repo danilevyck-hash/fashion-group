@@ -312,7 +312,7 @@ describe("lo que se envía no cambia: la barra llama a la misma función", () =>
     ["app/asistencia/AprobacionesTab.tsx", 'void decidir(pendientes, "si")', /onClick: \(\) => void decidir\(pendientes, "si"\)/],
     ["app/asistencia/PrestamosTab.tsx", "void abrirNuevoPrestamo()", /onClick: \(\) => void abrirNuevoPrestamo\(\)/],
     ["app/asistencia/ConfiguracionTab.tsx", "RUTA_PERSONA_NUEVA", /router\.push\(RUTA_PERSONA_NUEVA\)/],
-    ["app/guias/components/GuiasList.tsx", "onNewGuia", /rotulo: "Nueva guía", onClick: onNewGuia/],
+    ["app/despachos/components/GuiasList.tsx", "onNewGuia", /rotulo: "Nueva guía", onClick: onNewGuia/],
     ["app/recordatorios/RecordatoriosClient.tsx", "setPuertaAbierta(true)", /BarraAccionFija[^>]*onClick=\{\(\) => setPuertaAbierta\(true\)\}/],
   ];
   for (const [archivo, delEscritorio, deLaBarra] of casos) {
@@ -347,7 +347,7 @@ describe("lo que se envía no cambia: la barra llama a la misma función", () =>
   it("cada módulo cuelga del gancho compartido, no de un interruptor propio", () => {
     for (const m of [
       "app/asistencia/AsistenciaClient.tsx",
-      "app/guias/page.tsx",
+      "app/despachos/page.tsx",
       "app/recordatorios/RecordatoriosClient.tsx",
       "app/ventas/VentasShell.tsx",
       "app/comisiones/ComisionesPageClient.tsx",

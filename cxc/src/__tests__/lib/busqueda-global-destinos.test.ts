@@ -44,7 +44,7 @@ const API = sinComentarios(leer("src/app/api/search/route.ts"));
 
 describe("🔴 los cuatro destinos que no llegaban", () => {
   it("una guía abre LA GUÍA, no su hoja de imprimir", () => {
-    expect(BARRA).toContain("href: `/guias/${g.id}`");
+    expect(BARRA).toContain("href: `/despachos/${g.id}`");
     expect(BARRA).not.toContain("/guias?id=");
   });
 
@@ -89,7 +89,7 @@ describe("CONTROL: lo que ya llegaba sigue llegando", () => {
   it("los tres atajos con parámetro que SÍ se leen no se tocaron", () => {
     expect(BARRA).toContain("/cxc?search=");
     expect(BARRA).toContain("/reclamos?empresa=");
-    expect(BARRA).toContain("/guias?pendientes=1");
+    expect(BARRA).toContain("/despachos?pendientes=1");
   });
 
   it("los resultados de CXC, reclamos y préstamos conservan su destino", () => {

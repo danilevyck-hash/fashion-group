@@ -30,7 +30,7 @@ vi.mock("@/lib/guias/lista-apple-2026-10", async (orig) => ({
   GUIAS_LISTA_APPLE_2026_10: false,
 }));
 import { render, screen, cleanup, within } from "@testing-library/react";
-import type { Guia } from "@/app/guias/components/types";
+import type { Guia } from "@/app/despachos/components/types";
 
 // La sesión y el encabezado no son lo que se prueba.
 vi.mock("@/lib/hooks/useAuth", () => ({
@@ -46,7 +46,7 @@ vi.mock("next/navigation", () => ({
 
 // El hook del despacho se dobla para poder poner la guía que se quiere medir.
 const guiaMock = vi.fn();
-vi.mock("@/app/guias/components/useDespachoGuia", () => ({
+vi.mock("@/app/despachos/components/useDespachoGuia", () => ({
   useDespachoGuia: () => guiaMock(),
 }));
 
@@ -98,7 +98,7 @@ function montar(over: Partial<Guia> = {}) {
 }
 
 // Se importa DESPUÉS de los mocks.
-import GuiaPage from "@/app/guias/[id]/page";
+import GuiaPage from "@/app/despachos/[id]/page";
 // 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
 // El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
 import "@/lib/guias/papel-de-la-guia";

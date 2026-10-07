@@ -31,8 +31,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act, within, waitFor } from "@testing-library/react";
-import GuiaForm from "@/app/guias/components/GuiaForm";
-import type { GuiaItem } from "@/app/guias/components/types";
+import GuiaForm from "@/app/despachos/components/GuiaForm";
+import type { GuiaItem } from "@/app/despachos/components/types";
 import { invalidarDirectorioClientes } from "@/lib/hooks/useBusquedaClientes";
 
 // 🔴 El MISMO interruptor del panel de facturas, controlable por test: el resto

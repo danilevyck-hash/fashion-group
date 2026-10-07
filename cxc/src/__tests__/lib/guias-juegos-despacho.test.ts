@@ -272,12 +272,12 @@ describe("⚠️ en entrega directa esto no aparece", () => {
    * cuando el modo es externo, así que en directa sale vacía por construcción.
    */
   it("los juegos solo se calculan con transportista externo", () => {
-    const form = sinComentarios(leer("src/app/guias/components/DespachoForm.tsx"));
+    const form = sinComentarios(leer("src/app/despachos/components/DespachoForm.tsx"));
     expect(form).toContain("externo && onUsarJuego ? juegosQueCoinciden(juegos, bReceptor) : []");
   });
 
   it("y el hook ni siquiera lo pide sin transportista", () => {
-    const hook = sinComentarios(leer("src/app/guias/components/useDespachoGuia.ts"));
+    const hook = sinComentarios(leer("src/app/despachos/components/useDespachoGuia.ts"));
     expect(hook).toContain("if (!transportistaId || despachada) { setJuegos([]); return; }");
   });
 });

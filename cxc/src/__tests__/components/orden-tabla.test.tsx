@@ -162,8 +162,8 @@ const CON_ORDEN: readonly string[] = [
   "src/app/cxc/components/PanelCxcCelular.tsx",
   "src/app/cxc/page.tsx",
   "src/app/gastos-contabilidad/components/ResumenEgresos.tsx",
-  "src/app/guias/components/EtiquetasPorEnvio.tsx",
-  "src/app/guias/components/PedidosView.tsx",
+  "src/app/despachos/components/EtiquetasPorEnvio.tsx",
+  "src/app/despachos/components/PedidosView.tsx",
   "src/app/marketing/mobiliario/page.tsx",
   "src/app/productos/cargar/HistorialView.tsx",
   "src/app/proveedores/ProveedoresListClient.tsx",
@@ -186,7 +186,7 @@ const SIN_ORDEN_POR_DECISION: readonly string[] = [
   // «una vendedora no ordena: abre y baja» (16-sep-2026).
   "src/components/multifashion/ListaSeguimientoClientes.tsx",
   // Guías: «Siempre ordenado por fecha», pendientes arriba.
-  "src/app/guias/components/GuiasList.tsx",
+  "src/app/despachos/components/GuiasList.tsx",
   // Consulta de artículos: su orden propio de tres pasos y colores por stock.
   "src/components/referencia/ReferenciaModelo.tsx",
   // Marketing › ficha de la tienda: «UNA tabla por fecha».

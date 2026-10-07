@@ -39,15 +39,15 @@ import {
 } from "@/lib/guias/falta-para-despachar";
 
 const leer = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
-const LISTA = leer("src/app/guias/components/GuiasList.tsx");
-const PAGE_LISTA = leer("src/app/guias/page.tsx");
-const PAGE_GUIA = leer("src/app/guias/[id]/page.tsx");
-const PAGE_EDITAR = leer("src/app/guias/[id]/editar/page.tsx");
-const FORM = leer("src/app/guias/components/DespachoForm.tsx");
-const LISTA_ENVIOS = leer("src/app/guias/components/ListaEnvios.tsx");
-const ESTADO_LISTA = leer("src/app/guias/components/useGuiasState.ts");
+const LISTA = leer("src/app/despachos/components/GuiasList.tsx");
+const PAGE_LISTA = leer("src/app/despachos/page.tsx");
+const PAGE_GUIA = leer("src/app/despachos/[id]/page.tsx");
+const PAGE_EDITAR = leer("src/app/despachos/[id]/editar/page.tsx");
+const FORM = leer("src/app/despachos/components/DespachoForm.tsx");
+const LISTA_ENVIOS = leer("src/app/despachos/components/ListaEnvios.tsx");
+const ESTADO_LISTA = leer("src/app/despachos/components/useGuiasState.ts");
 const RUTA = leer("src/app/api/guias/[id]/route.ts");
-const IMPRESO = leer("src/app/guias/components/PrintDocument.tsx");
+const IMPRESO = leer("src/app/despachos/components/PrintDocument.tsx");
 const PDF = leer("src/lib/guias/pdf-guia.ts");
 
 describe("🔴 la lista NO despacha: ni deslizando ni desplegando el formulario", () => {
@@ -103,8 +103,8 @@ describe("🔴 la lista NO despacha: ni deslizando ni desplegando el formulario"
   it("los dos botones llevan a la PÁGINA de la guía, cada uno a lo suyo", () => {
     // «Editar» abre el formulario de una: es el mismo query por el que entra
     // el camino viejo `/guias/[id]/editar`, así que hay una sola puerta.
-    expect(PAGE_LISTA).toContain("onEditar={(id) => router.push(`/guias/${id}?editar=1`)}");
-    expect(PAGE_LISTA).toContain("onDespachar={(id) => router.push(`/guias/${id}`)}");
+    expect(PAGE_LISTA).toContain("onEditar={(id) => router.push(`/despachos/${id}?editar=1`)}");
+    expect(PAGE_LISTA).toContain("onDespachar={(id) => router.push(`/despachos/${id}`)}");
   });
 });
 
@@ -112,7 +112,7 @@ describe("🔴 la página de la guía es donde se termina", () => {
   it("tiene el encabezado aprobado: ‹ Atrás y el número de la guía", () => {
     expect(PAGE_GUIA).toContain("‹ Atrás");
     expect(PAGE_GUIA).toContain("fmtGuia(g.numero)");
-    expect(PAGE_GUIA).toContain('router.push("/guias")');
+    expect(PAGE_GUIA).toContain('router.push("/despachos")');
   });
 
   // ⚠️ CANDADO QUE CAMBIÓ DE DIRECCIÓN (23-ago-2026). Antes exigía que la
@@ -178,7 +178,7 @@ describe("🔴 el N° del transportista es POR LÍNEA", () => {
   it("se guarda con su propio campo, NUNCA mandando `items` (que reemplaza todo)", () => {
     // `items` en el PUT borra e inserta los renglones: usarlo acá le cambiaría
     // el id a cada línea en pleno despacho y tiraría los clientes atados.
-    const hook = leer("src/app/guias/components/useDespachoGuia.ts");
+    const hook = leer("src/app/despachos/components/useDespachoGuia.ts");
     expect(hook).toContain("items_guia_transp");
     expect(hook).not.toMatch(/payload\.items\s*=/);
     expect(hook).not.toMatch(/\bitems:\s/);

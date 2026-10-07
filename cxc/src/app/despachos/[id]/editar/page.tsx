@@ -26,7 +26,7 @@ export default function GuiaEditarPage() {
   const id = params?.id ?? null;
 
   useEffect(() => {
-    if (id) router.replace(`/guias/${id}?editar=1`);
+    if (id) router.replace(`/despachos/${id}?editar=1`);
   }, [id, router]);
 
   return null;

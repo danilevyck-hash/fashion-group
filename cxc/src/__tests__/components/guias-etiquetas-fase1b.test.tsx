@@ -26,7 +26,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act, waitFor } from "@testing-library/react";
 
-import EtiquetasView from "@/app/guias/components/EtiquetasView";
+import EtiquetasView from "@/app/despachos/components/EtiquetasView";
 
 // 🔄 1-oct-2026 — Daniel: las etiquetas pasan a ser POR ENVÍO
 // (`ETIQUETAS_POR_ENVIO`, prendido). Las pruebas de PANTALLA de este archivo
@@ -37,9 +37,9 @@ vi.mock("@/lib/guias/etiquetas-por-envio", async (orig) => ({
   ...(await orig<typeof import("@/lib/guias/etiquetas-por-envio")>()),
   ETIQUETAS_POR_ENVIO: false,
 }));
-import FacturasDelCliente from "@/app/guias/components/FacturasDelCliente";
-import EtiquetasPendientes from "@/app/guias/components/EtiquetasPendientes";
-import type { GuiaItem } from "@/app/guias/components/types";
+import FacturasDelCliente from "@/app/despachos/components/FacturasDelCliente";
+import EtiquetasPendientes from "@/app/despachos/components/EtiquetasPendientes";
+import type { GuiaItem } from "@/app/despachos/components/types";
 import type { EtiquetaFila } from "@/lib/guias/etiquetas";
 
 const NOVA = { codigo: "D-170", nombre: "Nova Lux, S.A." };

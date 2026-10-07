@@ -342,7 +342,7 @@ export default function GuiaPage() {
   return (
     <div>
       <AppHeader
-        module="Guías de despacho"
+        module="Despachos"
         breadcrumbs={[{ label: g ? fmtGuia(g.numero) : "Guía" }]}
       />
 
@@ -393,7 +393,7 @@ export default function GuiaPage() {
           <div className="flex items-center gap-3 mb-5">
             <button
               type="button"
-              onClick={() => router.push("/guias")}
+              onClick={() => router.push("/despachos")}
               className="inline-flex items-center min-h-[44px] px-2 -ml-2 text-sm text-blue-700 hover:text-blue-900 transition"
             >
               ‹ Atrás

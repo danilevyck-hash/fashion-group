@@ -238,7 +238,7 @@ describe("🔴 1d · «Reclamos sin pagar» abre EL reclamo", () => {
 describe("CONTROL: los destinos que ya estaban bien no se tocaron", () => {
   it("la búsqueda global conserva sus cuatro destinos del 11-sep-2026", () => {
     const barra = plano("src/components/SearchBar.tsx");
-    expect(barra).toContain("href: `/guias/${g.id}`");
+    expect(barra).toContain("href: `/despachos/${g.id}`");
     expect(barra).toContain("/ventas?tab=clientes&cliente=");
     expect(barra).toContain("/reclamos?view=detail&id=${rec.id}");
     expect(barra).toContain("/prestamos/${p.id}");

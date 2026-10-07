@@ -74,9 +74,9 @@ describe("🔴 la línea dice la verdad, caso por caso", () => {
 
 describe("🔴 esto es para MIRAR, no para FIRMAR", () => {
   it("el cuadro de firmar no encogió: 150 px de alto y todo el ancho", () => {
-    const canvas = leer("src/app/guias/components/SignatureCanvas.tsx");
+    const canvas = leer("src/app/despachos/components/SignatureCanvas.tsx");
     expect(canvas).toContain("150");
-    const form = leer("src/app/guias/components/DespachoForm.tsx");
+    const form = leer("src/app/despachos/components/DespachoForm.tsx");
     expect(form).toContain("SignatureCanvas");
     // 🔴 El plegado NO entra al despacho por ningún camino.
     expect(form).not.toContain("FirmasPlegadas");
@@ -85,8 +85,8 @@ describe("🔴 esto es para MIRAR, no para FIRMAR", () => {
 
   it("🔴 las dos pantallas de LECTURA usan el MISMO componente", () => {
     for (const ruta of [
-      "src/app/guias/components/GuiasList.tsx",
-      "src/app/guias/[id]/page.tsx",
+      "src/app/despachos/components/GuiasList.tsx",
+      "src/app/despachos/[id]/page.tsx",
     ]) {
       const src = leer(ruta);
       expect(src, ruta).toContain("<FirmasPlegadas");
@@ -99,7 +99,7 @@ describe("🔴 esto es para MIRAR, no para FIRMAR", () => {
     // 🩸 Se mira la EXPRESIÓN que dibuja cada firma, no la palabra suelta:
     // apagar la condición (`{false ? (`) deja el nombre del campo escrito más
     // abajo y un `toContain` no lo nota.
-    const papel = leer("src/app/guias/components/PrintDocument.tsx");
+    const papel = leer("src/app/despachos/components/PrintDocument.tsx");
     expect(papel).toContain("{g.firma_base64 ? (");
     expect(papel).toContain("{g.firma_entregador_base64 ? (");
     expect(papel).toContain("<img src={g.firma_base64}");
@@ -121,7 +121,7 @@ describe("🔴 esto es para MIRAR, no para FIRMAR", () => {
     expect(png).toContain("g.firma_base64,");
     expect(png).toContain("g.firma_entregador_base64,");
     for (const ruta of [
-      "src/app/guias/components/PrintDocument.tsx",
+      "src/app/despachos/components/PrintDocument.tsx",
       "src/lib/guias/pdf-guia.ts",
       "src/lib/guias/png-guia.ts",
     ]) {

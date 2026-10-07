@@ -23,16 +23,16 @@ import {
   entregadoPorElegido,
   nombreDespachadoPor,
 } from "@/lib/guias/despachado-por";
-import { validarGuia } from "@/app/guias/components/guia-form-logic";
+import { validarGuia } from "@/app/despachos/components/guia-form-logic";
 import { construirPdfGuia, construirPdfGuias, nombreArchivoGuias } from "@/lib/guias/pdf-guia";
-import { buildGuiasSheet } from "@/app/guias/components/excel-guias";
-import type { Guia, GuiaItem } from "@/app/guias/components/types";
+import { buildGuiasSheet } from "@/app/despachos/components/excel-guias";
+import type { Guia, GuiaItem } from "@/app/despachos/components/types";
 
 const leer = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 /** 🩸 Los barridos BORRAN LOS COMENTARIOS PRIMERO: en este repo un candado ya
  *  se cumplió cuatro veces con su propia explicación. */
 const sinComentarios = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-const HOOK = sinComentarios(leer("src/app/guias/components/useDespachoGuia.ts"));
+const HOOK = sinComentarios(leer("src/app/despachos/components/useDespachoGuia.ts"));
 
 function envio(p: Partial<GuiaItem> = {}): GuiaItem {
   return {
@@ -295,7 +295,7 @@ describe("4 · `__other__` no es un nombre y no llega al papel", () => {
   });
 
   it("los dos papeles usan la misma regla", () => {
-    const IMPRESO = sinComentarios(leer("src/app/guias/components/PrintDocument.tsx"));
+    const IMPRESO = sinComentarios(leer("src/app/despachos/components/PrintDocument.tsx"));
     const PDF = sinComentarios(leer("src/lib/guias/pdf-guia.ts"));
     expect(IMPRESO).toContain("nombreDespachadoPor(g.entregado_por)");
     expect(PDF).toContain("nombreDespachadoPor(g.entregado_por)");
@@ -350,7 +350,7 @@ describe("2 · «Imprimir todas» baja UN PDF con todas", () => {
   });
 
   it("la lista ya no abre una pestaña por guía", () => {
-    const LISTA = sinComentarios(leer("src/app/guias/components/GuiasList.tsx"));
+    const LISTA = sinComentarios(leer("src/app/despachos/components/GuiasList.tsx"));
     expect(LISTA).not.toMatch(/ids\.forEach\(id => window\.open/);
     expect(LISTA).toContain("construirPdfGuias");
   });

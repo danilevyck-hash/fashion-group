@@ -23,9 +23,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
-import GuiaForm from "@/app/guias/components/GuiaForm";
-import type { GuiaItem } from "@/app/guias/components/types";
-import { quitarFila, restaurarFila } from "@/app/guias/components/guia-form-logic";
+import GuiaForm from "@/app/despachos/components/GuiaForm";
+import type { GuiaItem } from "@/app/despachos/components/types";
+import { quitarFila, restaurarFila } from "@/app/despachos/components/guia-form-logic";
 
 const CLIENTES = [
   { codigo: "D-101", nombre: "City Mall" },

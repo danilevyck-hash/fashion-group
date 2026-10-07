@@ -93,7 +93,7 @@ describe("🔴 a. la lista que el campo ofrece de red está bien escrita", () =>
 
   it("ninguna grafía mala sobrevive en el CÓDIGO de Guías (los comentarios sí: cuentan la historia)", () => {
     const malas = ["Changinola", "Wesland"];
-    const dirs = ["src/lib/guias", "src/app/guias", "src/app/api/guias"];
+    const dirs = ["src/lib/guias", "src/app/despachos", "src/app/api/guias"];
     const hallazgos: string[] = [];
 
     const recorrer = (dir: string) => {

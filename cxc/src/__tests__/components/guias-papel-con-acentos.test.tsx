@@ -30,7 +30,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { readFileSync } from "fs";
 import path from "path";
-import PrintDocument from "@/app/guias/components/PrintDocument";
+import PrintDocument from "@/app/despachos/components/PrintDocument";
 // 🔄 24-sep-2026 — el papel nuevo (`GUIA_PAPEL_2026_09`) cambió el título, el
 // rótulo de la columna de destino y los «N°». Los rótulos se leen del módulo,
 // nunca escritos a mano acá: si mañana se apaga el interruptor, este candado
@@ -47,7 +47,7 @@ import {
   TINTA_RAYA_CON_VALOR,
 } from "@/lib/guias/casilla-en-blanco";
 import { esCeroDeFactura, facturasParaElPapel } from "@/lib/guias/numero-factura";
-import type { Guia } from "@/app/guias/components/types";
+import type { Guia } from "@/app/despachos/components/types";
 import { ESTILO_UNICO } from "@/lib/pdf-estilo";
 /** Con el estilo único el título del papel va sin gritar: «Guía de transporte externo». */
 const enPapel = (t: string) => (ESTILO_UNICO ? t.charAt(0) + t.slice(1).toLowerCase() : t);
@@ -255,7 +255,7 @@ describe("🔴 los DOS papeles de la guía están escritos con acentos", () => {
 
 describe("🔴 una casilla vacía sale con raya para escribirla a mano", () => {
   it("la regla está en UN solo lugar y la usan los dos papeles", () => {
-    expect(leer("src/app/guias/components/PrintDocument.tsx")).toContain("rayaDeLaCasilla");
+    expect(leer("src/app/despachos/components/PrintDocument.tsx")).toContain("rayaDeLaCasilla");
     expect(leer("src/lib/guias/pdf-guia.ts")).toContain("tintaDeLaCasilla");
   });
 
@@ -334,8 +334,8 @@ describe("🔴 el «0000» no se imprime, y «Traslado» sí", () => {
     expect(conCeros.guia_items![0].facturas).toBe("0000");
     // Y la lista, la ficha y el Excel lo siguen mostrando: ahí es donde
     // alguien revisa lo que tecleó.
-    expect(leer("src/app/guias/components/excel-guias.ts")).toContain("facturasParaMostrar");
-    expect(leer("src/app/guias/components/ResumenEnvio.tsx")).toContain("facturasParaMostrar");
+    expect(leer("src/app/despachos/components/excel-guias.ts")).toContain("facturasParaMostrar");
+    expect(leer("src/app/despachos/components/ResumenEnvio.tsx")).toContain("facturasParaMostrar");
   });
 
   it("el módulo puro distingue el 0000 del Traslado", () => {

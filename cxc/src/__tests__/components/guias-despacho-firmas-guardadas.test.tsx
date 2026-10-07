@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { useDespachoGuia } from "@/app/guias/components/useDespachoGuia";
+import { useDespachoGuia } from "@/app/despachos/components/useDespachoGuia";
 import { guardarFirma, leerFirma, barrerFirmasVencidas, VIDA_FIRMA_MS } from "@/lib/guias/firmas-despacho";
 
 const GUIA = {

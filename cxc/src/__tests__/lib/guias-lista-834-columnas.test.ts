@@ -34,7 +34,7 @@ const sinComentarios = (src: string) =>
     .filter((l) => !l.trim().startsWith("//"))
     .join("\n");
 
-const LISTA = sinComentarios(readFileSync(join(process.cwd(), "src/app/guias/components/GuiasList.tsx"), "utf8"));
+const LISTA = sinComentarios(readFileSync(join(process.cwd(), "src/app/despachos/components/GuiasList.tsx"), "utf8"));
 const SIDEBAR = readFileSync(join(process.cwd(), "src/components/Sidebar.tsx"), "utf8");
 
 /**

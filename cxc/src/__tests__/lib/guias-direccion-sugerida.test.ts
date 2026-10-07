@@ -169,7 +169,7 @@ describe("⚠️ la EMPRESA no se autocompleta, y el código no puede empezar a 
   });
 
   it("el formulario no le pone una lista propia al campo de empresa", () => {
-    const form = sinComentarios(leer("src/app/guias/components/GuiaForm.tsx"));
+    const form = sinComentarios(leer("src/app/despachos/components/GuiaForm.tsx"));
     const i = form.indexOf("function campoEmpresa");
     const bloque = form.slice(i, form.indexOf("function campoFacturas"));
     expect(i).toBeGreaterThan(0);

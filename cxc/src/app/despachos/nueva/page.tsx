@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 export default async function GuiaNuevaPage() {
   const role = verifySession((await cookies()).get("cxc_session")?.value)?.role ?? null;
   if (!role) redirect("/");
-  if (!puedeEscribirGuias(role)) redirect("/guias");
+  if (!puedeEscribirGuias(role)) redirect("/despachos");
 
   return <NuevaGuiaClient />;
 }

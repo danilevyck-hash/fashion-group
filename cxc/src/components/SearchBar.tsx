@@ -80,7 +80,7 @@ function parseQuickAction(query: string): QuickAction | null {
 
   // guías pendientes
   if (/gu[ií]as?\s+pendientes?/i.test(q)) {
-    return { label: "Ir a guías pendientes", href: "/guias?pendientes=1" };
+    return { label: "Ir a guías pendientes", href: "/despachos?pendientes=1" };
   }
 
   // últimos gastos / caja
@@ -155,15 +155,17 @@ function flatten(r: SearchResults): FlatItem[] {
   }
   for (const g of r.guias) {
     items.push({
-      module: "Guías de despacho",
+      module: "Despachos",
       label: `Guía #${g.numero}`,
       sub: `${fmtDate(g.fecha)} — ${g.estado}`,
       // 🩸 11-sep-2026: decía `/guias?id=<id>`, y esa dirección tiene un
       // redirect viejo en el middleware que la convierte en
       // `/guias/<id>/imprimir`. O sea que buscar una guía abría la HOJA DE
       // IMPRIMIR, no la guía. Se va derecho a la guía; el redirect no se toca,
-      // que cubre los enlaces viejos de WhatsApp y correo.
-      href: `/guias/${g.id}`,
+      // que cubre los enlaces viejos de WhatsApp y correo. El módulo se
+      // renombró a «Despachos» el 7-oct-2026: el documento sigue siendo UNA
+      // guía, con bultos y receptor, en `/despachos/<id>`.
+      href: `/despachos/${g.id}`,
       icon: "🚚",
     });
   }
@@ -260,7 +262,7 @@ const SEARCH_MODULES = [
   // siendo `cheques`). Las palabras viejas se CONSERVAN: quien teclea "cheque"
   // tiene que seguir llegando acá.
   { label: "Recordatorios", href: "/recordatorios", keywords: ["recordatorio", "recordar", "agenda", "cheque", "deposito", "posfechado", "banco"] },
-  { label: "Guías de despacho", href: "/guias", keywords: ["guia", "despacho", "envio", "transporte"] },
+  { label: "Despachos", href: "/despachos", keywords: ["guia", "despacho", "envio", "transporte", "pedido", "bulto"] },
   { label: "Ventas", href: "/ventas", keywords: ["venta", "factura", "ingreso", "vendedor"] },
   { label: "Clientes", href: "/clientes", keywords: ["directorio", "contacto", "correo", "telefono", "whatsapp", "clientes"] },
   { label: "Préstamos", href: "/prestamos", keywords: ["prestamo", "empleado", "descuento", "planilla"] },

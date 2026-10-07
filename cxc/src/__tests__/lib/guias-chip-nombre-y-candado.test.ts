@@ -17,8 +17,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const leer = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
-const LISTA = leer("src/app/guias/components/GuiasList.tsx");
-const PAGE = leer("src/app/guias/page.tsx");
+const LISTA = leer("src/app/despachos/components/GuiasList.tsx");
+const PAGE = leer("src/app/despachos/page.tsx");
 const RUTA_CLIENTE = leer("src/app/api/guias/[id]/cliente/route.ts");
 
 describe("el chip dice el NOMBRE del cliente, no solo el código", () => {
@@ -119,8 +119,8 @@ describe("🔴 LOS TRES TEXTOS QUE SE CONTRADECÍAN, RETIRADOS (25-ago-2026)", (
 
   const CODIGO = {
     lista: sinComentarios(LISTA),
-    guia: sinComentarios(leer("src/app/guias/[id]/page.tsx")),
-    renglon: sinComentarios(leer("src/app/guias/components/ListaEnvios.tsx")),
+    guia: sinComentarios(leer("src/app/despachos/[id]/page.tsx")),
+    renglon: sinComentarios(leer("src/app/despachos/components/ListaEnvios.tsx")),
   };
 
   it("🔴 los tres se fueron de los tres archivos", () => {
@@ -143,7 +143,7 @@ describe("🔴 LOS TRES TEXTOS QUE SE CONTRADECÍAN, RETIRADOS (25-ago-2026)", (
     // que decide qué se puede tocar, y lo leen el formulario y el servidor.
     const regla = leer("src/lib/guias/campos-editables.ts");
     expect(regla).toContain("CAMPOS_DESPACHADA");
-    expect(leer("src/app/guias/components/GuiaForm.tsx")).toContain("soloCorregible");
+    expect(leer("src/app/despachos/components/GuiaForm.tsx")).toContain("soloCorregible");
     expect(leer("src/app/api/guias/[id]/item/route.ts")).toContain("camposEditablesDeRenglon");
   });
 

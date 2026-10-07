@@ -67,12 +67,12 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     const ruta = leer("src/app/api/guias/pedidos/route.ts");
     expect(ruta).toContain("leerAliasOVacio()");
     expect(ruta).toMatch(/aplicarAlias\(p\.vendedor_nombre/);
-    expect(leer("src/app/guias/components/PedidosView.tsx")).not.toMatch(/\{p\.vendedor_nombre/);
+    expect(leer("src/app/despachos/components/PedidosView.tsx")).not.toMatch(/\{p\.vendedor_nombre/);
   });
 
   it("sin montos: ni la ruta ni la pantalla mandan o dibujan el total", () => {
     expect(leer("src/app/api/guias/pedidos/route.ts")).not.toMatch(/select\([^)]*total/);
-    expect(leer("src/app/guias/components/PedidosView.tsx")).not.toMatch(/\.total\b|fmt\(/);
+    expect(leer("src/app/despachos/components/PedidosView.tsx")).not.toMatch(/\.total\b|fmt\(/);
   });
 
   it("DEFAULT se muestra «Oficina»", () => {
@@ -85,7 +85,7 @@ describe("pedidos de bodega — reglas de Daniel", () => {
 
   it("v3 por empresa PRENDIDA con el «sí» de Daniel al mockup (6-oct-2026); apagada, la tabla v2 y sin Imprimir", () => {
     expect(PEDIDOS_POR_EMPRESA_2026_10).toBe(true);
-    const src = leer("src/app/guias/components/PedidosView.tsx");
+    const src = leer("src/app/despachos/components/PedidosView.tsx");
     expect(src).toContain("POR_EMPRESA ? tabla : tablaV2");
     expect(src).toContain("POR_EMPRESA && !barra && (");
     expect(src).toContain("menu={POR_EMPRESA ? (");
@@ -104,7 +104,7 @@ describe("pedidos de bodega — reglas de Daniel", () => {
   });
 
   it("la pantalla: encabezado «Empresa · N» por grupo; ni columna ni renglón repiten la empresa; Vendedor solo el nombre", () => {
-    const src = leer("src/app/guias/components/PedidosView.tsx");
+    const src = leer("src/app/despachos/components/PedidosView.tsx");
     expect(src).toContain("agruparPorEmpresa(visibles)");
     expect(src).toMatch(/\{nombreCortoEmpresa\(g\.empresa_key\)\} · \{g\.pedidos\.length\}/);
     const tabla = src.slice(src.indexOf("const tabla = ("), src.indexOf("const tablaV2 = ("));
@@ -117,7 +117,7 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     expect(haceDiasCorto("2026-10-05T08:00:00-05:00", "2026-10-05")).toBe("hoy");
     expect(haceDiasCorto("2026-10-04T23:00:00-05:00", "2026-10-05")).toBe("ayer");
     expect(haceDiasCorto("2026-08-23T11:00:00-05:00", "2026-10-05")).toBe("43 d");
-    const src = leer("src/app/guias/components/PedidosView.tsx");
+    const src = leer("src/app/despachos/components/PedidosView.tsx");
     expect(src).toMatch(/<td className=\{?`?"?whitespace-nowrap py-2 pr-1/); // AJUSTES_APPLE_6: el padding izquierdo depende del círculo
   });
 
@@ -132,7 +132,7 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     // Las firmas van solo por pedido: sin línea de firmas al pie del bloque.
     expect(pdf).not.toMatch(/Fecha _|PIE_DE_BLOQUE/);
     expect(pdf).not.toMatch(/NAVY|CEBRA|estilosDeTabla|\.total\b|fmt\(/);
-    const src = leer("src/app/guias/components/PedidosView.tsx");
+    const src = leer("src/app/despachos/components/PedidosView.tsx");
     expect(src).toContain("construirPdfPedidos(titulo, visibles, hoy)");
     expect(src.match(/onClick=\{\(\) => void imprimir\(\)\}/g)).toHaveLength(2); // compu + «···»
   });
@@ -182,7 +182,7 @@ describe("pedidos de bodega — reglas de Daniel", () => {
   });
 
   it("sin enlace a Etiquetas ni a Guías en la pantalla", () => {
-    const src = leer("src/app/guias/components/PedidosView.tsx");
+    const src = leer("src/app/despachos/components/PedidosView.tsx");
     expect(src).not.toMatch(/href=|router\.push|<Link|"\/guias/);
   });
 

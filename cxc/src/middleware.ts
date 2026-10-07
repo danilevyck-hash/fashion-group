@@ -169,7 +169,14 @@ export async function middleware(req: NextRequest) {
   // (middleware igual redirigirá a login en el destino si hace falta).
   if (pathname === "/guias" && searchParams.get("id")) {
     const id = searchParams.get("id")!;
-    return NextResponse.redirect(new URL(`/guias/${id}/imprimir`, req.url));
+    return NextResponse.redirect(new URL(`/despachos/${id}/imprimir`, req.url));
+  }
+  // 🔴 «Despachos» (era «Guías de despacho», 7-oct-2026): el módulo se MOVIÓ
+  // de /guias a /despachos — Pedidos · Bultos · Guías de despacho son sus
+  // pestañas. Esto es solo para que un enlace guardado (favorito, WhatsApp,
+  // correo) no se rompa; el resto del sistema ya navega a /despachos.
+  if (pathname === "/guias" || pathname.startsWith("/guias/")) {
+    return NextResponse.redirect(new URL(`/despachos${pathname.slice("/guias".length)}${req.nextUrl.search}`, req.url), 307);
   }
   if (pathname === "/caja") {
     const view = searchParams.get("view");

@@ -137,7 +137,7 @@ describe("cómo pega: por el principio del nombre o de cualquiera de sus palabra
 });
 
 describe("🔴 el bloque FIJO no vuelve al formulario de despacho", () => {
-  const form = sinComentarios(leer("src/app/guias/components/DespachoForm.tsx"));
+  const form = sinComentarios(leer("src/app/despachos/components/DespachoForm.tsx"));
 
   it("el rótulo del bloque fijo ya no se escribe en la pantalla", () => {
     expect(form).not.toContain("Los que más usa este transportista</span>");

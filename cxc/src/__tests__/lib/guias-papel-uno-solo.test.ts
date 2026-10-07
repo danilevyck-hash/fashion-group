@@ -32,7 +32,7 @@ const leer = (rel: string) => readFileSync(path.join(raiz, rel), "utf8");
 
 describe("🔴 1. hay UN solo papel, salga de donde salga", () => {
   it("la pantalla de imprimir llama a `imprimirGuia`, no a window.print()", () => {
-    const detalle = leer("src/app/guias/components/GuiaDetail.tsx");
+    const detalle = leer("src/app/despachos/components/GuiaDetail.tsx");
     expect(detalle).toContain("imprimirGuia(guia)");
     // ⚠️ La palabra `window.print()` sigue en el comentario que cuenta esta
     // historia: se mira la LLAMADA, no la palabra.
@@ -49,9 +49,9 @@ describe("🔴 1. hay UN solo papel, salga de donde salga", () => {
 
   it("los tres botones de imprimir del módulo son el MISMO camino", () => {
     for (const p of [
-      "src/app/guias/components/GuiasList.tsx",
-      "src/app/guias/[id]/page.tsx",
-      "src/app/guias/components/GuiaDetail.tsx",
+      "src/app/despachos/components/GuiasList.tsx",
+      "src/app/despachos/[id]/page.tsx",
+      "src/app/despachos/components/GuiaDetail.tsx",
     ]) {
       expect(leer(p), p).toContain("imprimirGuia");
     }
@@ -66,7 +66,7 @@ describe("🔴 1. hay UN solo papel, salga de donde salga", () => {
   });
 
   it("⚠️ el bloque @media print de HojaEscalada NO se tocó: cubre el Ctrl+P", () => {
-    const hoja = leer("src/app/guias/components/HojaEscalada.tsx");
+    const hoja = leer("src/app/despachos/components/HojaEscalada.tsx");
     expect(hoja).toContain("@media print");
     expect(hoja).toMatch(/transform:\s*none\s*!important/);
   });
@@ -82,7 +82,7 @@ function barrerGuias(re: RegExp): string[] {
       else if (/\.tsx?$/.test(e.name) && re.test(leer(rel))) encontrados.push(rel);
     }
   };
-  for (const d of ["src/app/guias", "src/lib/guias", "src/app/api/guias"]) recorrer(d);
+  for (const d of ["src/app/despachos", "src/lib/guias", "src/app/api/guias"]) recorrer(d);
   return encontrados;
 }
 

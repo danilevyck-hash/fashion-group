@@ -33,10 +33,10 @@ import {
 } from "@/lib/guias/etiquetas";
 import { datosDeEtiqueta } from "@/lib/guias/pdf-etiquetas";
 import { agregarFacturasSueltas, type FacturaDelCliente } from "@/lib/guias/atajos-facturas";
-import { faltaParaGuardar, textoFaltaAlGuardar, validarGuia } from "@/app/guias/components/guia-form-logic";
+import { faltaParaGuardar, textoFaltaAlGuardar, validarGuia } from "@/app/despachos/components/guia-form-logic";
 import { faltaParaDespachar } from "@/lib/guias/falta-para-despachar";
 import { GUIA_NUEVA_2026_10, ETIQUETAS_2026_10 } from "@/lib/guias/guias-2026-10";
-import type { GuiaItem } from "@/app/guias/components/types";
+import type { GuiaItem } from "@/app/despachos/components/types";
 
 function etq(over: Partial<EtiquetaFila> = {}): EtiquetaFila {
   return {

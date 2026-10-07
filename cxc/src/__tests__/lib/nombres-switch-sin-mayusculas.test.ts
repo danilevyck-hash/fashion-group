@@ -30,11 +30,11 @@ describe("nombres de Switch: nunca en mayúsculas sostenidas en pantalla", () =>
       ["src/components/catalogo/comprobantes/FilaComprobante.tsx", /nombreVendedorEnPantalla\(v\)/],
       ["src/app/admin/usuarios/VendedorSwitchSection.tsx", /\{nombreVendedorEnPantalla\(v\.nombre\)\}/],
       ["src/lib/multifashion/metas-lectura.ts", /nombre: nombreEnPantalla\(p\.nombre\)/],
-      ["src/app/guias/components/PedidosView.tsx", /vendedorEnPantalla\(p\.vendedor_nombre\)/],
+      ["src/app/despachos/components/PedidosView.tsx", /vendedorEnPantalla\(p\.vendedor_nombre\)/],
       ["src/components/SearchBar.tsx", /label: c\.nombre \|\| c\.nombre_normalized/],
     ];
     for (const [archivo, patron] of casos) expect(leer(archivo), archivo).toMatch(patron);
-    expect(leer("src/app/guias/components/PedidosView.tsx")).not.toMatch(/\{p\.vendedor_nombre/);
+    expect(leer("src/app/despachos/components/PedidosView.tsx")).not.toMatch(/\{p\.vendedor_nombre/);
   });
 });
 

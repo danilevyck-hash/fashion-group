@@ -123,8 +123,8 @@ describe("escala de la pantalla: Nuevo gasto abre como Reclamos y Marketing", ()
 
 describe("escala de la pantalla: todo centrado", () => {
   it("con la escala, el formulario de 820 px de Nueva guía (y del detalle Apple) va centrado en su caja", () => {
-    expect(leer("app/guias/components/GuiaForm.tsx")).toContain('`max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}`');
-    expect(leer("app/guias/[id]/page.tsx")).toContain('`max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}`');
+    expect(leer("app/despachos/components/GuiaForm.tsx")).toContain('`max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}`');
+    expect(leer("app/despachos/[id]/page.tsx")).toContain('`max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}`');
   });
 });
 

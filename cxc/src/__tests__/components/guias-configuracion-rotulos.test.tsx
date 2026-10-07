@@ -50,8 +50,8 @@ const leer = (r: string) => readFileSync(path.join(raiz, r), "utf8");
 const sinComentarios = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
-const vista = sinComentarios(leer("src/app/guias/components/GuiasConfiguracionView.tsx"));
-const lista = sinComentarios(leer("src/app/guias/components/DestinosListaConfig.tsx"));
+const vista = sinComentarios(leer("src/app/despachos/components/GuiasConfiguracionView.tsx"));
+const lista = sinComentarios(leer("src/app/despachos/components/DestinosListaConfig.tsx"));
 const reglas = sinComentarios(leer("src/lib/guias/destinos-config.ts"));
 
 describe("🔴 las dos tarjetas ya no se llaman igual", () => {

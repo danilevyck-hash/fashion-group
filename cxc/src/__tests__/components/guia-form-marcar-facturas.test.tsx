@@ -26,8 +26,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent, cleanup, act, within } from "@testing-library/react";
-import GuiaForm from "@/app/guias/components/GuiaForm";
-import type { GuiaItem } from "@/app/guias/components/types";
+import GuiaForm from "@/app/despachos/components/GuiaForm";
+import type { GuiaItem } from "@/app/despachos/components/types";
 
 // 🔴 El interruptor de reversión, controlable por test: el resto del módulo es
 // el REAL (las funciones de marcar/desmarcar son las de producción).
@@ -427,7 +427,7 @@ describe("🔴 «Traslado» se imprime en la columna FACTURA(S) del papel y en e
   };
 
   it("PrintDocument imprime «Traslado» en la celda de FACTURA(S)", async () => {
-    const { default: PrintDocument } = await import("@/app/guias/components/PrintDocument");
+    const { default: PrintDocument } = await import("@/app/despachos/components/PrintDocument");
     const { container } = render(<PrintDocument guia={GUIA_TRASLADO as never} />);
     const celdas = Array.from(container.querySelectorAll("td")).map((td) => (td.textContent || "").trim());
     expect(celdas).toContain("Traslado");
@@ -436,7 +436,7 @@ describe("🔴 «Traslado» se imprime en la columna FACTURA(S) del papel y en e
   });
 
   it("el Excel dice «Traslado» en la columna Facturas del envío", async () => {
-    const { buildGuiasSheet } = await import("@/app/guias/components/excel-guias");
+    const { buildGuiasSheet } = await import("@/app/despachos/components/excel-guias");
     const ws = buildGuiasSheet([GUIA_TRASLADO as never]);
     const celdas: string[] = [];
     for (const [addr, cell] of Object.entries(ws as Record<string, unknown>)) {

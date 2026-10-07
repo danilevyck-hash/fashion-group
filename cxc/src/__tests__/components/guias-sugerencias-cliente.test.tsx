@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import AtarClienteModal from "@/app/guias/components/AtarClienteModal";
+import AtarClienteModal from "@/app/despachos/components/AtarClienteModal";
 
 const DIRECTORIO = [
   { codigo: "D-71", nombre: "Hanna Calzados" },

@@ -196,6 +196,6 @@ describe("GUÍAS — no se le pone código al receptor, y por qué", () => {
   });
 
   it("las líneas de guía siguen atándose por código", () => {
-    expect(leer("src/app/guias/components/types.ts")).toContain("cliente_codigo");
+    expect(leer("src/app/despachos/components/types.ts")).toContain("cliente_codigo");
   });
 });

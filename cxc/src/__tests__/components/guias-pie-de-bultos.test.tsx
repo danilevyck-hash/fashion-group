@@ -32,11 +32,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, cleanup, fireEvent } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import GuiasList from "@/app/guias/components/GuiasList";
+import GuiasList from "@/app/despachos/components/GuiasList";
 // 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
 // El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
 import "@/lib/guias/papel-de-la-guia";
-import type { Guia, GuiaItem } from "@/app/guias/components/types";
+import type { Guia, GuiaItem } from "@/app/despachos/components/types";
 import { sumarBultos } from "@/lib/guias/pie-de-la-lista";
 
 // El GET de la ruta se prueba con la base mockeada: es donde nace
@@ -227,8 +227,8 @@ describe("🔴 4 · la suma de bultos vive en UN solo lugar", () => {
 
   it("ni la lista ni el Excel tienen su propio `reduce` de `total_bultos`", () => {
     for (const rel of [
-      "src/app/guias/components/GuiasList.tsx",
-      "src/app/guias/components/excel-guias.ts",
+      "src/app/despachos/components/GuiasList.tsx",
+      "src/app/despachos/components/excel-guias.ts",
     ]) {
       const codigo = leer(rel)
         .split("\n")
@@ -254,7 +254,7 @@ describe("🔴 4 · la suma de bultos vive en UN solo lugar", () => {
   });
 
   it("el pie se arma con la MISMA lista que se dibuja", () => {
-    const codigo = leer("src/app/guias/components/GuiasList.tsx");
+    const codigo = leer("src/app/despachos/components/GuiasList.tsx");
     expect(codigo).toContain("const mostradas = [...pendientes, ...visible];");
     expect(codigo).toContain("sumarBultos(mostradas)");
     expect(codigo).toContain("textoPieDeLista(mostradas.length, guias.length)");

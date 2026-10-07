@@ -21,8 +21,8 @@ import {
   type ComisionDetalle,
 } from "@/lib/ventas/comisionExcel";
 import { construirPdfGuias } from "@/lib/guias/pdf-guia";
-import { buildGuiasSheet } from "@/app/guias/components/excel-guias";
-import type { Guia, GuiaItem } from "@/app/guias/components/types";
+import { buildGuiasSheet } from "@/app/despachos/components/excel-guias";
+import type { Guia, GuiaItem } from "@/app/despachos/components/types";
 import { construirPdfEtiquetas, datosDeEtiqueta } from "@/lib/guias/pdf-etiquetas";
 import { cajasDelJuego, type EtiquetaFila } from "@/lib/guias/etiquetas";
 import { construirPdfPedidos } from "@/lib/guias/pdf-pedidos";

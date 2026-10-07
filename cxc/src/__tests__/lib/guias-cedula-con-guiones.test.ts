@@ -118,9 +118,9 @@ describe("las grafías raras que YA traen las partes solo se ordenan", () => {
 
 describe("🔴 dónde se aplica, y dónde NO", () => {
   const SUPERFICIES = [
-    ["el acordeón de la lista", "src/app/guias/components/GuiasList.tsx"],
-    ["la página de la guía", "src/app/guias/[id]/page.tsx"],
-    ["el papel", "src/app/guias/components/PrintDocument.tsx"],
+    ["el acordeón de la lista", "src/app/despachos/components/GuiasList.tsx"],
+    ["la página de la guía", "src/app/despachos/[id]/page.tsx"],
+    ["el papel", "src/app/despachos/components/PrintDocument.tsx"],
     ["el PDF", "src/lib/guias/pdf-guia.ts"],
   ] as const;
 
@@ -135,9 +135,9 @@ describe("🔴 dónde se aplica, y dónde NO", () => {
   it("🔴 el formulario de despacho NO la formatea: ahí se ESCRIBE", () => {
     // El juego frecuente ofrece la cédula para copiarla dentro del campo, y ese
     // texto se guarda. Mostrar una cosa y escribir otra sería peor que nada.
-    const form = leer("src/app/guias/components/DespachoForm.tsx");
+    const form = leer("src/app/despachos/components/DespachoForm.tsx");
     expect(form).not.toContain("cedulaParaMostrar");
-    expect(leer("src/app/guias/components/useDespachoGuia.ts")).not.toContain("cedulaParaMostrar");
+    expect(leer("src/app/despachos/components/useDespachoGuia.ts")).not.toContain("cedulaParaMostrar");
   });
 
   it("🔴 nada de esto escribe en la base", () => {

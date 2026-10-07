@@ -178,9 +178,9 @@ describe("🔴 marcar y desmarcar hablan el MISMO idioma que el renglón viejo",
 
 describe("candado estático — se muestra corto en las CUATRO superficies", () => {
   const superficies: Array<[string, string]> = [
-    ["el papel", "src/app/guias/components/PrintDocument.tsx"],
+    ["el papel", "src/app/despachos/components/PrintDocument.tsx"],
     ["el PDF", "src/lib/guias/pdf-guia.ts"],
-    ["el Excel", "src/app/guias/components/excel-guias.ts"],
+    ["el Excel", "src/app/despachos/components/excel-guias.ts"],
     // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026, «fuera la tabla que se corta»). Este
     // renglón apuntaba a `ListaEnvios.tsx`, donde vivía el helper `Resumen` que
     // arma la línea `destino · empresa · factura`. Ese helper se sacó a
@@ -188,8 +188,8 @@ describe("candado estático — se muestra corto en las CUATRO superficies", () 
     // mismo que la pantalla de despacho, así que la superficie a vigilar es la
     // ficha, no la lista que la usa. `ListaEnvios` sigue cubierto abajo: se le
     // exige que delegue.
-    ["la ficha del envío", "src/app/guias/components/ResumenEnvio.tsx"],
-    ["el acordeón de la lista", "src/app/guias/components/GuiasList.tsx"],
+    ["la ficha del envío", "src/app/despachos/components/ResumenEnvio.tsx"],
+    ["el acordeón de la lista", "src/app/despachos/components/GuiasList.tsx"],
     ["la imagen de WhatsApp", "src/lib/guias/png-guia.ts"],
   ];
 
@@ -198,7 +198,7 @@ describe("candado estático — se muestra corto en las CUATRO superficies", () 
   // (Daniel: que no se imprima). Lo demás —Excel, ficha, acordeón— sigue
   // mostrando el campo entero, que es donde alguien revisa lo que tecleó.
   const PAPELES = new Set([
-    "src/app/guias/components/PrintDocument.tsx",
+    "src/app/despachos/components/PrintDocument.tsx",
     "src/lib/guias/pdf-guia.ts",
   ]);
 
@@ -214,8 +214,8 @@ describe("candado estático — se muestra corto en las CUATRO superficies", () 
     // Sin esto, una de las dos podría volver a escribir su propia línea y
     // saltarse `facturasParaMostrar` sin que ningún candado lo note.
     for (const ruta of [
-      "src/app/guias/components/ListaEnvios.tsx",
-      "src/app/guias/components/GuiasList.tsx",
+      "src/app/despachos/components/ListaEnvios.tsx",
+      "src/app/despachos/components/GuiasList.tsx",
     ]) {
       expect(leer(ruta), ruta).toContain("<ResumenEnvio item={item}");
     }

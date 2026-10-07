@@ -78,7 +78,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 /** 🔴 SE ESPERA A LA PANTALLA, NO SE CUENTAN MILISEGUNDOS (19-sep-2026): con
  *  `setTimeout(300)` la afirmación podía llegar con la guía todavía viajando. */
 async function abrir() {
-  const Page = (await import("@/app/guias/[id]/page")).default;
+  const Page = (await import("@/app/despachos/[id]/page")).default;
   render(<Page />);
   await waitFor(() => {
     expect(document.querySelector(".animate-pulse")).toBeNull();

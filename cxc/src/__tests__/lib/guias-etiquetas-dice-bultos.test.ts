@@ -43,11 +43,11 @@ const leer = (rel: string) => readFileSync(path.join(RAIZ, rel), "utf8");
 
 /** Los archivos de la pestaña Etiquetas: pantalla, reglas, papel y rutas. */
 const ARCHIVOS = [
-  "app/guias/components/EtiquetasView.tsx",
+  "app/despachos/components/EtiquetasView.tsx",
   // 1-oct-2026: la pantalla de ENVÍOS y sus reglas entran al mismo barrido.
-  "app/guias/components/EtiquetasPorEnvio.tsx",
+  "app/despachos/components/EtiquetasPorEnvio.tsx",
   "lib/guias/etiquetas-por-envio.ts",
-  "app/guias/components/EtiquetasPendientes.tsx",
+  "app/despachos/components/EtiquetasPendientes.tsx",
   "lib/guias/etiquetas.ts",
   "lib/guias/etiquetas-server.ts",
   "lib/guias/pdf-etiquetas.ts",

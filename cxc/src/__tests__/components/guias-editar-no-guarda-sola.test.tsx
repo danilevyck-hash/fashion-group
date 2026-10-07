@@ -148,7 +148,7 @@ async function esperarElAutoguardado() {
  *  «Editar» («Unable to find an accessible element with the role "button" and
  *  name /^Editar$/i»), sin que nada del producto estuviera mal. */
 async function abrirPantallaDeEditar(envoltorio?: (hijo: ReactNode) => ReactNode) {
-  const Page = (await import("@/app/guias/[id]/page")).default;
+  const Page = (await import("@/app/despachos/[id]/page")).default;
   const arbol = <Page />;
   render(<>{envoltorio ? envoltorio(arbol) : arbol}</>);
   // 🔴 Se entra POR EL BOTÓN, como la gente. Si el botón no estuviera, este

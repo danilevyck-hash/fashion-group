@@ -11,9 +11,9 @@
  * — que es peor que el botón apagado, porque miente.
  */
 import { describe, it, expect } from "vitest";
-import { faltaParaGuardar, validarGuia, type EstadoGuia } from "@/app/guias/components/guia-form-logic";
+import { faltaParaGuardar, validarGuia, type EstadoGuia } from "@/app/despachos/components/guia-form-logic";
 import { textoFalta, unirEnHumano } from "@/lib/guias/falta-para-despachar";
-import type { GuiaItem } from "@/app/guias/components/types";
+import type { GuiaItem } from "@/app/despachos/components/types";
 
 function envio(p: Partial<GuiaItem> = {}): GuiaItem {
   return {

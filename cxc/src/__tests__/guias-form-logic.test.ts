@@ -27,9 +27,9 @@ import {
   validarGuia,
   vinculoCliente,
   type EstadoGuia,
-} from "@/app/guias/components/guia-form-logic";
-import { emptyItem } from "@/app/guias/components/constants";
-import type { GuiaItem } from "@/app/guias/components/types";
+} from "@/app/despachos/components/guia-form-logic";
+import { emptyItem } from "@/app/despachos/components/constants";
+import type { GuiaItem } from "@/app/despachos/components/types";
 
 function fila(over: Partial<GuiaItem> = {}): GuiaItem {
   return {
@@ -253,7 +253,7 @@ describe("empresa · lista cerrada de 8, una sola fuente", () => {
   });
 
   it("las listas muertas de constants.ts ya no existen", async () => {
-    const mod = await import("@/app/guias/components/constants");
+    const mod = await import("@/app/despachos/components/constants");
     expect("DEFAULT_EMPRESAS" in mod).toBe(false);
     expect("DEFAULT_CLIENTES" in mod).toBe(false);
   });

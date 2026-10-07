@@ -63,7 +63,7 @@ describe("aviso único", () => {
   it("los avisos sueltos de antes entran a la pila", () => {
     for (const f of [
       "src/components/ToastSystem.tsx", "src/components/ui.tsx", "src/components/UndoToast.tsx",
-      "src/app/guias/components/GuiaForm.tsx", "src/components/shared/SyncNowButton.tsx",
+      "src/app/despachos/components/GuiaForm.tsx", "src/components/shared/SyncNowButton.tsx",
       "src/components/shared/CatalogoSyncNow.tsx", "src/app/catalogos/admin/[marca]/categorias/CategoriasRubroClient.tsx",
       "src/app/asistencia/ReporteTab.tsx", "src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx",
     ]) {

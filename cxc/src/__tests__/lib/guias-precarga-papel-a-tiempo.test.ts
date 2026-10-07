@@ -32,9 +32,9 @@ const PRECARGA = 'import "@/lib/guias/papel-de-la-guia";';
 
 /** Las pantallas que piden el papel sin esperarlo. */
 const PANTALLAS_CON_PRECARGA = [
-  "@/app/guias/components/GuiasList",
-  "@/app/guias/page",
-  "@/app/guias/[id]/page",
+  "@/app/despachos/components/GuiasList",
+  "@/app/despachos/page",
+  "@/app/despachos/[id]/page",
 ];
 
 function archivosDePrueba(): string[] {
@@ -52,8 +52,8 @@ function archivosDePrueba(): string[] {
 
 /** Las pantallas donde vive la precarga, para que la lista de arriba no mienta. */
 const FUENTES = [
-  "src/app/guias/components/GuiasList.tsx",
-  "src/app/guias/[id]/page.tsx",
+  "src/app/despachos/components/GuiasList.tsx",
+  "src/app/despachos/[id]/page.tsx",
 ];
 
 describe("🔴 el papel de la guía se pide a tiempo en las pruebas", () => {

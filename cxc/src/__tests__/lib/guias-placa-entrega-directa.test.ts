@@ -35,7 +35,7 @@ const sinComentarios = (s: string) =>
     .join("\n");
 
 const api = sinComentarios(leer("src/app/api/guias/[id]/route.ts"));
-const form = sinComentarios(leer("src/app/guias/components/DespachoForm.tsx"));
+const form = sinComentarios(leer("src/app/despachos/components/DespachoForm.tsx"));
 
 // ⚠️ Desde el rediseño de ago-2026 el formulario ya no decide con `if`s propios:
 // el botón se APAGA y debajo dice qué falta, y esa lista la arma el módulo puro

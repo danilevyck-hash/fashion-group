@@ -20,7 +20,7 @@ describe("AJUSTES_APPLE_6_2026_10", () => {
     // círculo prendido para recibir un 403.
     expect(["admin", "secretaria", "bodega", "vendedor"].map(puedeMarcarPedidos)).toEqual([true, true, true, false]);
     expect(["contabilidad", "gerente_acs", "gerente_boston", "marcacion", null].map(puedeMarcarPedidos)).toEqual([false, false, false, false, false]);
-    const v = fs.readFileSync("src/app/guias/components/PedidosView.tsx", "utf8");
+    const v = fs.readFileSync("src/app/despachos/components/PedidosView.tsx", "utf8");
     expect(v).toMatch(/if \(!puedeMarcar\) return <span/); // quien no marca ve el círculo quieto
   });
 

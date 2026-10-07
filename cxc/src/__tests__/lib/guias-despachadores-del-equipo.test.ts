@@ -62,10 +62,10 @@ function barrer(re: RegExp): string[] {
   return encontrados;
 }
 
-const form = leer("src/app/guias/components/GuiaForm.tsx");
+const form = leer("src/app/despachos/components/GuiaForm.tsx");
 const ruta = leer("src/app/api/guias/despachadores/route.ts");
 const server = leer("src/lib/guias/despachadores-server.ts");
-const config = leer("src/app/guias/components/GuiasConfiguracionView.tsx");
+const config = leer("src/app/despachos/components/GuiasConfiguracionView.tsx");
 const migracion = leer("supabase/migrations/20261210120000_guias_despachadores.sql");
 
 describe("🔴 la lista ya no vive en el navegador", () => {
@@ -80,15 +80,15 @@ describe("🔴 la lista ya no vive en el navegador", () => {
   it("el formulario pide la lista al servidor", () => {
     // 🔄 1-oct-2026: la lectura se mudó a `useDespachadores`, que comparten el
     // formulario (interruptor apagado) y el DESPACHO, donde hoy se elige.
-    const hook = leer("src/app/guias/components/useDespachadores.ts");
+    const hook = leer("src/app/despachos/components/useDespachadores.ts");
     expect(hook).toContain('fetch("/api/guias/despachadores"');
     expect(hook).toContain("listaParaElDesplegable");
     expect(form).toContain("useDespachadores(");
-    expect(leer("src/app/guias/components/DespachoForm.tsx")).toContain("useDespachadores(");
+    expect(leer("src/app/despachos/components/DespachoForm.tsx")).toContain("useDespachadores(");
   });
 
   it("⚠️ y FALLA ABIERTA: sin la tabla, los cuatro de siempre", () => {
-    expect(leer("src/app/guias/components/useDespachadores.ts")).toContain("DESPACHADORES_BASE");
+    expect(leer("src/app/despachos/components/useDespachadores.ts")).toContain("DESPACHADORES_BASE");
     expect(server).toContain("return [...DESPACHADORES_BASE];");
     expect([...DESPACHADORES_BASE]).toEqual(["Julio", "Rodrigo", "Eloyn", "Jorman"]);
     // La semilla de la migración son ESOS CUATRO y ninguno más.
@@ -122,7 +122,7 @@ describe("🔴 en la guía quedó SOLO el desplegable", () => {
     // sí (`faltaParaDespachar` y el PUT que completa, ver
     // `guias-nueva-guia-2026-10.test.ts`).
     expect(form).toContain('label="Despachado por" requerido');
-    expect(leer("src/app/guias/components/guia-form-logic.ts")).toContain(
+    expect(leer("src/app/despachos/components/guia-form-logic.ts")).toContain(
       "if (!GUIA_NUEVA_2026_10 && !entregadoPorElegido(estado.entregadoPor)) errores.add(\"entregadoPor\");",
     );
     expect(leer("src/lib/guias/falta-para-despachar.ts")).toContain('falta.push("despachado por")');

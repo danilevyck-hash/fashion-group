@@ -57,7 +57,7 @@ export default function NuevaGuiaClient() {
   return (
     <div>
       <AppHeader
-        module="Guías de despacho"
+        module="Despachos"
         breadcrumbs={[{ label: "Nueva guía" }]}
       />
       <GuiaForm
@@ -92,7 +92,7 @@ export default function NuevaGuiaClient() {
         onRemoveRow={s.removeRow}
         onRestoreRow={s.restoreRow}
         onSave={s.saveGuia}
-        onCancel={() => router.push("/guias")}
+        onCancel={() => router.push("/despachos")}
       />
       <Toast message={s.toast} />
     </div>

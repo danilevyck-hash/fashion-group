@@ -242,7 +242,7 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   // Usuarios estrenó pestañas en el mismo cambio, y su h1 visible decía la
   // misma palabra que la pestaña de al lado: pasa a `sr-only`.
   { archivo: "app/admin/usuarios/page.tsx", que: "Usuarios · h1 grande 'Usuarios' (la pestaña ya lo dice)", texto: 'text-2xl sm:text-[28px] text-gray-900' },
-  { archivo: "app/guias/components/GuiasList.tsx", que: "Guías · h1 grande 'Guías de Despacho'", texto: 'tracking-tight">Guías de Despacho' },
+  { archivo: "app/despachos/components/GuiasList.tsx", que: "Guías · h1 grande 'Guías de Despacho'", texto: 'tracking-tight">Guías de Despacho' },
   { archivo: "app/reclamos/components/EmpresaSelector.tsx", que: "Reclamos · h1 grande 'Reclamos'", texto: 'tracking-tight">Reclamos' },
   { archivo: "app/reclamos/components/ReclamoForm.tsx", que: "Reclamos · h1 grande 'Nuevo Reclamo' (su breadcrumb propio ya lo dice en todos los anchos)", texto: 'text-[21px] font-medium tracking-tight">Nuevo Reclamo' },
   { archivo: "app/productos/cargar/DepuradorClient.tsx", que: "Depurador · masthead 'Depurador de Productos'", texto: "font-serif text-xl font-semibold tracking-tight text-gray-900" },
@@ -297,7 +297,7 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/clientes/[codigo]/ClienteDetail.tsx", que: "Clientes · coletilla del encabezado (abajo dice cuándo se actualizó)", texto: "Datos fiscales · sincronizados de Switch" },
   { archivo: "components/ventas/ClientesView.tsx", que: "Ventas › Clientes · el prefijo 'Vista:' del chip", texto: "Vista: {vistaChipLong}" },
   { archivo: "components/ventas/ClientesView.tsx", que: "Ventas › Clientes · rótulo del globo que se abre desde 'N empresas'", texto: "Desglose por empresa" },
-  { archivo: "app/guias/[id]/page.tsx", que: "Guías · 'de esta guía' estando DENTRO de la guía", texto: "Envíos de esta guía" },
+  { archivo: "app/despachos/[id]/page.tsx", que: "Guías · 'de esta guía' estando DENTRO de la guía", texto: "Envíos de esta guía" },
   { archivo: "app/reclamos/components/ReclamoForm.tsx", que: "Reclamos · rótulo sobre un único campo que ya se llama 'Empresa *'", texto: ">Empresa</div>" },
   { archivo: "app/asistencia/AsistenciaClient.tsx", que: "Asistencia · el 'Cómo funciona' DEL MEDIO (el botón y el contenido se quedan)", texto: ">Cómo funciona</h2>" },
   { archivo: "components/marketing/FacturaForm.tsx", que: "Marketing · la bajada del paso 3 repetía su propio título", texto: "Elige la marca (o marcas) del gasto." },
@@ -387,7 +387,7 @@ const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
   // Usuarios) y el 11-sep-2026 la pantalla se retiró entera. El encabezado que
   // queda es el de Usuarios, y sigue siendo UNO solo y `sr-only`.
   { archivo: "app/admin/usuarios/page.tsx", nombre: "Usuarios" },
-  { archivo: "app/guias/components/GuiasList.tsx", nombre: "Guías de despacho" }, // 1-oct-2026, Daniel: nombres normales de ERP
+  { archivo: "app/despachos/components/GuiasList.tsx", nombre: "Guías de despacho" }, // 1-oct-2026, Daniel: nombres normales de ERP
   { archivo: "app/reclamos/components/EmpresaSelector.tsx", nombre: "Reclamos" },
   { archivo: "app/reclamos/components/ReclamoForm.tsx", nombre: "Nuevo reclamo" }, // 1-oct-2026, Daniel: nombres normales de ERP
   // El módulo pasó a llamarse "Plantilla Switch" el 8-sep-2026 (Daniel: «se
@@ -431,7 +431,7 @@ describe("🔴 podar el título NO deja la pantalla sin encabezado", () => {
     // exigirle `end` sería exigirle que los junte.
     const filasQueQuedaronConUnSoloBoton = [
       "app/clientes/ClientesListClient.tsx",
-      "app/guias/components/GuiasList.tsx",
+      "app/despachos/components/GuiasList.tsx",
       "app/reclamos/components/EmpresaSelector.tsx",
       "app/recordatorios/RecordatoriosClient.tsx",
       "app/marketing/components/InicioMarketing.tsx",

@@ -157,7 +157,7 @@ describe("AppHeader · la hoja de abajo en el celular", () => {
     ]);
 
     // Abre en Operación, que es donde está: sus módulos a la vista.
-    await screen.findByRole("button", { name: "Guías de despacho" });
+    await screen.findByRole("button", { name: "Despachos" });
     const aqui = screen.getByRole("button", { name: "Asistencia y planilla" });
     expect(aqui.getAttribute("aria-current")).toBe("page");
     // Y los de otro grupo NO se dibujan hasta que se toque su pestaña.
@@ -167,7 +167,7 @@ describe("AppHeader · la hoja de abajo en el celular", () => {
   it("la pestaña cambia la lista sin salir de la hoja, y tocar un módulo navega", async () => {
     montarComoAdmin("/asistencia");
     fireEvent.click(await screen.findByLabelText(/^Abrir menú/));
-    await screen.findByRole("button", { name: "Guías de despacho" });
+    await screen.findByRole("button", { name: "Despachos" });
 
     fireEvent.click(screen.getByRole("tab", { name: "Ventas" }));
     await screen.findByRole("button", { name: "Proveedores" });
@@ -191,6 +191,6 @@ describe("AppHeader · la hoja de abajo en el celular", () => {
     await screen.findByRole("button", { name: "Ventas y clientes" });
     screen.getByRole("button", { name: "Operación" });
     expect(screen.queryByRole("tablist", { name: "Grupos de módulos" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Guías de despacho" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Despachos" })).toBeNull();
   });
 });

@@ -283,7 +283,7 @@ describe("D · el primer pintado trae contenido", () => {
   it("la página de grupo dibuja sus fichas en el servidor (real, con `modules.ts`)", () => {
     const html = htmlDelServidor(semilla({ role: "secretaria" }), <GroupPage group="operacion" />);
     // 1-oct-2026, Daniel: nombres normales de ERP — mayúscula solo en la primera palabra.
-    expect(html).toContain("Guías de despacho");
+    expect(html).toContain("Despachos");
     expect(html).toContain("Caja menuda");
     // Y solo las de ese rol: Gastos es de admin y contabilidad.
     expect(html).not.toContain("Gastos");
@@ -426,10 +426,10 @@ describe("G · las pantallas alcanzadas, por nombre", () => {
     // celular: «Ver los documentos ›» de la hoja «Cobrar» lleva acá).
     "src/app/cxc/cliente/[codigo]/ClienteCxc.tsx",
     "src/app/gastos-contabilidad/GastosContabilidadClient.tsx",
-    "src/app/guias/[id]/imprimir/page.tsx",
-    "src/app/guias/[id]/page.tsx",
-    "src/app/guias/nueva/NuevaGuiaClient.tsx",
-    "src/app/guias/page.tsx",
+    "src/app/despachos/[id]/imprimir/page.tsx",
+    "src/app/despachos/[id]/page.tsx",
+    "src/app/despachos/nueva/NuevaGuiaClient.tsx",
+    "src/app/despachos/page.tsx",
     "src/app/marketing/[marca]/[periodo]/page.tsx",
     "src/app/marketing/[marca]/page.tsx",
     "src/app/marketing/mobiliario/page.tsx",

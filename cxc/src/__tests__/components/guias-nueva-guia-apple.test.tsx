@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor, act, within } from "@testing-library/react";
-import NuevaGuiaClient from "@/app/guias/nueva/NuevaGuiaClient";
+import NuevaGuiaClient from "@/app/despachos/nueva/NuevaGuiaClient";
 import type { EtiquetaFila } from "@/lib/guias/etiquetas";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { ATRIBUTO_BARRA_FIJA, DIAMETRO_FLOTANTE, VAR_ALTO_BARRA_FIJA, abajoDelFlotante } from "@/lib/navegacion/barra-celular";
@@ -224,7 +224,7 @@ describe("🔴 el payload es IDÉNTICO con el interruptor prendido y apagado", (
     fireEvent.change(transp, { target: { value: "t1" } });
     fireEvent.change(document.getElementById("guia-observaciones") as HTMLTextAreaElement, { target: { value: "3 muebles" } });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Guardar guía" })); });
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/guias/g-nueva"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/despachos/g-nueva"));
     const guia = posts.find((p) => p.url === "/api/guias")!.body;
     const atar = posts.find((p) => p.url === "/api/guias/etiquetas/importar")!.body;
     // El `uid` es de la pantalla (al azar): se compara todo lo demás.

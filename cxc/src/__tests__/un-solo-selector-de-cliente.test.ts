@@ -175,7 +175,7 @@ const PERMITIDOS: Record<string, string> = {
     "EL selector del sistema contra el directorio (clientes_master, D-XXX).",
   "lib/hooks/useBusquedaClientes.ts":
     "El motor de búsqueda que usa ese selector. No dibuja ningún control.",
-  "app/guias/page.tsx":
+  "app/despachos/page.tsx":
     "Lee el directorio UNA vez y se lo pasa al selector de la ventana de atar; no dibuja control propio.",
 
   // ── Otro universo de clientes: los de Switch, por empresa, con "Contado" ──
@@ -228,7 +228,7 @@ describe("🔴 no puede haber una segunda forma de elegir cliente", () => {
   });
 
   it("⛔ el typeahead libre de cliente NO vuelve", () => {
-    expect(existsSync(join(SRC, "app", "guias", "components", "ClienteTypeahead.tsx"))).toBe(false);
+    expect(existsSync(join(SRC, "app", "despachos", "components", "ClienteTypeahead.tsx"))).toBe(false);
     const marketing = globSync("app/marketing/**/*.tsx", { cwd: SRC });
     for (const rel of marketing) {
       expect(sinComentarios(readFileSync(join(SRC, rel), "utf8"))).not.toContain(
@@ -375,7 +375,7 @@ describe("🔴 elegir cliente NO es obligatorio", () => {
 
   it("y las guías no la apagan", () => {
     const form = sinComentarios(
-      readFileSync(join(SRC, "app", "guias", "components", "GuiaForm.tsx"), "utf8"),
+      readFileSync(join(SRC, "app", "despachos", "components", "GuiaForm.tsx"), "utf8"),
     );
     expect(form).toContain("<ClientePicker");
     expect(form).not.toMatch(/permitirOtro=\{false\}/);

@@ -52,11 +52,11 @@ vi.mock("@/lib/guias/pdf-en-pestana", () => ({
   },
 }));
 
-import EtiquetasView from "@/app/guias/components/EtiquetasView";
-import EtiquetasPendientes from "@/app/guias/components/EtiquetasPendientes";
-import ListaEnvios from "@/app/guias/components/ListaEnvios";
-import GuiaForm from "@/app/guias/components/GuiaForm";
-import type { GuiaItem } from "@/app/guias/components/types";
+import EtiquetasView from "@/app/despachos/components/EtiquetasView";
+import EtiquetasPendientes from "@/app/despachos/components/EtiquetasPendientes";
+import ListaEnvios from "@/app/despachos/components/ListaEnvios";
+import GuiaForm from "@/app/despachos/components/GuiaForm";
+import type { GuiaItem } from "@/app/despachos/components/types";
 import type { EtiquetaFila } from "@/lib/guias/etiquetas";
 
 const NOVA = { codigo: "D-170", nombre: "Nova Lux, S.A." };

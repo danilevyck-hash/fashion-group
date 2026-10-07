@@ -26,11 +26,11 @@
 // Este candado leía los textos viejos y se actualiza a propósito.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
-import GuiasList from "@/app/guias/components/GuiasList";
+import GuiasList from "@/app/despachos/components/GuiasList";
 // 🔴 PRECARGA A TIEMPO: la pantalla pide el papel de la guía sin esperarlo.
 // El porqué, en `src/__tests__/lib/guias-precarga-papel-a-tiempo.test.ts`.
 import "@/lib/guias/papel-de-la-guia";
-import type { Guia, GuiaItem } from "@/app/guias/components/types";
+import type { Guia, GuiaItem } from "@/app/despachos/components/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🩸 EL RELOJ VA FIJO — nota del 11-sep-2026.

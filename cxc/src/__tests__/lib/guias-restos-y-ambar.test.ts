@@ -24,7 +24,7 @@ import {
   faltantesDeLaDespachada,
 } from "@/lib/guias/faltantes-despacho";
 import { guiaYaDespachada } from "@/lib/guias/modo-despacho";
-import { DEFAULT_DIRECCIONES } from "@/app/guias/components/constants";
+import { DEFAULT_DIRECCIONES } from "@/app/despachos/components/constants";
 
 const raiz = process.cwd();
 const leer = (p: string) => readFileSync(path.join(raiz, p), "utf8");
@@ -59,10 +59,10 @@ describe("🔴 6 · el rastro del cierre en bloque deja de mostrarse (54 guías)
 
   it("se esconde en las cinco superficies de lectura", () => {
     for (const p of [
-      "src/app/guias/components/PrintDocument.tsx",
+      "src/app/despachos/components/PrintDocument.tsx",
       "src/lib/guias/pdf-guia.ts",
-      "src/app/guias/components/GuiasList.tsx",
-      "src/app/guias/[id]/page.tsx",
+      "src/app/despachos/components/GuiasList.tsx",
+      "src/app/despachos/[id]/page.tsx",
       "src/lib/guias/png-guia.ts",
     ]) {
       expect(leer(p), p).toContain("observacionesVisibles");
@@ -73,10 +73,10 @@ describe("🔴 6 · el rastro del cierre en bloque deja de mostrarse (54 guías)
     // Importar la función y no usarla en el bloque que se pinta es exactamente
     // la mutación que hay que cazar.
     const casos: Array<[string, RegExp]> = [
-      ["src/app/guias/components/GuiasList.tsx", /expandedGuia\.observaciones(?!\s*\))/],
+      ["src/app/despachos/components/GuiasList.tsx", /expandedGuia\.observaciones(?!\s*\))/],
       ["src/lib/guias/pdf-guia.ts", /g\.observaciones(?!\s*\))/],
-      ["src/app/guias/[id]/page.tsx", /g\.observaciones(?!\s*\))/],
-      ["src/app/guias/components/PrintDocument.tsx", /g\.observaciones(?!\s*\))/],
+      ["src/app/despachos/[id]/page.tsx", /g\.observaciones(?!\s*\))/],
+      ["src/app/despachos/components/PrintDocument.tsx", /g\.observaciones(?!\s*\))/],
       ["src/lib/guias/png-guia.ts", /g\.observaciones(?!\s*\))/],
     ];
     for (const [ruta, prohibido] of casos) {
@@ -96,7 +96,7 @@ describe("🔴 6 · el rastro del cierre en bloque deja de mostrarse (54 guías)
 
   it("⚠️ el campo que se EDITA sigue trayendo el texto guardado", () => {
     // Si el formulario mostrara el texto recortado, guardar lo borraría.
-    const form = leer("src/app/guias/components/GuiaForm.tsx");
+    const form = leer("src/app/despachos/components/GuiaForm.tsx");
     expect(form).toContain("value={observaciones}");
     expect(form).not.toContain("observacionesVisibles");
   });
@@ -165,11 +165,11 @@ describe("🔴 8 · los restos muertos: sin lectores, y la columna NO se dropea"
   const CODIGO = [
     "src/app/api/guias/route.ts",
     "src/app/api/guias/[id]/route.ts",
-    "src/app/guias/components/types.ts",
-    "src/app/guias/components/GuiasList.tsx",
-    "src/app/guias/components/GuiaForm.tsx",
-    "src/app/guias/components/excel-guias.ts",
-    "src/app/guias/components/PrintDocument.tsx",
+    "src/app/despachos/components/types.ts",
+    "src/app/despachos/components/GuiasList.tsx",
+    "src/app/despachos/components/GuiaForm.tsx",
+    "src/app/despachos/components/excel-guias.ts",
+    "src/app/despachos/components/PrintDocument.tsx",
     "src/lib/guias/pdf-guia.ts",
     "src/lib/guias/png-guia.ts",
   ];
@@ -243,9 +243,9 @@ describe("🔴 9 · el estado «Rechazada» se retiró (0 de 242 guías)", () =>
 
   it("no queda ningún botón ni texto de rechazar en la pantalla", () => {
     for (const p of [
-      "src/app/guias/components/GuiasList.tsx",
-      "src/app/guias/[id]/page.tsx",
-      "src/app/guias/components/DespachoForm.tsx",
+      "src/app/despachos/components/GuiasList.tsx",
+      "src/app/despachos/[id]/page.tsx",
+      "src/app/despachos/components/DespachoForm.tsx",
     ]) {
       expect(leer(p), p).not.toMatch(/Rechazar|Motivo de rechazo/);
     }

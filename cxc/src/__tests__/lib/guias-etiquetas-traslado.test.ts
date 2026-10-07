@@ -29,8 +29,8 @@ import {
 } from "@/lib/guias/etiquetas-por-envio";
 import { construirPdfEtiquetas, datosDeEtiqueta, paginasDelEnvio } from "@/lib/guias/pdf-etiquetas";
 import type { EtiquetaFila } from "@/lib/guias/etiquetas";
-import { validarGuia } from "@/app/guias/components/guia-form-logic";
-import type { GuiaItem } from "@/app/guias/components/types";
+import { validarGuia } from "@/app/despachos/components/guia-form-logic";
+import type { GuiaItem } from "@/app/despachos/components/types";
 
 const CABECERA = {
   empresa_key: "vistana",

@@ -61,7 +61,7 @@ describe("‹ Octubre 2026 ›", () => {
 
 describe("🔴 ninguna pantalla con el panel se queda sin ‹ ›", () => {
   it("Comisiones (computadora v2), Ventas y Guías heredan las flechas: nadie las apaga", () => {
-    for (const f of ["components/comisiones/ComisionesComputadoraV2.tsx", "app/ventas/VentasShell.tsx", "app/guias/page.tsx", "components/comisiones/ComisionesView.tsx"]) {
+    for (const f of ["components/comisiones/ComisionesComputadoraV2.tsx", "app/ventas/VentasShell.tsx", "app/despachos/page.tsx", "components/comisiones/ComisionesView.tsx"]) {
       const src = leer(f);
       expect(src, f).toContain("<ComisionesPeriodo");
       expect(src, f).not.toContain("conFlechas={false}");

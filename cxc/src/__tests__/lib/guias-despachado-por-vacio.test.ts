@@ -47,9 +47,9 @@ function barrer(re: RegExp): string[] {
   return encontrados;
 }
 
-const estado = leer("src/app/guias/components/useGuiaFormState.ts");
-const form = leer("src/app/guias/components/GuiaForm.tsx");
-const logica = leer("src/app/guias/components/guia-form-logic.ts");
+const estado = leer("src/app/despachos/components/useGuiaFormState.ts");
+const form = leer("src/app/despachos/components/GuiaForm.tsx");
+const logica = leer("src/app/despachos/components/guia-form-logic.ts");
 
 describe("🔴 el campo nace vacío", () => {
   it("🩸 la clave `fg_last_entregado_por` no la USA ningún archivo", () => {

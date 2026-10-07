@@ -71,7 +71,7 @@ import {
   firmasDelPapel,
   renglonesDelPapel,
 } from "@/lib/guias/papel-2026-09";
-import type { Guia, GuiaItem } from "@/app/guias/components/types";
+import type { Guia, GuiaItem } from "@/app/despachos/components/types";
 
 import { ESTILO_UNICO } from "@/lib/pdf-estilo";
 /** Con el estilo único el título del papel va sin gritar: «Guía de transporte externo». */

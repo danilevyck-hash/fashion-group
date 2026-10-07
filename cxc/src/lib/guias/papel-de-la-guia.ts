@@ -30,7 +30,7 @@ import { compartirArchivo, type ResultadoCompartir } from "@/lib/compartir-archi
 import { fmtGuia } from "@/lib/format";
 import { imprimirPdf } from "@/lib/imprimir-pdf";
 import { construirPdfGuia, nombreArchivoGuia } from "./pdf-guia";
-import type { Guia } from "@/app/guias/components/types";
+import type { Guia } from "@/app/despachos/components/types";
 
 /**
  * Manda la guía a la impresora, sin pantalla intermedia.

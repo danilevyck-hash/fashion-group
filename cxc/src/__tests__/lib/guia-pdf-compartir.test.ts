@@ -20,7 +20,7 @@ import { readFileSync } from "fs";
 import path from "path";
 import { construirPdfGuia, nombreArchivoGuia } from "@/lib/guias/pdf-guia";
 import { fmtGuia } from "@/lib/format";
-import type { Guia } from "@/app/guias/components/types";
+import type { Guia } from "@/app/despachos/components/types";
 
 const raiz = process.cwd();
 
@@ -33,7 +33,7 @@ const sinComentarios = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
 const hoja = sinComentarios(
-  readFileSync(path.join(raiz, "src/app/guias/components/PrintDocument.tsx"), "utf8"),
+  readFileSync(path.join(raiz, "src/app/despachos/components/PrintDocument.tsx"), "utf8"),
 );
 const pdf = sinComentarios(readFileSync(path.join(raiz, "src/lib/guias/pdf-guia.ts"), "utf8"));
 // 🔄 CAMBIÓ DE DIRECCIÓN EL 24-sep-2026, NO SE AFLOJÓ. Desde el papel nuevo
@@ -45,7 +45,7 @@ const pdf = sinComentarios(readFileSync(path.join(raiz, "src/lib/guias/pdf-guia.
 const papelNuevo = sinComentarios(
   readFileSync(path.join(raiz, "src/lib/guias/papel-2026-09.ts"), "utf8"),
 );
-const detalle = readFileSync(path.join(raiz, "src/app/guias/components/GuiaDetail.tsx"), "utf8");
+const detalle = readFileSync(path.join(raiz, "src/app/despachos/components/GuiaDetail.tsx"), "utf8");
 const compartir = readFileSync(path.join(raiz, "src/lib/compartir-archivo.ts"), "utf8");
 
 const GUIA: Guia = {
@@ -245,7 +245,7 @@ describe("🔴 compartir de verdad abre la hoja del sistema", () => {
   });
 
   it("la ruta /guias tiene ToastProvider — sin él la pantalla se cae", () => {
-    const layout = readFileSync(path.join(raiz, "src/app/guias/layout.tsx"), "utf8");
+    const layout = readFileSync(path.join(raiz, "src/app/despachos/layout.tsx"), "utf8");
     expect(layout).toContain("ToastProvider");
   });
 });

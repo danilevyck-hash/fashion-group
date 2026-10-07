@@ -27,7 +27,7 @@ vi.mock("@/lib/guias/pdf-en-pestana", () => ({
   },
 }));
 
-import EtiquetasView from "@/app/guias/components/EtiquetasView";
+import EtiquetasView from "@/app/despachos/components/EtiquetasView";
 
 const NOVA = { codigo: "D-170", nombre: "Nova Lux, S.A." };
 let posts: Array<Record<string, unknown>> = [];

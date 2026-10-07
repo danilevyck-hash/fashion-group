@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import XLSX from "xlsx-js-style";
 import { workbookFromSheets } from "@/lib/excel-export";
-import { buildGuiasSheet } from "@/app/guias/components/excel-guias";
+import { buildGuiasSheet } from "@/app/despachos/components/excel-guias";
 import { buildProveedoresSheet } from "@/app/proveedores/excel-proveedores";
-import type { Guia, GuiaItem } from "@/app/guias/components/types";
+import type { Guia, GuiaItem } from "@/app/despachos/components/types";
 import type { CarteraCxp } from "@/lib/proveedores/por-empresa";
 import fs from "fs";
 import path from "path";

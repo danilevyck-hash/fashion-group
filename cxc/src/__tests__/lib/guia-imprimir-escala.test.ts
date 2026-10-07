@@ -39,8 +39,8 @@ import path from "path";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
 
-const HOJA = "src/app/guias/components/HojaEscalada.tsx";
-const DETALLE = "src/app/guias/components/GuiaDetail.tsx";
+const HOJA = "src/app/despachos/components/HojaEscalada.tsx";
+const DETALLE = "src/app/despachos/components/GuiaDetail.tsx";
 const GLOBALS = "src/app/globals.css";
 
 const hoja = leer(HOJA);
