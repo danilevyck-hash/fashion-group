@@ -10,6 +10,15 @@ Complementa [docs/diccionario.md](diccionario.md) (formatos y las diez decisione
 
 Antes de nombrar algo nuevo, busca aquí el término. Si el concepto no está, usa el nombre que usaría SAP/Odoo en español y agrégalo a esta tabla.
 
+## Cómo agregar un término nuevo
+
+Cuando Daniel corrija un nombre («eso no se dice así»), para que quede atrapado para siempre:
+
+1. **Decide la vara.** ¿La palabra mala NUNCA es correcta en ningún contexto (nombre de proveedor, identificador, color del catálogo)? Va en «Palabras prohibidas en textos visibles» (CERO en todo el código). ¿Puede aparecer legítimamente en otro lado? Va en «Formas coloquiales» (techo por archivo, solo sobre lo que se VE en pantalla).
+2. **Agrega la fila** «Prohibido | Reemplazo» en la tabla que corresponda, con el nombre de ERP correcto a la derecha. Si además define un concepto nuevo, suma también una fila en «Un término por concepto».
+3. **No se toca código.** `scripts/revisar-nombres.ts` (`glosario()`) lee este documento en cada corrida; el candado (`nombres-erp-prohibidos.test.ts` y `revisar-nombres.test.ts`) la hace cumplir sola.
+4. **Corre `npm test`.** Si la palabra ya estaba en pantalla, el candado falla con el archivo y la línea exactos: arregla ESE texto (nunca el candado). El techo de un archivo solo baja.
+
 ## Un término por concepto
 
 | Concepto | Término | No usar |
@@ -98,6 +107,9 @@ Candado: `src/__tests__/lib/nombres-erp-prohibidos.test.ts`, que **lee esta tabl
 | Subir foto o factura | Adjuntar comprobante |
 | Poner en bulto | Bultos |
 | Revocar | Quitar acceso |
+| Mueble de la bodega | Entrega de mobiliario |
+| Lo que va en el camión | Detalle de envío |
+| El viaje | Envío |
 
 ## Formas coloquiales (techo por archivo)
 

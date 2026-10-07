@@ -111,6 +111,20 @@ const LOS_DIEZ: [string, "rotulo" | "texto"][] = [
   ["Revocar", "rotulo"],
 ];
 
+/**
+ * 7-oct-2026: «Mueble de la bodega» se coló en Marketing (uno de los tres
+ * tipos de gasto) y Daniel lo vio antes que el revisor — es un rótulo corto
+ * y bien formado, así que la vara de FORMA no lo caza; solo lo caza una fila
+ * del glosario. Van con «Lo que va en el camión» y «El viaje», los dos
+ * ejemplos que ya citaba la regla general de este documento (línea 5) sin
+ * tener fila propia todavía.
+ */
+const NUEVOS_DEL_7_OCT: [string, string][] = [
+  ["Mueble de la bodega", "Entrega de mobiliario"],
+  ["Lo que va en el camión", "Detalle de envío"],
+  ["El viaje", "Envío"],
+];
+
 /** Nombres de ERP de verdad: ninguno puede caer. Son los CONTROLES. */
 const NOMBRES_BUENOS: [string, "rotulo" | "texto"][] = [
   ["Detalle de envío", "rotulo"],
@@ -139,6 +153,8 @@ const NOMBRES_BUENOS: [string, "rotulo" | "texto"][] = [
   ["Vuelve a intentarlo.", "texto"],
   ["La quincena está cerrada. Para corregir un monto hay que reabrirla.", "texto"],
   ["Sin resultados para «Boston».", "texto"],
+  ["Entrega de mobiliario", "rotulo"],
+  ["Envío", "rotulo"],
 ];
 
 describe("🔴 revisar-nombres: ningún texto de pantalla habla como una conversación", () => {
@@ -149,6 +165,12 @@ describe("🔴 revisar-nombres: ningún texto de pantalla habla como una convers
     const sueltos = LOS_DIEZ.filter(([t, c]) => !revisarTexto(t, c));
     expect(sueltos, `se le escaparon: ${sueltos.map(([t]) => `«${t}»`).join(" · ")}`).toEqual([]);
     for (const [t, c] of LOS_DIEZ) console.log(`  ✓ «${t}» → ${revisarTexto(t, c)!.regla}`);
+  });
+
+  it("caza «Mueble de la bodega» y los otros dos que quedaron solo en la prosa (7-oct-2026)", () => {
+    const sueltos = NUEVOS_DEL_7_OCT.filter(([t]) => !revisarTexto(t, "rotulo"));
+    expect(sueltos, `se le escaparon: ${sueltos.map(([t]) => `«${t}»`).join(" · ")}`).toEqual([]);
+    for (const [malo, bueno] of NUEVOS_DEL_7_OCT) expect(revisarTexto(malo, "rotulo")!.propuesta).toBe(bueno);
   });
 
   it("y NO caza los nombres de ERP de verdad (controles)", () => {
