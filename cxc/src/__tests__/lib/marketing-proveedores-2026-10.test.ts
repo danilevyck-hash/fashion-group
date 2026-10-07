@@ -75,18 +75,36 @@ function gasto(p: Partial<GastoDelProveedor>): GastoDelProveedor {
   };
 }
 
-// ─── 1. El interruptor nace apagado ─────────────────────────────────────────
+// ─── 1. El interruptor, PRENDIDO el 7-oct-2026 ──────────────────────────────
 
 describe("el interruptor", () => {
-  it("nace APAGADO en el archivo (no solo en la variable)", () => {
-    expect(MKT_PROVEEDORES_2026_10).toBe(false);
+  it("está PRENDIDO en el archivo (no solo en la variable)", () => {
+    expect(MKT_PROVEEDORES_2026_10).toBe(true);
     expect(leer("src/lib/marketing/proveedores-2026-10.ts")).toContain(
-      "export const MKT_PROVEEDORES_2026_10 = false;",
+      "export const MKT_PROVEEDORES_2026_10 = true;",
     );
   });
 
-  it("apagado, NI UNA columna nueva viaja a la base", () => {
-    expect(columnasDeProveedores({ pctALaMarca: 50 })).toEqual({});
+  it("prendido, la columna nueva SÍ viaja — y solo con un valor de la lista cerrada", () => {
+    // Los tres valores que el CHECK de la base acepta.
+    expect(columnasDeProveedores({ pctALaMarca: 100 })).toEqual({ pct_a_la_marca: 100 });
+    expect(columnasDeProveedores({ pctALaMarca: 50 })).toEqual({ pct_a_la_marca: 50 });
+    expect(columnasDeProveedores({ pctALaMarca: 0 })).toEqual({ pct_a_la_marca: 0 });
+    // Cualquier otro número se manda como NULL, nunca inventado: así el
+    // CHECK `pct_a_la_marca IN (0, 50, 100)` no puede rebotar el guardado.
+    expect(columnasDeProveedores({ pctALaMarca: 33 })).toEqual({ pct_a_la_marca: null });
+    // 🔴 Y si la pantalla NO mandó el campo, no se escribe la columna: una
+    // factura que se edita por otro motivo no se queda con un 0 puesto por
+    // nadie. `Number(undefined)` es NaN, pero acá ni se llega a convertir.
+    expect(columnasDeProveedores({})).toEqual({});
+  });
+
+  it("🔴 apagarlo vuelve a no mandar NADA (el camino de rollback sigue vivo)", () => {
+    // El corte por interruptor es la PRIMERA línea de la función, así que
+    // apagarlo deja la base exactamente como el 5-oct-2026. Se comprueba en el
+    // código porque la constante ya no se puede cambiar en caliente.
+    const src = leer("src/lib/marketing/proveedores-2026-10.ts");
+    expect(src).toMatch(/if \(!MKT_PROVEEDORES_2026_10\) return \{\};/);
   });
 
   it("🔴 NUNCA DOS MARCAS: `exigirUnaMarca` sigue en pie, con o sin interruptor", () => {
@@ -114,7 +132,7 @@ describe("el interruptor", () => {
   });
 
   it("🩸 el `porcentaje` de `mk_factura_marcas` NO se reusa (58 filas dicen 50 = 100 %)", () => {
-    const esquema = leer("supabase/migrations/20261231120000_mkt_proveedores.sql");
+    const esquema = leer("supabase/migrations/20270101120000_mkt_proveedores.sql");
     expect(esquema).toContain("pct_a_la_marca");
     expect(esquema).not.toMatch(/UPDATE\s+mk_factura_marcas/i);
     expect(esquema).not.toMatch(/ALTER TABLE mk_factura_marcas/i);
@@ -133,14 +151,14 @@ describe("el interruptor", () => {
   });
 
   it("las dos migraciones existen y NO se aplicaron", () => {
-    const esquema = leer("supabase/migrations/20261231120000_mkt_proveedores.sql");
+    const esquema = leer("supabase/migrations/20270101120000_mkt_proveedores.sql");
     expect(esquema).toContain("SIN APLICAR");
     expect(esquema).toContain("mk_proveedor_alias");
     // Aditiva: ni un DROP, ni un TRUNCATE, ni un DELETE.
     expect(esquema).not.toMatch(/\bDROP\s+(TABLE|COLUMN)\b/i);
     expect(esquema).not.toMatch(/\bTRUNCATE\b/i);
     const ciento45 = leer(
-      "supabase/migrations/20261231130000_factura_145_sin_marca.sql",
+      "supabase/migrations/20270101130000_factura_145_sin_marca.sql",
     );
     expect(ciento45).toContain("ESPERA EL \"SI\" DE DANIEL");
     // 🔴 El candado que impide moverla si ya se le reportó a la marca.

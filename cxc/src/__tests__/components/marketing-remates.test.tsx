@@ -351,7 +351,7 @@ describe("3. el mueble ofrece foto, y cuelga de la TIENDA", () => {
     invalidarDirectorioClientes();
   }
 
-  it("🔴 «Mueble de la bodega» ofrece subir una foto", async () => {
+  it("🔴 «Mueble de la bodega» ofrece adjuntar el comprobante", async () => {
     instalarFetchDeLaPuerta();
     render(
       <ToastProvider>
@@ -359,10 +359,16 @@ describe("3. el mueble ofrece foto, y cuelga de la TIENDA", () => {
       </ToastProvider>,
     );
     fireEvent.click(document.querySelector('[data-tipo="mueble"]') as HTMLElement);
+    // 🔴 NOMBRES DE ERP (7-oct-2026, `MKT_PROVEEDORES_2026_10`): el campo dice
+    // «Comprobante» y el botón «Adjuntar comprobante», no «Foto del mueble» ni
+    // «Subir foto». Lo que se prueba no cambió: el mueble sigue ofreciendo
+    // adjuntar el respaldo por la puerta.
     await waitFor(() => {
-      expect(screen.getByText("Foto del mueble")).toBeTruthy();
+      expect(screen.getByText("Comprobante")).toBeTruthy();
     });
-    expect(screen.getByTestId("subir-archivo-de-la-puerta").textContent).toContain("Subir foto");
+    expect(screen.getByTestId("subir-archivo-de-la-puerta").textContent).toContain(
+      "Adjuntar comprobante",
+    );
   });
 
   it("🔴 la foto del mueble se sube por la puerta de la TIENDA, con «General» de respaldo", () => {

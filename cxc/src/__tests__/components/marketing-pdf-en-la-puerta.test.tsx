@@ -190,7 +190,7 @@ describe("🔴 el campo de la puerta acepta la factura en PDF", () => {
     fireEvent.click(document.querySelector('[data-camino="factura"]')!);
     expect(campoArchivo().accept).toBe("image/*,application/pdf");
     expect(screen.getByText("Comprobante")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Subir foto o factura" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Adjuntar comprobante" })).toBeTruthy();
   });
 
   it("un PDF de más de 10 MB no entra, y se dice por qué", async () => {
@@ -199,7 +199,7 @@ describe("🔴 el campo de la puerta acepta la factura en PDF", () => {
     soltar(unPdf(11 * 1024 * 1024));
     await waitFor(() => expect(screen.getByText(/pesa más de 10 MB/)).toBeTruthy());
     // Y no quedó nada puesto.
-    expect(screen.getByRole("button", { name: "Subir foto o factura" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Adjuntar comprobante" })).toBeTruthy();
   });
 
   it("🔴 es UNO U OTRO: elegir la factura reemplaza la foto, no la suma", async () => {

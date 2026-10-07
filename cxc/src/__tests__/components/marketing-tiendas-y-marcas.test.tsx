@@ -268,7 +268,11 @@ describe("1 · la portada abre en Tiendas, con N filas que enlazan a su ficha", 
   it("abre en Tiendas, con las 16 tiendas + General, cada una con su enlace, y sin «Reportes»", async () => {
     render(<ToastProvider><MarketingPage /></ToastProvider>);
     const pestanas = await screen.findAllByRole("tab");
-    expect(pestanas.map((t) => t.textContent)).toEqual(["Tiendas", "Marcas", "Impulsadoras", "Mobiliario"]);
+    // 🔴 La quinta, «Proveedores», entró el 7-oct-2026 con
+    // `MKT_PROVEEDORES_2026_10`. Las cuatro de antes no se movieron de orden.
+    expect(pestanas.map((t) => t.textContent)).toEqual([
+      "Tiendas", "Marcas", "Impulsadoras", "Mobiliario", "Proveedores",
+    ]);
     expect(pestanas[0].getAttribute("aria-selected")).toBe("true");
     await waitFor(() => expect(screen.getByText("City Mall David")).toBeTruthy());
     const hrefs = hrefsDeTienda();

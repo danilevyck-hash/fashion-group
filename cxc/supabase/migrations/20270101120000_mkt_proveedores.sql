@@ -4,7 +4,7 @@
 --
 -- 🔴 ESCRITA Y **SIN APLICAR**. Se corrio con `-- --dry-run` y nada mas.
 --    Se aplica con el "si" de Daniel:
---      npm run migrar supabase/migrations/20261231120000_mkt_proveedores.sql
+--      npm run migrar supabase/migrations/20270101120000_mkt_proveedores.sql
 --
 -- 🔴 TODO ES ADITIVO. No se dropea, no se renombra y no se toca una fila
 --    existente: ninguna columna nueva es NOT NULL y ninguna tiene DEFAULT que
@@ -138,6 +138,6 @@ COMMIT;
 -- · NO toca `mk_inventario_productos` ni `mk_mobiliario_notas_proveedor`.
 --   Mobiliario no se conecta con las facturas: Daniel escribe la cantidad.
 -- · NO arregla la factura #145. Eso va aparte, en
---   `20261231130000_factura_145_sin_marca.sql`, y espera el
+--   `20270101130000_factura_145_sin_marca.sql`, y espera el
 --   "si" de Daniel.
 -- ============================================================================

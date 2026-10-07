@@ -8,7 +8,7 @@
 // totales los hace el módulo PURO (`lib/marketing/proveedores-2026-10.ts`); acá
 // solo se leen las filas y se les pone el nombre de la marca y de la tienda.
 //
-// 🔴 Falla ABIERTA sin la migración `20261231120000_mkt_proveedores.sql`: se
+// 🔴 Falla ABIERTA sin la migración `20270101120000_mkt_proveedores.sql`: se
 // relee sin `destino_sin_marca` y toda factura sin marca sale como «Costo
 // propio», que es lo que hay hoy (`columnas-opcionales.ts`).
 //

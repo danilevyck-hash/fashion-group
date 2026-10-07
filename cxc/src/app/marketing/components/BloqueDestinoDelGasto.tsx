@@ -28,6 +28,7 @@
 
 import { useMemo } from "react";
 import { Aviso } from "@/components/ui/Aviso";
+import { ENLACE } from "@/lib/marketing/marketing-2026-10";
 import {
   CUANTO_POR_OMISION,
   CUANTO_SE_COBRA,
@@ -66,6 +67,13 @@ interface Props {
   marcas: MkMarca[];
   /** La marca que vino puesta de la página desde la que se abrió la puerta. */
   marcaFija?: MkMarca | null;
+  /**
+   * 🔴 «Cambiar» sobre la marca fija (6-oct-2026, mismo trato que el renglón
+   * de marca de siempre): sin esto, quien abre la puerta desde la página de
+   * una marca no podría escoger «A cargo de la empresa» ni otra marca.
+   * `undefined` = no se ofrece el enlace (la marca queda fija de verdad).
+   */
+  onCambiarMarcaFija?: () => void;
   /** Lo que se escribió de proveedor, para el aviso de doble cobro. */
   proveedor?: string;
 }
@@ -77,6 +85,7 @@ export default function BloqueDestinoDelGasto({
   onMarcaId,
   marcas,
   marcaFija = null,
+  onCambiarMarcaFija,
   proveedor = "",
 }: Props) {
   // El valor del único desplegable: la marca, o el centinela de la empresa.
@@ -95,8 +104,17 @@ export default function BloqueDestinoDelGasto({
           {ROTULO_SE_COBRA_A}
         </label>
         {marcaFija && !valor.aCargoDeLaEmpresa ? (
-          <div className="flex min-h-[44px] items-center rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+          <div className="flex min-h-[44px] items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
             <span className="truncate text-sm font-medium text-gray-900">{marcaFija.nombre}</span>
+            {onCambiarMarcaFija && (
+              <button
+                type="button"
+                onClick={onCambiarMarcaFija}
+                className={`shrink-0 text-sm transition min-h-[44px] -my-2 inline-flex items-center ${ENLACE}`}
+              >
+                Cambiar
+              </button>
+            )}
           </div>
         ) : (
           <select

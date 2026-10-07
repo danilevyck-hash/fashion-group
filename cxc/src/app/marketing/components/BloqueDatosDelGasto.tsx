@@ -126,6 +126,7 @@ export default function BloqueDatosDelGasto({
           onMarcaId={(id) => cambiar({ marcaId: id })}
           marcas={marcas}
           marcaFija={marcaInicial && !cambiandoMarca ? marcaInicial : null}
+          onCambiarMarcaFija={marcaInicial ? () => setCambiandoMarca(true) : undefined}
           proveedor={destino.proveedor ?? ""}
         />
       )}

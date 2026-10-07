@@ -41,7 +41,7 @@ export const COLUMNAS_DEL_PERIODO = {
 
 /**
  * 🔴 La columna de PROVEEDORES (6-oct-2026, migración
- * `20261231120000_mkt_proveedores.sql`, escrita y SIN aplicar). Mientras no
+ * `20270101120000_mkt_proveedores.sql`, escrita y SIN aplicar). Mientras no
  * exista, el módulo se porta como el 5-oct-2026: una factura sin marca no se
  * puede guardar y a ninguna se le cobra la mitad — o sea, la función nueva no
  * aparece, pero NADA se rompe.

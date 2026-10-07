@@ -21,6 +21,8 @@
 // constante en `true` — un solo lugar, sin migración ni datos que arreglar.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ROTULO_ADJUNTAR_COMPROBANTE } from "./proveedores-2026-10";
+
 /**
  * 🔴 EL INTERRUPTOR — un solo lugar. Nació APAGADO (10-sep-2026) y Daniel lo
  * PRENDIÓ el mismo día: *«prende marketing»*. En `false`, «Registrar gasto»
@@ -64,9 +66,18 @@ export function rotuloDeLaPuerta(encendido: boolean = MARKETING_PDF_EN_LA_PUERTA
   return encendido ? "Comprobante" : "Foto";
 }
 
-/** El rótulo del botón que abre el selector de archivos. */
+/**
+ * El rótulo del botón que abre el selector de archivos.
+ *
+ * 🔴 NOMBRE DE ERP (7-oct-2026): «Adjuntar comprobante», no «Subir foto o
+ * factura». Sale de `ROTULO_ADJUNTAR_COMPROBANTE` —el mismo que usa el
+ * formulario del gasto— para que el nombre viva en UN solo lugar. Lo cazó el
+ * candado `nombres-erp-prohibidos` al entrar la fila «Subir foto o factura →
+ * Adjuntar comprobante» en `docs/nombres-erp.md`: este botón se había quedado
+ * con el nombre viejo.
+ */
 export function rotuloBotonDeLaPuerta(encendido: boolean = MARKETING_PDF_EN_LA_PUERTA): string {
-  return encendido ? "Subir foto o factura" : "Subir foto";
+  return encendido ? ROTULO_ADJUNTAR_COMPROBANTE : "Subir foto";
 }
 
 /** Lo mínimo de un archivo que este módulo necesita mirar (así se prueba sin `File`). */

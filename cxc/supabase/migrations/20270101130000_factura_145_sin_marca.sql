@@ -7,9 +7,9 @@
 --    Esto NO es un cambio de esquema: TOCA UNA FILA DE PLATA REAL.
 --    Se corrio con `-- --dry-run` y nada mas.
 --
---    npm run migrar supabase/migrations/20261231130000_factura_145_sin_marca.sql
+--    npm run migrar supabase/migrations/20270101130000_factura_145_sin_marca.sql
 --
--- ⚠️ DEPENDE de `20261231120000_mkt_proveedores.sql`, que tampoco esta
+-- ⚠️ DEPENDE de `20270101120000_mkt_proveedores.sql`, que tampoco esta
 --    aplicada. Primero esa, despues esta.
 --
 -- ----------------------------------------------------------------------------

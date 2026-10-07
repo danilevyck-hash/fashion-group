@@ -268,7 +268,18 @@ function abrir(
 
 const tipo = (k: string) => document.querySelector(`[data-tipo="${k}"]`) as HTMLElement;
 const continuar = () => screen.getByRole("button", { name: "Continuar" }) as HTMLButtonElement;
-const selectMarca = () => document.querySelector('select[name="marca"]') as HTMLSelectElement;
+/**
+ * El desplegable donde se elige la marca.
+ *
+ * 🔴 Con `MKT_PROVEEDORES_2026_10` prendido (7-oct-2026) el campo pasó a
+ * llamarse «Se cobra a» (`name="seCobraA"`) y su última opción es «A cargo de
+ * la empresa». En IMPULSADORA el destino no se usa, así que ahí sigue siendo el
+ * `name="marca"` de siempre: por eso el selector acepta los dos.
+ */
+const selectMarca = () =>
+  document.querySelector('select[name="seCobraA"], select[name="marca"]') as HTMLSelectElement;
+/** «Se cobra»: Completo o Mitad. Solo existe con una marca elegida. */
+const selectCuanto = () => document.querySelector('select[name="cuanto"]') as HTMLSelectElement | null;
 const casillaReporta = () => document.querySelector('input[name="se-reporta"]') as HTMLInputElement;
 const falta = () => screen.queryByTestId("falta-para-continuar")?.textContent ?? "";
 
@@ -612,7 +623,7 @@ describe("6 · 🔴 las tres columnas viajan en el MISMO guardado, y solo si la 
   it("Impulsadora: la marca es la de ella, y su modal recibe lo del paso 2", async () => {
     abrir();
     fireEvent.click(tipo("impulsadora"));
-    expect(falta()).toBe("Falta: a quién le pagas");
+    expect(falta()).toBe("Falta: el beneficiario");
     await waitFor(() => expect(document.querySelector('[data-impulsadora="i1"]')).not.toBeNull());
     fireEvent.click(document.querySelector('[data-impulsadora="i1"]')!);
     expect(screen.getByTestId("marca-de-impulsadora").textContent).toContain("Tommy Hilfiger");
@@ -763,7 +774,7 @@ describe("8 · 🔴 MARKETING_APPLE_2026_10: cambia la PANTALLA, no lo que se en
     // La MISMA regla de qué falta, y no se avanza.
     expect(falta()).toBe("Falta: la marca y la tienda");
     expect(screen.queryByRole("button", { name: /Guardar factura/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "No se reporta a la marca…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reporte a la marca" }));
     expect(casillaReporta().checked).toBe(true); // nace PRENDIDA, igual que hoy
     fireEvent.click(screen.getByRole("button", { name: "+ Agregar observaciones" }));
     expect(document.querySelector('input[name="nota"]')).not.toBeNull();
@@ -778,7 +789,7 @@ describe("8 · 🔴 MARKETING_APPLE_2026_10: cambia la PANTALLA, no lo que se en
     fireEvent.click(tipo("factura"));
     fireEvent.change(selectMarca(), { target: { value: "m-ck" } });
     await elegirTienda("City Mall David");
-    fireEvent.click(screen.getByRole("button", { name: "No se reporta a la marca…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reporte a la marca" }));
     fireEvent.click(casillaReporta());
     fireEvent.click(screen.getByRole("button", { name: "+ Agregar observaciones" }));
     fireEvent.change(document.querySelector('input[name="nota"]')!, { target: { value: "Apertura" } });

@@ -52,16 +52,31 @@ function round2(n: number): number {
  * proveedor sigue siendo texto libre, la marca sigue siendo obligatoria, una
  * factura sigue llevando UNA marca al 100 % y Mobiliario sigue sin margen.
  *
- * Apagado hasta el «sí» de Daniel sobre las capturas.
+ * ✅ PRENDIDO el 7-oct-2026 con el «sí» de Daniel sobre el mockup aprobado.
+ * Se aplicó antes la migración `20270101120000_mkt_proveedores.sql`, que es la
+ * que trae `mk_facturas.pct_a_la_marca` y `mk_proveedor_alias`; sin ella el
+ * módulo falla ABIERTO (`columnas-opcionales.ts`) y no se rompe, pero los dos
+ * campos no tendrían dónde guardar.
  *
- * ⚠️ AL PRENDERLO HAY QUE ACTUALIZAR UN CANDADO, EN EL MISMO COMMIT:
- * `src/__tests__/components/marketing-puerta-gasto.test.tsx` fija la pantalla
- * de HOY (el campo «Marca», «De una tienda», «Falta: qué tipo de gasto es…»).
- * Medido el 6-oct-2026: con el interruptor en `true` caen **16 de sus
- * pruebas**, y ninguna otra en todo el repo. Que caigan es la prueba de que el
- * interruptor aísla; lo que no puede pasar es prenderlo y dejarlas rojas.
+ * 🔑 LAS 108 FACTURAS DE ANTES NO SE TOCARON: las 108 quedaron con
+ * `pct_a_la_marca = NULL`, que se lee EXACTAMENTE como hasta ayer —entera para
+ * su marca—. El `NULL` no es un 0: `Number(null)` es 0, no NaN, así que el
+ * corte es explícito (ver `cuantoSeLeCobra`). Sin ese corte una factura vieja
+ * se habría reportado en $0.00 a su marca.
+ *
+ * 🩸 Y por eso NO se reusó `mk_factura_marcas.porcentaje`: medido de nuevo el
+ * 7-oct-2026, después de migrar, esa tabla sigue con sus 108 filas y 58 de
+ * ellas dicen 50 queriendo decir el 100 %. La columna vieja no se tocó ni se
+ * lee para esto.
+ *
+ * ⚠️ AL PRENDERLO HUBO QUE ACTUALIZAR UN CANDADO, EN EL MISMO COMMIT:
+ * `src/__tests__/components/marketing-puerta-gasto.test.tsx` fijaba la
+ * pantalla de HOY (el campo «Marca», «De una tienda», «Falta: qué tipo de
+ * gasto es…»). Medido el 6-oct-2026: con el interruptor en `true` caían 16 de
+ * sus pruebas, y ninguna otra en todo el repo. Ya están actualizadas a la
+ * pantalla nueva; que cayeran fue la prueba de que el interruptor aislaba.
  */
-export const MKT_PROVEEDORES_2026_10 = false;
+export const MKT_PROVEEDORES_2026_10 = true;
 
 // ─── EL AMARRE: quién es quién ───────────────────────────────────────────────
 
