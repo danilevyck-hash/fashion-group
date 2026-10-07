@@ -37,9 +37,11 @@ import {
   ESTADOS_FLUJO_SIMPLE,
   ROTULO_ESTADO_FLUJO_SIMPLE,
   estadoFlujoSimpleLeido,
-  siguienteEstadoFlujoSimple,
   validarCantidadBultos,
   ultimaFirmaFlujoSimple,
+  diasEnPreparado,
+  preparadoViejo,
+  lineaPreparadoHaceDias,
   type EstadoFlujoSimple,
   type FirmasFlujoSimple,
 } from "@/lib/guias/pedidos-flujo-simple";
@@ -79,11 +81,11 @@ const CHIPS: { value: Filtro; label: string }[] = SIMPLE
 const clave = (p: Pick<PedidoBodega, "empresa_key" | "pedido_switch_id">) => `${p.empresa_key}:${p.pedido_switch_id}`;
 
 /** Lo que el detalle con bultos necesita de la fila. */
-/** El rótulo del estado, con los tres juegos: los 2 de hoy, los 3 con bultos y los 4 del flujo simple. */
+/** El rótulo del estado, con los tres juegos: los 2 de hoy, los 3 con bultos y los 3 del flujo simple. */
 const rotuloDe = (e: PedidoBodega["estado"]): string =>
   e === "pendiente" || e === "preparado"
     ? ROTULO_ESTADO[e]
-    : e === "facturado" || e === "despachado"
+    : e === "recibido"
     ? ROTULO_ESTADO_FLUJO_SIMPLE[e]
     : ROTULO_ESTADO_BULTOS[e];
 
@@ -279,11 +281,8 @@ export default function PedidosView({
 
   function textoDeConfirmarSimple(p: PedidoBodega, destino: EstadoFlujoSimple) {
     const titulo = `Pedido ${p.secuencial} · ${p.cliente_nombre}`;
-    if (destino === "facturado") {
-      return { titulo, mensaje: "Queda facturado: la secretaria ya lo facturó en Switch.", boton: "Marcar facturado" };
-    }
-    if (destino === "despachado") {
-      return { titulo, mensaje: "Queda despachado y se cierra: salió con sus etiquetas.", boton: "Marcar despachado" };
+    if (destino === "recibido") {
+      return { titulo, mensaje: "Queda recibido: confirmas que ya tienes el pedido en mano. Se cierra en Pedidos.", boton: "Marcar recibido" };
     }
     return { titulo, mensaje: `Vuelve a ${ROTULO_ESTADO_FLUJO_SIMPLE[destino]}.`, boton: `Volver a ${ROTULO_ESTADO_FLUJO_SIMPLE[destino]}` };
   }
@@ -291,10 +290,8 @@ export default function PedidosView({
   const firmasSimpleDe = (p: PedidoBodega): FirmasFlujoSimple => ({
     preparado_por: p.preparado_por ?? null,
     preparado_en: p.preparado_en ?? null,
-    facturado_por: p.facturado_por ?? null,
-    facturado_en: p.facturado_en ?? null,
-    despachado_por: p.despachado_por ?? null,
-    despachado_en: p.despachado_en ?? null,
+    recibido_por: p.recibido_por ?? null,
+    recibido_en: p.recibido_en ?? null,
   });
 
   const hoy = hoyPanama();
@@ -497,13 +494,12 @@ export default function PedidosView({
 
   // ── El control de la fila, flujo simplificado ───────────────────────────
   // UN control por fila, que dice lo que hace (docs/diseno.md, regla 6):
-  //   · Pendiente  → la casilla del número de bultos + «Marcar preparado»,
-  //     apagado hasta que el número sea válido (bodega o la secretaria).
-  //   · Preparado  → los bultos que anotó bodega, quietos, + «Marcar
-  //     facturado» (solo la secretaria o admin; bodega solo lee el chip).
-  //   · Facturado  → + «Marcar despachado» y, al lado, «Volver a Preparado»
-  //     por si se marcó por error.
-  //   · Despachado → el pedido ya se cerró: un chip quieto y nada más.
+  //   · Pendiente → la casilla del número de bultos + «Preparado», apagado
+  //     hasta que el número sea válido (bodega o la secretaria).
+  //   · Preparado → los bultos que anotó bodega, quietos, + «Recibir» (solo
+  //     la secretaria o admin; bodega solo lee el chip). Termina AQUÍ:
+  //     facturar en Switch y Etiquetas quedan afuera de Pedidos.
+  //   · Recibido → el pedido ya se cerró: un chip quieto y nada más.
   const controlSimple = (p: PedidoBodega) => {
     const e = estadoFlujoSimpleLeido(p.estado);
     const base = "inline-flex h-7 items-center whitespace-nowrap rounded-full border px-2.5 text-xs font-medium";
@@ -551,46 +547,36 @@ export default function PedidosView({
           {chipBultos}
           <button
             type="button"
-            onClick={() => setPorConfirmarSimple({ pedido: p, destino: "facturado" })}
+            onClick={() => setPorConfirmarSimple({ pedido: p, destino: "recibido" })}
             className="h-7 whitespace-nowrap rounded-full border border-gray-900 bg-gray-900 px-2.5 text-xs font-medium text-white transition active:scale-[0.97]"
           >
-            Facturar
+            Recibir
           </button>
         </div>
       );
     }
-    if (e === "facturado") {
-      if (!puedeRecibir) return chipBultos;
-      return (
-        <div className={fila}>
-          {chipBultos}
-          <span className="inline-flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setPorConfirmarSimple({ pedido: p, destino: "preparado" })}
-              title="Volver a Preparado"
-              className="relative inline-flex h-7 items-center rounded-full px-1 text-xs font-medium text-blue-600 transition hover:text-blue-800 active:scale-[0.97] before:absolute before:-inset-x-1 before:-inset-y-2 before:content-['']"
-            >
-              <Undo2 size={13} strokeWidth={1.8} aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={() => setPorConfirmarSimple({ pedido: p, destino: "despachado" })}
-              className="h-7 whitespace-nowrap rounded-full border border-gray-900 bg-gray-900 px-2.5 text-xs font-medium text-white transition active:scale-[0.97]"
-            >
-              Despachar
-            </button>
-          </span>
-        </div>
-      );
-    }
-    // despachado: cerrado.
+    // recibido: cerrado.
     return (
       <span className={`${base} border-emerald-200 bg-emerald-50 text-emerald-700`}>
         <Check size={13} strokeWidth={3} aria-hidden className="mr-1" />
-        {ROTULO_ESTADO_FLUJO_SIMPLE.despachado}
+        {ROTULO_ESTADO_FLUJO_SIMPLE.recibido}
       </span>
     );
+  };
+
+  /**
+   * 🔴 UN «PREPARADO» QUE NADIE RECIBE TIENE QUE VERSE (Daniel): en la lista
+   * de la secretaria, la línea de antigüedad se vuelve ámbar y dice cuánto
+   * lleva, a los `PREPARADO_VIEJO_DIAS` (2) de marcado. Mismo tono de aviso
+   * que el resto del sistema (`docs/diseno.md`: ámbar = aviso).
+   */
+  const avisoPreparadoViejo = (p: PedidoBodega) => {
+    if (estadoFlujoSimpleLeido(p.estado) !== "preparado" || !p.preparado_en) return null;
+    // El instante EXACTO de ahora, no la fecha-sin-hora de `hoy`: dos
+    // pedidos preparados el mismo día pueden llevar horas muy distintas.
+    const dias = diasEnPreparado(p.preparado_en, new Date().toISOString());
+    if (!preparadoViejo(dias)) return null;
+    return <span className="block text-xs font-medium text-amber-700">{lineaPreparadoHaceDias(dias)}</span>;
   };
 
   const tablaSimple = (
@@ -644,7 +630,10 @@ export default function PedidosView({
                 >
                   {ultimaFirmaFlujoSimple(firmasSimpleDe(p)) ?? <span className="text-gray-300">—</span>}
                 </td>
-                <td className="py-1.5 pl-0.5 pr-3 text-right sm:px-3">{controlSimple(p)}</td>
+                <td className="py-1.5 pl-0.5 pr-3 text-right sm:px-3">
+                  {controlSimple(p)}
+                  {avisoPreparadoViejo(p)}
+                </td>
               </tr>
             ))}
           </tbody>

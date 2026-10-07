@@ -1,6 +1,7 @@
 // Capturas HOY vs RECOMENDACIÓN — Despachos › Pedidos, flujo SIMPLIFICADO
-// (7-oct-2026). SOLO LECTURA: bloquea todo método que no sea GET/HEAD antes
-// de navegar — nada se guarda nunca, en NINGÚN modo.
+// (7-oct-2026, tres estados: Pendiente → Preparado → Recibido). SOLO
+// LECTURA: bloquea todo método que no sea GET/HEAD antes de navegar — nada
+// se guarda nunca, en NINGÚN modo.
 //
 //   MODO=hoy|propuesta BASE=http://127.0.0.1:3491 OUT=/tmp/caps-flujo-simple \
 //     node -r dotenv/config scripts/_capturas-pedidos-flujo-simple.mjs
@@ -36,7 +37,7 @@ const cookie = (rol, persona, sesion) => firmar({
 const CHROME = "/Users/daniellevy/Library/Caches/ms-playwright/chromium-1217/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing";
 const br = await chromium.launch({ executablePath: CHROME });
 
-async function nuevaPagina(rol, persona, sesion, viewport) {
+async function nuevaPagina(rol, persona, sesion, viewport, { simularPreparadoViejo = false } = {}) {
   const ctx = await br.newContext({ viewport, deviceScaleFactor: 2 });
   await ctx.addCookies([{ name: "cxc_session", value: cookie(rol, persona, sesion), domain: "127.0.0.1", path: "/" }]);
   const modules = perms.find((p) => p.role === rol).modulos;
@@ -50,10 +51,33 @@ async function nuevaPagina(rol, persona, sesion, viewport) {
     [rol, persona.id, persona.name, modules],
   );
   const pg = await ctx.newPage();
-  await pg.route("**/*", (r) => {
-    const m = r.request().method();
+  await pg.route("**/*", async (r) => {
+    const req = r.request();
+    const m = req.method();
     if (m !== "GET" && m !== "HEAD") return r.abort();
-    r.continue();
+    // 🔑 DEMO DE SOLO VISTA, declarada: los pedidos REALES que estaban
+    // «Preparado» esta mañana ya se facturaron en Switch y el sync los
+    // purgó de `switch_pedidos` (se verificó contra la base: cero siguen
+    // vivos). Para mostrar el aviso de «Preparado viejo» sin esperar a que
+    // haya otro real, se toma UN pendiente real y se le simulan bultos +
+    // fecha de preparado en la respuesta YA RECIBIDA del servidor — nada se
+    // escribe, es puro maquillaje del lado del cliente para esta captura
+    // (se avisa igual en el mockup).
+    if (simularPreparadoViejo && req.url().includes("/api/guias/pedidos") && m === "GET") {
+      const resp = await r.fetch();
+      const json = await resp.json().catch(() => null);
+      if (json?.pedidos) {
+        const p = json.pedidos.find((x) => x.estado === "pendiente");
+        if (p) {
+          p.estado = "preparado";
+          p.bultos = 6;
+          p.preparado_por = "Julio";
+          p.preparado_en = new Date(Date.now() - 3 * 86_400_000).toISOString();
+        }
+      }
+      return r.fulfill({ response: resp, json });
+    }
+    return r.continue();
   });
   return { ctx, pg };
 }
@@ -75,6 +99,10 @@ async function shot(pg, nombre) {
 const DESKTOP = { width: 1440, height: 900 };
 const CEL = { width: 390, height: 844 };
 
+// Pedido con líneas REALES (102, medido antes) para que la pantalla no
+// salga vacía: fashion_wear #2816, dentro de las empresas de Julio.
+const PEDIDO_CON_LINEAS = "16-000002816";
+
 // ── 1 · bodega: la lista y sus chips (computadora) ──────────────────────────
 {
   const { ctx, pg } = await nuevaPagina("bodega", personaBodega, sesBodega, DESKTOP);
@@ -83,16 +111,11 @@ const CEL = { width: 390, height: 844 };
   await ctx.close();
 }
 
-// Pedido con líneas REALES (102, medido antes) para que la pantalla no
-// salga vacía: fashion_wear #2816, dentro de las empresas de Julio.
-const PEDIDO_CON_LINEAS = "16-000002816";
-
 // ── 2 · bodega: anotar los bultos y entregar (celular) ──────────────────────
 {
   const { ctx, pg } = await nuevaPagina("bodega", personaBodega, sesBodega, CEL);
   await abrirPedidos(pg);
   if (MODO === "propuesta") {
-    // La casilla de bultos, EN LA FILA del pedido (nunca por artículo).
     const fila = pg.locator(`text=${PEDIDO_CON_LINEAS}`).first();
     await fila.scrollIntoViewIfNeeded().catch(() => {});
     const input = pg.locator('input[aria-label^="Bultos del pedido"]').first();
@@ -100,7 +123,6 @@ const PEDIDO_CON_LINEAS = "16-000002816";
     await pg.waitForTimeout(300);
     await shot(pg, "2a-bodega-bultos-en-la-fila");
   } else {
-    // Hoy: tocar el cliente abre el detalle con la casilla POR ARTÍCULO.
     const fila = pg.locator(`text=${PEDIDO_CON_LINEAS}`).first();
     if (await fila.count()) {
       await fila.click().catch(() => {});
@@ -111,20 +133,11 @@ const PEDIDO_CON_LINEAS = "16-000002816";
   await ctx.close();
 }
 
-// ── 3 · secretaria: Preparados, para facturar en Switch ─────────────────────
+// ── 3 · secretaria: Preparados, con el aviso de «Preparado viejo» ──────────
 {
-  const { ctx, pg } = await nuevaPagina("secretaria", personaAdmin, sesAdmin, DESKTOP);
-  await abrirPedidos(pg, MODO === "propuesta" ? "Preparados" : "Preparados");
-  if (MODO === "propuesta") {
-    const facturar = pg.locator('button:has-text("Facturar")').first();
-    if (await facturar.count()) {
-      await facturar.click().catch(() => {});
-      await pg.waitForTimeout(500);
-    }
-    await shot(pg, "3a-secretaria-facturar-pc");
-  } else {
-    await shot(pg, "3a-secretaria-verificar-pc");
-  }
+  const { ctx, pg } = await nuevaPagina("secretaria", personaAdmin, sesAdmin, DESKTOP, { simularPreparadoViejo: MODO === "propuesta" });
+  await abrirPedidos(pg, "Preparados");
+  await shot(pg, MODO === "propuesta" ? "3a-secretaria-recibir-pc" : "3a-secretaria-verificar-pc");
   await ctx.close();
 }
 

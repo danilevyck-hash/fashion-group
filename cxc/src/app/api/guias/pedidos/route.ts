@@ -70,17 +70,15 @@ interface EstadoDeBodega {
   preparado_en?: string | null;
   verificado_por?: string | null;
   verificado_en?: string | null;
-  /** 🔴 Flujo simplificado: el número de bultos y las dos firmas que faltaban. */
+  /** 🔴 Flujo simplificado: el número de bultos y la firma de Recibido. */
   bultos?: number | null;
-  facturado_por?: string | null;
-  facturado_en?: string | null;
-  despachado_por?: string | null;
-  despachado_en?: string | null;
+  recibido_por?: string | null;
+  recibido_en?: string | null;
 }
 
 const COLUMNAS_BASE = "empresa_key, pedido_switch_id, estado, cambiado_por, cambiado_en, envio_id";
 const COLUMNAS_CON_FIRMAS = `${COLUMNAS_BASE}, preparado_por, preparado_en, verificado_por, verificado_en`;
-const COLUMNAS_FLUJO_SIMPLE = `${COLUMNAS_BASE}, preparado_por, preparado_en, bultos, facturado_por, facturado_en, despachado_por, despachado_en`;
+const COLUMNAS_FLUJO_SIMPLE = `${COLUMNAS_BASE}, preparado_por, preparado_en, bultos, recibido_por, recibido_en`;
 
 /**
  * 🔴 FALLA ABIERTA SOBRE LAS COLUMNAS NUEVAS. 🩸 Pedirlas a secas devolvía un
@@ -191,9 +189,9 @@ export async function GET(req: NextRequest) {
       cliente_codigo: p.cliente_codigo,
       cliente_nombre: p.cliente_nombre,
       vendedor_nombre: p.vendedor_nombre ? aplicarAlias(p.vendedor_nombre, alias) : null,
-      // Flujo simplificado: CUATRO estados. Con bultos (lo de hoy) son TRES y
-      // «preparado» se LEE como «terminado». Los dos fallan abierto mientras
-      // su migración no corra.
+      // Flujo simplificado: TRES estados (termina en Recibido). Con bultos
+      // (lo de hoy) también son tres, con otro significado. Los dos fallan
+      // abierto mientras su migración no corra.
       estado: PEDIDOS_FLUJO_SIMPLE_2026_10
         ? estadoFlujoSimpleLeido(m?.estado)
         : PEDIDOS_BULTOS_2026_10
@@ -216,10 +214,8 @@ export async function GET(req: NextRequest) {
       preparado_en: m?.preparado_en ?? null,
       verificado_por: m?.verificado_por ?? null,
       verificado_en: m?.verificado_en ?? null,
-      facturado_por: m?.facturado_por ?? null,
-      facturado_en: m?.facturado_en ?? null,
-      despachado_por: m?.despachado_por ?? null,
-      despachado_en: m?.despachado_en ?? null,
+      recibido_por: m?.recibido_por ?? null,
+      recibido_en: m?.recibido_en ?? null,
     };
   });
   return NextResponse.json({
@@ -233,7 +229,8 @@ export async function GET(req: NextRequest) {
  * 🔴 Flujo simplificado (7-oct-2026): PATCH propio, SIN crear envío de
  * Etiquetas (ese enlace no se programó — Daniel, 7-oct-2026: «se usa la
  * factura, no el pedido») y sin la regla de «otra persona»: el porqué, en
- * `pedidos-flujo-simple.ts`.
+ * `pedidos-flujo-simple.ts`. Termina en «Recibido» — facturar en Switch
+ * queda AFUERA de Pedidos (alcance recortado el mismo día).
  */
 async function patchFlujoSimple(
   auth: SessionPayload,
@@ -261,7 +258,7 @@ async function patchFlujoSimple(
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 403 });
 
   // El número de bultos SOLO se pide (y se exige) al preparar DESDE pendiente:
-  // volver a «Preparado» desde «Facturado» conserva el que ya había.
+  // volver a «Preparado» desde «Recibido» conserva el que ya había.
   let bultosNuevos: number | null = null;
   if (estado === "preparado" && desde === "pendiente") {
     const val = validarCantidadBultos(body?.bultos);
@@ -271,15 +268,13 @@ async function patchFlujoSimple(
 
   const ahora = new Date().toISOString();
   // Cada paso firma SU columna; retroceder a «Preparado» borra SOLO la firma
-  // de Facturado (la de Preparado, de bodega, se conserva).
-  const firma: { preparado_por?: string | null; preparado_en?: string | null; facturado_por?: string | null; facturado_en?: string | null; despachado_por?: string | null; despachado_en?: string | null } =
+  // de Recibido (la de Preparado, de bodega, se conserva).
+  const firma: { preparado_por?: string | null; preparado_en?: string | null; recibido_por?: string | null; recibido_en?: string | null } =
     estado === "preparado"
-      ? desde === "facturado"
-        ? { facturado_por: null, facturado_en: null }
+      ? desde === "recibido"
+        ? { recibido_por: null, recibido_en: null }
         : { preparado_por: quienFirma, preparado_en: ahora }
-      : estado === "facturado"
-        ? { facturado_por: quienFirma, facturado_en: ahora }
-        : { despachado_por: quienFirma, despachado_en: ahora };
+      : { recibido_por: quienFirma, recibido_en: ahora };
 
   const fila = {
     empresa_key: empresa,
@@ -300,10 +295,8 @@ async function patchFlujoSimple(
     cambiado_en: fila.cambiado_en,
     preparado_por: firma.preparado_por ?? previo?.preparado_por ?? null,
     preparado_en: firma.preparado_en ?? previo?.preparado_en ?? null,
-    facturado_por: "facturado_por" in firma ? firma.facturado_por : previo?.facturado_por ?? null,
-    facturado_en: "facturado_en" in firma ? firma.facturado_en : previo?.facturado_en ?? null,
-    despachado_por: firma.despachado_por ?? null,
-    despachado_en: firma.despachado_en ?? null,
+    recibido_por: firma.recibido_por ?? null,
+    recibido_en: firma.recibido_en ?? null,
   });
 }
 
