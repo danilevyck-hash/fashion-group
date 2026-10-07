@@ -39,6 +39,7 @@ import { cuadrarConSwitch } from "@/lib/cxc/estado-cuenta-switch";
 import { Aviso } from "@/components/ui/Aviso";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
+import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
 /** El código Switch (D-XXX) es el mismo en todas las empresas del cliente. */
 function codigoDe(client: ConsolidatedClient): string | null {
@@ -92,6 +93,17 @@ interface Props {
   ultimoPagoTexto?: string | null;
   /** A dónde lleva «Ver los documentos ›». `null` = no se dibuja. */
   hrefDocumentos?: string | null;
+  /**
+   * 🔴 GRUPO POR OMISIÓN; UNA SOLA EMPRESA CUANDO HAGA FALTA (7-oct-2026,
+   * propuesta). Es el MISMO filtro de empresa que ya tiene la lista arriba —
+   * no se agrega un selector nuevo: con «Todas» (`"all"` o sin valor) el PDF
+   * que se DESCARGA es el del grupo; filtrada a una empresa, el PDF es solo
+   * de esa empresa. ⚠️ Lo que se ENVÍA por correo o WhatsApp NO mira este
+   * filtro: sigue siendo SIEMPRE las 6 empresas (`empresasDelEnvio()`, en el
+   * servidor) — ésa es la deuda completa, la única cifra que el cliente puede
+   * reconocer. Interruptor `ESTADO_CUENTA_UN_BOTON_2026_10`.
+   */
+  companyFilter?: string;
 }
 
 export default function HojaCobrar({
@@ -105,6 +117,7 @@ export default function HojaCobrar({
   totalDeLaFila = null,
   ultimoPagoTexto = null,
   hrefDocumentos = null,
+  companyFilter,
 }: Props) {
   const abierto = !!client;
   const codigo = client ? codigoDe(client) : null;
@@ -163,12 +176,28 @@ export default function HojaCobrar({
   // el DEDO (`lib/aparato.ts`), la misma regla que ya usa «Compartir» de
   // Guías, y el PDF se entrega con la misma puerta única (`compartirArchivo`).
   async function entregarPdf() {
-    if (!datos) return;
+    if (!datos || !codigo) return;
     setOcupado(true);
     setError(null);
     try {
+      // 🔴 DESCARGAR RESPETA EL FILTRO DE EMPRESA; ENVIAR NO (7-oct-2026,
+      // propuesta). Con la lista mirando una sola empresa, el PAPEL que se
+      // baja es de esa empresa sola — se pide por la MISMA puerta que ya mira
+      // el cajón de documentos (`/api/cxc/estado-cuenta/[codigo]`). Sin
+      // filtro (o «Todas»), sigue siendo el `datos` del grupo que ya se
+      // preparó para enviar. Interruptor `ESTADO_CUENTA_UN_BOTON_2026_10`:
+      // apagado, siempre se descarga `datos` tal cual, como hoy.
+      let datosPdf = datos;
+      let unaEmpresaElegida = false;
+      if (ESTADO_CUENTA_UN_BOTON_2026_10 && companyFilter && companyFilter !== "all") {
+        const r = await fetch(
+          `/api/cxc/estado-cuenta/${encodeURIComponent(codigo)}?empresa=${encodeURIComponent(companyFilter)}`,
+          { cache: "no-store" },
+        );
+        if (r.ok) { datosPdf = await r.json(); unaEmpresaElegida = true; }
+      }
       const { buildEstadoCuentaPDF } = await import("@/lib/pdf-estado-cuenta");
-      const { doc, filename } = buildEstadoCuentaPDF(datos, nombre);
+      const { doc, filename } = buildEstadoCuentaPDF(datosPdf, nombre, { unaEmpresaElegida });
       const blob = doc.output("blob");
       const file = new File([blob], filename, { type: "application/pdf" });
       if (aparatoDeQuienMira() === "celular") {
