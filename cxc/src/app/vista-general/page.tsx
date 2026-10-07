@@ -205,7 +205,6 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       <KpiCard
         href="/ventas"
         label="Ventas"
-        hoverLabel="Ir a Ventas"
         value={ventas ? moneyK(ventas.total) : "—"}
         tags={ventas?.parcial ? ["mes en curso"] : []}
         sub={
@@ -227,7 +226,6 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       <KpiCard
         href="/ventas"
         label="Margen bruto"
-        hoverLabel="Ir a Ventas"
         value={margen ? pct(margen.pct) : "—"}
         sub={margen ? <span className="text-gray-400">{moneyK(margen.utilidad)} utilidad bruta</span> : <span className="text-gray-400">Sin datos</span>}
       />
@@ -259,7 +257,6 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       <KpiCard
         href="/saldos-banco"
         label="Disponibilidad"
-        hoverLabel="Ir a Saldos de banco"
         value={disponibilidad ? moneyK(disponibilidad.total) : "—"}
         sub={disponibilidad
           ? <span className="text-gray-400">al {fechaCorta(disponibilidad.fechaMasVieja)}</span>
@@ -273,7 +270,6 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       <KpiCard
         href="/referencia"
         label="Inventario"
-        hoverLabel="Ir a Consulta de artículos"
         value={InventarioKpiValue({ inv: inventario })}
         tags={inventario?.disponible ? ["al costo"] : []}
         sub={
@@ -293,7 +289,6 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       <KpiCard
         href="/cxc"
         label="Cuentas por cobrar"
-        hoverLabel="Ir a Cuentas por cobrar"
         value={moneyK(cxc.total)}
         sub={
           <span className={cxc.vencido > 0 ? "text-red-600 font-medium" : "text-gray-400"}>
@@ -306,7 +301,6 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       <KpiCard
         href="/proveedores"
         label="Cuentas por pagar"
-        hoverLabel="Ir a Proveedores"
         value={moneyK(cxp.total)}
         sub={
           <span className={cxp.vencido > 0 ? "text-amber-600 font-medium" : "text-gray-400"}>
@@ -318,10 +312,9 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
   );
 }
 
-function KpiCard({ href, label, hoverLabel, value, valueClass, tags = [], sub }: {
+function KpiCard({ href, label, value, valueClass, tags = [], sub }: {
   href: string;
   label: string;
-  hoverLabel: string;
   value: string;
   valueClass?: string;
   tags?: string[];
@@ -340,12 +333,11 @@ function KpiCard({ href, label, hoverLabel, value, valueClass, tags = [], sub }:
           "▼ 20.3% vs julio 2025 (parcial)" necesita 148: con `truncate` se
           perdía justo el "(parcial)", que es el aviso de que la comparación
           está incompleta. `min-h` reserva las 2 líneas siempre, así todas las
-          tarjetas quedan de la misma altura (y el label de hover, que es de 1
-          sola línea, no la hace saltar). */}
-      <div className="text-xs mt-1 tabular-nums min-h-[2rem] sm:min-h-0">
-        <span className="group-hover:hidden">{sub}</span>
-        <span className="hidden group-hover:inline text-blue-600 font-medium">{hoverLabel} →</span>
-      </div>
+          tarjetas quedan de la misma altura.
+          🔴 Antes el subtítulo se cambiaba por «Ir a Ventas →» al pasar el
+          mouse (7-oct-2026, quitado): en el celular, que es la mitad del
+          tráfico, ese aviso nunca se veía — la tarjeta ya es un link completo. */}
+      <div className="text-xs mt-1 tabular-nums min-h-[2rem] sm:min-h-0">{sub}</div>
     </Link>
   );
 }

@@ -1969,10 +1969,9 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   // 🔴 2d — UN DÍA QUE TODAVÍA NO LLEGÓ NO OFRECE NADA QUE ARREGLAR. Es
   // ESTRICTAMENTE futuro: hoy sí se puede arreglar, que para eso está.
   const diaFuturo = ASISTENCIA_PANTALLA_2026_09 && d.enCurso && d.fecha > hoyPanama();
-  /** Las acciones del día: se ven al pasar el mouse y con el foco del teclado. */
-  const alPasarElMouse = ASISTENCIA_PANTALLA_2026_09
-    ? "opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-    : "";
+  /** Las acciones del día: siempre visibles (7-oct-2026; antes solo se veían
+   *  al pasar el mouse — invisibles y sin equivalente al toque en celular). */
+  const alPasarElMouse = "";
   const justificar = () => onJustificar({ codigo, persona, empresa, fecha: d.fecha });
   const enlaceJustificar = diaFuturo ? null : (
     <button type="button" onClick={justificar}
