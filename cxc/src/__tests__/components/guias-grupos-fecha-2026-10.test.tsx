@@ -107,12 +107,18 @@ describe("prendido: siete grupos, separados", () => {
     ]);
   });
 
-  it("el encabezado se separa: mayúsculas con tracking y aire arriba", () => {
+  it("el encabezado se separa: mayúsculas con tracking, aire y una línea tenue entre grupos", () => {
     pintar({ periodo: { year: 2026, mes: 0 } });
     expect(screen.getByText("Hoy").className).toContain("uppercase");
-    // El SEGUNDO grupo (no el primero) lleva el aire de arriba.
-    const segundo = screen.getByText("Ayer").closest("button")!.parentElement!;
-    expect(segundo.className).toContain("mt-5");
+    // El corte es una línea tenue (border-gray-100) + aire — nada de cajas ni
+    // colores nuevos — y se APAGA en el primer grupo vía `first:` (Tailwind:
+    // misma clase en todos los grupos, el pseudo-elemento CSS decide; por
+    // eso se verifica la clase, no un className distinto por grupo).
+    const grupo = screen.getByText("Ayer").closest("button")!.parentElement!;
+    expect(grupo.className).toContain("mt-6");
+    expect(grupo.className).toContain("border-t");
+    expect(grupo.className).toContain("border-gray-100");
+    expect(grupo.className).toContain("first:border-t-0");
   });
 
   it("un mes puntual, sin buscar: SIN «Este mes» ni «Mes pasado» — no se contradicen con el selector", () => {
