@@ -19,6 +19,21 @@
 
 ---
 
+## Registro de overrides por usuario — quién y por qué (7-oct-2026)
+
+> No vivía documentado en ningún lado fuera del código: `fg_users.modulos_override` se podía leer en la base, pero nadie había escrito en un solo lugar quién tiene uno y por qué. Esta tabla es esa deuda, pagada el 7-oct-2026. Medido contra producción ese día — es el estado REAL, no lo que debería ser.
+
+| Usuario | Rol | `modulos_override` | Motivo y fecha |
+|---|---|---|---|
+| **rodrigo** | bodega | `{guias,catalogos,referencia,marcacion}` | **14-sep-2026**, migración `20261125120000_rol_marcacion_y_rodrigo.sql`. Daniel aprobó el reloj del teléfono para cuatro personas que trabajan afuera (textual: *«ponle marcación al módulo»*, *«rodrigo es bodega con marcacion»*). Rodrigo pasó de `vendedor` a `bodega` + el módulo `marcacion` por override: un rol solo no alcanzaba para las dos cosas, y agregarle `bodega` al `roles[]` de Marcación se lo habría abierto a TODOS los bodega. Pierde CXC y el directorio de Clientes (los tenía por ser vendedor); gana Guías con despacho y Marcación. |
+| **angel** | bodega | `{guias,catalogos,referencia,marcacion}` | **Sin migración ni commit que lo documenten por nombre.** Medido en producción: la fila nace el **15-sep-2026** (un día después de la de Rodrigo) ya con este mismo override. Mismo patrón exacto — bodega + `marcacion` —, así que todo indica que es parte del mismo rollout del reloj del teléfono, pero no hay una cita de Daniel ni un archivo que lo confirme. Queda señalado para que quien lo audite no lo tome por inventado ni por documentado: es lo que la base dice, sin más respaldo escrito. |
+| **julio** | bodega | `NULL` (ninguno — hereda del rol) | No tiene override. Ve lo que el rol `bodega` da hoy: `guias, catalogos, referencia, asistencia`. |
+| **jorman** | bodega | `{guias,catalogos,referencia}` | **7-oct-2026**, migración `20270102120000_jorman_sin_asistencia.sql`. Daniel: *«Jorman no debería ver asistencia»*. Jorman no tiene ninguna fila en `asistencia_aprobador_empresa` (no es aprobador de ninguna empresa), así que el módulo «Asistencia y planilla › Aprobaciones» que el rol `bodega` le daba se le abría **vacío y sin uso**. El override le quita exactamente `asistencia` y conserva el resto de lo que `bodega` trae (leído de `role_permissions` al correr la migración, no copiado a mano — mismo patrón que Rodrigo). No se le agregó `marcacion`: no se pidió y no corresponde a su caso. |
+
+⚠️ **Dato aparte, sin tocar nada**: la cuenta compartida `Bodega` (rol `bodega`, sin override) SÍ tiene filas en `asistencia_aprobador_empresa` — aprueba por `fashion_wear` y `vistana` desde el 1-sep-2026. A diferencia de Jorman y Julio, para esa cuenta el módulo Asistencia **sí tiene uso real** (es aprobadora de dos empresas), así que no es un caso igual al de Jorman y no se tocó.
+
+---
+
 ## Data Health se fue de la pantalla (movido desde CLAUDE.md el 14-sep-2026, verbatim)
 
 - **Administración:** Usuarios (🩸 **Data Health se fue de la pantalla el 11-sep-2026** — la ficha ya se había retirado el 13-ago para volverse pestaña de Usuarios, y ese día se retiró también la pestaña. Daniel: *«data health quiero que el sistema o tú mida todo pero no verlo… no lo uso y no lo quiero usar»*. 🔴 **La medición se quedó ENTERA** — ver `docs/donde-vive-cada-dato.md` › `data_integrity_checks`)
