@@ -2329,7 +2329,9 @@ function Fila({
         ) : capitalizarNombre(l.etiqueta)}
         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
         {verAsistencia && (
-          <span aria-hidden className="ml-1.5 hidden text-[11px] text-gray-400 group-hover:inline">
+          // 🔴 Siempre visible (7-oct-2026; antes solo con el mouse encima,
+          // invisible en el celular — igual que la tarjeta de abajo).
+          <span aria-hidden className="ml-1.5 text-[11px] text-gray-400">
             {VER_SU_ASISTENCIA}
           </span>
         )}
