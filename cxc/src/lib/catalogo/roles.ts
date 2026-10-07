@@ -245,3 +245,27 @@ export const COMPROBANTES_EDITAR_ROLES = PEDIDO_ROLES;
 
 /** Copia mutable para quien reciba `string[]`. */
 export const comprobantesEditarRoles = (): string[] => [...COMPROBANTES_EDITAR_ROLES];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 BODEGA ENTRA A VER EL PEDIDO, NUNCA A VER SU PLATA (7-oct-2026)
+//
+// Daniel, textual: *"que ningún usuario con rol bodega vea precio, solo admin
+// y secretaria"*. Bodega SÍ está en `COMPROBANTES_ROLES` (ve la lista y el
+// detalle), pero no arma pedidos — y el precio es justo lo que `PEDIDO_ROLES`
+// necesita para armar uno. Es el MISMO trío de siempre, así que no se escribe
+// una lista nueva: quien ya veía precio para trabajar el pedido lo sigue
+// viendo igual.
+//
+// 🔑 Lo decide el SERVIDOR: `orders/route.ts` (lista) y `orders/[id]/route.ts`
+// (detalle) mandan `total`/`unit_price`/`precio_lista` en `null` a quien esta
+// función rechaza — nunca escondidos en el navegador, que es como bodega veía
+// el Total en dinero y el precio unitario hasta hoy.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** ¿Este rol ve el precio de un pedido (total de la lista, unit_price y
+ *  precio_lista del detalle)? Bodega entra a mirar el pedido pero no a su
+ *  plata — el resto de `COMPROBANTES_ROLES` (admin, secretaria, vendedor) la
+ *  ve igual que siempre. */
+export function puedeVerPrecioDePedido(role: string | null | undefined): boolean {
+  return (PEDIDO_ROLES as readonly string[]).includes(role ?? "");
+}

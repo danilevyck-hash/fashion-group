@@ -411,7 +411,12 @@ describe("🔴 lo que Daniel pidió al APROBAR (6-oct-2026)", () => {
 
   it("1 · el BULTO es la PRIMERA columna: «es lo que bodega llena, así que manda»", () => {
     expect(COLUMNAS_DETALLE[0]).toBe("Bulto");
-    expect([...COLUMNAS_DETALLE]).toEqual(["Bulto", "Código", "Descripción", "Cantidad", "Precio", "Total"]);
+    // 🔴 SIN «Total» EN LA PANTALLA (7-oct-2026, Daniel): «al abrir un pedido
+    // que no salga el total» — es cantidad × precio y no aporta nada al
+    // trabajo de esa pantalla. Para TODOS los roles, no solo bodega. El papel
+    // (`COLUMNAS_PAPEL_BULTOS`, abajo) SÍ lo sigue llevando: es otro módulo.
+    expect([...COLUMNAS_DETALLE]).toEqual(["Bulto", "Código", "Descripción", "Cantidad", "Precio"]);
+    expect(COLUMNAS_DETALLE).not.toContain("Total");
     // 🔴 Ni «Código barra» ni «Referencia»: Switch no manda la segunda (medido).
     expect(COLUMNAS_DETALLE).not.toContain("Código barra");
     expect(COLUMNAS_DETALLE).not.toContain("Referencia");
@@ -647,6 +652,15 @@ describe("🔴 LA PLATA DEPENDE DE QUIÉN MIRA, Y LO DECIDE EL SERVIDOR (6-oct-2
     const detalle = leer("app/despachos/components/PedidoBultos.tsx");
     expect(detalle).toContain("const conPlata = !!lineas?.some((l) => l.precio != null)");
     expect([...COLUMNAS_DETALLE_SIN_PLATA]).toEqual(["Bulto", "Código", "Descripción", "Cantidad"]);
+  });
+
+  it("🔴 SIN TOTAL EN LA PANTALLA (7-oct-2026): «al abrir un pedido que no salga el total»", () => {
+    // Daniel, textual: «al abrir un pedido que no salga el total». Es
+    // cantidad × precio y no aporta nada al trabajo de esta pantalla —
+    // para NINGÚN rol, a diferencia de Precio (que sí se recorta por rol).
+    const detalle = leer("app/despachos/components/PedidoBultos.tsx");
+    expect(detalle).not.toContain("l.total");
+    expect(detalle).not.toMatch(/>\s*Total\s*</);
   });
 });
 

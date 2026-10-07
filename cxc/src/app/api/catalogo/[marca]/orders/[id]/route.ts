@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { leerCategoriaYBulto, leerPreciosLista } from "@/lib/catalogo/bulto-productos";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
-import { comprobantesRoles } from "@/lib/catalogo/roles";
+import { comprobantesRoles, puedeVerPrecioDePedido } from "@/lib/catalogo/roles";
 import { getEnvioActivo, switchLockResponse, fetchReemplazoInfo } from "@/lib/catalogo/switch-lock";
 
 const EDIT_ROLES = ["admin", "secretaria", "vendedor"];
@@ -141,10 +141,19 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     });
   }
 
+  // 🔴 BODEGA NO VE PLATA (7-oct-2026): mismo recorte que la lista, acá en el
+  // detalle — `unit_price` y `precio_lista` de cada línea, y el `total` del
+  // pedido, salen en null. `puedeVerPrecioDePedido` es el trío de siempre
+  // (`PEDIDO_ROLES`); nadie que ya veía precio para trabajar el pedido pierde
+  // nada.
+  const verPrecio = puedeVerPrecioDePedido(session.role);
+  const itemsFinal = verPrecio
+    ? itemsOut
+    : itemsOut.map((i) => ({ ...i, unit_price: null, precio_lista: null }));
   return NextResponse.json({
     ...row,
-    [cfg.itemsRelation]: itemsOut,
-    total: recalcTotal,
+    [cfg.itemsRelation]: itemsFinal,
+    total: verPrecio ? recalcTotal : null,
     stock_confirmacion: stockConfirmacion,
     ...reemplazo,
   });

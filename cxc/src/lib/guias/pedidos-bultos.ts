@@ -300,18 +300,22 @@ export function descripcionCompleta(l: Pick<LineaPedido, "descripcion" | "talla"
  * 🔴 EL BULTO VA PRIMERO (Daniel, 6-oct-2026, al aprobar): «es lo que bodega
  * llena, así que manda». El resto conserva el orden del papel de Switch.
  */
+// 🔴 SIN «TOTAL» EN LA PANTALLA (7-oct-2026, Daniel, al abrir un pedido): «que
+// no salga el total» — es cantidad × precio y no aporta nada al trabajo de
+// esta pantalla. Para TODOS los roles. El papel (`COLUMNAS_PAPEL_BULTOS` en
+// `pdf-pedido-bultos.ts`) SÍ lo sigue llevando: es otro módulo, y Daniel lo
+// aprobó así.
 export const COLUMNAS_DETALLE = [
   "Bulto",
   "Código",
   "Descripción",
   "Cantidad",
   "Precio",
-  "Total",
 ] as const;
 
-/** Las que ve quien NO puede ver plata: las mismas, sin Precio ni Total. */
+/** Las que ve quien NO puede ver plata: las mismas, sin Precio. */
 export const COLUMNAS_DETALLE_SIN_PLATA = COLUMNAS_DETALLE.filter(
-  (c) => c !== "Precio" && c !== "Total",
+  (c) => c !== "Precio",
 );
 
 /**

@@ -7,7 +7,9 @@
 //
 // Se ve como el PDF de pedido de Switch, SIN «Código barra» ni «Referencia»
 // —que el API no manda, medido—:
-//   Bulto · Código · Descripción · Cantidad · Precio · Total
+//   Bulto · Código · Descripción · Cantidad · Precio
+//   🔴 SIN «Total» (7-oct-2026, Daniel): cantidad × precio no aporta nada al
+//   trabajo de esta pantalla, para ningún rol — el papel sí lo sigue llevando.
 //
 // 🔴 ASIGNAR UN BULTO SON DOS PASOS, NO CUATRO (Daniel, 7-oct-2026: *«¿por qué
 // clic en las celdas, después asignar bulto, después ponerlo y después asignar?
@@ -402,7 +404,7 @@ export default function PedidoBultos({
                     casi nunca es larga, no le reserves tanto ancho»). Medido en
                     el pedido real: «REEBOK BASE TRAIL MID» es lo más largo. Así
                     que la descripción lleva un ancho propio y lo que sobra va a
-                    Código, Cantidad, Precio y Total, que son los que se leen de
+                    Código, Cantidad y Precio, que son los que se leen de
                     corrido. */}
                 {!ocultarBulto && <th className="w-20 py-2 pl-1 pr-1 sm:px-3">{COLUMNAS_DETALLE[0]}</th>}
                 <th className="hidden px-3 py-2 sm:table-cell sm:w-44">{COLUMNAS_DETALLE[1]}</th>
@@ -413,10 +415,11 @@ export default function PedidoBultos({
                   <span className="sm:hidden">Cant.</span>
                   <span className="hidden sm:inline">{COLUMNAS_DETALLE[3]}</span>
                 </th>
-                {/* 🔴 Precio y Total solo si el SERVIDOR los mandó: a bodega no
-                    le llegan, así que la columna ni se dibuja. */}
+                {/* 🔴 Precio solo si el SERVIDOR lo mandó: a bodega no le llega,
+                    así que la columna ni se dibuja. Sin «Total» (7-oct-2026,
+                    Daniel): cantidad × precio no aporta nada al trabajo de
+                    esta pantalla, para NINGÚN rol. */}
                 {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell sm:w-32">{COLUMNAS_DETALLE[4]}</th>}
-                {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell sm:w-36">{COLUMNAS_DETALLE[5]}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 align-top">
@@ -448,12 +451,6 @@ export default function PedidoBultos({
                       ${fmt(l.precio ?? 0)}
                     </td>
                   )}
-                  {conPlata && (
-                    <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 sm:table-cell">
-                      ${fmt(l.total ?? 0)}
-                    </td>
-                  )}
-
                 </tr>
               ))}
             </tbody>

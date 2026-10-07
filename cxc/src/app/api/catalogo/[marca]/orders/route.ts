@@ -51,7 +51,7 @@ import { resumirDesdeItems, type ContextoLineas, type ItemCrudo } from "@/lib/ca
 import { contextoDeLineas, totalDeLaLista } from "@/lib/catalogo/totales-lista";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
-import { comprobantesRoles } from "@/lib/catalogo/roles";
+import { comprobantesRoles, puedeVerPrecioDePedido } from "@/lib/catalogo/roles";
 import { esPedidoDelLink } from "@/lib/catalogo/cliente-elegido";
 import { avisoPedidoDeVendedor } from "@/lib/catalogo/telegram-pedido";
 import { enviarNegocio } from "@/lib/alertas/canal";
@@ -196,7 +196,13 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const todos = [...orders, ...delLinkSinConvertir].sort(
     (a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime(),
   );
-  return NextResponse.json(todos);
+  // 🔴 BODEGA NO VE PLATA (7-oct-2026): el Total de cada fila se recorta ACÁ,
+  // antes de salir — nunca escondido en el navegador. `puedeVerPrecioDePedido`
+  // es el mismo trío que ya trabaja el pedido (`PEDIDO_ROLES`).
+  const salida = puedeVerPrecioDePedido(session.role)
+    ? todos
+    : todos.map((o) => ({ ...o, total: null }));
+  return NextResponse.json(salida);
 }
 
 /** Lo que la tabla de públicos aporta a la lista. */
