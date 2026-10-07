@@ -179,6 +179,18 @@ export function rolesDelEstado(destino: EstadoBultos): readonly string[] {
   return destino === "verificado" ? ROLES_VERIFICADO : ROLES_PREPARADO;
 }
 
+/**
+ * 🔴 «VOLVER A PREPARADO» LO MARCAN LA SECRETARIA Y ADMIN, NUNCA BODEGA
+ * (Daniel, 7-oct-2026). Deshacer una verificación es parte de la verificación:
+ * si bodega pudiera devolver un pedido a «Preparado» y cambiarle los bultos, el
+ * segundo par de ojos no serviría de nada.
+ *
+ * Para todo lo demás manda el estado DESTINO (`rolesDelEstado`).
+ */
+export function rolesDelPaso(desde: EstadoBultos, hasta: EstadoBultos): readonly string[] {
+  return desde === "verificado" ? ROLES_VERIFICADO : rolesDelEstado(hasta);
+}
+
 export interface QuienMarca {
   role: string | null | undefined;
   userName: string | null | undefined;
@@ -199,6 +211,8 @@ export type Veredicto = { ok: true } | { ok: false; error: string };
  *      tiene que ser otra persona. Es el control que hace que el segundo par de
  *      ojos sirva de algo — y vale también si lo preparó la secretaria.
  *   4. Y la empresa del pedido tiene que ser una de las suyas.
+ *   5. 🔴 Volver de «Verificado» a «Preparado» lo marcan la secretaria y admin,
+ *      nunca bodega (7-oct-2026, `rolesDelPaso`).
  */
 export function puedeMover(
   args: {
@@ -218,10 +232,15 @@ export function puedeMover(
   if (!veLaEmpresa(empresa_key, quien.userName, quien.role)) {
     return { ok: false, error: "Ese pedido no es de una de tus empresas" };
   }
-  if (!quien.role || !rolesDelEstado(hasta).includes(quien.role)) {
+  if (!quien.role || !rolesDelPaso(desde, hasta).includes(quien.role)) {
     return {
       ok: false,
-      error: hasta === "verificado" ? "«Verificado» lo marca la secretaria" : "No puedes marcar pedidos",
+      error:
+        hasta === "verificado"
+          ? "«Verificado» lo marca la secretaria"
+          : desde === "verificado"
+            ? "Volver a «Preparado» lo marca la secretaria"
+            : "No puedes marcar pedidos",
     };
   }
   // 🔴 Ni siquiera admin: el segundo par de ojos tiene que ser de otra persona.
@@ -376,6 +395,32 @@ export function resumenAsignacion(lineas: readonly Pick<LineaPedido, "bulto">[])
 export function todoAsignado(lineas: readonly Pick<LineaPedido, "bulto">[]): boolean {
   return lineas.length > 0 && lineas.every((l) => l.bulto != null);
 }
+
+/**
+ * 🔴 «VERIFICAR» ESTÁ BLOQUEADO MIENTRAS QUEDE UNA LÍNEA SIN BULTO
+ * (Daniel, 7-oct-2026). 🩸 Hasta hoy solo avisaba: el envío de Etiquetas no se
+ * creaba, pero el pedido quedaba «Verificado» igual y nadie se enteraba de que
+ * faltaba mercancía por empacar.
+ *
+ * Devuelve el motivo, o `null` si no falta nada. Lo leen la pantalla (para
+ * apagar el botón y decir qué falta) y el SERVIDOR (que es el que manda).
+ */
+export function faltaParaVerificar(sinAsignar: number, articulos: number): string | null {
+  if (articulos <= 0) return "Sin artículos todavía";
+  if (sinAsignar <= 0) return null;
+  // Corto a propósito: el mismo texto se lee bajo el botón apagado, en una
+  // columna angosta, y vuelve del servidor como motivo del rechazo.
+  return `${sinAsignar} ${sinAsignar === 1 ? "artículo" : "artículos"} sin bulto`;
+}
+
+/** Los artículos del pedido que todavía no están en ningún bulto. */
+export function cuantosSinBulto(lineas: readonly Pick<LineaPedido, "bulto">[]): number {
+  return lineas.filter((l) => l.bulto == null).length;
+}
+
+// ⚠️ EL ENLACE PEDIDO → ENVÍO DE ETIQUETAS NO SE PROGRAMÓ (Daniel, 7-oct-2026:
+// *«habría que ver cómo sería en la vida real porque se usa la factura, no el
+// pedido»*). Queda pendiente de decidir desde dónde va el enlace.
 
 /** Cuántos bultos distintos tiene el pedido: los `cajas` del envío de Etiquetas. */
 export function cuantosBultos(lineas: readonly Pick<LineaPedido, "bulto">[]): number {

@@ -26,7 +26,14 @@ import {
   veLaPlata,
 } from "@/lib/guias/pedidos-bultos";
 import { PEDIDOS_VER_ROLES } from "@/lib/guias/pedidos-bodega";
-import { bajarLineas, hayQueBajar, leerLineas, ponerEnBulto, quitarDelBulto } from "@/lib/guias/pedido-detalle-server";
+import {
+  bajarLineas,
+  estadoDelPedido,
+  hayQueBajar,
+  leerLineas,
+  ponerEnBulto,
+  quitarDelBulto,
+} from "@/lib/guias/pedido-detalle-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -119,6 +126,19 @@ export async function PATCH(req: NextRequest) {
   if (!pedido) return noEsTuyo();
   const firma = quienFirma(auth);
   if (!firma) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+
+  // 🔴 EL DETALLE SE CONGELA AL VERIFICAR (Daniel, 7-oct-2026). 🩸 Esta ruta no
+  // miraba el estado, así que bodega podía quitarle bultos a un pedido ya
+  // verificado —y el envío de Etiquetas seguía diciendo el número viejo—. Para
+  // cambiarlo hay que devolverlo a «Preparado», que es un acto FIRMADO de la
+  // secretaria. Lo decide el SERVIDOR: la pantalla apaga las casillas por la
+  // misma regla, pero no es la pantalla la que manda.
+  if ((await estadoDelPedido(empresa, id)) === "verificado") {
+    return NextResponse.json(
+      { error: "El pedido está verificado: los bultos no se cambian" },
+      { status: 409 },
+    );
+  }
 
   // `bulto: null` = «Quitar del bulto»; cualquier otra cosa tiene que ser un número.
   const quitar = body?.bulto === null;

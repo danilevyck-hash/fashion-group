@@ -5,12 +5,28 @@
 //
 // La pregunta de la pantalla: «¿en qué bulto va cada cosa de este pedido?».
 //
-// Se ve como el PDF de pedido de Switch, SIN la columna «Código barra»:
-//   Código · Referencia · Descripción · Cantidad · Precio · Total · Bulto
+// Se ve como el PDF de pedido de Switch, SIN «Código barra» ni «Referencia»
+// —que el API no manda, medido—:
+//   Bulto · Código · Descripción · Cantidad · Precio · Total
 //
-// Bodega selecciona varias líneas con casillas y toca «Asignar bulto», escribe
-// el número y esas líneas quedan ahí. Repite hasta terminar. Arriba se lee
-// «18 de 24 artículos asignados · 6 bultos».
+// 🔴 ASIGNAR UN BULTO SON DOS PASOS, NO CUATRO (Daniel, 7-oct-2026: *«¿por qué
+// clic en las celdas, después asignar bulto, después ponerlo y después asignar?
+// ¿pueden haber menos pasos?»*). Eran cuatro; quedan dos caminos de dos:
+//   · UNA fila: se escribe el número en la casilla que ya tiene la fila y con
+//     salir de ella queda asignado. Sin marcar nada y sin ninguna ventana.
+//     La casilla está en las DOS pantallas: antes el celular veía un chip
+//     quieto y tenía que pasar por las casillas y el botón.
+//   · VARIAS filas: se marcan y el número se escribe EN LA MISMA barra de
+//     abajo («Bulto [ 3 ] · Asignar»). Se fue el paso intermedio de tocar
+//     «Asignar bulto» para que apareciera el campo.
+// Arriba se lee «18 de 24 artículos asignados · 6 bultos».
+//
+// 🔴 Y LA LISTA TERMINA CON COLCHÓN: la barra de abajo no tapa la última fila
+// (Daniel: *«no se ve lo de abajo»*). Es el `ALTO_COLCHON_DE_ABAJO` de la casa.
+//
+// 🔴 VERIFICADO = CONGELADO (7-oct-2026): con el pedido verificado las casillas
+// no se dibujan y el servidor rechaza el PATCH. Para cambiar bultos, la
+// secretaria lo devuelve a «Preparado».
 //
 // 🔑 Lo medido: 416 bultos y 56 líneas en un envío real. Por eso el bulto se
 // ESCRIBE en un campo angosto (regla 9 de `docs/diseno.md`) y no se elige de una
@@ -25,6 +41,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, Printer } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
+import { ALTO_COLCHON_DE_ABAJO, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { descargarArchivo } from "@/lib/compartir-archivo";
 import { fmt } from "@/lib/format";
@@ -56,19 +73,26 @@ interface Respuesta {
 export default function PedidoBultos({
   pedido,
   puedePoner,
+  verificado = false,
   onVolver,
 }: {
   pedido: PedidoDelDetalle;
-  /** Bodega pone bultos; quien solo mira ve la columna, quieta. */
+  /**
+   * Bodega pone bultos; quien solo mira ve la columna, quieta. 🔴 El vendedor
+   * NUNCA la puede poner: antes veía la casilla prendida y el servidor le
+   * contestaba 403 (`puedeMarcarPedidos`, 7-oct-2026).
+   */
   puedePoner: boolean;
+  /** 🔴 Verificado = congelado: el detalle ya no se toca (7-oct-2026). */
+  verificado?: boolean;
   onVolver: () => void;
 }) {
   const { toast } = useToast();
+  const barraCelular = useHayBarraCelular();
   const [lineas, setLineas] = useState<LineaPedido[] | null>(null);
   const [sinTabla, setSinTabla] = useState(false);
   const [error, setError] = useState(false);
   const [marcadas, setMarcadas] = useState<ReadonlySet<number>>(new Set());
-  const [pidiendoBulto, setPidiendoBulto] = useState(false);
   const [imprimirAbierto, setImprimirAbierto] = useState(false);
   const [numero, setNumero] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -137,7 +161,6 @@ export default function PedidoBultos({
       if (!r.ok) throw new Error(d?.error ?? String(r.status));
       setLineas(d?.lineas ?? []);
       setMarcadas(new Set());
-      setPidiendoBulto(false);
       setNumero("");
       toast(bulto == null ? "Bulto quitado" : `Bulto ${bulto} asignado`, "success");
     } catch (e) {
@@ -148,11 +171,14 @@ export default function PedidoBultos({
   }
 
   /**
-   * 🔴 MENOS CLICS EN LA COMPUTADORA (Daniel, 6-oct-2026, al aprobar): el número
-   * del bulto se escribe DIRECTO en la celda y con Tab se pasa a la siguiente,
-   * sin abrir ninguna ventana. Se guarda al salir de la casilla o con Enter —no
-   * en cada tecla—, así escribir «416» es UNA llamada y no tres.
-   * ⚠️ En el celular esto no cambia: ahí mandan las casillas y el botón.
+   * 🔴 EL PRIMER CAMINO DE DOS PASOS (Daniel, 6 y 7-oct-2026): el número del
+   * bulto se escribe DIRECTO en la casilla de la fila y con Tab se pasa a la
+   * siguiente, sin marcar nada y sin abrir ninguna ventana. Se guarda al salir
+   * de la casilla o con Enter —no en cada tecla—, así escribir «416» es UNA
+   * llamada y no tres.
+   * 🔴 7-oct-2026: la casilla está TAMBIÉN en el celular. Antes ahí se veía un
+   * chip quieto y el único camino eran las casillas de la izquierda más el
+   * botón de abajo: cuatro toques para una sola fila.
    */
   async function guardarUna(id: number, texto: string) {
     const crudo = texto.trim();
@@ -198,6 +224,9 @@ export default function PedidoBultos({
     void guardar(v.valor!);
   }
 
+  /** El alto que sobra al final para que la barra no tape la última fila. */
+  const colchon = barraCelular ? ALTO_COLCHON_DE_ABAJO : "calc(var(--fg-alto-barra-fija, 0px) + 1rem)";
+
   /**
    * 🔴 EL PAPEL LO DIBUJA EL SERVIDOR (6-oct-2026). Daniel pidió que bodega no
    * vea Precio ni Total y que el papel SIEMPRE los lleve: las dos cosas solo se
@@ -226,46 +255,44 @@ export default function PedidoBultos({
   }
 
   /**
-   * El bulto de una línea. En la computadora es una casilla que se escribe
-   * (Tab pasa a la siguiente); en el celular, el chip de siempre, quieto —ahí
-   * se usan las casillas y «Asignar bulto»—. Quien no puede asignar bultos ve
-   * el chip en las dos.
+   * El bulto de una línea: una casilla que se escribe y queda asignado al salir
+   * de ella (Tab o Enter pasan a la siguiente). 🔴 La MISMA casilla en el
+   * celular y en la computadora (7-oct-2026). Quien no puede asignar bultos
+   * —el vendedor, o cualquiera con el pedido ya verificado— ve el chip quieto.
    */
   const celdaBulto = (l: LineaPedido) => {
-    const chip =
-      l.bulto == null ? (
+    if (!puedePoner) {
+      return l.bulto == null ? (
         <span className="text-gray-400">—</span>
       ) : (
         <span className="inline-flex h-7 items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 text-xs font-medium text-emerald-700">
           {l.bulto}
         </span>
       );
-    if (!puedePoner) return chip;
+    }
     const valor = enCelda[l.codigo_barra_id] ?? (l.bulto == null ? "" : String(l.bulto));
     return (
-      <>
-        <span className="sm:hidden">{chip}</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={MIN_BULTO}
-          max={MAX_BULTO}
-          value={valor}
-          aria-label={`Bulto de ${l.descripcion}`}
-          onChange={(e) => setEnCelda((m) => ({ ...m, [l.codigo_barra_id]: e.target.value }))}
-          onFocus={(e) => e.currentTarget.select()}
-          onBlur={(e) => void guardarUna(l.codigo_barra_id, e.target.value)}
-          onKeyDown={(e) => {
-            // Enter guarda y baja a la siguiente; Tab ya baja solo.
-            if (e.key !== "Enter") return;
-            e.preventDefault();
-            e.currentTarget.blur();
-            const casillas = [...(e.currentTarget.closest("tbody")?.querySelectorAll<HTMLInputElement>('input[type="number"]') ?? [])];
-            casillas[casillas.indexOf(e.currentTarget) + 1]?.focus();
-          }}
-          className="hidden h-9 w-16 rounded-md border border-gray-300 px-2 text-right tabular-nums focus:border-gray-900 focus:outline-none sm:block"
-        />
-      </>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={MIN_BULTO}
+        max={MAX_BULTO}
+        value={valor}
+        aria-label={`Bulto de ${l.descripcion}`}
+        onChange={(e) => setEnCelda((m) => ({ ...m, [l.codigo_barra_id]: e.target.value }))}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={(e) => void guardarUna(l.codigo_barra_id, e.target.value)}
+        onKeyDown={(e) => {
+          // Enter guarda y baja a la siguiente; Tab ya baja solo.
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          e.currentTarget.blur();
+          const casillas = [...(e.currentTarget.closest("tbody")?.querySelectorAll<HTMLInputElement>('input[type="number"]') ?? [])];
+          casillas[casillas.indexOf(e.currentTarget) + 1]?.focus();
+        }}
+        // 44 px de alto en el celular (regla 10 de `docs/diseno.md`).
+        className="h-11 w-14 rounded-md border border-gray-300 px-1.5 text-right tabular-nums focus:border-gray-900 focus:outline-none sm:h-9 sm:w-16 sm:px-2"
+      />
     );
   };
 
@@ -354,10 +381,10 @@ export default function PedidoBultos({
                   </th>
                 )}
                 {/* 🔴 El BULTO va primero: es lo que bodega llena.
-                    🩸 En el celular, Código y Referencia NO tienen columna propia: con
-                    las 7 columnas a 390 px el chip del Bulto quedaba CORTADO
-                    («41» en vez de 416). El código va bajo la descripción, como
-                    el n.º de pedido va bajo el cliente en la lista. */}
+                    🩸 En el celular, Código NO tiene columna propia: con las 7
+                    columnas a 390 px el chip del Bulto quedaba CORTADO («41» en
+                    vez de 416). El código va bajo la descripción, como el n.º de
+                    pedido va bajo el cliente en la lista. */}
                 {/* 🔴 ANCHOS REPARTIDOS (Daniel, 6-oct-2026: «la descripción
                     casi nunca es larga, no le reserves tanto ancho»). Medido en
                     el pedido real: «REEBOK BASE TRAIL MID» es lo más largo. Así
@@ -397,9 +424,6 @@ export default function PedidoBultos({
                   )}
                   <td className="whitespace-nowrap py-2 pl-1 pr-1 tabular-nums sm:px-3">{celdaBulto(l)}</td>
                   <td className="hidden whitespace-nowrap px-3 py-2 tabular-nums text-gray-700 sm:table-cell">{l.codigo}</td>
-                  {/* ⚠️ El API de Switch NO manda la referencia (medido): la
-                      celda va vacía antes que repetir el código y hacerla pasar
-                      por otro dato. */}
                   {/* La categoría de Switch, con su talla y su color si los manda. */}
                   <td className="break-words py-2 pl-1 pr-1 font-medium text-gray-900 sm:px-3">
                     {descripcionCompleta(l)}
@@ -424,6 +448,17 @@ export default function PedidoBultos({
         </div>
       )}
 
+      {/* Verificado = congelado. UNA línea al pie, sin cartel permanente arriba
+          (docs/diseno.md: «lo que aporta va en UNA línea gris al final»). */}
+      {verificado && lineas && lineas.length > 0 && (
+        <p className="pt-2 text-xs text-gray-500">Pedido verificado · los bultos ya no se cambian</p>
+      )}
+
+      {/* 🔴 EL COLCHÓN DEL FINAL (Daniel, 7-oct-2026: «no se ve lo de abajo»).
+          La barra fija de abajo publica su alto y la última fila sube por
+          encima de ella y del ☰ redondo del celular. */}
+      <div aria-hidden data-colchon-pedido style={{ height: colchon }} />
+
       {/* UNA sola acción principal, abajo, con el resultado en vivo y apagada
           hasta que haya algo que guardar (docs/diseno.md, regla 3). */}
       {puedePoner && marcadas.size > 0 && (
@@ -444,41 +479,33 @@ export default function PedidoBultos({
               >
                 Quitar bulto
               </button>
-              {pidiendoBulto ? (
-                <>
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <span>Bulto</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={MIN_BULTO}
-                      max={MAX_BULTO}
-                      value={numero}
-                      autoFocus
-                      onChange={(e) => setNumero(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && confirmarBulto()}
-                      // Un dato de 1 a 4 caracteres usa un campo angosto (regla 9).
-                      className="h-11 w-20 rounded-md border border-gray-300 px-2 text-right tabular-nums"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={confirmarBulto}
-                    disabled={guardando || !numero.trim()}
-                    className="h-11 rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:opacity-40"
-                  >
-                    Asignar
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setPidiendoBulto(true)}
-                  className="h-11 rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
-                >
-                  Asignar bulto
-                </button>
-              )}
+              {/* 🔴 EL SEGUNDO CAMINO DE DOS PASOS (Daniel, 7-oct-2026): el
+                  número se escribe EN LA MISMA BARRA. Se fue el botón
+                  «Asignar bulto» que solo servía para hacer aparecer este
+                  campo —un toque que no decidía nada—. */}
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <span>Bulto</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={MIN_BULTO}
+                  max={MAX_BULTO}
+                  value={numero}
+                  autoFocus
+                  onChange={(e) => setNumero(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && confirmarBulto()}
+                  // Un dato de 1 a 4 caracteres usa un campo angosto (regla 9).
+                  className="h-11 w-20 rounded-md border border-gray-300 px-2 text-right tabular-nums"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={confirmarBulto}
+                disabled={guardando || !numero.trim()}
+                className="h-11 rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97] disabled:opacity-40"
+              >
+                Asignar bulto
+              </button>
             </div>
           </div>
         </div>

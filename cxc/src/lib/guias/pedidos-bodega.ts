@@ -16,6 +16,7 @@ import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { DEFAULT_VENDEDOR } from "@/lib/comisiones/vendedor-default";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
+import { PEDIDOS_BULTOS_2026_10, ROLES_PREPARADO } from "./pedidos-bultos";
 
 /** `false` = la pestaña no existe, la ruta contesta 404 y el cron no hace nada. */
 export const PEDIDOS_BODEGA_2026_10 = true;
@@ -59,8 +60,16 @@ export function puedeVerPedidosBodega(role: string | null | undefined): boolean 
   return PEDIDOS_BODEGA_2026_10 && !!role && PEDIDOS_VER_ROLES.includes(role);
 }
 
+/**
+ * 🔴 EL VENDEDOR SOLO MIRA (Daniel, 7-oct-2026). 🩸 Con bultos veía el círculo y
+ * la casilla del bulto PRENDIDOS y el servidor le contestaba 403: la pantalla
+ * ofrecía lo que la ruta ya rechazaba. La lista de quién marca es la MISMA del
+ * servidor (`ROLES_PREPARADO`: admin · secretaria · bodega), así que no puede
+ * haber dos respuestas. Sin bultos sigue la de los seis ajustes, intacta.
+ */
 export function puedeMarcarPedidos(role: string | null | undefined): boolean {
-  return !!role && PEDIDOS_BODEGA_ROLES.includes(role);
+  const lista = PEDIDOS_BULTOS_2026_10 ? ROLES_PREPARADO : PEDIDOS_BODEGA_ROLES;
+  return !!role && lista.includes(role);
 }
 
 /** Los DOS estados. Sin fila en `pedidos_bodega_estado` = «pendiente». */
@@ -120,6 +129,15 @@ export interface PedidoBodega {
   preparado_en?: string | null;
   verificado_por?: string | null;
   verificado_en?: string | null;
+  /**
+   * 🔴 Cuántos artículos le faltan por poner en un bulto, y cuántos tiene en
+   * total (7-oct-2026): es lo que apaga «Verificar» y dice QUÉ falta. Los cuenta
+   * el SERVIDOR con la misma función que usa para rechazar el toque
+   * (`faltaParaVerificar`). `null` = todavía no se sabe (la tabla del detalle no
+   * contestó): ahí la pantalla no apaga nada y manda el servidor, como siempre.
+   */
+  articulos?: number | null;
+  sin_bulto?: number | null;
 }
 
 /** Del más viejo al más nuevo; empate por número. */

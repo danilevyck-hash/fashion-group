@@ -51,7 +51,10 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     expect(puedeMarcarPedidos("bodega")).toBe(true);
     // 6-oct-2026: iguales a Guías (AJUSTES_APPLE_6_2026_10).
     expect(puedeMarcarPedidos("secretaria")).toBe(true);
-    expect(puedeMarcarPedidos("vendedor")).toBe(true);
+    // 🩸 7-oct-2026: EL VENDEDOR SOLO MIRA. Lo del 6-oct lo dejaba marcando, y
+    // con bultos eso era una promesa falsa: veía el círculo y la casilla del
+    // bulto prendidos y el servidor le contestaba 403 (`ROLES_PREPARADO`).
+    expect(puedeMarcarPedidos("vendedor")).toBe(false);
     expect(puedeMarcarPedidos("contabilidad")).toBe(false);
   });
 
