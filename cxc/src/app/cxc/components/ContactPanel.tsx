@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
-import { fmt, fmtDate } from "@/lib/format";
+import { fmt } from "@/lib/format";
 import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 import UltimosPagosPorFecha from "./UltimosPagosPorFecha";
 import { useUltimosPagosGrupo } from "../hooks/useUltimosPagosGrupo";
@@ -75,11 +75,14 @@ export default function ContactPanel({
               <thead>
                 <tr className="text-xs text-gray-400 uppercase tracking-wide">
                   {roleCompanies.length > 1 && <th className="text-left py-1.5 font-medium">Empresa</th>}
-                  <th className="text-right py-1.5 font-medium text-emerald-600" title="0-30 + 31-60 + 61-90 días">0-90 días</th>
-                  <th className="text-right py-1.5 font-medium text-amber-600" title="91-120 días">91-120 días</th>
-                  <th className="text-right py-1.5 font-medium text-red-500" title="121-180 + 181-270 + 271-365 + +365 días">+120 días</th>
+                  <th className="text-right py-1.5 font-medium text-emerald-600">0-90 días</th>
+                  <th className="text-right py-1.5 font-medium text-amber-600">91-120 días</th>
+                  <th className="text-right py-1.5 font-medium text-red-500">+120 días</th>
                   <th className="text-right py-1.5 font-medium">Total</th>
-                  <th className="text-right py-1.5 font-medium" title="Cobro real más reciente del cliente en esta empresa (excluye retenciones y recibos en cero)">Último pago</th>
+                  <th className="text-right py-1.5 font-medium">Último pago</th>
+                  {/* 🔒 Candado `cxc-ultima-compra-pantalla.test.tsx`: esta
+                      aclaración se queda — distingue «última compra» de un
+                      pago, y que las notas de crédito no cuentan como compra. */}
                   <th className="text-right py-1.5 font-medium" title="Última factura del cliente en esta empresa (las notas de crédito no son compras)">Última compra</th>
                 </tr>
               </thead>
@@ -89,21 +92,16 @@ export default function ContactPanel({
                   const current = d.d0_30 + d.d31_60 + d.d61_90;
                   const watch = d.d91_120;
                   const overdue = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
-                  const tipCurrent = `0-30: $${fmt(d.d0_30)} · 31-60: $${fmt(d.d31_60)} · 61-90: $${fmt(d.d61_90)}`;
-                  const tipOverdue = `121-180: $${fmt(d.d121_180)} · 181-270: $${fmt(d.d181_270)} · 271-365: $${fmt(d.d271_365)} · +365: $${fmt(d.mas_365)}`;
                   const ultDias = daysSince(d.ultimoPagoFecha);
                   const compraDias = daysSince(d.ultimaCompraFecha);
                   return (
                     <tr key={co.key} className="border-t border-gray-200 hover:bg-white transition">
                       {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
-                      <td className="text-right py-1.5 tabular-nums text-emerald-700 cursor-help" title={tipCurrent}>{fmt(current)}</td>
-                      <td className="text-right py-1.5 tabular-nums text-amber-600 cursor-help" title="91-120 días">{fmt(watch)}</td>
-                      <td className="text-right py-1.5 tabular-nums text-red-600 cursor-help" title={tipOverdue}>{fmt(overdue)}</td>
+                      <td className="text-right py-1.5 tabular-nums text-emerald-700">{fmt(current)}</td>
+                      <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(watch)}</td>
+                      <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(overdue)}</td>
                       <td className="text-right py-1.5 tabular-nums font-semibold">{fmt(d.total)}</td>
-                      <td
-                        className="text-right py-1.5 tabular-nums whitespace-nowrap"
-                        title={d.ultimoPagoFecha ? `Último pago: ${fmtDate(d.ultimoPagoFecha)}` : undefined}
-                      >
+                      <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
                         {d.ultimoPagoFecha ? (
                           <span>
                             {d.ultimoPagoMonto != null && (
@@ -120,10 +118,7 @@ export default function ContactPanel({
                           esta pantalla el rojo significa "plata vencida", y una
                           compra vieja no es plata en riesgo — pintarla igual
                           diría algo que no es. */}
-                      <td
-                        className="text-right py-1.5 tabular-nums whitespace-nowrap"
-                        title={d.ultimaCompraFecha ? `Última compra: ${fmtDate(d.ultimaCompraFecha)}` : "Sin compras registradas"}
-                      >
+                      <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
                         {d.ultimaCompraFecha ? (
                           <span>
                             {d.ultimaCompraMonto != null && (

@@ -138,8 +138,13 @@ describe("Ventas › Clientes — el iPad deja de recibir la tabla de escritorio
     expect(clienteSheet).not.toContain("z-50 md:hidden");
   });
 
-  it("el HoverCard sólo aparece donde hay tabla (debajo de lg no hay hover)", () => {
-    expect(clientes).toContain('className="hidden w-[320px] lg:block"');
+  // 🩸 7-oct-2026: el HoverCard se retiró ENTERO (Daniel: «quítame el hover
+  // que no me gusta») — ya no hay preview al pasar el mouse en ningún ancho,
+  // ni en el iPad ni en la computadora. El toque sigue siendo el link directo
+  // a la ficha.
+  it("sin HoverCard: ya no hay preview al pasar el mouse en Ventas › Clientes", () => {
+    expect(clientes).not.toContain("@/components/ui/hover-card");
+    expect(clientes).not.toMatch(/<HoverCard[ >]/);
   });
 });
 

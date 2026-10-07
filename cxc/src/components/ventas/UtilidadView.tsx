@@ -309,7 +309,7 @@ function UtilidadRow({ r }: { r: UtilidadClienteRow }) {
         <span className="text-gray-800">{r.cliente}</span>
         {UNA_SOLA_VENTA && r.mostrador && <MarcaMostrador />}
         {neg && (
-          <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-600" title="Devoluciones netas: las notas de crédito superan las ventas del período">
+          <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-600">
             dev. neta
           </span>
         )}
@@ -341,7 +341,6 @@ function UtilidadCard({ r }: { r: UtilidadClienteRow }) {
         {neg && (
           <span
             className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-600"
-            title="Devoluciones netas: las notas de crédito superan las ventas del período"
           >
             dev. neta
           </span>

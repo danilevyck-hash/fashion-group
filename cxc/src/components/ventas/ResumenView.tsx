@@ -990,7 +990,7 @@ function HeatCell({
           <span className="flex flex-col items-end leading-tight">
             <span className={isNa ? "text-gray-400" : "text-gray-950"}>{renderCellValue(cur, mode)}</span>
             {(dc || margen) && (
-              <span className="mt-0.5" title={leyendaDelta(mode, prevYear)}>
+              <span className="mt-0.5">
                 {margen && <span data-margen-celda className="text-gray-500">{margen}</span>}
                 {margen && dc && <span className="text-gray-300"> · </span>}
                 {dc && <span className={toneDelta(dc.tone)}>{dc.texto}</span>}
@@ -1078,7 +1078,7 @@ function EmpresaTotalCell({
         <span className="flex flex-col items-end leading-tight">
           <span className="text-sm font-medium text-gray-950">{fmtMoney(cur)}</span>
           {(dc || margen) && (
-            <span className="mt-0.5 text-xs" title={leyendaDelta(mode, prevYear)}>
+            <span className="mt-0.5 text-xs">
               {margen && <span data-margen-celda className="text-gray-500">{margen}</span>}
               {margen && dc && <span className="text-gray-300"> · </span>}
               {dc && <span className={toneDelta(dc.tone)}>{dc.texto}</span>}
@@ -1149,7 +1149,7 @@ function TotalGroupCell({
         <span className="flex flex-col items-end leading-tight">
           <span className="text-white">{renderCellValue(cur, mode)}</span>
           {(dc || margen) && (
-            <span className="mt-0.5" title={leyendaDelta(mode, prevYear)}>
+            <span className="mt-0.5">
               {margen && <span data-margen-celda className="text-gray-400">{margen}</span>}
               {margen && dc && <span className="text-gray-600"> · </span>}
               {dc && <span className={toneDeltaOscuro(dc.tone)}>{dc.texto}</span>}
@@ -1204,7 +1204,7 @@ function TotalGroupAnnualCell({
         <span className="flex flex-col items-end leading-tight">
           <span className="text-white">{displayValue}</span>
           {(dc || margen) && (
-            <span className="mt-0.5 text-xs font-medium" title={leyendaDelta(mode, prevYear)}>
+            <span className="mt-0.5 text-xs font-medium">
               {margen && <span data-margen-celda className="text-gray-400">{margen}</span>}
               {margen && dc && <span className="text-gray-600"> · </span>}
               {dc && <span className={toneDeltaOscuro(dc.tone)}>{dc.texto}</span>}

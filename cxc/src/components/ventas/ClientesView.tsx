@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Download, Search } from "lucide-react";
 import type { Clientes, Cliente } from "./types";
@@ -13,7 +12,7 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
+import type { HistorialState } from "./ClienteHoverCard";
 import { ClienteSheet } from "./ClienteSheet";
 import { OrdenarEnLaBarra, ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { ControlSegmentado } from "./ControlSegmentado";
@@ -307,8 +306,10 @@ export function ClientesView({
   }, [empresa, selectedYear, qsVentana]);
 
   // Cache de historial-mensual por (codigo + empresaKey). Lazy: solo se
-  // popula al primer hover/tap sobre cada cliente. El CXC aging se fetchea
-  // y cachea internamente en ClienteHoverCard (cache module-level allá).
+  // popula al tocar un cliente y abrir su `ClienteSheet` (7-oct-2026: el
+  // preview al pasar el mouse se retiró, así que el único trigger es ESE
+  // toque). El CXC aging se fetchea y cachea internamente en
+  // ClienteHoverCard (cache module-level allá).
   const [historialCache, setHistorialCache] = useState<Record<string, HistorialState>>({});
   const histInFlight = useRef<Set<string>>(new Set());
   /** Lo que ya llegó bien: no se vuelve a pedir aunque se toque otra vez. */
@@ -828,10 +829,7 @@ export function ClientesView({
                   c={c}
                   displayRank={idx + 1}
                   mostrarRanking={mostrarRanking}
-                  histState={histStateFor(c)}
-                  empresaScope={empresa}
                   resaltado={!!resaltado && c.id === resaltado}
-                  onTriggerHistorial={() => loadHistorial(c.id, c.empresaKey)}
                 />
               ))}
 
@@ -847,10 +845,7 @@ export function ClientesView({
                   c={c}
                   displayRank={bloques.conCompras.length + idx + 1}
                   mostrarRanking={mostrarRanking}
-                  histState={histStateFor(c)}
-                  empresaScope={empresa}
                   resaltado={!!resaltado && c.id === resaltado}
-                  onTriggerHistorial={() => loadHistorial(c.id, c.empresaKey)}
                 />
               ))}
 
@@ -902,10 +897,7 @@ export function ClientesView({
                   c={c}
                   displayRank={bloques.conCompras.length + bloques.huerfanos.length + idx + 1}
                   mostrarRanking={mostrarRanking}
-                  histState={histStateFor(c)}
-                  empresaScope={empresa}
                   resaltado={!!resaltado && c.id === resaltado}
-                  onTriggerHistorial={() => loadHistorial(c.id, c.empresaKey)}
                 />
               ))}
 
@@ -996,9 +988,9 @@ export function ClientesView({
           lista (ver `bloques`). El año contra el que compara, que era lo único
           que el diálogo agregaba, lo dice el encabezado de la columna. */}
 
-      {/* Sheet mobile: equivalente del HoverCard desktop. Aparece sólo
-          en `md:hidden` (su breakpoint interno). El chip CXC se fetchea
-          internamente en ClienteHoverCard. */}
+      {/* Sheet mobile: abre al tocar la tarjeta del cliente (<lg). El
+          desktop ya no tiene un preview propio — ver el toque en ClienteRow.
+          El chip CXC se fetchea internamente en ClienteHoverCard. */}
       <ClienteSheet
         open={!!sheetCliente}
         onClose={() => setSheetCliente(null)}
@@ -1067,10 +1059,7 @@ function ClienteRow({
   c,
   displayRank,
   mostrarRanking,
-  histState,
-  empresaScope,
   resaltado = false,
-  onTriggerHistorial,
 }: {
   c: Cliente;
   /** Llegó por `?cliente=` desde la ficha: la fila se marca para reconocerla. */
@@ -1080,21 +1069,8 @@ function ClienteRow({
    *  al lado de un nombre se lee como si lo fuera. */
   displayRank: number;
   mostrarRanking: boolean;
-  histState: HistorialState;
-  empresaScope: string;
-  onTriggerHistorial: () => void;
 }) {
   const isMultiEmpresa = c.empresas_count > 1 && (c.empresas_breakdown?.length ?? 0) > 1;
-  // Auto-flip: cliente en la mitad inferior de la viewport → HoverCard se
-  // abre hacia arriba (side="top") en vez de a la derecha. Evita que el
-  // card se corte cuando el row está cerca del bottom del scroll.
-  const [hoverSide, setHoverSide] = useState<"right" | "top">("right");
-
-  const handleHoverEnter = (e: React.SyntheticEvent<HTMLElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const middle = window.innerHeight / 2;
-    setHoverSide(rect.top > middle ? "top" : "right");
-  };
 
   return (
     // `data-fila-cliente` es el ancla ESTABLE que cruza fila y tarjeta en el
@@ -1110,46 +1086,26 @@ function ClienteRow({
         <td className="border-b border-gray-200 px-2.5 py-3 text-right text-xs text-gray-500 tabular-nums">{displayRank}</td>
       )}
       <td className="border-b border-gray-200 px-2.5 py-3 text-sm text-gray-950">
-        {/* Escritorio (lg+): HoverCard con popover. Debajo de lg el mismo
-            botón dispara onMobileTap → abre ClienteSheet en el padre. */}
-        <HoverCard openDelay={250} closeDelay={100}>
-          <HoverCardTrigger asChild>
-            {/* El nombre es link directo a la ficha (/clientes/[codigo]); el
-                HoverCard sigue mostrando el preview al hover en desktop. */}
-            {/* El CÓDIGO va ADENTRO del enlace a propósito. El nombre solo
-                medía 18 px de alto y el iPad horizontal (1194) cae del lado de
-                la tabla y se toca con el dedo. Envolver las dos líneas da los
-                44 px SIN agrandar la fila ni un píxel: el código ya estaba ahí
-                abajo, sólo dejó de ser texto muerto al lado del enlace. */}
-            <Link
-              href={`/clientes/${encodeURIComponent(c.id)}`}
-              onMouseEnter={handleHoverEnter}
-              onFocus={handleHoverEnter}
-              className="flex min-h-[44px] max-w-full flex-col justify-center text-left font-medium leading-tight hover:text-blue-600"
-            >
-              <span data-col="nombre">
-                {c.nombre}
-                {c.esDelGrupo && <DelGrupoBadge />}
-              </span>
-              <span data-col="codigo" className="tabular-nums text-xs font-normal leading-tight text-gray-500">{c.id}</span>
-            </Link>
-          </HoverCardTrigger>
-          <HoverCardContent
-            side={hoverSide}
-            align="start"
-            collisionPadding={12}
-            className="hidden w-[320px] lg:block"
-          >
-            <ClienteHoverCard
-              nombre={c.nombre}
-              codigo={c.id}
-              empresa={c.empresa}
-              empresaScope={empresaScope}
-              historial={histState}
-              onFirstHover={onTriggerHistorial}
-            />
-          </HoverCardContent>
-        </HoverCard>
+        {/* 🔴 SIN PREVIEW AL PASAR EL MOUSE (7-oct-2026). Aquí vivía un
+            `HoverCard` que abría una tarjeta de 320 px con solo pasar el
+            mouse por el nombre — nunca con un toque, y en la computadora
+            aparecía sin que nadie la pidiera. Daniel: «quítame el hover que
+            no me gusta». El nombre sigue siendo el link directo a la ficha
+            (/clientes/[codigo]): ese toque ya abre el detalle completo.
+            El CÓDIGO va ADENTRO del enlace a propósito: el nombre solo medía
+            18 px de alto y el iPad horizontal (1194) cae del lado de la
+            tabla y se toca con el dedo. Envolver las dos líneas da los 44 px
+            SIN agrandar la fila ni un píxel. */}
+        <Link
+          href={`/clientes/${encodeURIComponent(c.id)}`}
+          className="flex min-h-[44px] max-w-full flex-col justify-center text-left font-medium leading-tight hover:text-blue-600"
+        >
+          <span data-col="nombre">
+            {c.nombre}
+            {c.esDelGrupo && <DelGrupoBadge />}
+          </span>
+          <span data-col="codigo" className="tabular-nums text-xs font-normal leading-tight text-gray-500">{c.id}</span>
+        </Link>
       </td>
       {/* 🔴 SIEMPRE EL NÚMERO. Antes decía «6 empresas» cuando eran varias y
           «Vistana International» cuando era una: dos preguntas distintas bajo
