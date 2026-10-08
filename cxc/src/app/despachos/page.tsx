@@ -164,8 +164,10 @@ export default function GuiasPage() {
   // `ETIQUETAS_ROLES` derivado de `GUIAS_WRITE_ROLES`); el vendedor no.
   type Vista = "pedidos" | "guias" | "config" | "etiquetas";
   const [vista, setVista] = useState<Vista>("guias");
-  // 🔴 «Pedidos» es la PRIMERA pestaña para bodega y admin, y abre ahí
-  // (`?vista=guias` vuelve a la lista). Con el interruptor apagado no existe.
+  // 🔴 «Pedidos» es la PRIMERA pestaña y el módulo ABRE AHÍ para todos los
+  // que la ven (Daniel, 7-oct-2026: «el módulo Despachos debe abrir en
+  // Pedidos»). `?vista=guias` y `?pendientes=1` siguen abriendo la lista de
+  // guías. Con el interruptor apagado no existe.
   const hayPedidos = puedeVerPedidosBodega(role);
   const hayConfig =
     GUIAS_ATAJOS_NUEVOS && !!role && (CONFIG_GUIAS_ROLES as readonly string[]).includes(role);
@@ -174,11 +176,13 @@ export default function GuiasPage() {
     if (!authChecked) return;
     const v = new URLSearchParams(window.location.search).get("vista");
     if (v === "config" || v === "etiquetas") setVista(v);
-    else if (v === "pedidos" && hayPedidos) setVista("pedidos");
-    // Abre en Pedidos para bodega y admin, como antes; los demás marcan pero abren en Guías.
-    else if (hayPedidos && (role === "admin" || role === "bodega") && v !== "guias") setVista("pedidos");
+    else if (hayPedidos && v !== "guias" && !hayFiltroPendientes()) setVista("pedidos");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
+  /** `?pendientes=1` (⌘K › «Ir a guías pendientes») es un enlace a la lista de guías. */
+  function hayFiltroPendientes() {
+    return new URLSearchParams(window.location.search).get("pendientes") === "1";
+  }
   function cambiarVista(v: Vista) {
     setVista(v);
     const params = new URLSearchParams(window.location.search);

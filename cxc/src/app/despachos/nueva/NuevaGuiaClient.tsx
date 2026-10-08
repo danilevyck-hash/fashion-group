@@ -92,7 +92,7 @@ export default function NuevaGuiaClient() {
         onRemoveRow={s.removeRow}
         onRestoreRow={s.restoreRow}
         onSave={s.saveGuia}
-        onCancel={() => router.push("/despachos")}
+        onCancel={() => router.push("/despachos?vista=guias")}
       />
       <Toast message={s.toast} />
     </div>

@@ -315,7 +315,7 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
       } catch {
         if (!cancelado) {
           showToast("Error al cargar guía");
-          router.push("/despachos");
+          router.push("/despachos?vista=guias");
         }
       }
     })();
@@ -643,7 +643,7 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
       // autoguardado) simplemente no se hace nada.
       if (!silent) {
         if (alGuardar) alGuardar();
-        else router.push("/despachos");
+        else router.push("/despachos?vista=guias");
       }
       return;
     }
@@ -733,9 +733,9 @@ export function useGuiaFormState({ editingId = null, alGuardar, despuesDeCrear, 
             // ⚠️ Si el servidor no devolvió el id (no debería pasar: el POST
             // responde la guía insertada), se vuelve al listado como siempre.
             // Quedarse quieto sin decir nada sería peor.
-            router.push(nuevoId ? `/despachos/${nuevoId}` : "/despachos");
+            router.push(nuevoId ? `/despachos/${nuevoId}` : "/despachos?vista=guias");
           } else {
-            router.push("/despachos");
+            router.push("/despachos?vista=guias");
           }
         }
       } else {
