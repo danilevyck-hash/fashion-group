@@ -151,7 +151,7 @@ describe("🔴 4 · quién marca cada paso", () => {
     const bodega = { role: "bodega", userName: "julio" };
     expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, bodega).ok).toBe(true);
     const rechazo = puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: "fashion_wear" }, bodega);
-    expect(rechazo).toEqual({ ok: false, error: "Ese paso lo marca la secretaria" });
+    expect(rechazo).toEqual({ ok: false, error: "«Recibido» lo marca la secretaria. La sesión abierta es de julio (bodega)." });
   });
 
   // 🔑 El candado de los DOS rechazos que pidió Daniel: ni bodega marca
@@ -161,7 +161,7 @@ describe("🔴 4 · quién marca cada paso", () => {
     const secretaria = { role: "secretaria", userName: "angela" };
     expect(puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: "fashion_wear" }, secretaria).ok).toBe(true);
     const rechazo = puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, secretaria);
-    expect(rechazo).toEqual({ ok: false, error: "Ese paso lo marca bodega" });
+    expect(rechazo).toEqual({ ok: false, error: "«Preparado» lo marca bodega. La sesión abierta es de angela (secretaria)." });
     // No se salta Preparado.
     expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "recibido", empresa_key: "fashion_wear" }, secretaria).ok).toBe(false);
   });
