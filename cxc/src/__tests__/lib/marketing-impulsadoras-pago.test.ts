@@ -344,11 +344,11 @@ describe("listImpulsadoras — chips con meses a medias", () => {
   });
 });
 
-// 🔴 CANDADO — «Se cobra» en el pago de impulsadora (Marketing nuevo,
-// 8-oct-2026: «al hacer un gasto el default sea 50 %»). Con el código de antes,
-// `pct_a_la_marca` nunca viajaba y el pago se cobraba entero sin remedio.
-describe("registrarPagoImpulsadora — Se cobra 100 % · 50 %", () => {
-  it("con pctALaMarca 50 la factura del pago guarda pct_a_la_marca = 50", async () => {
+// 🔴 CANDADO — el pago de impulsadora se cobra al 100 % a su marca, SIEMPRE
+// (Daniel, 8-oct-2026: «las impulsadoras son al 100 %. Ya definitivo»). Aunque
+// alguien mande un porcentaje, `pct_a_la_marca` no se escribe (vacío = 100 %).
+describe("registrarPagoImpulsadora — siempre al 100 %", () => {
+  it("un pago nuevo no escribe pct_a_la_marca, ni aunque le manden 50", async () => {
     const estado = estadoBase();
     const { registrarPagoImpulsadora } = await cargarLib(estado);
     await registrarPagoImpulsadora("imp-1", {
@@ -357,14 +357,8 @@ describe("registrarPagoImpulsadora — Se cobra 100 % · 50 %", () => {
       monto: 800,
       comprobante,
       pctALaMarca: 50,
-    });
-    expect(estado.inserts.mk_facturas?.[0]).toMatchObject({ total: 800, pct_a_la_marca: 50 });
-  });
-
-  it("sin el campo (pantallas de antes) no escribe la columna: se cobra entero", async () => {
-    const estado = estadoBase();
-    const { registrarPagoImpulsadora } = await cargarLib(estado);
-    await registrarPagoImpulsadora("imp-1", { desde: "2026-07-01", hasta: "2026-07-31", monto: 800, comprobante });
+    } as Parameters<typeof registrarPagoImpulsadora>[1]);
+    expect(estado.inserts.mk_facturas?.[0]).toMatchObject({ total: 800 });
     expect(estado.inserts.mk_facturas?.[0]).not.toHaveProperty("pct_a_la_marca");
   });
 });
