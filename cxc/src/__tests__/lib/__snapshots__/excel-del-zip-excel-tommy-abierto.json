@@ -1,0 +1,497 @@
+{
+ "total": 3700,
+ "excel": [
+  {
+   "hoja": "Resumen",
+   "celdas": [
+    [
+     "FASHION GROUP — Tommy Hilfiger",
+     null,
+     null,
+     null
+    ],
+    [
+     "Período 2026 · período abierto — gastos al HOY",
+     null,
+     null,
+     null
+    ],
+    [
+     "",
+     null,
+     null,
+     null
+    ],
+    [
+     "Cliente",
+     "# Gastos",
+     "# Fotos",
+     "Total"
+    ],
+    [
+     "Nova Lux, S.A.",
+     2,
+     0,
+     3610
+    ],
+    [
+     "City Mall David",
+     1,
+     1,
+     40
+    ],
+    [
+     "Impulsadoras",
+     1,
+     0,
+     30
+    ],
+    [
+     "General",
+     1,
+     1,
+     20
+    ],
+    [
+     "TOTAL",
+     5,
+     2,
+     3700
+    ]
+   ],
+   "vinculos": [],
+   "columnas": [
+    32,
+    9,
+    8,
+    18
+   ],
+   "combinadas": []
+  },
+  {
+   "hoja": "Nova Lux, S.A.",
+   "celdas": [
+    [
+     "GASTOS",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Ver todas las facturas (1)",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Fecha",
+     "Período",
+     "Concepto",
+     "Proveedor",
+     "N° Factura",
+     "Total",
+     "Comprobante"
+    ],
+    [
+     "2026-09-18",
+     "—",
+     "Instalación de paneles",
+     "Krysthel Morales",
+     "0000062711",
+     1070,
+     "Ver factura"
+    ],
+    [
+     "2026-09-24",
+     "—",
+     "14 paneles, 40 barras planas",
+     "Mobiliario",
+     "ME-0007",
+     2540,
+     "Ver comprobante"
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "TOTALES",
+     3610,
+     ""
+    ],
+    [
+     "",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "FOTOS",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Archivo",
+     "Foto",
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "(sin fotos)",
+     "",
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "vinculos": [
+    [
+     "A2",
+     "https://www.fashiongr.com/api/marketing/facturas-pdf/D-170?t=suyfXCkvPVFaOI9u5c-BQWWhfObKpYC0e4tjFDrN2P8",
+     null
+    ],
+    [
+     "F6",
+     null,
+     "SUM(F4:F5)"
+    ],
+    [
+     "G4",
+     "https://firmado/fact/f6.pdf",
+     null
+    ],
+    [
+     "G5",
+     "https://www.fashiongr.com/api/marketing/entregas-pdf/e2?t=VZNHJKUsASvVcVErYkOAJIjsmxJI2VKtL1kbI5MadME",
+     null
+    ]
+   ],
+   "columnas": [
+    12,
+    16,
+    40,
+    22,
+    16,
+    18,
+    16
+   ],
+   "combinadas": []
+  },
+  {
+   "hoja": "City Mall David",
+   "celdas": [
+    [
+     "GASTOS",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Fecha",
+     "Período",
+     "Concepto",
+     "Proveedor",
+     "N° Factura",
+     "Total",
+     "Comprobante"
+    ],
+    [
+     "2026-06-20",
+     "—",
+     "muebles apertura",
+     "Mobiliario",
+     "ME-0007",
+     40,
+     "Ver comprobante"
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "TOTALES",
+     40,
+     ""
+    ],
+    [
+     "",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "FOTOS",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Ver todas las fotos (1)",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "vinculos": [
+    [
+     "A7",
+     "https://www.fashiongr.com/marketing/galeria/D-24?t=5tH751uvBn1IjYDl4L7XP3dVr8Wv5bnfehmgQ_NCy4c",
+     null
+    ],
+    [
+     "F4",
+     null,
+     "SUM(F3:F3)"
+    ],
+    [
+     "G3",
+     "https://www.fashiongr.com/api/marketing/entregas-pdf/e1?t=YyVAL4PWRvDID58enkQw4PF29s2tWuQaglbJvBDjU9I",
+     null
+    ]
+   ],
+   "columnas": [
+    12,
+    16,
+    40,
+    22,
+    16,
+    18,
+    16
+   ],
+   "combinadas": []
+  },
+  {
+   "hoja": "Impulsadoras",
+   "celdas": [
+    [
+     "GASTOS",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Fecha",
+     "Período",
+     "Concepto",
+     "Proveedor",
+     "N° Factura",
+     "Total",
+     "Comprobante"
+    ],
+    [
+     "2026-06-01",
+     "jun 2026",
+     "pago impulsadora junio",
+     "Proveedor, S.A.",
+     "IMP-1",
+     30,
+     "Ver factura"
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "TOTALES",
+     30,
+     ""
+    ],
+    [
+     "",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "FOTOS",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Archivo",
+     "Foto",
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "(sin fotos)",
+     "",
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "vinculos": [
+    [
+     "F4",
+     null,
+     "SUM(F3:F3)"
+    ],
+    [
+     "G3",
+     "https://firmado/fact/f3.jpg",
+     null
+    ]
+   ],
+   "columnas": [
+    12,
+    16,
+    40,
+    22,
+    16,
+    18,
+    16
+   ],
+   "combinadas": []
+  },
+  {
+   "hoja": "General",
+   "celdas": [
+    [
+     "GASTOS",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Fecha",
+     "Período",
+     "Concepto",
+     "Proveedor",
+     "N° Factura",
+     "Total",
+     "Comprobante"
+    ],
+    [
+     "2026-06-10",
+     "—",
+     "evento apertura",
+     "Proveedor, S.A.",
+     "EV-1",
+     20,
+     "Ver factura"
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "TOTALES",
+     20,
+     ""
+    ],
+    [
+     "",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "FOTOS",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Archivo",
+     "Foto",
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "evento.jpg",
+     "Ver foto",
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "vinculos": [
+    [
+     "B8",
+     "https://firmado/fotos/evento.jpg",
+     null
+    ],
+    [
+     "F4",
+     null,
+     "SUM(F3:F3)"
+    ],
+    [
+     "G3",
+     "https://firmado/fact/f4.pdf",
+     null
+    ]
+   ],
+   "columnas": [
+    12,
+    16,
+    40,
+    22,
+    16,
+    18,
+    16
+   ],
+   "combinadas": []
+  }
+ ]
+}

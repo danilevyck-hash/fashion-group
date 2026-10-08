@@ -48,12 +48,16 @@ import ImpulsadorasView from "./components/ImpulsadorasView";
 import PortadaTiendasYMarcas from "./components/PortadaTiendasYMarcas";
 import { useRedirigirProyectoViejo } from "./components/useProyectoViejo";
 import { useEsCelular } from "./components/celular/useEsCelular";
+import { veMarketingNuevo } from "@/lib/marketing/marketing-nuevo";
 
 // LAZY (7-oct-2026): los dos se abren con un toque y arrastran jsPDF +
 // html2canvas (la nota de entrega del mueble): 104 KB comprimidos que la
 // portada bajaba al abrir sin usarlos. Medido: First Load de /marketing 476 KB.
 const RegistrarGastoModal = dynamic(() => import("./components/RegistrarGastoModal"), { ssr: false });
 const ProyectoOverlay = dynamic(() => import("./components/ProyectoOverlay"), { ssr: false });
+// 🔴 MARKETING NUEVO (8-oct-2026): solo para `veMarketingNuevo(role)`. Lazy:
+// quien ve la pantalla de hoy no baja ni un byte de la nueva.
+const MarketingNuevo = dynamic(() => import("./components/nuevo/MarketingNuevo"), { ssr: false });
 
 type VistaExtra = "reportes" | "impulsadoras" | null;
 
@@ -137,6 +141,17 @@ function MarketingPage() {
   if (redirigiendoProyecto) return null;
 
   const refrescar = () => setRefreshKey((k) => k + 1);
+
+  if (veMarketingNuevo(role)) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <AppHeader module="Marketing" breadcrumbs={[]} tituloEnLaPantalla={celular} />
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+          <MarketingNuevo role={role} marcas={marcas} />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

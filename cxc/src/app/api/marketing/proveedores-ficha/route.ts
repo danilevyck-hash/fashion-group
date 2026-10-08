@@ -21,6 +21,7 @@ import {
   facturasEnPeriodoCerrado,
 } from "@/lib/marketing/solo-cobrable-2026-10";
 import { requireRole } from "@/lib/requireRole";
+import { veMarketingNuevo } from "@/lib/marketing/marketing-nuevo";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { TIENDA_GENERAL } from "@/lib/marketing/gasto";
@@ -96,7 +97,8 @@ export async function GET(req: NextRequest) {
     // CERRADO está cobrado (Daniel). Dos lecturas chicas: los cerrados y sus
     // sellos de factura. Apagado, no se lee nada de esto.
     let cobradas: Set<string> | null = null;
-    if (MKT_SOLO_COBRABLE_2026_10) {
+    // 🔴 Marketing nuevo (8-oct-2026): también para quien lo ve (`veMarketingNuevo`).
+    if (MKT_SOLO_COBRABLE_2026_10 || veMarketingNuevo(auth.role)) {
       const [perRes, selRes] = await Promise.all([
         supabaseServer.from("mk_periodos").select("id, estado"),
         supabaseServer.from("mk_periodo_documentos").select("periodo_id, tipo, documento_id"),

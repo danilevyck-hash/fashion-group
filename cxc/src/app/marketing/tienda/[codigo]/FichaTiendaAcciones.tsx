@@ -32,7 +32,7 @@ import { FacturaForm } from "@/components/marketing";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import { MARKETING_PUERTA_GASTO } from "@/lib/marketing/puerta-gasto";
 import { DIAS_PARA_BORRAR_ANULADOS } from "@/lib/marketing/periodo-manda";
-import { MKT_SOLO_COBRABLE_2026_10 } from "@/lib/marketing/solo-cobrable-2026-10";
+import { useSoloCobrable } from "@/lib/marketing/solo-cobrable-contexto";
 import { adjuntarPdfDeFactura } from "../../components/uploadHelpers";
 import ConfirmarEliminar from "./ConfirmarEliminar";
 import type {
@@ -91,6 +91,7 @@ function EditarFactura({
   onCerrar: () => void;
   onCambio: () => void;
 }) {
+  const MKT_SOLO_COBRABLE_2026_10 = useSoloCobrable();
   const { toast } = useToast();
   const [factura, setFactura] = useState<FacturaConAdjuntos | null>(null);
   const [marcasIniciales, setMarcasIniciales] = useState<MarcaPorcentajeInput[] | null>(null);

@@ -18,7 +18,9 @@ import ClientePicker from "@/components/ClientePicker";
 import type { MkMarca } from "@/lib/marketing/types";
 import { ENLACE } from "@/lib/marketing/marketing-2026-10";
 import { PCT_QUE_SE_COBRA, type DestinoDelCargo } from "@/lib/marketing/solo-cobrable-2026-10";
-import { ROTULO_ADJUNTAR_COMPROBANTE, ROTULO_COMPROBANTE, ROTULO_SE_COBRA } from "@/lib/marketing/proveedores-2026-10";
+import { ROTULO_COMPROBANTE, ROTULO_SE_COBRA } from "@/lib/marketing/proveedores-2026-10";
+
+export const ROTULO_SUBIR_FACTURA = "Subir factura";
 
 const CAMPO =
   "w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none bg-white";
@@ -33,18 +35,13 @@ const OPCION = (sel: boolean) =>
 export function ComprobanteDelCargo({
   archivo,
   leyendo,
-  enCelular,
   onAdjuntar,
-  onEscanear,
   onQuitar,
 }: {
   archivo: string | null;
   leyendo: boolean;
-  enCelular: boolean;
-  /** Abre el selector de archivo (PDF o foto). */
+  /** Abre el selector: en el celular, cámara o archivo; en la computadora, archivo. */
   onAdjuntar: () => void;
-  /** Abre la cámara (solo en el celular). */
-  onEscanear: () => void;
   onQuitar: () => void;
 }) {
   return (
@@ -65,23 +62,17 @@ export function ComprobanteDelCargo({
             Quitar
           </button>
         </div>
-      ) : enCelular ? (
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={onEscanear} className={OPCION(false)} data-testid="escanear-cargo">
-            Escanear
-          </button>
-          <button type="button" onClick={onAdjuntar} className={OPCION(false)}>
-            Subir PDF
-          </button>
-        </div>
       ) : (
+        // 🔴 UN SOLO BOTÓN (8-oct-2026). Daniel: «Escanear y Subir PDF son lo
+        // mismo». Sin `capture`, el celular ofrece cámara, fotos o archivo; la
+        // computadora, archivo. La lectura llena los datos igual.
         <button
           type="button"
           onClick={onAdjuntar}
           className="w-full rounded-md border border-dashed border-gray-300 px-3 min-h-[56px] py-3 text-sm text-gray-600 hover:border-gray-500 hover:text-black transition"
           data-testid="adjuntar-cargo"
         >
-          {ROTULO_ADJUNTAR_COMPROBANTE}
+          {ROTULO_SUBIR_FACTURA}
         </button>
       )}
     </div>
