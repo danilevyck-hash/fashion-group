@@ -169,11 +169,18 @@ export function puedeMoverFlujoSimple(
   if (!veLaEmpresa(empresa_key, quien.userName, quien.role)) {
     return { ok: false, error: "Ese pedido no es de una de tus empresas" };
   }
-  if (!quien.role || !rolesDelEstadoFlujoSimple(hasta).includes(quien.role)) {
-    return {
-      ok: false,
-      error: hasta === "preparado" ? "Ese paso lo marca bodega" : "Ese paso lo marca la secretaria",
-    };
+  // 🔴 El rol lo decide el PASO que se toca, no solo el destino: deshacer
+  // «Recibido» (volver a Preparado) es de la secretaria, y deshacer
+  // «Preparado» (volver a Pendiente) es de bodega.
+  const paso: EstadoFlujoSimple = desde === "recibido" || hasta === "recibido" ? "recibido" : "preparado";
+  if (!quien.role || !rolesDelEstadoFlujoSimple(paso).includes(quien.role)) {
+    // 🩸 7-oct-2026: Ángela leyó «Ese paso lo marca la secretaria» siendo la
+    // secretaria — su pestaña decía Angela, pero el navegador ya tenía abierta
+    // la sesión de jorman (bodega). El rechazo nombra la sesión con que llegó
+    // la petición, para que nunca contradiga a quien lo lee.
+    const quienEs = quien.userName ? `${quien.userName} (${quien.role ?? "sin rol"})` : (quien.role ?? "sin rol");
+    const quienMarca = paso === "preparado" ? "«Preparado» lo marca bodega" : "«Recibido» lo marca la secretaria";
+    return { ok: false, error: `${quienMarca}. La sesión abierta es de ${quienEs}.` };
   }
   return { ok: true };
 }
