@@ -102,7 +102,9 @@ describe("1 · el encabezado: el nombre y UNA sola línea con lo fiscal", () => 
 
   it("a la derecha hay UN botón: «Cobrar»", () => {
     pintar();
-    expect(screen.getByRole("button", { name: "Enviar estado de cuenta" })).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
+    // 1-oct-2026, Daniel: nombres normales de ERP.
+    // 7-oct-2026, Daniel aprobó un solo botón «Estado de cuenta» (ESTADO_CUENTA_UN_BOTON_2026_10 prendido).
+    expect(screen.getByRole("button", { name: "Estado de cuenta" })).toBeTruthy();
   });
 });
 
@@ -274,9 +276,14 @@ describe("5 · el contacto se edita TOCANDO el dato", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("6 · el pie: enlaces, no botones", () => {
-  it("«Ver los N documentos» con el número real", () => {
+  it("«Ver los N documentos» ya no se repite en el pie: lo abre el botón de arriba", () => {
     pintar();
-    expect(screen.getByRole("button", { name: /Estado de cuenta \(353\)/ })).toBeTruthy(); // 1-oct-2026, Daniel: nombres normales de ERP
+    // 🔁 CAMBIA DE DIRECCIÓN, 7-oct-2026: antes el pie traía «Estado de cuenta (353)»
+    // (1-oct-2026, nombres normales de ERP). Con un solo botón prendido, ese
+    // segundo botón para el mismo trabajo ya no se dibuja.
+    expect(screen.queryByRole("button", { name: /Estado de cuenta \(353\)/ })).toBeNull();
+    // Control al revés: el botón de arriba sigue.
+    expect(screen.getByRole("button", { name: "Estado de cuenta" })).toBeTruthy();
   });
 
   it("«Últimas guías» viene PLEGADO", () => {
@@ -302,7 +309,8 @@ describe("6 · el pie: enlaces, no botones", () => {
   it("🔴 bodega NO ve Cobrar, ni los documentos, ni los dos enlaces", () => {
     ROL = "bodega";
     pintar();
-    // 1-oct-2026, Daniel: nombres normales de ERP
+    // 1-oct-2026, Daniel: nombres normales de ERP. 7-oct-2026, Daniel aprobó un solo botón «Estado de cuenta» (ESTADO_CUENTA_UN_BOTON_2026_10 prendido).
+    expect(screen.queryByRole("button", { name: "Estado de cuenta" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Enviar estado de cuenta" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Estado de cuenta \(353\)/ })).toBeNull();
     expect(screen.queryByText(/Ver en Cuentas por cobrar/)).toBeNull();
@@ -315,7 +323,8 @@ describe("6 · el pie: enlaces, no botones", () => {
   it("🔴 el vendedor ve Cobrar pero NO «Ver en Ventas»", () => {
     ROL = "vendedor";
     pintar();
-    expect(screen.getByRole("button", { name: "Enviar estado de cuenta" })).toBeTruthy();
+    // 7-oct-2026, Daniel aprobó un solo botón «Estado de cuenta» (ESTADO_CUENTA_UN_BOTON_2026_10 prendido).
+    expect(screen.getByRole("button", { name: "Estado de cuenta" })).toBeTruthy();
     expect(screen.queryByText(/Ver en Ventas/)).toBeNull();
   });
 });
@@ -324,7 +333,8 @@ describe("6 · el pie: enlaces, no botones", () => {
 describe("7 · «Cobrar» abre la MISMA hoja del CXC, sin salir de la ficha", () => {
   it("al tocarlo aparece la hoja «Cobrar» con sus cuatro salidas", async () => {
     pintar();
-    fireEvent.click(screen.getByRole("button", { name: "Enviar estado de cuenta" }));
+    // 7-oct-2026, Daniel aprobó un solo botón «Estado de cuenta» (ESTADO_CUENTA_UN_BOTON_2026_10 prendido).
+    fireEvent.click(screen.getByRole("button", { name: "Estado de cuenta" }));
     // 1-oct-2026, Daniel: nombres normales de ERP: la hoja se titula «Enviar estado de cuenta».
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Enviar estado de cuenta" })).toBeTruthy();

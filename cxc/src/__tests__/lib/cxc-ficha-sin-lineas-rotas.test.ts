@@ -125,9 +125,13 @@ describe("🔴 1 · ningún valor se le monta a su rótulo, en NINGUNA página",
     expect(pedazos.length).toBeGreaterThan(0);
 
     const paginas = new Set(pedazos.map((p) => p.pagina));
-    expect(paginas.size, "el papel tiene que traer las DOS hojas").toBe(2);
+    // 7-oct-2026: con ESTADO_CUENTA_UN_BOTON_2026_10 prendido, un cliente que
+    // debe en DOS empresas abre con la hoja del GRUPO antes de las dos fichas.
+    expect(paginas.size, "el papel tiene que traer la hoja del grupo y las DOS fichas").toBe(3);
 
-    for (const pagina of paginas) {
+    // La hoja del grupo (la primera) no lleva los rótulos de la ficha.
+    const fichas = [...paginas].sort((a, b) => a - b).slice(1);
+    for (const pagina of fichas) {
       for (const [rotulo, valor] of PARES) {
         const elRotulo = pedazos.find((p) => p.pagina === pagina && p.texto.trim() === rotulo);
         expect(elRotulo, `falta «${rotulo}» en la hoja ${pagina}`).toBeDefined();
