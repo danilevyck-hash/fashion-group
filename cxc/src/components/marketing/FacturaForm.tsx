@@ -7,7 +7,7 @@
 // debe invocar setMarcasDeFactura(facturaId, marcas) después de crear/editar
 // la fila en mk_facturas.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   EstadoPagoFactura,
   MarcaPorcentajeInput,
@@ -49,6 +49,9 @@ import {
   opcionDeImpuesto,
   type OpcionDeImpuesto,
 } from "@/lib/marketing/ficha-gasto-2026-10";
+import { unirEnHumano } from "@/lib/guias/falta-para-despachar";
+import { MKT_SOLO_COBRABLE_2026_10 } from "@/lib/marketing/solo-cobrable-2026-10";
+import { SeCobraAlEditar } from "@/app/marketing/components/RegistroDelCargo";
 
 export interface FacturaFormValues {
   numeroFactura: string;
@@ -208,6 +211,21 @@ interface FacturaFormProps {
    * las pantallas), nada cambia.
    */
   adjuntoPdfExistente?: { nombre: string; url: string } | null;
+  /**
+   * 🔴 SOLO LO COBRABLE (7-oct-2026, `MKT_SOLO_COBRABLE_2026_10`, apagado).
+   * El registro de UNA pantalla: el comprobante lo pide la puerta (arriba),
+   * acá van los datos de la factura y, debajo, `destino` (Marca · Tienda ·
+   * Se cobra). Sin asteriscos, sin el paso de marcas y sin «A cargo de la
+   * empresa»: lo que falta se dice TODO junto al tocar Guardar. Sin la prop,
+   * el formulario es el de siempre.
+   */
+  cargo?: {
+    destino: ReactNode;
+    /** Lo que falta del destino, en palabras («la marca», «la tienda»). */
+    faltaDestino: readonly string[];
+    /** Ya hay un PDF o una foto de la factura. */
+    hayComprobante: boolean;
+  };
 }
 
 type ItbmsOption = "0" | "7";
@@ -265,6 +283,7 @@ export function FacturaForm({
   historicoProveedores,
   editarDatosDelGasto = false,
   adjuntoPdfExistente = null,
+  cargo,
 }: FacturaFormProps) {
   const { toast } = useToast();
 
@@ -415,7 +434,7 @@ export function FacturaForm({
   // 🔴 Con «Se cobra a / Se cobra» (6-oct-2026): válido con «A cargo de la
   // empresa» o con UNA marca elegida — nunca varias, nunca porcentajes libres.
   const marcasValidasDestino = destino.aCargoDeLaEmpresa || marcaIdDestino !== "";
-  const marcasValidasFinal = usaDestino ? marcasValidasDestino : marcasValidas;
+  const marcasValidasFinal = cargo ? true : usaDestino ? marcasValidasDestino : marcasValidas;
   // `[]` cuando queda «a cargo de la empresa»: el caller NO llama al PUT de
   // marcas con la lista vacía (la deja intacta — ver `zip-marca.ts ›
   // vaEnElPapel`, que ya corta por `pct_a_la_marca = 0` sin mirar la marca).
@@ -452,7 +471,21 @@ export function FacturaForm({
   // 🔴 Sin factura no se guarda el gasto — pero solo donde SE PIDE (compras),
   // y la pantalla dice QUÉ falta en vez de apagar el botón sin explicación.
   const falta = faltaLaFactura(Boolean(pdfFile), pdfObligatorio);
-  const puedeGuardar = pasoDatos && marcasValidasFinal && !enviando && falta === null;
+  const puedeGuardar = cargo
+    ? !enviando
+    : pasoDatos && marcasValidasFinal && !enviando && falta === null;
+  // 🔴 SOLO LO COBRABLE: lo que falta se dice al tocar Guardar, todo junto.
+  const [intentoGuardar, setIntentoGuardar] = useState(false);
+  const faltaDelCargo: string[] = cargo
+    ? [
+        ...(cargo.hayComprobante ? [] : ["el comprobante"]),
+        ...(numeroFactura.trim() ? [] : ["el N.º de factura"]),
+        ...(proveedor.trim() ? [] : ["el proveedor"]),
+        ...(concepto.trim() ? [] : ["el concepto"]),
+        ...(subtotal > 0 ? [] : ["el subtotal"]),
+        ...cargo.faltaDestino,
+      ]
+    : [];
 
   // Check de duplicados con debounce 500ms. Se activa cuando cambian
   // numero_factura o proveedor. Excluye la factura en edición actual.
@@ -572,7 +605,16 @@ export function FacturaForm({
           estadoPago,
           marcasSeleccionadas: marcasPayloadFinal,
           permitirDuplicado,
-          ...(pideDatosDelGasto ? { gasto: cuerpoDeLaEdicion(datosGasto) } : {}),
+          ...(pideDatosDelGasto
+            ? {
+                gasto:
+                  MKT_SOLO_COBRABLE_2026_10 && usaDestino
+                    ? // 🔴 SOLO LO COBRABLE: «No recuperable» también apaga
+                      // «se reporta», así sale de TODA suma de la marca.
+                      { ...cuerpoDeLaEdicion(datosGasto), seReporta: !destino.aCargoDeLaEmpresa }
+                    : cuerpoDeLaEdicion(datosGasto),
+              }
+            : {}),
           ...(usaDestino ? { pctALaMarca: pctQueSeGuarda(destino) } : {}),
         },
         pdfFile,
@@ -591,6 +633,10 @@ export function FacturaForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!puedeGuardar) return;
+    if (cargo && faltaDelCargo.length > 0) {
+      setIntentoGuardar(true);
+      return;
+    }
     if (duplicados.length > 0) {
       setShowConfirmDup(true);
       return;
@@ -601,12 +647,15 @@ export function FacturaForm({
   // 🔴 N° factura · Fecha · Proveedor · Concepto: IDÉNTICO en la pantalla de
   // hoy y en la ficha de edición — solo cambia lo de abajo (el control de
   // impuesto y el envoltorio de pasos).
+  // 🔴 SOLO LO COBRABLE: sin asteriscos (diseno.md, regla 8). Sin la prop, el de siempre.
+  const asterisco =
+    cargo || (MKT_SOLO_COBRABLE_2026_10 && modoEdicionApple) ? null : <span className="text-red-500 ml-0.5">*</span>;
   const datosComunesDeLaFactura = (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label htmlFor="factura-numero" className="block text-sm text-gray-600 mb-1">
-            Nº factura<span className="text-red-500 ml-0.5">*</span>
+            Nº factura{asterisco}
           </label>
           <input
             id="factura-numero"
@@ -619,7 +668,7 @@ export function FacturaForm({
         </div>
         <div>
           <label htmlFor="factura-fecha" className="block text-sm text-gray-600 mb-1">
-            Fecha<span className="text-red-500 ml-0.5">*</span>
+            Fecha{asterisco}
           </label>
           <CampoFecha
             id="factura-fecha"
@@ -633,7 +682,7 @@ export function FacturaForm({
 
       <div>
         <label htmlFor="factura-proveedor" className="block text-sm text-gray-600 mb-1">
-          Proveedor<span className="text-red-500 ml-0.5">*</span>
+          Proveedor{asterisco}
         </label>
         {historicoProveedores ? (
           <ProveedorInput
@@ -658,7 +707,7 @@ export function FacturaForm({
 
       <div>
         <label htmlFor="factura-concepto" className="block text-sm text-gray-600 mb-1">
-          Concepto<span className="text-red-500 ml-0.5">*</span>
+          Concepto{asterisco}
         </label>
         <input
           id="factura-concepto"
@@ -672,7 +721,7 @@ export function FacturaForm({
 
       <div>
         <label htmlFor="factura-subtotal" className="block text-sm text-gray-600 mb-1">
-          Subtotal<span className="text-red-500 ml-0.5">*</span>
+          Subtotal{asterisco}
         </label>
         <input
           id="factura-subtotal"
@@ -703,8 +752,16 @@ export function FacturaForm({
   );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {modoEdicionApple ? (
+    <form onSubmit={handleSubmit} noValidate={cargo ? true : undefined} className="space-y-4">
+      {cargo ? (
+        // 🔴 SOLO LO COBRABLE: el comprobante ya lo pidió la puerta, arriba.
+        leyendoIA ? (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            {iconoLeyendoIA}
+            Leyendo factura con IA...
+          </div>
+        ) : null
+      ) : modoEdicionApple ? (
         // 🔴 FICHA DE EDICIÓN (7-oct-2026): ni «Paso 1» ni el título repetido
         // del uploader. Si ya hay un PDF, se dice cuál es, con un enlace para
         // verlo; «Reemplazar» recién ahí abre el campo de subir otro.
@@ -775,7 +832,7 @@ export function FacturaForm({
       </PasoInstruccion>
       )}
 
-      {modoEdicionApple ? (
+      {modoEdicionApple || cargo ? (
         // 🔴 FICHA DE EDICIÓN: sin «Paso 2» ni visto, y un control único
         // «Impuesto» (0 % · 7 % · Zona libre 15 %) en vez de dos controles
         // que se leían como si el 15 % fuera un tercer tramo de ITBMS.
@@ -1094,8 +1151,19 @@ export function FacturaForm({
           `estadoPago` arriba). */}
       {/* Sin `descripcion`: el título ya dice "Marca del gasto" y abajo está el
           campo "Marca(s) *" con los botones a la vista. */}
-      {!marcaFija && (() => {
-        const contenido = usaDestino ? (
+      {!marcaFija && !cargo && (() => {
+        const contenido = usaDestino && MKT_SOLO_COBRABLE_2026_10 ? (
+          // 🔴 SOLO LO COBRABLE: Marca y Se cobra 100 % · 50 % · No recuperable.
+          <SeCobraAlEditar
+            marcas={marcasOrdenadas}
+            marcaId={marcaIdDestino}
+            onMarcaId={setMarcaIdDestino}
+            valor={destino.aCargoDeLaEmpresa ? "no-recuperable" : destino.cuanto === "mitad" ? 50 : 100}
+            onChange={(v) =>
+              setDestino({ aCargoDeLaEmpresa: v === "no-recuperable", cuanto: v === 50 ? "mitad" : "completo" })
+            }
+          />
+        ) : usaDestino ? (
           <BloqueDestinoDelGasto
             valor={destino}
             onChange={setDestino}
@@ -1218,17 +1286,25 @@ export function FacturaForm({
             marcas={[]}
             sinMarca
             tiendaComoBuscador={modoEdicionApple}
+            {...(MKT_SOLO_COBRABLE_2026_10 ? { sinSeReporta: true } : {})}
           />
         </div>
       )}
 
+      {cargo?.destino}
+
       <div className="flex items-center gap-2 justify-end">
+        {cargo && intentoGuardar && faltaDelCargo.length > 0 && (
+          <span className="text-xs text-amber-700 mr-auto" data-testid="falta-para-guardar">
+            Falta: {unirEnHumano(faltaDelCargo)}
+          </span>
+        )}
         {checkingDup && (
           <span className="text-xs text-gray-400 mr-auto">
             Verificando duplicados…
           </span>
         )}
-        {!checkingDup && falta && (
+        {!cargo && !checkingDup && falta && (
           <span className="text-xs text-amber-700 mr-auto" data-testid="falta-para-guardar">
             {falta}
           </span>

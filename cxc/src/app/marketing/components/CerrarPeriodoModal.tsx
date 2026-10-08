@@ -53,6 +53,7 @@ import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import type { BloqueResumen } from "./InicioMarketing";
 import { Aviso } from "@/components/ui/Aviso";
+import { MKT_SOLO_COBRABLE_2026_10 } from "@/lib/marketing/solo-cobrable-2026-10";
 
 interface Props {
   bloque: BloqueResumen;
@@ -61,6 +62,11 @@ interface Props {
   onClose: () => void;
   /** Se llama con el período recién cerrado, para bajar su reporte. */
   onCerrado: (periodoId: string, etiqueta: string) => void | Promise<void>;
+  /**
+   * 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): las tiendas del período, para
+   * avisar cuáles no tienen foto. Nunca frena el cierre.
+   */
+  tiendas?: ReadonlyArray<{ codigo: string | null; nombre: string }>;
 }
 
 function plural(n: number, uno: string, varios: string): string {
@@ -268,8 +274,32 @@ function CerrarPeriodoModalDeAntes({
 // ────────────────────────────────────────────────────────────────────────────
 // EL MODAL DEL REDISEÑO — nombre al cerrar + nota de crédito, sin reporte.
 // ────────────────────────────────────────────────────────────────────────────
-function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado }: Props) {
+function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado, tiendas }: Props) {
   const { toast } = useToast();
+  // 🔴 SOLO LO COBRABLE: qué tiendas no tienen foto. Falla ABIERTA: sin la
+  // lectura, no se dice nada y el cierre sigue igual.
+  const [tiendasSinFoto, setTiendasSinFoto] = useState<string[]>([]);
+  // La lista llega nueva en cada dibujo: se compara por sus códigos.
+  const claveTiendas = (tiendas ?? []).map((t) => t.codigo ?? "").join(",");
+  useEffect(() => {
+    if (!MKT_SOLO_COBRABLE_2026_10 || !tiendas || tiendas.length === 0) return;
+    const conCodigo = tiendas.filter((t): t is { codigo: string; nombre: string } => !!t.codigo);
+    if (conCodigo.length === 0) return;
+    let cancelado = false;
+    const qs = encodeURIComponent(conCodigo.map((t) => t.codigo).join(","));
+    fetch(`/api/marketing/periodos/${periodoId}/tiendas-sin-foto?tiendas=${qs}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { sinFoto?: string[] } | null) => {
+        if (cancelado || !d?.sinFoto) return;
+        const faltan = new Set(d.sinFoto);
+        setTiendasSinFoto(conCodigo.filter((t) => faltan.has(t.codigo.toUpperCase())).map((t) => t.nombre));
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveTiendas, periodoId]);
   // Arranca con el nombre que el período ya tiene: Daniel lo cambia si quiere.
   const [nombre, setNombre] = useState(bloque.periodoAbierto?.nombre ?? "");
   const [notaCredito, setNotaCredito] = useState("");
@@ -320,7 +350,10 @@ function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado }: P
 
   if (!mounted) return null;
 
-  const hayPendientes = pendientes.sinComprobante > 0 || pendientes.sinFoto > 0;
+  // 🔴 SOLO LO COBRABLE: si ya se dice QUÉ tiendas no tienen foto, el conteo
+  // de «gastos sin foto» sobra (un solo aviso por cosa).
+  const sinFotoEnElAviso = MKT_SOLO_COBRABLE_2026_10 && tiendasSinFoto.length > 0 ? 0 : pendientes.sinFoto;
+  const hayPendientes = pendientes.sinComprobante > 0 || sinFotoEnElAviso > 0;
 
   // 🔴 10a — LA MISMA PANTALLA, VESTIDA DE HOJA DE iOS (24-sep-2026). Daniel:
   // *«No hay nada que arreglar»* en el cierre — cabe entera en un iPhone, dice
@@ -384,8 +417,14 @@ function CerrarPeriodoModalRediseno({ bloque, periodoId, onClose, onCerrado }: P
               <span className="font-medium">Documentación pendiente:</span>{" "}
               {[
                 pendientes.sinComprobante > 0 ? `${plural(pendientes.sinComprobante, "gasto", "gastos")} sin comprobante` : null,
-                pendientes.sinFoto > 0 ? `${plural(pendientes.sinFoto, "gasto", "gastos")} sin foto` : null,
+                sinFotoEnElAviso > 0 ? `${plural(sinFotoEnElAviso, "gasto", "gastos")} sin foto` : null,
               ].filter(Boolean).join(" · ")}.
+            </Aviso>
+          )}
+
+          {MKT_SOLO_COBRABLE_2026_10 && tiendasSinFoto.length > 0 && (
+            <Aviso tono="aviso">
+              <span className="font-medium">Tiendas sin foto:</span> {tiendasSinFoto.join(" · ")}. Se puede cerrar igual.
             </Aviso>
           )}
 

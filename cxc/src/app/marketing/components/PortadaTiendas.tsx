@@ -53,7 +53,7 @@ interface Props {
    * LUGAR de la de computadora. Las DOS reciben las MISMAS filas y el MISMO
    * total, calculados una sola vez arriba: ningún número puede diferir.
    */
-  celular?: { escribe: boolean; onRegistrarGasto: () => void } | null;
+  celular?: { escribe: boolean; onRegistrarGasto: () => void; comoSeccion?: boolean } | null;
 }
 
 export default function PortadaTiendas({ refreshKey, celular = null }: Props) {
@@ -115,6 +115,7 @@ export default function PortadaTiendas({ refreshKey, celular = null }: Props) {
         hayDatos={datos !== null && filas !== null}
         escribe={celular!.escribe}
         onRegistrarGasto={celular!.onRegistrarGasto}
+        {...(celular!.comoSeccion ? { comoSeccion: true } : {})}
       />
     );
   }

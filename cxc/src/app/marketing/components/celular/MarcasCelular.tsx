@@ -24,6 +24,7 @@
 // `portada-rediseno.ts` y `cerrados-por-periodo.ts`.
 // ============================================================================
 
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { formatearFecha } from "@/lib/marketing/normalizar";
 import { montoCelular, subtituloMarcaCelular } from "@/lib/marketing/celular";
@@ -48,6 +49,11 @@ interface Props {
   onSelectCerrado: (bloqueKey: string, periodoId: string) => void;
   /** A dónde vuelve «‹ Marketing». */
   hrefVolver: string;
+  /**
+   * 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): Marcas ES la portada. Sin
+   * «‹ Marketing», con el título «Marketing» y las otras secciones al final.
+   */
+  puertas?: ReactNode;
 }
 
 /** La línea gris de arriba: el período que está abierto y desde cuándo. */
@@ -67,7 +73,9 @@ export default function MarcasCelular({
   onSelectBloque,
   onSelectCerrado,
   hrefVolver,
+  puertas,
 }: Props) {
+  const esPortada = puertas !== undefined;
   const router = useRouter();
   // Las que tienen plata arriba, de mayor a menor; las que no, al final en
   // gris. Es el mismo conjunto de filas, solo ordenado.
@@ -76,6 +84,7 @@ export default function MarcasCelular({
 
   return (
     <PantallaCelular>
+      {!esPortada && (
       <div className="px-2 pt-1">
         <button
           type="button"
@@ -85,9 +94,10 @@ export default function MarcasCelular({
           ‹ Marketing
         </button>
       </div>
+      )}
 
       <TituloCelular
-        titulo="Marcas"
+        titulo={esPortada ? "Marketing" : "Marcas"}
         detalle={subtituloDeLaPantalla(abiertas)}
         accion={
           escribe ? (
@@ -150,6 +160,7 @@ export default function MarcasCelular({
           </GrupoCelular>
         </>
       )}
+      {puertas}
     </PantallaCelular>
   );
 }

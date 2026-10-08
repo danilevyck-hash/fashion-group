@@ -62,6 +62,12 @@ interface Props {
   hayDatos: boolean;
   escribe: boolean;
   onRegistrarGasto: () => void;
+  /**
+   * 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): la portada es Marcas y Tiendas
+   * pasa a ser una sección más — «‹ Marketing», el título «Tiendas» y sin
+   * los renglones de las otras secciones.
+   */
+  comoSeccion?: boolean;
 }
 
 export default function TiendasCelular({
@@ -74,13 +80,25 @@ export default function TiendasCelular({
   hayDatos,
   escribe,
   onRegistrarGasto,
+  comoSeccion = false,
 }: Props) {
   const router = useRouter();
 
   return (
     <PantallaCelular>
+      {comoSeccion && (
+        <div className="px-2 pt-1">
+          <button
+            type="button"
+            onClick={() => router.push("/marketing")}
+            className="min-h-[44px] px-2 text-[17px] text-blue-600 active:opacity-60"
+          >
+            ‹ Marketing
+          </button>
+        </div>
+      )}
       <TituloCelular
-        titulo="Marketing"
+        titulo={comoSeccion ? "Tiendas" : "Marketing"}
         detalle={BARRA_CELULAR_2026_10 ? undefined : textoDelPieDeTiendas(periodo, chips, filas.length)}
         accion={
           escribe ? (
@@ -128,6 +146,7 @@ export default function TiendasCelular({
         </GrupoCelular>
       )}
 
+      {!comoSeccion && (<>
       <RotuloDeGrupo>Otras secciones</RotuloDeGrupo>
       <GrupoCelular className="mt-0">
         {PUERTAS_DEL_CELULAR.map((p) => (
@@ -144,6 +163,7 @@ export default function TiendasCelular({
           />
         ))}
       </GrupoCelular>
+      </>)}
     </PantallaCelular>
   );
 }

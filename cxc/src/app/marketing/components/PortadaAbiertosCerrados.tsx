@@ -34,9 +34,14 @@
 // ============================================================================
 
 import { MARKETING_APPLE_2026_10, PESTANA_ACTIVA, PESTANA_INACTIVA, marcasConGastoPrimero } from "@/lib/marketing/marketing-2026-10";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
+import {
+  MKT_SOLO_COBRABLE_2026_10,
+  porCobrar,
+  subtituloPorCobrar,
+} from "@/lib/marketing/solo-cobrable-2026-10";
 import { nombreDeBloque } from "@/lib/marketing/bloques";
 import {
   PESTANAS_PORTADA,
@@ -93,6 +98,11 @@ interface Props {
    * `agruparCerradosPorPeriodo`: ningún número puede diferir.
    */
   celular?: { escribe: boolean; hrefVolver: string } | null;
+  /**
+   * 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): en el celular, Marcas ES la
+   * portada — las otras secciones van al final, como renglones.
+   */
+  puertasDelCelular?: ReactNode;
 }
 
 const ROTULO_PESTANA: Record<PestanaPortada, string> = {
@@ -190,6 +200,7 @@ export default function PortadaAbiertosCerrados({
   sinHerramientas = false,
   sinBotonDeGasto = false,
   celular = null,
+  puertasDelCelular,
 }: Props) {
   const [datos, setDatos] = useState<DatosPortada | null>(null);
   const [loading, setLoading] = useState(true);
@@ -234,6 +245,12 @@ export default function PortadaAbiertosCerrados({
       ),
     [datos, meta, hoy],
   );
+  // 🔴 SOLO LO COBRABLE: la portada dice cuánto se le cobra a cada marca —
+  // solo las que tienen algo pendiente, la mayor arriba—. Apagado, las de hoy.
+  const abiertasVisibles = useMemo(
+    () => (MKT_SOLO_COBRABLE_2026_10 ? porCobrar(abiertas) : abiertas),
+    [abiertas],
+  );
   const cerradas = useMemo(() => filasCerradas(datos?.cerrados ?? [], meta), [datos, meta]);
   // 🔴 UNA fila por PERÍODO, no por marca: el contador de la pestaña y la
   // lista cuentan y dibujan lo mismo.
@@ -248,7 +265,8 @@ export default function PortadaAbiertosCerrados({
   if (enCelular) {
     return (
       <MarcasCelular
-        abiertas={abiertas}
+        abiertas={abiertasVisibles}
+        {...(MKT_SOLO_COBRABLE_2026_10 ? { puertas: puertasDelCelular } : {})}
         grupos={grupos}
         cargando={loading && datos === null}
         escribe={celular!.escribe}
@@ -317,13 +335,26 @@ export default function PortadaAbiertosCerrados({
         </div>
       ) : pestana === "abiertos" ? (
         <ListaCard titulo={MARKETING_APPLE_2026_10 ? undefined : "Marcas"}>
-          {(MARKETING_APPLE_2026_10 ? marcasConGastoPrimero(abiertas) : abiertas).map((f) => (
+          {(MKT_SOLO_COBRABLE_2026_10
+            ? abiertasVisibles
+            : MARKETING_APPLE_2026_10 ? marcasConGastoPrimero(abiertas) : abiertas
+          ).map((f) => (
             <FilaNivel
               key={f.key}
               titulo={f.nombre}
-              subtitulo={subtituloAbierta(f)}
+              subtitulo={
+                MKT_SOLO_COBRABLE_2026_10
+                  ? subtituloPorCobrar(
+                      f.cantidadReportada,
+                      f.periodoId ? meta[f.periodoId]?.abiertoEn : null,
+                      formatearFecha,
+                    )
+                  : subtituloAbierta(f)
+              }
               monto={
-                f.cantidadReportada === 0 && f.cantidadNoReportada === 0 ? (
+                MKT_SOLO_COBRABLE_2026_10 ? (
+                  formatearMonto(f.reportado)
+                ) : f.cantidadReportada === 0 && f.cantidadNoReportada === 0 ? (
                   <span className="text-gray-300 text-sm">—</span>
                 ) : (
                   <MontoConApagado

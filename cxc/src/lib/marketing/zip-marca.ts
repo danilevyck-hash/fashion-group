@@ -84,6 +84,7 @@ import { seReportaDe, TIENDA_GENERAL } from "./gasto";
 import { MARKETING_FOTOS_CON_PERIODO } from "./fotos-periodo";
 import { conRespaldoSinColumnas, type ResultadoPg } from "./columnas-opcionales";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "./zip-e-impulsadoras";
+import { MKT_SOLO_COBRABLE_2026_10, carpetaDeFacturaSinTienda } from "./solo-cobrable-2026-10";
 import {
   aCargoDeLaEmpresa,
   MKT_PROVEEDORES_2026_10,
@@ -628,9 +629,19 @@ function carpetaSinClientePorConcepto(ctx: {
   tipo: "factura" | "entrega";
   impulsadoraId?: string | null;
   concepto?: string | null;
+  documentoId?: string | null;
 }): string {
   if (ctx.tipo === "entrega") return CARPETA_MOBILIARIO_Y_EXHIBICION;
   if (txt(ctx.impulsadoraId)) return CARPETA_IMPULSADORAS;
+  // 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): la carpeta sale de lo elegido
+  // al registrar, sin adivinar por el concepto. Una factura nueva siempre trae
+  // tienda; las viejas sin tienda: las 4 de mobiliario por id, el resto General.
+  if (MKT_SOLO_COBRABLE_2026_10) {
+    return carpetaDeFacturaSinTienda(ctx.documentoId, {
+      mobiliario: CARPETA_MOBILIARIO_Y_EXHIBICION,
+      general: CARPETA_GENERAL,
+    });
+  }
   if (esConceptoDeMobiliario(ctx.concepto)) return CARPETA_MOBILIARIO_Y_EXHIBICION;
   return CARPETA_GENERAL;
 }
@@ -648,6 +659,7 @@ function carpetaDeGasto(
     tipo: "factura" | "entrega";
     impulsadoraId?: string | null;
     concepto?: string | null;
+    documentoId?: string | null;
   },
 ): string {
   const base = carpetaDeCliente(codigo, texto, nombrePorCodigo);
@@ -989,6 +1001,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
             tipo: "factura",
             impulsadoraId: f.impulsadora_id,
             concepto: f.concepto,
+            documentoId: String(f.id),
           }),
           clienteCodigo: cod,
           monto,
@@ -1707,6 +1720,7 @@ function congelarEnFilas(
         tipo: l.tipo,
         impulsadoraId,
         concepto: l.concepto,
+        documentoId,
       }),
       clienteCodigo: l.clienteCodigo,
       // 🔴 EL MONTO SALE TAL CUAL DEL REPORTE. No se recalcula, no se redondea

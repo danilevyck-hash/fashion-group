@@ -42,6 +42,27 @@ import ImpulsadorasView from "./ImpulsadorasView";
 import PortadaProveedores from "./PortadaProveedores";
 import { MKT_PROVEEDORES_2026_10 } from "@/lib/marketing/proveedores-2026-10";
 import { MARKETING_APPLE_2026_10, PESTANA_ACTIVA, PESTANA_INACTIVA } from "@/lib/marketing/marketing-2026-10";
+import {
+  MKT_SOLO_COBRABLE_2026_10,
+  PESTANA_NO_RECUPERABLE,
+  ROTULO_NO_RECUPERABLE,
+  pestanasDeLaPortada,
+} from "@/lib/marketing/solo-cobrable-2026-10";
+import NoRecuperable from "./NoRecuperable";
+import { FilaCelular, GrupoCelular, RotuloDeGrupo } from "./celular/PiezasCelular";
+
+type PestanaDeLaPortada = PestanaVisible | typeof PESTANA_NO_RECUPERABLE;
+
+/** 🔴 SOLO LO COBRABLE: con el interruptor la portada abre en Marcas. */
+const PESTANA_DE_ENTRADA: PestanaDeLaPortada = MKT_SOLO_COBRABLE_2026_10 ? "marcas" : PESTANA_INICIAL;
+
+/** En el celular, al pie de Marcas: las otras secciones, como renglones. */
+const PUERTAS_SOLO_COBRABLE = [
+  { href: "/marketing?tab=tiendas", titulo: "Tiendas", detalle: "dónde se gastó" },
+  { href: "/marketing?tab=impulsadoras", titulo: "Impulsadoras", detalle: "meses sin pagar" },
+  { href: HREF_MOBILIARIO, titulo: "Mobiliario", detalle: "inventario en unidades" },
+  { href: `/marketing?tab=${PESTANA_NO_RECUPERABLE}`, titulo: ROTULO_NO_RECUPERABLE, detalle: "no se cobra a ninguna marca" },
+] as const;
 
 interface Props {
   role: string;
@@ -63,15 +84,17 @@ export default function PortadaTiendasYMarcas({
   onSelectCerrado,
 }: Props) {
   const router = useRouter();
-  const [tabRaw, setTab] = useUrlState<PestanaVisible>("tab", PESTANA_INICIAL);
+  const [tabRaw, setTab] = useUrlState<PestanaDeLaPortada>("tab", PESTANA_DE_ENTRADA);
   // 🔴 Con el interruptor apagado, `?tab=proveedores` cae en Tiendas: la
-  // pestaña nueva no existe.
-  const tab: PestanaVisible = esPestanaVisible(tabRaw, MKT_PROVEEDORES_2026_10)
-    ? tabRaw
-    : PESTANA_INICIAL;
+  // pestaña nueva no existe. Igual `?tab=no-recuperable` sin SOLO LO COBRABLE.
+  const tab: PestanaDeLaPortada =
+    esPestanaVisible(tabRaw, MKT_PROVEEDORES_2026_10) ||
+    (MKT_SOLO_COBRABLE_2026_10 && tabRaw === PESTANA_NO_RECUPERABLE)
+      ? tabRaw
+      : PESTANA_DE_ENTRADA;
   const escribe = puedeEscribirMarketing(role);
 
-  const elegir = (p: PestanaVisible) => {
+  const elegir = (p: PestanaDeLaPortada) => {
     // Mobiliario es otra página: drill-down con push, Atrás vuelve acá.
     if (p === "mobiliario") {
       router.push(HREF_MOBILIARIO);
@@ -109,7 +132,7 @@ export default function PortadaTiendasYMarcas({
 
       {!cel && (
       <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto" role="tablist">
-        {pestanasVisibles(MKT_PROVEEDORES_2026_10).map((p) => (
+        {pestanasDeLaPortada(pestanasVisibles(MKT_PROVEEDORES_2026_10), MKT_SOLO_COBRABLE_2026_10).map((p) => (
           <button
             key={p}
             type="button"
@@ -122,7 +145,7 @@ export default function PortadaTiendasYMarcas({
                 : MARKETING_APPLE_2026_10 ? PESTANA_INACTIVA : "border-transparent text-gray-500 hover:text-gray-800"
             }`}
           >
-            {rotuloDePestanaVisible(p)}
+            {p === PESTANA_NO_RECUPERABLE ? ROTULO_NO_RECUPERABLE : rotuloDePestanaVisible(p)}
           </button>
         ))}
         {/* 🔴 MARKETING_APPLE_2026_10: «＋ Gasto» en la línea de las pestañas. */}
@@ -150,7 +173,13 @@ export default function PortadaTiendasYMarcas({
       {tab === "tiendas" && (
         <PortadaTiendas
           refreshKey={refreshKey}
-          celular={cel ? { escribe, onRegistrarGasto } : null}
+          celular={
+            cel
+              ? MKT_SOLO_COBRABLE_2026_10
+                ? { escribe, onRegistrarGasto, comoSeccion: true }
+                : { escribe, onRegistrarGasto }
+              : null
+          }
         />
       )}
       {tab === "marcas" && (
@@ -162,7 +191,31 @@ export default function PortadaTiendasYMarcas({
           sinHerramientas
           sinBotonDeGasto
           celular={cel ? { escribe, hrefVolver: hrefVolverACelular } : null}
+          {...(MKT_SOLO_COBRABLE_2026_10
+            ? {
+                puertasDelCelular: (
+                  <>
+                    <RotuloDeGrupo>Otras secciones</RotuloDeGrupo>
+                    <GrupoCelular className="mt-0">
+                      {PUERTAS_SOLO_COBRABLE.map((p) => (
+                        <FilaCelular
+                          key={p.href}
+                          data-fila="puerta"
+                          titulo={p.titulo}
+                          detalle={p.detalle}
+                          onClick={() => router.push(p.href)}
+                          ariaLabel={`Abrir ${p.titulo}`}
+                        />
+                      ))}
+                    </GrupoCelular>
+                  </>
+                ),
+              }
+            : {})}
         />
+      )}
+      {MKT_SOLO_COBRABLE_2026_10 && tab === PESTANA_NO_RECUPERABLE && (
+        <NoRecuperable refreshKey={refreshKey} hrefVolver={cel ? hrefVolverACelular : undefined} />
       )}
       {/* 🔴 PROVEEDORES (6-oct-2026): la lista y la ficha. `false` = no existe. */}
       {MKT_PROVEEDORES_2026_10 && tab === PESTANA_PROVEEDORES && (

@@ -367,6 +367,12 @@ export interface GastoDelProveedor {
   pctALaMarca: number | null;
   /** ¿Se le pasa a la marca? Un gasto con `se_reporta` apagado no se recobra. */
   seReporta: boolean;
+  /**
+   * 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): ¿está en un período CERRADO?
+   * Daniel: lo cerrado SÍ está cobrado. `false` = todavía por cobrar.
+   * `undefined` (interruptor apagado) = como hoy.
+   */
+  cobrado?: boolean;
 }
 
 /**
@@ -422,10 +428,24 @@ export function montoRecobrado(g: {
   seReporta?: boolean;
   monto?: number;
   pctALaMarca?: number | null;
+  cobrado?: boolean;
 }): number {
   if (String(g.marcaNombre ?? "").trim().length === 0) return 0;
   if (g.seReporta === false) return 0;
+  if (g.cobrado === false) return 0;
   return montoDeLaMarca(Number(g.monto ?? 0), g.pctALaMarca);
+}
+
+/** 🔴 SOLO LO COBRABLE: lo que se le cobra a la marca y todavía no se cobró. */
+export function montoPorCobrar(g: {
+  marcaNombre?: string | null;
+  seReporta?: boolean;
+  monto?: number;
+  pctALaMarca?: number | null;
+  cobrado?: boolean;
+}): number {
+  if (g.cobrado !== false) return 0;
+  return montoRecobrado({ ...g, cobrado: undefined });
 }
 
 /** ¿Algo de esta factura se recobra? */
@@ -508,6 +528,8 @@ export interface FilaProveedor {
   pagado: number;
   /** Lo que se recobró: la suma de las que se le reportan a una marca. */
   recobrado: number;
+  /** 🔴 SOLO LO COBRABLE: lo de períodos abiertos. 0 con el interruptor apagado. */
+  porCobrar: number;
 }
 
 /**
@@ -527,7 +549,7 @@ export function listaDeProveedores(
 ): FilaProveedor[] {
   const porClave = new Map<
     string,
-    { grafias: Map<string, number>; facturas: number; pagado: number; recobrado: number }
+    { grafias: Map<string, number>; facturas: number; pagado: number; recobrado: number; porCobrar: number }
   >();
   for (const g of gastos) {
     const clave = claveDeProveedor(g?.proveedor, alias);
@@ -535,13 +557,14 @@ export function listaDeProveedores(
     const nombre = String(g.proveedor ?? "").replace(/\s+/g, " ").trim();
     const acc =
       porClave.get(clave) ??
-      { grafias: new Map<string, number>(), facturas: 0, pagado: 0, recobrado: 0 };
+      { grafias: new Map<string, number>(), facturas: 0, pagado: 0, recobrado: 0, porCobrar: 0 };
     acc.grafias.set(nombre, (acc.grafias.get(nombre) ?? 0) + 1);
     acc.facturas += 1;
     const monto = Number(g.monto);
     if (Number.isFinite(monto)) {
       acc.pagado += monto;
       acc.recobrado += montoRecobrado(g);
+      acc.porCobrar += montoPorCobrar(g);
     }
     porClave.set(clave, acc);
   }
@@ -566,6 +589,7 @@ export function listaDeProveedores(
       facturas: acc.facturas,
       pagado: round2(acc.pagado),
       recobrado: round2(acc.recobrado),
+      porCobrar: round2(acc.porCobrar),
     });
   }
   out.sort((a, b) => b.pagado - a.pagado || a.nombre.localeCompare(b.nombre, "es"));
@@ -591,6 +615,7 @@ export interface FichaProveedor {
   /** 🔴 Los DOS totales del pie. */
   pagado: number;
   recobrado: number;
+  porCobrar: number;
 }
 
 /**
@@ -631,5 +656,6 @@ export function fichaDeProveedor(
     renglones,
     pagado: fila?.pagado ?? 0,
     recobrado: fila?.recobrado ?? 0,
+    porCobrar: fila?.porCobrar ?? 0,
   };
 }
