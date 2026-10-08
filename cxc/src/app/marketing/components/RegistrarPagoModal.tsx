@@ -25,6 +25,9 @@ import {
   lineaDistribucion,
   textoFaltaPago,
 } from "@/lib/marketing/marketing-2026-10-v2";
+import { useSoloCobrable } from "@/lib/marketing/solo-cobrable-contexto";
+import { PCT_AL_REGISTRAR, type PctQueSeCobra } from "@/lib/marketing/solo-cobrable-2026-10";
+import { SeCobraPct } from "./RegistroDelCargo";
 
 interface Props {
   impulsadora: ImpulsadoraConEstado;
@@ -82,6 +85,11 @@ export default function RegistrarPagoModal({
   const [subiendo, setSubiendo] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // 🔴 «Se cobra» 100 % · 50 %, solo en el Marketing nuevo (Daniel, 8-oct-2026:
+  // «al hacer un gasto el default sea 50 %»). Las pantallas de antes no lo
+  // enseñan ni lo mandan: su pago se sigue cobrando entero.
+  const pideSeCobra = useSoloCobrable();
+  const [pct, setPct] = useState<PctQueSeCobra>(PCT_AL_REGISTRAR);
 
   const montoNum = Number(monto) || 0;
   const errorPeriodo = validarPeriodo(desde, hasta);
@@ -195,6 +203,7 @@ export default function RegistrarPagoModal({
           ...(gasto
             ? { tiendaCodigo: gasto.tiendaCodigo, seReporta: gasto.seReporta, nota: gasto.nota }
             : {}),
+          ...(pideSeCobra ? { pctALaMarca: pct } : {}),
           comprobante: {
             path: comprobante.path,
             tipo: comprobante.tipo,
@@ -384,6 +393,8 @@ export default function RegistrarPagoModal({
               </div>
             )}
           </div>
+
+          {pideSeCobra && <SeCobraPct id="pago-se-cobra" valor={pct} onChange={setPct} />}
 
           {!v2 && (
           <>

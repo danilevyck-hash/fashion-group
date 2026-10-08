@@ -102,7 +102,10 @@ import type {
 } from "@/lib/marketing/types";
 import { ENLACE, MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 import {
+  NO_RECUPERABLE,
+  PCT_AL_REGISTRAR,
   faltaEnElDestino,
+  notaConMotivo,
   tiendaQueSeGuarda,
   type DestinoDelCargo,
 } from "@/lib/marketing/solo-cobrable-2026-10";
@@ -184,7 +187,8 @@ export default function PuertaGasto({
             nombre: String(tiendaNombre ?? "").trim() || String(tiendaCodigo).trim().toUpperCase(),
           }
         : null,
-    pct: null,
+    // 🔴 50 % por omisión (Daniel, 8-oct-2026). 100 % a un toque.
+    pct: PCT_AL_REGISTRAR,
   }));
 
   const [impulsadoras, setImpulsadoras] = useState<ImpulsadoraConEstado[] | null>(null);
@@ -443,15 +447,26 @@ export default function PuertaGasto({
     const { marcasSeleccionadas: _sinUso, ...payload } = data;
     void _sinUso;
     // 🔴 SOLO LO COBRABLE: marca, tienda y porcentaje salen del destino del
-    // cargo; siempre se reporta (lo no cobrable ya no entra por aquí).
+    // cargo y se reporta. 🔴 NO RECUPERABLE (8-oct-2026): sin marca ni tienda,
+    // `pctALaMarca` 0 y `seReporta` false —lo mismo que «No recuperable» al
+    // editar—, y el motivo al principio de la nota.
+    const noRecuperable = destinoCargo.pct === NO_RECUPERABLE;
     const cuerpoDelCargo = esCargo
-      ? {
-          marcaId: marcaEfectiva?.id ?? "",
-          pctALaMarca: destinoCargo.pct,
-          tiendaCodigo: tiendaQueSeGuarda(destinoCargo.tienda),
-          seReporta: true,
-          nota: comun.nota,
-        }
+      ? noRecuperable
+        ? {
+            marcaId: "",
+            pctALaMarca: NO_RECUPERABLE,
+            tiendaCodigo: null,
+            seReporta: false,
+            nota: notaConMotivo(destinoCargo.motivo ?? null, comun.nota ?? ""),
+          }
+        : {
+            marcaId: marcaEfectiva?.id ?? "",
+            pctALaMarca: destinoCargo.pct,
+            tiendaCodigo: tiendaQueSeGuarda(destinoCargo.tienda),
+            seReporta: true,
+            nota: comun.nota,
+          }
       : null;
     const res = await fetch("/api/marketing/facturas", {
       method: "POST",

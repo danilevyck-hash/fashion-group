@@ -372,3 +372,33 @@ describe("🔴 un solo número por marca: la pantalla nueva dice el total del ZI
     expect(th.fotosPorCarpeta["City Mall David"]).toBe(1);
   });
 });
+
+// 🔴 CANDADO — «No recuperable» al registrar (8-oct-2026). Daniel: «¿cómo meto
+// un gasto, por ejemplo unos muebles que compré, no cobrables?». Se guarda sin
+// marca ni tienda, con `pct_a_la_marca = 0` y `se_reporta = false`: no entra al
+// ZIP de ninguna marca (aunque quedara sellado en un período abierto) y la
+// pestaña Gastos lo dice «No recuperable».
+describe("🔴 un gasto no recuperable no se le cobra a nadie", () => {
+  it("no entra al ZIP de ninguna marca y sale con Estado «No recuperable»", async () => {
+    tablas.mk_facturas.push(
+      fact("f-nr", null, "145", "2026-10-05", "Barras planas", 545.7, {
+        pct_a_la_marca: 0,
+        se_reporta: false,
+        tienda_codigo: null,
+        nota: "Compra de mobiliario",
+      }),
+    );
+    tablas.mk_periodo_documentos.push(sello(P_ABIERTO, "factura", "f-nr"));
+    const { abiertos, cerrados, gastos } = await resumenesDeCobro();
+    for (const r of [...abiertos, ...cerrados]) {
+      expect(r.lineas.some((l) => l.documentoId === "f-nr")).toBe(false);
+    }
+    for (const m of ["TH", "CK"]) {
+      const zip = await buildZipDeMarca({ marcaCodigo: m });
+      expect(zip.total).toBe(abiertos.find((a) => a.marcaCodigo === m)!.total);
+    }
+    const g = gastos.find((x) => x.id === "f-nr")!;
+    expect(g.estado).toBe("no_recuperable");
+    expect(g.aCobrar).toBe(0);
+  });
+});

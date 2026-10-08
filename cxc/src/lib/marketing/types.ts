@@ -347,6 +347,11 @@ export interface RegistrarPagoImpulsadoraInput {
   seReporta?: boolean;
   tiendaCodigo?: string | null;
   nota?: string | null;
+  /**
+   * Cuánto se le cobra a la marca: 100 o 50 (Marketing nuevo, 8-oct-2026).
+   * Sin el campo no se escribe y el pago se cobra entero, como siempre.
+   */
+  pctALaMarca?: number | null;
 }
 
 // Marca del split con nombre/código resueltos, para la UI.

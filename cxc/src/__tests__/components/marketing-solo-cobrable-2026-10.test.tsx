@@ -107,9 +107,9 @@ describe("solo lo cobrable · registrar, en el orden del trabajo", () => {
     expect(pantalla.querySelector(".text-red-500")).toBeNull();
     // El comprobante se pide UNA vez.
     expect(screen.queryByText("Sube el PDF de la factura")).toBeNull();
-    // Solo 100 % y 50 %, y nada elegido de entrada.
+    // Solo 100 % y 50 %, y viene en 50 % (Daniel, 8-oct-2026).
     expect(screen.getByRole("radio", { name: "100 %" }).getAttribute("aria-checked")).toBe("false");
-    expect(screen.getByRole("radio", { name: "50 %" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("radio", { name: "50 %" }).getAttribute("aria-checked")).toBe("true");
     // La marca inactiva no se ofrece.
     expect(screen.queryByRole("radio", { name: "Otros" })).toBeNull();
   });
@@ -118,9 +118,11 @@ describe("solo lo cobrable · registrar, en el orden del trabajo", () => {
     abrirRegistro();
     fireEvent.click(screen.getByText("Guardar factura"));
     const falta = screen.getByTestId("falta-para-guardar").textContent ?? "";
-    for (const f of ["el comprobante", "el N.º de factura", "el proveedor", "el concepto", "el subtotal", "la marca", "la tienda", "cuánto se cobra"]) {
+    for (const f of ["el comprobante", "el N.º de factura", "el proveedor", "el concepto", "el subtotal", "la marca", "la tienda"]) {
       expect(falta).toContain(f);
     }
+    // «Se cobra» ya viene en 50 %: no falta.
+    expect(falta).not.toContain("cuánto se cobra");
     expect(llamadas.some((l) => l.metodo === "POST" && l.url.endsWith("/api/marketing/facturas"))).toBe(false);
   });
 

@@ -39,7 +39,58 @@ const CHIP_ESTADO: Record<EstadoDelGasto, string> = {
 };
 
 const SELECT =
-  "rounded-md border border-gray-300 bg-white px-3 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none max-w-full";
+  "w-full rounded-md border border-gray-300 bg-white px-3 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none";
+
+/**
+ * 🔴 LOS FILTROS (8-oct-2026). Daniel: «Marca es una opción, igual que Tienda y
+ * Sin tienda; eso confunde. ¿Qué hace qué?». Cada filtro es un control aparte
+ * con su NOMBRE arriba y su VALOR adentro («Todas» cuando no filtra), y Gastos
+ * abre en Estado «Por cobrar».
+ *
+ * 🔴 SIN «Sin tienda». Cada factura va a una tienda (obligatoria, Daniel): lo
+ * único sin tienda son los pagos de impulsadora (Tipo = Impulsadora, o su
+ * pestaña) y unos pocos gastos viejos, que salen con «Todas».
+ */
+export const ESTADO_AL_ABRIR: EstadoDelGasto = "por_cobrar";
+
+/** Las tiendas del filtro, por nombre. Solo las que tienen código. */
+export function opcionesDeTienda(gastos: ReadonlyArray<Pick<GastoDeLaLista, "tiendaCodigo" | "tiendaNombre">>): Array<[string, string]> {
+  const m = new Map<string, string>();
+  for (const g of gastos) if (g.tiendaCodigo) m.set(g.tiendaCodigo, `${g.tiendaNombre} (${g.tiendaCodigo})`);
+  return Array.from(m).sort((a, b) => a[1].localeCompare(b[1], "es"));
+}
+
+function Filtro({
+  id,
+  rotulo,
+  todas,
+  valor,
+  onChange,
+  opciones,
+}: {
+  id: string;
+  rotulo: string;
+  todas: string;
+  valor: string;
+  onChange: (v: string) => void;
+  opciones: ReadonlyArray<readonly [string, string]>;
+}) {
+  return (
+    <div className="min-w-0">
+      <label htmlFor={id} className="block text-xs font-medium text-gray-500 mb-1">
+        {rotulo}
+      </label>
+      <select id={id} value={valor} onChange={(e) => onChange(e.target.value)} className={SELECT}>
+        <option value="">{todas}</option>
+        {opciones.map(([v, r]) => (
+          <option key={v} value={v}>
+            {r}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 export function pctDe(g: Pick<GastoDeLaLista, "monto" | "aCobrar" | "estado">): number | null {
   if (g.estado === "no_recuperable" || g.monto <= 0) return null;
@@ -80,7 +131,7 @@ export default function GastosNuevo({
   const [marca, setMarca] = useState("");
   const [tienda, setTienda] = useState("");
   const [tipo, setTipo] = useState("");
-  const [estado, setEstado] = useState("");
+  const [estado, setEstado] = useState<string>(ESTADO_AL_ABRIR);
   const [accion, setAccion] = useState<AccionDeFila>(null);
   const [tiendaDeLaAccion, setTiendaDeLaAccion] = useState("");
 
@@ -89,16 +140,19 @@ export default function GastosNuevo({
     () => Array.from(new Set(gastos.map((g) => g.marcaNombre).filter((x): x is string => !!x))).sort(),
     [gastos],
   );
-  const opcionesTienda = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const g of gastos) m.set(g.tiendaCodigo ?? "", g.tiendaCodigo ? `${g.tiendaNombre} (${g.tiendaCodigo})` : "Sin tienda");
-    return Array.from(m).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [gastos]);
+  const opcionesTienda = useMemo(() => opcionesDeTienda(gastos), [gastos]);
+  const hayFiltro = marca !== "" || tienda !== "" || tipo !== "" || estado !== "";
+  const quitarFiltros = () => {
+    setMarca("");
+    setTienda("");
+    setTipo("");
+    setEstado("");
+  };
 
   const filtrados = gastos.filter(
     (g) =>
       (!marca || g.marcaNombre === marca) &&
-      (!tienda || (g.tiendaCodigo ?? "") === (tienda === "-" ? "" : tienda)) &&
+      (!tienda || g.tiendaCodigo === tienda) &&
       (!tipo || g.tipo === tipo) &&
       (!estado || g.estado === estado),
   );
@@ -115,44 +169,11 @@ export default function GastosNuevo({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="Marca" value={marca} onChange={(e) => setMarca(e.target.value)} className={SELECT}>
-          <option value="">Marca</option>
-          {opcionesMarca.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-        <select aria-label="Tienda" value={tienda} onChange={(e) => setTienda(e.target.value)} className={SELECT}>
-          <option value="">Tienda</option>
-          {opcionesTienda.map(([codigo, nombre]) => (
-            <option key={codigo || "-"} value={codigo || "-"}>
-              {nombre}
-            </option>
-          ))}
-        </select>
-        <select aria-label="Tipo" value={tipo} onChange={(e) => setTipo(e.target.value)} className={SELECT}>
-          <option value="">Tipo</option>
-          {Object.entries(ROTULO_TIPO).map(([v, r]) => (
-            <option key={v} value={v}>
-              {r}
-            </option>
-          ))}
-        </select>
-        <select aria-label="Estado" value={estado} onChange={(e) => setEstado(e.target.value)} className={SELECT}>
-          <option value="">Estado</option>
-          {Object.entries(ROTULO_ESTADO).map(([v, r]) => (
-            <option key={v} value={v}>
-              {r}
-            </option>
-          ))}
-        </select>
-        {escribe && (
-          <button type="button" onClick={onRegistrar} className={`${BOTON_PRINCIPAL} ml-auto`}>
-            ＋ Gasto
-          </button>
-        )}
+      <div className="grid grid-cols-2 md:flex md:flex-wrap md:items-end gap-x-3 gap-y-2 md:[&>*]:w-48">
+        <Filtro id="filtro-marca" rotulo="Marca" todas="Todas" valor={marca} onChange={setMarca} opciones={opcionesMarca.map((m) => [m, m] as const)} />
+        <Filtro id="filtro-tienda" rotulo="Tienda" todas="Todas" valor={tienda} onChange={setTienda} opciones={opcionesTienda} />
+        <Filtro id="filtro-tipo" rotulo="Tipo" todas="Todos" valor={tipo} onChange={setTipo} opciones={Object.entries(ROTULO_TIPO)} />
+        <Filtro id="filtro-estado" rotulo="Estado" todas="Todos" valor={estado} onChange={setEstado} opciones={Object.entries(ROTULO_ESTADO)} />
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
@@ -161,10 +182,20 @@ export default function GastosNuevo({
           <span className="text-gray-900 tabular-nums">{formatearMonto(monto)}</span> · A cobrar{" "}
           <span className="text-gray-900 font-semibold tabular-nums">{formatearMonto(aCobrar)}</span>
         </span>
-        {tienda && tienda !== "-" && (
+        {hayFiltro && (
+          <button type="button" onClick={quitarFiltros} className="text-blue-600 hover:text-blue-800 min-h-[44px] inline-flex items-center">
+            Quitar filtros
+          </button>
+        )}
+        {tienda && (
           <Link href={`/marketing/tienda/${encodeURIComponent(tienda)}`} className="text-blue-600 hover:text-blue-800 min-h-[44px] inline-flex items-center">
             Fotos de la tienda
           </Link>
+        )}
+        {escribe && (
+          <button type="button" onClick={onRegistrar} className={`${BOTON_PRINCIPAL} ml-auto`}>
+            ＋ Gasto
+          </button>
         )}
       </div>
 
