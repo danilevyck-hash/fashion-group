@@ -215,9 +215,13 @@ export function FilaTabla(p: PropsFila) {
       <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
         <TextoVendedor vendor={p.pedido.vendor} />
       </td>
-      <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
-        ${p.fmtMoney(p.pedido.total)}
-      </td>
+      {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): `total` llega en null desde el
+          servidor — la celda ni se dibuja, nunca `$0`. */}
+      {p.puedeEditar && (
+        <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
+          ${p.fmtMoney(p.pedido.total)}
+        </td>
+      )}
       <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{p.fmtDate(p.pedido.created_at)}</td>
       <td className="px-4 py-3 text-right">
         <AccionesComprobante
@@ -274,9 +278,12 @@ export function FichaFila(p: PropsFila) {
             <span className="text-sm font-medium text-gray-900 truncate">
               <NombreCliente pedido={p.pedido} clienteLabel={p.clienteLabel} />
             </span>
-            <span className="text-sm font-semibold text-gray-900 tabular-nums shrink-0">
-              ${p.fmtMoney(p.pedido.total)}
-            </span>
+            {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): `total` llega en null. */}
+            {p.puedeEditar && (
+              <span className="text-sm font-semibold text-gray-900 tabular-nums shrink-0">
+                ${p.fmtMoney(p.pedido.total)}
+              </span>
+            )}
           </div>
           <NumerosPedido pedido={p.pedido} esOrders={p.esOrders} hoy={p.hoy} />
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">

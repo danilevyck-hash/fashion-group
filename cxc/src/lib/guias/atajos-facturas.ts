@@ -77,7 +77,9 @@ export interface FacturaDelCliente {
   secuencial: string;
   /** timestamptz ISO de `switch_facturas.fecha`. */
   fecha: string;
-  total: number;
+  /** 🔴 BODEGA NO VE PLATA (7-oct-2026): el servidor manda `null` a quien no
+   *  puede ver precio — la pantalla no dibuja el monto si no llegó. */
+  total: number | null;
   /** N° de la guía VIVA donde esta factura ya aparece, o null. Aviso, nunca bloqueo. */
   yaSalioEn: number | null;
 }

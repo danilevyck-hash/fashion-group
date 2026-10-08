@@ -842,7 +842,11 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                                     </span>
                                   )}
                                   <span className="shrink-0 tabular-nums">{f.secuencial}</span>
-                                  <span className="ml-auto shrink-0 tabular-nums text-gray-600">{fmtMonto(f.total)}</span>
+                                  {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): `facturas-cliente`
+                                      manda `total: null` a quien no puede ver precio. */}
+                                  {f.total != null && (
+                                    <span className="ml-auto shrink-0 tabular-nums text-gray-600">{fmtMonto(f.total)}</span>
+                                  )}
                                 </label>
                                 {m && (
                                   <div className="mb-3 ml-7 flex flex-wrap items-start gap-3">

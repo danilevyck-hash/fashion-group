@@ -28,7 +28,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { requireAuth } from "@/lib/require-auth";
+import { requireAuth, getSession } from "@/lib/require-auth";
 import { B2B_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
 import { esCodigoDeCliente } from "@/lib/clientes/mundos";
 import { TIPO_FACTURA, yaSalioEn } from "@/lib/guias/atajos-facturas";
@@ -61,6 +61,11 @@ interface FacturaFila {
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ROLES);
   if (authError) return authError;
+  // 🔴 BODEGA NO VE PLATA (7-oct-2026, Daniel: «que ningún usuario con rol
+  // bodega vea precio, solo admin y secretaria»). Bodega entra a esta ruta
+  // para armar una guía; el `total` de cada factura se recorta ACÁ, nunca
+  // escondido en la pantalla — la fila lo pintaba igual que a cualquiera.
+  const verPrecio = getSession(req)?.role !== "bodega";
 
   const codigo = (req.nextUrl.searchParams.get("codigo") ?? "").trim();
   // Solo códigos del grupo (D-XXX). Un código numérico de Boston/Multifashion
@@ -129,7 +134,7 @@ export async function GET(req: NextRequest) {
         switch_factura_id: f.switch_factura_id == null ? null : Number(f.switch_factura_id),
         secuencial: String(f.secuencial),
         fecha: String(f.fecha),
-        total: Number(f.total ?? 0),
+        total: verPrecio ? Number(f.total ?? 0) : null,
         yaSalioEn: yaSalioEn(indice, empresa, String(f.secuencial)),
       };
     });
