@@ -8,6 +8,7 @@ import {
   debeTocarSesion,
   marcaDeToque,
 } from "@/lib/session-touch";
+import { sesionValidaConCache, type Veredicto } from "@/lib/session-valid-cache";
 
 const COOKIE_NAME = "cxc_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -71,13 +72,13 @@ const PUBLIC_PREFIXES = [
 ];
 
 // Validate session token against Supabase (direct REST call for edge compatibility)
-async function isSessionValid(sessionToken: string): Promise<boolean> {
+async function consultarSesion(sessionToken: string): Promise<Veredicto> {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseKey) {
     // Fail CLOSED: sin config no podemos validar la sesión → tratar como inválida.
     Sentry.captureMessage("[auth] Supabase env ausente en middleware — sesión rechazada (fail-closed)", "error");
-    return false;
+    return { valida: false, definitiva: true };
   }
 
   try {
@@ -98,17 +99,17 @@ async function isSessionValid(sessionToken: string): Promise<boolean> {
       // reintenta). Exposición acotada: una sesión revocada manualmente podría
       // seguir viva durante el outage. Loggeado para observabilidad.
       Sentry.captureMessage(`[auth] Supabase respondió ${res.status} validando sesión — fail-open transitorio`, "warning");
-      return true;
+      return { valida: true, definitiva: false };
     }
     const rows = await res.json();
     // Respuesta DEFINITIVA (2xx): 0 filas = token revocado o inexistente → sesión
     // realmente inválida → desloguear. >0 = activa. Esto NO es un blip.
-    return Array.isArray(rows) && rows.length > 0;
+    return { valida: Array.isArray(rows) && rows.length > 0, definitiva: true };
   } catch (err) {
     // Fail OPEN ante excepción de red (fetch falló): blip transitorio, no
     // desloguear por un error de conexión. Loggeado para observabilidad.
     Sentry.captureException(err);
-    return true;
+    return { valida: true, definitiva: false };
   }
 }
 
@@ -219,8 +220,9 @@ export async function middleware(req: NextRequest) {
     return clearSessionAndRedirect(req, pathname);
   }
 
-  // Validate session token against DB (fail-closed)
-  const valid = await isSessionValid(parsed.sessionToken);
+  // Validate session token against DB (fail-closed). Un «sí» definitivo se
+  // recuerda 60 s en esta instancia: ver `lib/session-valid-cache.ts`.
+  const valid = await sesionValidaConCache(parsed.sessionToken, consultarSesion);
   if (!valid) {
     return clearSessionAndRedirect(req, pathname);
   }

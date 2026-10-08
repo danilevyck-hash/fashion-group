@@ -162,6 +162,17 @@ export async function GET(req: NextRequest) {
   let rows: unknown[] = [];
   let refreshedAt: string | null = null;
 
+  // El aviso de montos no depende de la cartera: sale EN PARALELO (7-oct-2026).
+  // Antes esperaba a la MV y al contacto en vivo — un viaje más a la base
+  // (~200 ms medidos desde la función) en cada apertura del CXC. El `.catch`
+  // vacío solo evita el «rechazo sin atender» mientras tanto: el `await` de
+  // abajo sigue lanzando igual que antes.
+  const avisoMontosP = lineaDeRechazos({
+    familias: ["cxc"],
+    empresas: CXC_GRUPO_EMPRESA_KEYS,
+  });
+  avisoMontosP.catch(() => {});
+
   let mvQuery = supabaseServer.from("switch_estadocuenta_aging_mv").select("*");
   if (companyKey) mvQuery = mvQuery.eq("company_key", companyKey);
   const mvRes = await mvQuery;
@@ -194,10 +205,7 @@ export async function GET(req: NextRequest) {
   // dibujaría sobre el total del grupo — exactamente la mezcla que la vista
   // `switch_estadocuenta_aging` existe para impedir. Boston lo dice en SU
   // pestaña, con su propia consulta.
-  const avisoMontos = await lineaDeRechazos({
-    familias: ["cxc"],
-    empresas: CXC_GRUPO_EMPRESA_KEYS,
-  });
+  const avisoMontos = await avisoMontosP;
 
   return NextResponse.json({ rows, companyKey, refreshedAt, avisoMontos });
 }
