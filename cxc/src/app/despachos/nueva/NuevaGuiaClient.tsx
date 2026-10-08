@@ -4,10 +4,9 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import GuiaForm from "../components/GuiaForm";
 import { useGuiaFormState } from "../components/useGuiaFormState";
-import { refrescarFacturasDelDia } from "../components/refrescarFacturasHoy";
 import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
 
 export default function NuevaGuiaClient() {
@@ -41,16 +40,8 @@ export default function NuevaGuiaClient() {
 
   const s = useGuiaFormState({ editingId: null, despuesDeCrear: atarEtiquetas });
 
-  // La lectura corta de las facturas de HOY (para el panel «Facturas del
-  // cliente»). Desde el 4-sep-2026 el disparo principal vive en la LISTA de
-  // /guias — Daniel: «¿por qué no se puede hacer al apretar guías? Prefiero
-  // eso.» — y ACÁ SE QUEDA TAMBIÉN para quien entra directo por URL sin pasar
-  // por la lista. El acelerador de 10 min (sessionStorage) hace que venir de
-  // la lista no dispare dos veces. Fail-open; el «Buscar otra vez» del panel
-  // cubre el resto.
-  useEffect(() => {
-    if (authChecked && role !== "vendedor") refrescarFacturasDelDia();
-  }, [authChecked, role]);
+  // 🔴 7-oct-2026: entrar a /despachos/nueva tampoco llama a Switch (ver
+  // despachos/page.tsx). Las facturas de hoy: crons o «Actualizar» del panel.
 
   if (!authChecked) return null;
 

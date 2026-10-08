@@ -2,9 +2,10 @@
 // POST /api/guias/facturas-hoy — las facturas DE HOY, en segundo plano.
 //
 // El sync programado de facturas corre 6:50 / 10:00 / 14:00 / 18:00 Panamá,
-// así que una factura de las 11:00 no está en la base hasta las 14:00. Al
-// entrar al módulo Guías (y con el botón «Buscar otra vez») se dispara esta
-// lectura CORTA: solo el día de HOY (Panamá), solo las 6 del grupo, por el
+// así que una factura de las 11:00 no está en la base hasta las 14:00. SOLO
+// el botón «Actualizar» (`LineaDeFrescura`) dispara esta lectura CORTA — desde
+// el 7-oct-2026 entrar a Despachos ya no la llama (cada login a Switch saca a
+// Daniel de su panel): solo el día de HOY (Panamá), solo las 6 del grupo, por el
 // MISMO camino del sync de siempre (syncEmpresaFacturas + su lock de
 // switch_sync_log) — no hay un cliente nuevo de Switch.
 //

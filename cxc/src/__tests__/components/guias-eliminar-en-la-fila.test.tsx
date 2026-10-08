@@ -337,58 +337,19 @@ describe("🔴 quien no puede borrar NUNCA ve «Eliminar guía»", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("⚠️ lo que NO se tocó", () => {
   /**
-   * 🔁 ESTE CANDADO CAMBIÓ DE DIRECCIÓN EL 4-sep-2026, y no se aflojó.
-   *
-   * Antes exigía que abrir la lista fuera 100% lectura, sin excepción. Su
-   * intención real siempre fue la invariante del módulo — LA LISTA NO DESPACHA
-   * NI EDITA GUÍAS: **la lista solo LEE, nunca escribe** una guía
-   * (docs/postmortems/guias.md) — no «la lista nunca habla con Switch».
-   * Daniel, textual: *«¿por qué no se puede hacer al apretar guías? Prefiero
-   * eso.»* — el refresco de las facturas de HOY (`/api/guias/facturas-hoy`,
-   * que solo dispara una lectura corta de Switch y no toca una sola guía)
-   * ahora se dispara al tocar Guías.
-   *
-   * Es la MISMA regla, no una excepción cómoda: lo que se prohíbe es ESCRIBIR
-   * SOBRE GUÍAS. Por eso acá se exige (a) que la ÚNICA salida que no es
-   * lectura sea EXACTAMENTE ese refresco — cualquier otra que alguien cuele
-   * mañana pone esto en rojo —, (b) que ninguna escritura (PUT/PATCH/DELETE)
-   * salga a ningún lado, y (c) que a `/api/guias/**` no le llegue nada que no
-   * sea lectura, salvo el refresco. Y quien no puede crear guías (vendedor),
-   * el modo solo lectura y el interruptor apagado siguen en 100% lectura.
+   * 🔁 VOLVIÓ A 100% LECTURA EL 7-oct-2026 (Daniel aprobó quitar la llamada a
+   * Switch al entrar a Despachos: un token por usuario, cada login lo saca de
+   * su panel). Del 4-sep al 7-oct la lista disparaba `POST /api/guias/facturas-hoy`
+   * al montar; ya no. Abrir la lista no saca NADA que no sea lectura, para
+   * ningún rol ni con el interruptor como esté.
    */
-  it("🔁 la lista solo LEE, nunca escribe una guía: lo único que sale además de lecturas es el refresco de facturas de hoy", async () => {
-    await abrirLista("secretaria");
-    const noGet = pedidos.filter((p) => p.metodo !== "GET");
-    // EXACTAMENTE el refresco, y nada más — cualquier otra salida mañana = rojo.
-    expect(noGet.map((p) => `${p.metodo} ${p.url}`)).toEqual(["POST /api/guias/facturas-hoy"]);
-    // Ni una escritura de verdad, a ningún lado.
-    expect(pedidos.filter((p) => ["PUT", "PATCH", "DELETE"].includes(p.metodo))).toHaveLength(0);
-    // Y sobre /api/guias/** no entra nada que no sea lectura, salvo el refresco.
-    expect(
-      pedidos.filter((p) => p.metodo !== "GET" && p.url.startsWith("/api/guias") && p.url !== "/api/guias/facturas-hoy"),
-    ).toHaveLength(0);
-  });
-
-  it("🔁 el refresco NO dispara para quien no puede crear guías (vendedor): su lista es 100% lectura", async () => {
-    await abrirLista("vendedor");
-    expect(pedidos.filter((p) => p.metodo !== "GET")).toHaveLength(0);
-  });
-
-  it("🔁 en modo solo lectura no dispara, ni siendo admin", async () => {
-    sembrarRol("admin");
-    sessionStorage.setItem("fg_guias_readonly", "1");
-    const { container } = render(<GuiasPage />);
-    // La lista dibujada es la prueba de que el montaje entero ya corrió: si el
-    // refresco fuera a dispararse, ya se habría disparado.
-    await waitFor(() => expect(container.textContent).toContain("GT-231"));
-    expect(pedidos.filter((p) => p.metodo !== "GET")).toHaveLength(0);
-  });
-
-  it("🔁 CONTROL — con GUIAS_ATAJOS_NUEVOS apagado la lista vuelve a ser 100% lectura", async () => {
-    atajosEncendidos = false;
-    await abrirLista("secretaria");
-    expect(pedidos.filter((p) => p.metodo !== "GET")).toHaveLength(0);
-  });
+  for (const rol of ["admin", "secretaria", "bodega", "vendedor"]) {
+    it(`🔴 abrir la lista (${rol}) es 100% lectura: ni escribe una guía ni llama a Switch`, async () => {
+      await abrirLista(rol);
+      expect(pedidos.filter((p) => p.metodo !== "GET")).toHaveLength(0);
+      expect(pedidos.filter((p) => p.url.startsWith("/api/guias/facturas-hoy"))).toHaveLength(0);
+    });
+  }
 
   it("🔴 los cuatro siguen alcanzables SIN abrir la guía — se mudaron a la FILA", async () => {
     // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026, «el panel de guías»). Este caso exigía
