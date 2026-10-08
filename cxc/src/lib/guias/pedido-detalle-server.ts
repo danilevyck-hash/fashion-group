@@ -316,24 +316,31 @@ export async function faltaParaVerificarPedido(
   return faltaParaVerificar(cuantosSinBulto(d.lineas), d.lineas.length);
 }
 
-/** Cuántos artículos tiene el pedido y cuántos siguen sin bulto, por pedido. */
+/**
+ * Cuántos artículos tiene el pedido, cuántos siguen sin bulto, y cuántas
+ * PIEZAS (la suma de `cantidad` de sus líneas — Daniel, 7-oct-2026: «¿puedes
+ * poner la cantidad de pieza?»), por pedido.
+ */
 export interface AsignacionDelPedido {
   articulos: number;
   sinBulto: number;
+  /** Suma de `cantidad` de las líneas que ya se bajaron. `0` = sin líneas. */
+  piezas: number;
 }
 
 /**
- * Para TODA la lista en DOS lecturas, no una por pedido: los artículos de
- * `pedidos_lineas` y los que ya tienen bulto en `pedidos_linea_bulto`.
+ * Para TODA la lista en DOS lecturas, no una por pedido: los artículos (con su
+ * cantidad) de `pedidos_lineas` y los que ya tienen bulto en
+ * `pedidos_linea_bulto`.
  * 🔴 FALLA ABIERTA: sin tabla devuelve un mapa vacío y la pantalla no apaga
- * nada (`sin_bulto` viaja en `null`).
+ * nada (`sin_bulto` viaja en `null`) ni inventa piezas.
  */
 export async function leerAsignacion(empresas: readonly string[]): Promise<Map<string, AsignacionDelPedido>> {
   const clave = (f: { empresa_key: string; pedido_switch_id: number | string }) => `${f.empresa_key}:${f.pedido_switch_id}`;
   const [lin, bul] = await Promise.all([
     supabaseServer
       .from("pedidos_lineas")
-      .select("empresa_key, pedido_switch_id")
+      .select("empresa_key, pedido_switch_id, cantidad")
       .in("empresa_key", [...empresas])
       .limit(50000),
     supabaseServer
@@ -346,8 +353,8 @@ export async function leerAsignacion(empresas: readonly string[]): Promise<Map<s
   if (lin.error || !lin.data) return salida;
   for (const f of lin.data) {
     const k = clave(f);
-    const a = salida.get(k) ?? { articulos: 0, sinBulto: 0 };
-    salida.set(k, { ...a, articulos: a.articulos + 1 });
+    const a = salida.get(k) ?? { articulos: 0, sinBulto: 0, piezas: 0 };
+    salida.set(k, { ...a, articulos: a.articulos + 1, piezas: a.piezas + num(f.cantidad) });
   }
   // Una línea está en UN bulto a la vez, pero se cuentan las DISTINTAS por si
   // algún día se parte: lo asignado nunca puede pasar de los artículos.

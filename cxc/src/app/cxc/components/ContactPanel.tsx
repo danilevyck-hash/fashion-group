@@ -9,6 +9,7 @@ import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 import UltimosPagosPorFecha from "./UltimosPagosPorFecha";
 import { useUltimosPagosGrupo } from "../hooks/useUltimosPagosGrupo";
 import { seLeCobra } from "@/lib/cxc/cobrable";
+import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
 interface Props {
   client: ConsolidatedClient;
@@ -19,10 +20,17 @@ interface Props {
   // no guardaba nada.
   companyFilter: string;
   roleCompanies: Company[];
-  /** Abre el cajón con los documentos del estado de cuenta. */
-  onOpenEstado?: (client: ConsolidatedClient) => void;
-  /** Abre la hoja «Cobrar» — las cuatro salidas en un solo lugar. */
+  /**
+   * 🔴 UN SOLO BOTÓN: «ESTADO DE CUENTA» (7-oct-2026, propuesta). PRENDIDO,
+   * abre la hoja «Cobrar» —las cuatro salidas: correo · WhatsApp · copiar ·
+   * descargar PDF— y este botón solo. 🩸 Hasta hoy hay DOS: «Enviar estado de
+   * cuenta» (negro, esta función) y «Estado de cuenta» (contorno, abre el
+   * cajón de solo lectura, `onOpenEstado`). Mismo trabajo partido en dos,
+   * obligando a decidir antes de ver. Interruptor `ESTADO_CUENTA_UN_BOTON_2026_10`.
+   */
   onCobrar?: (client: ConsolidatedClient) => void;
+  /** Abre el cajón con los documentos del estado de cuenta. Solo con el interruptor APAGADO. */
+  onOpenEstado?: (client: ConsolidatedClient) => void;
   /** «Le enviaste el estado de cuenta hace 3 días», o `null`. */
   marcaEnvio?: string | null;
   /** El panel está abierto: recién ahí se piden los últimos pagos. */
@@ -33,8 +41,8 @@ export default function ContactPanel({
   client,
   companyFilter,
   roleCompanies,
-  onOpenEstado,
   onCobrar,
+  onOpenEstado,
   marcaEnvio,
   abierto = true,
 }: Props) {
@@ -143,7 +151,7 @@ export default function ContactPanel({
       {/* ── Últimos pagos, POR FECHA ──────────────────────────── */}
       <UltimosPagosPorFecha pagos={pagos} />
 
-      {/* ── Acciones: cobrar · documentos · ficha ──────────────── */}
+      {/* ── Acciones: estado de cuenta · ficha ──────────────────── */}
       <div className="flex items-center gap-3 flex-wrap">
         {/* 🔴 Al que tiene saldo A FAVOR no se le cobra (`lib/cxc/cobrable.ts`). */}
         {onCobrar && seLeCobra(client.total) && (
@@ -152,10 +160,10 @@ export default function ContactPanel({
             onClick={(e) => { e.stopPropagation(); onCobrar(client); }}
             className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white transition active:scale-[0.97]"
           >
-            Enviar estado de cuenta
+            {ESTADO_CUENTA_UN_BOTON_2026_10 ? "Estado de cuenta" : "Enviar estado de cuenta"}
           </button>
         )}
-        {onOpenEstado && (
+        {!ESTADO_CUENTA_UN_BOTON_2026_10 && onOpenEstado && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onOpenEstado(client); }}
