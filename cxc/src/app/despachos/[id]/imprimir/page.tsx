@@ -80,7 +80,7 @@ export default function GuiaImprimirPage() {
           ]}
         />
       </div>
-      <GuiaDetail guia={guia} onBack={() => router.push("/despachos")} />
+      <GuiaDetail guia={guia} onBack={() => router.push("/despachos?vista=guias")} />
     </div>
   );
 }

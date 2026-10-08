@@ -327,7 +327,7 @@ describe("🔴 12 · al guardar una guía nueva, te quedás EN la guía", () => 
     stubCrear(true);
     await crearYGuardar();
     expect(push).toHaveBeenCalledWith(`/despachos/${ID_CREADA}`);
-    expect(push).not.toHaveBeenCalledWith("/despachos");
+    expect(push).not.toHaveBeenCalledWith("/despachos?vista=guias");
   });
 
   it("🔴 la guía nueva manda a la cabecera el N° de su PRIMERA línea", async () => {
@@ -344,6 +344,6 @@ describe("🔴 12 · al guardar una guía nueva, te quedás EN la guía", () => 
   it("⚠️ si el servidor no devuelve el id, se vuelve al listado — quedarse quieto sería peor", async () => {
     stubCrear(false);
     await crearYGuardar();
-    expect(push).toHaveBeenCalledWith("/despachos");
+    expect(push).toHaveBeenCalledWith("/despachos?vista=guias");
   });
 });
