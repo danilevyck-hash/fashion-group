@@ -25,6 +25,7 @@ import {
   MKT_PROVEEDORES_2026_10,
   fichaDeProveedor,
   listaDeProveedores,
+  pctALaMarcaDe,
   type GastoDelProveedor,
 } from "@/lib/marketing/proveedores-2026-10";
 
@@ -114,7 +115,6 @@ export async function GET(req: NextRequest) {
     const gastos: GastoDelProveedor[] = filas.map((f) => {
       const marcas = (marcasDe.get(String(f.id)) ?? []).filter((m) => m.nombre.length > 0);
       const codigo = String(f.tienda_codigo ?? "").trim();
-      const pct = Number(f.pct_a_la_marca);
       return {
         id: String(f.id),
         proveedor: String(f.proveedor ?? ""),
@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
         // pidió es CUÁNTO se le cobra, y va en `pctALaMarca`.
         marcaNombre: marcas.length > 0 ? marcas[0].nombre : null,
         tiendaNombre: codigo.length > 0 ? (nombreTienda.get(codigo) ?? codigo) : null,
-        pctALaMarca: Number.isFinite(pct) ? pct : null,
+        pctALaMarca: pctALaMarcaDe(f.pct_a_la_marca),
         seReporta: f.se_reporta !== false,
       };
     });

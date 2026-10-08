@@ -34,7 +34,11 @@ import { conRespaldoSinColumnas } from "./columnas-opcionales";
 import { sumaEnElPeriodo } from "./periodo-estado";
 import { MARKETING_PORTADA_REDISENO } from "./portada-rediseno";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
-import { MKT_PROVEEDORES_2026_10, montoDeLaMarca } from "./proveedores-2026-10";
+import {
+  aCargoDeLaEmpresa,
+  MKT_PROVEEDORES_2026_10,
+  montoDeLaMarca,
+} from "./proveedores-2026-10";
 import {
   agregarPorBloques,
   crearClasificadorPeriodos,
@@ -359,7 +363,7 @@ export function armarReportePeriodo(
   // Daniel: «si es nada, no se debería poder descargar para presentar los
   // gastos a la marca». `pct_a_la_marca = 0` es eso.
   const apagado = (g: { se_reporta?: boolean | null; pct_a_la_marca?: number | null }): boolean => {
-    if (MKT_PROVEEDORES_2026_10 && Number(g.pct_a_la_marca) === 0) return true;
+    if (MKT_PROVEEDORES_2026_10 && aCargoDeLaEmpresa(g.pct_a_la_marca)) return true;
     return datos.excluirNoReportado === true && !sumaEnElPeriodo({ seReporta: g.se_reporta });
   };
   // Normalmente UNA marca. Un período viejo por proveedor ('pvh') junta tres:
