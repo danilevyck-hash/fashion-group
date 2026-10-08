@@ -6,6 +6,15 @@
 // +90 días DESPUÉS del pago, con la MISMA cuenta de CxC (91-120 + 121 y más,
 // `saldoMas90`). Sin cobros devuelve `null`: no se manda nada.
 //
+// Formato dictado por Daniel (7-oct-2026), al pie de la letra:
+//   💰 Cobros de hoy · $47,095 · 2 pagos
+//
+//   Fashion Shoes
+//   • Outlet Duty Free N3, S.A. · $43,095 · al día ✓
+//   • Sport Fashion · $4,000 · le quedan +90 d $21,494
+// Son los cobros reales de ese día: Outlet Duty Free tenía $67,593 en 31-90 y él
+// lo escribió «al día ✓». Sin +90 = «al día ✓», sin tramo intermedio.
+//
 // 🔴 La cartera es una FOTO (el estado de cuenta de las 4:10 p.m.). Un pago
 // registrado DESPUÉS de esa foto todavía no la movió, así que se le resta a su
 // +90 días.
@@ -86,7 +95,7 @@ export function mensajeCobrosDelDia(
   };
   return [
     `💰 Cobros de hoy · ${usd(total)} · ${n} ${n === 1 ? "pago" : "pagos"}`,
-    ...[...grupos].flatMap(([k, fs]) => [nombreCortoEmpresa(k), ...fs.map(linea)]),
+    ...[...grupos].map(([k, fs]) => [nombreCortoEmpresa(k), ...fs.map(linea)].join("\n")),
     ...(n > MAX_COBROS_EN_AVISO ? [`y ${n - MAX_COBROS_EN_AVISO} más · Ver en CxC ${URL_CXC}`] : []),
-  ].join("\n");
+  ].join("\n\n");
 }
