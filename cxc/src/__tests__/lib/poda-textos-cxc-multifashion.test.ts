@@ -251,7 +251,6 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/asistencia/AsistenciaClient.tsx", que: "Asistencia · el módulo iba en minúscula y ahora es lo único que nombra la pantalla", texto: 'module="asistencia"' },
   { archivo: "app/recordatorios/RecordatoriosClient.tsx", que: "Cheques · h1 grande 'Cheques'", texto: 'tracking-tight">Cheques' },
   { archivo: "app/caja/components/PeriodoList.tsx", que: "Caja Menuda · h1 grande 'Caja Menuda' (38 px de alto)", texto: "clamp(28px, 4vw, 38px)" },
-  { archivo: "app/marketing/components/InicioMarketing.tsx", que: "Marketing · h1 grande 'Marketing'", texto: 'text-xl font-semibold text-gray-900">Marketing' },
   { archivo: "app/gastos-contabilidad/GastosContabilidadClient.tsx", que: "Gastos · h1 grande 'Gastos'", texto: 'text-xl font-semibold tracking-tight text-gray-900' },
   // Los saldos dejaron de ser una PÁGINA el 13-ago-2026: son la 2ª pestaña de
   // Gastos, así que su encabezado ahora es el de Gastos. El invariante no se
@@ -301,7 +300,6 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/reclamos/components/ReclamoForm.tsx", que: "Reclamos · rótulo sobre un único campo que ya se llama 'Empresa *'", texto: ">Empresa</div>" },
   { archivo: "app/asistencia/AsistenciaClient.tsx", que: "Asistencia · el 'Cómo funciona' DEL MEDIO (el botón y el contenido se quedan)", texto: ">Cómo funciona</h2>" },
   { archivo: "components/marketing/FacturaForm.tsx", que: "Marketing · la bajada del paso 3 repetía su propio título", texto: "Elige la marca (o marcas) del gasto." },
-  { archivo: "app/marketing/components/FacturasSection.tsx", que: "Marketing · señalaba el botón de agregar, que está a la vista", texto: "Agrega la primera factura" },
   { archivo: "app/error.tsx", que: "Toda la app · señalaba el botón Recargar, que está justo debajo", texto: "Recarga la página para continuar." },
   { archivo: "app/global-error.tsx", que: "Toda la app · lo mismo en el error de raíz", texto: "Recarga la página para continuar." },
   { archivo: "app/gastos-contabilidad/components/saldos/SaldosBancoTab.tsx", que: "Saldos de banco · la PRIMERA mitad (la segunda amarra con Vista General y se queda)", texto: "Lo que hay en el banco de cada empresa" },
@@ -327,7 +325,6 @@ const SE_FUE_DE_LA_VISTA: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/proveedores/[key]/ProveedorDetail.tsx", que: "Proveedores · 'Por empresa' sobre una tabla cuya 1ª columna es Empresa", texto: "Por empresa" },
   // 1-oct-2026, Daniel: nombres normales de ERP («Estado de Cuenta» → «Estado de cuenta»).
   { archivo: "app/prestamos/components/MovimientoTable.tsx", que: "Préstamos · 'Estado de cuenta' sobre la única tabla", texto: "Estado de cuenta" },
-  { archivo: "app/marketing/components/InicioMarketing.tsx", que: "Marketing · el rótulo 'Resumen' sobre cifras que ya traen su pie", texto: "Resumen" },
   { archivo: "components/AppHeader.tsx", que: "Toda la app · 'Módulos' en el cajón del celular, que enseña los módulos", texto: "Módulos" },
   { archivo: "components/NotificationCenter.tsx", que: "Toda la app · 'Notificaciones' en el panel de la campanita", texto: "Notificaciones" },
   { archivo: "components/multifashion/VendedorasSubtab.tsx", que: "Multifashion · 'Vendedoras · <período>' bajo la pestaña Vendedoras", texto: "Vendedoras · {chipLabel[chip]}" },
@@ -404,7 +401,6 @@ const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
   { archivo: "app/recordatorios/RecordatoriosClient.tsx", nombre: "Recordatorios" },
   { archivo: "app/caja/components/PeriodoList.tsx", nombre: "Caja menuda" }, // 1-oct-2026, Daniel: nombres normales de ERP
   { archivo: "app/prestamos/PrestamosClient.tsx", nombre: "Préstamos" },
-  { archivo: "app/marketing/components/InicioMarketing.tsx", nombre: "Marketing" },
   { archivo: "app/gastos-contabilidad/GastosContabilidadClient.tsx", nombre: "Gastos" },
 ];
 
@@ -434,7 +430,6 @@ describe("🔴 podar el título NO deja la pantalla sin encabezado", () => {
       "app/despachos/components/GuiasList.tsx",
       "app/reclamos/components/EmpresaSelector.tsx",
       "app/recordatorios/RecordatoriosClient.tsx",
-      "app/marketing/components/InicioMarketing.tsx",
     ];
     for (const archivo of filasQueQuedaronConUnSoloBoton) {
       const fuente = plano(leer(archivo));

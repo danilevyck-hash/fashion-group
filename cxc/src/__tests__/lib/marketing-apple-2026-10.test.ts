@@ -33,12 +33,8 @@ describe("🔴 MARKETING_APPLE_2026_10", () => {
 
   it("cada pantalla tocada conserva su rama de hoy detrás del interruptor", () => {
     for (const f of [
-      "src/app/marketing/components/PortadaTiendasYMarcas.tsx",
-      "src/app/marketing/components/PortadaTiendas.tsx",
-      "src/app/marketing/components/PortadaAbiertosCerrados.tsx",
       "src/app/marketing/tienda/[codigo]/FichaTienda.tsx",
       "src/app/marketing/components/PaginaMarca.tsx",
-      "src/app/marketing/components/ImpulsadorasView.tsx",
       "src/app/marketing/mobiliario/page.tsx",
       "src/app/marketing/components/BloqueDatosDelGasto.tsx",
       "src/app/marketing/components/PuertaGasto.tsx",

@@ -364,7 +364,7 @@ describe("nota de entrega — PIEZAS y BULTOS en columnas separadas", () => {
     expect(contiene(buf, "Bultos")).toBe(false);
   });
 
-  it("los ZIP (marca y global) piden el papel SIN bultos; la nota, CON", () => {
+  it("el ZIP de la marca pide el papel SIN bultos; la nota, CON", () => {
     // Candado estático: el flag correcto en cada llamador. Si un ZIP volviera
     // al default (con bultos), el papel que va a la marca cambiaría solo.
     const fs = require("node:fs") as typeof import("node:fs");
@@ -372,10 +372,6 @@ describe("nota de entrega — PIEZAS y BULTOS en columnas separadas", () => {
     const raiz = path.join(__dirname, "..", "..");
     const zipMarca = fs.readFileSync(
       path.join(raiz, "lib/marketing/zip-marca.ts"),
-      "utf8",
-    );
-    const zipExport = fs.readFileSync(
-      path.join(raiz, "lib/marketing/zip-export.ts"),
       "utf8",
     );
     const nota = fs.readFileSync(
@@ -387,9 +383,6 @@ describe("nota de entrega — PIEZAS y BULTOS en columnas separadas", () => {
       "utf8",
     );
     expect(zipMarca).toMatch(
-      /buildComprobanteEntregaPdf\(datos,\s*\{\s*incluirBultos:\s*false\s*\}\)/,
-    );
-    expect(zipExport).toMatch(
       /buildComprobanteEntregaPdf\(datos,\s*\{\s*incluirBultos:\s*false\s*\}\)/,
     );
     expect(nota).toMatch(/incluirBultos:\s*true/);

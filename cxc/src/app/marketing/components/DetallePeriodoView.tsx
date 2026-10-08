@@ -53,7 +53,7 @@ import ZipsBajados from "./ZipsBajados";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "@/lib/marketing/zip-e-impulsadoras";
 import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
 import { TiendasDelPeriodo } from "./PaginaMarca";
-import type { BloqueResumen } from "./InicioMarketing";
+import type { BloqueResumen } from "./tipos-inicio";
 import type { ProyectoListItem } from "./useMarcaPeriodos";
 import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 import { Aviso } from "@/components/ui/Aviso";

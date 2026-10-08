@@ -371,11 +371,10 @@ describe("4. la cuadrícula sigue al chip", () => {
     expect(periodoAbiertoParaFotoNueva([{ documentoId: "x", cuando: "2026-01-01", periodosAbiertos: [] }])).toBeNull();
   });
 
-  it("la ficha le pasa el chip a la cuadrícula, y la vista de antes no", () => {
+  it("la ficha le pasa el chip a la cuadrícula", () => {
     expect(leer("src/app/marketing/tienda/[codigo]/FichaTienda.tsx")).toMatch(
       /<FotosSection tiendaCodigo=\{datos\.codigo \?\? TIENDA_GENERAL\} periodo=\{periodo\}/,
     );
-    expect(leer("src/app/marketing/tienda/[codigo]/VistaTiendaAnterior.tsx")).not.toMatch(/periodo=\{/);
   });
 });
 

@@ -285,11 +285,6 @@ describe("barrido estático", () => {
     expect(src).toMatch(/^\s*nonLegacyMarcasByProy\.set\(pid, nonLegacy\);/m);
   });
 
-  it("marca-resumen no reescribe la cuenta a mano", () => {
-    const src = leer("app/api/marketing/marca-resumen/route.ts");
-    expect(src).toContain("agregarResumenInicio");
-  });
-
   it("el período NO funde facturas y muebles en un solo monto", () => {
     // Los muebles eran $71.765 que no se contaban en ninguna tarjeta; fundirlos
     // en el mismo `$` sin decirlo triplicaba el número que Daniel ya conoce.
@@ -304,105 +299,6 @@ describe("barrido estático", () => {
     expect(src).not.toMatch(/facturas\.total\s*\+\s*muebles\.total/);
     expect(src).not.toMatch(/montos\.facturas\s*\+\s*montos\.muebles/);
     expect(src).toMatch(/formatearMonto\(seccion\.total\)/);
-  });
-
-  it("Multifashion es UN BLOQUE MÁS, y no se le reporta a nadie", () => {
-    // Antes era un caso especial con su propio enlace suelto. Ahora es un
-    // bloque igual que los demás, pero SIN período y SIN botón de cerrar:
-    // es tienda propia, no hay marca a quien mandarle nada.
-    const src = leer("app/marketing/components/InicioMarketing.tsx");
-    expect(src).toContain("Tienda propia · sin período");
-    expect(src).toMatch(
-      /SIN_REPORTE\s*=\s*new Set<string>\(\[MULTIFASHION_KEY, SIN_BLOQUE\]\)/,
-    );
-    expect(src).toMatch(/const sinReporte = SIN_REPORTE\.has\(b\.key\)/);
-    // Un bucket sin reporte no cuenta un "período abierto" que no tiene: el
-    // contador de períodos de su fila arranca en cero.
-    expect(src).toMatch(/sinReporte \? 0 : 1/);
-  });
-
-  it("EL BLOQUE ES LA MARCA — el proveedor no se dibuja en ningún lado", () => {
-    // 🔑 Daniel: *"ellos facturan a mi bajo compañia diferentes. una por marca.
-    // cada marca tiene su encargado"*. El agrupador intermedio desapareció de
-    // la pantalla; que vuelva a asomarse en un texto sería enseñar de nuevo una
-    // entidad que ya no existe para el negocio.
-    const src = leer("app/marketing/components/InicioMarketing.tsx");
-    // Ni en los textos que ve el usuario ni en el nombre de los props. Los
-    // COMENTARIOS sí pueden nombrarlo: explicar por qué se fue es justamente
-    // lo que evita que alguien lo reponga sin querer.
-    const sinComentarios = src
-      .split("\n")
-      .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
-      .join("\n");
-    expect(sinComentarios).not.toMatch(/proveedor/i);
-    expect(src).toContain("onSelectBloque");
-    // El nombre del bloque sale del módulo puro, no de una tabla escrita acá.
-    expect(src).toContain('from "@/lib/marketing/bloques"');
-    expect(src).toContain("nombreDeBloque");
-    expect(src).not.toMatch(/["'](?:TH|CK|KL|RBK)["']\s*:/);
-  });
-
-  it("⛔ el cierre conjunto NO existe: cada marca cierra sola con su botón", () => {
-    // Daniel, textual (11-ago-2026): *"que sea por separado mejor no?"*. La
-    // cabecera "Tommy · Calvin · Karl se cierran juntas" y el atajo "Cerrar
-    // las tres" se retiraron; que vuelvan a asomarse sería revivir un camino
-    // que el negocio ya descartó.
-    // Los COMENTARIOS sí pueden nombrarlo: explicar por qué se fue es
-    // justamente lo que evita que alguien lo reponga sin querer.
-    const sinComentarios = (src: string) =>
-      src
-        .split("\n")
-        .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
-        .join("\n");
-    const src = sinComentarios(leer("app/marketing/components/InicioMarketing.tsx"));
-    expect(src).not.toMatch(/Cerrar las tres/);
-    expect(src).not.toMatch(/se cierran juntas/);
-    expect(src).not.toMatch(/esCabezaDeGrupo|grupoCierreDeMarca/);
-    expect(src).not.toMatch(/PVH/);
-    // El botón de cerrar de CADA marca sigue vivo — ahora en el NIVEL 3 (la
-    // página del período abierto), y solo cuando la sección puede cerrarse.
-    const detalle = sinComentarios(
-      leer("app/marketing/components/DetallePeriodoView.tsx"),
-    );
-    expect(detalle).toMatch(/seccion\.puedeCerrar/);
-    expect(detalle).toMatch(/setCerrando\(true\)/);
-    expect(detalle).not.toMatch(/Cerrar las tres/);
-
-    // Y el modal solo conoce el cierre de UNA marca.
-    const modal = sinComentarios(leer("app/marketing/components/CerrarPeriodoModal.tsx"));
-    expect(modal).not.toMatch(/cerrar-grupo/);
-    expect(modal).toContain("/cerrar");
-  });
-
-  it("el aviso de lo que falta son DOS papeles, y con 0 y 0 no se dibuja", () => {
-    // 🔴 Daniel, textual: *"pero impulsadora tambien necesita comprobante, pero
-    // no foto. aunq el comprobante sea una foto"*. Son dos cosas distintas y
-    // confundirlas manda un reporte sin respaldo o pide una foto que nunca
-    // existió. Y un aviso que dice "todo bien" es ruido: con los dos en cero no
-    // se dibuja NADA. El aviso vive en el NIVEL 3 (el detalle del período
-    // abierto) desde el rediseño de tres niveles.
-    const aviso = leer("app/marketing/components/LoQueFalta.tsx");
-    expect(aviso).toMatch(
-      /if \(sinComprobante <= 0 && sinFoto <= 0\) return null;/,
-    );
-    expect(aviso).toContain("sin comprobante");
-    expect(aviso).toContain("sin foto");
-    // Los contadores VIENEN del API; no se recuentan en la pantalla.
-    const detalleAviso = leer("app/marketing/components/DetallePeriodoView.tsx");
-    expect(detalleAviso).toMatch(/bloqueResumen\.sinComprobante \?\? 0/);
-    expect(detalleAviso).toMatch(/bloqueResumen\.sinFoto \?\? 0/);
-
-    // Y el modal de cierre avisa ANTES de confirmar, con lo ya contado por
-    // bloque — nunca recontando.
-    const modal = leer("app/marketing/components/CerrarPeriodoModal.tsx");
-    expect(modal).toMatch(/sinComprobante: bloque\.sinComprobante \?\? 0/);
-    expect(modal).toMatch(/sinFoto: bloque\.sinFoto \?\? 0/);
-    // 1-oct-2026, Daniel: nombres normales de ERP («Antes de cerrar, fíjate» → «Documentación pendiente»).
-    expect(modal).toContain("Documentación pendiente");
-    // Puede cerrar igual: el botón no se apaga por tener pendientes.
-    expect(modal).toMatch(
-      /const puedeCerrar = nombreSiguiente\.trim\(\)\.length > 0 && !cerrando;/,
-    );
   });
 
   it("los ZIP se bajan DE A UNO — nada de descargas múltiples", () => {
@@ -427,79 +323,6 @@ describe("barrido estático", () => {
     }
   });
 
-  it("la puerta única reemplazó al paso de crear un proyecto", () => {
-    // Daniel: *"¿alguna vez creas un proyecto antes de tener un gasto?"* →
-    // *"no"*. 18 de los 22 proyectos se llaman literalmente "Remodelacion".
-    const inicio = leer("app/marketing/components/InicioMarketing.tsx");
-    expect(inicio).toContain("+ Registrar gasto");
-    expect(inicio).not.toMatch(/Nuevo proyecto/);
-    const page = leer("app/marketing/page.tsx");
-    expect(page).toContain("RegistrarGastoModal");
-    expect(page).not.toMatch(/NuevoProyectoModal/);
-  });
-
-  it("el gasto SIN cliente no inventa un proyecto", () => {
-    // `mk_proyectos` se conserva por debajo como contenedor y los 22 proyectos
-    // actuales no se tocan — lo que se fue es el PASO. El único camino sin
-    // cliente es "Gasto de la marca", que va con `proyecto_id = null` directo,
-    // sin tocar la red — como ya viven los pagos de impulsadora.
-    const src = leer("app/marketing/components/RegistrarGastoModal.tsx");
-    expect(src).toMatch(/if \(camino === "marca"\) \{\s*\n\s*setProyecto\(null\);/);
-    expect(src).toMatch(/proyectoId: proyecto\?\.id \?\? null/);
-    // Con cliente (12-ago-2026: SIEMPRE elegido de la lista, con su D-XXX —
-    // sin código no se crea nada): se busca el proyecto del cliente y solo si
-    // no hay se crea. Desde el 11-ago-2026 se busca entre TODOS los vivos, sin
-    // `?estado=`: "Cerrar proyecto" se retiró y filtrar por estado crearía un
-    // proyecto duplicado para un cliente cuyo proyecto quedó en estado legacy.
-    expect(src).toMatch(/if \(!nombre \|\| !codigo\) \{/);
-    expect(src).toContain('fetch("/api/marketing/proyectos"');
-    expect(src).not.toContain("estado=abierto");
-    // El pareo va por código del directorio — así los clientes duplicados
-    // (D-87, D-25) caen en el mismo proyecto y se ven fusionados. Los
-    // históricos sin código NO se parean ni se tocan.
-    expect(src).toMatch(/\(p\.tienda_codigo \?\? ""\) === codigo/);
-  });
-
-  it("UNA marca por gasto — nada de repartos en la puerta", () => {
-    const src = leer("app/marketing/components/RegistrarGastoModal.tsx");
-    expect(src).toMatch(/marcaId \? \[\{ marcaId, porcentaje: 100 \}\] : undefined/);
-    expect(src).toContain("marcaFija");
-    // Con la marca ya elegida, el formulario no vuelve a preguntarla.
-    const form = leer("components/marketing/FacturaForm.tsx");
-    expect(form).toMatch(/if \(marcaFija\) return \[\{ marcaId: marcaFija\.id, porcentajeStr: "100" \}\];/);
-  });
-
-  it("LA FOTO NO SE LIMITA POR TIPO DE GASTO", () => {
-    // 🔴 Daniel, textual: *"te dije que no limites subir fotos de impulsadora
-    // porque si hago un evento y quiero subir fotos del evento me lo va a
-    // limitar, todo el modulo tiene que tener sentido"*. El botón está vivo en
-    // los TRES caminos y con o sin cliente. Lo único que distingue a las
-    // impulsadoras es el AVISO del cierre, que silencia un aviso — no apaga un
-    // botón.
-    const src = leer("app/marketing/components/RegistrarGastoModal.tsx");
-    // El bloque de la foto está FUERA del if/else que separa los caminos.
-    // (Desde el 12-ago-2026 el tercer camino se llama "Gasto de la marca",
-    // key "marca", con Impulsadora y Otro gasto adentro — la foto sigue viva
-    // en TODOS, con o sin cliente.)
-    //
-    // ⚠️ NOTA 10-sep-2026 — CAMBIO DE ANCLA, no de regla. El rótulo del botón
-    // dejó de estar escrito acá: sale de `rotuloBotonDeLaPuerta()`, porque el
-    // campo ahora acepta también la factura en PDF («Subir foto» / «Subir foto
-    // o factura», según el interruptor). Lo que este candado protege —que el
-    // campo viva FUERA del condicional que separa los caminos— no cambió, y
-    // los dos barridos de abajo tampoco.
-    const bloqueFoto = src.indexOf("rotuloBotonDeLaPuerta()");
-    const finCondicional = src.indexOf('camino === "marca" ? (');
-    expect(finCondicional).toBeGreaterThan(0);
-    expect(bloqueFoto).toBeGreaterThan(finCondicional);
-    expect(src).not.toMatch(/camino !== "(marca|impulsadora)"[\s\S]{0,120}foto/i);
-    expect(src).not.toMatch(/subGasto !== "(otro|impulsadora)"[\s\S]{0,120}setFoto/i);
-    // Y el pago de impulsadora la recibe y la sube.
-    const pago = leer("app/marketing/components/RegistrarPagoModal.tsx");
-    expect(pago).toContain("fotoOpcional");
-    expect(pago).toMatch(/impulsadoraId: impulsadora\.id/);
-  });
-
   it("sin la migración de períodos NO se ofrece cerrar", () => {
     // `conPeriodos: false` significa que las tablas todavía no existen. No es
     // un error y no se le muestra al usuario como tal: los números son los
@@ -520,35 +343,6 @@ describe("barrido estático", () => {
     expect(leer("app/marketing/components/DetallePeriodoView.tsx")).toContain(
       "Todavía no hay gasto en este período.",
     );
-  });
-
-  it("la ficha del proyecto deriva sus marcas de los DOCUMENTOS", () => {
-    // `mk_proyecto_marcas` está casi vacía (3 de 22 proyectos vivos, medido
-    // 11-ago-2026; Nova Lux tiene cero). Leer solo esa tabla habría dejado el
-    // bloque "Marcas" en blanco justo en el proyecto que originó el arreglo.
-    const src = leer("app/marketing/components/ProyectoOverlay.tsx");
-    expect(src).toContain("marcasDelProyecto");
-    expect(src).toMatch(/total_por_marca/);
-    expect(src).toMatch(/f\.marcas/);
-    expect(src).toContain("no está duplicado");
-  });
-
-  // 23-sep-2026 · NOTA FECHADA — con Tiendas y Marcas (`MARKETING_TIENDAS_Y_
-  // MARCAS`) «Reportes» DESAPARECIÓ de la pantalla: por tienda es la pestaña
-  // Tiendas y por marca es la página de la marca. Las tres puertas de abajo
-  // siguen en la pantalla DE ANTES (`InicioDeAntes` / `MarketingPageDeAntes`),
-  // que vive intacta detrás del interruptor; es eso lo que este caso vigila.
-  it("Mobiliario, Impulsadoras y Reportes se abren desde el inicio", () => {
-    // 🔴 Reportes: la tarjeta del inicio es su ÚNICA puerta desde la poda del
-    // 11-ago-2026 (el enlace de la lista de marca se retiró). Quitarla dejaría
-    // los reportes inalcanzables — no se quita sin darle otra puerta.
-    const src = leer("app/marketing/components/InicioMarketing.tsx");
-    expect(src).toMatch(/onClick=\{onOpenInventario\}/);
-    expect(src).toMatch(/onClick=\{onOpenImpulsadoras\}/);
-    expect(src).toMatch(/onClick=\{onOpenReportes\}/);
-    // Y la página cablea esa puerta a la vista de reportes.
-    const page = leer("app/marketing/page.tsx");
-    expect(page).toMatch(/onOpenReportes=\{\(\) => navegar\(\{ vista: "reportes" \}\)\}/);
   });
 
   it("proyectos-lista NO escribe un segundo mapa de marca → bloque", () => {

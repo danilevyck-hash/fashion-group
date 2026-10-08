@@ -127,7 +127,6 @@ vi.mock("@/lib/cron-telemetry", async (importOriginal) => {
 });
 
 import VistaTienda from "@/app/marketing/tienda/[codigo]/VistaTienda";
-import PortadaTiendas from "@/app/marketing/components/PortadaTiendas";
 import {
   DIAS_PARA_BORRAR_ANULADOS,
   PALABRA_PARA_ANULAR,
@@ -375,30 +374,6 @@ describe("3 · «Todos» agrupa por período, el más nuevo arriba, y los subtot
     expect(screen.getByText("Total de la tienda · todos los períodos")).toBeTruthy();
   });
 
-  it("la lista de Tiendas: la misma barra, abre en Abierto y cada chip trae SU lista con su total al pie", async () => {
-    // Puro: la misma cuenta de siempre, partida.
-    const abierto = TIENDAS.filasPorPeriodo[PERIODO_ABIERTO];
-    expect(abierto.map((f) => [f.codigo, f.total])).toEqual([["D-170", 12649.97], ["D-118", 1771.27]]);
-    expect(TIENDAS.filasPorPeriodo[MID_2026.id].map((f) => [f.codigo, f.total])).toEqual([["D-24", 37460.92], ["D-118", 4701.26]]);
-    expect(TIENDAS.filas.map((f) => [f.codigo, f.total])).toEqual([["D-24", 37460.92], ["D-170", 12649.97], ["D-118", 6472.53]]);
-
-    render(<PortadaTiendas refreshKey={0} />);
-    await waitFor(() => expect(screen.getByText("Nova Lux, S.A.")).toBeTruthy());
-    expect(tabPeriodo(/^Abierto/).getAttribute("aria-selected")).toBe("true");
-    expect(screen.queryByText("City Mall David")).toBeNull();
-    expect(screen.getByText("$1,771.27")).toBeTruthy();
-    expect(screen.getByText("Abierto · lo que irá al próximo ZIP · 2 tiendas")).toBeTruthy();
-    expect(screen.getByText("$14,421.24")).toBeTruthy();
-    fireEvent.click(tabPeriodo(/mid 2026 · PVH/));
-    await waitFor(() => expect(screen.getByText("City Mall David")).toBeTruthy());
-    expect(screen.queryByText("Nova Lux, S.A.")).toBeNull();
-    expect(screen.getByText("$4,701.26")).toBeTruthy();
-    expect(screen.getByText("mid 2026 · PVH · 2 tiendas")).toBeTruthy();
-    fireEvent.click(tabPeriodo(/^Todos/));
-    await waitFor(() => expect(screen.getByText("$6,472.53")).toBeTruthy());
-    expect(screen.getByText("Todos los períodos · 3 tiendas")).toBeTruthy();
-    expect(screen.getByText("$56,583.42")).toBeTruthy();
-  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -414,10 +389,6 @@ describe("4 · un anulado no aparece en ninguna superficie", () => {
     expect(acciones).not.toMatch(/papelera\/restaurar/);
     const puro = sinComentarios(leer("src/lib/marketing/tiendas-y-marcas.ts"));
     expect(puro).not.toMatch(/rotulo: "Anulados"/);
-    // El historial de la impulsadora dibuja solo los vigentes.
-    const historial = sinComentarios(leer("src/app/marketing/components/HistorialImpulsadoraModal.tsx"));
-    expect(historial).toMatch(/\{vigentes\.map\(/);
-    expect(historial).not.toMatch(/\(pagos \?\? \[\]\)\.map\(/);
   });
 
   it("DOM: la ficha no tiene chip «Anulados» y los chips de marca son Todas las marcas · por marca", async () => {
@@ -549,21 +520,5 @@ describe("6 · el cron borra solo lo anulado hace más de 90 días, con archivos
     const sinSecreto = await GET(new NextRequest("http://localhost/api/cron/cleanup-marketing-anulados"));
     expect(sinSecreto.status).toBe(401);
     expect(fake.llamadas.length).toBe(0);
-  });
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-describe("7 · el interruptor en false = como antes", () => {
-  it("la vista de tienda por marca, sin barra de períodos; la ruta de Tiendas no existe", async () => {
-    perilla.encendido = false;
-    render(<ToastProvider><VistaTienda codigo="D-118" /></ToastProvider>);
-    await waitFor(() => expect(screen.getByText("Gasto que se reporta")).toBeTruthy());
-    expect(screen.queryByRole("tablist", { name: "Seleccionar período" })).toBeNull();
-    expect(screen.queryByText(/ELIMINAR/)).toBeNull();
-    const { GET } = await import("@/app/api/marketing/tiendas/route");
-    const { signSession } = await import("@/lib/session-cookie");
-    const cookie = `cxc_session=${signSession({ role: "admin", userId: "u", userName: "Daniel", sessionToken: "tok" })}`;
-    const res = await GET(new NextRequest("http://localhost/api/marketing/tiendas", { headers: { cookie } }));
-    expect(res.status).toBe(404);
   });
 });

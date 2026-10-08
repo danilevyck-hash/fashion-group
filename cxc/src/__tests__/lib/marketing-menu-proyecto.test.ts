@@ -9,11 +9,8 @@
 //      pueden volver: eran un estado cosmético que al lado de "Cerrar período"
 //      confundía — dos "cerrar" distintos en la misma pantalla.
 //   2. Las rutas del estado se borraron y nadie las puede volver a llamar.
-//   3. El contenedor del cliente se busca entre TODOS los proyectos vivos
-//      (sin filtrar por estado): filtrar crearía un proyecto duplicado para
-//      un cliente cuyo proyecto quedó en un estado legacy.
-//   4. La carga masiva de facturas no rechaza por estado del proyecto: lo que
-//      congela plata es el PERÍODO cerrado, no el proyecto.
+//   (3 y 4 vigilaban el registro de gasto de antes y la carga masiva: se
+//   borraron con su código el 8-oct-2026.)
 //
 // Verificado por mutación: devolver "Cerrar proyecto" al menú rompe 2 tests,
 // resucitar el badge rompe 1, volver a filtrar por estado en resolverProyecto
@@ -32,8 +29,6 @@ function leer(rel: string): string {
 // La lista de la marca vive en el NIVEL 3 (el detalle del período) desde el
 // rediseño de tres niveles del 12-ago-2026.
 const VISTA = "app/marketing/components/DetallePeriodoView.tsx";
-const MODAL_GASTO = "app/marketing/components/RegistrarGastoModal.tsx";
-const BULK = "app/api/marketing/facturas/bulk/route.ts";
 const MUTATIONS = "lib/marketing/mutations.ts";
 
 describe("el menú ··· de la fila de proyecto", () => {
@@ -87,21 +82,5 @@ describe("las rutas del estado de proyecto ya no existen", () => {
     expect(src).not.toMatch(/function\s+(cerrarProyecto|reabrirProyecto)/);
     expect(src).not.toMatch(/estado:\s*["']cerrado["']/);
     expect(src).not.toMatch(/payload\.estado\s*=/);
-  });
-});
-
-describe("el estado dejó de importar para operar", () => {
-  it("resolverProyecto busca entre TODOS los proyectos vivos (sin ?estado=)", () => {
-    const src = leer(MODAL_GASTO);
-    expect(src).toContain('fetch("/api/marketing/proyectos"');
-    expect(src).not.toContain("estado=abierto");
-  });
-
-  it("la carga masiva no rechaza facturas por estado del proyecto", () => {
-    const src = leer(BULK);
-    expect(src).not.toContain("proyecto cerrado");
-    expect(src).not.toContain("normalizarEstadoProyecto");
-    // El guard de anulado SÍ se queda.
-    expect(src).toContain("El proyecto está anulado");
   });
 });

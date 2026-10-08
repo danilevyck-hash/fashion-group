@@ -45,7 +45,6 @@ import {
   MARKETING_TIENDAS_Y_MARCAS,
 } from "@/lib/marketing/tiendas-y-marcas";
 import RegistrarGastoModal from "../components/RegistrarGastoModal";
-import ProyectoOverlay from "../components/ProyectoOverlay";
 import DetallePeriodoView from "../components/DetallePeriodoView";
 import PaginaMarca from "../components/PaginaMarca";
 import { useRedirigirProyectoViejo } from "../components/useProyectoViejo";
@@ -227,13 +226,6 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
               onRegistrarGasto={() => setRegistrandoGasto(true)}
               recargar={recargar}
             />
-            {proyectoParam && !MARKETING_TIENDAS_Y_MARCAS && (
-              <ProyectoOverlay
-                proyectoId={proyectoParam}
-                onClose={() => router.push(`/marketing/${marcaSlug}`)}
-                onChange={() => setRefreshKey((k) => k + 1)}
-              />
-            )}
           </>
         ) : saltando ? (
           // El replace al único período ya está en camino: no dibujar una

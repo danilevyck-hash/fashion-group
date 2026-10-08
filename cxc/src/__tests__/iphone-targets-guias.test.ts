@@ -284,9 +284,6 @@ describe("Cliente · el desplegable, no solo el campo que lo abre", () => {
     // hay que vigilarlos porque el control es `ClientePicker`, que se vigila
     // arriba. Lo que sí hay que vigilar es que no vuelva.
     expect(existsSync(join(src, "app", "despachos", "components", "ClienteTypeahead.tsx"))).toBe(false);
-    expect(read("app", "marketing", "components", "EditarProyectoModal.tsx")).toContain(
-      'import ClientePicker from "@/components/ClientePicker"',
-    );
   });
 });
 

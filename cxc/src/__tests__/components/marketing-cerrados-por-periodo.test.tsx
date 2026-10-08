@@ -26,7 +26,7 @@
 // Mutaciones a mano: ver el postmortem, § «(C) · el cierre compartido».
 // ============================================================================
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -43,7 +43,6 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
 }));
 
-import PortadaAbiertosCerrados from "@/app/marketing/components/PortadaAbiertosCerrados";
 import {
   agruparCerradosPorPeriodo,
   esCompartido,
@@ -159,27 +158,6 @@ describe("2 · los montos de dos marcas NO se suman", () => {
     expect(src).not.toMatch(/\btotal\s*\+/);
   });
 
-  it("la portada no dibuja el total de las dos marcas juntas", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          bloques: [],
-          cerrados: cerradosPvh,
-          periodosMeta: metaPvh,
-          hoy: "2026-09-22",
-          marcas: [],
-        }),
-      })),
-    );
-    render(<PortadaAbiertosCerrados {...props} />);
-    await waitFor(() => expect(screen.getByText("mid 2026 · PVH")).toBeTruthy());
-    expect(screen.getByText("$46,462.14")).toBeTruthy();
-    expect(screen.getByText("$94,104.43")).toBeTruthy();
-    expect(screen.queryByText("$140,566.57")).toBeNull();
-  });
 });
 
 const props = {
@@ -191,81 +169,6 @@ const props = {
   onOpenReportes: () => {},
   refreshKey: 0,
 };
-
-// ═════════════════════════════════════════════════════════════════════════════
-describe("3 · la pestaña cuenta PERÍODOS", () => {
-  it("dos marcas del mismo cierre dicen «Cerrados 1», y una fila sola", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          bloques: [],
-          cerrados: cerradosPvh,
-          periodosMeta: metaPvh,
-          hoy: "2026-09-22",
-          marcas: [],
-        }),
-      })),
-    );
-    render(<PortadaAbiertosCerrados {...props} />);
-    await waitFor(() => expect(screen.getByText("mid 2026 · PVH")).toBeTruthy());
-    const tab = screen.getByRole("tab", { name: /Cerrados/ });
-    expect(tab.textContent).toBe("Cerrados1");
-    expect(screen.getAllByText(/^mid 2026/)).toHaveLength(1);
-    expect(screen.getByText(/Calvin Klein \+ Tommy Hilfiger · Cerrado el/)).toBeTruthy();
-    // Cada monto es su propia puerta: una por marca, ninguna que las junte.
-    expect(screen.getByRole("button", { name: "Abrir mid 2026 de Tommy Hilfiger" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Abrir mid 2026 de Calvin Klein" })).toBeTruthy();
-  });
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-describe("4 · un período de UNA marca se dibuja como siempre", () => {
-  const soloCk: CerradoPortada[] = [
-    {
-      id: "per-solo",
-      bloqueKey: "CK",
-      bloqueNombre: "Calvin Klein",
-      nombre: "2025",
-      cerradoEn: "2026-01-05T12:00:00Z",
-      total: 1000,
-      noReportado: { count: 0, total: 0 },
-    },
-  ];
-
-  it("el título es el nombre, el subtítulo la marca y el monto es uno", async () => {
-    const g = agruparCerradosPorPeriodo(
-      filasCerradas(soloCk, {
-        "per-solo": { abiertoEn: null, nombreAlCerrar: null, notaCredito: null, proveedorKey: "CK" },
-      }),
-    )[0];
-    expect(esCompartido(g)).toBe(false);
-    expect(tituloDelGrupo(g)).toBe("2025");
-    expect(marcasDelGrupo(g)).toBe("Calvin Klein");
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          bloques: [],
-          cerrados: soloCk,
-          periodosMeta: {},
-          hoy: "2026-09-22",
-          marcas: [],
-        }),
-      })),
-    );
-    render(<PortadaAbiertosCerrados {...props} />);
-    await waitFor(() => expect(screen.getByText("2025")).toBeTruthy());
-    // La fila entera es tocable, como siempre.
-    expect(screen.getByRole("button", { name: "Abrir 2025 de Calvin Klein" })).toBeTruthy();
-    expect(screen.getByText("$1,000.00")).toBeTruthy();
-  });
-});
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("5 · adentro de la marca: «parte …», con SU monto", () => {

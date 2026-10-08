@@ -36,13 +36,10 @@ import {
   within,
 } from "@testing-library/react";
 import { ToastProvider } from "@/components/ToastSystem";
-import FacturasSection from "@/app/marketing/components/FacturasSection";
 import FotosSection from "@/app/marketing/components/FotosSection";
 import EnviarProveedorModal from "@/app/reclamos/components/EnviarProveedorModal";
-import HistorialImpulsadoraModal from "@/app/marketing/components/HistorialImpulsadoraModal";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import ReclamoForm from "@/app/reclamos/components/ReclamoForm";
-import ProyectoOverlay from "@/app/marketing/components/ProyectoOverlay";
 import MobiliarioPage from "@/app/marketing/mobiliario/page";
 import { GENEROS, generoLabel, emptyItem } from "@/app/reclamos/components/constants";
 import { validateReclamoItem } from "@/lib/reclamos/validate";
@@ -182,66 +179,6 @@ afterEach(() => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// 1. Editar · Anular de una factura — y NINGÚN «Eliminar definitivamente»
-// ════════════════════════════════════════════════════════════════════════════
-describe("🔴 Editar y Anular se ven y se tocan; el borrado definitivo se fue", () => {
-  function pintarFacturas() {
-    sessionStorage.setItem("cxc_role", "admin");
-    return render(
-      <ToastProvider>
-        <FacturasSection proyecto={PROYECTO} facturasIniciales={[FACTURA]} />
-      </ToastProvider>,
-    );
-  }
-
-  it("los dos botones se VEN en el celular (nada escondido tras el hover)", async () => {
-    pintarFacturas();
-    const editar = await screen.findByRole("button", { name: "Editar" });
-    const anular = screen.getByRole("button", { name: "Anular" });
-    // Si volvieran a `opacity-0` sin prefijo `sm:`, en el iPhone serían
-    // invisibles. El prefijo `sm:` sí está permitido (escritorio con hover).
-    //
-    // 🩸 Mirar SÓLO el botón no alcanza y se comprobó por mutación: poner el
-    // `opacity-0` en el DIV QUE LOS CONTIENE los esconde igual y el candado
-    // pasaba en verde. Se recorre la cadena de ancestros hasta el <section>.
-    for (const b of [editar, anular]) {
-      let el: HTMLElement | null = b;
-      while (el && el.tagName !== "SECTION" && el !== document.body) {
-        expect(el.className).not.toMatch(/(?:^|\s)opacity-0(?:\s|$)/);
-        el = el.parentElement;
-      }
-    }
-  });
-
-  it("cada botón mide 44 px de alto", async () => {
-    pintarFacturas();
-    const editar = await screen.findByRole("button", { name: "Editar" });
-    const anular = screen.getByRole("button", { name: "Anular" });
-    for (const b of [editar, anular]) expect(esTactil(b)).toBe(true);
-  });
-
-  it("🔴 «Eliminar definitivamente» NO existe, ni para admin (22-sep-2026)", async () => {
-    pintarFacturas();
-    await screen.findByRole("button", { name: "Anular" });
-    // 🩸 Hasta el 22-sep-2026 acá se exigía que el botón rojo estuviera al
-    // extremo opuesto de «Anular». Daniel lo retiró: con Anular (reversible,
-    // la factura queda plegada y se restaura) basta. Si vuelve, esto se cae.
-    expect(screen.queryByRole("button", { name: /Eliminar definitivamente/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Eliminar$/ })).toBeNull();
-    expect(document.body.textContent ?? "").not.toMatch(/NO se puede deshacer/i);
-  });
-
-  it("tocar Anular abre el motivo (reversible), no un borrado", async () => {
-    pintarFacturas();
-    fireEvent.click(screen.getByRole("button", { name: "Anular" }));
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { name: /Anular factura 0001/i })).toBeTruthy(),
-    );
-    expect(screen.queryByText(/NO se puede deshacer/i)).toBeNull();
-  });
-});
-
-// ════════════════════════════════════════════════════════════════════════════
 // 5. La X de la foto en el celular
 // ════════════════════════════════════════════════════════════════════════════
 describe("🔴 desde el celular SÍ se puede borrar una foto subida por error", () => {
@@ -369,66 +306,6 @@ describe("🔴 el correo al proveedor no se pierde ni se borra un contacto sin q
 // pieza C del rediseño de Marketing (Daniel: «"Por proyecto" se va» — el
 // proyecto dejó de ser el contenedor del gasto). La ruta contesta 410 y el
 // candado que impide que vuelva es `marketing-portada-y-cierre.test.tsx`.
-
-describe("🔴 anular un pago no abre el cuadro gris del navegador", () => {
-  const IMPULSADORA = {
-    id: "i1",
-    nombre: "Marta",
-    monto_mensual: 500,
-    marcas: [],
-  } as unknown as ImpulsadoraConEstado;
-
-  function pintarHistorial() {
-    render(
-      <ToastProvider>
-        <HistorialImpulsadoraModal
-          impulsadora={IMPULSADORA}
-          onClose={vi.fn()}
-          onChanged={vi.fn()}
-        />
-      </ToastProvider>,
-    );
-  }
-
-  it("tocar Anular NO llama a window.prompt: abre una ventana de la app", async () => {
-    const prompt = vi.fn(() => "motivo");
-    vi.stubGlobal("prompt", prompt);
-    pintarHistorial();
-    fireEvent.click(await screen.findByRole("button", { name: "Anular" }));
-    expect(prompt).not.toHaveBeenCalled();
-    expect(await screen.findByLabelText(/Motivo/)).toBeTruthy();
-  });
-
-  it("el botón queda apagado hasta que haya motivo escrito, y ahí anula", async () => {
-    pintarHistorial();
-    fireEvent.click(await screen.findByRole("button", { name: "Anular" }));
-    const confirmar = await screen.findByRole("button", { name: "Anular pago" });
-    expect((confirmar as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(await screen.findByLabelText(/Motivo/), {
-      target: { value: "se pagó dos veces" },
-    });
-    expect((confirmar as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(confirmar);
-    await waitFor(() =>
-      expect(
-        fetchMock.mock.calls.some(
-          ([u, init]) =>
-            String(u).includes("/pagos") &&
-            (init as RequestInit | undefined)?.method === "DELETE",
-        ),
-      ).toBe(true),
-    );
-  });
-
-  it("la fecha se lee como fecha, no como código", async () => {
-    pintarHistorial();
-    // "2026-04-03" → "3 abr 2026".
-    await screen.findByRole("button", { name: "Anular" });
-    const texto = document.body.textContent ?? "";
-    expect(texto).toMatch(/registrado\s*3 abr 2026/i);
-    expect(texto).not.toMatch(/2026-04-03/);
-  });
-});
 
 // ════════════════════════════════════════════════════════════════════════════
 // 6. El botón de entregar muebles
@@ -629,40 +506,6 @@ describe("🔴 el único campo en inglés del sistema", () => {
     expect(err).toMatch(/género/i);
     expect(err).toMatch(/Hombre/);
     expect(err).not.toMatch(/Men|Women|Kids|Accessories/);
-  });
-});
-
-// ════════════════════════════════════════════════════════════════════════════
-// 2. El proyecto ya no ofrece borrado definitivo (22-sep-2026)
-// ════════════════════════════════════════════════════════════════════════════
-describe("🔴 la ficha del proyecto: «Editar» se toca, «Eliminar definitivamente» no existe", () => {
-  function pintarOverlay() {
-    sessionStorage.setItem("cxc_role", "admin");
-    render(
-      <ToastProvider>
-        <ProyectoOverlay
-          proyectoId="p1"
-          onClose={vi.fn()}
-          onChange={vi.fn()}
-        />
-      </ToastProvider>,
-    );
-  }
-
-  it("«Editar» sigue ahí y mide 44 px", async () => {
-    pintarOverlay();
-    const editar = await screen.findByRole("button", { name: "Editar" });
-    expect(esTactil(editar)).toBe(true);
-  });
-
-  it("🔴 ningún botón borra el proyecto para siempre, ni para admin", async () => {
-    pintarOverlay();
-    await screen.findByRole("button", { name: "Editar" });
-    // 🩸 Hasta el 22-sep-2026 acá se exigía el botón rojo con confirmación por
-    // nombre. Daniel lo retiró (con «Anular» basta); la ruta contesta 403.
-    expect(screen.queryByRole("button", { name: /Eliminar definitivamente/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Eliminar$/ })).toBeNull();
-    expect(document.body.textContent ?? "").not.toMatch(/NO se puede deshacer/i);
   });
 });
 

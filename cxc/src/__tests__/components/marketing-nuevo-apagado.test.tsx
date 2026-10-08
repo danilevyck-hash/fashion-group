@@ -7,8 +7,7 @@
 // · Contabilidad SOLO MIRA: sin «＋ Gasto», «Cerrar», «Subir comprobante» ni
 //   editar, y el servidor le contesta 403 aunque lo intente.
 // · La secretaria registra y cierra (Daniel).
-// · Con el interruptor vacío (`ROLES_MARKETING_NUEVO = []`), todos vuelven a
-//   ver el Marketing de antes, byte por byte (`__snapshots__/marketing-hoy-*`).
+// · El Marketing de antes se borró el 8-oct-2026: la portada ES el nuevo.
 // ============================================================================
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, cleanup, act, waitFor, screen, fireEvent } from "@testing-library/react";
@@ -68,17 +67,6 @@ beforeEach(() => {
   }) as typeof fetch;
 });
 afterEach(cleanup);
-
-async function dibujar(role: string): Promise<string> {
-  estado.role = role;
-  const { container } = render(<MarketingPageWrapper />);
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 20));
-  });
-  return container.innerHTML;
-}
-
-const FOTO = (n: string) => `./__snapshots__/marketing-hoy-${n}.html`;
 
 async function dibujarNuevo(role: string) {
   estado.role = role;
@@ -144,18 +132,6 @@ describe("🔴 Marketing nuevo: prendido para todos los roles de Marketing", () 
     expect(cerrarCobro).not.toHaveBeenCalled();
     expect((await cerrar(pedir("/api/marketing/cobros/cerrar", "secretaria"))).status).toBe(200);
     expect(cerrarCobro).toHaveBeenCalledTimes(1);
-  });
-
-  describe("con el interruptor vacío, todos ven el Marketing de antes, byte por byte", () => {
-    beforeEach(() => {
-      estado.rolesNuevo = [];
-    });
-    afterEach(() => {
-      estado.rolesNuevo = [...TODOS];
-    });
-    it.each(["secretaria", "contabilidad", "admin"])("%s", async (role) => {
-      await expect(await dibujar(role)).toMatchFileSnapshot(FOTO(role));
-    });
   });
 
   it("el interruptor de verdad: los mismos roles que entran a Marketing", async () => {

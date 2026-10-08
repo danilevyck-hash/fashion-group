@@ -611,20 +611,6 @@ describe("7 · 🔴 el proyecto no vuelve a decidir la tienda", () => {
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("8 · 🔴 «Eliminar definitivamente» no vuelve, y `mk_proyecto_marcas` queda sin lectores", () => {
-  it("las dos pantallas no ofrecen el botón ni llaman al DELETE", () => {
-    for (const rel of [
-      "src/app/marketing/components/FacturasSection.tsx",
-      "src/app/marketing/components/ProyectoOverlay.tsx",
-    ]) {
-      const src = codigo(rel);
-      expect(src, rel).not.toMatch(/Eliminar definitivamente/);
-      expect(src, rel).not.toMatch(/ConfirmDeleteModal|ConfirmTypeNameModal/);
-      expect(src, rel).not.toMatch(/method:\s*"DELETE"/);
-    }
-    // CONTROL: «Anular» sigue ahí — con Anular basta.
-    expect(codigo("src/app/marketing/components/FacturasSection.tsx")).toMatch(/Anular/);
-  });
-
   it("las funciones de borrado duro no existen y las dos rutas contestan 403", () => {
     const mut = codigo("src/lib/marketing/mutations.ts");
     expect(mut).not.toMatch(/export async function eliminar(Proyecto|Factura)Definitiv/);
@@ -651,12 +637,6 @@ describe("8 · 🔴 «Eliminar definitivamente» no vuelve, y `mk_proyecto_marca
     expect(lectores).toEqual([]);
     expect(CLASIFICACION["mk_proyecto_marcas"]).toBe("congelada");
     expect(codigo("src/app/api/cron/backup/route.ts")).toMatch(/\{ table: "mk_proyecto_marcas" \}/);
-  });
-
-  it("la ruta de marcas por proyecto contesta 410 y no escribe", () => {
-    const src = codigo("src/app/api/marketing/proyectos/[id]/marcas/route.ts");
-    expect(src).toMatch(/status:\s*410/);
-    expect(src).not.toMatch(/updateProyectoMarcas|supabaseServer/);
   });
 
   it("el reporte por proyecto deriva las marcas de los DOCUMENTOS", () => {

@@ -134,7 +134,6 @@ import { NextRequest } from "next/server";
 import { signSession } from "@/lib/session-cookie";
 import { GET as inicioRoute } from "@/app/api/marketing/inicio/route";
 import { GET as proyectosListaRoute } from "@/app/api/marketing/proyectos-lista/route";
-import { GET as periodosRoute } from "@/app/api/marketing/periodos/route";
 import { GET as reporteRoute } from "@/app/api/marketing/periodos/[id]/reporte/route";
 import { cargarDatosPeriodos } from "@/lib/marketing/periodos-reporte";
 import { periodoAbiertoDe, sellarDocumento } from "@/lib/marketing/periodos-io";
@@ -187,17 +186,6 @@ describe("PGRST205 en las tablas de período ya no es 'no hay períodos'", () =>
     const body = (await res.json()) as { error?: string; secciones?: unknown };
     expect(body.error).toMatch(/periodos/);
     expect(body.secciones).toBeUndefined();
-  });
-
-  it("api/marketing/periodos → 500 con mensaje humano, nunca `hayPeriodos: false`", async () => {
-    estado.rotas.set("mk_periodos", TABLA_AUSENTE);
-    vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const res = await periodosRoute(req("/api/marketing/periodos"));
-    expect(res.status).toBe(500);
-    const body = (await res.json()) as { error?: string; hayPeriodos?: boolean };
-    expect(body.error).toBe("No se pudieron cargar los períodos. Intenta de nuevo.");
-    expect(body.hayPeriodos).toBeUndefined();
   });
 
   it("api/marketing/periodos/[id]/reporte → 500, no el 409 de 'falta la actualización'", async () => {
