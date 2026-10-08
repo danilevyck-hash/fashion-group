@@ -366,9 +366,14 @@ export default function FacturasDelCliente({
                               />
                               <span className="tabular-nums shrink-0">{f.secuencial}</span>
                               <span className="text-gray-500 truncate">{f.empresa}</span>
-                              <span className="tabular-nums text-gray-600 ml-auto shrink-0">
-                                {fmtMonto(f.total)}
-                              </span>
+                              {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): el servidor
+                                  manda `total: null` a quien no puede ver
+                                  precio — la celda ni se dibuja. */}
+                              {f.total != null && (
+                                <span className="tabular-nums text-gray-600 ml-auto shrink-0">
+                                  {fmtMonto(f.total)}
+                                </span>
+                              )}
                               <span className="text-gray-400 tabular-nums shrink-0 w-14 text-right">
                                 {rotuloFecha(f.fecha, hoy)}
                               </span>

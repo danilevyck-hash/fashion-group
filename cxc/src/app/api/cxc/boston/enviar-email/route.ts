@@ -51,6 +51,7 @@ import {
 import { buildCuentasHtml, sanitizeFilenamePart } from "@/lib/cxc/estado-cuenta-email";
 import { diasDesdeEnvio, esCanalEnvio, textoUltimoEnvio, VENTANA_MARCA_DIAS } from "@/lib/cxc/envios-registro";
 import { buildEstadoCuentaPDF } from "@/lib/pdf-estado-cuenta";
+import { hoyPanama } from "@/lib/fecha-panama";
 import type { EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
 
 export const dynamic = "force-dynamic";
@@ -111,7 +112,7 @@ async function marcaDelUltimoEnvio(codigo: string): Promise<string | null> {
   if (error || !data?.length) return null;
   const fila = data[0] as { canal?: unknown; created_at: string };
   if (!esCanalEnvio(fila.canal)) return null;
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyPanama(); // Panamá, no UTC
   return textoUltimoEnvio(fila.canal, diasDesdeEnvio(String(fila.created_at).slice(0, 10), hoy));
 }
 

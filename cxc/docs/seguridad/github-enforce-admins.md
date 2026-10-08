@@ -44,31 +44,28 @@ Lectura independiente (`GET`, no el resultado del propio `POST`) contra
 
 ## ⚠️ Cómo cambia el comportamiento del push de ahora en adelante
 
-Este repo publica empujando commits DIRECTO a `main` (no por Pull Request),
+Antes de este cambio, el repo publicaba empujando commits DIRECTO a `main`,
 docenas de veces por hora entre Daniel y los agentes que trabajan bajo su
-cuenta. Los chequeos (`Vercel`, `pruebas`) corren DESPUÉS de que el commit ya
-está en GitHub, nunca antes.
+cuenta. Con `enforce_admins` prendido **el push directo ya no entra**: un
+commit recién empujado no tiene todavía resultado de chequeos para ese SHA, así
+que GitHub no tiene cómo saber si pasa, y lo rechaza.
 
-Con `enforce_admins` prendido, es posible que un push directo a un commit
-TOTALMENTE NUEVO —que todavía no tiene ningún resultado de chequeo registrado
-para ese SHA exacto— **se trabe o se rechace**, porque GitHub no tiene cómo
-saber todavía si ese commit pasa. Si eso pasa:
+Desde el 7-oct-2026 se publica **por solicitud de cambio**: rama propia →
+`gh pr create --base main` → `gh pr merge <n> --auto --squash` en el acto →
+GitHub la integra sola cuando `pruebas` y `Vercel` estén en verde. El camino
+completo está en
+[`publicar-por-solicitud-de-cambio.md`](./publicar-por-solicitud-de-cambio.md).
 
-- **No fuerces nada** (nunca `--force`, nunca saltar el candado a mano).
-- Avísale a Daniel con el mensaje exacto de GitHub.
-- La salida de emergencia es apagar `enforce_admins` (los tres pasos de
-  abajo), publicar, y volver a prenderlo cuando se entienda el patrón nuevo.
+Si algo se traba:
 
-## Los tres pasos para apagarlo en una emergencia, desde la web de GitHub
+- **No fuerces nada**: nunca `--force`, nunca `gh pr merge --admin`.
+- **Nunca apagar `enforce_admins`** —ni «un minutito»— para publicar. No es
+  una salida de emergencia: es volver al estado que no protegía nada.
+- Si algo está tan urgente que parece justificarlo, **se le avisa a Daniel con
+  el mensaje exacto de GitHub y decide él**.
 
-Daniel, esto es para que puedas desbloquearte SOLO, sin depender de nadie:
-
-1. Entra a `github.com/danilevyck-hash/fashion-group` → pestaña **Settings**
-   → en el menú de la izquierda, **Branches**.
-2. En la fila de la regla de `main`, toca **Edit**.
-3. Busca la casilla **«Do not allow bypassing the above settings»** (es la
-   que dice que los chequeos también aplican a los administradores) y
-   **desmárcala**. Baja al final y toca **Save changes**.
-
-Con eso, tu cuenta vuelve a poder publicar en `main` aunque algún chequeo
-esté en rojo o pendiente — exactamente como funcionaba antes del 7-oct-2026.
+> 🔁 Corregido el 7-oct-2026: la primera versión de este documento decía que
+> «la salida de emergencia es apagar `enforce_admins`» y traía los pasos para
+> desmarcarlo. Eso contradecía la regla de
+> [`publicar-por-solicitud-de-cambio.md`](./publicar-por-solicitud-de-cambio.md)
+> y se quitó.

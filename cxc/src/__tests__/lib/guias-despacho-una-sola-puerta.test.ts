@@ -112,7 +112,7 @@ describe("🔴 la página de la guía es donde se termina", () => {
   it("tiene el encabezado aprobado: ‹ Atrás y el número de la guía", () => {
     expect(PAGE_GUIA).toContain("‹ Atrás");
     expect(PAGE_GUIA).toContain("fmtGuia(g.numero)");
-    expect(PAGE_GUIA).toContain('router.push("/despachos")');
+    expect(PAGE_GUIA).toContain('router.push("/despachos?vista=guias")');
   });
 
   // ⚠️ CANDADO QUE CAMBIÓ DE DIRECCIÓN (23-ago-2026). Antes exigía que la

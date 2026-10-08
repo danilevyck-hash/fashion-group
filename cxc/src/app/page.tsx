@@ -1,5 +1,6 @@
 "use client";
 
+import { CLAVE_SESION_DEL_NAVEGADOR } from "@/lib/sesion-entre-pestanas";
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
@@ -62,7 +63,11 @@ function LoginForm() {
   function storeSession(data: { role: string; userId?: string; userName?: string; modules?: string[]; empresaFilter?: string; guiasReadonly?: boolean; isOwner?: boolean }) {
     sessionStorage.setItem("cxc_role", data.role);
     if (data.userId) sessionStorage.setItem("fg_user_id", data.userId);
-    if (data.userName) sessionStorage.setItem("fg_user_name", data.userName);
+    if (data.userName) {
+      sessionStorage.setItem("fg_user_name", data.userName);
+      // Las demás pestañas de este navegador se enteran (ver sesion-entre-pestanas.ts).
+      try { localStorage.setItem(CLAVE_SESION_DEL_NAVEGADOR, data.userName); } catch { /* sin almacenamiento: como antes */ }
+    }
     if (data.modules) sessionStorage.setItem("fg_modules", JSON.stringify(data.modules));
     if (data.empresaFilter) sessionStorage.setItem("fg_empresa_filter", data.empresaFilter);
     else sessionStorage.removeItem("fg_empresa_filter");

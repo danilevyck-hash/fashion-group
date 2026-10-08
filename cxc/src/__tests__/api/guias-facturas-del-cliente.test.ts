@@ -25,9 +25,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
+/** El rol de la sesión — mutable por test (default: secretaria, el de siempre). */
+let mockRole = "secretaria";
+
 vi.mock("@/lib/require-auth", () => ({
   requireAuth: () => null,
-  getSession: () => ({ role: "secretaria", userName: "Angela" }),
+  getSession: () => ({ role: mockRole, userName: "Angela" }),
 }));
 
 type Filtro = [op: string, ...resto: unknown[]];
@@ -157,6 +160,7 @@ vi.mock("@/lib/supabase-server", () => ({
 }));
 
 beforeEach(() => {
+  mockRole = "secretaria";
   consultas = [];
   switchClientes = [
     { empresa_key: "vistana", cliente_switch_id: 101, codigo: "D-24" },
@@ -207,7 +211,7 @@ interface FacturaRespuesta {
   empresa: string;
   secuencial: string;
   fecha: string;
-  total: number;
+  total: number | null;
   yaSalioEn: number | null;
 }
 
@@ -317,5 +321,34 @@ describe("los bordes", () => {
   it("«hasta» = el sync exitoso más VIEJO entre las empresas (lo único que se puede prometer)", async () => {
     const { body } = await pedir("D-24");
     expect(body.hasta).toBe("2026-09-04T14:00:00Z");
+  });
+});
+
+// ─── 🔴 BODEGA NO VE PLATA (7-oct-2026) ──────────────────────────────────────
+//
+// Daniel, textual: *"que ningún usuario con rol bodega vea precio, solo admin
+// y secretaria"*. Bodega entra a esta misma ruta para armar una guía (marcar
+// las facturas del cliente), y el `total` de cada factura viajaba igual que
+// para secretaria y admin — y la pantalla lo pinta en cada fila
+// (`FacturasDelCliente.tsx`, `{fmtMonto(f.total)}`). El número se recorta ACÁ,
+// en el servidor, antes de salir.
+describe("🔴 bodega no ve PLATA — el total de cada factura sale en null", () => {
+  it("bodega: total en null en las tres filas", async () => {
+    mockRole = "bodega";
+    const { status, body } = await pedir("D-24");
+    expect(status).toBe(200);
+    const facturas = body.facturas as FacturaRespuesta[];
+    expect(facturas.length).toBeGreaterThan(0);
+    for (const f of facturas) expect(f.total, `${f.empresa_key}:${f.secuencial}`).toBeNull();
+  });
+
+  it("admin y secretaria: el total sigue llegando — no se le quitó nada a nadie", async () => {
+    for (const rol of ["admin", "secretaria"]) {
+      mockRole = rol;
+      const { body } = await pedir("D-24");
+      const facturas = body.facturas as FacturaRespuesta[];
+      expect(facturas.length, rol).toBeGreaterThan(0);
+      for (const f of facturas) expect(typeof f.total, `${rol}/${f.secuencial}`).toBe("number");
+    }
   });
 });

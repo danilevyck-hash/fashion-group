@@ -1019,7 +1019,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <span className="min-w-0 break-words text-sm">{item.name}</span>
-                  <span className="shrink-0 text-sm font-medium tabular-nums">${fmt(linea(item).subtotal)}</span>
+                  {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): el servidor manda
+                      `unit_price: null` y el subtotal saldría en $0 — se
+                      esconde entero en vez de mostrar un cero mentiroso. */}
+                  {isEditorRole && (
+                    <span className="shrink-0 text-sm font-medium tabular-nums">${fmt(linea(item).subtotal)}</span>
+                  )}
                 </div>
                 <div className="text-xs text-gray-400 tabular-nums break-all">{item.sku}</div>
                 {typeof item.disponible_pzas === "number" && item.disponible_pzas < linea(item).piezas && (
@@ -1047,9 +1052,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                         className="w-16 min-h-[44px] text-right border-b border-gray-200 text-base outline-none focus:border-black tabular-nums" />
                       <span className="text-xs text-gray-400">c/u</span>
                     </label>
-                  ) : (
+                  ) : isEditorRole ? (
                     <span className="tabular-nums">${fmt(item.unit_price)} c/u</span>
-                  )}
+                  ) : null}
                   {precioDeLista(item) !== null && (
                     <span className="text-xs text-amber-600 tabular-nums">← lista {fmtPrecio(precioDeLista(item)!)}</span>
                   )}
@@ -1110,8 +1115,11 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     0. La columna solo muestra un número corto (456 en el caso
                     más grande de hoy), así que 48 px le sobran. */}
                 <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-12">Cantidad</th>
-                <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-14">Precio</th>
-                <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-20">Subtotal</th>
+                {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): el servidor manda
+                    `unit_price`/`precio_lista` en null — estas dos columnas ni
+                    se dibujan para quien no arma pedidos (`isEditorRole`). */}
+                {isEditorRole && <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-14">Precio</th>}
+                {isEditorRole && <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-20">Subtotal</th>}
                 {canEdit && <th className="w-8"></th>}
               </tr>
             </thead>
@@ -1147,29 +1155,36 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     )}
                   </td>
                   <td className="py-2 text-center text-xs text-gray-400 tabular-nums">{linea(item).piezas}</td>
-                  <td className="py-2 text-right align-top">
-                    {canEdit ? (
-                      /* Misma geometría que la casilla de bultos de al lado
-                         (theme.pedido.qtyInputClass): 44 px de alto y 16 px de
-                         letra en teléfono. A `text-sm py-0.5` medía ~22 px —la
-                         mitad del mínimo táctil— y iOS hacía zoom solo al
-                         tocarla, justo en la casilla del PRECIO. */
-                      <input type="number" step={1} min={0} value={item.unit_price}
-                        onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
-                        className="w-14 min-h-[44px] text-right border-b border-gray-200 text-base md:text-sm outline-none focus:border-black tabular-nums" />
-                    ) : (
-                      <span className="tabular-nums">${fmt(item.unit_price)}</span>
-                    )}
-                    {/* El precio de lista, ahí mismo y sin bloquear: editar el
-                        precio es una función legítima. Solo se dice cuando
-                        DIFIERE — repetirlo cuando coincide sería ruido. */}
-                    {precioDeLista(item) !== null && (
-                      <div className="text-xs text-amber-600 tabular-nums mt-0.5 leading-tight">
-                        ← lista {fmtPrecio(precioDeLista(item)!)}
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-2 text-right tabular-nums text-sm">${fmt(linea(item).subtotal)}</td>
+                  {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): mismo recorte que el
+                      encabezado — sin estas dos celdas para quien no arma
+                      pedidos. */}
+                  {isEditorRole && (
+                    <td className="py-2 text-right align-top">
+                      {canEdit ? (
+                        /* Misma geometría que la casilla de bultos de al lado
+                           (theme.pedido.qtyInputClass): 44 px de alto y 16 px de
+                           letra en teléfono. A `text-sm py-0.5` medía ~22 px —la
+                           mitad del mínimo táctil— y iOS hacía zoom solo al
+                           tocarla, justo en la casilla del PRECIO. */
+                        <input type="number" step={1} min={0} value={item.unit_price}
+                          onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
+                          className="w-14 min-h-[44px] text-right border-b border-gray-200 text-base md:text-sm outline-none focus:border-black tabular-nums" />
+                      ) : (
+                        <span className="tabular-nums">${fmt(item.unit_price)}</span>
+                      )}
+                      {/* El precio de lista, ahí mismo y sin bloquear: editar el
+                          precio es una función legítima. Solo se dice cuando
+                          DIFIERE — repetirlo cuando coincide sería ruido. */}
+                      {precioDeLista(item) !== null && (
+                        <div className="text-xs text-amber-600 tabular-nums mt-0.5 leading-tight">
+                          ← lista {fmtPrecio(precioDeLista(item)!)}
+                        </div>
+                      )}
+                    </td>
+                  )}
+                  {isEditorRole && (
+                    <td className="py-2 text-right tabular-nums text-sm">${fmt(linea(item).subtotal)}</td>
+                  )}
                   {canEdit && (
                     <td className="py-2 text-center">
                       <button onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 transition text-xs">x</button>
@@ -1190,10 +1205,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         </div>
       )}
 
-      {/* Totals */}
+      {/* Totals. 🔴 BODEGA NO VE PLATA (7-oct-2026): `totalMoney` sale de
+          `unit_price`, que el servidor manda en null — se esconde entero en
+          vez de decir «$0». */}
       <div className="flex items-center justify-between py-3 border-t border-gray-200 mb-6">
         <span className="text-sm text-gray-500">{totalBultos} bultos · {totalPiezas} unidades</span>
-        <span className="text-lg font-semibold tabular-nums">${fmt(totalMoney)}</span>
+        {isEditorRole && <span className="text-lg font-semibold tabular-nums">${fmt(totalMoney)}</span>}
       </div>
 
       {/* ── CLIENTE DE SWITCH — visible también en BORRADOR (12-ago-2026) ──

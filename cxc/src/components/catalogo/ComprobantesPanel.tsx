@@ -672,7 +672,10 @@ export default function ComprobantesPanel({
                       <ThOrden col="origen" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Origen</ThOrden>
                       <ThOrden col="cliente" api={orden} className="text-left px-2 lg:px-4 py-3 font-medium text-gray-500">Cliente</ThOrden>
                       <ThOrden col="vendedor" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Vendedor</ThOrden>
-                      <ThOrden col="total" api={orden} derecha className="text-right px-4 py-3 font-medium text-gray-500">Total</ThOrden>
+                      {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): el servidor ya le manda
+                          `total: null` en cada fila — la columna ni se dibuja.
+                          `puedeEditar` es el mismo trío que ve precio (`PEDIDO_ROLES`). */}
+                      {puedeEditar && <ThOrden col="total" api={orden} derecha className="text-right px-4 py-3 font-medium text-gray-500">Total</ThOrden>}
                       <ThOrden col="fecha" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Fecha</ThOrden>
                       <th className="text-right px-4 py-3 font-medium text-gray-500"></th>
                     </tr>

@@ -60,7 +60,15 @@ export async function GET(req: NextRequest) {
     // hoy son 462 filas, pero `db-max-rows` = 1000 y PostgREST corta EN
     // SILENCIO. A partir de la línea 1.001 los "más usados" habrían empezado a
     // envejecer sin error ni señal — es el bug que este repo ya pagó una vez.
-    const rows = await leerTodoPaginado<{
+    // 🔴 LAS CUATRO LECTURAS SALEN JUNTAS (7-oct-2026). Iban en fila —
+    // renglones, guías, directorio, destinos definidos— y cada una paga el
+    // viaje de la función (Virginia) a la base (Oregón), ~200 ms medidos:
+    // p50 649 ms y p95 3,1 s en producción. Ninguna depende de otra.
+    const directorioP = leerClientesDelGrupo();
+    const definidosP = GUIAS_ATAJOS_NUEVOS ? leerDefinidosOVacio() : Promise.resolve({});
+    directorioP.catch(() => {});
+    definidosP.catch(() => {});
+    const rowsP = leerTodoPaginado<{
       guia_id: string;
       cliente_codigo: string | null;
       empresa: string | null;
@@ -79,7 +87,7 @@ export async function GET(req: NextRequest) {
 
     // La fecha de un envío vive en su GUÍA (`guia_items` no la tiene), y sin
     // fecha no hay "última dirección". Son ~200 filas, una sola página.
-    const guias = await leerTodoPaginado<{
+    const guiasP = leerTodoPaginado<{
       id: string;
       fecha: string | null;
       numero: number | null;
@@ -91,6 +99,8 @@ export async function GET(req: NextRequest) {
         .order("id", { ascending: true })
         .range(from, to)
     );
+
+    const [rows, guias] = await Promise.all([rowsP, guiasP]);
 
     // ── Clientes: contar por código ──
     const cntCod = new Map<string, number>();
@@ -110,7 +120,7 @@ export async function GET(req: NextRequest) {
     let clientes: Array<{ codigo: string; nombre: string }> = [];
     if (topCodigos.length > 0) {
       const nameByCod = new Map<string, string>();
-      for (const c of await leerClientesDelGrupo()) {
+      for (const c of await directorioP) {
         if (c.codigo && c.nombre) nameByCod.set(c.codigo, c.nombre);
       }
       // Conserva el orden por frecuencia; descarta códigos sin nombre vivo.
@@ -157,7 +167,7 @@ export async function GET(req: NextRequest) {
     // → histórico, ver `destinosDefinidosPara`). FALLA ABIERTO: con la
     // migración 20260918120000 sin correr devuelve {} y los botones caen a la
     // constante — la pantalla de guías no se rompe.
-    const definidos = GUIAS_ATAJOS_NUEVOS ? await leerDefinidosOVacio() : {};
+    const definidos = await definidosP;
 
     return NextResponse.json({ clientes, empresas, direcciones, destinos, definidos });
   } catch (err) {

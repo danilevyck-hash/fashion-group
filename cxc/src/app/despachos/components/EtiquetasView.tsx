@@ -657,7 +657,11 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
                                   />
                                   <span className="shrink-0 tabular-nums">{f.secuencial}</span>
                                   <span className="truncate text-gray-500">{f.empresa}</span>
-                                  <span className="ml-auto shrink-0 tabular-nums text-gray-600">{fmtMonto(f.total)}</span>
+                                  {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): `facturas-cliente`
+                                      manda `total: null` a quien no puede ver precio. */}
+                                  {f.total != null && (
+                                    <span className="ml-auto shrink-0 tabular-nums text-gray-600">{fmtMonto(f.total)}</span>
+                                  )}
                                 </label>
                               </li>
                             );

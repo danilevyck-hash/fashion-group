@@ -264,3 +264,35 @@ describe("🔴 5. los otros tres roles quedaron igual que antes", () => {
     }
   });
 });
+
+// ── 6. BODEGA NO VE PLATA (7-oct-2026) ───────────────────────────────────────
+//
+// Daniel, textual: *"que ningún usuario con rol bodega vea precio, solo admin
+// y secretaria"*. El feed real que manda el servidor a bodega llega con
+// `total: null` (candado del servidor en `api/bodega-ve-pedidos.test.ts`); acá
+// se comprueba que la PANTALLA, con ese feed de verdad, no dibuja ni la
+// columna «Total» ni ningún monto — y que a los demás roles no se les movió
+// nada.
+describe("🔴 6. bodega no ve el Total de la lista", () => {
+  const FEED_SIN_PLATA = FEED.map((f) => ({ ...f, total: null }));
+
+  it("bodega: sin «Total» en el encabezado y sin «$2,760» en ninguna fila", async () => {
+    fetchSpy = vi.fn(async (url: string) => {
+      if (String(url).endsWith("/orders")) return { ok: true, json: async () => FEED_SIN_PLATA };
+      return { ok: true, json: async () => [] };
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+    await montarComo("bodega");
+    expect(screen.queryByText("Total")).toBeNull();
+    expect(screen.queryByText(/\$\s*2,760/)).toBeNull();
+    expect(screen.queryByText(/\$\s*480/)).toBeNull();
+  });
+
+  for (const rol of COMPROBANTES_EDITAR_ROLES) {
+    it(`${rol}: sigue viendo «Total» y el monto — no se le quitó nada`, async () => {
+      await montarComo(rol);
+      expect(screen.getAllByText("Total").length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/\$\s*2,760/).length).toBeGreaterThan(0);
+    });
+  }
+});

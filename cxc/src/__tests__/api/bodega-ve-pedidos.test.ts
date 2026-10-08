@@ -54,7 +54,7 @@ vi.mock("@/lib/alertas/canal", () => ({ enviarNegocio: vi.fn(async () => true) }
 
 import type { NextRequest, NextResponse } from "next/server";
 import { GET as ordersGet, POST as ordersPost } from "@/app/api/catalogo/[marca]/orders/route";
-import { PUT as ordersPut, DELETE as ordersDelete } from "@/app/api/catalogo/[marca]/orders/[id]/route";
+import { GET as ordersGetDetalle, PUT as ordersPut, DELETE as ordersDelete } from "@/app/api/catalogo/[marca]/orders/[id]/route";
 import { POST as bulkDeletePost } from "@/app/api/catalogo/[marca]/orders/bulk-delete/route";
 import { POST as exportPost } from "@/app/api/catalogo/[marca]/pedidos-export/route";
 import { POST as enviarSwitchPost } from "@/app/api/catalogo/[marca]/orders/[id]/enviar-switch/route";
@@ -292,6 +292,85 @@ describe("🔴 4. las listas dicen lo que el servidor hace", () => {
   it("ver ⊃ editar: quien puede trabajar el pedido también puede verlo", () => {
     for (const rol of COMPROBANTES_EDITAR_ROLES) {
       expect(COMPROBANTES_ROLES as readonly string[], rol).toContain(rol);
+    }
+  });
+});
+
+// ── 5. bodega NO VE PLATA (7-oct-2026) ───────────────────────────────────────
+//
+// Daniel, textual: *"que ningún usuario con rol bodega vea precio, solo admin
+// y secretaria"*. Bodega SÍ entra a la lista y al detalle (sección 1), pero
+// hasta hoy el SERVIDOR le mandaba el `total` de cada fila y, en el detalle,
+// `unit_price`/`precio_lista` de cada línea — exactamente los números que
+// `veLaPlata` de Guías ya le niega. Esconder la columna en el navegador no
+// alcanza: estos candados comprueban que el número NUNCA SALE del servidor.
+describe("🔴 5. bodega no ve PLATA — el servidor no manda el número, en las 4 marcas", () => {
+  for (const marca of MARCAS) {
+    it(`${marca}: lista — bodega recibe total=null; los otros tres, el número`, async () => {
+      sembrarPedidos(marca);
+      const req = makeReq(`/api/catalogo/${marca}/orders`, { role: "bodega" }) as NextRequest;
+      const res = await ordersGet(req, { params: { marca } });
+      const body = (await res.json()) as { total: unknown }[];
+      expect(body.length).toBeGreaterThan(0);
+      for (const fila of body) expect(fila.total, `${marca}: total de la fila`).toBeNull();
+
+      for (const rol of ["admin", "secretaria", "vendedor"]) {
+        sembrarPedidos(marca);
+        const req2 = makeReq(`/api/catalogo/${marca}/orders`, { role: rol }) as NextRequest;
+        const body2 = (await (await ordersGet(req2, { params: { marca } })).json()) as { total: unknown }[];
+        for (const fila of body2) expect(typeof fila.total, `${marca}/${rol}`).toBe("number");
+      }
+    });
+  }
+
+  it("reebok: detalle — bodega recibe total/unit_price/precio_lista en null", async () => {
+    const pedidoCrudo = {
+      id: OID,
+      order_number: "PED-010",
+      client_name: "C",
+      status: "borrador",
+      total: 1,
+      reebok_order_items: [
+        { id: "i1", order_id: OID, product_id: "11111111-1111-4111-8111-111111111111", sku: "S1", quantity: 2, unit_price: 10 },
+      ],
+    };
+    reebokDb.queue(
+      "reebok_orders",
+      { data: pedidoCrudo },       // 1º: el select principal
+      { data: { reemplaza_a: null } }, // 2º: probe reemplaza_a
+      { data: null },              // 3º: query inversa "reemplazado por"
+    );
+    const res = await ordersGetDetalle(makeReq("/x", { role: "bodega" }) as NextRequest, { params: { marca: "reebok", id: OID } });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.total).toBeNull();
+    expect(json.reebok_order_items[0].unit_price).toBeNull();
+    expect(json.reebok_order_items[0].precio_lista).toBeNull();
+  });
+
+  it("reebok: detalle — admin, secretaria y vendedor SÍ reciben los números", async () => {
+    for (const rol of ["admin", "secretaria", "vendedor"]) {
+      const pedidoCrudo = {
+        id: OID,
+        order_number: "PED-010",
+        client_name: "C",
+        status: "borrador",
+        total: 1,
+        reebok_order_items: [
+          { id: "i1", order_id: OID, product_id: "11111111-1111-4111-8111-111111111111", sku: "S1", quantity: 2, unit_price: 10 },
+        ],
+      };
+      reebokDb.queue(
+        "reebok_orders",
+        { data: pedidoCrudo },
+        { data: { reemplaza_a: null } },
+        { data: null },
+      );
+      const res = await ordersGetDetalle(makeReq("/x", { role: rol }) as NextRequest, { params: { marca: "reebok", id: OID } });
+      expect(res.status, rol).toBe(200);
+      const json = await res.json();
+      expect(typeof json.total, rol).toBe("number");
+      expect(typeof json.reebok_order_items[0].unit_price, rol).toBe("number");
     }
   });
 });
