@@ -29,6 +29,7 @@
 // llegar a algún lado, no a un error.
 
 import { Suspense, useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -42,13 +43,17 @@ import {
   destinoDeVistaVieja,
 } from "@/lib/marketing/tiendas-y-marcas";
 import InicioMarketing from "./components/InicioMarketing";
-import ProyectoOverlay from "./components/ProyectoOverlay";
 import ReportesTabs from "./components/ReportesTabs";
 import ImpulsadorasView from "./components/ImpulsadorasView";
-import RegistrarGastoModal from "./components/RegistrarGastoModal";
 import PortadaTiendasYMarcas from "./components/PortadaTiendasYMarcas";
 import { useRedirigirProyectoViejo } from "./components/useProyectoViejo";
 import { useEsCelular } from "./components/celular/useEsCelular";
+
+// LAZY (7-oct-2026): los dos se abren con un toque y arrastran jsPDF +
+// html2canvas (la nota de entrega del mueble): 104 KB comprimidos que la
+// portada bajaba al abrir sin usarlos. Medido: First Load de /marketing 476 KB.
+const RegistrarGastoModal = dynamic(() => import("./components/RegistrarGastoModal"), { ssr: false });
+const ProyectoOverlay = dynamic(() => import("./components/ProyectoOverlay"), { ssr: false });
 
 type VistaExtra = "reportes" | "impulsadoras" | null;
 

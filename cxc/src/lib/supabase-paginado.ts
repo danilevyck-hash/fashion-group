@@ -67,15 +67,38 @@ export const PAGINA_POSTGREST = 1000;
  *  COUNT lo denuncia igual. */
 const MAX_PAGINAS = 1000;
 
+/**
+ * `simultaneas` (7-oct-2026): con el COUNT de la primera página ya se sabe
+ * cuántas faltan, y se pueden pedir de a N a la vez en vez de una tras otra.
+ * Por defecto 1 = el bucle de siempre; se prende caso por caso (hoy solo el
+ * directorio de clientes, 6 páginas) para no multiplicar la carga de un cron
+ * sobre una tabla grande — la base es Micro.
+ */
 export async function leerTodoPaginado<T>(
   etiqueta: string,
   ejecutar: EjecutarPagina,
   pagina: number = PAGINA_POSTGREST,
+  simultaneas: number = 1,
 ): Promise<T[]> {
   const filas: T[] = [];
   let esperadas: number | null = null;
 
   for (let p = 0; p < MAX_PAGINAS; p += 1) {
+    if (p === 1 && simultaneas > 1 && esperadas != null) {
+      // Las páginas que faltan, de a `simultaneas`, EN ORDEN.
+      const total = Math.min(Math.ceil(esperadas / pagina), MAX_PAGINAS);
+      for (let ini = 1; ini < total; ini += simultaneas) {
+        const tanda = [];
+        for (let q = ini; q < Math.min(ini + simultaneas, total); q += 1) {
+          tanda.push(ejecutar(false, q * pagina, q * pagina + pagina - 1));
+        }
+        for (const { data, error } of await Promise.all(tanda)) {
+          if (error) throw new Error(`${etiqueta}: ${error.message}`);
+          filas.push(...((data ?? []) as T[]));
+        }
+      }
+      break;
+    }
     const desde = p * pagina;
     const { data, error, count } = await ejecutar(p === 0, desde, desde + pagina - 1);
     if (error) throw new Error(`${etiqueta}: ${error.message}`);

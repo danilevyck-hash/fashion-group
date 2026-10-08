@@ -86,6 +86,9 @@ async function leerDelaBase(provincia: string): Promise<FilaCliente[]> {
         // Orden de PAGINACIÓN (estable y único), no el de presentación.
         return sel.order("id", { ascending: true }).range(from, to);
       },
+      undefined,
+      // ~5.000 filas = 6 páginas: de a 3 son 3 viajes a la base, no 6.
+      3,
     );
     return conAusencia ? filas : filas.map((f) => ({ ...f, ausente_desde: null }));
   };
