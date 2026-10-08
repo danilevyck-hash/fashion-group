@@ -65,7 +65,7 @@ Cuando Daniel corrija un nombre («eso no se dice así»), para que quede atrapa
 | Agrupar mercancía para despacho | Bultos · Unidades por bulto | Poner en bulto, Embultar |
 | Módulo de envíos a clientes (pedidos + bultos + la guía) | Despachos (adentro: Pedidos · Bultos · Guías de despacho) | Envíos, Logística |
 | Poner una línea del pedido en un bulto | Asignar bulto · Quitar bulto · «N artículos asignados» | Poner en bulto, Poner en el bulto, Quitar del bulto, Marcar artículos |
-| A quién se le cobra un gasto (Marketing) | Se cobra a (las 5 marcas, o «A cargo de la empresa») · Se cobra (Completo · Mitad) | A quién se le pasa, mi costo, costo propio, inventario propio, porcentajes en pantalla |
+| A quién se le cobra un gasto (Marketing) | Se cobra a (las 5 marcas, o «No recuperable») · Se cobra (Completo · Mitad) | A quién se le pasa, mi costo, costo propio, inventario propio, porcentajes en pantalla |
 | Adjunto de un gasto | Comprobante · Adjuntar comprobante | Foto o factura, Subir foto o factura |
 | Gasto sin tienda | Sin tienda (en el formulario; el cajón del reporte y del ZIP sigue siendo «General») | De una tienda, General (como botón) |
 | Rótulos de formulario | Sustantivo («Pago por planilla», «Marcación en reloj») | Preguntas («¿Qué…?», «¿Quién…?», «¿A quién…?»), salvo «¿Es X (D-25)?», que Daniel aprobó textual |
@@ -103,7 +103,8 @@ Candado: `src/__tests__/lib/nombres-erp-prohibidos.test.ts`, que **lee esta tabl
 | Foto o factura | Comprobante |
 | De una tienda | Tienda |
 | A quién se le pasa | Se cobra a |
-| costo propio · inventario propio | A cargo de la empresa |
+| costo propio · inventario propio | No recuperable |
+| A cargo de la empresa | No recuperable |
 | Subir foto o factura | Adjuntar comprobante |
 | Poner en bulto | Bultos |
 | Revocar | Quitar acceso |

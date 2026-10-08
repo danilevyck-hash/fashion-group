@@ -60,27 +60,11 @@ export type TiendaDelCargo = { codigo: string; nombre: string } | null;
 export const NO_RECUPERABLE = 0 as const;
 export type SeCobraAlRegistrar = PctQueSeCobra | typeof NO_RECUPERABLE;
 
-/**
- * Por qué no se le cobra a nadie. Mientras no exista una columna para él, el
- * motivo viaja al principio de la `nota` de la factura (`notaConMotivo`).
- */
-export const MOTIVOS_NO_RECUPERABLE = ["Compra de mobiliario", "Tienda propia", "Intercompañía", "Otro"] as const;
-export type MotivoAlRegistrar = (typeof MOTIVOS_NO_RECUPERABLE)[number];
-
-/** La nota que se guarda: el motivo y, si hay, las observaciones. */
-export function notaConMotivo(motivo: MotivoAlRegistrar | null, nota: string): string {
-  const obs = nota.trim();
-  if (!motivo) return obs;
-  return obs ? `${motivo} · ${obs}` : motivo;
-}
-
 export interface DestinoDelCargo {
   marcaId: string;
   tienda: TiendaDelCargo;
   /** `null` = todavía no se eligió. Nace en `PCT_AL_REGISTRAR`. `0` = no recuperable. */
   pct: SeCobraAlRegistrar | null;
-  /** Solo con «No recuperable». */
-  motivo?: MotivoAlRegistrar | null;
 }
 
 /**
@@ -93,8 +77,8 @@ export function faltaEnElDestino(
   esTiendaPropia: (codigo: string) => boolean,
 ): string[] {
   const out: string[] = [];
-  // No recuperable: ni marca ni tienda, solo el motivo.
-  if (d.pct === NO_RECUPERABLE) return d.motivo ? [] : ["el motivo"];
+  // No recuperable: ni marca ni tienda; las observaciones son opcionales.
+  if (d.pct === NO_RECUPERABLE) return [];
   if (d.marcaId.trim() === "") out.push("la marca");
   if (d.tienda === null) out.push("la tienda");
   else if (esTiendaPropia(d.tienda.codigo)) {
@@ -186,12 +170,6 @@ export const PESTANA_NO_RECUPERABLE = "no-recuperable" as const;
 export const ROTULO_NO_RECUPERABLE = "No recuperable";
 
 export type MotivoNoRecuperable = "tienda-propia" | "a-cargo-de-la-empresa" | "no-se-reporta";
-
-export const ROTULO_MOTIVO: Readonly<Record<MotivoNoRecuperable, string>> = {
-  "tienda-propia": "Tienda propia",
-  "a-cargo-de-la-empresa": "A cargo de la empresa",
-  "no-se-reporta": "No se reporta",
-};
 
 /** Por qué un gasto no se le cobra a nadie. `null` = sí es cobrable. */
 export function motivoNoRecuperable(g: {

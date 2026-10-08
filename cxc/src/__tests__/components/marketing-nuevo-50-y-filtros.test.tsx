@@ -5,9 +5,8 @@
 //      pago de impulsadora vienen en 50 %, con 100 % a un toque. Sin tocar
 //      nada, lo que viaja es 50. Fuera del Marketing nuevo, el pago de
 //      impulsadora no pregunta ni manda nada (se cobra entero, como siempre).
-//   1b. «No recuperable» al registrar: sin marca ni tienda, con Motivo; se
-//      guarda con pctALaMarca 0 y seReporta false (no entra a ningún ZIP:
-//      candado en `marketing-excel-del-zip-candado`).
+//   1b. «No recuperable» al registrar: vive en
+//      `marketing-no-recuperable-sin-motivo.test.tsx` (sin Motivo, 8-oct-2026).
 //   2. Gastos abre en Estado «Por cobrar»; cada filtro lleva su nombre y
 //      «Todas», y Tienda ya no ofrece «Sin tienda» (Daniel: «Marca es una
 //      opción, igual que Tienda y Sin tienda; eso confunde»; cada factura va a
@@ -18,7 +17,7 @@
 // filtros no tenían nombre.
 // ============================================================================
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { ToastProvider } from "@/components/ToastSystem";
 import type { MkMarca, ImpulsadoraConEstado } from "@/lib/marketing/types";
 import type { GastoDeLaLista, MarketingDelCobro } from "@/lib/marketing/zip-marca";
@@ -93,37 +92,6 @@ describe("al hacer un gasto, «Se cobra» viene en 50 %", () => {
     fireEvent.click(screen.getByText("Guardar factura"));
     await waitFor(() => expect(posts.some((p) => p.url.endsWith("/api/marketing/facturas"))).toBe(true));
     expect(posts.find((p) => p.url.endsWith("/api/marketing/facturas"))!.cuerpo).toMatchObject({ pctALaMarca: 50 });
-  });
-
-  it("No recuperable: Marca y Tienda se ocultan, pide el Motivo y se guarda sin marca ni tienda", async () => {
-    render(enMarketingNuevo(<RegistrarGastoModal marcas={[TOMMY, CALVIN]} onClose={() => {}} onSaved={() => {}} />));
-    fireEvent.click(screen.getByText("Factura de un proveedor"));
-    fireEvent.click(screen.getByRole("radio", { name: "No recuperable" }));
-    const destino = screen.getByTestId("destino-del-cargo");
-    expect(within(destino).queryByText("Marca")).toBeNull();
-    expect(within(destino).queryByText("Tienda")).toBeNull();
-    expect(within(destino).queryByRole("radio", { name: "Tommy Hilfiger" })).toBeNull();
-    expect(screen.getByRole("radio", { name: "Compra de mobiliario" })).toBeTruthy();
-
-    const input = document.querySelector<HTMLInputElement>('input[type="file"]:not([capture])')!;
-    fireEvent.change(input, { target: { files: [new File(["%PDF"], "f.pdf", { type: "application/pdf" })] } });
-    await waitFor(() => expect((document.getElementById("factura-numero") as HTMLInputElement).value).toBe("62700"));
-    // Sin motivo no guarda, y lo dice.
-    fireEvent.click(screen.getByText("Guardar factura"));
-    expect(screen.getByTestId("falta-para-guardar").textContent).toContain("el motivo");
-    expect(screen.getByTestId("falta-para-guardar").textContent).not.toContain("la marca");
-    expect(posts.some((p) => p.url.endsWith("/api/marketing/facturas"))).toBe(false);
-
-    fireEvent.click(screen.getByRole("radio", { name: "Compra de mobiliario" }));
-    fireEvent.click(screen.getByText("Guardar factura"));
-    await waitFor(() => expect(posts.some((p) => p.url.endsWith("/api/marketing/facturas"))).toBe(true));
-    expect(posts.find((p) => p.url.endsWith("/api/marketing/facturas"))!.cuerpo).toMatchObject({
-      marcaId: "",
-      pctALaMarca: 0,
-      tiendaCodigo: null,
-      seReporta: false,
-      nota: "Compra de mobiliario",
-    });
   });
 
   const ANA = {

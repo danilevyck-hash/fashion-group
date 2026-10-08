@@ -280,7 +280,7 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
       id,
       tipo,
       marcaCodigo: marca?.codigo ?? "",
-      marcaNombre: marca?.nombre ?? "Sin marca",
+      marcaNombre: marca?.nombre ?? "No recuperable",
       proveedor:
         tipo === "impulsadora"
           ? nombreImpulsadora.get(impulsadoraId) || String(f.proveedor ?? "").trim()
@@ -329,7 +329,7 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
       id,
       tipo: tipoDeFila({ tabla: "mk_entregas_muebles" }),
       marcaCodigo: marca?.codigo ?? "",
-      marcaNombre: marca?.nombre ?? "Sin marca",
+      marcaNombre: marca?.nombre ?? "No recuperable",
       proveedor: "",
       detalle: nota || notas || "Muebles de la bodega",
       monto: num(e.total),

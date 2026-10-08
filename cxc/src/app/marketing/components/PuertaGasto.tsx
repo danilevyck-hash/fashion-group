@@ -105,7 +105,6 @@ import {
   NO_RECUPERABLE,
   PCT_AL_REGISTRAR,
   faltaEnElDestino,
-  notaConMotivo,
   tiendaQueSeGuarda,
   type DestinoDelCargo,
 } from "@/lib/marketing/solo-cobrable-2026-10";
@@ -449,7 +448,7 @@ export default function PuertaGasto({
     // 🔴 SOLO LO COBRABLE: marca, tienda y porcentaje salen del destino del
     // cargo y se reporta. 🔴 NO RECUPERABLE (8-oct-2026): sin marca ni tienda,
     // `pctALaMarca` 0 y `seReporta` false —lo mismo que «No recuperable» al
-    // editar—, y el motivo al principio de la nota.
+    // editar—. La nota es la de siempre: opcional.
     const noRecuperable = destinoCargo.pct === NO_RECUPERABLE;
     const cuerpoDelCargo = esCargo
       ? noRecuperable
@@ -458,7 +457,7 @@ export default function PuertaGasto({
             pctALaMarca: NO_RECUPERABLE,
             tiendaCodigo: null,
             seReporta: false,
-            nota: notaConMotivo(destinoCargo.motivo ?? null, comun.nota ?? ""),
+            nota: comun.nota,
           }
         : {
             marcaId: marcaEfectiva?.id ?? "",

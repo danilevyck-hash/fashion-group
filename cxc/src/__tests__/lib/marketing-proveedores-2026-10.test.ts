@@ -241,13 +241,13 @@ describe("a dónde fue el gasto", () => {
 
   it("sin marca ni tienda: a cargo de la empresa", () => {
     expect(destinoDelGasto({})).toBe(ROTULO_A_CARGO_EMPRESA);
-    expect(ROTULO_A_CARGO_EMPRESA).toBe("A cargo de la empresa");
+    expect(ROTULO_A_CARGO_EMPRESA).toBe("No recuperable");
   });
 
   it("🔴 la mitad: $100 → $50 a Tommy · $50 a cargo de la empresa", () => {
     expect(
       destinoDelGasto({ marcaNombre: "Tommy Hilfiger", monto: 100, pctALaMarca: 50 }),
-    ).toBe("Tommy Hilfiger $50.00 · A cargo de la empresa $50.00");
+    ).toBe("Tommy Hilfiger $50.00 · No recuperable $50.00");
     expect(montoDeLaMarca(100, 50)).toBe(50);
     expect(montoACargoDeLaEmpresa(100, 50)).toBe(50);
     // Con el 100 % la frase es el nombre y nada más: sin datos repetidos.
@@ -358,10 +358,10 @@ describe("la lista de proveedores y la ficha", () => {
   it("cada renglón dice a dónde fue", () => {
     const ficha = fichaDeProveedor("krysthel yanneth morales martinez", gastos);
     expect(ficha.renglones.map((r) => r.destino).sort()).toEqual([
-      ROTULO_A_CARGO_EMPRESA,
       "City Mall",
+      ROTULO_A_CARGO_EMPRESA,
       "Tommy Hilfiger",
-      "Tommy Hilfiger $50.00 · A cargo de la empresa $50.00",
+      "Tommy Hilfiger $50.00 · No recuperable $50.00",
     ]);
   });
 
@@ -458,7 +458,7 @@ describe("nombres de ERP, no los de Daniel", () => {
   it("🔴 los cinco rótulos son sustantivos de ERP", () => {
     expect(ROTULO_SE_COBRA_A).toBe("Se cobra a");
     expect(ROTULO_SE_COBRA).toBe("Se cobra");
-    expect(ROTULO_A_CARGO_EMPRESA).toBe("A cargo de la empresa");
+    expect(ROTULO_A_CARGO_EMPRESA).toBe("No recuperable");
     expect(ROTULO_COMPROBANTE).toBe("Comprobante");
     expect(ROTULO_ADJUNTAR_COMPROBANTE).toBe("Adjuntar comprobante");
     expect(ROTULO_TIENDA).toBe("Tienda");

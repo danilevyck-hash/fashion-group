@@ -18,7 +18,6 @@ import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import type { EstadoDelGasto, GastoDeLaLista, MarketingDelCobro } from "@/lib/marketing/zip-marca";
 import type { MkMarca } from "@/lib/marketing/types";
 import type { FilaDeTienda } from "@/lib/marketing/vista-tienda";
-import { ROTULO_MOTIVO } from "@/lib/marketing/solo-cobrable-2026-10";
 import FichaTiendaAcciones, { type AccionDeFila } from "../../tienda/[codigo]/FichaTiendaAcciones";
 import { BOTON_PRINCIPAL } from "./PorCobrarNuevo";
 
@@ -237,7 +236,11 @@ export default function GastosNuevo({
                   <td className="px-2 py-2 text-right tabular-nums">{g.estado === "no_recuperable" ? "—" : formatearMonto(g.aCobrar)}</td>
                   <td className="px-4 py-2 whitespace-nowrap">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${CHIP_ESTADO[g.estado]}`}>{ROTULO_ESTADO[g.estado]}</span>
-                    {g.motivo && <span className="ml-2 text-xs text-gray-500">{ROTULO_MOTIVO[g.motivo]}</span>}
+                    {g.estado === "no_recuperable" && g.nota && (
+                      <span className="block mt-0.5 text-xs text-gray-500 max-w-[14rem] truncate" data-testid="observacion-gasto">
+                        {g.nota}
+                      </span>
+                    )}
                   </td>
                 </tr>
               );
@@ -259,6 +262,9 @@ export default function GastosNuevo({
                   <span className="block text-xs text-gray-500 truncate">
                     {formatearFecha(g.fecha)} · {g.marcaNombre ?? "—"} · {g.concepto}
                   </span>
+                  {g.estado === "no_recuperable" && g.nota && (
+                    <span className="block text-xs text-gray-400 truncate">{g.nota}</span>
+                  )}
                 </span>
                 <span className="text-right shrink-0">
                   <span className="block text-sm tabular-nums text-gray-900">{formatearMonto(g.monto)}</span>
