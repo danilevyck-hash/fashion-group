@@ -99,7 +99,6 @@ const EN_UN_AYUDA: Array<[string, string]> = [
   // funcionalidad que explicaba (Daniel mandó quitar el autorrelleno por
   // curva): no es una poda de texto, es una función eliminada. El candado
   // inverso —que la curva no VUELVA— vive abajo en este mismo archivo.
-  ["components/marketing/AyudaClienteVinculado.tsx", "Selecciona del directorio para vincular"], // 1-oct-2026, Daniel: nombres normales de ERP («Elige» → «Selecciona»)
   ["app/marketing/components/FotosSection.tsx", "Respaldo visual que se adjunta a la cobranza a la marca"],
 
   // ── Gastos de Empresa: el módulo se retiró (11-ago-2026) ─────────────────
@@ -136,25 +135,6 @@ describe("la metodología que se movió a un ⓘ sigue estando adentro del ⓘ",
         `${a} usa <Ayuda> pero no lo importa de @/components/shared/Ayuda`,
       ).toBe(true);
     }
-  });
-});
-
-describe("🩸 el 'cómo se guarda el cliente' de Marketing es UNO, no dos copias", () => {
-  // Estaba escrito palabra por palabra en el formulario de nuevo proyecto y en
-  // el modal de editar. Dos copias de la misma frase se separan sola la primera
-  // vez que alguien corrige una.
-  // ProyectoForm.tsx se borró el 11-ago-2026 (su único caller era el modal de
-  // "Nuevo proyecto", retirado cuando el proyecto pasó a autocrearse).
-  const CONSUMIDORES = [
-    "app/marketing/components/EditarProyectoModal.tsx",
-  ];
-
-  it.each(CONSUMIDORES)("%s usa el componente compartido", (archivo) => {
-    expect(leer(archivo)).toContain("<AyudaClienteVinculado />");
-  });
-
-  it.each(CONSUMIDORES)("%s no vuelve a escribir la frase a mano", (archivo) => {
-    expect(aplanar(leer(archivo))).not.toContain("Selecciona del directorio para vincular");
   });
 });
 

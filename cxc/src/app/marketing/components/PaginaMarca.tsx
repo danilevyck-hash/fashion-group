@@ -36,7 +36,7 @@ import type { MkMarca } from "@/lib/marketing/types";
 import { puedeEscribirMarketing, TEXTO_SOLO_LECTURA } from "@/lib/marketing/roles";
 import { hrefDePestana, type TiendaDeSeccion } from "@/lib/marketing/tiendas-y-marcas";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "@/lib/marketing/zip-e-impulsadoras";
-import type { BloqueResumen } from "./InicioMarketing";
+import type { BloqueResumen } from "./tipos-inicio";
 import CerrarPeriodoModal from "./CerrarPeriodoModal";
 import { MKT_SOLO_COBRABLE_2026_10 } from "@/lib/marketing/solo-cobrable-2026-10";
 import LoQueFalta from "./LoQueFalta";

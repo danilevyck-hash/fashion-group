@@ -25,25 +25,12 @@ const leer = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
 describe("Marketing: el drill-down APILA historial", () => {
   const fuente = leer("src/app/marketing/page.tsx");
 
-  // 23-sep-2026 · NOTA FECHADA — con Tiendas y Marcas la página raíz tiene DOS
-  // pantallas en el mismo archivo (`MarketingPage`, la nueva, y
-  // `MarketingPageDeAntes`, intacta detrás del interruptor). `navegar()` vive
-  // en la de antes; se recorta desde su `const navegar` hasta el `const
-  // refrescar` que le SIGUE, no el primero del archivo.
-  it("navegar() usa router.push (con replace, Atrás desde la marca caía en Inicio)", () => {
-    // La función navegar es la única puerta de navegación interna del módulo.
-    const desde = fuente.indexOf("const navegar");
-    const navegar = fuente.slice(desde, fuente.indexOf("const refrescar", desde));
-    expect(navegar).toContain("router.push(");
-    expect(navegar).not.toContain("router.replace(");
-  });
-
-  // 23-sep-2026 · NOTA FECHADA — son DOS `router.replace(`, uno por pantalla,
-  // y los dos son el redirect de enlaces viejos (`destinoLegacy`: `?vista=`,
-  // `?bloque=`, papelera). Ninguno es navegación normal.
+  // 8-oct-2026 · La pantalla de antes (`MarketingPageDeAntes`, con su
+  // `navegar()`) se borró: queda UN `router.replace(`, el redirect de enlaces
+  // viejos (`destinoLegacy`: `?vista=`, `?bloque=`). No es navegación normal.
   it("todo router.replace que queda es el redirect de enlaces viejos", () => {
     const usos = fuente.split("router.replace(").length - 1;
-    expect(usos).toBe(2);
+    expect(usos).toBe(1);
     let desde = 0;
     for (let i = 0; i < usos; i += 1) {
       const idx = fuente.indexOf("router.replace(", desde);
@@ -51,7 +38,6 @@ describe("Marketing: el drill-down APILA historial", () => {
       expect(contexto).toContain("destinoLegacy");
       desde = idx + 1;
     }
-    expect(fuente).toContain("papelera");
   });
 });
 
@@ -71,7 +57,6 @@ describe("Tabs principales con URL propia (sobreviven refresh, se comparten)", (
     // vive en la URL —y es lo que este candado protege— es el chip elegido, en
     // `?ver=`. Sigue siendo `replace`: es un filtro del MISMO nivel.
     ["src/app/catalogos/admin/[marca]/AdminCatalogoClient.tsx", 'useUrlState("ver"'],
-    ["src/app/marketing/components/ReportesTabs.tsx", 'useUrlState<Tab>("rep"'],
   ];
 
   for (const [rel, firma] of casos) {

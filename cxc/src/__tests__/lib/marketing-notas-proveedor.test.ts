@@ -99,7 +99,6 @@ const RUTA_AYUDA_PRECIOS = "src/components/marketing/PreciosProveedorAyuda.tsx";
 const RUTAS_API = [
   "src/app/api/marketing/mobiliario/notas-proveedor/route.ts",
   "src/app/api/marketing/mobiliario/notas-proveedor/[id]/route.ts",
-  "src/app/api/marketing/mobiliario/notas-proveedor/upload-url/route.ts",
 ];
 const RUTA_MIGRACION =
   "supabase/migrations/20260808120000_mk_mobiliario_notas_proveedor.sql";

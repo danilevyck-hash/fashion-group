@@ -147,7 +147,6 @@ describe("BARRIDO — no existe ninguna conversión piezas ↔ bultos", () => {
     "src/lib/marketing/entrega-comprobante.ts",
     "src/lib/marketing/pdf-entrega-mueble.ts",
     "src/components/marketing/EntregaForm.tsx",
-    "src/app/marketing/components/EntregasSection.tsx",
   ];
 
   it("no hay 'piezas por bulto' ni un factor de conversión", () => {

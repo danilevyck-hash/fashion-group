@@ -70,7 +70,9 @@ describe("10 · un proyecto eliminado se puede devolver", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("11 · «Otro gasto» sí le pasa el PDF a la IA", () => {
   const RUTA = sinComentarios(leer("src/app/api/marketing/adjuntos/upload-url/route.ts"));
-  const MODAL = sinComentarios(leer("src/app/marketing/components/RegistrarGastoModal.tsx"));
+  // La puerta de «Registrar gasto» vive en `PuertaGasto` desde que se borró el
+  // registro de antes (8-oct-2026).
+  const MODAL = sinComentarios(leer("src/app/marketing/components/PuertaGasto.tsx"));
 
   it("🔴 la promesa dejó de ser falsa: sin proyecto ya no devuelve `null`", () => {
     expect(MODAL).toContain("paraLeerConIA: true");

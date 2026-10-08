@@ -18,9 +18,8 @@
 //   3. 🔴 FUENTE EXACTA: ni un comodín que se coma `/marketing/<marca>`,
 //      `/marketing/mobiliario` ni `/marketing/galeria/<cliente>`.
 //   4. `/marketing/proyectos/nuevo` va ANTES que `/marketing/proyectos/:id`.
-//   5. Las dos vistas siguen existiendo en la página raíz, y la tarjeta
-//      «Reportes» sigue en el menú de Herramientas: la dirección promete algo
-//      que está.
+//   5. La página raíz redirige `?vista=` y `?proyecto=`: la dirección llega a
+//      algún lado.
 //   6. Ninguna de las direcciones redirigidas tiene además un `page.tsx`: un
 //      redirect le ganaría y la pantalla quedaría inalcanzable.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -135,36 +134,22 @@ describe("🔴 ninguna dirección que hoy funciona deja de funcionar", () => {
   });
 });
 
-// 23-sep-2026 · NOTA FECHADA — con Tiendas y Marcas (`MARKETING_TIENDAS_Y_
-// MARCAS` prendido) `?vista=reportes` REDIRIGE a la pestaña Tiendas y
-// `?proyecto=<id>` a la ficha de la tienda de ese proyecto (`useRedirigir
-// ProyectoViejo`): las direcciones siguen llegando a algún lado. Lo de abajo
-// vigila la pantalla DE ANTES (`MarketingPageDeAntes`, `InicioDeAntes`), que
-// vive intacta detrás del interruptor.
+// 8-oct-2026 · La portada vieja (`MarketingPageDeAntes`, `InicioMarketing`,
+// Reportes, el overlay del proyecto) se borró. `?vista=` y `?proyecto=<id>`
+// siguen llegando a algún lado: la página raíz los REDIRIGE.
 describe("🔑 lo que la dirección promete, existe", () => {
   const raiz = readFileSync(
     path.join(RAIZ, "src/app/marketing/page.tsx"),
     "utf8",
   );
-  const inicio = readFileSync(
-    path.join(RAIZ, "src/app/marketing/components/InicioMarketing.tsx"),
-    "utf8",
-  );
 
-  it("la página raíz sigue sirviendo las dos vistas", () => {
-    expect(raiz).toContain('vistaRaw === "reportes"');
-    expect(raiz).toContain('vistaRaw === "impulsadoras"');
-    expect(raiz).toContain("<ReportesTabs />");
-    expect(raiz).toContain("<ImpulsadorasView");
+  it("la página raíz redirige `?vista=` (Reportes, Impulsadoras, papelera)", () => {
+    expect(raiz).toContain('searchParams.get("vista")');
+    expect(raiz).toContain("destinoDeVistaVieja(vistaRaw)");
   });
 
-  it("y el overlay de `?proyecto=` sigue vivo (ahí llega un proyecto viejo)", () => {
-    expect(raiz).toContain("<ProyectoOverlay");
+  it("y un `?proyecto=` viejo va a la ficha de la tienda de ese proyecto", () => {
     expect(raiz).toContain('searchParams.get("proyecto")');
-  });
-
-  it("la tarjeta «Reportes» sigue en el menú de Herramientas", () => {
-    expect(inicio).toContain('titulo="Reportes"');
-    expect(inicio).toContain("onClick={onOpenReportes}");
+    expect(raiz).toContain("useRedirigirProyectoViejo(");
   });
 });

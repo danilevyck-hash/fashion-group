@@ -32,7 +32,6 @@ vi.mock("next/navigation", () => ({
 
 const { default: RegistrarGastoModal } = await import("@/app/marketing/components/RegistrarGastoModal");
 const { FacturaForm } = await import("@/components/marketing/FacturaForm");
-const { default: MarcasCelular } = await import("@/app/marketing/components/celular/MarcasCelular");
 const lib = await import("@/lib/marketing/solo-cobrable-2026-10");
 const prov = await import("@/lib/marketing/proveedores-2026-10");
 
@@ -181,27 +180,6 @@ describe("solo lo cobrable · al editar, «No recuperable»", () => {
     expect((datos.gasto as Record<string, unknown>).seReporta).toBe(false);
     // La marca se conserva: no se manda una lista nueva.
     expect(datos.marcasSeleccionadas).toEqual([]);
-  });
-});
-
-describe("solo lo cobrable · la portada en el celular es Marcas", () => {
-  it("título «Marketing», sin «‹ Marketing», y las otras secciones al final", () => {
-    render(
-      <MarcasCelular
-        abiertas={[]}
-        grupos={[]}
-        cargando={false}
-        escribe
-        onRegistrarGasto={() => {}}
-        onSelectBloque={() => {}}
-        onSelectCerrado={() => {}}
-        hrefVolver="/marketing"
-        puertas={<p>Otras secciones</p>}
-      />,
-    );
-    expect(screen.getByText("Marketing")).toBeTruthy();
-    expect(screen.queryByText("‹ Marketing")).toBeNull();
-    expect(screen.getByText("Otras secciones")).toBeTruthy();
   });
 });
 

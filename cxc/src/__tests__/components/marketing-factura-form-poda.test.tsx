@@ -112,11 +112,3 @@ describe("🔴 PasoInstruccion no tacha títulos nunca", () => {
     );
   });
 });
-
-describe("el badge de la tarjeta de factura", () => {
-  it('solo existe para "Pagado" (impulsadoras): un "Creado" en todas sería ruido', () => {
-    const src = leer("components/marketing/FacturaCard.tsx");
-    expect(src).toContain('factura.estado_pago === "pagado"');
-    expect(src).not.toMatch(/>\s*Creado\s*</);
-  });
-});

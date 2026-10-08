@@ -131,7 +131,7 @@ import { GET as comisiones } from "@/app/api/ventas/comisiones/route";
 import { GET as proveedores } from "@/app/api/proveedores/route";
 import { GET as saldosBanco } from "@/app/api/saldos-banco/route";
 import { GET as gastosEgresos } from "@/app/api/gastos-contabilidad/egresos/route";
-import { GET as marketingProyectos } from "@/app/api/marketing/proyectos/route";
+import { GET as marketingProyectos } from "@/app/api/marketing/proyectos-lista/route";
 import { GET as cajaPeriodos } from "@/app/api/caja/periodos/route";
 import { GET as multifashionOverview } from "@/app/api/multifashion/overview/route";
 import { GET as prestamosEmpleados } from "@/app/api/prestamos/empleados/route";
@@ -434,7 +434,7 @@ const RUTAS_AJENAS: Array<[modulo: string, url: string, handler: Handler]> = [
   ["proveedores",         "/api/proveedores",                             proveedores as Handler],
   ["gastos (saldos)",     "/api/saldos-banco",                            saldosBanco as Handler],
   ["gastos (egresos)",    "/api/gastos-contabilidad/egresos?mes=2026-08", gastosEgresos as Handler],
-  ["marketing",           "/api/marketing/proyectos",                     marketingProyectos as Handler],
+  ["marketing",           "/api/marketing/proyectos-lista",               marketingProyectos as Handler],
   ["caja menuda",         "/api/caja/periodos",                           cajaPeriodos as Handler],
   // 10-sep-2026 · NOTA FECHADA — la fila «packing lists» se fue porque el MÓDULO
   // se retiró (Daniel: «packing list no se usa, eliminar»; `packing_lists` con

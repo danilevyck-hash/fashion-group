@@ -8,8 +8,8 @@
 //   /marketing/calvin-klein/actual         → alias permanente del abierto
 //
 // El detalle lo dibuja DetallePeriodoView; acá vive el cableado: resolver el
-// slug del período, la búsqueda (server-side, como siempre), el overlay del
-// proyecto (?proyecto=<id>, con push — Atrás lo cierra) y Registrar gasto.
+// slug del período, la búsqueda (server-side, como siempre), el redirect de un
+// `?proyecto=<id>` viejo a la ficha de la tienda y Registrar gasto.
 //
 // 🔑 LA VUELTA ATRÁS depende de cuántos períodos tiene la marca: con varios,
 // "‹ Calvin Klein" lleva al nivel 2; con UNO solo, el nivel 2 no existe como
@@ -25,7 +25,6 @@ import { seccionPorSlug } from "@/lib/marketing/lista-por-periodo";
 import { ROLES_MARKETING, puedeEscribirMarketing } from "@/lib/marketing/roles";
 import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
 import RegistrarGastoModal from "../../components/RegistrarGastoModal";
-import ProyectoOverlay from "../../components/ProyectoOverlay";
 import DetallePeriodoView from "../../components/DetallePeriodoView";
 import { useRedirigirProyectoViejo } from "../../components/useProyectoViejo";
 import {
@@ -169,24 +168,6 @@ function PeriodoPage({
               recargar={recargar}
               soloLectura={!puedeEscribirMarketing(role)}
             />
-            {proyectoParam && !MARKETING_TIENDAS_Y_MARCAS && (
-              <ProyectoOverlay
-                proyectoId={proyectoParam}
-                // El contexto de la marca/período desde el que se abrió: la
-                // línea "En Calvin Klein · Período 2026: $X — este proyecto
-                // también tiene $Y de Tommy Hilfiger". El monto es EL DEL
-                // AGREGADOR (seccion.proyectos, la misma cifra de la tarjeta
-                // tocada) — acá no se calcula nada.
-                marca={marcaInicialModal ?? undefined}
-                periodoNombre={seccion.nombre}
-                montoEnPeriodo={
-                  seccion.proyectos.find((p) => p.id === proyectoParam)
-                    ?.monto ?? null
-                }
-                onClose={() => router.push(rutaPeriodo)}
-                onChange={() => setRefreshKey((k) => k + 1)}
-              />
-            )}
           </>
         )}
       </main>

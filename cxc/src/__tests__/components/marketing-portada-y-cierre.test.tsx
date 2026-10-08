@@ -130,9 +130,7 @@ import {
   validarNombreAlCerrar,
   validarNotaCredito,
 } from "@/app/api/marketing/periodos/cerrar";
-import { GET as reporteProyectoGET } from "@/app/api/marketing/reportes/proyecto/route";
 import CerrarPeriodoModal from "@/app/marketing/components/CerrarPeriodoModal";
-import InicioMarketing from "@/app/marketing/components/InicioMarketing";
 
 const RAIZ = path.resolve(__dirname, "../../..");
 const leer = (rel: string) => fs.readFileSync(path.join(RAIZ, rel), "utf8");
@@ -204,11 +202,6 @@ describe("1 · 🔴 dos estados y nada más", () => {
     expect(esPestanaPortada("en_proceso")).toBe(false);
   });
 
-  it("la portada no dibuja un tercer estado", () => {
-    const src = codigo("src/app/marketing/components/PortadaAbiertosCerrados.tsx");
-    expect(src).not.toMatch(/en proceso|enviado|cobrado|pipeline/i);
-    expect(src).toContain("PESTANAS_PORTADA.map(");
-  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -419,19 +412,6 @@ describe("4 · 🔴 Multifashion no es una marca", () => {
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("5 · 🔴 los gastos de las marcas no se suman entre sí", () => {
-  it("la portada nueva no tiene total del grupo ni «Por marca» / «Por cliente»", () => {
-    const src = codigo("src/app/marketing/components/PortadaAbiertosCerrados.tsx");
-    expect(src).not.toMatch(/resumen\.total/);
-    expect(src).not.toMatch(/gastado en el período actual/);
-    expect(src).not.toMatch(/PorClienteModal|PorMarcaModal/);
-    expect(src).not.toMatch(/\.reduce\(/);
-  });
-
-  it("el reporte por marca no tiene pie con el interruptor prendido", () => {
-    const src = codigo("src/app/marketing/components/ReportePorMarcaView.tsx");
-    expect(src).toMatch(/MARKETING_PORTADA_REDISENO \? null : filas\.reduce/);
-    expect(src).toMatch(/totalDeAntes !== null && \(/);
-  });
 
   it("los cerrados muestran el nombre que se les puso, la fecha y la nota", () => {
     const filas = filasCerradas(
@@ -449,13 +429,7 @@ describe("5 · 🔴 los gastos de las marcas no se suman entre sí", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-describe("6 · 🩸 el reporte por proyecto contesta 410 y no hay «Exportar Excel»", () => {
-  it("GET /api/marketing/reportes/proyecto → 410, con el porqué", async () => {
-    const res = await reporteProyectoGET();
-    expect(res.status).toBe(410);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toMatch(/por marca y por tienda/);
-  });
+describe("6 · 🩸 no hay reporte por proyecto ni «Exportar Excel»", () => {
 
   it("ni la vista, ni la exportación, ni el botón vuelven", () => {
     expect(fs.existsSync(path.join(RAIZ, "src/app/marketing/components/ReportePorProyectoView.tsx"))).toBe(false);
@@ -467,68 +441,8 @@ describe("6 · 🩸 el reporte por proyecto contesta 410 y no hay «Exportar Exc
       if (!/\.tsx?$/.test(f)) continue;
       expect(codigo(`src/app/marketing/components/${f}`), f).not.toMatch(/Exportar Excel/);
     }
-    const tabs = codigo("src/app/marketing/components/ReportesTabs.tsx");
-    expect(tabs).not.toMatch(/proyecto/i);
-    expect(tabs.match(/value: "(marca|tienda)"/g)).toHaveLength(2);
-  });
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-describe("7 · el interruptor", () => {
-  const datosInicio = {
-    bloques: [
-      { key: "TH", nombre: "Tommy Hilfiger", periodoAbierto: { id: "per-th", nombre: "Período 2026" }, facturas: { count: 3, total: 21530.98 }, muebles: { count: 0, total: 0 }, total: 21530.98, proyectos: 2, noReportado: { count: 0, total: 0 } },
-      { key: MULTIFASHION_KEY, nombre: "Multifashion", periodoAbierto: null, facturas: { count: 4, total: 8061.63 }, muebles: { count: 0, total: 0 }, total: 8061.63, proyectos: 1, noReportado: { count: 0, total: 0 } },
-    ],
-    cerrados: [],
-    resumen: { total: 29592.61, proyectos: 3, clientes: 2 },
-    porCliente: [],
-    porMarca: {},
-    marcas: [],
-    conPeriodos: true,
-    mobiliario: { entregas: 24, total: 81347 },
-    impulsadoras: { count: 2, montoMensual: 1600 },
-    periodosMeta: { "per-th": { abiertoEn: "2026-08-12T03:21:05Z", nombreAlCerrar: null, notaCredito: null } },
-    hoy: "2026-09-22",
-  };
-  const props = {
-    onSelectBloque: () => {},
-    onRegistrarGasto: () => {},
-    onOpenImpulsadoras: () => {},
-    onOpenInventario: () => {},
-    onOpenReportes: () => {},
-    refreshKey: 0,
-  };
-
-  it("hoy está PRENDIDO: la portada es Abiertos | Cerrados, sin Multifashion como marca y sin total del grupo", async () => {
-    expect(MARKETING_PORTADA_REDISENO).toBe(true);
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => datosInicio })));
-    render(<InicioMarketing {...props} />);
-    await waitFor(() => expect(screen.getByText("Tommy Hilfiger")).toBeTruthy());
-    expect(screen.getByRole("tab", { name: /Abiertos/ })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /Cerrados/ })).toBeTruthy();
-    expect(screen.getByText("$21,530.98")).toBeTruthy();
-    expect(screen.getByText(/42 días abierto/)).toBeTruthy();
-    expect(screen.queryByText(/gastado en el período actual/)).toBeNull();
-    expect(screen.queryByText("$29,592.61")).toBeNull();
-    // Multifashion: en Herramientas como tienda, no bajo «Marcas».
-    expect(screen.getByText(/Tienda propia · 4 gastos/)).toBeTruthy();
-    expect(screen.getByText("Por marca y por tienda")).toBeTruthy();
-  });
-
-  it("apagado = la portada de antes, con el mismo archivo, intacta", () => {
-    const src = codigo("src/app/marketing/components/InicioMarketing.tsx");
-    expect(src).toContain("if (MARKETING_PORTADA_REDISENO) {");
-    expect(src).toContain("return <InicioDeAntes {...props} />;");
-    expect(src).toContain("gastado en el período actual");
-    expect(src).toContain("Tienda propia · sin período");
-    const modal = codigo("src/app/marketing/components/CerrarPeriodoModal.tsx");
-    expect(modal).toContain("return <CerrarPeriodoModalDeAntes {...props} />;");
-    expect(modal).toContain("¿Cómo se llama el período que empieza?");
-    const cerrar = codigo("src/app/api/marketing/periodos/cerrar.ts");
-    expect(cerrar).toContain("export async function cerrarPeriodoDeMarca");
-    const reportes = codigo("src/lib/marketing/reportes.ts");
-    expect(reportes).toContain("export async function reportePorMarca(");
-    expect(reportes).toContain("export async function reportePorTienda(");
+    // La ruta del reporte por proyecto (410) y las pestañas de Reportes se
+    // borraron con la portada vieja (8-oct-2026).
+    expect(fs.existsSync(path.join(RAIZ, "src/app/api/marketing/reportes"))).toBe(false);
   });
 });

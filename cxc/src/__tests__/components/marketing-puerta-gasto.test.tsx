@@ -689,14 +689,6 @@ describe("7 · 🔴 CONTROL — con MARKETING_PUERTA_GASTO en false es la pantal
     perilla.encendido = false;
   });
 
-  it("los tres caminos viejos, con «Gasto de la marca», y ningún botón por tipo", () => {
-    abrir();
-    expect(document.querySelectorAll("[data-camino]")).toHaveLength(3);
-    expect(screen.getByText("Gasto de la marca")).toBeTruthy();
-    expect(document.querySelector("[data-tipo]")).toBeNull();
-    expect(selectMarca()).toBeNull();
-  });
-
   it("y el freno del servidor no corre: el mismo gasto entra como hoy", async () => {
     db.filas.mk_facturas = [
       { id: "f-viva", numero_factura: "1", proveedor: "Premium Paint", total: 120, fecha_factura: "2026-09-01", anulado_en: null, impulsadora_id: null },
@@ -704,12 +696,6 @@ describe("7 · 🔴 CONTROL — con MARKETING_PUERTA_GASTO en false es la pantal
     await expect(frenarFacturaDuplicada({ proveedor: "Premium Paint", monto: 120, fecha: "2026-09-01" })).resolves.toBeUndefined();
   });
 
-  it("candado estático: `RegistrarGastoModal` elige por el interruptor y la pantalla vieja sigue entera", () => {
-    const src = sinComentarios(leer("src/app/marketing/components/RegistrarGastoModal.tsx"));
-    expect(src).toMatch(/if \(MARKETING_PUERTA_GASTO\) return <PuertaGasto \{\.\.\.props\} \/>;/);
-    expect(src).toMatch(/return <RegistrarGastoModalAnterior \{\.\.\.props\} \/>;/);
-    expect(src).toContain("permitirOtro={false}");
-  });
 });
 
 // ── Ayudas ───────────────────────────────────────────────────────────────────

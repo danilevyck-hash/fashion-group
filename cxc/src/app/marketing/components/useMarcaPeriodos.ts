@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { SeccionPeriodo } from "@/lib/marketing/lista-por-periodo";
-import type { BloqueResumen } from "./InicioMarketing";
+import type { BloqueResumen } from "./tipos-inicio";
 import type { MkMarca } from "@/lib/marketing/types";
 
 export interface ProyectoListItem {

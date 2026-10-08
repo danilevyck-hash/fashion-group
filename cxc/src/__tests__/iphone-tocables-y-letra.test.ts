@@ -91,18 +91,6 @@ describe("Tocables · 44 px de alto Y de ancho", () => {
     expect(existe("src/lib/hooks/useSmartSuggestions.ts")).toBe(false);
   });
 
-  // 22-sep-2026 · NOTA FECHADA — «Por Proyecto» y «Exportar Excel» se retiraron
-  // con la pieza C del rediseño de Marketing (Daniel: «"Por proyecto" se va;
-  // "Exportar Excel" se va»). Quedan DOS pestañas y el año.
-  it("Marketing › Reportes: las 2 pestañas y el año", () => {
-    expect(leer("src/app/marketing/components/ReportesTabs.tsx"))
-      .toContain("inline-flex min-h-[44px] items-center px-4 py-2 text-sm font-medium border-b-2");
-    for (const f of ["ReportePorMarcaView", "ReportePorTiendaView"]) {
-      const src = leer(`src/app/marketing/components/${f}.tsx`);
-      expect(src, f).toContain("min-h-[44px]");
-    }
-  });
-
   it("Catálogos › Admin y los dos campos del Depurador", () => {
     // 🔄 6-sep-2026: el admin ya no tiene pestañas — se vigila el CHIP, que es
     // lo que ocupó su lugar, y el botón de subir/esconder de cada fila.

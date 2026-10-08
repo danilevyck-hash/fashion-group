@@ -68,13 +68,11 @@ const RUTA_DATOS = "src/app/api/marketing/tienda/[codigo]/datos.ts";
 const RUTA_API = "src/app/api/marketing/tienda/[codigo]/route.ts";
 const RUTA_FOTOS = "src/app/api/marketing/tienda/[codigo]/fotos/route.ts";
 const RUTA_PAGINA = "src/app/marketing/tienda/[codigo]/page.tsx";
-// 23-sep-2026 · NOTA FECHADA — `VistaTienda.tsx` pasó a ser el envoltorio
-// (la sesión y el interruptor `MARKETING_TIENDAS_Y_MARCAS`); las DOS pantallas
-// que dibujan la plata son la de antes (`VistaTiendaAnterior.tsx`, una tabla
-// por marca) y la ficha nueva (`FichaTienda.tsx`, una sola lista). La regla
-// —no sumar por su cuenta— se exige en las dos.
+// 23-sep-2026 · NOTA FECHADA — `VistaTienda.tsx` pasó a ser el envoltorio (la
+// sesión); la pantalla que dibuja la plata es la ficha (`FichaTienda.tsx`, una
+// sola lista). La vista de antes se borró el 8-oct-2026. La regla —no sumar
+// por su cuenta— se exige ahí.
 const RUTAS_VISTA = [
-  "src/app/marketing/tienda/[codigo]/VistaTiendaAnterior.tsx",
   "src/app/marketing/tienda/[codigo]/FichaTienda.tsx",
 ];
 const RUTA_BUSCADOR = "src/app/api/search/route.ts";

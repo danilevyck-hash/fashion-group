@@ -11,8 +11,6 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import { ToastProvider } from "@/components/ToastSystem";
 import { FacturaForm } from "@/components/marketing/FacturaForm";
-import MarcasCelular from "@/app/marketing/components/celular/MarcasCelular";
-import TiendasCelular from "@/app/marketing/components/celular/TiendasCelular";
 import type { MkMarca } from "@/lib/marketing/types";
 
 vi.mock("next/navigation", () => ({
@@ -78,31 +76,4 @@ describe("solo lo cobrable · apagado = las pantallas de hoy, byte por byte", ()
     await expect(container.innerHTML).toMatchFileSnapshot(FOTO("factura-editar"));
   });
 
-  it("Marcas en el celular", async () => {
-    const abiertas = [
-      { key: "ck", nombre: "Calvin Klein", periodoId: "p", periodoNombre: "Período 2026", reportado: 30869.23, cantidadReportada: 20, noReportado: 0, cantidadNoReportada: 0, diasAbierto: 57, sinMarca: false },
-      { key: "kl", nombre: "Karl Lagerfeld", periodoId: "p", periodoNombre: "Período 2026", reportado: 0, cantidadReportada: 0, noReportado: 0, cantidadNoReportada: 0, diasAbierto: 57, sinMarca: false },
-    ];
-    const { container } = render(
-      <MarcasCelular abiertas={abiertas} grupos={[]} cargando={false} escribe onRegistrarGasto={() => {}} onSelectBloque={() => {}} onSelectCerrado={() => {}} hrefVolver="/marketing" />,
-    );
-    await expect(container.innerHTML).toMatchFileSnapshot(FOTO("marcas-celular"));
-  });
-
-  it("Tiendas en el celular (la portada de hoy)", async () => {
-    const { container } = render(
-      <TiendasCelular
-        filas={[{ codigo: "D-170", nombre: "Nova Lux, S.A.", cantidad: 3, total: 13480.29, href: "/marketing/tienda/D-170", esGeneral: false, esMultifashion: false } as never]}
-        chips={[]}
-        periodo="abierto"
-        onPeriodo={() => {}}
-        total={13480.29}
-        cargando={false}
-        hayDatos
-        escribe
-        onRegistrarGasto={() => {}}
-      />,
-    );
-    await expect(container.innerHTML).toMatchFileSnapshot(FOTO("tiendas-celular"));
-  });
 });

@@ -268,38 +268,7 @@ const hrefsDeTienda = () =>
   screen.getAllByRole("link").map((a) => a.getAttribute("href") ?? "").filter((h) => h.startsWith("/marketing/tienda/"));
 
 // ═════════════════════════════════════════════════════════════════════════════
-describe("1 · la portada abre en Tiendas, con N filas que enlazan a su ficha", () => {
-  it("abre en Tiendas, con las 16 tiendas + General, cada una con su enlace, y sin «Reportes»", async () => {
-    render(<ToastProvider><MarketingPage /></ToastProvider>);
-    const pestanas = await screen.findAllByRole("tab");
-    // 🔴 La quinta, «Proveedores», entró el 7-oct-2026 con
-    // `MKT_PROVEEDORES_2026_10`. Las cuatro de antes no se movieron de orden.
-    expect(pestanas.map((t) => t.textContent)).toEqual([
-      "Tiendas", "Marcas", "Impulsadoras", "Mobiliario", "Proveedores",
-    ]);
-    expect(pestanas[0].getAttribute("aria-selected")).toBe("true");
-    await waitFor(() => expect(screen.getByText("City Mall David")).toBeTruthy());
-    const hrefs = hrefsDeTienda();
-    expect(hrefs.length).toBe(17); // medido: 16 tiendas con gasto + «General»
-    expect(hrefs).toContain("/marketing/tienda/D-24");
-    expect(hrefs).toContain("/marketing/tienda/D-108");
-    expect(hrefs[hrefs.length - 1]).toBe("/marketing/tienda/general");
-    // El nombre del directorio, no el texto del proyecto viejo.
-    expect(screen.getByText("City Mall Paso Canoa")).toBeTruthy();
-    expect(screen.queryByText("City Mall Pasocanoa")).toBeNull();
-    // Lo reportado como único monto y el desglose por marca en gris.
-    expect(screen.getByText("$37,460.92")).toBeTruthy();
-    expect(screen.getByText("Tommy Hilfiger $29,199.12 · Calvin Klein $8,261.80")).toBeTruthy();
-    expect(screen.queryByText("Reportes")).toBeNull();
-    expect(screen.getByRole("button", { name: "＋ Gasto" })).toBeTruthy();
-  });
-
-  it("el buscador de arriba solo filtra lo que ya está en pantalla", async () => {
-    render(<ToastProvider><MarketingPage /></ToastProvider>);
-    await waitFor(() => expect(screen.getByText("City Mall David")).toBeTruthy());
-    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar una tienda" }), { target: { value: "nova" } });
-    expect(hrefsDeTienda()).toEqual(["/marketing/tienda/D-170"]);
-  });
+describe("1 · las direcciones viejas de la portada", () => {
 
   it("`?vista=reportes` viejo cae en Tiendas; `?vista=impulsadoras` en su pestaña", async () => {
     expect(destinoDeVistaVieja("reportes")).toBe("/marketing");
@@ -309,20 +278,10 @@ describe("1 · la portada abre en Tiendas, con N filas que enlazan a su ficha", 
     await waitFor(() => expect(perilla.replace).toHaveBeenCalledWith("/marketing"));
   });
 
-  it("Mobiliario es una página propia: la pestaña lleva ahí", async () => {
-    render(<ToastProvider><MarketingPage /></ToastProvider>);
-    fireEvent.click(await screen.findByRole("tab", { name: "Mobiliario" }));
-    expect(perilla.push).toHaveBeenCalledWith("/marketing/mobiliario");
-  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("2 · Multifashion es una tienda, y no aparece en ninguna marca", () => {
-  it("está en Tiendas como una más, rotulada «tienda propia»", async () => {
-    render(<ToastProvider><MarketingPage /></ToastProvider>);
-    await waitFor(() => expect(screen.getByText("Multi Fashion Holding")).toBeTruthy());
-    expect(screen.getByText(/tienda propia · 3 gastos · no se le pasa a ninguna marca/)).toBeTruthy();
-  });
 
   it("por marca: Tommy $116.675,66 y Calvin $73.782,95 — sin la tienda propia; tiendas = marcas + Multifashion", () => {
     const porMarca = reportePorMarcaDe(sinMultifashion(GASTOS), NOMBRES_MARCA);
@@ -536,13 +495,8 @@ describe("6 · contabilidad entra solo lectura, con y sin la migración", () => 
     expect(getVisibleModules("bodega", ["gastos-contabilidad"]).map((m) => m.key)).not.toContain("marketing");
   });
 
-  it("la portada y la ficha no dibujan botones de escritura", async () => {
+  it("la ficha no dibuja botones de escritura", async () => {
     perilla.role = "contabilidad";
-    render(<ToastProvider><MarketingPage /></ToastProvider>);
-    await waitFor(() => expect(screen.getByText("City Mall David")).toBeTruthy());
-    expect(screen.queryByRole("button", { name: "＋ Gasto" })).toBeNull();
-    expect(screen.getByText("Solo lectura")).toBeTruthy();
-    cleanup();
     render(<ToastProvider><VistaTienda codigo="D-170" /></ToastProvider>);
     await waitFor(() => expect(screen.getByText(/Nova Lux, S.A./)).toBeTruthy());
     expect(screen.queryByRole("button", { name: "＋ Gasto" })).toBeNull();
@@ -574,21 +528,5 @@ describe("6 · contabilidad entra solo lectura, con y sin la migración", () => 
       { params: { id: "fa506291-53b4-40af-a0b1-f197c89f4ca3" } },
     );
     expect(post.status).toBe(403);
-  });
-});
-
-// ═════════════════════════════════════════════════════════════════════════════
-describe("7 · el interruptor en false = como antes", () => {
-  it("la portada de antes (Abiertos | Cerrados con «Reportes») y la vista de tienda por marca", async () => {
-    perilla.encendido = false;
-    render(<ToastProvider><MarketingPage /></ToastProvider>);
-    await waitFor(() => expect(screen.getByText("Reportes")).toBeTruthy());
-    expect(screen.queryByRole("tab", { name: "Tiendas" })).toBeNull();
-    expect(screen.getByRole("tab", { name: "Abiertos" })).toBeTruthy();
-    cleanup();
-    render(<ToastProvider><VistaTienda codigo="D-170" /></ToastProvider>);
-    await waitFor(() => expect(screen.getByText("Gasto que se reporta")).toBeTruthy());
-    expect(screen.queryByRole("tab", { name: /Todos/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Más opciones/ })).toBeNull();
   });
 });

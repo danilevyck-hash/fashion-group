@@ -949,10 +949,6 @@ describe("barrido estático — una sola fuente de verdad", () => {
         .split("\n")
         .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
         .join("\n");
-    const inicio = sinComentarios(leer("src/app/marketing/components/InicioMarketing.tsx"));
-    expect(inicio).not.toMatch(/Cerrar las tres/);
-    expect(inicio).not.toMatch(/se cierran juntas/);
-    expect(inicio).not.toMatch(/cerrandoGrupo|hermanosDeGrupo/);
     const modal = sinComentarios(leer("src/app/marketing/components/CerrarPeriodoModal.tsx"));
     expect(modal).not.toMatch(/cerrar-grupo/);
     expect(modal).not.toMatch(/Cerrar las tres/);

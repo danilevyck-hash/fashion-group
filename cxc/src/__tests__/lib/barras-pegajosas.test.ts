@@ -79,7 +79,6 @@ const NO_SON_BARRAS_DE_PAGINA: { archivo: string; motivo: string }[] = [
   { archivo: "app/reclamos/components/ReclamoDetail.tsx", motivo: "thead de artículos y de liquidaciones" },
   // 22-sep-2026 · NOTA FECHADA — `ReportePorProyectoView.tsx` salió de esta
   // lista porque el archivo se retiró (pieza C del rediseño de Marketing).
-  { archivo: "app/marketing/components/ReportePorTiendaView.tsx", motivo: "thead del reporte" },
   { archivo: "app/productos/cargar/ReebokClient.tsx", motivo: "thead de la vista previa" },
   { archivo: "app/productos/cargar/HistorialView.tsx", motivo: "thead del historial" },
   { archivo: "app/productos/cargar/DepuradorClient.tsx", motivo: "thead de la vista previa" },
@@ -99,17 +98,13 @@ const NO_SON_BARRAS_DE_PAGINA: { archivo: string; motivo: string }[] = [
   // vista Anual se retiró con la pestaña.)
   { archivo: "components/catalogo/PedidoDetalleClient.tsx", motivo: "thead del detalle del pedido" },
   // Cabeceras y pies de MODAL — se pegan al panel del modal, no a la página.
-  { archivo: "app/marketing/components/HistorialImpulsadoraModal.tsx", motivo: "cabecera del modal" },
   { archivo: "app/marketing/components/RegistrarPagoModal.tsx", motivo: "cabecera del modal" },
-  { archivo: "app/marketing/components/NuevaImpulsadoraModal.tsx", motivo: "cabecera del modal" },
-  { archivo: "app/marketing/components/ProyectoOverlay.tsx", motivo: "cabecera del overlay del proyecto" },
   { archivo: "components/marketing/EntregaForm.tsx", motivo: "cabecera del modal de entrega" },
   // ⚠️ Dentro del overlay del proyecto, y por eso queda: su contenedor de
   // scroll es el panel del modal, no la página. Lo que SÍ queda pendiente de
   // decidir con Daniel es que ahí conviven dos `sticky top-0` en el mismo panel
   // (esta tira y la cabecera del overlay) — es otra pregunta, otro módulo, y no
   // es lo que Daniel reportó.
-  { archivo: "app/marketing/components/FacturasSection.tsx", motivo: "tira de borradores dentro del overlay" },
 ];
 
 /** Todos los `.tsx` de la app y de los componentes. */
