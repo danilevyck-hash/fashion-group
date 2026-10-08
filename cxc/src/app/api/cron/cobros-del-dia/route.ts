@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/cron/cobros-del-dia — el resumen de los cobros de hoy, por 📊
-// NEGOCIO. Aprobado por Daniel el 6-oct-2026.
+// GET /api/cron/cobros-del-dia — el resumen de los cobros de hoy, al chat de
+// ALERTAS (el privado de Daniel, `enviarNegocioPrivado`). Aprobado el 6-oct-2026;
+// Daniel, 7-oct-2026: «Los cobros de Telegram deben llegar a Alertas, no a Negocio.»
 //
 // 00:00 UTC = 7:00 p.m. de Panamá, 45 min después del último `sync-recibos`
 // del día (23:15 UTC). No toca Switch —lee solo Supabase—, así que la
@@ -18,7 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
-import { enviarNegocio } from "@/lib/alertas/canal";
+import { enviarNegocioPrivado } from "@/lib/alertas/canal";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { mensajeCobrosDelDia, type CobroDelDia } from "@/lib/cxc/cobros-del-dia";
@@ -97,7 +98,7 @@ export async function GET(req: NextRequest) {
 
     let enviado = false;
     if (mensaje) {
-      enviado = await enviarNegocio(mensaje);
+      enviado = await enviarNegocioPrivado(mensaje);
       if (!enviado) await logCronError("cobros_del_dia_telegram_failed", "Telegram no aceptó el mensaje", null, { telegram: false });
     }
     await recordCronHeartbeat(CRON_NAME);
