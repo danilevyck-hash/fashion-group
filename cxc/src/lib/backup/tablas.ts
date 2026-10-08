@@ -457,12 +457,14 @@ export function tablasQueObliganRespaldo(): string[] {
 //
 // El respaldo pagina de a 1.000 con `.order()`, y PostgREST sin un orden
 // determinista puede saltear filas entre página y página. El route ordena por
-// `id` salvo excepción declarada en su `ORDER_BY`.
+// la llave primaria REAL de cada tabla: `columnasDeOrden()`, que lee esta
+// lista y si la tabla no está, usa `id`.
 //
-// 🔴 Una tabla cuya llave primaria NO es `id` y que no esté en `ORDER_BY` deja
-// un respaldo INCOMPLETO que parece completo — nada lo dice. Por eso la llave
-// real de producción vive acá, medida, y un candado exige que el `ORDER_BY` del
-// route la cubra columna por columna.
+// 🔴 Hasta el 8-oct-2026 el route tenía su propia copia de esta lista
+// (`ORDER_BY`) y una tabla nueva sin `id` que nadie anotaba en las dos rompía
+// el respaldo: `mk_proveedor_alias` lo tumbó a 500 el 8-oct. Ahora hay una sola
+// lista, y `backup-nada-sin-copia.test.ts` (parte D) lee las migraciones y pone
+// el build ROJO si una tabla respaldada no tiene la columna por la que se ordena.
 //
 // Foto de producción del 5-sep-2026 (`pg_constraint`, contype='p'). Solo las
 // que NO son `id`: todas las demás tienen `id` y les alcanza el default.
@@ -486,6 +488,9 @@ export const PK_QUE_NO_ES_ID: Readonly<Record<string, readonly string[]>> = Obje
   fg_catalogo_publico_switch: ["empresa_key"],
   fg_user_switch_vendedor: ["user_id", "empresa_key"],
   login_attempts: ["ip"],
+  // 8-oct-2026: entró al respaldo el 7-oct pidiendo `id`, que no tiene → el
+  // respaldo de las 06:00 UTC del 8-oct salió con esta tabla afuera y 500.
+  mk_proveedor_alias: ["alias_normalizado"],
   pedidos_bodega_estado: ["empresa_key", "pedido_switch_id"],
   pedidos_lineas: ["empresa_key", "pedido_switch_id", "codigo_barra_id"],
   pedidos_linea_bulto: ["empresa_key", "pedido_switch_id", "codigo_barra_id", "bulto"],
@@ -496,7 +501,14 @@ export const PK_QUE_NO_ES_ID: Readonly<Record<string, readonly string[]>> = Obje
   switch_ingresos_mercancia: ["empresa_key", "n_interno", "linea"],
   switch_pedidos: ["empresa_key", "pedido_switch_id"],
   vendedores: ["empresa_key", "nombre"],
+  visitas_modulo: ["dia", "user_id", "modulo", "aparato"],
 });
+
+/** Las columnas por las que el respaldo ordena (y pagina) una tabla: su llave
+ *  primaria real. Fuente ÚNICA — el route la usa, el candado la verifica. */
+export function columnasDeOrden(tabla: string): readonly string[] {
+  return PK_QUE_NO_ES_ID[tabla] ?? ["id"];
+}
 
 /**
  * Tablas que una migración crea pero que NUNCA llegaron a producción (se
