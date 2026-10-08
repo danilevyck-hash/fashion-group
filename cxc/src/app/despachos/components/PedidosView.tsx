@@ -567,9 +567,9 @@ export default function PedidosView({
     // nadie abrió el detalle de este pedido todavía: se calla, no se inventa.
     const chipBultos = (
       <span className={`${base} border-gray-300 bg-white text-gray-700`}>
-        {p.bultos
-          ? `${p.bultos} ${p.bultos === 1 ? "bulto" : "bultos"}${p.piezas != null ? ` · ${textoUnidades(p.piezas)}` : ""}`
-          : "—"}
+        {[p.bultos ? `${p.bultos} ${p.bultos === 1 ? "bulto" : "bultos"}` : null, p.piezas != null ? textoUnidades(p.piezas) : null]
+          .filter(Boolean)
+          .join(" · ") || "—"}
       </span>
     );
     if (e === "preparado") {
@@ -602,9 +602,18 @@ export default function PedidosView({
         {ROTULO_ESTADO_FLUJO_SIMPLE.recibido}
       </span>
     );
-    if (!puedeRecibir) return chipRecibido;
+    // 🔴 Las unidades se ven en TODAS las pestañas (Daniel, 8-oct-2026: «lo quiero afuera»).
+    if (!puedeRecibir) {
+      return (
+        <div className={fila}>
+          {chipBultos}
+          {chipRecibido}
+        </div>
+      );
+    }
     return (
       <div className={fila}>
+        {chipBultos}
         {chipRecibido}
         {deshacer("preparado")}
       </div>

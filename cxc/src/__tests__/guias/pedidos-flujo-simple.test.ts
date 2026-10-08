@@ -306,7 +306,6 @@ describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
     const v = vista();
     expect(v).toContain('{puedeMarcar && deshacer("pendiente")}');
     expect(v).toContain('{deshacer("preparado")}');
-    expect(v).toContain("if (!puedeRecibir) return chipRecibido;");
     expect(v).toContain("onClick={() => setPorConfirmarSimple({ pedido: p, destino })}");
   });
 });
@@ -317,6 +316,12 @@ describe("🔴 10 · las unidades también en Pendientes (Daniel, 8-oct-2026)", 
     expect(v).toContain("const chipUnidades = p.piezas != null");
     expect(v).toContain("if (!puedeMarcar) return chipUnidades ||");
     expect(v).toMatch(/<div className=\{fila\}>\s*\{chipUnidades\}/);
+  });
+
+  it("Preparados y Recibidos también dicen las unidades, tengan o no bultos", () => {
+    const v = vista();
+    expect(v).toContain('p.piezas != null ? textoUnidades(p.piezas) : null]');
+    expect(v.match(/\{chipBultos\}\s*\{chipRecibido\}/g)?.length).toBe(2);
   });
 
   it("el sync de pedidos baja las líneas que faltan, para que haya unidades sin abrir el pedido", () => {
