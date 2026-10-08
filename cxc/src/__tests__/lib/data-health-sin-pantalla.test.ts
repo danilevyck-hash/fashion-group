@@ -169,7 +169,10 @@ describe("🔴 la medición no se tocó", () => {
     // ⚠️ 7-oct-2026: bajan a 87 — se retiró `sync-egresos-varios` (Daniel:
     // «Apaga gasto»; ver `docs/gastos-pausado.md`). Se fue de `vercel.json` Y
     // de `cron-telemetry.ts`, los dos.
-    expect(vercel.crons).toHaveLength(87);
+    // ⚠️ 8-oct-2026: suben a 93 — las facturas del día corren CADA HORA de 7 a. m.
+    // a 6 p. m. de Panamá (9 entradas nuevas) y se retiraron las 3 de solo
+    // american_classic de la jornada. Ver `cron-calendario.test.ts`.
+    expect(vercel.crons).toHaveLength(93);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

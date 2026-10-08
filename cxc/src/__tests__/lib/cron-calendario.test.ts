@@ -206,8 +206,9 @@ describe("ventas intradía — cobertura de empresas", () => {
 
   it("las entradas grandes cubren TODAS las empresas con facturas (7 B2B + ACS)", () => {
     const completas = ventas.filter((e) => e.empresas.length > 1);
-    // 11:50 = corrida temprana (06:50 Panamá) agregada el 26-jul-2026.
-    expect(completas.map((e) => e.hhmmUtc)).toEqual(["1150", "1500", "1900", "2300"]);
+    // 11:50 = corrida temprana (06:50 Panamá) agregada el 26-jul-2026; el resto,
+    // cada hora de oficina desde el 8-oct-2026 (ver el bloque de abajo).
+    expect(completas.map((e) => e.hhmmUtc).sort()).toEqual(FACTURAS_CADA_HORA_UTC);
     for (const e of completas) {
       expect([...e.empresas].sort()).toEqual([...empresasConFacturas()].sort());
     }
@@ -220,12 +221,12 @@ describe("ventas intradía — cobertura de empresas", () => {
     expect(b2b).toContain("joystep");
   });
 
-  it("ACS (american_classic) se refresca cada 2h entre 13:00 y 23:00 UTC", () => {
+  it("ACS (american_classic): las de cada hora + el cierre de las 00:15, nada más", () => {
     const acs = ventas
       .filter((e) => e.empresas.includes("american_classic"))
       .map((e) => e.hhmmUtc)
       .sort();
-    expect(acs).toEqual(["0015", "1150", "1300", "1500", "1700", "1900", "2100", "2300"]);
+    expect(acs).toEqual(["0015", ...FACTURAS_CADA_HORA_UTC]);
   });
 
   it("el sync de CIERRE de ACS (00:15) sigue en pie — el resumen de las 00:30 depende de él", () => {
@@ -271,12 +272,6 @@ describe("frescura — hueco MÁS LARGO entre dos refrescos consecutivos", () =>
     }
     expect(peorHueco("vistana", VENTAS)).toBeCloseTo(6.5, 5);
     expect(peorHueco("confecciones_boston", VENTAS)).toBeCloseTo(7.5, 5);
-    // Entre 15:00 y 23:00 UTC (10:00-18:00 Panamá, horario de oficina) el ritmo
-    // sigue siendo de 4h, y el que entra a las 8 a.m. (13:00 UTC) tiene el dato
-    // de las 11:50, o sea 1h10 de antigüedad en vez de 7h30.
-    expect(distanciaCircularMin("1500", "1900") / 60).toBe(4);
-    expect(distanciaCircularMin("1900", "2300") / 60).toBe(4);
-    expect(distanciaCircularMin("1150", "1300") / 60).toBeCloseTo(1 + 10 / 60, 5);
   });
 
   it("la corrida temprana respeta la separación con sus vecinos de Switch", () => {
@@ -288,11 +283,8 @@ describe("frescura — hueco MÁS LARGO entre dos refrescos consecutivos", () =>
     expect(distanciaCircularMin("1200", "1210")).toBeLessThan(SEPARACION_MINIMA_MIN);
   });
 
-  it("ventas ACS: de 6h30 a ≤6h15 (2h entre las 13:00 y las 23:00 UTC)", () => {
+  it("ventas ACS: peor hueco 6h15, de noche (00:15 → 06:30 UTC)", () => {
     expect(peorHueco("american_classic", VENTAS)).toBeCloseTo(6.25, 5);
-    for (const [a, b] of [["1300", "1500"], ["1500", "1700"], ["1700", "1900"], ["1900", "2100"], ["2100", "2300"]]) {
-      expect(distanciaCircularMin(a, b) / 60).toBe(2);
-    }
   });
 
   it("pagos (recibos): de 12h20 a 8h35", () => {
@@ -395,6 +387,97 @@ describe("EXTRA_ENTRY_HOURS_UTC — espejo derivado de vercel.json", () => {
     // no hay motivo para mover ese volumen mientras la gente trabaja.
     for (const h of horasDe(PATH_DE["backup-switch"])) {
       expect(h >= 13 && h < 23, `backup?grupo=switch a las ${h} UTC cae en horario de oficina`).toBe(false);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8-oct-2026 · Daniel: «cada hora en horario de oficina, de 7 a. m. a 6 p. m.».
+// Antes: 06:50, 10:00, 14:00 y 18:00 de Panamá para las 8 empresas (una factura
+// de las 10:30 no aparecía hasta las 14:00).
+//
+//   Panamá  UTC    vecinos más cercanos que comparten empresa (hora de Panamá)
+//   06:50   11:50  acs-fidelizacion 06:30 (20) · facturas 07:30 (40)
+//   07:30   12:30  facturas 06:50 (40) · sync-pedidos 08:10 (40)
+//   08:30   13:30  sync-pedidos 08:10 (20) · reconciliación 09:00 (30)
+//   09:15   14:15  reconciliación 09:00 (15; techo 740 s) · tommy 09:30 (15)
+//   10:00   15:00  joybees 09:45 (15) · sync-recibos 10:15 (15)
+//   11:45   16:45  acs-fidelizacion 11:30 (15) · tommy 12:00 (15)
+//   12:30   17:30  joybees 12:15 (15) · reconciliación 13:00 (30)
+//   13:40   18:40  sync-pedidos 13:20 (20) · facturas 14:00 (20)
+//   14:00   19:00  facturas 13:40 (20) · sync-recibos 14:15 (15)
+//   15:20   20:20  joybees 14:55 (25) · sync-pedidos 15:45 (25)
+//   16:40   21:40  estadocuenta 16:20 (20) · tommy 16:55 (15)
+//   17:30   22:30  joybees 17:10 (20) · facturas 18:00 (30)
+//   18:00   23:00  facturas 17:30 (30) · sync-recibos 18:15 (15)
+//
+// El hueco 10:00 → 11:45 no se puede partir: recibos 10:15, pedidos 10:40,
+// estadocuenta 11:00-11:10 y fidelización 11:30 ocupan cada minuto con ≥15.
+const FACTURAS_CADA_HORA_UTC = [
+  "1150", "1230", "1330", "1415", "1500", "1645", "1730",
+  "1840", "1900", "2020", "2140", "2230", "2300",
+];
+const FACTURAS_CADA_HORA_PANAMA = [
+  "06:50", "07:30", "08:30", "09:15", "10:00", "11:45", "12:30",
+  "13:40", "14:00", "15:20", "16:40", "17:30", "18:00",
+];
+
+describe("facturas del día cada hora de oficina (7 a. m. - 6 p. m. de Panamá)", () => {
+  const PANAMA_UTC_OFFSET_MIN = -5 * 60; // sin horario de verano
+  const aPanama = (hhmm: string) => {
+    const m = (hhmmAMinutos(hhmm) + PANAMA_UTC_OFFSET_MIN + 24 * 60) % (24 * 60);
+    return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  };
+  const deCadaHora = SWITCH_CRON_ENTRADAS.filter(
+    (e) => e.cron === "switch-sync facturas" && e.empresas.length > 1,
+  );
+
+  it("la tabla en hora de Panamá es exactamente la acordada", () => {
+    expect(deCadaHora.map((e) => aPanama(e.hhmmUtc)).sort()).toEqual(FACTURAS_CADA_HORA_PANAMA);
+  });
+
+  it("hay al menos una corrida en cada hora de 7 a 18 de Panamá", () => {
+    const horas = new Set(deCadaHora.map((e) => Number(aPanama(e.hhmmUtc).slice(0, 2))));
+    for (let h = 7; h <= 18; h++) {
+      expect(horas.has(h), `sin corrida de facturas a las ${h} de Panamá`).toBe(true);
+    }
+  });
+
+  it("ningún hueco de oficina pasa de 1h45 (el 10:00 → 11:45 que no se puede partir)", () => {
+    const min = deCadaHora.map((e) => hhmmAMinutos(e.hhmmUtc)).sort((a, b) => a - b);
+    const huecos = min.slice(1).map((m, i) => m - min[i]);
+    expect(Math.max(...huecos)).toBe(105);
+    expect(huecos.filter((h) => h > 80)).toEqual([105]);
+  });
+
+  it("🔴 ninguna empresa queda con dos llamadas a Switch a menos de 15 min de una de cada hora", () => {
+    const choques: string[] = [];
+    for (const f of deCadaHora) {
+      for (const otra of SWITCH_CRON_ENTRADAS) {
+        if (otra === f) continue;
+        const comparten = f.empresas.filter((e) => otra.empresas.includes(e));
+        if (comparten.length === 0) continue;
+        const gap = distanciaCircularMin(f.hhmmUtc, otra.hhmmUtc);
+        if (gap < SEPARACION_MINIMA_MIN)
+          choques.push(`${aPanama(f.hhmmUtc)} vs ${otra.cron} ${aPanama(otra.hhmmUtc)} (${gap} min)`);
+      }
+    }
+    expect(choques).toEqual([]);
+  });
+
+  it("cada corrida nueva es tipo=facturas de las 8 empresas, con su slot y en vercel.json", () => {
+    for (const hhmm of FACTURAS_CADA_HORA_UTC) {
+      const v = VERCEL.crons.filter((c) => c.path.includes(`slot=facturas-${hhmm}`));
+      expect(v.length, hhmm).toBe(1);
+      expect(v[0].path).toContain("tipo=facturas&empresas=");
+      const empresas = new URL(v[0].path, "http://x").searchParams.get("empresas")!.split(",");
+      expect(empresas.sort()).toEqual([...empresasConFacturas()].sort());
+    }
+  });
+
+  it("las de solo american_classic de la jornada se retiraron (las cubren las de cada hora)", () => {
+    for (const hhmm of ["1300", "1700", "2100"]) {
+      expect(esSlotRetirado(slotHeartbeatName(`facturas-${hhmm}`)), hhmm).toBe(true);
     }
   });
 });

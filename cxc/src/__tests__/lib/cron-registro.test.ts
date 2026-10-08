@@ -290,27 +290,37 @@ describe("D. ninguna fila de cron_heartbeats sobrevive a su cron", () => {
   // tiene migración de limpieza (queda pendiente, igual que `sync-mayor` y
   // `cleanup-packing-lists` la tuvieron suya): la fila sigue en la base, pero
   // `esCronRetirado` ya impide que el watchdog la reporte como caída.
+  //
+  // 8-oct-2026 · TERCERA NOTA FECHADA — las facturas del día pasan a correr
+  // CADA HORA de 7 a. m. a 6 p. m. de Panamá, y las tres entradas de solo
+  // american_classic de la jornada (`facturas-1300/1700/2100`) se retiraron
+  // porque las cubren las nuevas. Sus 9 filas (slot + #recuperado + #visto) se
+  // vuelven huérfanas; `esSlotRetirado` impide que el watchdog las reporte.
+  // Sin migración de limpieza todavía (mismo pendiente que sync-egresos-varios).
+  const SLOTS_ACS_RETIRADOS_8_OCT = ["1300", "1700", "2100"].flatMap((h) => [
+    slotHeartbeatName(`facturas-${h}`),
+    slotRecuperadoName(`facturas-${h}`),
+    slotVistoName(`facturas-${h}`),
+  ]);
+  const conRetiradosAcs = (xs: string[]) => [...xs, ...SLOTS_ACS_RETIRADOS_8_OCT].sort();
   it("sobre la foto del 3-sep-2026 los huérfanos de hoy son sync-mayor, cleanup-packing-lists y sync-egresos-varios", () => {
-    expect(heartbeatsHuerfanos(FOTO_3_SEP_2026, PROGRAMADOS)).toEqual([
-      "cleanup-packing-lists",
-      "sync-egresos-varios",
-      "sync-mayor",
-    ]);
+    expect(heartbeatsHuerfanos(FOTO_3_SEP_2026, PROGRAMADOS)).toEqual(
+      conRetiradosAcs(["cleanup-packing-lists", "sync-egresos-varios", "sync-mayor"]),
+    );
   });
 
   it("después de las migraciones 20260914120000 y 20261110120000 solo queda sync-egresos-varios (sin migración todavía)", () => {
     const barridos = FOTO_3_SEP_2026.filter(
       (n) => n !== "sync-mayor" && n !== "cleanup-packing-lists",
     );
-    expect(heartbeatsHuerfanos(barridos, PROGRAMADOS)).toEqual(["sync-egresos-varios"]);
+    expect(heartbeatsHuerfanos(barridos, PROGRAMADOS)).toEqual(conRetiradosAcs(["sync-egresos-varios"]));
   });
 
   it("🔴 CONTROL · barrer solo uno de los tres deja a los otros dos denunciados", () => {
     const soloMayor = FOTO_3_SEP_2026.filter((n) => n !== "sync-mayor");
-    expect(heartbeatsHuerfanos(soloMayor, PROGRAMADOS)).toEqual([
-      "cleanup-packing-lists",
-      "sync-egresos-varios",
-    ]);
+    expect(heartbeatsHuerfanos(soloMayor, PROGRAMADOS)).toEqual(
+      conRetiradosAcs(["cleanup-packing-lists", "sync-egresos-varios"]),
+    );
   });
 
   it("CONTROL: cada cron de vercel.json tiene derecho a su fila", () => {
@@ -365,7 +375,9 @@ describe("D. ninguna fila de cron_heartbeats sobrevive a su cron", () => {
     // usó el botón todavía. Se mide sobre lo que SÍ está en la foto.)
     const excepciones = new Set<string>([...HEARTBEATS_NO_CRON, ...HEARTBEATS_EXTERNOS]);
     const esperadas = FOTO_3_SEP_2026.filter(
-      (n) => excepciones.has(n) || n.startsWith("switch-sync:"),
+      (n) =>
+        excepciones.has(n) ||
+        (n.startsWith("switch-sync:") && !SLOTS_ACS_RETIRADOS_8_OCT.includes(n)),
     ).sort();
     expect(sobreviven).toEqual(esperadas);
   });
