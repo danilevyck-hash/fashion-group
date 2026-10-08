@@ -107,6 +107,54 @@ vercel inspect <url> --logs         # ¿en qué paso se quedó?
 Puede ser el trabajo de otro agente. Se reporta y decide Daniel. La integración
 automática ya está prendida: cuando la cola drene, las solicitudes entran solas.
 
+### 5.1 Por qué se colgaba, y qué se hizo (7-oct-2026)
+
+🩸 **El síntoma.** Ese día 6 vistas previas se quedaron en
+`Linting and checking validity of types` **sin una línea de salida** hasta el
+límite de 45 min (`BUILD_EXCEEDED_MAXIMUM_TIME`). Otras 4 vistas previas y
+2 construcciones de producción de `main` se cancelaron colgadas en ese mismo
+paso, y 2 más murieron por memoria (`SIGKILL`). Lo normal de ese paso es
+1 a 1,5 min. No
+dependía del código: el mismo commit (`6f6ddf0`) pasó en producción y se colgó
+como vista previa.
+
+**La causa más probable:** memoria. La máquina de build es la estándar
+(4 núcleos, 8 GB). `next build` corre el chequeo de tipos en un proceso aparte
+que necesita ~3,3 GB por sí solo, mientras el proceso principal sigue con la
+memoria de webpack. Cuando el sistema mata ese proceso, Next se queda
+esperándolo para siempre. Cada vez pasaba más seguido, a medida que crece el
+código.
+
+**Lo que se hizo:** el chequeo de tipos **salió del build de Vercel y pasó a
+«pruebas»** (#670).
+
+| Dónde | Qué |
+|---|---|
+| `cxc/next.config.js` | `typescript: { ignoreBuildErrors: true }`: Vercel ya no chequea tipos. |
+| `cxc/tsconfig.typecheck.json` | Extiende `tsconfig.json` y deja fuera `__tests__`, `__mocks__`, `*.test.*` y `*.spec.*`, **lo mismo que filtraba `next build`** (`regexIgnoredFile` de Next 14.2). Las pruebas traen ~330 errores de tipos viejos (mocks de `fetch`, `@ts-expect-error` sin uso) que el build nunca miró. |
+| `cxc/package.json` | `npm run typecheck` = `tsc --noEmit -p tsconfig.typecheck.json` (~12 s, ~2,3 GB). |
+| `.github/workflows/pruebas.yml` | Paso «Chequeo de tipos», antes de las pruebas. |
+
+**No se perdió ningún control.** «pruebas» es chequeo obligatorio de `main`:
+un error de tipos no entra. Se comprobó metiendo a propósito
+`const x: number = "texto"` en `src/lib/pdf-tabla.ts`. «pruebas» se puso en
+rojo (`error TS2322`, run 37701968001) y después se sacó.
+
+**Lo que cambió en el build:** se ahorra el paso entero de tipos, que eran
+56 a 95 s cuando terminaba y 45 min cuando se colgaba. El build de la vista
+previa de #670 tardó 2 min y el chequeo de tipos ya no aparece en el log.
+
+⚠️ **Lo único que `tsc` no ve:** `.next/types/**`, los tipos que Next genera
+en el build para comprobar los exports de `page.tsx` y `layout.tsx`. Ahí solo
+caen errores como exportar de una página algo que Next no permite. Si alguna
+vez hace falta, se cubre corriendo `next build` en «pruebas».
+
+🔑 **Para una rama vieja** (creada antes de #670): su vista previa todavía
+chequea tipos y se puede colgar. Se arregla con `gh pr update-branch <n>`, que
+le trae `main` sin tocar su código. Su vista previa vieja queda obsoleta y se
+puede cancelar.
+
+
 ## 6. Por qué conviene, además de ser obligatorio
 
 - Lo roto **se queda afuera de `main`**, no adentro esperando que alguien mire.
