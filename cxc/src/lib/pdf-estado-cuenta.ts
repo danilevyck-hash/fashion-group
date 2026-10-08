@@ -43,8 +43,10 @@ import {
   dibujarComoPagar,
   dibujarRecibidoConforme,
   dibujarPieDeLaCasa,
+  dibujarResumenGrupo,
 } from "@/lib/cxc/pdf-estado-cuenta-hoja";
 import { casaDeEmpresas } from "@/lib/cxc/casa-del-papel";
+import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
 /** Y de arranque de un bloque, saltando de página si no cabe entero. */
 export function yParaTotal(doc: jsPDF, y: number, alto = 9): number {
@@ -73,8 +75,16 @@ function dibujarCliente(doc: jsPDF, data: EstadoCuenta, nombreDeLaPantalla: stri
   const ficha = data.cliente ?? FICHA_CLIENTE_VACIA;
   let total = 0;
 
+  // 🔴 CON VARIAS EMPRESAS, ABRE UNA HOJA DE GRUPO (7-oct-2026, propuesta):
+  // el total arriba y el desglose por empresa, antes del detalle de cada una.
+  // Con una sola empresa no se dibuja — ver `dibujarResumenGrupo`. Interruptor
+  // `ESTADO_CUENTA_UN_BOTON_2026_10`: apagado, el papel sigue siendo una hoja
+  // por empresa y nada más, como siempre.
+  const esGrupo = ESTADO_CUENTA_UN_BOTON_2026_10 && data.empresas.length > 1;
+  if (esGrupo) dibujarResumenGrupo(doc, nombre, data.codigo, data.empresas, data.total);
+
   data.empresas.forEach((emp, i) => {
-    if (i > 0) doc.addPage();
+    if (i > 0 || esGrupo) doc.addPage();
     let y = dibujarCabeza(doc, emp.empresa_key, emp.empresa_nombre);
     y = dibujarFichaCliente(doc, y, nombre, data.codigo, ficha);
     const docs = dibujarDocumentos(doc, y, emp);
@@ -98,7 +108,27 @@ function dibujarCliente(doc: jsPDF, data: EstadoCuenta, nombreDeLaPantalla: stri
  * defecto haría que el día que alguien lo olvide, un cliente de Confecciones
  * Boston reciba un estado de cuenta con el logo de Fashion Group.
  */
-export function buildEstadoCuentaPDF(data: EstadoCuenta, nombre: string): { doc: jsPDF; filename: string } {
+export interface OpcionesEstadoCuentaPDF {
+  /**
+   * 🔴 SOLO CUANDO SE ELIGIÓ UNA EMPRESA A PROPÓSITO (7-oct-2026), con el
+   * selector del grupo: el nombre del archivo agrega la empresa («Estado de
+   * cuenta - Novedades El Dollar - Fashion Wear - 7 oct 2026.pdf»), para que
+   * no se confunda con el del grupo cuando el cliente debe en varias.
+   *
+   * ⚠️ NO se infiere de `data.empresas.length === 1`: un cliente que debe
+   * NATURALMENTE en una sola empresa (el caso de siempre, medido en
+   * `cxc-nombre-de-archivo-del-pdf.test.ts`) sigue con el nombre limpio, sin
+   * la empresa — ahí no hay nada que distinguir del «grupo», porque para ese
+   * cliente nunca existió un grupo.
+   */
+  unaEmpresaElegida?: boolean;
+}
+
+export function buildEstadoCuentaPDF(
+  data: EstadoCuenta,
+  nombre: string,
+  opciones: OpcionesEstadoCuentaPDF = {},
+): { doc: jsPDF; filename: string } {
   const doc = new jsPDF({ unit: "mm", format: "letter" });
   dibujarCliente(doc, data, nombre);
   dibujarPieDeLaCasa(doc, casaDeEmpresas(data.empresas.map((e) => e.empresa_key)));
@@ -109,7 +139,10 @@ export function buildEstadoCuentaPDF(data: EstadoCuenta, nombre: string): { doc:
   // quien lo recibe; usa el mismo nombre que ya se imprime en el papel
   // (`nombreDelPapel`) y la fecha legible, sanitizados para no romper la
   // descarga en Mac ni en Windows.
-  const filename = `${nombreArchivoEstadoCuenta(nombreDelPapel(data.clienteNombre, nombre), iso)}.pdf`;
+  const sufijoEmpresa = ESTADO_CUENTA_UN_BOTON_2026_10 && opciones.unaEmpresaElegida && data.empresas.length === 1
+    ? ` - ${data.empresas[0].empresa_nombre}`
+    : "";
+  const filename = `${nombreArchivoEstadoCuenta(`${nombreDelPapel(data.clienteNombre, nombre)}${sufijoEmpresa}`, iso)}.pdf`;
   return { doc, filename };
 }
 

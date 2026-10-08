@@ -34,5 +34,10 @@ jobs:
           cache: npm
           cache-dependency-path: cxc/package-lock.json
       - run: npm ci
+      # Lo que antes revisaba el build de Vercel: los tipos del código de la
+      # aplicación (sin las pruebas, igual que `next build`). Ver
+      # cxc/docs/seguridad/publicar-por-solicitud-de-cambio.md
+      - name: Chequeo de tipos
+        run: npm run typecheck
       - name: Las 16.000 pruebas
         run: npm test

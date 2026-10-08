@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "migrar": "NODE_OPTIONS=--no-deprecation tsx scripts/migrar.ts"
   },
   "dependencies": {

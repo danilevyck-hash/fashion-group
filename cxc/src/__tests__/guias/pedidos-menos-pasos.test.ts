@@ -201,13 +201,18 @@ describe("🔴 4 · el detalle se congela al verificar", () => {
 describe("🔴 5 · el vendedor solo mira", () => {
   it("la lista de quién marca es la MISMA del servidor", () => {
     expect(puedeMarcarPedidos("vendedor")).toBe(false);
-    for (const r of ROLES_PREPARADO) expect(puedeMarcarPedidos(r)).toBe(true);
     expect(puedeMarcarPedidos("contabilidad")).toBe(false);
     expect(puedeMarcarPedidos(null)).toBe(false);
+    // 🔴 7-oct-2026, SEGUNDA VUELTA (Daniel: «¿por qué Ángela puede preparar un
+    // pedido en su sistema?»): con el flujo simplificado prendido —el que hoy
+    // manda en producción— `puedeMarcarPedidos` ya NO sigue `ROLES_PREPARADO`
+    // (la lista de ESTE flujo de bultos, donde la secretaria SÍ prepara): mira
+    // `ROLES_PREPARA_FLUJO_SIMPLE` primero, que es solo admin+bodega.
+    expect(puedeMarcarPedidos("bodega")).toBe(true);
+    expect(puedeMarcarPedidos("admin")).toBe(true);
+    expect(puedeMarcarPedidos("secretaria")).toBe(false);
     // Derivada, no escrita a mano: no puede haber dos respuestas.
-    expect(leer("lib/guias/pedidos-bodega.ts")).toContain(
-      "const lista = PEDIDOS_BULTOS_2026_10 ? ROLES_PREPARADO : PEDIDOS_BODEGA_ROLES;",
-    );
+    expect(leer("lib/guias/pedidos-bodega.ts")).toContain("? ROLES_PREPARA_FLUJO_SIMPLE");
   });
 
   it("y sigue VIENDO la pestaña: solo mira, no se le esconde", () => {
