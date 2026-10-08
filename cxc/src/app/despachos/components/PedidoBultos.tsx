@@ -51,6 +51,8 @@ import {
   MIN_BULTO,
   descripcionCompleta,
   resumenAsignacion,
+  textoUnidades,
+  totalesDelPedido,
   validarBulto,
   type LineaPedido,
 } from "@/lib/guias/pedidos-bultos";
@@ -135,6 +137,10 @@ export default function PedidoBultos({
   }, [clave]);
 
   const resumen = useMemo(() => (lineas ? resumenAsignacion(lineas) : ""), [lineas]);
+  // 🔴 LAS PIEZAS DEL PEDIDO (7-oct-2026, Daniel: «¿puedes poner la cantidad
+  // de pieza?»): la suma de `cantidad` de sus líneas, EN TEXTO «unidades»
+  // (`docs/nombres-erp.md`). Las líneas en 0 no inflan nada, ya suman 0.
+  const piezas = useMemo(() => (lineas && lineas.length > 0 ? textoUnidades(totalesDelPedido(lineas).unidades) : null), [lineas]);
   // 🔴 Las columnas de plata se dibujan solo si el SERVIDOR las mandó. A bodega
   // no le viajan, así que acá no hay nada que esconder: no están.
   const conPlata = !!lineas?.some((l) => l.precio != null);
@@ -322,7 +328,18 @@ export default function PedidoBultos({
           <p className="text-base font-semibold text-gray-900">
             Pedido {pedido.secuencial} · {pedido.cliente_nombre}
           </p>
-          {!ocultarBulto && resumen && <p className="text-xs text-gray-500">{resumen}</p>}
+          {/* Con bultos por línea, el resumen ya cuenta artículos y bultos:
+              las piezas se agregan AL FINAL de esa misma línea. En el flujo
+              simplificado (`ocultarBulto`) no hay resumen de bultos —bodega
+              anota un número aparte, desde la lista—, así que las piezas
+              salen solas. */}
+          {!ocultarBulto && resumen && (
+            <p className="text-xs text-gray-500">
+              {resumen}
+              {piezas ? ` · ${piezas}` : ""}
+            </p>
+          )}
+          {ocultarBulto && piezas && <p className="text-xs text-gray-500">{piezas}</p>}
         </div>
         {/* 🔴 UN SOLO BOTÓN «Imprimir» (Daniel, 6-oct-2026): al tocarlo
             aparecen las dos formas. Antes estaban las dos a la vista y pesaban
