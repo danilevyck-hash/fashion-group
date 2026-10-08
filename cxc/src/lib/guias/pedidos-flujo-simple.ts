@@ -185,6 +185,52 @@ export function puedeMoverFlujoSimple(
   return { ok: true };
 }
 
+// ─── Lo que se escribe en la fila al dar (o deshacer) un paso ───────────────
+
+export interface ColumnasDelPaso {
+  estado: EstadoFlujoSimple;
+  bultos?: number | null;
+  preparado_por?: string | null;
+  preparado_en?: string | null;
+  recibido_por?: string | null;
+  recibido_en?: string | null;
+}
+
+/**
+ * 🔴 DESHACER UN PASO (Daniel, 8-oct-2026: «¿cómo se deshace si se pasó de un
+ * paso a otro por error?»). Una sola función para avanzar y retroceder; la
+ * usan el PATCH de la pantalla y cualquier corrección hecha a mano, para que
+ * las dos escriban exactamente lo mismo.
+ *   · Avanzar firma SU columna (y Preparado guarda los bultos).
+ *   · Volver a Preparado borra SOLO la firma de Recibido: la de bodega queda.
+ *   · Volver a Pendiente deja la fila como nueva —sin bultos ni firmas—, porque
+ *     al prepararlo de nuevo se anota otra vez el número. La firma de quien lo
+ *     había marcado NO se pierde: queda en el registro de actividad (`antes`).
+ * Sin validar permisos: eso es `puedeMoverFlujoSimple`, antes de llamar aquí.
+ */
+export function columnasDelPaso(
+  desde: EstadoFlujoSimple,
+  hasta: EstadoFlujoSimple,
+  quien: string,
+  ahora: string,
+  bultos?: number | null,
+): ColumnasDelPaso {
+  if (hasta === "pendiente") {
+    return { estado: hasta, bultos: null, preparado_por: null, preparado_en: null, recibido_por: null, recibido_en: null };
+  }
+  if (hasta === "preparado") {
+    return desde === "recibido"
+      ? { estado: hasta, recibido_por: null, recibido_en: null }
+      : { estado: hasta, bultos: bultos ?? null, preparado_por: quien, preparado_en: ahora };
+  }
+  return { estado: hasta, recibido_por: quien, recibido_en: ahora };
+}
+
+/** ¿Este cambio es deshacer un paso (ir hacia atrás)? */
+export function esDeshacerFlujoSimple(desde: EstadoFlujoSimple, hasta: EstadoFlujoSimple): boolean {
+  return estadoAnteriorFlujoSimple(desde) === hasta;
+}
+
 // ─── Cuántos bultos: UN número por pedido ───────────────────────────────────
 
 /** El número que anota bodega al preparar el pedido. Entero de 1 a 9999. */

@@ -57,6 +57,8 @@ import {
   diasEnPreparado,
   preparadoViejo,
   lineaPreparadoHaceDias,
+  columnasDelPaso,
+  esDeshacerFlujoSimple,
 } from "@/lib/guias/pedidos-flujo-simple";
 
 const leer = (f: string) => fs.readFileSync(path.resolve(__dirname, "../..", f), "utf8");
@@ -246,5 +248,78 @@ describe("🔴 8 · el servidor tiene su propio PATCH, sin crear envío de Etiqu
 
   it("el flujo simplificado REEMPLAZA al de bulto-por-línea si los dos están prendidos", () => {
     expect(rutaLista()).toContain("const BULTOS_ACTIVO = PEDIDOS_BULTOS_2026_10 && !PEDIDOS_FLUJO_SIMPLE_2026_10");
+  });
+});
+
+describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
+  const ahora = "2026-10-08T15:00:00.000Z";
+  const bodega = { role: "bodega", userName: "jorman" };
+  const secretaria = { role: "secretaria", userName: "Angela" };
+  const admin = { role: "admin", userName: "daniel" };
+  const mover = (desde: "pendiente" | "preparado" | "recibido", hasta: "pendiente" | "preparado" | "recibido", q: typeof bodega) =>
+    puedeMoverFlujoSimple({ desde, hasta, empresa_key: "vistana" }, q).ok;
+
+  it("Preparado → Pendiente: lo deshace bodega o admin, nunca la secretaria", () => {
+    expect(mover("preparado", "pendiente", bodega)).toBe(true);
+    expect(mover("preparado", "pendiente", admin)).toBe(true);
+    expect(mover("preparado", "pendiente", secretaria)).toBe(false);
+  });
+
+  it("Recibido → Preparado: lo deshace la secretaria o admin, nunca bodega", () => {
+    expect(mover("recibido", "preparado", secretaria)).toBe(true);
+    expect(mover("recibido", "preparado", admin)).toBe(true);
+    expect(mover("recibido", "preparado", bodega)).toBe(false);
+  });
+
+  it("volver a Pendiente deja la fila sin bultos ni firmas (🩸 antes firmaba «recibido_por»)", () => {
+    expect(columnasDelPaso("preparado", "pendiente", "jorman", ahora)).toEqual({
+      estado: "pendiente", bultos: null, preparado_por: null, preparado_en: null, recibido_por: null, recibido_en: null,
+    });
+  });
+
+  it("volver a Preparado borra SOLO la firma de Recibido: la de bodega y los bultos quedan", () => {
+    const c = columnasDelPaso("recibido", "preparado", "Angela", ahora);
+    expect(c).toEqual({ estado: "preparado", recibido_por: null, recibido_en: null });
+    expect(c).not.toHaveProperty("preparado_por");
+    expect(c).not.toHaveProperty("bultos");
+  });
+
+  it("avanzar firma su columna", () => {
+    expect(columnasDelPaso("pendiente", "preparado", "jorman", ahora, 3)).toEqual({ estado: "preparado", bultos: 3, preparado_por: "jorman", preparado_en: ahora });
+    expect(columnasDelPaso("preparado", "recibido", "Angela", ahora)).toEqual({ estado: "recibido", recibido_por: "Angela", recibido_en: ahora });
+  });
+
+  it("esDeshacerFlujoSimple solo es verdad hacia atrás", () => {
+    expect(esDeshacerFlujoSimple("preparado", "pendiente")).toBe(true);
+    expect(esDeshacerFlujoSimple("recibido", "preparado")).toBe(true);
+    expect(esDeshacerFlujoSimple("pendiente", "preparado")).toBe(false);
+  });
+
+  it("el PATCH escribe con columnasDelPaso y deja rastro en el registro de actividad", () => {
+    const r = rutaLista();
+    expect(r).toContain("columnasDelPaso(desde, estado, quienFirma, ahora, bultosNuevos)");
+    expect(r).toContain('"deshacer_paso"');
+    expect(r).toContain("antes: previo");
+  });
+
+  it("la fila ofrece «Volver a Pendiente» a bodega y «Volver a Preparado» a la secretaria, con confirmación", () => {
+    const v = vista();
+    expect(v).toContain('{puedeMarcar && deshacer("pendiente")}');
+    expect(v).toContain('{deshacer("preparado")}');
+    expect(v).toContain("if (!puedeRecibir) return chipRecibido;");
+    expect(v).toContain("onClick={() => setPorConfirmarSimple({ pedido: p, destino })}");
+  });
+});
+
+describe("🔴 10 · las unidades también en Pendientes (Daniel, 8-oct-2026)", () => {
+  it("la fila pendiente muestra las unidades, también a quien solo mira", () => {
+    const v = vista();
+    expect(v).toContain("const chipUnidades = p.piezas != null");
+    expect(v).toContain("if (!puedeMarcar) return chipUnidades ||");
+    expect(v).toMatch(/<div className=\{fila\}>\s*\{chipUnidades\}/);
+  });
+
+  it("el sync de pedidos baja las líneas que faltan, para que haya unidades sin abrir el pedido", () => {
+    expect(leer("lib/switch-api/sync-pedidos.ts")).toContain("await bajarLineasQueFaltan(empresaKey, filas.map((f) => f.pedido_switch_id))");
   });
 });

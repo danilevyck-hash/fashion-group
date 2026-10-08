@@ -182,6 +182,44 @@ export async function bajarLineas(empresaKey: string, pedidoId: number): Promise
   return filas.length;
 }
 
+/**
+ * 🔴 LAS UNIDADES DE CADA PEDIDO, SIN TENER QUE ABRIRLO (Daniel, 8-oct-2026:
+ * en «Pendientes» no salía la cantidad). Antes las líneas solo se bajaban al
+ * abrir el detalle, así que un pedido que nadie abrió decía «—». Lo llama el
+ * sync de pedidos (cron y «Actualizar»), que ya tiene abierta la sesión de
+ * Switch de esa empresa: baja las líneas de los pedidos que no las tienen o
+ * que pasaron las `HORAS_DETALLE_FRESCO`. Falla ABIERTA: un pedido que no se
+ * pudo bajar no frena a los demás ni al sync. Devuelve cuántos bajó.
+ */
+export async function bajarLineasQueFaltan(empresaKey: string, pedidoIds: readonly number[], ahora = Date.now()): Promise<number> {
+  if (pedidoIds.length === 0) return 0;
+  const { data, error } = await supabaseServer
+    .from("pedidos_lineas")
+    .select("pedido_switch_id, synced_at")
+    .eq("empresa_key", empresaKey)
+    .in("pedido_switch_id", [...pedidoIds])
+    .limit(50000);
+  if (error) return 0;
+  const bajado = new Map<number, string>();
+  for (const f of data ?? []) {
+    const id = Number(f.pedido_switch_id);
+    const previo = bajado.get(id);
+    if (!previo || f.synced_at > previo) bajado.set(id, f.synced_at);
+  }
+  let n = 0;
+  for (const id of pedidoIds) {
+    const b = bajado.get(id);
+    if (b && ahora - Date.parse(b) <= HORAS_DETALLE_FRESCO * 3_600_000) continue;
+    try {
+      await bajarLineas(empresaKey, id);
+      n++;
+    } catch {
+      /* falla abierta: la fila sigue diciendo «—» */
+    }
+  }
+  return n;
+}
+
 // ─── Poner y quitar del bulto ────────────────────────────────────────────────
 
 /**

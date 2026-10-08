@@ -16,6 +16,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fechaSwitchAIso, pedidoEntra } from "@/lib/guias/pedidos-bodega";
+import { bajarLineasQueFaltan } from "@/lib/guias/pedido-detalle-server";
 
 const PAGINA = 50;
 const MAX_PAGINAS = 200;
@@ -107,6 +108,10 @@ async function syncEmpresa(empresaKey: string, fichas: Set<string>, triggeredBy:
       const { error } = await supabaseServer.from("switch_pedidos").upsert(filas, { onConflict: "empresa_key,pedido_switch_id" });
       if (error) throw new Error(`upsert switch_pedidos: ${error.message}`);
     }
+
+    // Las líneas de cada pedido, para que la lista diga sus unidades sin
+    // tener que abrirlo (8-oct-2026). Misma sesión de Switch; falla abierta.
+    await bajarLineasQueFaltan(empresaKey, filas.map((f) => f.pedido_switch_id));
 
     // Lo que ya no está Activo (facturado) se va. Solo con la lista completa.
     let borrados = 0;

@@ -37,8 +37,11 @@ import {
   estadoFlujoSimpleLeido,
   puedeMoverFlujoSimple,
   validarCantidadBultos,
+  columnasDelPaso,
+  esDeshacerFlujoSimple,
   type EstadoFlujoSimple,
 } from "@/lib/guias/pedidos-flujo-simple";
+import { logActivity } from "@/lib/log-activity";
 import {
   crearEnvioDelPedido,
   deshacerEnvioDelPedido,
@@ -273,36 +276,31 @@ async function patchFlujoSimple(
   }
 
   const ahora = new Date().toISOString();
-  // Cada paso firma SU columna; retroceder a «Preparado» borra SOLO la firma
-  // de Recibido (la de Preparado, de bodega, se conserva).
-  const firma: { preparado_por?: string | null; preparado_en?: string | null; recibido_por?: string | null; recibido_en?: string | null } =
-    estado === "preparado"
-      ? desde === "recibido"
-        ? { recibido_por: null, recibido_en: null }
-        : { preparado_por: quienFirma, preparado_en: ahora }
-      : { recibido_por: quienFirma, recibido_en: ahora };
-
-  const fila = {
-    empresa_key: empresa,
-    pedido_switch_id: id,
-    estado,
-    cambiado_por: quienFirma,
-    cambiado_en: ahora,
-    ...(bultosNuevos != null ? { bultos: bultosNuevos } : {}),
-    ...firma,
-  };
+  // 🩸 8-oct-2026: volver a «Pendiente» caía en la rama de Recibido y FIRMABA
+  // «recibido_por». Ahora avanzar y deshacer salen de una sola función.
+  const cols = columnasDelPaso(desde, estado, quienFirma, ahora, bultosNuevos);
+  const fila = { empresa_key: empresa, pedido_switch_id: id, cambiado_por: quienFirma, cambiado_en: ahora, ...cols };
   const { error } = await supabaseServer.from("pedidos_bodega_estado").upsert(fila, { onConflict: "empresa_key,pedido_switch_id" });
   if (error) return NextResponse.json({ error: "No se pudo guardar el estado" }, { status: 500 });
+  // Rastro de cada paso, con la fila de ANTES: deshacer no borra quién lo había marcado.
+  await logActivity(
+    auth.role,
+    esDeshacerFlujoSimple(desde, estado) ? "deshacer_paso" : "cambiar_estado",
+    "pedidos_bodega_estado",
+    { pedido: `${empresa}:${id}`, desde, hasta: estado, antes: previo, despues: fila },
+    auth.userName,
+  );
+  const despues = { ...previo, ...fila };
   return NextResponse.json({
     ok: true,
     estado,
-    bultos: bultosNuevos ?? previo?.bultos ?? null,
+    bultos: despues.bultos ?? null,
     cambiado_por: fila.cambiado_por,
     cambiado_en: fila.cambiado_en,
-    preparado_por: firma.preparado_por ?? previo?.preparado_por ?? null,
-    preparado_en: firma.preparado_en ?? previo?.preparado_en ?? null,
-    recibido_por: firma.recibido_por ?? null,
-    recibido_en: firma.recibido_en ?? null,
+    preparado_por: despues.preparado_por ?? null,
+    preparado_en: despues.preparado_en ?? null,
+    recibido_por: despues.recibido_por ?? null,
+    recibido_en: despues.recibido_en ?? null,
   });
 }
 

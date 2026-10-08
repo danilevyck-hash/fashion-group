@@ -244,7 +244,9 @@ export default function PedidosView({
   /** Mueve el pedido, con los bultos si los hay. Optimista, revierte si falla. */
   async function moverSimple(p: PedidoBodega, destino: EstadoFlujoSimple, bultos?: number) {
     const antes = { estado: p.estado, bultos: p.bultos };
-    setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado: destino, bultos: bultos ?? x.bultos } : x)));
+    // Volver a Pendiente borra los bultos anotados (el servidor hace lo mismo).
+    const bultosDespues = destino === "pendiente" ? null : bultos ?? p.bultos;
+    setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado: destino, bultos: bultosDespues } : x)));
     try {
       const r = await fetch("/api/guias/pedidos", {
         method: "PATCH",
@@ -285,7 +287,13 @@ export default function PedidosView({
     if (destino === "recibido") {
       return { titulo, mensaje: "Queda recibido: confirmas que ya tienes el pedido en mano. Se cierra en Pedidos.", boton: "Marcar recibido" };
     }
-    return { titulo, mensaje: `Vuelve a ${ROTULO_ESTADO_FLUJO_SIMPLE[destino]}.`, boton: `Volver a ${ROTULO_ESTADO_FLUJO_SIMPLE[destino]}` };
+    // 🔴 Deshacer (8-oct-2026): le toca a quien marcó el paso. El registro de
+    // actividad guarda quién lo había marcado.
+    const mensaje =
+      destino === "pendiente"
+        ? "Vuelve a Pendiente: se quitan los bultos anotados y bodega lo prepara de nuevo."
+        : "Vuelve a Preparado: se quita la recepción. La firma de bodega se conserva.";
+    return { titulo, mensaje, boton: `Volver a ${ROTULO_ESTADO_FLUJO_SIMPLE[destino]}` };
   }
 
   const firmasSimpleDe = (p: PedidoBodega): FirmasFlujoSimple => ({
@@ -508,11 +516,29 @@ export default function PedidosView({
     // `docs/diseno.md`: «nada se desliza de lado en el celular»): el botón de
     // abajo quedaba cortado contra el borde a 390 px.
     const fila = "flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5";
+    // 🔴 LAS UNIDADES TAMBIÉN EN PENDIENTES (Daniel, 8-oct-2026): antes solo
+    // salían pegadas a los bultos, y un pedido pendiente no tiene bultos.
+    const chipUnidades = p.piezas != null && (
+      <span className={`${base} border-gray-300 bg-white text-gray-700`}>{textoUnidades(p.piezas)}</span>
+    );
+    // 🔴 DESHACER (Daniel, 8-oct-2026): le toca a quien marcó el paso —bodega
+    // deshace Preparado, la secretaria deshace Recibido; admin, los dos—. El
+    // servidor aplica la misma regla (`puedeMoverFlujoSimple`).
+    const deshacer = (destino: EstadoFlujoSimple) => (
+      <button
+        type="button"
+        onClick={() => setPorConfirmarSimple({ pedido: p, destino })}
+        className="h-7 whitespace-nowrap px-1 text-xs text-gray-500 underline-offset-2 hover:text-gray-900 hover:underline"
+      >
+        Volver a {ROTULO_ESTADO_FLUJO_SIMPLE[destino]}
+      </button>
+    );
     if (e === "pendiente") {
-      if (!puedeMarcar) return <span className="text-gray-400">—</span>;
+      if (!puedeMarcar) return chipUnidades || <span className="text-gray-400">—</span>;
       const valor = bultoEnFila[clave(p)] ?? "";
       return (
         <div className={fila}>
+          {chipUnidades}
           <input
             type="number"
             inputMode="numeric"
@@ -547,10 +573,18 @@ export default function PedidosView({
       </span>
     );
     if (e === "preparado") {
-      if (!puedeRecibir) return chipBultos;
+      if (!puedeRecibir) {
+        return puedeMarcar ? (
+          <div className={fila}>
+            {chipBultos}
+            {deshacer("pendiente")}
+          </div>
+        ) : chipBultos;
+      }
       return (
         <div className={fila}>
           {chipBultos}
+          {puedeMarcar && deshacer("pendiente")}
           <button
             type="button"
             onClick={() => setPorConfirmarSimple({ pedido: p, destino: "recibido" })}
@@ -561,12 +595,19 @@ export default function PedidosView({
         </div>
       );
     }
-    // recibido: cerrado.
-    return (
+    // recibido: cerrado. Solo la secretaria (o admin) puede deshacerlo.
+    const chipRecibido = (
       <span className={`${base} border-emerald-200 bg-emerald-50 text-emerald-700`}>
         <Check size={13} strokeWidth={3} aria-hidden className="mr-1" />
         {ROTULO_ESTADO_FLUJO_SIMPLE.recibido}
       </span>
+    );
+    if (!puedeRecibir) return chipRecibido;
+    return (
+      <div className={fila}>
+        {chipRecibido}
+        {deshacer("preparado")}
+      </div>
     );
   };
 
