@@ -44,6 +44,8 @@ import {
   fichaDeProveedor,
   listaDeProveedores,
   mismoProveedorConAlias,
+  aCargoDeLaEmpresa,
+  pctALaMarcaDe,
   montoACargoDeLaEmpresa,
   montoDeLaMarca,
   montoRecobrado,
@@ -56,6 +58,7 @@ import {
   avisoDeDobleCobro,
   avisoDeDobleCobroEnLaEntrega,
 } from "@/lib/marketing/doble-cobro";
+import { completarProveedores } from "@/lib/marketing/columnas-opcionales";
 
 const RAIZ = join(__dirname, "..", "..", "..");
 const leer = (rel: string) => readFileSync(join(RAIZ, rel), "utf8");
@@ -531,13 +534,62 @@ describe("nombres de ERP, no los de Daniel", () => {
     // lugares que arman el papel (`vaEnElPapel`), y en el reporte congelado.
     const zip = sinComentarios(leer("src/lib/marketing/zip-marca.ts"));
     expect(zip).toMatch(
-      /function vaEnElPapel\([\s\S]{0,220}MKT_PROVEEDORES_2026_10 && Number\(fila\.pct_a_la_marca\) === 0\) return false;/,
+      /function vaEnElPapel\([\s\S]{0,220}MKT_PROVEEDORES_2026_10 && aCargoDeLaEmpresa\(fila\.pct_a_la_marca\)\) return false;/,
     );
     // Y la columna viaja: sin ella el guard nunca vería un 0.
     expect(zip).toContain("pct_a_la_marca`)");
     const rep = sinComentarios(leer("src/lib/marketing/periodos-reporte.ts"));
-    expect(rep).toMatch(/MKT_PROVEEDORES_2026_10 && Number\(g\.pct_a_la_marca\) === 0\) return true;/);
+    expect(rep).toMatch(
+      /MKT_PROVEEDORES_2026_10 && aCargoDeLaEmpresa\(g\.pct_a_la_marca\)\) return true;/,
+    );
     expect(rep).toContain("pct_a_la_marca");
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 🩸 EL ZIP DE LA MARCA SALIÓ CASI VACÍO (7-oct-2026)
+  //
+  // `Number(null) === 0`, así que `Number(fila.pct_a_la_marca) === 0` leía toda
+  // factura SIN valor escrito como «cero por ciento» y la sacaba del papel.
+  // Casi ninguna factura viva tiene el valor escrito: el ZIP salió con las 26
+  // entregas de mueble y CERO facturas. Las tres formas, en un solo candado.
+  // ──────────────────────────────────────────────────────────────────────────
+  it("🔴 un gasto SIN valor escrito se cobra COMPLETO; solo el 0 escrito queda a cargo de la empresa", () => {
+    // 1) Valor escrito: 100 y 50 van al papel; el 0 escrito, no.
+    expect(aCargoDeLaEmpresa(100)).toBe(false);
+    expect(aCargoDeLaEmpresa(50)).toBe(false);
+    // 2) Valor vacío (NULL de la base, o la columna que no vino): se cobra
+    //    completo, NUNCA cero por ciento.
+    expect(aCargoDeLaEmpresa(null)).toBe(false);
+    expect(aCargoDeLaEmpresa(undefined)).toBe(false);
+    // 3) «A cargo de la empresa» es el 0 ESCRITO, y ese sí sale del papel.
+    expect(aCargoDeLaEmpresa(0)).toBe(true);
+    expect(aCargoDeLaEmpresa(pctQueSeGuarda({ aCargoDeLaEmpresa: true, cuanto: "completo" }))).toBe(
+      true,
+    );
+
+    // Y lo mismo al LEER la fila: un NULL se queda null, no se vuelve 0.
+    expect(pctALaMarcaDe(null)).toBe(null);
+    expect(pctALaMarcaDe(undefined)).toBe(null);
+    expect(pctALaMarcaDe(0)).toBe(0);
+    expect(pctALaMarcaDe(50)).toBe(50);
+    expect(completarProveedores({ id: "x" }).pct_a_la_marca).toBe(null);
+    expect(completarProveedores({ id: "x", pct_a_la_marca: null }).pct_a_la_marca).toBe(null);
+    expect(completarProveedores({ id: "x", pct_a_la_marca: 0 }).pct_a_la_marca).toBe(0);
+
+    // 🔴 Y NADIE compara con `Number(...)` sobre esa columna: ese es el patrón
+    // que ya mordió dos veces (el ZIP vacío y las facturas viejas en $0.00).
+    for (const rel of [
+      "src/lib/marketing/zip-marca.ts",
+      "src/lib/marketing/periodos-reporte.ts",
+      "src/lib/marketing/columnas-opcionales.ts",
+      "src/app/api/marketing/facturas/route.ts",
+      "src/app/api/marketing/proveedores-ficha/route.ts",
+    ]) {
+      const vivo = sinComentarios(leer(rel));
+      expect(vivo, `${rel} compara Number(...) contra la columna del porcentaje`).not.toMatch(
+        /Number\([^)]*pct[_A]?[aA]?[_]?[lL]a[_]?[mM]arca[^)]*\)\s*(===|!==|==|!=|<|>)/,
+      );
+    }
   });
 
   it("🔴 con «Mitad» va la MITAD al papel y al Excel de la marca", () => {

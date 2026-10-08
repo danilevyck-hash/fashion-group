@@ -32,7 +32,7 @@ import {
 } from "@/lib/guias/pedidos-bultos";
 import {
   PEDIDOS_FLUJO_SIMPLE_2026_10,
-  ROLES_PREPARA_FLUJO_SIMPLE,
+  ROLES_FLUJO_SIMPLE_TODAS,
   esEstadoFlujoSimple,
   estadoFlujoSimpleLeido,
   puedeMoverFlujoSimple,
@@ -168,10 +168,13 @@ export async function GET(req: NextRequest) {
     leerEstadoDeBodega(),
     leerAliasOVacio(),
     leerCuentaDeBultos([...empresas]),
-    // 🔴 Lo que apaga «Verificar»: cuántos artículos siguen sin bulto
-    // (7-oct-2026). Solo aplica al flujo de bulto-por-línea. Falla ABIERTA:
-    // sin tabla, mapa vacío y no se apaga nada.
-    BULTOS_ACTIVO ? leerAsignacion([...empresas]) : Promise.resolve(new Map()),
+    // 🔴 Cuántos artículos siguen sin bulto (apaga «Verificar», solo con el
+    // flujo de bulto-por-línea) Y cuántas PIEZAS tiene el pedido (Daniel,
+    // 7-oct-2026: «¿puedes poner la cantidad de pieza?»; vale en los DOS
+    // flujos, se haya o no prendido `BULTOS_ACTIVO`). Falla ABIERTA: sin
+    // tabla o sin que alguien haya abierto el detalle, mapa vacío — la
+    // pantalla no apaga nada ni inventa piezas, muestra «—».
+    leerAsignacion([...empresas]),
   ]);
   if (ped.error) return NextResponse.json({ error: "No se pudieron leer los pedidos" }, { status: 500 });
   if (est.error) return NextResponse.json({ error: "No se pudo leer el estado de bodega" }, { status: 500 });
@@ -210,6 +213,9 @@ export async function GET(req: NextRequest) {
       // Solo aplica al flujo de bulto-por-línea.
       articulos: BULTOS_ACTIVO ? asignacion.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.articulos ?? null : null,
       sin_bulto: BULTOS_ACTIVO ? asignacion.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.sinBulto ?? null : null,
+      // 🔴 Las piezas SÍ viajan en los dos flujos: `null` = nadie abrió
+      // todavía el detalle de este pedido, y la fila dice «—» en vez de un 0.
+      piezas: asignacion.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.piezas ?? null,
       preparado_por: m?.preparado_por ?? null,
       preparado_en: m?.preparado_en ?? null,
       verificado_por: m?.verificado_por ?? null,
@@ -302,11 +308,13 @@ async function patchFlujoSimple(
 
 export async function PATCH(req: NextRequest) {
   if (!PEDIDOS_BODEGA_2026_10) return apagado();
-  // Con bultos, quién puede marcar QUÉ lo decide `puedeMover` abajo (que mira el
-  // estado destino, quién terminó el pedido y de qué empresa es): aquí solo se
-  // exige estar en la lista más ANCHA de las dos, que es la de «Preparado».
+  // Quién puede marcar QUÉ lo decide `puedeMover`/`puedeMoverFlujoSimple` abajo
+  // (que miran el estado DESTINO, no esta puerta): aquí solo se exige estar en
+  // ALGUNA de las listas del flujo activo —con el simplificado, bodega
+  // (Preparado) o secretaria (Recibido), nunca una sola de las dos, o la
+  // secretaria quedaría sin poder ni entrar a marcar Recibido—.
   const auth = requireRole(req, [
-    ...(PEDIDOS_FLUJO_SIMPLE_2026_10 ? ROLES_PREPARA_FLUJO_SIMPLE : BULTOS_ACTIVO ? ROLES_PREPARADO : PEDIDOS_BODEGA_ROLES),
+    ...(PEDIDOS_FLUJO_SIMPLE_2026_10 ? ROLES_FLUJO_SIMPLE_TODAS : BULTOS_ACTIVO ? ROLES_PREPARADO : PEDIDOS_BODEGA_ROLES),
   ]);
   if (auth instanceof NextResponse) return auth;
 

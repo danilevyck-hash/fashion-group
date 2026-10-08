@@ -62,6 +62,7 @@ import {
   sinBulto,
   todoAsignado,
   renglonesDelPie,
+  textoUnidades,
   tituloDeFirmas,
   totalesDelPedido,
   ultimaFirma,
@@ -758,5 +759,86 @@ describe("🔴 6 · el envío de Etiquetas que nace al recibir", () => {
 
   it("y va en mayúsculas, como las guarda Etiquetas", () => {
     expect(notaDelPedido("ab12")).toBe("PEDIDO AB12");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 CANDADO — LAS PIEZAS DEL PEDIDO (7-oct-2026, Daniel: «¿puedes poner la
+// cantidad de pieza?»). La suma de `cantidad` de las líneas ya existía
+// (`totalesDelPedido().unidades`, para el papel); lo nuevo es decirla EN
+// PANTALLA, junto a los bultos, en la lista Y en el detalle del pedido.
+//
+//   1. 🔴 EN TEXTO SIEMPRE «unidades», nunca «piezas» como rótulo nuevo
+//      (`docs/nombres-erp.md`: «Piezas, Pzas, Unidades» están prohibidas como
+//      ENCABEZADO; en texto corrido manda «unidades»).
+//   2. Con miles, el separador es el punto («1.224»), como lo pidió Daniel.
+//   3. Una línea en 0 no infla nada: ya suma 0 desde `totalesDelPedido`.
+//   4. La RUTA manda `piezas` en los DOS flujos (no solo con el de
+//      bulto-por-línea): `leerAsignacion` ya no queda detrás del interruptor.
+//   5. La lista pinta las piezas JUNTO a los bultos, y el detalle las dice
+//      aunque el flujo simplificado no tenga bultos por línea que mostrar.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 las piezas del pedido, en texto", () => {
+  it("dice «unidades», nunca «piezas» como rótulo", () => {
+    expect(textoUnidades(1)).toBe("1 unidad");
+    expect(textoUnidades(12345)).toBe("12.345 unidades");
+    expect(textoUnidades(12345)).not.toMatch(/pieza/i);
+  });
+
+  it("los miles separan con punto, como `clientes/lista.ts` (mismo `toLocaleString(\"es\")`)", () => {
+    expect(textoUnidades(12345)).toBe("12.345 unidades");
+  });
+
+  it("una fracción (línea rara de Switch) se ve con dos decimales", () => {
+    expect(textoUnidades(4.5)).toBe("4,50 unidades");
+  });
+
+  it("cero no se calla: dice «0 unidades», no se inventa un guion aquí", () => {
+    expect(textoUnidades(0)).toBe("0 unidades");
+  });
+
+  it("se arma con lo que YA calcula totalesDelPedido — nada se recalcula aparte", () => {
+    const L = (cantidad: number) => ({ cantidad, total: null });
+    // Una línea en cero (cancelada, o una promoción a $0) no infla la cuenta.
+    const { unidades } = totalesDelPedido([L(10_000), L(2_240), L(0)]);
+    expect(textoUnidades(unidades)).toBe("12.240 unidades");
+  });
+});
+
+describe("🔴 la ruta manda las piezas en los DOS flujos, no solo con bultos por línea", () => {
+  const ruta = () => fs.readFileSync(path.resolve(__dirname, "../../app/api/guias/pedidos/route.ts"), "utf8");
+
+  it("leerAsignacion ya no está detrás de `BULTOS_ACTIVO ?`", () => {
+    const s = ruta();
+    expect(s).not.toMatch(/BULTOS_ACTIVO\s*\?\s*leerAsignacion/);
+    expect(s).toContain("leerAsignacion([...empresas])");
+  });
+
+  it("el pedido sale con su campo `piezas`", () => {
+    const s = ruta();
+    expect(s).toMatch(/piezas:\s*asignacion\.get/);
+  });
+});
+
+describe("🔴 la pantalla dibuja las piezas junto a los bultos", () => {
+  const leer = (f: string) => fs.readFileSync(path.resolve(__dirname, "../..", f), "utf8");
+  const vista = () => leer("app/despachos/components/PedidosView.tsx");
+  const detalle = () => leer("app/despachos/components/PedidoBultos.tsx");
+
+  it("la LISTA (flujo activo hoy) agrega las unidades a la MISMA casilla de bultos", () => {
+    const v = vista();
+    expect(v).toContain("textoUnidades");
+    // El chip sigue diciendo «—» cuando no hay bultos; las piezas van PEGADAS
+    // al número de bultos, no en una columna nueva.
+    expect(v).toMatch(/p\.piezas[^\n]*textoUnidades\(p\.piezas\)/);
+  });
+
+  it("el DETALLE del pedido dice las piezas en los DOS flujos (con y sin bultos por línea)", () => {
+    const d = detalle();
+    expect(d).toContain("textoUnidades");
+    expect(d).toContain("totalesDelPedido");
+    // Con bultos por línea se suma al resumen de siempre; en el flujo
+    // simplificado (`ocultarBulto`) sale sola, porque ahí no hay resumen.
+    expect(d).toMatch(/ocultarBulto\s*&&\s*piezas/);
   });
 });

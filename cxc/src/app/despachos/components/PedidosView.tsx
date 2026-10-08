@@ -27,6 +27,7 @@ import {
   ROTULO_ESTADO_BULTOS,
   estadoLeido,
   faltaParaVerificar,
+  textoUnidades,
   tituloDeFirmas,
   ultimaFirma,
   siguienteEstado,
@@ -535,9 +536,14 @@ export default function PedidosView({
         </div>
       );
     }
+    // 🔴 LAS PIEZAS, JUNTO A LOS BULTOS (7-oct-2026, Daniel: «¿puedes poner la
+    // cantidad de pieza?»): «5 bultos · 620 unidades». `p.piezas == null` =
+    // nadie abrió el detalle de este pedido todavía: se calla, no se inventa.
     const chipBultos = (
       <span className={`${base} border-gray-300 bg-white text-gray-700`}>
-        {p.bultos ? `${p.bultos} ${p.bultos === 1 ? "bulto" : "bultos"}` : "—"}
+        {p.bultos
+          ? `${p.bultos} ${p.bultos === 1 ? "bulto" : "bultos"}${p.piezas != null ? ` · ${textoUnidades(p.piezas)}` : ""}`
+          : "—"}
       </span>
     );
     if (e === "preparado") {
@@ -732,6 +738,11 @@ export default function PedidosView({
                 {!BULTOS && (
                   <td className={`break-words py-2 text-gray-700 sm:px-3 ${conCirculo ? "pl-1 pr-3 pt-3" : "px-1"}`}>{vendedorEnPantalla(p.vendedor_nombre)}</td>
                 )}
+                {/* ponytail: esta tabla (flujo bulto-por-línea) queda DORMIDA
+                    mientras `SIMPLE` esté prendido — ver el render de abajo:
+                    `SIMPLE ? tablaSimple : …`. Las piezas se wirearon en
+                    `chipBultos` de `tablaSimple`, que es la que se ve hoy;
+                    agrégalas aquí también si ese flujo vuelve a activarse. */}
                 {BULTOS && (
                   <td className={`whitespace-nowrap px-1 py-2 text-right tabular-nums text-gray-700 sm:px-3 ${conCirculo ? "pt-3" : ""}`}>
                     {p.bultos ? p.bultos : <span className="text-gray-300">—</span>}

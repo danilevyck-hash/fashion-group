@@ -152,6 +152,8 @@ Cuando se afirma algo de una pantalla, **se mira la pantalla**, no solo el códi
 
 ## 15. Cómo se entrega
 
+🔴 **Se publica por SOLICITUD DE CAMBIO, nunca con push directo a `main`** (desde el 7-oct-2026). `main` exige dos chequeos —`pruebas` y `Vercel`— y desde ese día **los exige también a los administradores** (`enforce_admins`), así que **el push directo ya no entra**. El camino es: rama propia en worktree aparte → `gh pr create --base main` → **`gh pr merge <n> --auto --squash` en el acto**, sin esperar el verde → GitHub la integra sola cuando los dos chequeos pasen. **Nunca** `--force`, **nunca** `gh pr merge --admin`, **nunca** apagar `enforce_admins` para publicar. Antes de decir que algo quedó publicado: `git branch -r --contains <sha>` y el deploy de producción en `Ready`. Y **nunca `gh run watch`** (bloquea la sesión): se consulta cada tanto con `gh pr checks <n>`. Todo el detalle —orden cuando varias solicitudes chocan, y la cola de una-vista-previa-a-la-vez de Vercel— en [docs/seguridad/publicar-por-solicitud-de-cambio.md](../../../docs/seguridad/publicar-por-solicitud-de-cambio.md). 🩸 El día que se prendió el candado quedaron **cuatro cambios ya aprobados frenados** porque los agentes seguían empujando directo.
+
 - **Un archivo no pasa de 800 líneas.** Las decisiones, en módulos PUROS sin I/O.
 - **Candado con verificación por mutación**: se rompe cada regla a propósito, se comprueba que el test se pone ROJO, y se reporta «N mutaciones, N cazadas» con al menos 2 CONTROLES que NO deben cazarse.
 - **Un candado nunca se borra.** Si ahora apunta al revés, **cambia de dirección con nota fechada** y conserva el **control al revés**, para que siga cazando el defecto original.

@@ -29,7 +29,7 @@
 
 import type jsPDF from "jspdf";
 import autoTable from "@/lib/pdf-tabla";
-import { casaDeEmpresa, type CasaDelPapel } from "@/lib/cxc/casa-del-papel";
+import { casaDeEmpresa, casaDeEmpresas, type CasaDelPapel } from "@/lib/cxc/casa-del-papel";
 import { AGING_ORDER, tramoRango } from "@/lib/cxc-aging";
 import { comoPagar, fichaFiscal, lineasDePago } from "@/lib/cxc/empresa-fiscal";
 import type { EstadoEmpresa, FichaCliente } from "@/lib/cxc/estado-cuenta-tipos";
@@ -40,7 +40,8 @@ import {
   fechaDMY,
   type FilaDelPapel,
 } from "@/lib/cxc/estado-cuenta-switch";
-import { ESTILO_UNICO, MARGEN_PAPEL, PIE_PAPEL, cabeceraPapel, piePapel } from "@/lib/pdf-estilo";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { ESTILO_UNICO, MARGEN_PAPEL, PIE_PAPEL, PAPEL, cabeceraPapel, piePapel } from "@/lib/pdf-estilo";
 
 export const MARGEN = ESTILO_UNICO ? MARGEN_PAPEL : 12;
 /** Alto reservado abajo para el pie de la casa. */
@@ -49,12 +50,11 @@ export const FOOTER_RESERVA_MM = ESTILO_UNICO ? PIE_PAPEL : 16;
 const GRIS = [107, 114, 128] as const;
 const NEGRO = [17, 24, 39] as const;
 
-/** El «Fecha:» del encabezado, en el DD-MM-AAAA de Switch y con el día LOCAL
- *  (con UTC, de madrugada el papel sale fechado mañana). */
+/** El «Fecha:» del encabezado, en el DD-MM-AAAA de Switch y con el día de
+ *  PANAMÁ (7-oct-2026: antes era el del aparato; en el servidor —UTC—, que
+ *  arma el adjunto del correo, desde las 7 p. m. el papel salía fechado mañana). */
 export function hoyDMY(): string {
-  const d = new Date();
-  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  return fechaDMY(iso);
+  return fechaDMY(hoyPanama());
 }
 
 // ── 1. La cabeza: quién cobra ────────────────────────────────────────────────
@@ -308,6 +308,78 @@ export function dibujarPie(doc: jsPDF, y: number, emp: EstadoEmpresa, total: num
   doc.setTextColor(...NEGRO);
   doc.text(`Total General: ${monto(total)}`, w - MARGEN, y, { align: "right" });
   return y + 12;
+}
+
+// ── 3 bis. El resumen del grupo, cuando el cliente debe a varias empresas ───
+
+/**
+ * 🔴 CON VARIAS EMPRESAS, EL PAPEL ABRE CON EL GRUPO (7-oct-2026). Daniel:
+ * para nosotros son empresas distintas; para el cliente es UNA sola deuda.
+ * Esta hoja va PRIMERO —antes de las hojas por empresa, que no cambian ni un
+ * número— con el total arriba y el desglose por empresa, con los MISMOS tres
+ * tramos de la pantalla (`ContactPanel`) y del pie de cada hoja
+ * (`tramosDelPapel`, la misma función). Con una sola empresa NO se dibuja —ver
+ * `dibujarCliente`—: un «grupo» de un solo renglón no se lee natural.
+ */
+export function dibujarResumenGrupo(
+  doc: jsPDF,
+  nombre: string,
+  codigo: string,
+  empresas: EstadoEmpresa[],
+  total: number,
+): number {
+  const casa = casaDeEmpresas(empresas.map((e) => e.empresa_key));
+  let y = cabeceraPapel(doc, {
+    titulo: "Estado de cuenta",
+    subtitulo: [nombre, `Código: ${codigo}`],
+    derecha: [hoyDMY()],
+    logo: casa.logo,
+  });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...PAPEL.gris);
+  doc.text("TOTAL GENERAL", MARGEN_PAPEL, y);
+  y += 7;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...PAPEL.tinta);
+  doc.text(`$${monto(total)}`, MARGEN_PAPEL, y);
+  y += 9;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...PAPEL.gris);
+  doc.text(`DESGLOSE POR EMPRESA (${empresas.length})`, MARGEN_PAPEL, y);
+  y += 3;
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGEN_PAPEL, right: MARGEN_PAPEL, bottom: PIE_PAPEL },
+    head: [["Empresa", ...AGING_ORDER.map((k) => tramoRango(k)), "Total"]],
+    body: empresas.map((emp) => {
+      const t = tramosDelPapel(emp.documentos);
+      return [emp.empresa_nombre, monto(t.current), monto(t.watch), monto(t.overdue), monto(emp.subtotal)];
+    }),
+    styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2, textColor: [...PAPEL.tinta] },
+    headStyles: { fillColor: [...PAPEL.azul], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.5 },
+    columnStyles: {
+      0: { cellWidth: "auto" },
+      1: { halign: "right", cellWidth: 26 },
+      2: { halign: "right", cellWidth: 26 },
+      3: { halign: "right", cellWidth: 26 },
+      4: { halign: "right", cellWidth: 28, fontStyle: "bold" },
+    },
+  });
+  // @ts-expect-error lastAutoTable lo agrega el plugin en runtime
+  y = doc.lastAutoTable.finalY + 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...PAPEL.gris);
+  doc.text("El detalle de cada documento va en su propia hoja, una por empresa.", MARGEN_PAPEL, y);
+
+  return y;
 }
 
 // ── 4 bis. Dónde pagar ───────────────────────────────────────────────────────
