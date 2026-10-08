@@ -40,6 +40,7 @@ import {
   fechaDMY,
   type FilaDelPapel,
 } from "@/lib/cxc/estado-cuenta-switch";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { ESTILO_UNICO, MARGEN_PAPEL, PIE_PAPEL, PAPEL, cabeceraPapel, piePapel } from "@/lib/pdf-estilo";
 
 export const MARGEN = ESTILO_UNICO ? MARGEN_PAPEL : 12;
@@ -49,12 +50,11 @@ export const FOOTER_RESERVA_MM = ESTILO_UNICO ? PIE_PAPEL : 16;
 const GRIS = [107, 114, 128] as const;
 const NEGRO = [17, 24, 39] as const;
 
-/** El «Fecha:» del encabezado, en el DD-MM-AAAA de Switch y con el día LOCAL
- *  (con UTC, de madrugada el papel sale fechado mañana). */
+/** El «Fecha:» del encabezado, en el DD-MM-AAAA de Switch y con el día de
+ *  PANAMÁ (7-oct-2026: antes era el del aparato; en el servidor —UTC—, que
+ *  arma el adjunto del correo, desde las 7 p. m. el papel salía fechado mañana). */
 export function hoyDMY(): string {
-  const d = new Date();
-  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  return fechaDMY(iso);
+  return fechaDMY(hoyPanama());
 }
 
 // ── 1. La cabeza: quién cobra ────────────────────────────────────────────────

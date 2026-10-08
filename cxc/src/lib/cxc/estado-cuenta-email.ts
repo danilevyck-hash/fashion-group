@@ -17,15 +17,19 @@
 import type { EstadoCuentaDoc, EstadoCuentaEmpresa } from "@/lib/cxc/estado-cuenta-data";
 import { comoPagar, lineasDePago, type ComoPagar } from "@/lib/cxc/empresa-fiscal";
 import { fmtDate } from "@/lib/format";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-/** Mes en español capitalizado + año, ej. "Julio 2026". */
+/** Mes en español capitalizado + año, ej. "Julio 2026" — el mes de PANAMÁ
+ *  (7-oct-2026: corre en el servidor, en UTC; el último día del mes, desde las
+ *  7 p. m., el asunto del correo decía ya el mes siguiente). */
 export function mesLabel(d: Date = new Date()): string {
-  return `${MESES[d.getMonth()]} ${d.getFullYear()}`;
+  const [anio, mes] = hoyPanama(d).split("-");
+  return `${MESES[Number(mes) - 1]} ${anio}`;
 }
 
 export function escapeHtml(s: string): string {

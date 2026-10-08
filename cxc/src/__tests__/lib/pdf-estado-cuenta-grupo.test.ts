@@ -18,11 +18,12 @@
 // resultado que Daniel todavía no aprobó sin tocar el valor real en
 // producción.
 // ─────────────────────────────────────────────────────────────────────────────
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
 
 vi.mock("@/lib/cxc/estado-cuenta-un-boton-2026-10", () => ({ ESTADO_CUENTA_UN_BOTON_2026_10: true }));
 
 import { buildEstadoCuentaPDF } from "@/lib/pdf-estado-cuenta";
+import { mesLabel } from "@/lib/cxc/estado-cuenta-email";
 import type { EstadoCuenta, EstadoEmpresa, EstadoDocumento } from "@/lib/cxc/estado-cuenta-tipos";
 
 async function textoDelPdf(doc: { output: (t: "arraybuffer") => ArrayBuffer }): Promise<string> {
@@ -125,5 +126,51 @@ describe("🔴 una sola empresa no se ve como un «grupo» de un renglón", () =
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 7-oct-2026: desde las 7 p. m. de Panamá (00:00 UTC) el PDF salía con la
+// fecha de MAÑANA — el nombre del archivo usaba `toISOString()` (UTC) y el
+// «Fecha:» del encabezado la hora del aparato (en el servidor, UTC). La fecha
+// de un estado de cuenta es la de PANAMÁ. La zona del proceso se pone en UTC,
+// como la máquina de GitHub y el servidor, para que el defecto se vea en
+// cualquier computadora.
+describe("🔴 a las 8 p. m. de Panamá el estado de cuenta dice la fecha de Panamá, no la de mañana", () => {
+  const tzAntes = process.env.TZ;
+  beforeAll(() => { process.env.TZ = "UTC"; });
+  afterAll(() => { process.env.TZ = tzAntes; });
+  afterEach(() => { vi.useRealTimers(); });
+  const ocho_pm_panama = (diaUtcSiguiente: string) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${diaUtcSiguiente}T01:00:00Z`)); // = 20:00 del día anterior en Panamá
+  };
+
+  it("el nombre del archivo dice 7 oct, no 8 oct", () => {
+    ocho_pm_panama("2026-10-08");
+    const { filename } = buildEstadoCuentaPDF(CLIENTE_GRUPO, "Novedades El Dollar");
+    expect(filename).toBe("Estado de cuenta - Novedades El Dollar - 7 oct 2026.pdf");
+  });
+
+  it("el «Fecha:» del papel dice 07-10-2026, no 08-10-2026", async () => {
+    ocho_pm_panama("2026-10-08");
+    const { doc } = buildEstadoCuentaPDF(CLIENTE_UNA_EMPRESA, "Novedades El Dollar");
+    const texto = await textoDelPdf(doc);
+    expect(texto).toContain("07-10-2026");
+    expect(texto).not.toContain("08-10-2026");
+  });
+
+  it("el mes del asunto del correo, el último día del mes a las 8 p. m., sigue siendo ese mes", () => {
+    ocho_pm_panama("2026-11-01");
+    expect(mesLabel()).toBe("Octubre 2026");
+  });
+
+  it("control: a mediodía de Panamá la fecha es la del día (no se corre de más)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-08T17:00:00Z"));
+    expect(buildEstadoCuentaPDF(CLIENTE_GRUPO, "Novedades El Dollar").filename).toBe(
+      "Estado de cuenta - Novedades El Dollar - 8 oct 2026.pdf",
+    );
+    expect(mesLabel()).toBe("Octubre 2026");
   });
 });
