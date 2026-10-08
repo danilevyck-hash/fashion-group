@@ -140,7 +140,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - Despachada se corrigen **TRES campos**: transportista · cliente · facturas; **los bultos NO** (`campos-editables.ts`).
 - **El cliente vive en `guia_items.cliente_codigo`, uno por renglón**; `receptor_nombre` es quien FIRMA; elegirlo **no es obligatorio**. Las sugerencias **NUNCA atan solas**: pareo **exacto, nunca por parecido**.
 - N° del transportista **POR LÍNEA** y **NO bloquea**; placa, «recibido por», cédula y **las dos firmas SÍ**. **Entrega directa**: sin placa ni transportista, `"0"` pelado se imprime vacío (`sinCeroPelado`).
-- **La lista solo LEE, nunca escribe**; el refresco de facturas de hoy es la **ÚNICA salida que no es lectura**.
+- **La lista solo LEE**; 🔴 **entrar a Despachos NO llama a Switch** (7-oct-2026): solo crons o «Actualizar».
 - 🔴 **El DESTINO se autollena con «el de siempre»**: UN destino por cliente (`guias_destino_cliente.el_de_siempre`); sin marcar, nada; sin definición, el **único** del histórico. Lo escrito no se pisa. `GUIAS_ATAJOS_NUEVOS`.
 - **Al crear, el cliente se elige UNA vez y se marcan sus facturas**: por CÓDIGO (`switch_clientes`, nunca por nombre), 6 del grupo por inclusión, solo `Factura`; «ya salió en otra guía» es **aviso, nunca bloqueo**; el payload no cambia (`atajos-facturas.ts`; flag en `false` = pantalla de antes). No guarda si nada cambió (`cambios-form.ts`).
 - 🔴 **DOS caminos y nada más: factura o «Traslado»** —del ENVÍO, no del cliente—: escribe el TEXTO `Traslado` en `facturas`, **empresa a mano**. Los `0000` viejos **no se tocan**.

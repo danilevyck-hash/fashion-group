@@ -9,9 +9,8 @@ import { Toast, PullToRefresh } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import dynamic from "next/dynamic";
-import GuiasList, { CREATE_ROLES } from "./components/GuiasList";
+import GuiasList from "./components/GuiasList";
 import AtarClienteModal from "./components/AtarClienteModal";
-import { refrescarFacturasDelDia } from "./components/refrescarFacturasHoy";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import { CONFIG_GUIAS_ROLES } from "@/lib/guias/destinos-config";
 import { puedeEtiquetar } from "@/lib/guias/etiquetas";
@@ -210,25 +209,13 @@ export default function GuiasPage() {
     ...(hayConfig ? ([["config", "Configuración"]] as Array<[Vista, string]>) : []),
   ];
 
-  // Al TOCAR Guías se dispara, en segundo plano, la lectura corta de las
-  // facturas de HOY para el panel «Facturas del cliente». Daniel, textual
-  // (4-sep-2026): «¿por qué no se puede hacer al apretar guías? Prefiero eso.»
-  // — antes vivía solo en /guias/nueva. Fail-open, acelerada a 10 min
-  // (sessionStorage) + cooldown de 10 min del server + lock del sync;
-  // `logoutAllSwitchSessions()` va en el `finally` del route. NO dispara para
-  // quien no puede crear guías (vendedor) ni en modo solo lectura: para ellos
-  // el dato no se usa. Detrás de GUIAS_ATAJOS_NUEVOS (lo mira la función).
-  // 🔴 La lista SIGUE sin despachar ni editar guías: este POST no escribe
-  // sobre /api/guias/** — el candado de guias-eliminar-en-la-fila cambió de
-  // dirección para exigir exactamente eso.
-  useEffect(() => {
-    if (!authChecked || !role || !CREATE_ROLES.includes(role)) return;
-    let readonly = false;
-    try {
-      readonly = sessionStorage.getItem("fg_guias_readonly") === "1";
-    } catch { /* sin sessionStorage no hay modo lectura que respetar */ }
-    if (!readonly) refrescarFacturasDelDia();
-  }, [authChecked, role]);
+  // 🔴 7-oct-2026 (Daniel aprobó): ENTRAR a Despachos NO llama a Switch.
+  // Switch da UN token por usuario y cada login saca a Daniel de su panel
+  // (medido 3-sep, docs/estado-actual.md). Antes aquí se disparaba
+  // `POST /api/guias/facturas-hoy` al montar. Ahora la pantalla muestra lo
+  // último sincronizado (`LineaDeFrescura`) y las facturas de hoy llegan por
+  // los crons de switch-sync o con el botón «Actualizar» (cooldown 10 min del
+  // server). Candado: src/__tests__/components/despachos-sin-switch-al-entrar.test.tsx
 
   // Los clientes más usados EN GUÍAS, para que atar una línea vieja no obligue
   // a teclear. Se piden una sola vez y solo cuando hay sesión. Si falla, el

@@ -114,14 +114,14 @@ los envíos, el chip del cliente de cada renglón y los botones.
 
 **🔴 La lista NUNCA escribe una guía.** Ni por swipe ni desplegando un formulario. El candado
 (`src/__tests__/components/guias-eliminar-en-la-fila.test.tsx`, 17 casos) monta la página real, toca
-los botones y cuenta lo que sale por `fetch`. Desde el 4-sep permite **exactamente una** salida que
-no es lectura: el refresco de facturas de hoy (abajo). Cualquier otra la pone en rojo.
+los botones y cuenta lo que sale por `fetch`: abrir la lista es 100% lectura, para todos los roles.
 
-**El disparo automático al abrir `/guias`** (4-sep-2026, Daniel: *«¿por qué no se puede hacer al
-apretar guías? Prefiero eso»*): al montar, si el rol puede crear guías y no está en solo lectura y
-`GUIAS_ATAJOS_NUEVOS` está encendido, la pantalla llama `refrescarFacturasDelDia()` →
-`POST /api/guias/facturas-hoy`, que le pide a Switch las facturas del día de las 6 empresas del
-grupo. **No toca ni una guía.** Acelerador de 10 min en `sessionStorage` para evitar el doble disparo.
+**Entrar a Despachos NO llama a Switch** (7-oct-2026, aprobado por Daniel). Del 4-sep al 7-oct, abrir
+`/guias` y `/guias/nueva` disparaba `POST /api/guias/facturas-hoy`, que entra a Switch como `daniel`; Switch
+da un token por usuario y cada login lo sacaba de su panel. Hoy la pantalla muestra lo último sincronizado
+(`LineaDeFrescura`) y las facturas de hoy llegan por los crons de `switch-sync tipo=facturas` (6:50 · 10:00 ·
+14:00 · 18:00 Panamá) o con «Actualizar», que conserva el freno de 10 min por empresa del servidor. Candado:
+`src/__tests__/components/despachos-sin-switch-al-entrar.test.tsx`.
 
 ### 2 · `/guias/nueva` — crear una guía
 
