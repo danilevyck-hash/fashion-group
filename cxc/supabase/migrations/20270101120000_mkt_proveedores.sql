@@ -137,7 +137,6 @@ COMMIT;
 -- · NO toca `mk_factura_marcas` ni sus porcentajes (ver el 🩸 de arriba).
 -- · NO toca `mk_inventario_productos` ni `mk_mobiliario_notas_proveedor`.
 --   Mobiliario no se conecta con las facturas: Daniel escribe la cantidad.
--- · NO arregla la factura #145. Eso va aparte, en
---   `20270101130000_factura_145_sin_marca.sql`, y espera el
---   "si" de Daniel.
+-- · NO arregla la factura #145. Se paso a «No recuperable» desde la
+--   pantalla de Marketing.
 -- ============================================================================
