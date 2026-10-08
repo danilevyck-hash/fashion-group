@@ -91,8 +91,16 @@ describe("🔴 el estado de cuenta sale del grupo por omisión", () => {
   });
 
   it("el nombre del archivo dice el cliente y la fecha legible", () => {
-    const { filename } = buildEstadoCuentaPDF(CLIENTE_GRUPO, "Novedades El Dollar");
-    expect(filename).toBe("Estado de cuenta - Novedades El Dollar - 7 oct 2026.pdf");
+    // 🩸 7-oct-2026: sin reloj fijo esta prueba se puso roja a las 19:00 de
+    // Panamá (00:00 UTC, la hora de la máquina de GitHub). Se fija el día.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-07T15:00:00Z"));
+    try {
+      const { filename } = buildEstadoCuentaPDF(CLIENTE_GRUPO, "Novedades El Dollar");
+      expect(filename).toBe("Estado de cuenta - Novedades El Dollar - 7 oct 2026.pdf");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -109,7 +117,13 @@ describe("🔴 una sola empresa no se ve como un «grupo» de un renglón", () =
     // de UNA empresa a propósito. Un cliente que NATURALMENTE debe en una
     // sola (sin elegir nada) sigue con el nombre limpio: ver
     // `cxc-nombre-de-archivo-del-pdf.test.ts`.
-    const { filename } = buildEstadoCuentaPDF(CLIENTE_UNA_EMPRESA, "Novedades El Dollar", { unaEmpresaElegida: true });
-    expect(filename).toBe("Estado de cuenta - Novedades El Dollar - Fashion Wear - 7 oct 2026.pdf");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-07T15:00:00Z"));
+    try {
+      const { filename } = buildEstadoCuentaPDF(CLIENTE_UNA_EMPRESA, "Novedades El Dollar", { unaEmpresaElegida: true });
+      expect(filename).toBe("Estado de cuenta - Novedades El Dollar - Fashion Wear - 7 oct 2026.pdf");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

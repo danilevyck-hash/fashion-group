@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 UN SOLO BOTÓN «ESTADO DE CUENTA», Y EL DEL GRUPO POR OMISIÓN (7-oct-2026,
-// propuesta — mockup HOY vs RECOMENDACIÓN, Daniel todavía no dijo que sí).
+// PRENDIDO el 7-oct-2026 — Daniel escribió «Aprobado» sobre el mockup HOY vs
+// RECOMENDACIÓN: https://claude.ai/artifact/ChnNpSKFkGWhDcF9HHvgMZ).
 //
 // Hasta hoy había DOS botones para el mismo trabajo —«Enviar estado de
 // cuenta» (negro, manda) y «Estado de cuenta» (contorno, solo mira)— en la
@@ -23,4 +24,4 @@
 // Interruptor `ESTADO_CUENTA_UN_BOTON_2026_10`: `false` = todo como antes.
 // Candado `estado-cuenta-un-boton-2026-10.test.tsx`.
 // ─────────────────────────────────────────────────────────────────────────────
-export const ESTADO_CUENTA_UN_BOTON_2026_10 = false;
+export const ESTADO_CUENTA_UN_BOTON_2026_10 = true;
