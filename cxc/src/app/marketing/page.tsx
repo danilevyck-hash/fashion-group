@@ -55,7 +55,7 @@ import { veMarketingNuevo } from "@/lib/marketing/marketing-nuevo";
 // portada bajaba al abrir sin usarlos. Medido: First Load de /marketing 476 KB.
 const RegistrarGastoModal = dynamic(() => import("./components/RegistrarGastoModal"), { ssr: false });
 const ProyectoOverlay = dynamic(() => import("./components/ProyectoOverlay"), { ssr: false });
-// 🔴 MARKETING NUEVO (8-oct-2026): solo para `veMarketingNuevo(role)`. Lazy:
+// 🔴 MARKETING NUEVO (8-oct-2026): para `veMarketingNuevo(role)` (todos). Lazy:
 // quien ve la pantalla de hoy no baja ni un byte de la nueva.
 const MarketingNuevo = dynamic(() => import("./components/nuevo/MarketingNuevo"), { ssr: false });
 

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // POST /api/marketing/cobros/cerrar — { marcaCodigo, periodoId, excluidos: ["factura:<id>", …] }
-// Solo para quien ve el Marketing nuevo (`ROLES_MARKETING_NUEVO`).
+// Solo para quien ve el Marketing nuevo (`ROLES_MARKETING_NUEVO`) y escribe (contabilidad, 403).
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, [...ROLES_MARKETING_ESCRITURA]);
   if (auth instanceof NextResponse) return auth;

@@ -11,8 +11,9 @@
 // (`resumenesDeCobro`), que es el cálculo del ZIP. La portada, el detalle del
 // cobro, el cierre y el ZIP dicen lo mismo.
 //
-// Se ve solo con `veMarketingNuevo(role)` (hoy: administrador). Los demás,
-// la pantalla de hoy (`MarketingPage`).
+// Se ve con `veMarketingNuevo(role)` (desde el 8-oct-2026: todos los roles de
+// Marketing). Contabilidad solo mira: sin «＋ Gasto», «Cerrar», «Subir
+// comprobante» ni editar (`escribe`).
 // ============================================================================
 
 import { useCallback, useEffect, useState } from "react";
