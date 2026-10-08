@@ -55,7 +55,9 @@ describe("solo lo cobrable · apagado = las pantallas de hoy, byte por byte", ()
       </ToastProvider>,
     );
     // La fecha nace con «hoy»: se fija para que la foto no dependa del día.
-    const html = container.innerHTML.replace(/value="\d{4}-\d{2}-\d{2}"/g, 'value="HOY"');
+    const html = container.innerHTML
+      .replace(/value="\d{4}-\d{2}-\d{2}"/g, 'value="HOY"')
+      .replace(/<span class="text-gray-900">\d{1,2} [a-z]{3,4} \d{4}<\/span>/g, '<span class="text-gray-900">HOY</span>');
     await expect(html).toMatchFileSnapshot(FOTO("factura-form"));
   });
 
