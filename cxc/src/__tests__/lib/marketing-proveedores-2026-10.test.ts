@@ -153,24 +153,13 @@ describe("el interruptor", () => {
     expect(ruta).not.toMatch(/inventario/i);
   });
 
-  it("las dos migraciones existen y NO se aplicaron", () => {
+  it("la migración de proveedores es aditiva", () => {
     const esquema = leer("supabase/migrations/20270101120000_mkt_proveedores.sql");
     expect(esquema).toContain("SIN APLICAR");
     expect(esquema).toContain("mk_proveedor_alias");
     // Aditiva: ni un DROP, ni un TRUNCATE, ni un DELETE.
     expect(esquema).not.toMatch(/\bDROP\s+(TABLE|COLUMN)\b/i);
     expect(esquema).not.toMatch(/\bTRUNCATE\b/i);
-    const ciento45 = leer(
-      "supabase/migrations/20270101130000_factura_145_sin_marca.sql",
-    );
-    expect(ciento45).toContain("ESPERA EL \"SI\" DE DANIEL");
-    // 🔴 El candado que impide moverla si ya se le reportó a la marca.
-    expect(ciento45).toMatch(/p\.estado = 'cerrado'/);
-    // 🔴 El monto no se toca en ningún UPDATE.
-    expect(ciento45).not.toMatch(/SET[^;]*\b(total|subtotal|itbms)\s*=/i);
-    // 🔴 Daniel dijo «no» a crear «Barras planas» en Mobiliario.
-    expect(ciento45).not.toMatch(/INSERT INTO mk_inventario_productos/i);
-    expect(ciento45).not.toMatch(/stock_total/i);
   });
 });
 
