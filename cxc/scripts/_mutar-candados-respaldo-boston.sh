@@ -119,17 +119,29 @@ mutar "src/app/api/cron/backup/route.ts" \
   '  { table: "mayor_lineas" },' "" \
   "backup: se va el mayor contable retirado"
 
-# 1.6 🩸 Se respalda una tabla con PK compuesta SIN su ORDER_BY: la paginación
+# 1.6 🩸 Se respalda una tabla con PK compuesta SIN declararla: la paginación
 #     deja de ser determinista y el respaldo sale corto pareciendo completo.
-mutar "src/app/api/cron/backup/route.ts" \
-  '  asistencia_horas_extra_aprobadas: ["empleado_codigo", "fecha"],' "" \
-  "backup: se pierde el ORDER_BY de una PK compuesta"
+mutar "src/lib/backup/tablas.ts" \
+  '  pedidos_linea_bulto: ["empresa_key", "pedido_switch_id", "codigo_barra_id", "bulto"],' "" \
+  "backup: se pierde la PK compuesta de una tabla respaldada"
 
-# 1.7 El ORDER_BY existe pero le falta una columna de la PK.
+# 1.7 La PK declarada cubre media PK.
+mutar "src/lib/backup/tablas.ts" \
+  '  pedidos_bodega_estado: ["empresa_key", "pedido_switch_id"],' \
+  '  pedidos_bodega_estado: ["empresa_key"],' \
+  "backup: la PK declarada cubre media PK"
+
+# 1.7b 🩸 8-oct-2026: una tabla sin `id` que nadie declaró → el respaldo pide
+#      `id` y sale 500.
+mutar "src/lib/backup/tablas.ts" \
+  '  mk_proveedor_alias: ["alias_normalizado"],' "" \
+  "backup: tabla sin id ordenada por id"
+
+# 1.7c Alguien vuelve a poner una lista de orden propia en el route.
 mutar "src/app/api/cron/backup/route.ts" \
-  '  cuentas_contables: ["empresa_key", "cuenta"],' \
-  '  cuentas_contables: ["empresa_key"],' \
-  "backup: el ORDER_BY cubre media PK"
+  'const orderCols = columnasDeOrden(table);' \
+  'const ORDER_BY: Record<string, string[]> = {}; const orderCols = ORDER_BY[table] || ["id"];' \
+  "backup: el route vuelve a tener su propia lista de orden"
 
 # 1.8 Se respalda una VISTA (al restaurar choca con la que recrea la migración).
 mutar "src/app/api/cron/backup/route.ts" \

@@ -100,6 +100,7 @@ import {
 import { verifySession } from "@/lib/session-cookie";
 import { shortError } from "@/lib/telegram";
 import { enviarSistema } from "@/lib/alertas/canal";
+import { columnasDeOrden } from "@/lib/backup/tablas";
 
 /**
  * ¿El fallo de ESTA corrida de backup puede esperar a la próxima entrada del
@@ -423,6 +424,11 @@ const SWITCH_DATASETS: Dataset[] = [
   // switch_articulo_diario). Cuando se decida borrar la tabla, se saca de acá en
   // el MISMO cambio — nunca antes.
   { table: "multifashion_tickets" },
+  // Guías › Pedidos (8-oct-2026): los pedidos y sus líneas, como los mandó
+  // Switch. Se vuelven a bajar, pero pesan nada (13 + 226 filas) y sin ellos
+  // los bultos de `pedidos_linea_bulto` restaurados no tienen a qué colgarse.
+  { table: "switch_pedidos" },
+  { table: "pedidos_lineas" },
 ];
 
 // ── Buckets de Storage que se replican OFF-SITE a R2 ─────────────────────────
@@ -459,52 +465,53 @@ const R2_MANIFEST_DIAS = 7;
  *  off-site de Storage — para poder auditarla sin credenciales de R2. */
 const STORAGE_R2_META_PATH = `${STORAGE_PREFIX}/meta-r2.json`;
 
-// Columna(s) de orden para paginación estable (PostgREST Range sin order NO es
-// determinista). Default: "id". Excepciones = tablas cuya PK no es "id".
-// 🔴 La lista NO se escribe a ojo: `PK_QUE_NO_ES_ID` (src/lib/backup/tablas.ts)
-// tiene la llave real de producción, medida, y `backup-nada-sin-copia.test.ts`
-// exige que ACÁ esté cubierta columna por columna toda tabla respaldada cuya PK
-// no sea `id`. Sin eso el respaldo sale incompleto y parece completo.
-const ORDER_BY: Record<string, string[]> = {
-  comision_vendedor_tasa: ["vendedor_nombre"],
-  vendedores: ["empresa_key", "nombre"],
-  app_settings: ["key"],
-  asistencia_personas: ["empleado_codigo"],
-  asistencia_horarios: ["empleado_codigo"],
-  asistencia_horas_extra_aprobadas: ["empleado_codigo", "fecha"],
-  asistencia_planilla_manual: ["quincena", "empleado_codigo"],
-  asistencia_prestamo_aprobado: ["quincena", "empleado_codigo"],
-  asistencia_lugares_referencia: ["empresa_key"],
-  asistencia_reparto_empresa: ["empleado_codigo", "empresa"],
-  asistencia_aprobador_empresa: ["usuario", "empresa"],
-  asistencia_codigos_ignorados: ["empleado_codigo"],
-  asistencia_feriados: ["fecha"],
-  asistencia_dispositivos: ["dispositivo"],
-  comision_vendedor_alias: ["nombre_switch"],
-  cuentas_contables: ["empresa_key", "cuenta"],
-  fg_catalogo_publico_switch: ["empresa_key"],
-  fg_user_switch_vendedor: ["user_id", "empresa_key"],
-  switch_articulo_info: ["empresa_key", "codigo"],
-  switch_articulo_marca: ["empresa_key", "articulo_id"],
-  switch_estadocuenta_saldo: ["empresa_key", "cliente_switch_id"],
-  switch_ingresos_mercancia: ["empresa_key", "n_interno", "linea"],
-  pedidos_bodega_estado: ["empresa_key", "pedido_switch_id"],
-  pedidos_linea_bulto: ["empresa_key", "pedido_switch_id", "codigo_barra_id", "bulto"],
-  switch_pedidos: ["empresa_key", "pedido_switch_id"],
-};
+// Orden para paginación estable (PostgREST Range sin order NO es determinista):
+// la llave primaria real de cada tabla, de `columnasDeOrden()` en
+// src/lib/backup/tablas.ts — fuente única, con candado en
+// `backup-nada-sin-copia.test.ts`.
+
+/** Error que NO se arregla esperando: falta una columna o una tabla, o no hay
+ *  permiso. Una caída de red o un 5xx sí puede arreglarse sola. */
+function esErrorDeEstructura(mensaje: string): boolean {
+  return /does not exist|could not find the table|permission denied|schema cache/i.test(mensaje);
+}
+
+/** Error de Postgres «la columna no existe» (42703). */
+function esColumnaInexistente(error: { code?: string; message?: string }): boolean {
+  return error.code === "42703" || /column .* does not exist/i.test(error.message ?? "");
+}
 
 /** Trae TODAS las filas de una tabla paginando de a PAGE con orden estable,
  *  acumulando NDJSON por página. No retiene los objetos: switch_articulo_diario
  *  son ~197K filas (~72MB de NDJSON) — retener el array de objetos y además el
  *  string duplicaría el pico de memoria de la función. */
-async function fetchTableNdjson(table: string, select: string): Promise<{ ndjson: string; rows: number }> {
-  const orderCols = ORDER_BY[table] || ["id"];
+async function fetchTableNdjson(
+  table: string,
+  select: string,
+): Promise<{ ndjson: string; rows: number; aviso?: string }> {
+  const orderCols = columnasDeOrden(table);
   const parts: string[] = [];
   let count = 0;
   for (let from = 0; ; from += PAGE) {
     let query = supabaseServer.from(table).select(select);
     for (const col of orderCols) query = query.order(col, { ascending: true });
     const { data, error } = await query.range(from, from + PAGE - 1);
+    if (error && from === 0 && esColumnaInexistente(error)) {
+      // La columna de orden no existe (la llave declarada está mal). Sin orden
+      // una tabla que entra en UNA página sale completa igual: no hay página
+      // siguiente que pueda saltear filas. Si no entra, falla — con nombre.
+      const sinOrden = await supabaseServer.from(table).select(select).range(0, PAGE);
+      if (sinOrden.error) throw new Error(`${table}: ${sinOrden.error.message}`);
+      const filas = sinOrden.data ?? [];
+      if (filas.length > PAGE) {
+        throw new Error(`${table}: ${error.message} (y tiene más de ${PAGE} filas: sin orden no se puede paginar)`);
+      }
+      return {
+        ndjson: filas.map((r) => JSON.stringify(r)).join("\n"),
+        rows: filas.length,
+        aviso: `${table}: ${error.message} — copiada sin orden (${filas.length} filas, cabe en una página)`,
+      };
+    }
     if (error) throw new Error(`${table}: ${error.message}`);
     for (const r of data ?? []) parts.push(JSON.stringify(r));
     count += (data ?? []).length;
@@ -682,6 +689,9 @@ export async function GET(req: NextRequest) {
 
   const results: Array<{ file: string; table: string; rows: number; bytes: number }> = [];
   const errores: Array<{ file: string; error: string }> = [];
+  // Tablas que salieron completas pero por el camino de emergencia (sin orden):
+  // no tumban nada, pero dicen que la llave declarada está mal.
+  const avisos: string[] = [];
   let totalBytes = 0;
   // Mismos bytes que van a Supabase, para la réplica off-site a R2. Paths CON
   // FECHA (data/YYYY-MM-DD/<archivo>): antes eran estables y cada corrida
@@ -693,7 +703,8 @@ export async function GET(req: NextRequest) {
   for (const ds of datasets) {
     const file = ds.file || ds.table;
     try {
-      const { ndjson, rows } = await fetchTableNdjson(ds.table, ds.select || "*");
+      const { ndjson, rows, aviso } = await fetchTableNdjson(ds.table, ds.select || "*");
+      if (aviso) avisos.push(aviso);
       const gz = gzipSync(Buffer.from(ndjson, "utf-8"));
       const { error: upErr } = await supabaseServer.storage
         .from(BUCKET)
@@ -740,6 +751,7 @@ export async function GET(req: NextRequest) {
     // (no puede contarse a sí misma) y su resultado sale en la respuesta HTTP.
     r2,
     errores,
+    avisos,
   };
   const metaBuf = Buffer.from(JSON.stringify(meta, null, 2), "utf-8");
 
@@ -834,12 +846,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  if (avisos.length > 0) {
+    console.error(`[${cronName}] tablas copiadas sin orden:`, avisos.join("; "));
+    await logCronError(`${cronName.replace(/-/g, "_")}_sin_orden`, avisos.join("; "), null, { telegram: false });
+  }
+
   if (errores.length > 0) {
     const detalle = errores.map((e) => `${e.file}: ${e.error}`).join("; ");
     console.error(`[${cronName}] datasets con error:`, detalle);
     // Backup incompleto → 500 (sin heartbeat → health-crons lo marca stale). El
-    // aviso a Daniel espera si hoy queda otra entrada del grupo que lo repare.
-    const puedeEsperar = alertaDeBackupEsperaSegundaOportunidad(cronName, horaUtcAhora);
+    // aviso a Daniel espera si hoy queda otra entrada del grupo que lo repare…
+    // salvo que el error sea de ESTRUCTURA (columna o tabla que no existe):
+    // ese no se arregla solo y la corrida de las 10:30 fallaría igual. El
+    // 8-oct-2026 `mk_proveedor_alias.id does not exist` esperó callado.
+    const puedeEsperar =
+      !errores.some((e) => esErrorDeEstructura(e.error)) &&
+      alertaDeBackupEsperaSegundaOportunidad(cronName, horaUtcAhora);
     await logCronError(
       `${cronName.replace(/-/g, "_")}_incompleto`,
       puedeEsperar ? `(sin avisar: queda otra corrida hoy) ${detalle}` : detalle,

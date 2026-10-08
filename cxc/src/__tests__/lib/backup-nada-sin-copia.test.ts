@@ -26,10 +26,12 @@
 //   C. NO SE RESPALDA UNA VISTA. Se recalculan; una vista en el respaldo es un
 //      archivo que al restaurar choca con la vista que la migración recrea.
 //
-//   D. 🩸 LA PAGINACIÓN NO PUEDE SER SILENCIOSAMENTE INCOMPLETA. Toda tabla
-//      respaldada cuya llave primaria no sea `id` tiene que estar en `ORDER_BY`
-//      con SUS columnas: sin eso PostgREST puede saltear filas entre páginas y
-//      el respaldo sale corto pareciendo completo. Nada más lo dice.
+//   D. 🩸 LA PAGINACIÓN NO PUEDE ROMPERSE NI SER SILENCIOSAMENTE INCOMPLETA.
+//      El respaldo ordena cada tabla por `columnasDeOrden()` (su PK real). Se
+//      leen las migraciones: si una tabla respaldada no tiene esa columna, o su
+//      PK no es la declarada, el build se pone ROJO. El 8-oct-2026 entró
+//      `mk_proveedor_alias` (PK `alias_normalizado`, sin `id`) y el respaldo
+//      pidió `id` → 500.
 //
 // La foto de producción (qué tablas existen y cuál es su PK) la verifica
 // `src/__tests__/integration/backup-tablas-produccion.test.ts` contra la base
@@ -41,6 +43,7 @@ import path from "path";
 import {
   CLASIFICACION,
   PK_QUE_NO_ES_ID,
+  columnasDeOrden,
   TABLAS_DE_MIGRACION_QUE_NO_EXISTEN,
   VISTAS,
   obligaRespaldo,
@@ -58,15 +61,55 @@ const RESPALDADAS = new Set(
   [...ROUTE.matchAll(/\{\s*table:\s*"([a-z_0-9]+)"/g)].map((m) => m[1]),
 );
 
-/** El `ORDER_BY` del route, leído del archivo (no importable: el route arrastra
- *  Supabase y Next). */
-function orderByDelRoute(): Record<string, string[]> {
-  const bloque = ROUTE.match(/const ORDER_BY: Record<string, string\[\]> = \{([\s\S]*?)\n\};/);
-  if (!bloque) throw new Error("no encontré ORDER_BY en el route del backup");
-  const out: Record<string, string[]> = {};
-  for (const m of bloque[1].matchAll(/^\s*([a-z_0-9]+):\s*\[([^\]]*)\]/gm)) {
-    out[m[1]] = [...m[2].matchAll(/"([a-z_0-9]+)"/g)].map((c) => c[1]);
+/** Columnas y PK de cada tabla según las migraciones (`create table` +
+ *  `alter table … add column`). Una tabla creada desde el panel no aparece. */
+type Esquema = { columnas: Set<string>; pk?: string[]; creada?: boolean };
+function esquemaDeMigraciones(): Map<string, Esquema> {
+  const dir = path.join(RAIZ, "supabase/migrations");
+  const out = new Map<string, Esquema>();
+  const de = (t: string) => {
+    if (!out.has(t)) out.set(t, { columnas: new Set() });
+    return out.get(t)!;
+  };
+  for (const archivo of fs.readdirSync(dir).sort()) {
+    if (!archivo.endsWith(".sql")) continue;
+    const sql = fs.readFileSync(path.join(dir, archivo), "utf8").replace(/--[^\n]*/g, "");
+    for (const m of sql.matchAll(
+      /create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?"?([a-z_][a-z_0-9]*)"?\s*\(/gi,
+    )) {
+      // Cuerpo hasta el paréntesis que cierra, cortado por comas de nivel 0.
+      let nivel = 1, i = m.index! + m[0].length, parte = "";
+      const partes: string[] = [];
+      for (; i < sql.length && nivel > 0; i++) {
+        const c = sql[i];
+        if (c === "(") nivel++;
+        if (c === ")") nivel--;
+        if (nivel === 1 && c === ",") { partes.push(parte); parte = ""; } else if (nivel > 0) parte += c;
+      }
+      partes.push(parte);
+      const t = de(m[1].toLowerCase());
+      t.creada = true;
+      for (const p of partes.map((x) => x.trim())) {
+        const pkCompuesta = p.match(/^(?:constraint\s+\S+\s+)?primary\s+key\s*\(([^)]*)\)/i);
+        if (pkCompuesta) { t.pk = pkCompuesta[1].split(",").map((c) => c.trim().replace(/"/g, "").toLowerCase()); continue; }
+        if (/^(constraint|unique|check|foreign|exclude|like)\b/i.test(p)) continue;
+        const col = p.match(/^"?([a-z_][a-z_0-9]*)"?\s/i);
+        if (!col) continue;
+        t.columnas.add(col[1].toLowerCase());
+        if (/\bprimary\s+key\b/i.test(p)) t.pk = [col[1].toLowerCase()];
+      }
+    }
+    for (const m of sql.matchAll(
+      /alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?(?:public\.)?"?([a-z_][a-z_0-9]*)"?([^;]*)/gi,
+    )) {
+      for (const c of m[2].matchAll(/add\s+column\s+(?:if\s+not\s+exists\s+)?"?([a-z_][a-z_0-9]*)"?/gi)) {
+        de(m[1].toLowerCase()).columnas.add(c[1].toLowerCase());
+      }
+    }
   }
+  // Las que solo aparecen en un `alter table` nacieron en el panel: no se sabe
+  // su estructura entera, así que no se juzgan acá.
+  for (const [t, e] of out) if (!e.creada) out.delete(t);
   return out;
 }
 
@@ -169,17 +212,42 @@ describe("C. no se respalda una vista", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("D. la paginación no puede quedar incompleta en silencio", () => {
-  const ORDER_BY = orderByDelRoute();
+describe("D. la paginación no puede romperse ni quedar incompleta en silencio", () => {
+  const ESQUEMA = esquemaDeMigraciones();
 
-  it("toda tabla respaldada con PK distinta de `id` tiene su ORDER_BY", () => {
+  it("el parser de migraciones ve la tabla del 8-oct como es", () => {
+    // Si esto falla, el parser se rompió y el resto de D no prueba nada.
+    expect(ESQUEMA.get("mk_proveedor_alias")?.pk).toEqual(["alias_normalizado"]);
+    expect(ESQUEMA.get("mk_proveedor_alias")?.columnas.has("id")).toBe(false);
+    expect(ESQUEMA.get("pedidos_linea_bulto")?.pk).toEqual([
+      "empresa_key", "pedido_switch_id", "codigo_barra_id", "bulto",
+    ]);
+  });
+
+  it("toda tabla respaldada tiene la columna por la que el respaldo la lee", () => {
     const rotas: string[] = [];
     for (const tabla of RESPALDADAS) {
-      const pk = PK_QUE_NO_ES_ID[tabla];
-      if (!pk) continue; // PK = id → el default alcanza
-      const orden = ORDER_BY[tabla];
-      if (!orden || orden.join(",") !== pk.join(",")) {
-        rotas.push(`${tabla} (PK ${pk.join("+")}, ORDER_BY ${orden?.join("+") ?? "ausente"})`);
+      const t = ESQUEMA.get(tabla);
+      if (!t) continue; // creada desde el panel: la mira el test de integración
+      const faltan = columnasDeOrden(tabla).filter((c) => !t.columnas.has(c));
+      if (faltan.length) rotas.push(`${tabla}: ordena por ${faltan.join("+")} y no la tiene`);
+    }
+    expect(
+      rotas,
+      `El respaldo va a fallar en estas tablas:\n` +
+        rotas.map((r) => `  · ${r}`).join("\n") +
+        `\nDeclárale su PK real en PK_QUE_NO_ES_ID (src/lib/backup/tablas.ts).`,
+    ).toEqual([]);
+  });
+
+  it("toda tabla respaldada se ordena por su PK de verdad", () => {
+    const rotas: string[] = [];
+    for (const tabla of RESPALDADAS) {
+      const pk = ESQUEMA.get(tabla)?.pk;
+      if (!pk) continue;
+      const orden = columnasDeOrden(tabla);
+      if (orden.join(",") !== pk.join(",")) {
+        rotas.push(`${tabla} (PK ${pk.join("+")}, se ordena por ${orden.join("+")})`);
       }
     }
     expect(
@@ -189,8 +257,8 @@ describe("D. la paginación no puede quedar incompleta en silencio", () => {
     ).toEqual([]);
   });
 
-  it("no sobra ningún ORDER_BY (una tabla con PK `id` no lo necesita)", () => {
-    const sobran = Object.keys(ORDER_BY).filter((t) => !PK_QUE_NO_ES_ID[t]);
-    expect(sobran, `ORDER_BY de más: ${sobran.join(", ")}`).toEqual([]);
+  it("el route no tiene una lista de orden propia (una sola fuente)", () => {
+    expect(ROUTE).not.toMatch(/const ORDER_BY/);
+    expect(ROUTE).toMatch(/columnasDeOrden\(table\)/);
   });
 });
