@@ -35,6 +35,7 @@
 // Todo cuelga de `MARKETING_PUERTA_GASTO` (`RegistrarGastoModal.tsx` elige).
 // ============================================================================
 
+import { useSoloCobrable } from "@/lib/marketing/solo-cobrable-contexto";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ToastSystem";
@@ -101,7 +102,6 @@ import type {
 } from "@/lib/marketing/types";
 import { ENLACE, MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
 import {
-  MKT_SOLO_COBRABLE_2026_10,
   faltaEnElDestino,
   tiendaQueSeGuarda,
   type DestinoDelCargo,
@@ -159,6 +159,7 @@ export default function PuertaGasto({
   onSaved,
 }: PuertaGastoProps) {
   const { toast } = useToast();
+  const MKT_SOLO_COBRABLE_2026_10 = useSoloCobrable();
   const codigoPuesto = String(tiendaCodigo ?? "").trim().toUpperCase();
   const tiendaInicial: TiendaElegida | null =
     tiendaInicialProp ??
@@ -812,18 +813,6 @@ export default function PuertaGasto({
         {paso === "form" && esCargo && (
           <div className="p-5 space-y-4" data-testid="registro-del-cargo">
             <input
-              ref={camaraRef}
-              type="file"
-              accept={ACCEPT_DE_LA_CAMARA}
-              capture={CAPTURE_DE_LA_CAMARA}
-              className="hidden"
-              onChange={(e) => {
-                const archivo = e.target.files?.[0] ?? null;
-                e.target.value = "";
-                if (archivo) void escanearFactura(archivo);
-              }}
-            />
-            <input
               ref={fotoRef}
               type="file"
               accept={aceptaDeLaPuerta()}
@@ -841,9 +830,7 @@ export default function PuertaGasto({
             <ComprobanteDelCargo
               archivo={(foto ?? pdfPuerta)?.name ?? null}
               leyendo={leyendo}
-              enCelular={enCelular}
               onAdjuntar={() => fotoRef.current?.click()}
-              onEscanear={() => camaraRef.current?.click()}
               onQuitar={() => {
                 setFoto(null);
                 setPdfPuerta(null);

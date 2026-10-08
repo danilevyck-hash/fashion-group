@@ -1,0 +1,153 @@
+{
+ "total": 3410,
+ "gastos": 1,
+ "carpetas": [],
+ "archivos": [
+  "resumen_gastos.xlsx"
+ ],
+ "excel": [
+  {
+   "hoja": "Resumen",
+   "celdas": [
+    [
+     "FASHION GROUP — Calvin Klein",
+     null,
+     null,
+     null
+    ],
+    [
+     "Período 2026 · período abierto — gastos al HOY",
+     null,
+     null,
+     null
+    ],
+    [
+     "",
+     null,
+     null,
+     null
+    ],
+    [
+     "Cliente",
+     "# Gastos",
+     "# Fotos",
+     "Total"
+    ],
+    [
+     "Nova Lux, S.A.",
+     1,
+     0,
+     3410
+    ],
+    [
+     "TOTAL",
+     1,
+     0,
+     3410
+    ]
+   ],
+   "vinculos": [],
+   "columnas": [
+    32,
+    9,
+    8,
+    18
+   ],
+   "combinadas": []
+  },
+  {
+   "hoja": "Nova Lux, S.A.",
+   "celdas": [
+    [
+     "GASTOS",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Fecha",
+     "Período",
+     "Concepto",
+     "Proveedor",
+     "N° Factura",
+     "Total",
+     "Comprobante"
+    ],
+    [
+     "2026-09-26",
+     "—",
+     "Caja de luz",
+     "Proveedor, S.A.",
+     "0000062800",
+     3410,
+     "—"
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "TOTALES",
+     3410,
+     ""
+    ],
+    [
+     "",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "FOTOS",
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "Archivo",
+     "Foto",
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     "(sin fotos)",
+     "",
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   ],
+   "vinculos": [
+    [
+     "F4",
+     null,
+     "SUM(F3:F3)"
+    ]
+   ],
+   "columnas": [
+    12,
+    16,
+    40,
+    22,
+    16,
+    18,
+    16
+   ],
+   "combinadas": []
+  }
+ ]
+}

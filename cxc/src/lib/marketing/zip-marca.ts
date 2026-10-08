@@ -69,7 +69,7 @@ import {
   type MarcaCodigo,
 } from "./bloques";
 import { esMultifashion, MULTIFASHION_LABEL } from "./multifashion";
-import { MARKETING_TIENDAS_Y_MARCAS, esTiendaMultifashion } from "./tiendas-y-marcas";
+import { MARKETING_TIENDAS_Y_MARCAS, esTiendaMultifashion, gastoEsDeMultifashion } from "./tiendas-y-marcas";
 import { formatearFecha } from "./normalizar";
 import { etiquetaPeriodoCorta, periodoEfectivo } from "./periodo";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
@@ -84,7 +84,12 @@ import { seReportaDe, TIENDA_GENERAL } from "./gasto";
 import { MARKETING_FOTOS_CON_PERIODO } from "./fotos-periodo";
 import { conRespaldoSinColumnas, type ResultadoPg } from "./columnas-opcionales";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "./zip-e-impulsadoras";
-import { MKT_SOLO_COBRABLE_2026_10, carpetaDeFacturaSinTienda } from "./solo-cobrable-2026-10";
+import {
+  MKT_SOLO_COBRABLE_2026_10,
+  carpetaDeFacturaSinTienda,
+  motivoNoRecuperable,
+  type MotivoNoRecuperable,
+} from "./solo-cobrable-2026-10";
 import {
   aCargoDeLaEmpresa,
   MKT_PROVEEDORES_2026_10,
@@ -251,6 +256,7 @@ export interface PeriodoDeMarca {
   proveedor_key: string;
   nombre: string;
   estado: string;
+  abierto_en?: string | null;
   cerrado_en?: string | null;
   reporte?: unknown;
 }
@@ -775,7 +781,42 @@ async function leerAdjuntosDelZip(): Promise<{ data: AdjuntoFila[] | null; error
   return resultado;
 }
 
-async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescarga> {
+/**
+ * 🔴 LA ÚNICA TANDA DE LECTURAS DEL ZIP (8-oct-2026). Sale a una función para
+ * que la pantalla nueva (`resumenesDeCobro`) lea UNA vez para todas las marcas
+ * en lugar de una tanda por marca. El ZIP la sigue llamando igual.
+ */
+function leerTablasDelZip() {
+  return Promise.all([
+      supabaseServer
+        .from("mk_periodos")
+        .select("id, proveedor_key, nombre, estado, abierto_en, cerrado_en, reporte"),
+      supabaseServer
+        .from("mk_periodo_documentos")
+        .select("periodo_id, proveedor_key, tipo, documento_id"),
+      leerFacturasConSeReporta(),
+      supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id, porcentaje"),
+      supabaseServer
+        .from("mk_proyectos")
+        .select("id, nombre, tienda, tienda_codigo, anulado_en"),
+      supabaseServer.from("mk_marcas").select("id, nombre, codigo, empresa_codigo"),
+      leerEntregasConSeReporta(),
+      leerAdjuntosDelZip(),
+    ]);
+}
+
+type TablasDelZip = Awaited<ReturnType<typeof leerTablasDelZip>>;
+
+interface CtxPreparacion {
+  /** Las lecturas ya hechas (pantalla nueva: una tanda para todas las marcas). */
+  tablas?: TablasDelZip;
+  /** Solo los montos y las carpetas: sin firmar links ni armar comprobantes. */
+  soloMontos?: boolean;
+  /** Nombres del directorio ya leídos (se comparten entre marcas). */
+  nombres?: Map<string, string>;
+}
+
+async function prepararDescargaDeMarca(op: ZipMarcaOpciones, ctx: CtxPreparacion = {}): Promise<PrepDescarga> {
   const marcaCodigo = txt(op.marcaCodigo).toUpperCase();
   if (!esMarcaCodigo(marcaCodigo)) {
     throw new ErrorZipMarca(
@@ -790,22 +831,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
   // 1. UNA sola tanda de lecturas. La base de Daniel se satura fácil: nada de
   //    una consulta por documento ni de barridos en bucle.
   const [perRes, selloRes, factRes, fmRes, proyRes, marcasRes, entRes, adjRes] =
-    await Promise.all([
-      supabaseServer
-        .from("mk_periodos")
-        .select("id, proveedor_key, nombre, estado, cerrado_en, reporte"),
-      supabaseServer
-        .from("mk_periodo_documentos")
-        .select("periodo_id, proveedor_key, tipo, documento_id"),
-      leerFacturasConSeReporta(),
-      supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id, porcentaje"),
-      supabaseServer
-        .from("mk_proyectos")
-        .select("id, nombre, tienda, tienda_codigo, anulado_en"),
-      supabaseServer.from("mk_marcas").select("id, nombre, codigo, empresa_codigo"),
-      leerEntregasConSeReporta(),
-      leerAdjuntosDelZip(),
-    ]);
+    ctx.tablas ?? (await leerTablasDelZip());
 
   if (perRes.error || selloRes.error) {
     throw new ErrorZipMarca(
@@ -913,11 +939,14 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
   // 🔴 Los nombres se piden por los códigos de los GASTOS, no solo de los
   // proyectos: una factura con una tienda que ningún proyecto usa igual tiene
   // que salir con el nombre del directorio, no en «General».
-  const nombrePorCodigo = await leerNombresDeCliente([
-    ...proyectos.map((p) => p.tienda_codigo),
-    ...facturas.map((f) => f.tienda_codigo),
-    ...entregas.map((e) => e.tienda_codigo),
-  ]);
+  const nombrePorCodigo =
+    ctx.nombres ??
+    (await leerNombresDeCliente([
+      ...proyectos.map((p) => p.tienda_codigo),
+      ...facturas.map((f) => f.tienda_codigo),
+      ...entregas.map((e) => e.tienda_codigo),
+    ]));
+  if (ctx.nombres === undefined && ctx.soloMontos) ctx.nombres = nombrePorCodigo;
 
   const facturasDeMarca: Array<{ f: FacturaFila; monto: number }> = [];
   if (marcaId) {
@@ -1054,6 +1083,23 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescar
     },
     periodoId: periodo.id,
   });
+  if (ctx.soloMontos) {
+    // La pantalla nueva solo necesita la plata y las carpetas: nada de Storage.
+    return {
+      codigo: marca,
+      marcaNombre,
+      periodo,
+      usarCongelado,
+      lineasSinMarca: usarCongelado ? lineasSinMarca : 0,
+      gastos,
+      total,
+      comprobantesPorFactura,
+      fotosPorCarpeta,
+      urlFirmada: new Map(),
+      comprobantesEntrega: new Map(),
+      linkPorGasto: new Map(),
+    };
+  }
   const urlFirmada = await firmarLote(
     pathsParaFirmar(gastos, comprobantesPorFactura, fotosPorCarpeta),
   );
@@ -1817,4 +1863,259 @@ function armarClientes(
       fotos: fotosDe(nombre),
     };
   });
+}
+
+// ============================================================================
+// 🔴 EL NÚMERO DE LA PANTALLA NUEVA ES EL DEL ZIP (8-oct-2026).
+//
+// Daniel: hoy «cuatro pantallas dan cuatro totales distintos». En el Marketing
+// nuevo, Por cobrar, el detalle del cobro, el cierre y el ZIP leen ESTE
+// cálculo: la misma preparación que arma el Excel (`prepararDescargaDeMarca`),
+// sin bajar archivos. Si el ZIP cambiara una regla, la pantalla cambia con él.
+// Solo lee: una tanda de lecturas para todas las marcas.
+// ============================================================================
+
+const MARCAS_DEL_COBRO: readonly MarcaCodigo[] = ["TH", "CK", "KL", "RBK", "J"];
+
+export interface LineaDelCobro {
+  tipo: "factura" | "entrega";
+  documentoId: string | null;
+  fecha: string;
+  concepto: string;
+  proveedor: string;
+  /** La carpeta del ZIP: la tienda, «Impulsadoras», «General»… */
+  carpeta: string;
+  clienteCodigo: string | null;
+  /** Lo que se le cobra a la marca: la celda «Total» del Excel. */
+  monto: number;
+}
+
+export interface ResumenDelCobro {
+  marcaCodigo: MarcaCodigo;
+  marcaNombre: string;
+  periodoId: string;
+  periodoNombre: string;
+  estado: "abierto" | "cerrado";
+  abiertoEn: string | null;
+  cerradoEn: string | null;
+  /** El total de la hoja Resumen del ZIP, al centavo. */
+  total: number;
+  lineas: LineaDelCobro[];
+  /** Fotos por carpeta (la columna «# Fotos» del Excel). */
+  fotosPorCarpeta: Record<string, number>;
+  /** Tiendas (carpetas con código) que van sin ninguna foto. */
+  tiendasSinFoto: string[];
+}
+
+function resumenDe(prep: PrepDescarga, marca: MarcaCodigo): ResumenDelCobro {
+  const fotos: Record<string, number> = {};
+  for (const g of prep.gastos) fotos[g.carpeta] = prep.fotosPorCarpeta.get(g.carpeta)?.length ?? 0;
+  const tiendas = new Set(prep.gastos.filter((g) => g.clienteCodigo).map((g) => g.carpeta));
+  return {
+    marcaCodigo: marca,
+    marcaNombre: prep.marcaNombre,
+    periodoId: prep.periodo ? String(prep.periodo.id) : "",
+    periodoNombre: prep.periodo ? txt(prep.periodo.nombre) : "",
+    estado: prep.periodo && txt(prep.periodo.estado) === "cerrado" ? "cerrado" : "abierto",
+    abiertoEn: prep.periodo?.abierto_en ?? null,
+    cerradoEn: prep.periodo?.cerrado_en ?? null,
+    total: prep.total,
+    lineas: prep.gastos.map((g) => ({
+      tipo: g.tipo,
+      documentoId: g.documentoId,
+      fecha: g.fecha,
+      concepto: g.concepto,
+      proveedor: g.proveedor,
+      carpeta: g.carpeta,
+      clienteCodigo: g.clienteCodigo,
+      monto: g.monto,
+    })),
+    fotosPorCarpeta: fotos,
+    tiendasSinFoto: Array.from(tiendas).filter((c) => (fotos[c] ?? 0) === 0).sort(),
+  };
+}
+
+export type EstadoDelGasto = "por_cobrar" | "cobrado" | "no_recuperable";
+
+/** Un renglón de la pestaña Gastos: cualquier gasto, con lo que dice el ZIP. */
+export interface GastoDeLaLista {
+  id: string;
+  tipo: "factura" | "mobiliario" | "impulsadora";
+  fecha: string;
+  numero: string;
+  proveedor: string;
+  concepto: string;
+  marcaCodigo: string | null;
+  marcaNombre: string | null;
+  tiendaCodigo: string | null;
+  tiendaNombre: string;
+  /** El monto completo del documento. */
+  monto: number;
+  /** Lo que se le cobra a la marca, del ZIP (abierto o cerrado). 0 = no recuperable. */
+  aCobrar: number;
+  estado: EstadoDelGasto;
+  motivo: MotivoNoRecuperable | null;
+  impulsadoraId: string | null;
+  impulsadoraMes: string | null;
+  periodoId: string | null;
+}
+
+export interface MarketingDelCobro {
+  abiertos: ResumenDelCobro[];
+  cerrados: ResumenDelCobro[];
+  gastos: GastoDeLaLista[];
+}
+
+/** El resumen de UN cobro (abierto o cerrado). Lanza `ErrorZipMarca` como el ZIP. */
+export async function resumenDeUnCobro(op: ZipMarcaOpciones): Promise<ResumenDelCobro> {
+  const marca = txt(op.marcaCodigo).toUpperCase();
+  const prep = await prepararDescargaDeMarca(op, { soloMontos: true });
+  return resumenDe(prep, marca as MarcaCodigo);
+}
+
+/** Lo abierto (por cobrar) y lo cerrado (cobros anteriores) de cada marca. */
+export async function resumenesDeCobro(): Promise<MarketingDelCobro> {
+  const ctx: CtxPreparacion = { tablas: await leerTablasDelZip(), soloMontos: true };
+  const periodos = (ctx.tablas![0].data ?? []) as PeriodoDeMarca[];
+  const abiertos: ResumenDelCobro[] = [];
+  const cerrados: ResumenDelCobro[] = [];
+  const intentar = async (marca: MarcaCodigo, periodoId: string | null): Promise<ResumenDelCobro | null> => {
+    try {
+      return resumenDe(await prepararDescargaDeMarca({ marcaCodigo: marca, periodoId }, ctx), marca);
+    } catch (err) {
+      // Sin gasto o sin período abierto: esa marca no tiene nada que cobrar.
+      if (err instanceof ErrorZipMarca) return null;
+      throw err;
+    }
+  };
+  // En serie a propósito: la base ya se leyó; esto es solo cálculo.
+  for (const marca of MARCAS_DEL_COBRO) {
+    const abierto = await intentar(marca, null);
+    if (abierto) abiertos.push(abierto);
+    const claves = clavesDeSello(marca);
+    for (const p of periodos) {
+      if (txt(p.estado) !== "cerrado" || !claves.includes(txt(p.proveedor_key))) continue;
+      const c = await intentar(marca, String(p.id));
+      if (c) cerrados.push(c);
+    }
+  }
+  cerrados.sort((a, b) => txt(b.cerradoEn).localeCompare(txt(a.cerradoEn)) || a.marcaNombre.localeCompare(b.marcaNombre));
+  return { abiertos, cerrados, gastos: await listaDeGastos(ctx, abiertos, cerrados) };
+}
+
+/**
+ * La pestaña Gastos: TODO lo registrado, con el estado y el «A cobrar» que
+ * salen de los mismos resúmenes del ZIP. Por cobrar = está en el ZIP abierto
+ * de su marca; Cobrado = en el de un período cerrado; lo demás no se le cobra
+ * a nadie.
+ */
+async function listaDeGastos(
+  ctx: CtxPreparacion,
+  abiertos: ReadonlyArray<ResumenDelCobro>,
+  cerrados: ReadonlyArray<ResumenDelCobro>,
+): Promise<GastoDeLaLista[]> {
+  const [, , factRes, fmRes, proyRes, marcasRes, entRes] = ctx.tablas!;
+  const facturas = (factRes.data ?? []) as FacturaFila[];
+  const fm = (fmRes.data ?? []) as Array<{ factura_id: string; marca_id: string }>;
+  const proyectos = new Map(((proyRes.data ?? []) as ProyectoFila[]).map((p) => [String(p.id), p]));
+  const marcas = (marcasRes.data ?? []) as MarcaFila[];
+  const entregas = (entRes.data ?? []) as EntregaFila[];
+  const marcaPorId = new Map(marcas.map((m) => [String(m.id), m]));
+  const nombres =
+    ctx.nombres ??
+    (await leerNombresDeCliente([...facturas.map((f) => f.tienda_codigo), ...entregas.map((e) => e.tienda_codigo)]));
+
+  type EnElZip = { estado: EstadoDelGasto; aCobrar: number; carpeta: string; marcas: string[]; periodoId: string };
+  const enElZip = new Map<string, EnElZip>();
+  const anotar = (r: ResumenDelCobro, estado: EstadoDelGasto) => {
+    for (const l of r.lineas) {
+      if (!l.documentoId) continue;
+      const k = `${l.tipo}:${l.documentoId}`;
+      const ya = enElZip.get(k);
+      if (ya && ya.estado !== estado) continue; // lo abierto manda sobre lo cerrado
+      if (ya) {
+        ya.aCobrar = round2(ya.aCobrar + l.monto);
+        if (!ya.marcas.includes(r.marcaCodigo)) ya.marcas.push(r.marcaCodigo);
+      } else {
+        enElZip.set(k, { estado, aCobrar: l.monto, carpeta: l.carpeta, marcas: [r.marcaCodigo], periodoId: r.periodoId });
+      }
+    }
+  };
+  abiertos.forEach((r) => anotar(r, "por_cobrar"));
+  cerrados.forEach((r) => anotar(r, "cobrado"));
+
+  const marcaDe = (codigos: string[], ids: string[]): { codigo: string | null; nombre: string | null } => {
+    if (codigos.length > 0) {
+      const m = marcas.find((x) => txt(x.codigo).toUpperCase() === codigos[0]);
+      return { codigo: codigos[0], nombre: m ? txt(m.nombre) : codigos[0] };
+    }
+    const m = ids.map((id) => marcaPorId.get(id)).find(Boolean);
+    return m ? { codigo: txt(m.codigo).toUpperCase() || null, nombre: txt(m.nombre) } : { codigo: null, nombre: null };
+  };
+  const tiendaDe = (codigo: string | null | undefined, z: EnElZip | undefined) => {
+    const c = txt(codigo).toUpperCase() || null;
+    return { tiendaCodigo: c, tiendaNombre: z?.carpeta ?? (c ? nombres.get(c) || c : "Sin tienda") };
+  };
+
+  const out: GastoDeLaLista[] = [];
+  for (const f of facturas) {
+    if (f.anulado_en) continue;
+    const z = enElZip.get(`factura:${f.id}`);
+    const p = f.proyecto_id ? proyectos.get(String(f.proyecto_id)) : undefined;
+    const m = marcaDe(z?.marcas ?? [], fm.filter((r) => String(r.factura_id) === String(f.id)).map((r) => String(r.marca_id)));
+    out.push({
+      id: String(f.id),
+      tipo: f.impulsadora_id ? "impulsadora" : "factura",
+      fecha: txt(f.fecha_factura).slice(0, 10),
+      numero: txt(f.numero_factura),
+      proveedor: txt(f.proveedor),
+      concepto: txt(f.concepto),
+      marcaCodigo: m.codigo,
+      marcaNombre: m.nombre,
+      ...tiendaDe(f.tienda_codigo ?? p?.tienda_codigo, z),
+      monto: num(f.total),
+      aCobrar: z?.aCobrar ?? 0,
+      estado: z?.estado ?? "no_recuperable",
+      motivo: z
+        ? null
+        : motivoNoRecuperable({
+            esTiendaPropia: gastoEsDeMultifashion({ tiendaCodigo: f.tienda_codigo, proyecto: p ?? null }),
+            pctALaMarca: f.pct_a_la_marca,
+            seReporta: f.se_reporta,
+          }),
+      impulsadoraId: f.impulsadora_id ? String(f.impulsadora_id) : null,
+      impulsadoraMes: f.impulsadora_mes ? txt(f.impulsadora_mes).slice(0, 7) : null,
+      periodoId: z?.periodoId ?? null,
+    });
+  }
+  for (const e of entregas) {
+    const z = enElZip.get(`entrega:${e.id}`);
+    const p = e.proyecto_id ? proyectos.get(String(e.proyecto_id)) : undefined;
+    const m = marcaDe(z?.marcas ?? [], marcasDeEntrega(e));
+    out.push({
+      id: String(e.id),
+      tipo: "mobiliario",
+      fecha: txt(e.created_at).slice(0, 10),
+      numero: "",
+      proveedor: "Mobiliario",
+      concepto: txt(e.notas) || "Entrega de mobiliario",
+      marcaCodigo: m.codigo,
+      marcaNombre: m.nombre,
+      ...tiendaDe(e.tienda_codigo ?? p?.tienda_codigo, z),
+      monto: num(e.total),
+      aCobrar: z?.aCobrar ?? 0,
+      estado: z?.estado ?? "no_recuperable",
+      motivo: z
+        ? null
+        : motivoNoRecuperable({
+            esTiendaPropia: gastoEsDeMultifashion({ tiendaCodigo: e.tienda_codigo, proyecto: p ?? null }),
+            seReporta: e.se_reporta,
+          }),
+      impulsadoraId: null,
+      impulsadoraMes: null,
+      periodoId: z?.periodoId ?? null,
+    });
+  }
+  out.sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
+  return out;
 }

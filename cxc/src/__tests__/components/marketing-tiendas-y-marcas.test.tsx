@@ -74,6 +74,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/hooks/useAuth", () => ({
   useAuth: () => ({ authChecked: true, role: perilla.role, isOwner: perilla.role === "admin" }),
 }));
+// 🔴 Marketing nuevo (8-oct-2026): este candado cuida la portada de HOY, la
+// que siguen viendo secretaria y contabilidad. Con el interruptor por rol, el
+// administrador ve la nueva (`marketing-nuevo-apagado`); acá se fija apagado.
+vi.mock("@/lib/marketing/marketing-nuevo", () => ({ veMarketingNuevo: () => false, ROLES_MARKETING_NUEVO: [] }));
 vi.mock("@/lib/hooks/useSidebarCollapsed", () => ({
   useSidebarCollapsed: () => false,
   readSidebarCollapsed: () => false,

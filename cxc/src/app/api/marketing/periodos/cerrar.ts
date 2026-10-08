@@ -295,6 +295,12 @@ export async function cerrarPeriodoRediseno(args: {
   nombreAlCerrar: string;
   notaCredito: string | null;
   cerradoPor: string;
+  /**
+   * 🔴 Marketing nuevo (8-oct-2026): QUÉ se sella, exactamente lo que el ZIP
+   * de la marca lleva menos lo excluido de este cierre. Ausente = lo de
+   * siempre (`documentosDelPeriodoAbierto`), sin cambios para el cierre de hoy.
+   */
+  documentos?: DocumentosDelReporte;
   /** Solo para las pruebas: el instante y el «hoy». */
   ahoraISO?: string;
   hoy?: string;
@@ -326,7 +332,7 @@ export async function cerrarPeriodoRediseno(args: {
   const marcaCodigo = String(periodo.proveedor_key);
   const marcaNombre = nombreDeBloque(marcaCodigo, datos.marcas);
   const fila = { id: periodo.id, proveedor_key: marcaCodigo, nombre: periodo.nombre };
-  await sellarLoQuePertenece(marcaCodigo, documentosDelPeriodoAbierto(datos, fila));
+  await sellarLoQuePertenece(marcaCodigo, args.documentos ?? documentosDelPeriodoAbierto(datos, fila));
   // Los totales para decirlos: los del MISMO agregador que dibuja la portada.
   const bloque = agregar(datos).bloques.find((b) => b.key === marcaCodigo);
   const totales = {

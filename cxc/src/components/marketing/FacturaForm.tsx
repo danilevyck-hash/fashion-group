@@ -50,7 +50,7 @@ import {
   type OpcionDeImpuesto,
 } from "@/lib/marketing/ficha-gasto-2026-10";
 import { unirEnHumano } from "@/lib/guias/falta-para-despachar";
-import { MKT_SOLO_COBRABLE_2026_10 } from "@/lib/marketing/solo-cobrable-2026-10";
+import { useSoloCobrable } from "@/lib/marketing/solo-cobrable-contexto";
 import { SeCobraAlEditar } from "@/app/marketing/components/RegistroDelCargo";
 
 export interface FacturaFormValues {
@@ -285,6 +285,7 @@ export function FacturaForm({
   adjuntoPdfExistente = null,
   cargo,
 }: FacturaFormProps) {
+  const MKT_SOLO_COBRABLE_2026_10 = useSoloCobrable();
   const { toast } = useToast();
 
   const [numeroFactura, setNumeroFactura] = useState<string>(

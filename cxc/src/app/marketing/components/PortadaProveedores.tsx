@@ -18,7 +18,7 @@
 //     (24-sep-2026, `MARKETING_CELULAR`).
 // ============================================================================
 
-import { MKT_SOLO_COBRABLE_2026_10 } from "@/lib/marketing/solo-cobrable-2026-10";
+import { useSoloCobrable } from "@/lib/marketing/solo-cobrable-contexto";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Aviso } from "@/components/ui/Aviso";
@@ -235,6 +235,7 @@ function Ficha({
   cel: boolean;
   onVolver: () => void;
 }) {
+  const MKT_SOLO_COBRABLE_2026_10 = useSoloCobrable();
   // 🔴 SOLO LO COBRABLE: lo de un período abierto no es «a cargo de la
   // empresa», es lo que falta cobrar. Apagado, `porCobrar` es 0.
   const propio = ficha.pagado - ficha.recobrado - (MKT_SOLO_COBRABLE_2026_10 ? ficha.porCobrar : 0);
