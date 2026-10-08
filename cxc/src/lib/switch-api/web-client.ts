@@ -122,6 +122,7 @@ async function webFetch(
     // primera petición
     let res = await fetch(currentUrl, {
       ...init,
+      cache: "no-store", // nunca del Data Cache de Next: ver client.ts › rawCall
       redirect: "manual",
       signal: controller.signal,
       headers: { "User-Agent": UA, Cookie: cookieHeader(jar), ...(init.headers || {}) },
@@ -133,6 +134,7 @@ async function webFetch(
       currentUrl = loc.startsWith("http") ? loc : new URL(loc, currentUrl).toString();
       res = await fetch(currentUrl, {
         method: "GET",
+        cache: "no-store",
         redirect: "manual",
         signal: controller.signal,
         headers: { "User-Agent": UA, Cookie: cookieHeader(jar) },

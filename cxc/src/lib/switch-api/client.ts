@@ -188,7 +188,13 @@ async function rawCall(
   );
 
   try {
+    // 🔴 cache: "no-store" SIEMPRE. Next 14 guarda por omisión en su Data Cache
+    // cualquier fetch de servidor (hasta POST y con Authorization) si en la misma
+    // petición no hubo antes un fetch sin caché: el login y los datos de Switch
+    // quedarían repitiéndose para siempre. Probado el 8-oct-2026 con
+    // `next build && next start`. Candado: `switch-fetch-sin-cache.test.ts`.
     const res = await fetch(url, {
+      cache: "no-store",
       method: opts.method,
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
