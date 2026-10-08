@@ -31,6 +31,7 @@ import {
   sinColumnasDelRediseno,
 } from "./columnas-opcionales";
 import { columnasDelGasto, traeColumnasDelGasto } from "./puerta-gasto";
+import { columnasDeProveedores } from "./proveedores-2026-10";
 import {
   exigirTiendaDelDirectorio,
   frenarPagoDuplicado,
@@ -479,7 +480,9 @@ export async function registrarPagoImpulsadora(
   // SOLO si la pantalla las mandó; la tienda tiene que estar en el directorio;
   // y el freno de duplicados mira `periodo_desde` como fecha — ANTES de
   // escribir nada.
-  const cols = columnasDelGasto(input);
+  // 🔴 «Se cobra» 100 % · 50 % (Marketing nuevo, 8-oct-2026): `pct_a_la_marca`
+  // SOLO si la pantalla lo mandó; sin él, el pago se cobra entero como siempre.
+  const cols = { ...columnasDelGasto(input), ...columnasDeProveedores(input) };
   await exigirTiendaDelDirectorio(cols.tienda_codigo);
   await frenarPagoDuplicado(impulsadoraId, {
     proveedor: nombreImpulsadora,

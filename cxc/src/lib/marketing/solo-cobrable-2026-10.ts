@@ -38,14 +38,49 @@ export const MKT_SOLO_COBRABLE_2026_10 = false;
 export const PCT_QUE_SE_COBRA = [100, 50] as const;
 export type PctQueSeCobra = (typeof PCT_QUE_SE_COBRA)[number];
 
+/**
+ * 🔴 AL REGISTRAR, «Se cobra» viene en 50 % (Daniel, 8-oct-2026: «quiero que
+ * al hacer un gasto el default sea 50 %»). 100 % queda a un toque. Vale para la
+ * factura y el pago de impulsadora; la entrega de mobiliario se cobra como
+ * siempre (su total, sin porcentaje). Al EDITAR no aplica: una factura vieja
+ * sin porcentaje escrito sigue siendo 100 %.
+ */
+export const PCT_AL_REGISTRAR: PctQueSeCobra = 50;
+
 /** La tienda del cargo: un código del directorio, o nada todavía. Obligatoria. */
 export type TiendaDelCargo = { codigo: string; nombre: string } | null;
+
+/**
+ * 🔴 «NO RECUPERABLE» AL REGISTRAR (8-oct-2026). Daniel: «¿cómo meto un gasto,
+ * por ejemplo unos muebles que compré, no cobrables?». Se guarda como siempre
+ * se guardó lo no recuperable —`pct_a_la_marca = 0` y `se_reporta = false`—:
+ * no suma a ninguna marca ni entra a ningún ZIP, y en Gastos sale con Estado
+ * «No recuperable». Sin marca ni tienda: no se le cobra a nadie.
+ */
+export const NO_RECUPERABLE = 0 as const;
+export type SeCobraAlRegistrar = PctQueSeCobra | typeof NO_RECUPERABLE;
+
+/**
+ * Por qué no se le cobra a nadie. Mientras no exista una columna para él, el
+ * motivo viaja al principio de la `nota` de la factura (`notaConMotivo`).
+ */
+export const MOTIVOS_NO_RECUPERABLE = ["Compra de mobiliario", "Tienda propia", "Intercompañía", "Otro"] as const;
+export type MotivoAlRegistrar = (typeof MOTIVOS_NO_RECUPERABLE)[number];
+
+/** La nota que se guarda: el motivo y, si hay, las observaciones. */
+export function notaConMotivo(motivo: MotivoAlRegistrar | null, nota: string): string {
+  const obs = nota.trim();
+  if (!motivo) return obs;
+  return obs ? `${motivo} · ${obs}` : motivo;
+}
 
 export interface DestinoDelCargo {
   marcaId: string;
   tienda: TiendaDelCargo;
-  /** `null` = todavía no se eligió: es decisión de una persona (diseno.md, regla 4). */
-  pct: PctQueSeCobra | null;
+  /** `null` = todavía no se eligió. Nace en `PCT_AL_REGISTRAR`. `0` = no recuperable. */
+  pct: SeCobraAlRegistrar | null;
+  /** Solo con «No recuperable». */
+  motivo?: MotivoAlRegistrar | null;
 }
 
 /**
@@ -58,6 +93,8 @@ export function faltaEnElDestino(
   esTiendaPropia: (codigo: string) => boolean,
 ): string[] {
   const out: string[] = [];
+  // No recuperable: ni marca ni tienda, solo el motivo.
+  if (d.pct === NO_RECUPERABLE) return d.motivo ? [] : ["el motivo"];
   if (d.marcaId.trim() === "") out.push("la marca");
   if (d.tienda === null) out.push("la tienda");
   else if (esTiendaPropia(d.tienda.codigo)) {

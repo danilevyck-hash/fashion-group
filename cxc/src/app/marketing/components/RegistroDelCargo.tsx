@@ -11,13 +11,22 @@
 //
 // Nada viene preseleccionado salvo lo que da el contexto (la marca o la tienda
 // desde la que se abrió): son decisiones de una persona (diseno.md, regla 4).
+// La excepción es «Se cobra», que viene en 50 % (`PCT_AL_REGISTRAR`, Daniel,
+// 8-oct-2026).
 // ============================================================================
 
 import { useState } from "react";
 import ClientePicker from "@/components/ClientePicker";
 import type { MkMarca } from "@/lib/marketing/types";
 import { ENLACE } from "@/lib/marketing/marketing-2026-10";
-import { PCT_QUE_SE_COBRA, type DestinoDelCargo } from "@/lib/marketing/solo-cobrable-2026-10";
+import {
+  MOTIVOS_NO_RECUPERABLE,
+  NO_RECUPERABLE,
+  PCT_QUE_SE_COBRA,
+  type DestinoDelCargo,
+  type PctQueSeCobra,
+  type SeCobraAlRegistrar,
+} from "@/lib/marketing/solo-cobrable-2026-10";
 import { ROTULO_COMPROBANTE, ROTULO_SE_COBRA } from "@/lib/marketing/proveedores-2026-10";
 
 export const ROTULO_SUBIR_FACTURA = "Subir factura";
@@ -79,6 +88,58 @@ export function ComprobanteDelCargo({
   );
 }
 
+// ─── «SE COBRA» 50 % · 100 % (· NO RECUPERABLE) ─────────────────────────────
+
+/** 50 % primero: es lo que viene puesto (`PCT_AL_REGISTRAR`). */
+const ORDEN_SE_COBRA: readonly PctQueSeCobra[] = [50, 100];
+
+/**
+ * El selector de cuánto se le cobra a la marca. Lo comparten la factura y el
+ * pago de impulsadora; la factura suma «No recuperable» (`conNoRecuperable`).
+ */
+export function SeCobraPct<T extends SeCobraAlRegistrar>({
+  id,
+  valor,
+  onChange,
+  conNoRecuperable = false,
+}: {
+  id: string;
+  valor: T | null;
+  onChange: (p: T) => void;
+  conNoRecuperable?: boolean;
+}) {
+  const opciones: ReadonlyArray<{ v: SeCobraAlRegistrar; rotulo: string }> = [
+    ...ORDEN_SE_COBRA.map((p) => ({ v: p, rotulo: `${p} %` })),
+    ...(conNoRecuperable ? [{ v: NO_RECUPERABLE, rotulo: "No recuperable" }] : []),
+  ];
+  return (
+    <div>
+      <div id={id} className="text-sm font-medium text-gray-700 mb-1">
+        {ROTULO_SE_COBRA}
+      </div>
+      <div
+        role="radiogroup"
+        aria-labelledby={id}
+        className={`grid gap-2 ${conNoRecuperable ? "grid-cols-3 sm:max-w-md" : "grid-cols-2 sm:max-w-xs"}`}
+      >
+        {opciones.map((o) => (
+          <button
+            key={o.v}
+            type="button"
+            role="radio"
+            aria-checked={valor === o.v}
+            data-pct={o.v}
+            onClick={() => onChange(o.v as T)}
+            className={`tabular-nums ${OPCION(valor === o.v)}`}
+          >
+            {o.rotulo}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── 2 · EL DESTINO ─────────────────────────────────────────────────────────
 
 export function DestinoDelCargoBloque({
@@ -102,9 +163,14 @@ export function DestinoDelCargoBloque({
   const activas = marcas.filter((m) => m.activo !== false);
   const cambiar = (parte: Partial<DestinoDelCargo>) => onChange({ ...valor, ...parte });
   const tienda = valor.tienda;
+  // 🔴 No recuperable: Marca y Tienda se ocultan (no se le cobra a nadie) y
+  // aparece el Motivo (8-oct-2026).
+  const noRecuperable = valor.pct === NO_RECUPERABLE;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-5" data-testid="destino-del-cargo">
+      {!noRecuperable && (
+      <>
       <div>
         <div id="cargo-marca" className="text-sm font-medium text-gray-700 mb-1">
           Marca
@@ -147,26 +213,32 @@ export function DestinoDelCargoBloque({
         )}
       </div>
 
-      <div>
-        <div id="cargo-se-cobra" className="text-sm font-medium text-gray-700 mb-1">
-          {ROTULO_SE_COBRA}
+      </>
+      )}
+
+      <SeCobraPct id="cargo-se-cobra" valor={valor.pct} onChange={(pct) => cambiar({ pct })} conNoRecuperable />
+
+      {noRecuperable && (
+        <div>
+          <div id="cargo-motivo" className="text-sm font-medium text-gray-700 mb-1">
+            Motivo
+          </div>
+          <div role="radiogroup" aria-labelledby="cargo-motivo" className="grid grid-cols-2 gap-2 sm:max-w-md">
+            {MOTIVOS_NO_RECUPERABLE.map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={valor.motivo === m}
+                onClick={() => cambiar({ motivo: m })}
+                className={`text-left ${OPCION(valor.motivo === m)}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
         </div>
-        <div role="radiogroup" aria-labelledby="cargo-se-cobra" className="grid grid-cols-2 gap-2 sm:max-w-xs">
-          {PCT_QUE_SE_COBRA.map((p) => (
-            <button
-              key={p}
-              type="button"
-              role="radio"
-              aria-checked={valor.pct === p}
-              data-pct={p}
-              onClick={() => cambiar({ pct: p })}
-              className={`tabular-nums ${OPCION(valor.pct === p)}`}
-            >
-              {p} %
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
       {verNota ? (
         <div>
