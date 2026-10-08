@@ -26,6 +26,12 @@ const nextConfig = {
     ],
   },
   compress: true,
+  // 🔴 El chequeo de tipos NO corre en el build de Vercel (7-oct-2026): lo
+  // corre «pruebas» en GitHub (`npm run typecheck`), que es chequeo
+  // obligatorio de `main`. En la máquina de build (4 núcleos, 8 GB) ese paso
+  // se colgaba sin salida hasta el límite de 45 min y retenía la cola de
+  // vistas previas. Detalle: docs/seguridad/publicar-por-solicitud-de-cambio.md
+  typescript: { ignoreBuildErrors: true },
   poweredByHeader: false,
   // Skew Protection (Vercel Pro). La ventana la fija el "Maximum Age" del
   // proyecto en el panel de Vercel: por defecto 1 día, y se puede subir hasta la

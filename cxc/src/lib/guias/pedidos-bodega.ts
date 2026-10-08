@@ -16,7 +16,8 @@ import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { DEFAULT_VENDEDOR } from "@/lib/comisiones/vendedor-default";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
-import { PEDIDOS_BULTOS_2026_10, ROLES_PREPARADO } from "./pedidos-bultos";
+import { PEDIDOS_BULTOS_2026_10, ROLES_PREPARADO, ROLES_VERIFICADO } from "./pedidos-bultos";
+import { PEDIDOS_FLUJO_SIMPLE_2026_10, ROLES_PREPARA_FLUJO_SIMPLE, ROLES_RECIBE_FLUJO_SIMPLE } from "./pedidos-flujo-simple";
 
 /** `false` = la pestaña no existe, la ruta contesta 404 y el cron no hace nada. */
 export const PEDIDOS_BODEGA_2026_10 = true;
@@ -64,11 +65,31 @@ export function puedeVerPedidosBodega(role: string | null | undefined): boolean 
  * 🔴 EL VENDEDOR SOLO MIRA (Daniel, 7-oct-2026). 🩸 Con bultos veía el círculo y
  * la casilla del bulto PRENDIDOS y el servidor le contestaba 403: la pantalla
  * ofrecía lo que la ruta ya rechazaba. La lista de quién marca es la MISMA del
- * servidor (`ROLES_PREPARADO`: admin · secretaria · bodega), así que no puede
- * haber dos respuestas. Sin bultos sigue la de los seis ajustes, intacta.
+ * servidor, así que no puede haber dos respuestas.
+ *
+ * 🔴 Y con el flujo simplificado (7-oct-2026, segunda vuelta) «Preparado» lo
+ * marca SOLO bodega: este botón usaba `ROLES_PREPARADO` del otro flujo (que
+ * sí deja entrar a la secretaria) sin fijarse en qué flujo está prendido de
+ * verdad — por eso la secretaria veía el botón. Ahora mira
+ * `PEDIDOS_FLUJO_SIMPLE_2026_10` primero.
  */
 export function puedeMarcarPedidos(role: string | null | undefined): boolean {
-  const lista = PEDIDOS_BULTOS_2026_10 ? ROLES_PREPARADO : PEDIDOS_BODEGA_ROLES;
+  const lista = PEDIDOS_FLUJO_SIMPLE_2026_10
+    ? ROLES_PREPARA_FLUJO_SIMPLE
+    : PEDIDOS_BULTOS_2026_10
+      ? ROLES_PREPARADO
+      : PEDIDOS_BODEGA_ROLES;
+  return !!role && lista.includes(role);
+}
+
+/**
+ * ¿Puede esta persona marcar el paso de CIERRE («Verificado» con bultos,
+ * «Recibido» con el flujo simplificado)? Las dos listas de hoy son
+ * admin+secretaria, pero cada flujo lee la SUYA para no quedar atado si una
+ * de las dos cambia sin la otra.
+ */
+export function puedeRecibirPedidos(role: string | null | undefined): boolean {
+  const lista = PEDIDOS_FLUJO_SIMPLE_2026_10 ? ROLES_RECIBE_FLUJO_SIMPLE : ROLES_VERIFICADO;
   return !!role && lista.includes(role);
 }
 

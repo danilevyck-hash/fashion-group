@@ -116,11 +116,30 @@ export function estadoAnteriorFlujoSimple(e: EstadoFlujoSimple): EstadoFlujoSimp
   return i <= 0 ? null : ORDEN[i - 1];
 }
 
-/** «Preparado» lo marca bodega o la secretaria, como en el flujo de hoy. */
-export const ROLES_PREPARA_FLUJO_SIMPLE: readonly string[] = ["admin", "secretaria", "bodega"];
+/**
+ * 🔴 «PREPARADO» LO MARCA SOLO BODEGA (y admin) — Daniel, 7-oct-2026, segunda
+ * vuelta: «¿por qué Ángela puede preparar un pedido en su sistema? Ya
+ * habíamos hablado del tema». La lista venía copiada de la del otro flujo
+ * (`ROLES_PREPARADO` en `pedidos-bultos.ts`, que sí deja preparar a la
+ * secretaria); acá los dos pasos son la doble firma, así que cada uno lo
+ * marca alguien DISTINTO: bodega prepara, secretaria recibe.
+ */
+export const ROLES_PREPARA_FLUJO_SIMPLE: readonly string[] = ["admin", "bodega"];
 
 /** «Recibido» es trabajo de LA SECRETARIA: confirma que lo tiene en mano. */
 export const ROLES_RECIBE_FLUJO_SIMPLE: readonly string[] = ["admin", "secretaria"];
+
+/**
+ * La unión de las dos listas de arriba. La usa el guard ANCHO del PATCH
+ * (`/api/guias/pedidos`): ahí solo se pregunta «¿puede tocar esta ruta?»,
+ * nunca «¿puede marcar ESTE estado?» —eso lo decide `puedeMoverFlujoSimple`
+ * con el destino—. Con `ROLES_PREPARA_FLUJO_SIMPLE` sola (ya sin secretaria)
+ * esa puerta ancha dejaría afuera a la secretaria también para marcar
+ * Recibido.
+ */
+export const ROLES_FLUJO_SIMPLE_TODAS: readonly string[] = [
+  ...new Set([...ROLES_PREPARA_FLUJO_SIMPLE, ...ROLES_RECIBE_FLUJO_SIMPLE]),
+];
 
 export function rolesDelEstadoFlujoSimple(destino: EstadoFlujoSimple): readonly string[] {
   return destino === "preparado" ? ROLES_PREPARA_FLUJO_SIMPLE : ROLES_RECIBE_FLUJO_SIMPLE;
@@ -153,7 +172,7 @@ export function puedeMoverFlujoSimple(
   if (!quien.role || !rolesDelEstadoFlujoSimple(hasta).includes(quien.role)) {
     return {
       ok: false,
-      error: hasta === "preparado" ? "No puedes marcar pedidos" : "Ese paso lo marca la secretaria",
+      error: hasta === "preparado" ? "Ese paso lo marca bodega" : "Ese paso lo marca la secretaria",
     };
   }
   return { ok: true };
