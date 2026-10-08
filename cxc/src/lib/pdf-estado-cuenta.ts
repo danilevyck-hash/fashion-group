@@ -46,6 +46,7 @@ import {
   dibujarResumenGrupo,
 } from "@/lib/cxc/pdf-estado-cuenta-hoja";
 import { casaDeEmpresas } from "@/lib/cxc/casa-del-papel";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
 /** Y de arranque de un bloque, saltando de página si no cabe entero. */
@@ -133,7 +134,9 @@ export function buildEstadoCuentaPDF(
   dibujarCliente(doc, data, nombre);
   dibujarPieDeLaCasa(doc, casaDeEmpresas(data.empresas.map((e) => e.empresa_key)));
 
-  const iso = new Date().toISOString().slice(0, 10);
+  // 🩸 7-oct-2026: con `toISOString()` (UTC) el archivo salía fechado MAÑANA
+  // desde las 7 p. m. de Panamá. La fecha es la de Panamá.
+  const iso = hoyPanama();
   // 🔴 EL NOMBRE DEL ARCHIVO ES EL DEL CLIENTE, NO SU CÓDIGO INTERNO
   // (7-oct-2026). «Estado-cuenta-D-98-2026-10-07.pdf» no significa nada para
   // quien lo recibe; usa el mismo nombre que ya se imprime en el papel
@@ -218,7 +221,7 @@ export function buildEstadoCuentaLotePDF(clientes: ClienteDelLote[]): { doc: jsP
     casaDeEmpresas(clientes.flatMap((c) => c.data.empresas.map((e) => e.empresa_key))),
   );
 
-  const iso = new Date().toISOString().slice(0, 10);
+  const iso = hoyPanama(); // Panamá, no UTC (ver buildEstadoCuentaPDF)
   const filename = clientes.length === 1
     ? `${nombreArchivoEstadoCuenta(nombreDelPapel(clientes[0].data.clienteNombre, clientes[0].nombre), iso)}.pdf`
     : `${nombreArchivoEstadoCuenta(`${clientes.length} clientes`, iso)}.pdf`;
