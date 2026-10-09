@@ -29,3 +29,11 @@
 - Input login: autoCapitalize=none, autoCorrect=off
 - User indicator: nombre + rol visible en header desktop y drawer mobile
 - Forgot password: link en login → "Contacta al administrador"
+
+## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
+
+> Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.
+
+### Auth › quién entra a cada módulo se anota (25-sep-2026)
+
+- 🔴 **QUIÉN ENTRA A CADA MÓDULO SE ANOTA (25-sep-2026, `REGISTRO_DE_VISITAS` en `lib/visitas/registro.ts`, hoy `true`)**: al cambiar de módulo el navegador avisa por `POST /api/visitas` —como mucho **una vez por módulo cada 10 min por pestaña**, sin `await` y con `.catch()`, como el recorte de `last_seen`— y el servidor SUMA en `visitas_modulo` (día de Panamá · persona · módulo · aparato). 🔴 **El quién sale de la cookie FIRMADA, nunca del cuerpo**; una key fuera de `ALL_MODULES` es **400** y sin sesión **204**. Se mira en **Usuarios › «Actividad»**, SOLO admin, 30 días; el cron `cleanup-sessions` borra a los **180 días** (sin entrada nueva de cron). 🔴 Falla ABIERTA sin la migración `20261221120000`, **aplicada el 25-sep-2026**. Candado `visitas/registro-de-visitas`.

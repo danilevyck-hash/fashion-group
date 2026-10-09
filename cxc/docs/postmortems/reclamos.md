@@ -402,3 +402,15 @@ el cobrado con la línea verde y sus dos filas; la hoja de cobro (monto puesto,
 editable, un solo botón que dice cuánto, «Se deshace por 5 segundos», el
 comprobante obligatorio) y que manda **las mismas filas**; el correo con el
 **mismo cuerpo y la misma ruta**; y que todo cuelga del interruptor.
+
+## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
+
+> Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.
+
+### Reclamos › Lo del 24-sep-2026 (cobrado, factura como foto, el celular)
+
+**Lo del 24-sep-2026.**
+
+- 🔴 **SE DICE «COBRADO», NUNCA «PAGADO»** (Daniel: *«solo hay creado y cobrado, ¿por qué veo pagado?»*): los rótulos viven en `lib/reclamos/rotulos.ts` —«Marcar como cobrado», el chip «Cobrado», los avisos del cobro— y hay **barrido** que pone el build rojo si la palabra vuelve a una pantalla. ⚠️ **Solo el rótulo**: el estado de la base sigue siendo `Pagado`, el PATCH manda ese valor y el papel no cambia. Candado `reclamos-cobrado-no-pagado`.
+- 🔴 **LA FACTURA ENTRA COMO PDF O COMO FOTO**: 🩸 en el iPhone «Elegir archivo» abría Archivos y nada más, y la factura es obligatoria: desde el teléfono **no se podía ni empezar**. Cuatro puntos: el `accept` y el `validar()` de `FacturaPdfUploader`, el `Content-Type` del PUT y el bloque `document`→`image` (`lib/ia/bloque-archivo.ts`: PDF como siempre, foto como `image`, **lo demás se RECHAZA en español**). La foto se achica en el navegador (1600 px · JPEG 0,8), el bucket guarda la **extensión real** y el lector deduce el tipo de ella. ⚠️ **Varias hojas son varias fotos y NO se soportan**: se dice en pantalla. **El prompt, el modelo, el parser, el bucket y las columnas no cambian.** Candado `lector-factura-imagen`.
+- 🔴 **EN EL CELULAR RECLAMOS ES OTRA PANTALLA** (`RECLAMOS_CELULAR`, `lib/reclamos/celular.ts`, hoy `true`; **solo hasta `sm`**): portada de **UNA FILA POR EMPRESA** con el número chico (*«kpi más chico»*) y el chip rojo del más viejo · la fila del reclamo **SIN botones** —se toca y abre— · **UN botón negro fijo abajo** y lo demás en el «···» · **Fotos y Seguimiento, dos renglones** a pantalla completa · cobrar y mandar, **hojas que suben con Deshacer de 5 s** y el monto grande y editable · en «Cobrados», **visto verde y la fecha del cobro, sin días** · buscar en **filas, nunca una tabla** · elegir se pide UNA vez desde arriba. 🩸 Medido: portada de **1.055 px**, **45 cosas tocables** en la lista (2,5 reclamos por pantalla), «350 días» en uno ya cobrado y **la PLATA fuera de la pantalla** al buscar. 🔴 **Nada de lo que se guarda cambia**: el correo y las descargas salen de `components/descargas.ts` —el MISMO módulo de la computadora— y el cobro llama al mismo `submitSettlement`; `AppHeader` se dibuja UNA vez (`sinEncabezado`). ⚠️ Editar sigue siendo la pantalla de siempre. Candado `reclamos-celular`.

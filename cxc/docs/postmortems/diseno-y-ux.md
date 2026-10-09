@@ -71,3 +71,13 @@ porqué, las mediciones y las citas.
 - **usePersistedState** — sessionStorage-backed state
 - **useUndoAction** — delayed execution con 5s undo window
 - **useOnlineStatus** — offline/online detection
+
+## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
+
+> Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.
+
+### Navegación e Historial › en el celular: pestaña = pantalla, ☰ a pantalla completa, sin barra de arriba (24-sep-2026)
+
+- 🔴 **EN EL CELULAR, UNA PESTAÑA ES UNA PANTALLA (24-sep-2026)**: `useUrlState` decide por el dedo (`aparatoDeQuienMira`): `CLAVES_DE_PANTALLA` (`tab · subtab · vista · ver · modo · mfCel`) hacen `push` en el celular y `replace` en la computadora; filtros siguen en `replace`. Candado `url-state-pestana-es-pantalla`.
+- 🔴 **EN EL CELULAR, ☰ ABRE EL MENÚ ENTERO, A PANTALLA COMPLETA (24-sep-2026)**: los TRES grupos como secciones con TODOS los módulos del ROL —ícono en su color, el de aquí marcado— y un buscador que solo acorta ESA lista (`coincideBusqueda`, **nunca por parecido**). **2 toques a cualquiera.** 🔴 Los CUATRO sin acento ya tienen tono, **fuera de `getModuleKeyFromPath`**. `MODO_DEL_CAJON` en `cajon-por-grupos.ts`. Candados `menu-pantalla-completa` · `cajon-hoja-abajo`.
+- 🔴 **Y EN EL CELULAR YA NO HAY BARRA DE ARRIBA (24-sep-2026)**: la franja de 46 px se fue entera (respaldo: `SIN_BARRA_ARRIBA=false`; campana y lupa siguen afuera del celular). 🔴 **El nombre del módulo es el TÍTULO grande de la página** (34 px, con el punto del acento, se va con el dedo) y se dice **UNA sola vez**: la portada que ya lo dibuja pasa `tituloEnLaPantalla` (Reclamos · CxC · Asistencia · Multifashion · Marketing); es un `<p>`, nunca un segundo `<h1>`. 🔴 **Las tres rayas son un botón redondo de 56 px abajo a la derecha** que abre el MISMO menú entero, con colchón de **76 px** en las listas; **sube encima de los botones negros fijos** —la barra publica su alto en `--fg-alto-barra-fija` y el botón negro no se mueve—. 🔴 **`--fg-altura-encabezado` queda en 0** y las pegajosas se pegan arriba del todo; a quien **solo marca** no se le dibuja ni título ni botón. En la computadora nada cambia. `lib/navegacion/barra-celular.ts`. Candado `sin-barra-arriba`.

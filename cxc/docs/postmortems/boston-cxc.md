@@ -1606,3 +1606,25 @@ Cartera del grupo leída de `switch_estadocuenta_aging_mv` acotada a las 6: **21
 - 🔴 **AHÍ MISMO VIVE DÓNDE SE PAGA, CADA UNA EN SU CUENTA (20-sep-2026)**: las 8 salen por `lineasDePago`, en el PDF al pie de CADA hoja y en el correo con TODAS las del papel. **Falla ABIERTA**. Candado `cxc-donde-pagar`.
 - 🔴 **Boston FIRMA COMO BOSTON** (Daniel: *«Firma Confecciones Boston»*). La casa se pregunta por `empresa_key` (`casa-del-papel.ts`): su papel sale **sin el logo del grupo y sin `fashiongr.com` en el pie**. ⚠️ Su correo sale por Resend desde `fashiongr.com`: **un dominio propio sigue pendiente**.
 - Candados: `cxc-estado-cuenta-forma-switch` · `cxc-papel-vocabulario` · `pdf-cliente-layout`.
+
+## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
+
+> Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.
+
+### Boston y CXC › El rediseño de `/cxc` (20 al 24-sep-2026)
+
+**El rediseño.** Vive en **`/cxc`**; `/admin` EXACTO redirige 307 con su query.
+
+- 🔴 **Cobra todo el que ve el módulo**, por la única puerta «Enviar estado de cuenta» (correo con **Deshacer de 5 s**).
+- 🔴 **Abre por «más viejo sin pagar»** (20-sep, `ORDEN_AL_ABRIR`, override anclado a «Total pendiente»); el que nunca pagó primero y **los días se ven SIEMPRE en la fila**.
+- 🔴 **El papel y el Excel cierran con el total de la PANTALLA** (20-sep): bloque «Saldo a favor (N)» y «Total general».
+- 🔴 **La tira dice plata, no conteos** (20-sep).
+- 🔴 **En Boston ningún monto se encima** (20-sep): UN botón, y tocar la fila abre los documentos.
+- 🔴 **Se mandan SIEMPRE las 6 empresas**, mire lo que mire el filtro: lo decide el SERVIDOR (`empresasDelEnvio()`). ⚠️ El cajón SÍ conserva el filtro: es lo que se MIRA.
+- 🔴 **UN correo por DIRECCIÓN, nunca uno por cliente**: un PDF con una hoja por cliente y un total al final, agrupado en el SERVIDOR. Los **sin correo NO abortan el lote** y se dicen por nombre.
+- 🔴 **«Sin pago en +90 días»**: días desde el ÚLTIMO PAGO REAL en las 6, por **CÓDIGO**; **retenciones y recibos en cero no cuentan**, y **el que nunca pagó avisa**. «Hoy» es el de PANAMÁ.
+- 🔴 **Se anota lo que se manda por los TRES canales** (correo · whatsapp · copia), 7 días; el correo lo anota `enviar-email` **tras confirmar Resend**.
+- 🔴 **«Contacto» en la ficha: el sync NUNCA lo pisa**. Lo usa el saludo del correo y del WhatsApp; sin contacto, el de siempre; en un correo compartido **no se saluda a nadie**.
+- 🔴 **Boston: mismo FORMATO, APARTE.** Ruta propia, **no reusa `fetchEstadoCuentaData`**; sus teléfonos y correos de `switch_clientes` acotado a Boston, **nunca de `clientes_master`**.
+- 🩸 `/api/cxc-rows` se retiró; `contact-log` y `cxc-summary` se quedan. `cxc_rows` y `cxc_contact_log` **no se borran**.
+- 🔴 **EN EL CELULAR, LA LISTA ES LA CARTERA (24-sep-2026)**: `/cxc` hasta `sm` abre en la lista, con el total **EXACTO** y tres chips que **filtran Y ordenan por su plata**; el cliente son DOS renglones (nombre de Switch · lo que urge · monto sin centavos · rayita del tramo **DOMINANTE**) y **tocar la fila abre la MISMA `HojaCobrar`**. 🔴 **Abre por PLATA** (`ordenDelCelular` = `ordenParaRiskFilter`); la computadora conserva `ORDEN_AL_ABRIR`. El total abre **«Por empresa»**; `/cxc/cliente/[codigo]` va en **RENGLONES, nunca una tabla**. `lib/cxc/lista-celular.ts`, interruptor `CXC_CELULAR` (`false` = `PanelCxcMobile` intacto). ⚠️ Boston aparte. Candado `cxc-celular`.
