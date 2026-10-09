@@ -90,3 +90,15 @@
 - **`⌘K` / `Ctrl+K` — abrir la búsqueda global.** Tiene su propio listener dentro de `SearchBar.tsx` y nunca dependió de ningún gancho.
 - 🩸 **Todo lo demás se retiró el 11-sep-2026** (Daniel: *«quita lo que no funciona»*): la `/` para buscar, la ayuda «?», los saltos `G+…`, el `J/K` por filas y la `E` para editar **nunca corrieron** —`useKeyboardShortcuts` estaba sin un solo importador desde el 11-abr-2026—. Candado: `atajos-de-teclado-retirados.test.ts`. Detalle en [el postmortem](docs/postmortems/usuarios-inicio-teclado.md).
 - El **clic derecho** en filas de CXC y Recordatorios se había retirado antes, con el rediseño de esos dos módulos (ver sus bloques).
+
+---
+
+## Inicio estilo Apple — propuesta APAGADA (9-oct-2026, `INICIO_APPLE_2026_10`)
+
+La pregunta de la pantalla: **«¿a qué módulo voy?»**. Medido 25-sep → 9-oct (`visitas_modulo`): a dónde va la gente después del Inicio es Despachos 169 · Catálogos 124 · Asistencia 104 · Plantilla Switch 48 · Multifashion 44 · Comisiones 43. Las secretarias ven 11 módulos; el admin, 21. **No se esconde ningún módulo.**
+
+- **Celular**: lista agrupada como Ajustes del iPhone (renglón de 44 px, ícono a color, ›), la MISMA forma de la hoja «Más» y del menú.
+- **Computadora**: ficha horizontal (ícono + nombre) de 56 px, ícono con el color del módulo (`getModuleColorByKey`, como la barra lateral), 4 columnas.
+- **Buscador** al ancho del contenido (`<SearchBar alineado />`), no centrado.
+
+`false` = el Inicio de hoy, byte por byte: candado `src/__tests__/components/inicio-apple-apagado.test.tsx` (foto del HTML tomada con el código de `origin/main` antes del cambio, admin y secretaria; prendido se pone rojo). Mockup con capturas reales: hoy vs recomendación. Se prende con el «sí» de Daniel.

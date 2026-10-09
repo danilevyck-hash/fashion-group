@@ -278,7 +278,11 @@ function getModuleSuggestions(q: string, visibleHrefs: Set<string>) {
     .slice(0, 3);
 }
 
-export default function SearchBar({ compact, fullScreen, onClose }: { compact?: boolean; fullScreen?: boolean; onClose?: () => void }) {
+export default function SearchBar({ compact, fullScreen, onClose, alineado }: {
+  compact?: boolean; fullScreen?: boolean; onClose?: () => void;
+  /** Inicio estilo Apple (`INICIO_APPLE_2026_10`): al ancho del contenido, no centrado. */
+  alineado?: boolean;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
@@ -513,7 +517,7 @@ export default function SearchBar({ compact, fullScreen, onClose }: { compact?: 
   }
 
   return (
-    <div ref={wrapperRef} className={`relative ${compact ? "w-56" : "w-full max-w-xl mx-auto mb-6"}`}>
+    <div ref={wrapperRef} className={`relative ${compact ? "w-56" : alineado ? "w-full mb-6" : "w-full max-w-xl mx-auto mb-6"}`}>
       <div className={`relative flex items-center rounded-lg border border-gray-200 bg-gray-50 transition focus-within:border-gray-400 focus-within:shadow-sm`}>
         {/* Search icon */}
         <svg className="absolute left-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
