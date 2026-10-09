@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { supabaseServer } from "@/lib/supabase-server";
+import { historicoDeProveedores } from "@/lib/marketing/proveedores-conocidos-server";
 
 export const dynamic = "force-dynamic";
 
@@ -18,16 +18,7 @@ export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   try {
-    const { data, error } = await supabaseServer
-      .from("mk_facturas")
-      .select("proveedor")
-      .is("anulado_en", null)
-      .is("impulsadora_id", null)
-      .limit(1000);
-    if (error) throw new Error(error.message);
-    const proveedores = ((data ?? []) as Array<{ proveedor: string | null }>)
-      .map((r) => String(r.proveedor ?? "").trim())
-      .filter((p) => p.length > 0);
+    const proveedores = await historicoDeProveedores();
     return NextResponse.json({ proveedores });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error";

@@ -14,7 +14,9 @@ import { useMemo, useState } from "react";
 import { sugerirProveedores } from "@/lib/marketing/proveedor";
 import {
   MKT_PROVEEDORES_2026_10,
+  ROTULO_PROVEEDOR_NUEVO,
   claveDeProveedor,
+  reconocerProveedor,
   sugerirProveedoresConAlias,
 } from "@/lib/marketing/proveedores-2026-10";
 import { vidrioSobre } from "@/lib/ui/vidrio";
@@ -34,13 +36,20 @@ export function ProveedorInput({ id, value, onChange, historico, required, class
   // 🔴 PROVEEDORES (6-oct-2026): las sugerencias agrupan por el AMARRE, así
   // «Impreco» e «Impresora Comercial S a» no se ofrecen como dos proveedores
   // distintos. Apagado, es `sugerirProveedores` de siempre, intacto.
-  const sugerencias = useMemo(
-    () =>
-      MKT_PROVEEDORES_2026_10
-        ? sugerirProveedoresConAlias(value, historico)
-        : sugerirProveedores(value, historico),
-    [value, historico],
-  );
+  // 🔴 EL PROVEEDOR RECONOCIDO (8-oct-2026): si lo tecleado ES un proveedor
+  // existente (alias o parecido claro: «Kristhel», «Changalo»), ese va PRIMERO
+  // en la lista aunque no empiece igual. Si no es ninguno: «Proveedor nuevo».
+  const reconocido = useMemo(() => reconocerProveedor(value, historico), [value, historico]);
+  const sugerencias = useMemo(() => {
+    if (!MKT_PROVEEDORES_2026_10) return sugerirProveedores(value, historico);
+    const lista = sugerirProveedoresConAlias(value, historico);
+    if (!reconocido.existente) return lista;
+    return [
+      { nombre: reconocido.nombre, clave: reconocido.clave, usos: reconocido.usos },
+      ...lista.filter((s) => s.clave !== reconocido.clave),
+    ];
+  }, [value, historico, reconocido]);
+  const esNuevo = MKT_PROVEEDORES_2026_10 && value.trim().length > 0 && !reconocido.existente;
   // La ficha del proveedor se llega desde acá y desde la pestaña Proveedores.
   const claveElegida = MKT_PROVEEDORES_2026_10 ? claveDeProveedor(value) : "";
   const yaEsUno =
@@ -99,6 +108,11 @@ export function ProveedorInput({ id, value, onChange, historico, required, class
             </li>
           ))}
         </ul>
+      )}
+      {esNuevo && visibles.length === 0 && (
+        <p data-testid="proveedor-nuevo" className="mt-1 text-xs text-gray-500">
+          {ROTULO_PROVEEDOR_NUEVO}
+        </p>
       )}
       {/* 🔴 «Ver su ficha ›»: desde el gasto nuevo se llega a todo lo que se le
           pagó a ese proveedor. Solo si el proveedor ya tiene facturas — si es

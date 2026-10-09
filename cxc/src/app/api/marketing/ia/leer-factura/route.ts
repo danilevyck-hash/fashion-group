@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerPdfConAnthropic, esTipoQueLee, tipoPorNombre } from "@/lib/ia/anthropic";
+import { reconocerProveedor } from "@/lib/marketing/proveedores-2026-10";
+import { aliasDeProveedores, historicoDeProveedores } from "@/lib/marketing/proveedores-conocidos-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -132,6 +134,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 🔴 EL PROVEEDOR RECONOCIDO (8-oct-2026): lo leído se cambia por el
+    // proveedor que YA existe («Kristel» → «Krysthel Yanneth Morales
+    // Martinez»). Si no se reconoce, queda lo leído y la pantalla lo marca
+    // «Proveedor nuevo». Falla abierta: si la base no contesta, lo leído.
+    if (extraido.proveedor) {
+      try {
+        const [historico, alias] = await Promise.all([historicoDeProveedores(), aliasDeProveedores()]);
+        const r = reconocerProveedor(extraido.proveedor, historico, alias);
+        return NextResponse.json({
+          ...extraido,
+          proveedor: r.nombre,
+          proveedor_leido: extraido.proveedor,
+          proveedor_nuevo: !r.existente,
+        });
+      } catch (err) {
+        console.error("marketing/ia/leer-factura proveedor:", err instanceof Error ? err.message : err);
+      }
+    }
     return NextResponse.json(extraido);
   } catch (err) {
     const message =
