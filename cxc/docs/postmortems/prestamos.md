@@ -576,3 +576,17 @@ verde.
 - 🔴 **EL DESCUENTO NUNCA DEJA EL NETO EN NEGATIVO** (14-sep-2026; red de seguridad). `recortarAlNeto` (`neto-no-negativo.ts`) corre **al FINAL de la ruta**, achica **solo lo AUTOMÁTICO** (lo escrito a mano manda), en el orden **daño → terceros → préstamo**. **El saldo no baja por lo que no se cobró**: el cierre anota solo lo que entró. Se DICE en la celda y en «Antes de cerrar». **El ISR sigue a mano.** Detalle y mediciones en el postmortem.
 - 🔴 **Los movimientos de UNA quincena, en una pantalla y no en 31 fichas** (17-sep): vista «Movimientos» adentro de la pestaña, solo LECTURA, con «Origen» (del cierre o a mano). Postmortem › 10.
 - Candados: `prestamos-dos-cuentas.test.ts` · `planilla-sin-descontar.test.ts` · `prestamos-cuota-obligatoria-y-neto.test.tsx` (26 casos, con los dos controles; `planilla-unida-cierre-prestamo` cambió de dirección con nota fechada).
+
+---
+
+## Préstamos estilo Apple — propuesta APAGADA (4-oct-2026, al día el 9-oct, `PRESTAMOS_APPLE_2026_10`)
+
+🔴 **Préstamos no es un módulo aparte**: con `NEXT_PUBLIC_PLANILLA_UNIDA` prendido en producción desde el 11-sep, la ficha sale del menú y `/prestamos` redirige (307) a `/asistencia?tab=prestamos`. El rediseño es de **Asistencia › Préstamos** (`PrestamosTab.tsx`); Boston › Préstamos es la misma pestaña filtrada.
+
+Medido 25-sep → 9-oct: 8 entradas, todas de Contabilidad y desde la computadora; 15 colaboradores con saldo, $18.805,44.
+
+1. **«Saldo total» grande y «Próximo descuento»** (suma de `montoDeFicha` + `montoTercerosDeFicha` + `montoDanoDeFicha`, cada cuota capeada a su saldo: lo que la planilla PROPONE). Sale el conteo «N colaboradores con saldo».
+2. **Abre con lo que requiere atención arriba** (`conAtencionArriba`): sin colaborador asignado primero, después saldo mayor. Ordenar tocando el encabezado no cambia.
+3. **Celular: dos líneas por colaborador** (nombre · saldo; cuota) y la tarjeta entera abre `/prestamos/<id>`, donde está el abono.
+
+Ningún número cambia; ni una ruta ni `lib/asistencia` importan el interruptor (candado `prestamos-apple-2026-10`). `false` = la pestaña de hoy: candado `src/__tests__/components/prestamos-apple-apagado.test.tsx` (HTML del `PrestamosTab.tsx` de `origin/main` antes de traer el rediseño; prendido, rojo).
