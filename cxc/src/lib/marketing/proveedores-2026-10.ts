@@ -660,3 +660,126 @@ export function fichaDeProveedor(
     porCobrar: fila?.porCobrar ?? 0,
   };
 }
+
+// ─── EL PROVEEDOR RECONOCIDO (8-oct-2026) ────────────────────────────────────
+//
+// Daniel, 8-oct-2026: «¿o el proveedor puede salir de la factura con el lector
+// de factura?». El lector ya lo leía, pero lo dejaba TAL CUAL venía, y así la
+// misma persona quedó escrita de cuatro formas. Ahora lo leído (o tecleado) se
+// reconoce contra los proveedores que YA están en las facturas:
+//
+//   1. por su nombre normalizado o por un alias del amarre → ese proveedor;
+//   2. por un parecido CLARO, palabra por palabra → ese proveedor, solo si es
+//      UNO. Dos candidatos = no se adivina.
+//   3. si no → queda lo leído y se marca «Proveedor nuevo».
+//
+// 🔴 El parecido es por PALABRAS COMPLETAS, nunca `includes` (la trampa de
+// «nova» → «Renovación»): todas las palabras del nombre corto tienen que estar
+// en el largo, con al menos DOS palabras de verdad —o una sola palabra contra
+// una sola, de 6 letras o más—. Una palabra «está» si es igual, si es una
+// inicial («Y.» por «Yanneth») o si difiere en una letra (dos si tiene 7+):
+// «Kristhel» es «Krysthel». «Grupo» solo NO encuentra a «Grupo Monat».
+
+/** Rótulo discreto del proveedor que no está en ninguna factura. */
+export const ROTULO_PROVEEDOR_NUEVO = "Proveedor nuevo";
+
+export interface ProveedorReconocido {
+  /** El nombre que va en el campo: el del proveedor existente, o lo leído. */
+  nombre: string;
+  /** `false` = no está en ninguna factura: «Proveedor nuevo». */
+  existente: boolean;
+  /** Clave canónica del proveedor existente ("" si es nuevo). */
+  clave: string;
+  /** Cuántas facturas tiene el existente. */
+  usos: number;
+}
+
+const PALABRAS_DE_SOCIEDAD = new Set(["s", "a", "sa", "inc", "corp", "ltd", "srl"]);
+
+/** Las palabras que distinguen: «a g display s a» → ["ag", "display"]. Las
+ *  letras sueltas seguidas se juntan (A.G. = AG) y la sociedad se va. */
+function palabras(normalizado: string): string[] {
+  const juntas = normalizado.replace(/\b(?:[a-z0-9] )+[a-z0-9]\b/g, (m) => m.replace(/ /g, ""));
+  return juntas.split(" ").filter((p) => p.length > 0 && !PALABRAS_DE_SOCIEDAD.has(p));
+}
+
+function distancia(a: string, b: string): number {
+  const fila = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = fila[0];
+    fila[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const arriba = fila[j];
+      fila[j] = Math.min(fila[j] + 1, fila[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = arriba;
+    }
+  }
+  return fila[b.length];
+}
+
+function palabraCerca(x: string, y: string): boolean {
+  if (x === y) return true;
+  if (x.length === 1) return y.startsWith(x);
+  if (y.length === 1) return x.startsWith(y);
+  const corta = Math.min(x.length, y.length);
+  if (corta < 5) return false;
+  return distancia(x, y) <= (corta >= 7 ? 2 : 1);
+}
+
+/** ¿Se parecen CLARO dos nombres normalizados? Ver la cabecera. */
+function seParecen(a: string, b: string): boolean {
+  const pa = palabras(a);
+  const pb = palabras(b);
+  if (pa.length === 0 || pb.length === 0) return false;
+  const [corto, largo] = pa.length <= pb.length ? [pa, pb] : [pb, pa];
+  const deVerdad = corto.filter((p) => p.length > 1).length;
+  if (corto.length === 1) {
+    if (largo.length !== 1 || corto[0].length < 6) return false;
+  } else if (deVerdad < 2) {
+    return false;
+  }
+  const usadas = new Set<number>();
+  return corto.every((p) => {
+    const i = largo.findIndex((q, k) => !usadas.has(k) && palabraCerca(p, q));
+    if (i < 0) return false;
+    usadas.add(i);
+    return true;
+  });
+}
+
+/**
+ * Reconoce un proveedor leído o tecleado contra los que ya están en las
+ * facturas (`historico`, con repeticiones, como lo da
+ * `/api/marketing/facturas/proveedores`).
+ */
+export function reconocerProveedor(
+  leido: string | null | undefined,
+  historico: ReadonlyArray<string | null | undefined>,
+  alias: Readonly<Record<string, string>> = ALIAS_DE_PROVEEDOR,
+): ProveedorReconocido {
+  const tal = String(leido ?? "").replace(/\s+/g, " ").trim();
+  const nuevo: ProveedorReconocido = { nombre: tal, existente: false, clave: "", usos: 0 };
+  const base = normalizarProveedor(tal);
+  if (base.length === 0) return nuevo;
+
+  const filas = sugerirProveedoresConAlias("", historico, Number.MAX_SAFE_INTEGER, alias);
+  const deClave = (clave: string) => filas.find((f) => f.clave === clave);
+  const hallado = (f: SugerenciaConFicha): ProveedorReconocido =>
+    ({ nombre: f.nombre, existente: true, clave: f.clave, usos: f.usos });
+
+  // 1. Igual al nombre o a un alias del amarre.
+  const exacto = deClave(claveDeProveedor(tal, alias));
+  if (exacto) return hallado(exacto);
+
+  // 2. Parecido claro con una grafía guardada o con un alias — y UNO solo.
+  const candidatas = new Set<string>();
+  for (const crudo of historico) {
+    const n = normalizarProveedor(crudo);
+    if (n && seParecen(base, n)) candidatas.add(claveDeProveedor(crudo, alias));
+  }
+  for (const [apodo, canonico] of Object.entries(alias)) {
+    if (seParecen(base, apodo) || seParecen(base, canonico)) candidatas.add(canonico);
+  }
+  const existentes = [...candidatas].map(deClave).filter((f): f is SugerenciaConFicha => !!f);
+  return existentes.length === 1 ? hallado(existentes[0]) : nuevo;
+}
