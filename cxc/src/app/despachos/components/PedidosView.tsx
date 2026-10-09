@@ -725,7 +725,7 @@ export default function PedidosView({
     const dias = diasEnPreparado(p.espera_muestra_desde, new Date().toISOString());
     return (
       <span className="mt-0.5 block text-xs font-medium text-amber-700">
-        {lineaEsperaMuestra(dias)}
+        {lineaEsperaMuestra(dias, p.espera_muestra_por, p.espera_muestra_desde)}
         {p.espera_muestra_nota && <span className="block font-normal">{p.espera_muestra_nota}</span>}
       </span>
     );

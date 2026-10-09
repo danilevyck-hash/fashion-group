@@ -171,10 +171,10 @@ describe("🔴 4 · quién marca cada paso", () => {
     expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "recibido", empresa_key: "fashion_wear" }, secretaria).ok).toBe(false);
   });
 
-  it("puedeMoverFlujoSimple respeta la empresa de cada persona (Julio no ve Vistana)", () => {
-    const julio = { role: "bodega", userName: "julio" };
-    expect(puedeMoverFlujoSimple({ desde: "en_preparacion", hasta: "preparado", empresa_key: "vistana" }, julio).ok).toBe(false);
-    expect(puedeMoverFlujoSimple({ desde: "en_preparacion", hasta: "preparado", empresa_key: "fashion_wear" }, julio).ok).toBe(true);
+  it("puedeMoverFlujoSimple respeta la empresa de cada persona (Jorman no ve Fashion Wear)", () => {
+    const jorman = { role: "bodega", userName: "jorman" };
+    expect(puedeMoverFlujoSimple({ desde: "en_preparacion", hasta: "preparado", empresa_key: "fashion_wear" }, jorman).ok).toBe(false);
+    expect(puedeMoverFlujoSimple({ desde: "en_preparacion", hasta: "preparado", empresa_key: "vistana" }, jorman).ok).toBe(true);
   });
 
   it("el guard ANCHO del PATCH es la UNIÓN de las dos listas, no solo la de Preparado", () => {
