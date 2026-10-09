@@ -292,7 +292,8 @@ describe("D · control", () => {
     for (const inventado of ["Vacaciones", "Permiso", "Luto", "Otro"]) {
       expect(modulo).not.toContain(`"${inventado}"`);
     }
-    expect(motivosParaVarios(["vistana"]).every((m) => MOTIVOS_JUSTIFICACION.includes(m))).toBe(true);
+    // 9-oct-2026: «Permiso personal» se suma con el tiempo fuera prendido; ninguno más.
+    expect(motivosParaVarios(["vistana"]).every((m) => MOTIVOS_JUSTIFICACION.includes(m) || m === "Permiso personal")).toBe(true);
   });
 
   it("la ficha y la fila del día siguen justificando a UNA persona, como siempre", () => {

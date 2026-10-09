@@ -147,8 +147,8 @@ describe("🔴 máximo 4 marcas: lo que no se adivina (reloj físico)", () => {
 });
 
 describe("🔴 apagado = la planilla de hoy", () => {
-  it("el interruptor viene apagado", () => {
-    expect(DESCUENTA_TIEMPO_FUERA).toBe(false);
+  it("el interruptor está PRENDIDO (9-oct-2026, Daniel)", () => {
+    expect(DESCUENTA_TIEMPO_FUERA).toBe(true);
   });
   it.each([
     ["caso 1", CASO1, 0], ["caso 2", CASO2, 0], ["caso 3", CASO3, 0], ["caso 4", CASO4, 240],
@@ -164,9 +164,9 @@ describe("🔴 apagado = la planilla de hoy", () => {
     expect(dia.revisar).toBe(true);
     expect(dia.trabajadoMin).toBe(510);
   });
-  it("«Permiso personal» no se ofrece ni se acepta", () => {
-    expect(motivosParaElegir(null)).toEqual(MOTIVOS_JUSTIFICACION);
-    expect(motivoSeOfrece(MOTIVO_PERMISO_PERSONAL)).toBe(false);
+  it("apagado, «Permiso personal» no se ofrece ni se acepta", () => {
+    expect(motivosParaElegir(null, false)).toEqual(MOTIVOS_JUSTIFICACION);
+    expect(motivoSeOfrece(MOTIVO_PERMISO_PERSONAL, false)).toBe(false);
   });
 });
 

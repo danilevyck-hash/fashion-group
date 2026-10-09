@@ -106,7 +106,7 @@ import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./conf
 // motor lo necesita para NO contar esos días como ausencias justificadas.
 import { esPermisoPersonal, esTrabajoDeVendedor } from "./motivos";
 // 🔴 EL TIEMPO FUERA DURANTE LA JORNADA (9-oct-2026), detrás de su interruptor.
-import { DESCUENTA_TIEMPO_FUERA, huecosDelDia, marcasMedibles } from "./tiempo-fuera";
+import { DESCUENTA_TIEMPO_FUERA, marcasMedibles } from "./tiempo-fuera";
 import { motivoAutomaticoDelDiaSinMarca } from "./trabaja-afuera";
 // 🔴 Dos marcas y la segunda a mediodía: un aviso, NUNCA un cálculo. Ver
 // `salida-sospechosa.ts` — no toca `revisar` ni un centavo.
@@ -1223,23 +1223,12 @@ export function armarReporte(opts: {
       let permisoPerdonaAlmuerzoMin = 0;
       let almuerzoTomado = 0;
       // ── 🔴 EL TIEMPO FUERA DURANTE LA JORNADA (9-oct-2026) ─────────────────
-      // Con el interruptor prendido y 4 marcas: TODOS los huecos, menos el
-      // almuerzo permitido (con su gracia, la misma puerta de siempre), menos
-      // lo que cubra una Constancia. Apagado, o con 5 o más marcas: lo de
-      // siempre (2.ª a 3.ª marca). Ver `tiempo-fuera.ts`.
+      // Con 4 marcas por día (Daniel) el único hueco ES el almuerzo: lo que se
+      // descuenta es este mismo exceso, con la misma gracia y la misma
+      // Constancia de siempre. Con 5 o más, a revisar y no se descuenta.
+      // Ver `tiempo-fuera.ts`.
       const fueraNuevo = descuentaFuera && marcasMedibles(buenas.length);
-      if (fueraNuevo) {
-        const huecos = huecosDelDia(buenas);
-        almuerzoTomado = huecos.reduce((a, [sale, vuelve]) => a + (vuelve - sale), 0);
-        const excesoBrutoMin = excesoAlmuerzoBrutoMin(almuerzoTomado, almuerzoProgSeg, graciaAlmuerzoMin);
-        // La Constancia perdona lo que se solape con los huecos, nunca más que
-        // el exceso: el almuerzo permitido no se "gasta" dos veces.
-        const cubierto = huecos.reduce((a, [sale, vuelve]) => a + minutosPerdonadosDe(ventana, {
-          desdeSeg: sale, hastaSeg: vuelve, bordeDelReloj: "fin",
-        }), 0);
-        permisoPerdonaAlmuerzoMin = Math.min(excesoBrutoMin, cubierto);
-        excesoAlmuerzoMin = Math.max(0, excesoBrutoMin - permisoPerdonaAlmuerzoMin);
-      } else if (buenas.length >= 4) {
+      if (buenas.length >= 4) {
         almuerzoTomado = buenas[2] - buenas[1]; // segundos
         // 🔴 CON GRACIA (24-sep-2026): una PUERTA como la tolerancia. Hasta
         // `programado + gracia` no hay exceso; un segundo más y se cuenta TODO

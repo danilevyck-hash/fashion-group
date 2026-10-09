@@ -29,6 +29,8 @@ function correr(reponeTardanza?: ReadonlySet<string>) {
     horarios: F.horarios, justificaciones: [], feriados: new Map(F.feriados),
     desde: F.desde, hasta: F.hasta, reglas: F.reglas, incluirNoHabiles: true, diaEnCurso: null,
     diasLaborables: new Map(F.diasLaborables),
+    // 9-oct-2026: el fixture es de antes del tiempo no laborado; ése tiene su candado.
+    descuentaTiempoFuera: false,
     ...(reponeTardanza ? { reponeTardanza } : {}),
   });
 }
