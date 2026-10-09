@@ -28,6 +28,14 @@ import path from "path";
 
 // Ni un solo test de acá toca la base: `rpc-retail` y el resumen de Telegram
 // importan el cliente, y con esto no se construye.
+// 9-oct-2026: `MULTIFASHION_APPLE_2026_10` quedó PRENDIDO (Daniel aprobó el
+// rediseño). Estos candados describen la pantalla de ANTES, que sigue siendo la
+// del interruptor apagado: se fijan a `false` para que la vuelta atrás no se
+// rompa. La pantalla nueva la cuida `multifashion-apple.test.tsx`.
+vi.mock("@/lib/multifashion/apple", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/multifashion/apple")>()),
+  MULTIFASHION_APPLE_2026_10: false,
+}));
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: { from: vi.fn(), rpc: vi.fn() },
 }));

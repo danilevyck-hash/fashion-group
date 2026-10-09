@@ -48,8 +48,10 @@ function meta(nombre: string, avance: Partial<MetaConAvance["avance"]>, extra: P
 }
 
 describe("el interruptor", () => {
-  it("nace apagado", () => {
-    expect(MULTIFASHION_APPLE_2026_10).toBe(false);
+  // 🔁 9-oct-2026: nació apagado; Daniel aprobó el rediseño (con «No vuelven» y
+  // sin «Ver meta») y queda prendido. La gráfica nueva sigue aparte, apagada.
+  it("prendido: Daniel lo aprobó", () => {
+    expect(MULTIFASHION_APPLE_2026_10).toBe(true);
   });
 });
 
