@@ -78,9 +78,10 @@ describe("🔴 1 · prendido — Daniel aprobó el mockup", () => {
 });
 
 describe("🔴 2 · tres estados, nombres de ERP, sin Facturado ni Despachado", () => {
-  it("el orden es Pendiente → Preparado → Recibido", () => {
-    expect([...ESTADOS_FLUJO_SIMPLE]).toEqual(["pendiente", "preparado", "recibido"]);
-    expect(ROTULO_ESTADO_FLUJO_SIMPLE).toEqual({ pendiente: "Pendiente", preparado: "Preparado", recibido: "Recibido" });
+  // 9-oct-2026: se suma «En preparación» entre Pendiente y Preparado.
+  it("el orden es Pendiente → En preparación → Preparado → Recibido", () => {
+    expect([...ESTADOS_FLUJO_SIMPLE]).toEqual(["pendiente", "en_preparacion", "preparado", "recibido"]);
+    expect(ROTULO_ESTADO_FLUJO_SIMPLE).toEqual({ pendiente: "Pendiente", en_preparacion: "En preparación", preparado: "Preparado", recibido: "Recibido" });
   });
 
   it("ni «facturado» ni «despachado» son estados válidos: quedaron afuera del alcance", () => {
@@ -97,14 +98,16 @@ describe("🔴 2 · tres estados, nombres de ERP, sin Facturado ni Despachado", 
   });
 
   it("siguienteEstadoFlujoSimple avanza UN paso; recibido es el final", () => {
-    expect(siguienteEstadoFlujoSimple("pendiente")).toBe("preparado");
+    expect(siguienteEstadoFlujoSimple("pendiente")).toBe("en_preparacion");
+    expect(siguienteEstadoFlujoSimple("en_preparacion")).toBe("preparado");
     expect(siguienteEstadoFlujoSimple("preparado")).toBe("recibido");
     expect(siguienteEstadoFlujoSimple("recibido")).toBeNull();
   });
 
   it("estadoAnteriorFlujoSimple retrocede UN paso; pendiente no tiene atrás", () => {
     expect(estadoAnteriorFlujoSimple("recibido")).toBe("preparado");
-    expect(estadoAnteriorFlujoSimple("preparado")).toBe("pendiente");
+    expect(estadoAnteriorFlujoSimple("preparado")).toBe("en_preparacion");
+    expect(estadoAnteriorFlujoSimple("en_preparacion")).toBe("pendiente");
     expect(estadoAnteriorFlujoSimple("pendiente")).toBeNull();
   });
 
@@ -151,7 +154,7 @@ describe("🔴 4 · quién marca cada paso", () => {
 
   it("puedeMoverFlujoSimple: bodega SÍ prepara, NO recibe", () => {
     const bodega = { role: "bodega", userName: "julio" };
-    expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, bodega).ok).toBe(true);
+    expect(puedeMoverFlujoSimple({ desde: "en_preparacion", hasta: "preparado", empresa_key: "fashion_wear" }, bodega).ok).toBe(true);
     const rechazo = puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: "fashion_wear" }, bodega);
     expect(rechazo).toEqual({ ok: false, error: "«Recibido» lo marca la secretaria. La sesión abierta es de julio (bodega)." });
   });
@@ -162,7 +165,7 @@ describe("🔴 4 · quién marca cada paso", () => {
   it("puedeMoverFlujoSimple: la secretaria SÍ recibe, NO prepara, no se salta pasos", () => {
     const secretaria = { role: "secretaria", userName: "angela" };
     expect(puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: "fashion_wear" }, secretaria).ok).toBe(true);
-    const rechazo = puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, secretaria);
+    const rechazo = puedeMoverFlujoSimple({ desde: "en_preparacion", hasta: "preparado", empresa_key: "fashion_wear" }, secretaria);
     expect(rechazo).toEqual({ ok: false, error: "«Preparado» lo marca bodega. La sesión abierta es de angela (secretaria)." });
     // No se salta Preparado.
     expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "recibido", empresa_key: "fashion_wear" }, secretaria).ok).toBe(false);
@@ -170,8 +173,8 @@ describe("🔴 4 · quién marca cada paso", () => {
 
   it("puedeMoverFlujoSimple respeta la empresa de cada persona (Julio no ve Vistana)", () => {
     const julio = { role: "bodega", userName: "julio" };
-    expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "vistana" }, julio).ok).toBe(false);
-    expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, julio).ok).toBe(true);
+    expect(puedeMoverFlujoSimple({ desde: "en_preparacion", hasta: "preparado", empresa_key: "vistana" }, julio).ok).toBe(false);
+    expect(puedeMoverFlujoSimple({ desde: "en_preparacion", hasta: "preparado", empresa_key: "fashion_wear" }, julio).ok).toBe(true);
   });
 
   it("el guard ANCHO del PATCH es la UNIÓN de las dos listas, no solo la de Preparado", () => {
@@ -186,7 +189,7 @@ describe("🔴 4 · quién marca cada paso", () => {
 describe("🔴 5 · sin la regla de «otra persona»", () => {
   it("admin puede preparar Y recibir el mismo pedido: no hace falta que sea otra persona", () => {
     const admin = { role: "admin", userName: "daniel" };
-    expect(puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear" }, admin).ok).toBe(true);
+    expect(puedeMoverFlujoSimple({ desde: "en_preparacion", hasta: "preparado", empresa_key: "fashion_wear" }, admin).ok).toBe(true);
     expect(puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: "fashion_wear" }, admin).ok).toBe(true);
   });
 });
@@ -256,13 +259,18 @@ describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
   const bodega = { role: "bodega", userName: "jorman" };
   const secretaria = { role: "secretaria", userName: "Angela" };
   const admin = { role: "admin", userName: "daniel" };
-  const mover = (desde: "pendiente" | "preparado" | "recibido", hasta: "pendiente" | "preparado" | "recibido", q: typeof bodega) =>
+  type E = "pendiente" | "en_preparacion" | "preparado" | "recibido";
+  const mover = (desde: E, hasta: E, q: typeof bodega) =>
     puedeMoverFlujoSimple({ desde, hasta, empresa_key: "vistana" }, q).ok;
 
-  it("Preparado → Pendiente: lo deshace bodega o admin, nunca la secretaria", () => {
-    expect(mover("preparado", "pendiente", bodega)).toBe(true);
-    expect(mover("preparado", "pendiente", admin)).toBe(true);
-    expect(mover("preparado", "pendiente", secretaria)).toBe(false);
+  it("Preparado → En preparación → Pendiente: lo deshace bodega o admin, nunca la secretaria", () => {
+    for (const [d, h] of [["preparado", "en_preparacion"], ["en_preparacion", "pendiente"]] as [E, E][]) {
+      expect(mover(d, h, bodega)).toBe(true);
+      expect(mover(d, h, admin)).toBe(true);
+      expect(mover(d, h, secretaria)).toBe(false);
+    }
+    // Un paso a la vez también hacia atrás.
+    expect(mover("preparado", "pendiente", bodega)).toBe(false);
   });
 
   it("Recibido → Preparado: lo deshace la secretaria o admin, nunca bodega", () => {
@@ -272,9 +280,15 @@ describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
   });
 
   it("volver a Pendiente deja la fila sin bultos ni firmas (🩸 antes firmaba «recibido_por»)", () => {
-    expect(columnasDelPaso("preparado", "pendiente", "jorman", ahora)).toEqual({
+    expect(columnasDelPaso("en_preparacion", "pendiente", "jorman", ahora)).toEqual({
       estado: "pendiente", bultos: null, preparado_por: null, preparado_en: null, recibido_por: null, recibido_en: null,
+      en_preparacion_por: null, en_preparacion_en: null, espera_muestra_desde: null, espera_muestra_por: null, espera_muestra_nota: null,
     });
+  });
+
+  it("volver a En preparación borra los bultos y la firma de Preparado, no la de En preparación", () => {
+    const c = columnasDelPaso("preparado", "en_preparacion", "jorman", ahora);
+    expect(c).toEqual({ estado: "en_preparacion", bultos: null, preparado_por: null, preparado_en: null });
   });
 
   it("volver a Preparado borra SOLO la firma de Recibido: la de bodega y los bultos quedan", () => {
@@ -285,12 +299,17 @@ describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
   });
 
   it("avanzar firma su columna", () => {
-    expect(columnasDelPaso("pendiente", "preparado", "jorman", ahora, 3)).toEqual({ estado: "preparado", bultos: 3, preparado_por: "jorman", preparado_en: ahora });
+    expect(columnasDelPaso("pendiente", "en_preparacion", "jorman", ahora)).toEqual({ estado: "en_preparacion", en_preparacion_por: "jorman", en_preparacion_en: ahora });
+    expect(columnasDelPaso("en_preparacion", "preparado", "jorman", ahora, 3)).toEqual({
+      estado: "preparado", bultos: 3, preparado_por: "jorman", preparado_en: ahora,
+      espera_muestra_desde: null, espera_muestra_por: null, espera_muestra_nota: null,
+    });
     expect(columnasDelPaso("preparado", "recibido", "Angela", ahora)).toEqual({ estado: "recibido", recibido_por: "Angela", recibido_en: ahora });
   });
 
   it("esDeshacerFlujoSimple solo es verdad hacia atrás", () => {
-    expect(esDeshacerFlujoSimple("preparado", "pendiente")).toBe(true);
+    expect(esDeshacerFlujoSimple("en_preparacion", "pendiente")).toBe(true);
+    expect(esDeshacerFlujoSimple("preparado", "en_preparacion")).toBe(true);
     expect(esDeshacerFlujoSimple("recibido", "preparado")).toBe(true);
     expect(esDeshacerFlujoSimple("pendiente", "preparado")).toBe(false);
   });
@@ -302,9 +321,10 @@ describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
     expect(r).toContain("antes: previo");
   });
 
-  it("la fila ofrece «Volver a Pendiente» a bodega y «Volver a Preparado» a la secretaria, con confirmación", () => {
+  it("la fila ofrece a bodega volver un paso y «Volver a Preparado» a la secretaria, con confirmación", () => {
     const v = vista();
-    expect(v).toContain('{puedeMarcar && deshacer("pendiente")}');
+    expect(v).toContain('{puedeMarcar && deshacer("en_preparacion")}');
+    expect(v).toContain('{deshacer("pendiente")}');
     expect(v).toContain('{deshacer("preparado")}');
     expect(v).toContain("onClick={() => setPorConfirmarSimple({ pedido: p, destino })}");
   });

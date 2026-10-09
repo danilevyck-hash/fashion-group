@@ -63,6 +63,8 @@ Cuando Daniel corrija un nombre («eso no se dice así»), para que quede atrapa
 | Dónde se gastó | Tienda | De una tienda, La tienda esa |
 | Tipo de gasto: mobiliario que sale de la bodega a una tienda (Marketing) | Entrega de mobiliario | Mueble de la bodega |
 | Agrupar mercancía para despacho | Bultos · Unidades por bulto | Poner en bulto, Embultar |
+| Pasos de un pedido en Despachos › Pedidos | Pendiente · En preparación · Preparado · Recibido (botón: «Iniciar preparación») | Armando, En proceso, Recibí la hoja, Listo |
+| Pedido detenido porque faltan piezas que se traen de otro lado | En espera de muestra (una marca sobre En preparación; botones «En espera de muestra» · «Quitar espera») | Esperando pieza, Falta muestra, Parado |
 | Módulo de envíos a clientes (pedidos + bultos + la guía) | Despachos (adentro: Pedidos · Bultos · Guías de despacho) | Envíos, Logística |
 | Poner una línea del pedido en un bulto | Asignar bulto · Quitar bulto · «N artículos asignados» | Poner en bulto, Poner en el bulto, Quitar del bulto, Marcar artículos |
 | A quién se le cobra un gasto (Marketing) | Se cobra a (las 5 marcas, o «No recuperable») · Se cobra (Completo · Mitad) | A quién se le pasa, mi costo, costo propio, inventario propio, porcentajes en pantalla |

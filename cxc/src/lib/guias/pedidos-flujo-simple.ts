@@ -82,15 +82,30 @@ export const PEDIDOS_FLUJO_SIMPLE_2026_10: boolean =
 
 export { empresasQueVe, veLaEmpresa };
 
-// ─── Los TRES estados ────────────────────────────────────────────────────────
+// ─── Los CUATRO estados ──────────────────────────────────────────────────────
+//
+// 🔴 9-oct-2026, Daniel: se suma «En preparación» entre Pendiente y Preparado.
+// Lo marca BODEGA para confirmar que la secretaria le entregó la hoja del
+// pedido (que el papel físico llegó a bodega). Bodega puede tener varios a la
+// vez. Los pedidos que ya estaban en Preparado o Recibido se quedan donde
+// están: ninguna fila se mueve.
 
-export const ESTADOS_FLUJO_SIMPLE = ["pendiente", "preparado", "recibido"] as const;
+export const ESTADOS_FLUJO_SIMPLE = ["pendiente", "en_preparacion", "preparado", "recibido"] as const;
 export type EstadoFlujoSimple = (typeof ESTADOS_FLUJO_SIMPLE)[number];
 
 export const ROTULO_ESTADO_FLUJO_SIMPLE: Record<EstadoFlujoSimple, string> = {
   pendiente: "Pendiente",
+  en_preparacion: "En preparación",
   preparado: "Preparado",
   recibido: "Recibido",
+};
+
+/** El rótulo de cada pestaña de la lista (el plural no sale de pegar una «s»). */
+export const PESTANA_FLUJO_SIMPLE: Record<EstadoFlujoSimple, string> = {
+  pendiente: "Pendientes",
+  en_preparacion: "En preparación",
+  preparado: "Preparados",
+  recibido: "Recibidos",
 };
 
 export function esEstadoFlujoSimple(v: unknown): v is EstadoFlujoSimple {
@@ -141,8 +156,9 @@ export const ROLES_FLUJO_SIMPLE_TODAS: readonly string[] = [
   ...new Set([...ROLES_PREPARA_FLUJO_SIMPLE, ...ROLES_RECIBE_FLUJO_SIMPLE]),
 ];
 
+/** «En preparación» y «Preparado» los marca bodega; «Recibido», la secretaria. */
 export function rolesDelEstadoFlujoSimple(destino: EstadoFlujoSimple): readonly string[] {
-  return destino === "preparado" ? ROLES_PREPARA_FLUJO_SIMPLE : ROLES_RECIBE_FLUJO_SIMPLE;
+  return destino === "recibido" ? ROLES_RECIBE_FLUJO_SIMPLE : ROLES_PREPARA_FLUJO_SIMPLE;
 }
 
 export interface QuienMarcaFlujoSimple {
@@ -170,16 +186,17 @@ export function puedeMoverFlujoSimple(
     return { ok: false, error: "Ese pedido no es de una de tus empresas" };
   }
   // 🔴 El rol lo decide el PASO que se toca, no solo el destino: deshacer
-  // «Recibido» (volver a Preparado) es de la secretaria, y deshacer
-  // «Preparado» (volver a Pendiente) es de bodega.
-  const paso: EstadoFlujoSimple = desde === "recibido" || hasta === "recibido" ? "recibido" : "preparado";
+  // «Recibido» (volver a Preparado) es de la secretaria; deshacer «Preparado»
+  // (volver a En preparación) y «En preparación» (volver a Pendiente), de bodega.
+  const paso: EstadoFlujoSimple = ORDEN.indexOf(desde) > ORDEN.indexOf(hasta) ? desde : hasta;
   if (!quien.role || !rolesDelEstadoFlujoSimple(paso).includes(quien.role)) {
     // 🩸 7-oct-2026: Ángela leyó «Ese paso lo marca la secretaria» siendo la
     // secretaria — su pestaña decía Angela, pero el navegador ya tenía abierta
     // la sesión de jorman (bodega). El rechazo nombra la sesión con que llegó
     // la petición, para que nunca contradiga a quien lo lee.
     const quienEs = quien.userName ? `${quien.userName} (${quien.role ?? "sin rol"})` : (quien.role ?? "sin rol");
-    const quienMarca = paso === "preparado" ? "«Preparado» lo marca bodega" : "«Recibido» lo marca la secretaria";
+    const quienMarca =
+      paso === "recibido" ? "«Recibido» lo marca la secretaria" : `«${ROTULO_ESTADO_FLUJO_SIMPLE[paso]}» lo marca bodega`;
     return { ok: false, error: `${quienMarca}. La sesión abierta es de ${quienEs}.` };
   }
   return { ok: true };
@@ -190,6 +207,11 @@ export function puedeMoverFlujoSimple(
 export interface ColumnasDelPaso {
   estado: EstadoFlujoSimple;
   bultos?: number | null;
+  en_preparacion_por?: string | null;
+  en_preparacion_en?: string | null;
+  espera_muestra_desde?: string | null;
+  espera_muestra_por?: string | null;
+  espera_muestra_nota?: string | null;
   preparado_por?: string | null;
   preparado_en?: string | null;
   recibido_por?: string | null;
@@ -216,14 +238,73 @@ export function columnasDelPaso(
   bultos?: number | null,
 ): ColumnasDelPaso {
   if (hasta === "pendiente") {
-    return { estado: hasta, bultos: null, preparado_por: null, preparado_en: null, recibido_por: null, recibido_en: null };
+    return {
+      estado: hasta, bultos: null, preparado_por: null, preparado_en: null, recibido_por: null, recibido_en: null,
+      en_preparacion_por: null, en_preparacion_en: null, ...SIN_ESPERA_MUESTRA,
+    };
+  }
+  if (hasta === "en_preparacion") {
+    // Volver desde Preparado borra los bultos y la firma de Preparado; la de
+    // «En preparación» queda (la hoja sigue en bodega).
+    return desde === "preparado"
+      ? { estado: hasta, bultos: null, preparado_por: null, preparado_en: null }
+      : { estado: hasta, en_preparacion_por: quien, en_preparacion_en: ahora };
   }
   if (hasta === "preparado") {
+    // 🔴 Marcar Preparado QUITA SOLA la espera de muestra (Daniel, 9-oct-2026).
     return desde === "recibido"
       ? { estado: hasta, recibido_por: null, recibido_en: null }
-      : { estado: hasta, bultos: bultos ?? null, preparado_por: quien, preparado_en: ahora };
+      : { estado: hasta, bultos: bultos ?? null, preparado_por: quien, preparado_en: ahora, ...SIN_ESPERA_MUESTRA };
   }
   return { estado: hasta, recibido_por: quien, recibido_en: ahora };
+}
+
+// ─── «En espera de muestra» ──────────────────────────────────────────────────
+//
+// 🔴 Daniel, 9-oct-2026: mientras un pedido está En preparación, bodega puede
+// marcar que le faltan piezas finales que tiene que traer de otro lado. Es EL
+// ÚNICO motivo, así que es un solo botón (sin lista) y una nota opcional
+// (qué pieza falta). NO es un estado: es una marca sobre «En preparación».
+// Solo existe ahí — lo garantiza también un CHECK en la base — y marcar
+// Preparado la quita sola.
+
+const SIN_ESPERA_MUESTRA = { espera_muestra_desde: null, espera_muestra_por: null, espera_muestra_nota: null } as const;
+
+export const MAX_NOTA_MUESTRA = 200;
+
+/** ¿Puede esta persona poner o quitar «En espera de muestra» a este pedido? */
+export function puedeMarcarEsperaMuestra(
+  args: { estado: EstadoFlujoSimple; empresa_key: string },
+  quien: QuienMarcaFlujoSimple,
+): Veredicto {
+  if (args.estado !== "en_preparacion") {
+    return { ok: false, error: "«En espera de muestra» solo se marca en un pedido En preparación" };
+  }
+  if (!veLaEmpresa(args.empresa_key, quien.userName, quien.role)) {
+    return { ok: false, error: "Ese pedido no es de una de tus empresas" };
+  }
+  if (!quien.role || !ROLES_PREPARA_FLUJO_SIMPLE.includes(quien.role)) {
+    return { ok: false, error: "«En espera de muestra» lo marca bodega" };
+  }
+  return { ok: true };
+}
+
+/** Las columnas al poner (`true`) o quitar (`false`) la espera. La nota se recorta. */
+export function columnasEsperaMuestra(
+  poner: boolean,
+  quien: string,
+  ahora: string,
+  nota?: unknown,
+): Pick<ColumnasDelPaso, "espera_muestra_desde" | "espera_muestra_por" | "espera_muestra_nota"> {
+  if (!poner) return { ...SIN_ESPERA_MUESTRA };
+  const n = typeof nota === "string" ? nota.trim().slice(0, MAX_NOTA_MUESTRA) : "";
+  return { espera_muestra_desde: ahora, espera_muestra_por: quien, espera_muestra_nota: n || null };
+}
+
+/** «En espera de muestra · hace 2 días» — la línea ámbar de la fila. */
+export function lineaEsperaMuestra(dias: number): string {
+  const cuando = dias === 0 ? "desde hoy" : dias === 1 ? "hace 1 día" : `hace ${dias} días`;
+  return `En espera de muestra · ${cuando}`;
 }
 
 /** ¿Este cambio es deshacer un paso (ir hacia atrás)? */
@@ -272,6 +353,8 @@ export function lineaPreparadoHaceDias(dias: number): string {
 // ─── Quién marcó cada paso, y cuándo ─────────────────────────────────────────
 
 export interface FirmasFlujoSimple {
+  en_preparacion_por?: string | null;
+  en_preparacion_en?: string | null;
   preparado_por: string | null;
   preparado_en: string | null;
   recibido_por: string | null;
@@ -289,6 +372,7 @@ export function ultimaFirmaFlujoSimple(f: FirmasFlujoSimple): string | null {
   const pasos: [EstadoFlujoSimple, string | null, string | null][] = [
     ["recibido", f.recibido_por, f.recibido_en],
     ["preparado", f.preparado_por, f.preparado_en],
+    ["en_preparacion", f.en_preparacion_por ?? null, f.en_preparacion_en ?? null],
   ];
   for (const [paso, por, en] of pasos) {
     const t = firmaEnColumnaFlujoSimple(por, en);

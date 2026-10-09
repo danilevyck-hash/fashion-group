@@ -3,6 +3,7 @@
  *
  *   GET   → { pedidos: PedidoBodega[], actualizado: string | null }
  *   PATCH → { empresa_key, pedido_switch_id, estado } → { ok, cambiado_por, cambiado_en }
+ *   PATCH → { empresa_key, pedido_switch_id, muestra: true|false, nota? } → «En espera de muestra»
  *
  * Ven los de `PEDIDOS_VER_ROLES`; marcan solo admin y bodega. Sin montos:
  * la pantalla la ve bodega, así que `total` no sale de aquí. Lee `switch_pedidos` (lo escribe el cron de madrugada)
@@ -39,6 +40,8 @@ import {
   validarCantidadBultos,
   columnasDelPaso,
   esDeshacerFlujoSimple,
+  puedeMarcarEsperaMuestra,
+  columnasEsperaMuestra,
   type EstadoFlujoSimple,
 } from "@/lib/guias/pedidos-flujo-simple";
 import { logActivity } from "@/lib/log-activity";
@@ -77,11 +80,16 @@ interface EstadoDeBodega {
   bultos?: number | null;
   recibido_por?: string | null;
   recibido_en?: string | null;
+  en_preparacion_por?: string | null;
+  en_preparacion_en?: string | null;
+  espera_muestra_desde?: string | null;
+  espera_muestra_por?: string | null;
+  espera_muestra_nota?: string | null;
 }
 
 const COLUMNAS_BASE = "empresa_key, pedido_switch_id, estado, cambiado_por, cambiado_en, envio_id";
 const COLUMNAS_CON_FIRMAS = `${COLUMNAS_BASE}, preparado_por, preparado_en, verificado_por, verificado_en`;
-const COLUMNAS_FLUJO_SIMPLE = `${COLUMNAS_BASE}, preparado_por, preparado_en, bultos, recibido_por, recibido_en`;
+const COLUMNAS_FLUJO_SIMPLE = `${COLUMNAS_BASE}, preparado_por, preparado_en, bultos, recibido_por, recibido_en, en_preparacion_por, en_preparacion_en, espera_muestra_desde, espera_muestra_por, espera_muestra_nota`;
 
 /**
  * 🔴 FALLA ABIERTA SOBRE LAS COLUMNAS NUEVAS. 🩸 Pedirlas a secas devolvía un
@@ -225,6 +233,11 @@ export async function GET(req: NextRequest) {
       verificado_en: m?.verificado_en ?? null,
       recibido_por: m?.recibido_por ?? null,
       recibido_en: m?.recibido_en ?? null,
+      en_preparacion_por: m?.en_preparacion_por ?? null,
+      en_preparacion_en: m?.en_preparacion_en ?? null,
+      espera_muestra_desde: m?.espera_muestra_desde ?? null,
+      espera_muestra_por: m?.espera_muestra_por ?? null,
+      espera_muestra_nota: m?.espera_muestra_nota ?? null,
     };
   });
   return NextResponse.json({
@@ -266,10 +279,10 @@ async function patchFlujoSimple(
   const v = puedeMoverFlujoSimple({ desde, hasta: estado, empresa_key: empresa }, { role: auth.role, userName: auth.userName });
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 403 });
 
-  // El número de bultos SOLO se pide (y se exige) al preparar DESDE pendiente:
-  // volver a «Preparado» desde «Recibido» conserva el que ya había.
+  // El número de bultos SOLO se pide (y se exige) al preparar DESDE En
+  // preparación: volver a «Preparado» desde «Recibido» conserva el que había.
   let bultosNuevos: number | null = null;
-  if (estado === "preparado" && desde === "pendiente") {
+  if (estado === "preparado" && desde === "en_preparacion") {
     const val = validarCantidadBultos(body?.bultos);
     if (!val.ok) return NextResponse.json({ error: val.error }, { status: 400 });
     bultosNuevos = val.valor!;
@@ -294,6 +307,11 @@ async function patchFlujoSimple(
   return NextResponse.json({
     ok: true,
     estado,
+    en_preparacion_por: despues.en_preparacion_por ?? null,
+    en_preparacion_en: despues.en_preparacion_en ?? null,
+    espera_muestra_desde: despues.espera_muestra_desde ?? null,
+    espera_muestra_por: despues.espera_muestra_por ?? null,
+    espera_muestra_nota: despues.espera_muestra_nota ?? null,
     bultos: despues.bultos ?? null,
     cambiado_por: fila.cambiado_por,
     cambiado_en: fila.cambiado_en,
@@ -302,6 +320,59 @@ async function patchFlujoSimple(
     recibido_por: despues.recibido_por ?? null,
     recibido_en: despues.recibido_en ?? null,
   });
+}
+
+/**
+ * 🔴 «En espera de muestra» (Daniel, 9-oct-2026): bodega la pone o la quita
+ * sobre un pedido En preparación. No cambia el estado. Queda en el registro de
+ * actividad quién la puso, cuándo, y cuándo se quitó.
+ */
+async function patchEsperaMuestra(
+  auth: SessionPayload,
+  empresa: string,
+  id: number,
+  poner: boolean,
+  nota: unknown,
+): Promise<NextResponse> {
+  const quienFirma = auth.userName || auth.userId;
+  if (!quienFirma) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const { data: pedido } = await supabaseServer
+    .from("switch_pedidos")
+    .select("empresa_key")
+    .eq("empresa_key", empresa)
+    .eq("pedido_switch_id", id)
+    .maybeSingle();
+  if (!pedido || !empresasQueVe(auth.userName, auth.role).includes(empresa)) {
+    return NextResponse.json({ error: "Ese pedido no existe" }, { status: 404 });
+  }
+  const previo = await leerEstadoPrevio(empresa, id);
+  const v = puedeMarcarEsperaMuestra(
+    { estado: estadoFlujoSimpleLeido(previo?.estado), empresa_key: empresa },
+    { role: auth.role, userName: auth.userName },
+  );
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 403 });
+  const ahora = new Date().toISOString();
+  const cols = columnasEsperaMuestra(poner, quienFirma, ahora, nota);
+  // UPDATE, no upsert: la fila ya existe (el pedido está En preparación), y el
+  // CHECK de la base rechaza la marca en cualquier otro estado.
+  const { error } = await supabaseServer
+    .from("pedidos_bodega_estado")
+    .update({ ...cols, cambiado_por: quienFirma, cambiado_en: ahora })
+    .eq("empresa_key", empresa)
+    .eq("pedido_switch_id", id)
+    .eq("estado", "en_preparacion");
+  if (error) return NextResponse.json({ error: "No se pudo guardar" }, { status: 500 });
+  await logActivity(
+    auth.role,
+    poner ? "marcar_espera_muestra" : "quitar_espera_muestra",
+    "pedidos_bodega_estado",
+    {
+      pedido: `${empresa}:${id}`,
+      ...(poner ? { nota: cols.espera_muestra_nota } : { desde: previo?.espera_muestra_desde ?? null, por: previo?.espera_muestra_por ?? null }),
+    },
+    auth.userName,
+  );
+  return NextResponse.json({ ok: true, ...cols });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -324,6 +395,12 @@ export async function PATCH(req: NextRequest) {
   const empresa = String(body?.empresa_key ?? "");
   const id = Number(body?.pedido_switch_id);
   const estado = body?.estado;
+  if (PEDIDOS_FLUJO_SIMPLE_2026_10 && typeof body?.muestra === "boolean") {
+    if (!(B2B_EMPRESA_KEYS as readonly string[]).includes(empresa) || !Number.isInteger(id)) {
+      return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+    }
+    return patchEsperaMuestra(auth, empresa, id, body.muestra, body.nota);
+  }
   const valido = PEDIDOS_FLUJO_SIMPLE_2026_10 ? esEstadoFlujoSimple(estado) : BULTOS_ACTIVO ? esEstadoBultos(estado) : esEstadoPedido(estado);
   if (!(B2B_EMPRESA_KEYS as readonly string[]).includes(empresa) || !Number.isInteger(id) || !valido) {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
