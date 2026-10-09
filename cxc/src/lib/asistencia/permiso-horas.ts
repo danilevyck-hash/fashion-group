@@ -61,11 +61,32 @@
  * justificaciones vivas no tienen horas).
  * ────────────────────────────────────────────────────────────────────────── */
 
-import { MOTIVO_CONSTANCIA } from "./motivos";
+import { MOTIVO_CONSTANCIA, MOTIVO_PERMISO_PERSONAL, esPermisoPersonal } from "./motivos";
 
-/** ¿Este motivo admite un rango de HORAS? Solo Constancia. */
+/**
+ * ¿Este motivo admite un rango de HORAS? Constancia y, desde el 9-oct-2026,
+ * «Permiso personal» (que las EXIGE: ver `motivoExigeHoras`).
+ */
 export function motivoAdmiteHoras(motivo: string | null | undefined): boolean {
-  return String(motivo ?? "").trim() === MOTIVO_CONSTANCIA;
+  const m = String(motivo ?? "").trim();
+  return m === MOTIVO_CONSTANCIA || m === MOTIVO_PERMISO_PERSONAL;
+}
+
+/** ¿Sin horas no se guarda? Solo el permiso personal: no existe de día entero. */
+export function motivoExigeHoras(motivo: string | null | undefined): boolean {
+  return esPermisoPersonal(motivo);
+}
+
+/**
+ * Cómo se lee un permiso personal, en el chip, el título y el Excel:
+ * «Permiso personal · 14:00–16:00 · se descuenta». No perdona nada.
+ */
+export function textoPermisoPersonal(
+  horaDesde: string | null | undefined,
+  horaHasta: string | null | undefined,
+): string {
+  const r = rangoPermiso(horaDesde, horaHasta);
+  return `${MOTIVO_PERMISO_PERSONAL}${r ? ` · ${r}` : ""} · se descuenta`;
 }
 
 /**
@@ -234,6 +255,9 @@ export function textoPermiso(
   horaDesde: string | null | undefined,
   horaHasta: string | null | undefined,
 ): string {
+  // 🔴 El permiso personal se lee «… · se descuenta» en TODAS las listas
+  // (ficha, Justificaciones, Reporte): autorizado, pero no perdona (9-oct-2026).
+  if (esPermisoPersonal(motivo)) return textoPermisoPersonal(horaDesde, horaHasta);
   const v = ventanaDe(horaDesde, horaHasta);
   if (!v) return motivo;
   return `${motivo} — permiso de ${segundosAHora(v.desdeSeg)} a ${segundosAHora(v.hastaSeg)}`;

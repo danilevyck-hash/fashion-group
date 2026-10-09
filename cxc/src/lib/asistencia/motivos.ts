@@ -52,6 +52,8 @@
 // misma naturalidad, como *"ya no trabaja acá"* — la confusión más cara posible
 // justo en la pantalla que decide un pago.
 
+import { DESCUENTA_TIEMPO_FUERA } from "./tiempo-fuera";
+
 /** El nombre nuevo, el que se guarda de ahora en adelante. */
 export const MOTIVO_TRABAJO_VENDEDOR = "Trabajo de vendedor";
 
@@ -123,6 +125,31 @@ export const MOTIVO_COMPENSATORIO = "Compensatorio";
  * paga y no nace deuda, que es exactamente lo que pasaba ayer.
  */
 export const MOTIVO_DIA_LIBRE_EMPRESA = "Día libre de la empresa";
+
+/**
+ * 🔴 «PERMISO PERSONAL» — 9-oct-2026, detrás de `DESCUENTA_TIEMPO_FUERA`.
+ *
+ * Daniel, textual: *«el permiso sin goce (no me gustó ese nombre) es solo para
+ * saber que se le dio permiso; igual no se le paga»*.
+ *
+ * ⚠️ NO es el «justificado pero no se paga» que Daniel descartó el 10-sep-2026
+ * (ver `MOTIVO_CONSTANCIA`): éste NO JUSTIFICA NADA. No perdona un minuto, no
+ * vuelve justificado ningún día, y el motor lo descuenta igual que un hueco sin
+ * explicación. Solo deja dicho que la salida fue AUTORIZADA, para que no se lea
+ * como una falta. Se carga con horas (obligatorias), como una Constancia.
+ * Decisión de Daniel del 9-oct-2026; la palabra «justificar» sigue significando
+ * que se paga.
+ */
+export const MOTIVO_PERMISO_PERSONAL = "Permiso personal";
+
+/** ¿Es un permiso personal (autorizado, pero se descuenta)? */
+export function esPermisoPersonal(motivo: string | null | undefined): boolean {
+  return typeof motivo === "string" && motivo.trim() === MOTIVO_PERMISO_PERSONAL;
+}
+
+/** La nota del formulario para el permiso personal. */
+export const TEXTO_PERMISO_PERSONAL =
+  "Deja registrado que la salida fue autorizada. El tiempo fuera se descuenta igual.";
 
 /** Los siete que la pantalla ofrece. Compensatorio va al lado de Incapacidad
  *  (Daniel: *«así como incapacidad»*); el día libre de la empresa va ÚLTIMO,
@@ -220,10 +247,18 @@ export const TEXTO_DIA_LIBRE_NO_APLICA =
  * libre de la empresa donde no aplica. Sin empresa conocida se ofrecen todos
  * (el servidor lo vuelve a preguntar con la ficha en la mano).
  */
-export function motivosParaElegir(empresa: string | null | undefined): readonly string[] {
-  return ofreceDiaLibreDeLaEmpresa(empresa)
+export function motivosParaElegir(
+  empresa: string | null | undefined,
+  conPermisoPersonal: boolean = DESCUENTA_TIEMPO_FUERA,
+): readonly string[] {
+  const base = ofreceDiaLibreDeLaEmpresa(empresa)
     ? MOTIVOS_JUSTIFICACION
     : MOTIVOS_JUSTIFICACION.filter((m) => !esDiaLibreDeLaEmpresa(m));
+  // 🔴 «Permiso personal» solo con el interruptor del tiempo fuera prendido:
+  // apagado, el hueco no se descuenta y el rótulo «se descuenta» mentiría.
+  if (!conPermisoPersonal) return base;
+  const i = base.indexOf(MOTIVO_CONSTANCIA);
+  return [...base.slice(0, i + 1), MOTIVO_PERMISO_PERSONAL, ...base.slice(i + 1)];
 }
 
 /**
@@ -238,6 +273,7 @@ export function notaDelMotivo(motivo: string | null | undefined): string | null 
   if (esTrabajoDeVendedor(motivo)) return TEXTO_DIA_AFUERA;
   if (String(motivo ?? "").trim() === MOTIVO_COMPENSATORIO) return TEXTO_DIA_COMPENSATORIO;
   if (esDiaLibreDeLaEmpresa(motivo)) return TEXTO_DIA_LIBRE_EMPRESA;
+  if (esPermisoPersonal(motivo)) return TEXTO_PERMISO_PERSONAL;
   return null;
 }
 
@@ -263,15 +299,20 @@ export const MOTIVOS_RETIRADOS = [
 ] as const;
 
 /** ¿Este motivo se puede elegir hoy? Los retirados se leen, no se ofrecen. */
-export function motivoSeOfrece(motivo: string | null | undefined): boolean {
+export function motivoSeOfrece(
+  motivo: string | null | undefined,
+  conPermisoPersonal: boolean = DESCUENTA_TIEMPO_FUERA,
+): boolean {
   const m = typeof motivo === "string" ? motivo.trim() : "";
+  if (conPermisoPersonal && m === MOTIVO_PERMISO_PERSONAL) return true;
   return (MOTIVOS_JUSTIFICACION as readonly string[]).includes(m);
 }
 
 /** ¿Es un motivo que el módulo conoce, aunque ya no se ofrezca? */
 export function motivoConocido(motivo: string | null | undefined): boolean {
   const m = typeof motivo === "string" ? motivo.trim() : "";
-  return motivoSeOfrece(m) || (MOTIVOS_RETIRADOS as readonly string[]).includes(m);
+  return motivoSeOfrece(m) || m === MOTIVO_PERMISO_PERSONAL
+    || (MOTIVOS_RETIRADOS as readonly string[]).includes(m);
 }
 
 /**

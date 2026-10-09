@@ -100,12 +100,14 @@
 import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./config";
 // 🔑 Un motivo de justificación puede significar "trabajó, pero no acá". El
 // motor lo necesita para NO contar esos días como ausencias justificadas.
-import { esTrabajoDeVendedor } from "./motivos";
+import { esPermisoPersonal, esTrabajoDeVendedor } from "./motivos";
+// 🔴 EL TIEMPO FUERA DURANTE LA JORNADA (9-oct-2026), detrás de su interruptor.
+import { DESCUENTA_TIEMPO_FUERA, huecosDelDia, marcasMedibles } from "./tiempo-fuera";
 import { motivoAutomaticoDelDiaSinMarca } from "./trabaja-afuera";
 // 🔴 Dos marcas y la segunda a mediodía: un aviso, NUNCA un cálculo. Ver
 // `salida-sospechosa.ts` — no toca `revisar` ni un centavo.
 import { salidaSospechosa } from "./salida-sospechosa";
-import { minutosPerdonadosDe, rangoPermiso, textoPermiso, ventanaDe } from "./permiso-horas";
+import { minutosPerdonadosDe, rangoPermiso, textoPermiso, textoPermisoPersonal, ventanaDe } from "./permiso-horas";
 // 🔴 LA MARCA REPETIDA SE OLVIDA SOLA (18-sep-2026): a 60 s o menos de la
 // última que cuenta, no cuenta. La regla y el número viven en
 // `marca-repetida.ts`; aquí solo se le pregunta, sobre las marcas de CADA día.
@@ -356,6 +358,20 @@ export interface DiaReporte {
   permisoPerdonaMin: number;
   permisoPerdonaSalidaMin: number;
   permisoPerdonaAlmuerzoMin: number;
+  /**
+   * 🔴 `true` = el permiso del día es un «Permiso personal» (9-oct-2026): se
+   * AUTORIZÓ, pero no perdona nada. `permiso` ya trae el texto entero
+   * («Permiso personal · 14:00–16:00 · se descuenta»). Ausente = los de siempre.
+   */
+  permisoSeDescuenta?: boolean;
+  /**
+   * 🔴 EL TIEMPO FUERA QUE LA PLANILLA DESCUENTA (9-oct-2026): todos los huecos
+   * del día menos el almuerzo permitido, con su gracia y neto de Constancia.
+   * Solo viaja con `DESCUENTA_TIEMPO_FUERA` prendido y solo en días de 4 o 6
+   * marcas (con 5, 7 u 8 no se adivina: 0). Ausente = la planilla de hoy. Ver
+   * `tiempo-fuera.ts`.
+   */
+  descuentaFueraMin?: number;
   feriado: string | null;
   /**
    * El día es LABORABLE para esta persona: lunes a viernes, salvo que tenga
@@ -790,6 +806,12 @@ export function armarReporte(opts: {
    * devuelve vacío. Quien no tiene autorización se mide como siempre.
    */
   entradasAutorizadas?: ReadonlyMap<string, EntradaAutorizada>;
+  /**
+   * 🔴 ¿Se descuenta el tiempo fuera durante la jornada? (9-oct-2026). Por
+   * omisión, el interruptor `DESCUENTA_TIEMPO_FUERA` (apagado = lo de hoy).
+   * Entra por parámetro solo para que los candados prueben los dos lados.
+   */
+  descuentaTiempoFuera?: boolean;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
   const vacaciones = opts.vacaciones ?? [];
@@ -809,6 +831,7 @@ export function armarReporte(opts: {
   // 🔴 El umbral del aviso de entrada temprana (24-sep-2026). 0 = sin aviso.
   const avisoTempranaMin = num(opts.reglas?.avisoEntradaTempranaMin, REGLAS_DEFAULT.avisoEntradaTempranaMin);
   const entradasAutorizadas = opts.entradasAutorizadas ?? new Map<string, EntradaAutorizada>();
+  const descuentaFuera = opts.descuentaTiempoFuera ?? DESCUENTA_TIEMPO_FUERA;
 
   const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
   // 🔴 Los días se recorren POR PERSONA desde el 18-sep-2026: sin
@@ -912,19 +935,26 @@ export function armarReporte(opts: {
       const entradaProgSeg = hhmmASeg(horarioHoy.entrada);
       const salidaProgSeg = hhmmASeg(horarioHoy.salida);
       const just = justificacionDe(justificaciones, codigo, fecha);
-      const ventana = just ? ventanaDe(just.hora_desde, just.hora_hasta) : null;
+      // 🔴 «PERMISO PERSONAL» (9-oct-2026) NO PERDONA NADA: ni ventana para el
+      // perdón ni día justificado. Solo se DICE, para que no se lea como falta.
+      const personal = just !== null && esPermisoPersonal(just.motivo);
+      const ventana = just && !personal ? ventanaDe(just.hora_desde, just.hora_hasta) : null;
       // 🔴 UN PERMISO DE HORAS NO JUSTIFICA EL DÍA ENTERO. `justificado` es lo
       // que decide si un día SIN MARCAS deja de ser ausencia, y dos horas de
       // permiso no explican no haber venido: eso borraría ocho horas de sueldo
       // y nadie lo vería hasta el día de pago. Con ventana, el día NO queda
       // justificado y el permiso solo perdona minutos de tardanza más abajo.
-      const justificado = just && !ventana ? just.motivo : null;
+      const justificado = just && !ventana && !personal ? just.motivo : null;
       /** El permiso de horas, tal como se muestra. `null` = no hay. */
-      const permiso = just && ventana
-        ? textoPermiso(just.motivo, just.hora_desde, just.hora_hasta)
-        : null;
+      const permiso = just && personal
+        ? textoPermisoPersonal(just.hora_desde, just.hora_hasta)
+        : just && ventana
+          ? textoPermiso(just.motivo, just.hora_desde, just.hora_hasta)
+          : null;
       /** Solo el rango, para el chip del día: «12:00–17:00». */
-      const permisoRango = just && ventana ? rangoPermiso(just.hora_desde, just.hora_hasta) : null;
+      const permisoRango = just && (ventana || personal) ? rangoPermiso(just.hora_desde, just.hora_hasta) : null;
+      /** Solo cuando hay algo que decir: un día de siempre sale como siempre. */
+      const seDescuenta = personal ? { permisoSeDescuenta: true as const } : {};
       // 🔴 Laborable PARA ESTA PERSONA (18-sep-2026): lunes a viernes, o su
       // lista. Multifashion suma el sábado; el domingo nunca entra.
       const habil = esDiaLaborable(fecha, diasDeEsta);
@@ -1117,6 +1147,7 @@ export function armarReporte(opts: {
           vacacion: null,
           justificado: justificadoDelDia, permiso, permisoRango,
           permisoPerdonaMin: 0, permisoPerdonaSalidaMin: 0, permisoPerdonaAlmuerzoMin: 0, feriado, habil,
+          ...seDescuenta,
           correcciones,
         });
         continue;
@@ -1170,7 +1201,24 @@ export function armarReporte(opts: {
       let excesoAlmuerzoMin = 0;
       let permisoPerdonaAlmuerzoMin = 0;
       let almuerzoTomado = 0;
-      if (buenas.length >= 4) {
+      // ── 🔴 EL TIEMPO FUERA DURANTE LA JORNADA (9-oct-2026) ─────────────────
+      // Con el interruptor prendido y 4 o 6 marcas: TODOS los huecos, menos el
+      // almuerzo permitido (con su gracia, la misma puerta de siempre), menos
+      // lo que cubra una Constancia. Apagado, o con 5, 7 u 8 marcas: lo de
+      // siempre (2.ª a 3.ª marca). Ver `tiempo-fuera.ts`.
+      const fueraNuevo = descuentaFuera && marcasMedibles(buenas.length);
+      if (fueraNuevo) {
+        const huecos = huecosDelDia(buenas);
+        almuerzoTomado = huecos.reduce((a, [sale, vuelve]) => a + (vuelve - sale), 0);
+        const excesoBrutoMin = excesoAlmuerzoBrutoMin(almuerzoTomado, almuerzoProgSeg, graciaAlmuerzoMin);
+        // La Constancia perdona lo que se solape con los huecos, nunca más que
+        // el exceso: el almuerzo permitido no se "gasta" dos veces.
+        const cubierto = huecos.reduce((a, [sale, vuelve]) => a + minutosPerdonadosDe(ventana, {
+          desdeSeg: sale, hastaSeg: vuelve, bordeDelReloj: "fin",
+        }), 0);
+        permisoPerdonaAlmuerzoMin = Math.min(excesoBrutoMin, cubierto);
+        excesoAlmuerzoMin = Math.max(0, excesoBrutoMin - permisoPerdonaAlmuerzoMin);
+      } else if (buenas.length >= 4) {
         almuerzoTomado = buenas[2] - buenas[1]; // segundos
         // 🔴 CON GRACIA (24-sep-2026): una PUERTA como la tolerancia. Hasta
         // `programado + gracia` no hay exceso; un segundo más y se cuenta TODO
@@ -1263,6 +1311,8 @@ export function armarReporte(opts: {
       // 🔴 18-sep-2026: se cuenta DESPUÉS de olvidar la repetida. Un día de 5
       // con una repetida deja de estar a revisar; uno de 5 con una marca que
       // falta sigue estándolo.
+      // ⚠️ 9-oct-2026: un día de 6 marcas SIGUE a revisar aunque el tiempo fuera
+      // ya se mida (decisión pendiente de Daniel: ¿6 es un día bien marcado?).
       const revisar = !enCurso && buenas.length !== 4;
       // 🔴 DOS MARCAS Y LA SEGUNDA MUY ANTES DE SU SALIDA (16-sep-2026): se
       // AVISA, no se calcula. Los minutos de arriba ya están decididos y esto
@@ -1289,6 +1339,9 @@ export function armarReporte(opts: {
         revisar, salidaSospechosa: sospechosa,
         enCurso, fueraDeVigencia: false, ausente: false, vacacion: null, justificado, permiso, permisoRango,
         permisoPerdonaMin, permisoPerdonaSalidaMin, permisoPerdonaAlmuerzoMin, feriado, habil,
+        ...seDescuenta,
+        // 🔴 Solo con el interruptor prendido: apagado, el día sale como siempre.
+        ...(descuentaFuera ? { descuentaFueraMin: fueraNuevo ? excesoAlmuerzoMin : 0 } : {}),
         // Solo para decirlo: los minutos de arriba ya salieron con ese horario.
         horarioDeAfuera: horarioHoy.deAfuera,
         correcciones,

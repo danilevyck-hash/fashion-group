@@ -2308,9 +2308,10 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
               {d.permiso && (
                 <span
                   className="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-900"
-                  title={`${textoPermisoDelDia(d.permiso, perdonDelDia(d))}. NO justifica el día entero.`}
+                  title={d.permisoSeDescuenta ? d.permiso : `${textoPermisoDelDia(d.permiso, perdonDelDia(d))}. NO justifica el día entero.`}
                 >
-                  {etiquetaPermisoDelDia(d.permisoRango, perdonDelDia(d))}
+                  {/* 🔴 «Permiso personal · 14:00–16:00 · se descuenta» (9-oct-2026): autorizado, no perdona. */}
+                  {d.permisoSeDescuenta ? d.permiso : etiquetaPermisoDelDia(d.permisoRango, perdonDelDia(d))}
                 </span>
               )}
               {/* Agregar la marca que falta. Es el caso más común de todos: quien

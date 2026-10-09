@@ -807,9 +807,14 @@ export function clasificarDia(
   // son SOLO de la entrada. El Reporte ya medía la salida temprana; acá entra
   // al dinero tal cual. Caso real: María B. el 21-ago-2026 salió a las 12:04
   // p.m. (5,75 h) y la contable lo descontó; el sistema lo medía y no lo hacía.
+  // 🔴 EL TIEMPO FUERA DURANTE LA JORNADA (9-oct-2026): lo que el motor dice
+  // que sobra del almuerzo permitido entra con la MISMA rata, en la misma
+  // columna (misma deducción, mismo concepto del cierre y del corte). Ausente
+  // —interruptor `DESCUENTA_TIEMPO_FUERA` apagado— suma 0: la planilla de hoy.
   const salidaTempranaMin = Math.max(0, d.salidaTempranaMin || 0);
+  const salidaYFueraMin = salidaTempranaMin + Math.max(0, d.descuentaFueraMin ?? 0);
   const extra = d.extraMin;
-  if (extra <= 0) return { ...cero, tardanzaMin, salidaTempranaMin };
+  if (extra <= 0) return { ...cero, tardanzaMin, salidaTempranaMin: salidaYFueraMin };
 
   const corte = hhmmAMin(reglas.horaCorteNocturno);
 
@@ -847,7 +852,7 @@ export function clasificarDia(
   return {
     ...cero,
     tardanzaMin,
-    salidaTempranaMin,
+    salidaTempranaMin: salidaYFueraMin,
     extraDiurnoMin: diurno + entradaDiurno,
     extraNocturnoMin: nocturno + entradaNocturno,
     excedenteMin: 0,

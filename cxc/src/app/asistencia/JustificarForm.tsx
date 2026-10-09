@@ -46,7 +46,7 @@ import { useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import RangoFechas from "@/components/ui/RangoFechas";
 import { motivosParaElegir, notaDelMotivo } from "@/lib/asistencia/motivos";
-import { horasParaGuardar, motivoAdmiteHoras, ventanaDe } from "@/lib/asistencia/permiso-horas";
+import { horasParaGuardar, motivoAdmiteHoras, motivoExigeHoras, ventanaDe } from "@/lib/asistencia/permiso-horas";
 import { motivosParaVarios, resumenDelLote, type FalloDelLote } from "@/lib/asistencia/justificar-a-varios";
 
 export default function JustificarForm({
@@ -88,6 +88,8 @@ export default function JustificarForm({
   const [horaDesde, setHoraDesde] = useState("");
   const [horaHasta, setHoraHasta] = useState("");
   const conHoras = motivoAdmiteHoras(motivo);
+  /** 🔴 «Permiso personal» (9-oct-2026) exige las dos horas y no perdona nada. */
+  const exigeHoras = motivoExigeHoras(motivo);
   // 🔴 Una línea para «Trabajo de vendedor» y «Compensatorio»; nada para los demás.
   const notaMotivo = notaDelMotivo(motivo);
 
@@ -96,6 +98,10 @@ export default function JustificarForm({
     // motor decide si la ventana sirve.
     const horas = horasParaGuardar(motivo, horaDesde, horaHasta);
     const pidioHoras = horas.horaDesde !== "" || horas.horaHasta !== "";
+    if (exigeHoras && !pidioHoras) {
+      toast("Escribe las dos horas, y la de fin después de la de inicio", "error");
+      return;
+    }
     if (pidioHoras && !ventanaDe(horas.horaDesde, horas.horaHasta)) {
       toast("Escribe las dos horas, y la de fin después de la de inicio", "error");
       return;
@@ -169,20 +175,22 @@ export default function JustificarForm({
         <div className="grid grid-cols-2 gap-3 sm:col-span-2">
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500">
-              De <span className="normal-case text-gray-400">(opcional)</span>
+              De {!exigeHoras && <span className="normal-case text-gray-400">(opcional)</span>}
             </span>
             <input type="time" value={horaDesde} onChange={(e) => setHoraDesde(e.target.value)}
               className="min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base outline-none focus:border-black sm:text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500">
-              Hasta <span className="normal-case text-gray-400">(opcional)</span>
+              Hasta {!exigeHoras && <span className="normal-case text-gray-400">(opcional)</span>}
             </span>
             <input type="time" value={horaHasta} onChange={(e) => setHoraHasta(e.target.value)}
               className="min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base outline-none focus:border-black sm:text-sm" />
           </label>
           <p className="col-span-2 text-[12px] text-gray-500">
-            {ventanaDe(horaDesde, horaHasta)
+            {exigeHoras
+              ? <>Queda registrado como autorizado. El tiempo fuera se descuenta igual.</>
+              : ventanaDe(horaDesde, horaHasta)
               ? <>Perdona lo que caiga entre las <b>{horaDesde}</b> y las <b>{horaHasta}</b>, y nada más. Si no viene en todo el día, el día se sigue descontando.</>
               : <>Sin horas se justifica el día completo.</>}
           </p>

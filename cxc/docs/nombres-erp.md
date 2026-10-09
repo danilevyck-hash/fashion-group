@@ -70,6 +70,7 @@ Cuando Daniel corrija un nombre («eso no se dice así»), para que quede atrapa
 | A quién se le cobra un gasto (Marketing) | Se cobra a (las 5 marcas, o «No recuperable») · Se cobra (Completo · Mitad) | A quién se le pasa, mi costo, costo propio, inventario propio, porcentajes en pantalla |
 | Adjunto de un gasto | Comprobante · Adjuntar comprobante | Foto o factura, Subir foto o factura |
 | Gasto sin tienda | Sin tienda (en el formulario; el cajón del reporte y del ZIP sigue siendo «General») | De una tienda, General (como botón) |
+| Salida autorizada en la jornada que igual se descuenta (Asistencia, motivo de justificación con horas; 9-oct-2026) | Permiso personal (se lee «Permiso personal · 14:00–16:00 · se descuenta») | Permiso sin goce, Justificado sin pago |
 | Rótulos de formulario | Sustantivo («Pago por planilla», «Marcación en reloj») | Preguntas («¿Qué…?», «¿Quién…?», «¿A quién…?»), salvo «¿Es X (D-25)?», que Daniel aprobó textual |
 
 ## Palabras prohibidas en textos visibles
