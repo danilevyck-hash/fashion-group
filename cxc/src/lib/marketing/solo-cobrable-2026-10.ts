@@ -41,7 +41,7 @@ export type PctQueSeCobra = (typeof PCT_QUE_SE_COBRA)[number];
 /**
  * 🔴 AL REGISTRAR, «Se cobra» viene en 50 % (Daniel, 8-oct-2026: «quiero que
  * al hacer un gasto el default sea 50 %»). 100 % queda a un toque. Vale para la
- * factura y el pago de impulsadora; la entrega de mobiliario se cobra como
+ * factura; el pago de impulsadora (siempre 100 %) y la entrega de mobiliario se cobran como
  * siempre (su total, sin porcentaje). Al EDITAR no aplica: una factura vieja
  * sin porcentaje escrito sigue siendo 100 %.
  */

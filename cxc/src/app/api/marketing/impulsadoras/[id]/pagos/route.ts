@@ -57,8 +57,6 @@ export async function POST(
       seReporta: body.seReporta,
       tiendaCodigo: body.tiendaCodigo,
       nota: body.nota,
-      // «Se cobra» 100 % · 50 % (Marketing nuevo). Sin él, entero.
-      pctALaMarca: body.pctALaMarca,
     });
     logActivity(
       auth.role,

@@ -2,9 +2,10 @@
 // 🔴 CANDADO — Marketing nuevo (8-oct-2026, Daniel probándolo en vivo).
 //
 //   1. «Quiero que al hacer un gasto el default sea 50 %.» La factura y el
-//      pago de impulsadora vienen en 50 %, con 100 % a un toque. Sin tocar
-//      nada, lo que viaja es 50. Fuera del Marketing nuevo, el pago de
-//      impulsadora no pregunta ni manda nada (se cobra entero, como siempre).
+//      La factura viene en 50 %, con 100 % a un toque. Sin tocar nada, lo que
+//      viaja es 50. El pago de impulsadora NO pregunta: siempre al 100 % a su
+//      marca (Daniel, 8-oct-2026: «las impulsadoras son al 100 %. Ya
+//      definitivo»), con un texto fijo en el Marketing nuevo.
 //   1b. «No recuperable» al registrar: vive en
 //      `marketing-no-recuperable-sin-motivo.test.tsx` (sin Motivo, 8-oct-2026).
 //   2. Gastos abre en Estado «Por cobrar»; cada filtro lleva su nombre y
@@ -104,13 +105,12 @@ describe("al hacer un gasto, «Se cobra» viene en 50 %", () => {
     mesesSinPagar: [],
   } as unknown as ImpulsadoraConEstado;
 
-  it("pago de impulsadora en el Marketing nuevo: 50 % marcado, 100 % a un toque", () => {
+  it("pago de impulsadora en el Marketing nuevo: sin elección, texto fijo «100 % a la marca»", () => {
     render(enMarketingNuevo(<RegistrarPagoModal impulsadora={ANA} mesInicial="2026-10-01" onClose={() => {}} onSaved={() => {}} />));
-    const cincuenta = screen.getByRole("radio", { name: "50 %" });
-    const cien = screen.getByRole("radio", { name: "100 %" });
-    expect(cincuenta.getAttribute("aria-checked")).toBe("true");
-    fireEvent.click(cien);
-    expect(cien.getAttribute("aria-checked")).toBe("true");
+    expect(screen.queryByRole("radio", { name: "50 %" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "100 %" })).toBeNull();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(screen.getByTestId("pago-se-cobra").textContent).toBe("Se cobra: 100 % a la marca");
   });
 
   it("pago de impulsadora fuera del Marketing nuevo: no pregunta «Se cobra»", () => {
