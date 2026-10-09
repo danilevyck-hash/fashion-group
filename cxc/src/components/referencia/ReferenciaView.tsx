@@ -52,6 +52,7 @@ import { exportComprasToExcel } from "@/lib/ventas/referencia-excel";
 import { TarjetaArticulo } from "./ReferenciaTarjeta";
 import { ReferenciaTablaPedido } from "./ReferenciaTablaPedido";
 import { Aviso } from "@/components/ui/Aviso";
+import { REFERENCIA_APPLE_2026_10 } from "@/lib/ventas/referencia-apple-2026-10";
 
 // ─── Vista ───────────────────────────────────────────────────────────────────
 
@@ -278,7 +279,7 @@ export function ReferenciaView() {
         {hayResultados && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3">
           <p className="text-xs text-gray-600">
-            {modo === "color"
+            {REFERENCIA_APPLE_2026_10 && modo !== "varios" ? null : modo === "color"
               ? "1 artículo"
               : modo === "varios"
                 ? `${resp!.articulos.length} artículos`

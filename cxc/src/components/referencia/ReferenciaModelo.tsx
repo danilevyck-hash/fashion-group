@@ -45,6 +45,8 @@ import {
 import type { LlegadaMedida } from "@/lib/ventas/referencia-llegadas";
 import { barrasDeVentana, fmtFechaCorta, fmtMesAnio, fmtMesCorto, pctVendido } from "@/lib/ventas/resumen-articulo";
 import { etiquetaEmpresa, fmtInt, fmtMoney, fmtPct } from "./ReferenciaTarjeta";
+import { REFERENCIA_APPLE_2026_10 } from "@/lib/ventas/referencia-apple-2026-10";
+import { useEsCelularReferencia } from "./useEsCelularReferencia";
 
 // ─── Textos (una sola definición para pantalla y candado) ────────────────────
 
@@ -146,6 +148,60 @@ function TablaLlegadas({ ultima, vara }: { ultima: LlegadaMedida | null; vara: L
           ))}
         </tbody>
       </table>
+      <p className="mt-1 text-xs text-gray-600">
+        El 80 % es aprox.: se vende primero lo que llegó primero, y las cajas no vienen marcadas.
+      </p>
+    </div>
+  );
+}
+
+/** Estilo Apple: Stock grande y lo demás en UNA línea gris debajo. */
+function ResumenMercancia({
+  comprado,
+  vendido,
+  stock,
+  parteVendida,
+}: {
+  comprado: number | null;
+  vendido: number;
+  stock: number | null;
+  parteVendida: number | null;
+}) {
+  return (
+    <div>
+      <p data-referencia="stock-grande" className="flex items-baseline gap-2 tabular-nums">
+        <span className="text-3xl font-semibold tracking-tight text-gray-950">{stock == null ? "—" : fmtInt(stock)}</span>
+        <span className="text-sm text-gray-600">{ROTULOS.stock.toLowerCase()}</span>
+      </p>
+      <p data-referencia="linea-mercancia" className="mt-0.5 text-sm tabular-nums text-gray-600">
+        {ROTULOS.comprado} {comprado == null ? "—" : fmtInt(comprado)} · {ROTULOS.vendido} {fmtInt(vendido)} ·{" "}
+        {textoPct(parteVendida)} vendido
+      </p>
+    </div>
+  );
+}
+
+/** Estilo Apple: cada recepción en dos líneas, sin tabla de cuatro columnas. */
+function ListaLlegadas({ ultima, vara }: { ultima: LlegadaMedida | null; vara: LlegadaMedida | null }) {
+  const filas = [ultima, vara].filter((l): l is LlegadaMedida => l != null);
+  if (filas.length === 0) return null;
+  return (
+    <div>
+      <ul className="text-sm tabular-nums">
+        {filas.map((l) => (
+          <li key={l.fecha} data-referencia="recepcion" className="border-b border-gray-100 py-2 last:border-0">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-gray-900">
+                {fmtMesAnio(l.fecha.slice(0, 7))} <span className="text-gray-400">·</span> {fmtInt(l.unidades)}
+              </span>
+              <span className="text-gray-600">{textoQueda(l)}</span>
+            </div>
+            <p className="text-xs text-gray-600">
+              {ROTULOS.ochenta} <span className="font-medium text-gray-900">{textoOchenta(l)}</span>
+            </p>
+          </li>
+        ))}
+      </ul>
       <p className="mt-1 text-xs text-gray-600">
         El 80 % es aprox.: se vende primero lo que llegó primero, y las cajas no vienen marcadas.
       </p>
@@ -284,6 +340,23 @@ export function CuerpoTarjetaModelo({
   mostrarMargen: boolean;
 }) {
   const llegadas = textoLlegadas(t);
+  if (REFERENCIA_APPLE_2026_10) {
+    // 🔴 Estilo Apple (`REFERENCIA_APPLE_2026_10`): Stock es EL número y las
+    // recepciones son un solo bloque. Mismos números, misma cuenta.
+    return (
+      <div className="px-3.5 py-3">
+        <ResumenMercancia comprado={t.comprado} vendido={t.vendido} stock={t.stock} parteVendida={t.parteVendida} />
+        {t.ultima && (
+          <Seccion titulo={llegadas ? `Últimas recepciones · ${llegadas}` : "Últimas recepciones"}>
+            <ListaLlegadas ultima={t.ultima} vara={t.vara} />
+          </Seccion>
+        )}
+        <LineaPlata t={t} mostrarMargen={mostrarMargen} />
+        <RenglonTrimestres trimestres={t.trimestres} />
+        <MasInfo t={t} hoyMes={hoyMes} />
+      </div>
+    );
+  }
   return (
     <div className="px-3.5 py-3">
       <Seccion titulo="Existencias">
@@ -364,6 +437,53 @@ function FilaDeColor({
   );
 }
 
+/** Estilo Apple, celular: el color en dos líneas y el detalle al tocarlo. */
+function ColorCelular({
+  f,
+  hoyMes,
+  mostrarMargen,
+  abierta,
+  onTocar,
+}: {
+  f: FilaColor;
+  hoyMes: string;
+  mostrarMargen: boolean;
+  abierta: boolean;
+  onTocar: () => void;
+}) {
+  const detalle = useMemo(
+    () => (abierta ? armarTarjetaModelo(f.codigo, [f.art], hoyMes) : null),
+    [abierta, f.art, f.codigo, hoyMes],
+  );
+  return (
+    <li className="border-b border-gray-100 last:border-0">
+      <button
+        type="button"
+        data-referencia="color-celular"
+        onClick={onTocar}
+        aria-expanded={abierta}
+        className="flex min-h-[44px] w-full flex-col py-2 text-left tabular-nums active:bg-gray-50"
+      >
+        <span className="flex w-full items-baseline justify-between gap-3">
+          <span className="text-gray-900">{f.color ?? f.codigo}</span>
+          <span className="font-semibold text-gray-900">
+            {f.stock == null ? "—" : fmtInt(f.stock)} <span className="text-xs font-normal text-gray-500">{ROTULOS.stock.toLowerCase()}</span>
+          </span>
+        </span>
+        <span className="text-xs text-gray-600">
+          {ROTULOS.comprado} {f.comprado == null ? "—" : fmtInt(f.comprado)} · {ROTULOS.vendido} {fmtInt(f.vendido)} ·{" "}
+          {textoPct(f.parteVendida)}
+        </span>
+      </button>
+      {abierta && detalle && (
+        <div className="-mx-3.5 bg-gray-50">
+          <CuerpoTarjetaModelo t={detalle} hoyMes={hoyMes} mostrarMargen={mostrarMargen} />
+        </div>
+      )}
+    </li>
+  );
+}
+
 function TablaColores({
   filas,
   hoyMes,
@@ -374,6 +494,23 @@ function TablaColores({
   mostrarMargen: boolean;
 }) {
   const [abierta, setAbierta] = useState<string | null>(null);
+  const enCelular = useEsCelularReferencia();
+  if (REFERENCIA_APPLE_2026_10 && enCelular) {
+    return (
+      <ul className="text-sm">
+        {filas.map((f) => (
+          <ColorCelular
+            key={f.codigo}
+            f={f}
+            hoyMes={hoyMes}
+            mostrarMargen={mostrarMargen}
+            abierta={abierta === f.codigo}
+            onTocar={() => setAbierta((v) => (v === f.codigo ? null : f.codigo))}
+          />
+        ))}
+      </ul>
+    );
+  }
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[540px] text-sm tabular-nums">
