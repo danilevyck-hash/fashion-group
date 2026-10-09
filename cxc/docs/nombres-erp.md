@@ -72,6 +72,7 @@ Cuando Daniel corrija un nombre («eso no se dice así»), para que quede atrapa
 | Gasto sin tienda | Sin tienda (en el formulario; el cajón del reporte y del ZIP sigue siendo «General») | De una tienda, General (como botón) |
 | Salida autorizada en la jornada que igual se descuenta (Asistencia, motivo de justificación con horas; 9-oct-2026) | Permiso personal (se lee «Permiso personal · 14:00–16:00 · se descuenta») | Permiso sin goce, Justificado sin pago |
 | Rótulos de formulario | Sustantivo («Pago por planilla», «Marcación en reloj») | Preguntas («¿Qué…?», «¿Quién…?», «¿A quién…?»), salvo «¿Es X (D-25)?», que Daniel aprobó textual |
+| Reponer la tardanza quedándose más tarde el mismo día (ficha del colaborador, Asistencia) | Compensación de tardanza (opciones: «No, la tardanza se descuenta» · «Sí, con tiempo después de la salida») | Repone tardanza, Recupera tardanza, Repone |
 
 ## Palabras prohibidas en textos visibles
 

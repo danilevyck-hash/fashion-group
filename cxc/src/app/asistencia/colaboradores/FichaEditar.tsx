@@ -32,6 +32,9 @@ import {
 import {
   ETIQUETA_NO_TRABAJA_AFUERA, ETIQUETA_TRABAJA_AFUERA, EXPLICACION_TRABAJA_AFUERA, PREGUNTA_TRABAJA_AFUERA,
 } from "@/lib/asistencia/trabaja-afuera";
+import {
+  ETIQUETA_NO_REPONE_TARDANZA, ETIQUETA_REPONE_TARDANZA, EXPLICACION_REPONE_TARDANZA, PREGUNTA_REPONE_TARDANZA,
+} from "@/lib/asistencia/repone-tardanza";
 import { useEffect, useState } from "react";
 import { leerHora24 } from "@/lib/asistencia/hora-24";
 import {
@@ -86,6 +89,7 @@ export interface BorradorFicha {
   cobraHorasExtra: boolean;
   /** No por defecto para todos (14-sep-2026): el día sin marca es ausencia. */
   trabajaAfuera: boolean;
+  reponeTardanza: boolean;
   fechaSalida: string;
   motivoSalida: string;
 }
@@ -108,6 +112,7 @@ export function borradorDe(p: PersonaDeLaPagina | null, codigo: string): Borrado
     noMarcaReloj: p?.noMarcaReloj ?? false,
     cobraHorasExtra: p?.cobraHorasExtra ?? true,
     trabajaAfuera: p?.trabajaAfuera ?? false,
+    reponeTardanza: p?.reponeTardanza ?? false,
     fechaSalida: p?.fechaSalida ?? "",
     motivoSalida: p?.motivoSalida ?? "",
   };
@@ -116,7 +121,7 @@ export function borradorDe(p: PersonaDeLaPagina | null, codigo: string): Borrado
 /** ¿Esta ficha tiene alguna excepción prendida? Decide si el bloque abre solo. */
 function tieneExcepciones(b: BorradorFicha): boolean {
   return b.servicioProfesional || !b.pagaSeguros || b.baseSeguros.trim() !== "" || b.noMarcaReloj || !b.cobraHorasExtra
-    || b.trabajaAfuera;
+    || b.trabajaAfuera || b.reponeTardanza;
 }
 
 const CAMPO =
@@ -348,6 +353,16 @@ export default function FichaEditar({
                 onChange={(e) => set({ trabajaAfuera: e.target.value === "si" })}>
                 <option value="no">{ETIQUETA_NO_TRABAJA_AFUERA}</option>
                 <option value="si">{ETIQUETA_TRABAJA_AFUERA}</option>
+              </select>
+            </Campo>
+            {/* 🔴 «Compensación de tardanza», en No para todos (9-oct-2026).
+                Prendida: el tiempo después de la salida borra la tardanza del
+                mismo día y no es hora extra. Ver `repone-tardanza.ts`. */}
+            <Campo etiqueta={PREGUNTA_REPONE_TARDANZA} ayuda={b.reponeTardanza ? EXPLICACION_REPONE_TARDANZA : undefined}>
+              <select className={CAMPO} value={b.reponeTardanza ? "si" : "no"}
+                onChange={(e) => set({ reponeTardanza: e.target.value === "si" })}>
+                <option value="no">{ETIQUETA_NO_REPONE_TARDANZA}</option>
+                <option value="si">{ETIQUETA_REPONE_TARDANZA}</option>
               </select>
             </Campo>
             {/* ⚠️ LO DE TERCEROS NO ESTÁ ACÁ A PROPÓSITO. El monto y la cuota

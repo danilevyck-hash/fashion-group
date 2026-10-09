@@ -32,7 +32,7 @@ import { sinIgnorados } from "@/lib/asistencia/codigos-ignorados";
 import { leerIgnorados } from "@/lib/asistencia/codigos-ignorados-server";
 import {
   leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas, servicioProfesionalDeFila, cobraHorasExtraDeFila, leerJustificaciones,
-  leerVacaciones, leerTrabajaAfuera,
+  leerVacaciones, leerTrabajaAfuera, leerReponeTardanza,
 } from "@/lib/asistencia/config-server";
 import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
 // 🔴 QUIEN NO MARCÓ EN EL PERÍODO APARECE IGUAL (24-sep-2026). La regla de a
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
     // marcas diarias pasa de 1.000 filas, y PostgREST corta ahí EN SILENCIO.
     // Un reporte de horas recortado sin avisar es peor que uno que falla.
-    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, horariosLeidos, jRes, vRes, fRes, telefono, aprRes, entradasRes] = await Promise.all([
+    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, horariosLeidos, jRes, vRes, fRes, telefono, aprRes, entradasRes, compensan] = await Promise.all([
       leerTodoPaginado<MarcacionConId>(
         "asistencia_marcaciones (reporte)",
         (pedirCount, from, to) => {
@@ -177,6 +177,8 @@ export async function GET(req: NextRequest) {
       // 🔴 Las entradas autorizadas del rango (24-sep-2026). Sin la tabla,
       // vacío: nadie tiene, como siempre.
       leerEntradasAutorizadas(desde, hasta),
+      // 🔴 Quién tiene «Compensación de tardanza» (9-oct-2026). Vacío = hoy.
+      leerReponeTardanza(),
     ]);
     const nombres = new Map<string, string>(
       directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
@@ -353,6 +355,8 @@ export async function GET(req: NextRequest) {
       // entrada se mide desde la hora autorizada. La MISMA lectura que la
       // planilla; vacío = nadie tiene.
       entradasAutorizadas: indexarEntradasAutorizadas(entradasRes.entradas),
+      // 🔴 Compensación de tardanza (9-oct-2026), la MISMA lectura que la planilla.
+      reponeTardanza: compensan,
       // 🔴 Los días laborables de cada quien (18-sep-2026), la MISMA lista que
       // usa la planilla. Vacío = lunes a viernes para todos.
       // ⚠️ Va ÚLTIMO a propósito: el candado `horario-configurable` lo exige.

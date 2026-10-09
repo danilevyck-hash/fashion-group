@@ -39,7 +39,7 @@ import {
   BANDERAS_DE_CONFIGURACION,
 } from "@/lib/asistencia/ficha-de-configuracion";
 import { leerInsumosDeUnaPersona } from "@/lib/asistencia/ficha-de-configuracion-server";
-import { leerTrabajaAfuera } from "@/lib/asistencia/config-server";
+import { leerReponeTardanza, leerTrabajaAfuera } from "@/lib/asistencia/config-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
   try {
     // 🔴 «Trabaja afuera» se lee APARTE (14-sep-2026): su columna nace con la
     // migración sin aplicar, y la lectura es la MISMA que usa la lista.
-    const [insumos, afuera] = await Promise.all([leerInsumosDeUnaPersona(codigo), leerTrabajaAfuera()]);
+    const [insumos, afuera, compensan] = await Promise.all([leerInsumosDeUnaPersona(codigo), leerTrabajaAfuera(), leerReponeTardanza()]);
 
     // 🔴 `null` = el código está IGNORADO, y entonces la respuesta es la misma
     // que daba la lista: la lista lo filtraba con `sinIgnorados` y el `find` de
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     // ficha en blanco, en «Editar»— y ese comportamiento no cambia.
     // Y se le pega la casilla exactamente como lo hace la lista.
     const persona = insumos
-      ? { ...armarPersonaDeConfiguracion(insumos).persona, trabajaAfuera: afuera.has(codigo) }
+      ? { ...armarPersonaDeConfiguracion(insumos).persona, trabajaAfuera: afuera.has(codigo), reponeTardanza: compensan.has(codigo) }
       : null;
 
     return NextResponse.json({

@@ -28,7 +28,10 @@ import { COLUMNA_COBRA_HORAS_EXTRA, validarCobraHorasExtra } from "@/lib/asisten
 import {
   avisoMigracionTrabajaAfuera, COLUMNA_TRABAJA_AFUERA, esColumnaTrabajaAfueraFaltante, validarTrabajaAfuera,
 } from "@/lib/asistencia/trabaja-afuera";
-import { leerTrabajaAfuera } from "@/lib/asistencia/config-server";
+import { leerReponeTardanza, leerTrabajaAfuera } from "@/lib/asistencia/config-server";
+import {
+  avisoMigracionReponeTardanza, COLUMNA_REPONE_TARDANZA, esColumnaReponeTardanzaFaltante, validarReponeTardanza,
+} from "@/lib/asistencia/repone-tardanza";
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
@@ -108,7 +111,7 @@ export async function GET(req: NextRequest) {
     //
     // Paginado con verificación contra el COUNT: PostgREST corta en 1.000 filas
     // EN SILENCIO, y con 3.287 marcaciones cargadas eso dejaría códigos afuera.
-    const [marcas, { reglas }, { filas }, repRes, deudaDe, conHorario, afuera] = await Promise.all([
+    const [marcas, { reglas }, { filas }, repRes, deudaDe, conHorario, afuera, compensan] = await Promise.all([
       // 🔑 La MISMA lectura que usa la ficha de una persona, sin acotar por
       // código. Ver `ficha-de-configuracion-server.ts`.
       leerMarcasDeLaVentana(desde),
@@ -128,6 +131,8 @@ export async function GET(req: NextRequest) {
       // 🔴 QUIÉN TRABAJA AFUERA (14-sep-2026). Lectura APARTE y tolerante: con
       // la migración sin aplicar viene vacía y nadie lleva el chip.
       leerTrabajaAfuera(),
+      // 🔴 Quién tiene «Compensación de tardanza» (9-oct-2026). Vacío = nadie.
+      leerReponeTardanza(),
     ]);
 
     // El día de hoy en Panamá. Solo decide cómo se REDACTA la baja («Renunció»
@@ -174,7 +179,7 @@ export async function GET(req: NextRequest) {
       // 🔴 «Trabaja afuera» se PEGA acá y no adentro de `armarPersonaDeConfiguracion`:
       // su columna se lee aparte (migración sin aplicar, ver `leerTrabajaAfuera`)
       // y la ruta de una persona hace exactamente lo mismo con la misma lectura.
-      return { ...persona, trabajaAfuera: afuera.has(codigo) };
+      return { ...persona, trabajaAfuera: afuera.has(codigo), reponeTardanza: compensan.has(codigo) };
     });
 
     // ⚠️ ACÁ el orden es al revés que en el resto del módulo, y a propósito:
@@ -322,6 +327,11 @@ export async function PUT(req: NextRequest) {
   if (!rta.ok) return NextResponse.json({ error: rta.error }, { status: 400 });
   const trabajaAfueraValor = rta.valor;
 
+  // Y «compensación de tardanza» (9-oct-2026): OTRA pregunta, ausente = no.
+  const rrt = validarReponeTardanza(body);
+  if (!rrt.ok) return NextResponse.json({ error: rrt.error }, { status: 400 });
+  const reponeTardanzaValor = rrt.valor;
+
   // 🩸 ACÁ SE VALIDABA Y SE GUARDABA EL SALDO DE VACACIONES ESCRITO A MANO, con
   // su fecha de corte puesta por el servidor. Se fue el 17-sep-2026 —Daniel:
   // *«Quita lo del saldo vacaciones»*—: de las 49 fichas ninguna tenía un número (47 vacías, 2 con un 0) y los días
@@ -443,5 +453,22 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, cobraHorasExtra: cobraHorasExtraValor, trabajaAfuera: trabajaAfueraValor } });
+  // 🔴 «Compensación de tardanza» (9-oct-2026): igual que «trabaja afuera»,
+  // aparte, después, y SOLO si cambió. Ver `repone-tardanza.ts`.
+  const compensaHoy = (await leerReponeTardanza()).has(p.codigo);
+  if (compensaHoy !== reponeTardanzaValor) {
+    const escr = await supabaseServer
+      .from(TABLA_PERSONAS)
+      .update({ [COLUMNA_REPONE_TARDANZA]: reponeTardanzaValor })
+      .eq("empleado_codigo", p.codigo);
+    if (escr.error) {
+      if (esColumnaReponeTardanzaFaltante(escr.error)) {
+        return NextResponse.json({ error: avisoMigracionReponeTardanza() }, { status: 500 });
+      }
+      console.error("[asistencia/configuracion PUT repone_tardanza]", escr.error.message);
+      return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, cobraHorasExtra: cobraHorasExtraValor, trabajaAfuera: trabajaAfueraValor, reponeTardanza: reponeTardanzaValor } });
 }

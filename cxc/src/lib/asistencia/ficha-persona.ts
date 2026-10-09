@@ -22,6 +22,7 @@ import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { etiquetaEmpresa } from "./config";
 import { CHIP_NO_COBRA_HORAS_EXTRA, EXPLICACION_NO_COBRA_HORAS_EXTRA } from "./cobra-horas-extra";
 import { CHIP_TRABAJA_AFUERA, EXPLICACION_TRABAJA_AFUERA } from "./trabaja-afuera";
+import { CHIP_REPONE_TARDANZA, EXPLICACION_REPONE_TARDANZA } from "./repone-tardanza";
 
 /** Lo que la página necesita saber de una persona para dibujarla. */
 export interface PersonaFicha {
@@ -49,6 +50,8 @@ export interface PersonaFicha {
   cobraHorasExtra?: boolean;
   /** `true` = trabaja afuera (14-sep-2026): el día sin marca se paga. Ausente = no. */
   trabajaAfuera?: boolean;
+  /** `true` = compensación de tardanza (9-oct-2026). Ausente = no. */
+  reponeTardanza?: boolean;
   /** Las partes de un sueldo repartido entre dos empresas. Vacío = una sola. */
   reparto?: readonly { empresa: string; salarioMensual: number }[];
   /** «Renunció el 12 de agosto de 2026». `null` = sigue trabajando. */
@@ -173,6 +176,9 @@ export function excepcionesDeLaFicha(p: PersonaFicha): EtiquetaExcepcion[] {
       texto: CHIP_TRABAJA_AFUERA,
       ayuda: EXPLICACION_TRABAJA_AFUERA,
     });
+  }
+  if (p.reponeTardanza === true) {
+    out.push({ clave: "repone-tardanza", texto: CHIP_REPONE_TARDANZA, ayuda: EXPLICACION_REPONE_TARDANZA });
   }
   if (!p.pagaSeguros) {
     out.push({

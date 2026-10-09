@@ -24,6 +24,8 @@ export interface PersonaDeLaPagina {
   cobraHorasExtra?: boolean;
   /** `true` = trabaja afuera (14-sep-2026): el día sin marca se paga. Ausente = no. */
   trabajaAfuera?: boolean;
+  /** `true` = compensación de tardanza (9-oct-2026). Ausente = no. */
+  reponeTardanza?: boolean;
   posicion?: string | null;
   cedula?: string | null;
   /** La rata por hora, ya calculada por el servidor. */
