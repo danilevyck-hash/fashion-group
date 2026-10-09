@@ -208,35 +208,34 @@ describe("🔴 2. LA VENTANA OFRECE «QUITAR ESTA MARCACIÓN»", () => {
     expect(screen.queryByRole("button", { name: "Quitar esta marcación" })).toBeNull();
   });
 
-  it("🔴 al elegirla se va la hora, queda el PORQUÉ, y dice qué va a pasar", () => {
+  // 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+  it("🔴 al elegirla se va la hora, NO se pide el porqué, y dice qué va a pasar", () => {
     servir([]);
     montar(<CorregirMarcacionModal marca={MARCA} onCerrar={vi.fn()} onGuardado={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Quitar esta marcación" }));
     expect(screen.getByText("Quitar esta marcación", { selector: "h2" })).toBeTruthy();
     expect(document.querySelector('input[type="time"]')).toBeNull();
-    expect(screen.getByPlaceholderText("Escribe el motivo…")).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Escribe el motivo…")).toBeNull();
     // 🔴 «Quitada», nunca «borrada»: la fila del reloj se queda.
     expect(screen.getByText(/No se borra nada/)).toBeTruthy();
     expect(screen.getByText(/deja de contar/)).toBeTruthy();
   });
 
-  it("🔴 SIN EL PORQUÉ EL BOTÓN ESTÁ APAGADO, Y DICE QUÉ FALTA", () => {
+  // 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+  it("🔴 SIN PORQUÉ EL BOTÓN ESTÁ PRENDIDO: quitar no pide nada más", () => {
     servir([]);
     montar(<CorregirMarcacionModal marca={MARCA} onCerrar={vi.fn()} onGuardado={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Quitar esta marcación" }));
     const guardar = screen.getByRole("button", { name: "Quitar la marcación" }) as HTMLButtonElement;
-    expect(guardar.disabled).toBe(true);
-    expect(screen.getByText("Falta: el porqué")).toBeTruthy();
+    expect(guardar.disabled).toBe(false);
+    expect(screen.queryByText(/Falta/)).toBeNull();
   });
 
-  it("🔴 CON EL PORQUÉ MANDA `quita: true`, SIN HORA Y CON SU `marcacionId`", async () => {
+  it("🔴 MANDA `quita: true`, SIN HORA, SIN MOTIVO Y CON SU `marcacionId`", async () => {
     servir([["/api/asistencia/correcciones", { ok: true, id: "c1" }]]);
     const onGuardado = vi.fn();
     montar(<CorregirMarcacionModal marca={MARCA} onCerrar={vi.fn()} onGuardado={onGuardado} />);
     fireEvent.click(screen.getByRole("button", { name: "Quitar esta marcación" }));
-    fireEvent.change(screen.getByPlaceholderText("Escribe el motivo…"), {
-      target: { value: "marcó dos veces seguidas" },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Quitar la marcación" }));
     await waitFor(() => expect(onGuardado).toHaveBeenCalled());
 
@@ -245,14 +244,13 @@ describe("🔴 2. LA VENTANA OFRECE «QUITAR ESTA MARCACIÓN»", () => {
     expect(cuerpo.quita).toBe(true);
     expect(cuerpo.hora).toBeNull();
     expect(cuerpo.marcacionId).toBe("m3");
-    expect(cuerpo.motivo).toBe("marcó dos veces seguidas");
+    expect(cuerpo).not.toHaveProperty("motivo"); // 9-oct-2026: ya no se pide
   });
 
   it("⚠️ CORREGIR LA HORA NO CAMBIÓ: manda la hora y NO manda `quita`", async () => {
     servir([["/api/asistencia/correcciones", { ok: true, id: "c1" }]]);
     const onGuardado = vi.fn();
     montar(<CorregirMarcacionModal marca={MARCA} onCerrar={vi.fn()} onGuardado={onGuardado} />);
-    fireEvent.change(screen.getByPlaceholderText("Escribe el motivo…"), { target: { value: "se atrasó el reloj" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(onGuardado).toHaveBeenCalled());
 

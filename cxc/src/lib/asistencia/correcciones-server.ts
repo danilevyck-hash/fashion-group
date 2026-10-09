@@ -21,6 +21,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { esTablaFaltante } from "./config";
 import {
   TABLA_CORRECCIONES,
+  motivoLeido,
   type Correccion,
 } from "./correcciones";
 import { desdeDeLaVentana, motivosFrecuentes } from "./motivos-frecuentes";
@@ -81,7 +82,7 @@ function aCorreccion(f: FilaCorreccion): Correccion {
     // "08:00:00.5". Se corta a los segundos, que es la unidad del módulo.
     // ⚠️ Una corrección que QUITA no tiene hora: la columna viene NULL.
     hora: String(f.hora ?? "").slice(0, 8),
-    motivo: String(f.motivo ?? ""),
+    motivo: motivoLeido(f.motivo),
     creadaPor: String(f.creada_por ?? ""),
     creadaEn: String(f.creada_en ?? ""),
     quita: Boolean(f.quita),

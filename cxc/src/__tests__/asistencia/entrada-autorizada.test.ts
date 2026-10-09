@@ -230,19 +230,22 @@ describe("lo que se teclea en «Arreglar el día»", () => {
     expect(normalizarHoraEntrada("25:00")).toBeNull();
   });
 
-  it("solo la entrada autorizada ya es un cambio: se puede guardar con porqué, y se resume", () => {
+  // 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+  it("solo la entrada autorizada ya es un cambio: se puede guardar SIN porqué, y se resume", () => {
     const plan = conEntradaAutorizada(planDelDia([], new Map()), cambioEntradaAutorizada(null, { hora: "06:00" }));
-    expect(faltaParaGuardarElDia(plan, "")).toBe("Falta: el porqué");
-    expect(faltaParaGuardarElDia(plan, "inventario")).toBeNull();
+    expect(faltaParaGuardarElDia(plan)).toBeNull();
     expect(resumenDelPlan(plan)).toBe("entrada autorizada a las 06:00");
     expect(resumenCambioEntrada({ tipo: "quitar", reemplaza: "a" })).toBe("entrada autorizada quitada");
     const nada = conEntradaAutorizada(planDelDia([], new Map()), cambioEntradaAutorizada(null, null));
-    expect(faltaParaGuardarElDia(nada, "x")).toBe("Todavía no cambiaste nada");
+    expect(faltaParaGuardarElDia(nada)).toBe("Todavía no cambiaste nada");
   });
 
   it("la línea bajo el día dice desde qué hora, quién y por qué", () => {
     expect(textoEntradaAutorizada({ hora: "06:00:00", creadaPor: "yulissa", motivo: "inventario" }))
       .toBe("Entrada autorizada a las 06:00 · yulissa: inventario");
+    // 9-oct-2026: sin motivo no queda un «:» colgando.
+    expect(textoEntradaAutorizada({ hora: "06:00:00", creadaPor: "yulissa", motivo: "" }))
+      .toBe("Entrada autorizada a las 06:00 · yulissa");
   });
 
   it("con autorización el aviso de entrada temprana se calla", () => {
@@ -288,10 +291,11 @@ async function postDia(body: unknown) {
 describe("🔴 la ruta del día", () => {
   beforeEach(() => { escrituras.length = 0; viva = null; });
 
-  it("sin motivo: 400 y CERO escrituras", async () => {
-    const r = await postDia({ codigo: CODIGO, fecha: DIA, motivo: "   ", cambios: [], entradaAutorizada: { hora: "06:00" } });
-    expect(r.status).toBe(400);
-    expect(escrituras).toEqual([]);
+  // 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+  it("🔴 SIN MOTIVO SE GUARDA, con la persona, el día, la hora y la firma", async () => {
+    const r = await postDia({ codigo: CODIGO, fecha: DIA, cambios: [], entradaAutorizada: { hora: "06:00" } });
+    expect(r.status).toBe(200);
+    expect(escrituras).toEqual([{ op: "crear-entrada", payload: { empleadoCodigo: CODIGO, fecha: DIA, hora: "06:00:00", motivo: "—", creadaPor: "yulissa" } }]);
   });
 
   it("con motivo: se escribe con la persona, el día, la hora y la firma", async () => {

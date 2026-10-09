@@ -91,12 +91,11 @@ import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 // 🔴 EL DÍA COMPLETO SE ARREGLA EN LA FILA, SIN ABRIR UNA VENTANA (19-sep-2026).
 // La regla de qué se va a escribir vive en un módulo PURO; acá solo se dibuja.
 import {
-  EDITAR_EL_DIA, GUARDAR_EL_DIA, PORQUE, TITULO_EDITAR_EL_DIA,
+  EDITAR_EL_DIA, GUARDAR_EL_DIA, TITULO_EDITAR_EL_DIA,
   casillasDelDia, claveMarca, claveVacia, conEntradaAutorizada,
   faltaParaGuardarElDia, planDelDia, resumenDelPlan, textoGuardado,
   type CasillaDelDia, type EscritoEnCasilla,
 } from "@/lib/asistencia/editar-el-dia";
-import { MOTIVO_MAX } from "@/lib/asistencia/correcciones";
 // 🔴 ARRASTRAR UNA HORA DE COLUMNA (25-sep-2026). Se agarra la hora y se suelta
 // donde va, en vez de abrir la casilla y teclearla. Lo que se guarda es la
 // MISMA corrección: el módulo PURO solo dice qué movimiento vale y arma las dos
@@ -110,8 +109,8 @@ import {
 // toda»*. Qué motivo aplica a cada casilla, cuándo sale «Hoy entraba a las», el
 // chip único y qué se dice debajo del día: todo vive en el módulo PURO.
 import {
-  ARREGLAR_EL_DIA, NOTA_NO_SE_BORRA_NADA, OTRO_MOTIVO, PANEL_DEL_DIA_2026_09, ROTULO_NOTA,
-  chipRevisar, lineaDelReporte, motivoDeLaCasilla, motivosLibres, rotuloGuardar,
+  ARREGLAR_EL_DIA, NOTA_NO_SE_BORRA_NADA, PANEL_DEL_DIA_2026_09, ROTULO_NOTA,
+  chipRevisar, lineaDelReporte, rotuloGuardar,
   seMuestraEntradaAutorizada, seOfreceArreglarElDia,
 } from "@/lib/asistencia/panel-del-dia";
 // 🔴 LA ENTRADA AUTORIZADA Y SU AVISO (24-sep-2026). Daniel: «hoy entraba a
@@ -366,11 +365,6 @@ export default function ReporteTab({ empresa = "" }: {
   const [puedeCorregir, setPuedeCorregir] = useState(false);
   const [avisoCorreccion, setAvisoCorreccion] = useState<string | null>(null);
   const [corrigiendo, setCorrigiendo] = useState<MarcaParaCorregir | null>(null);
-  // 🔴 LOS MOTIVOS MÁS USADOS SE PIDEN UNA VEZ POR PANTALLA (19-sep-2026), no
-  // una por ventana: ahora el campo del porqué vive en cada fila que se edita y
-  // pedirlos por fila serían 30 peticiones iguales. Sin ellos el campo libre
-  // sigue sirviendo, que es lo que se guarda.
-  const [motivosFrecuentes, setMotivosFrecuentes] = useState<string[]>([]);
   // 🔑 El rol sale de `sessionStorage`, igual que en `PlanillaTab` y `AppHeader`.
   // Arranca vacío: solo decide si se DIBUJAN los dos botones; el freno de verdad
   // está en la ruta, que rechaza a quien no puede aprobar y a quien manda un
@@ -482,20 +476,6 @@ export default function ReporteTab({ empresa = "" }: {
     [empresa, toast],
   );
 
-  // Los motivos frecuentes, una sola vez y solo cuando se puede corregir.
-  useEffect(() => {
-    if (!puedeCorregir || !EDITAR_EL_DIA) return;
-    let vivo = true;
-    void fetch("/api/asistencia/correcciones/motivos", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!vivo) return;
-        const lista = Array.isArray(d?.motivos) ? d.motivos.filter((m: unknown) => typeof m === "string") : [];
-        setMotivosFrecuentes(lista as string[]);
-      })
-      .catch(() => { /* sin botones; el campo libre sigue */ });
-    return () => { vivo = false; };
-  }, [puedeCorregir]);
 
   // 🔴 LO QUE SE VE. Con el botón prendido queda solo quien tiene días a
   // revisar — filtrando lo YA cargado, sin pedirle nada al servidor. Todo lo
@@ -1107,7 +1087,6 @@ export default function ReporteTab({ empresa = "" }: {
                   puedeCorregir={puedeCorregir}
                   onCorregir={setCorrigiendo}
                   onJustificar={setJustificando}
-                  motivosFrecuentes={motivosFrecuentes}
                   onGuardadoElDia={() => guardadoElDia(p.codigo)}
                   anclada={seQuedanAncladas.has(p.codigo)}
                   seleccionada={seleccion.has(p.codigo)}
@@ -1229,7 +1208,7 @@ export default function ReporteTab({ empresa = "" }: {
   );
 }
 
-function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerFotos, decisionesExtra, motivosFrecuentes, onGuardadoElDia, anclada, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar, celular = false, anchoCodigo = 3, modoTiempo = "hmm" }: {
+function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, onToggle, puedeCorregir, onCorregir, onJustificar, marcasTelefono, onVerFotos, decisionesExtra, onGuardadoElDia, anclada, puedeDecidirExtra, onDecidirExtra, extrasEnVuelo, seleccionada, onSeleccionar, celular = false, anchoCodigo = 3, modoTiempo = "hmm" }: {
   p: PersonaReporte;
   /** h:mm o minutos: solo cómo se dibujan las columnas de tiempo. */
   modoTiempo?: ModoTiempo;
@@ -1251,8 +1230,6 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
   onVerFotos: (m: FotoParaVer[]) => void;
   /** `codigo|fecha → si|no`. Lo que no está es PENDIENTE. */
   decisionesExtra: ReadonlyMap<string, Decision>;
-  /** Los motivos más escritos en 90 días, para los botones del porqué. */
-  motivosFrecuentes: readonly string[];
   /** Se guardó un día: hay que volver a leer el reporte. */
   onGuardadoElDia: () => void;
   /** 🔴 Está en la tabla SOLO porque se la acaba de corregir. Lleva «listo». */
@@ -1328,7 +1305,6 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
                     sinMarcas={esSinMarcas(p)}
                     puedeCorregir={puedeCorregir} onCorregir={onCorregir}
                     onJustificar={onJustificar}
-                    motivosFrecuentes={motivosFrecuentes}
                     onGuardadoElDia={onGuardadoElDia}
                     decisionExtra={decisionesExtra.get(claveDia(p.codigo, d.fecha)) ?? null}
                     puedeDecidirExtra={puedeDecidirExtra}
@@ -1601,7 +1577,7 @@ function perdonDelDia(d: DiaReporte): PerdonDelDia {
  * corrección debajo. Debajo de la fila, una línea por corrección dice qué se
  * cambió, por qué, quién y cuándo — sin abrir nada más.
  */
-function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerFotos, motivosFrecuentes, onGuardadoElDia, decisionExtra, puedeDecidirExtra, onDecidirExtra, extraEnVuelo }: {
+function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorregir, onCorregir, onJustificar, delTelefono, onVerFotos, onGuardadoElDia, decisionExtra, puedeDecidirExtra, onDecidirExtra, extraEnVuelo }: {
   d: DiaReporte;
   codigo: string;
   persona: string;
@@ -1617,8 +1593,6 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   /** Las marcas que ese día salieron del teléfono. Vacío = ninguna. */
   delTelefono: MarcaTelefonoUI[];
   onVerFotos: (m: FotoParaVer[]) => void;
-  /** Los motivos más escritos en 90 días, para los botones del porqué. */
-  motivosFrecuentes: readonly string[];
   /** Se guardó este día: el reporte se vuelve a leer. */
   onGuardadoElDia: () => void;
   /** Lo decidido para la hora extra de ESTE día. `null` = pendiente. */
@@ -1720,10 +1694,10 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
   const esLaCasillaAbierta = (clave: string) =>
     abierta !== null && (abierta.clave === null || abierta.clave === clave);
   const [escrito, setEscrito] = useState<Map<string, EscritoEnCasilla>>(new Map());
+  // 🔴 9-oct-2026 (Daniel): «quita lo de poner motivo al cambiar la hora en
+  // asistencia». Ya no hay campo de motivo. Lo único que sigue viajando es la
+  // nota que el sistema escribe SOLO al arrastrar una hora de columna.
   const [motivoDia, setMotivoDia] = useState("");
-  // 🔴 «Otro…» abre el campo libre con los motivos más usados de 90 días. Sin
-  // motivo propio (una marca suelta, fuera de las cuatro columnas) arranca abierto.
-  const [motivoLibre, setMotivoLibre] = useState(false);
   /** El ⓘ de «No se borra nada…»: cerrado salvo que alguien lo toque. */
   const [notaAbierta, setNotaAbierta] = useState(false);
   const [guardandoDia, setGuardandoDia] = useState(false);
@@ -1755,7 +1729,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
     ),
     [casillas, escrito, entradaActual, escritoEntrada],
   );
-  const faltaDia = faltaParaGuardarElDia(plan, motivoDia);
+  const faltaDia = faltaParaGuardarElDia(plan);
   /** Editar es lo mismo que corregir: mismos roles, misma migración. */
   const seEdita = EDITAR_EL_DIA && puedeCorregir && !d.fueraDeVigencia;
 
@@ -1800,9 +1774,6 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
     setEscrito(mapaDelArrastre(origen, destino));
     setEscritoEntrada(null);
     setMotivoDia(MOTIVO_ARRASTRE);
-    // El motivo escrito no es el propio de la casilla: se muestra en el campo
-    // libre, donde se puede cambiar antes de guardar.
-    setMotivoLibre(true);
     setNotaAbierta(false);
     setAbierta({ clave: claveVacia(destino), columna: destino });
   }
@@ -1864,7 +1835,6 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
     setEscritoEntrada(null);
     setMotivoDia("");
     const col = columna ?? null;
-    setMotivoLibre(motivoDeLaCasilla(col) === null);
     setAbierta(
       PANEL_DEL_DIA_2026_09
         ? { clave: clave ?? claveDeColumna(0), columna: clave ? col : 0 }
@@ -1876,7 +1846,6 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
     setEscrito(new Map());
     setEscritoEntrada(null);
     setMotivoDia("");
-    setMotivoLibre(false);
   }
   function escribir(clave: string, cambio: EscritoEnCasilla) {
     setEscrito((m) => {
@@ -1901,7 +1870,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
         body: JSON.stringify({
           codigo,
           fecha: d.fecha,
-          motivo: motivoDia,
+          ...(motivoDia ? { motivo: motivoDia } : {}),
           cambios: plan.cambios,
           // 🔴 La entrada autorizada viaja en el MISMO golpe (24-sep-2026).
           ...(plan.entradaAutorizada
@@ -2138,12 +2107,6 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
     salidaSospechosa: d.salidaSospechosa,
     tituloSalida: d.salidaSospechosa ? tituloSalidaSospechosa(d.salidaTempranaMin) : null,
   });
-
-  /** El motivo que aplica a la casilla abierta, y los libres de «Otro…». */
-  const motivoPropio = motivoDeLaCasilla(abierta?.columna ?? null);
-  const motivosDeOtro = motivosLibres(motivosFrecuentes, motivoPropio);
-  /** Con el panel apagado el campo libre y sus chips salen siempre, como hoy. */
-  const seEscribeElMotivo = !PANEL_DEL_DIA_2026_09 || motivoLibre || motivoPropio === null;
 
   return (
     <>
@@ -2413,10 +2376,11 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
       {/* 🔴 Y UNA MARCA DESHECHA SE VE TACHADA, NO SE ESCONDE: la fila sigue en
           la base (append-only) y dejó de contar por una corrección encima. */}
       {/* ══════════════════════════════════════════════════════════════════
-          🔴 UN SOLO PORQUÉ Y UN SOLO BOTÓN PARA TODO EL DÍA (19-sep-2026).
-          🩸 Antes cada marca pedía su ventana y su motivo: 58 de 141 días
-          necesitaron 2, 3 y hasta 7. Acá se arreglan las cuatro y se guarda
-          una vez. El motivo sigue siendo OBLIGATORIO.
+          🔴 UN SOLO BOTÓN PARA TODO EL DÍA (19-sep-2026).
+          🩸 Antes cada marca pedía su ventana: 58 de 141 días necesitaron 2,
+          3 y hasta 7. Acá se arreglan las cuatro y se guarda una vez.
+          🔴 9-oct-2026 (Daniel): el motivo ya NO se pide. Queda quién, cuándo
+          y la hora de antes y la de después.
           ══════════════════════════════════════════════════════════════════ */}
       {editando && (
         <tr className="border-b border-gray-100 bg-blue-50/40">
@@ -2497,100 +2461,6 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
               </div>
             )}
             <div>
-              {/* 🩸 El rótulo NO envuelve los botones en un <label>: un botón es
-                  «labelable», así que el label se ataría al PRIMER botón y no al
-                  campo. El campo se rotula por `aria-labelledby`. */}
-              <span id={`porque-${codigo}-${d.fecha}`} className="block text-[12px] font-medium text-gray-700">
-                {PORQUE} <span className="text-red-600">*</span>
-              </span>
-              {/* ══════════════════════════════════════════════════════════
-                  🔴 EL MOTIVO QUE APLICA A ESTA CASILLA (25-sep-2026).
-                  🩸 Salían los CUATRO juntos —«no marco salida · no marco
-                  salida almuerzo · no marco Entrada · no marco salida de
-                  almuerzo»—, que eran los motivos más usados de 90 días, mal
-                  escritos y sin orden, se hubiera tocado la hora que se
-                  hubiera tocado. Ahora sale UNO, el de la casilla abierta, con
-                  el rótulo parejo; y «Otro…» abre el campo libre con los más
-                  usados, que NO se retiran.
-                  ══════════════════════════════════════════════════════════ */}
-              {PANEL_DEL_DIA_2026_09 ? (
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {motivoPropio && (
-                    <button type="button"
-                      onClick={() => { setMotivoDia(motivoPropio); setMotivoLibre(false); }}
-                      aria-pressed={!motivoLibre && motivoDia === motivoPropio}
-                      disabled={guardandoDia}
-                      className={`min-h-[44px] rounded-full border px-3 text-[12px] transition active:scale-[0.97] ${
-                        !motivoLibre && motivoDia === motivoPropio
-                          ? "border-black bg-black text-white"
-                          : "border-gray-200 bg-white text-gray-600 hover:border-black hover:text-black"
-                      }`}>
-                      {motivoPropio}
-                    </button>
-                  )}
-                  {motivoPropio && (
-                    <button type="button"
-                      onClick={() => { setMotivoLibre(true); if (motivoDia === motivoPropio) setMotivoDia(""); }}
-                      aria-pressed={motivoLibre}
-                      disabled={guardandoDia}
-                      className={`min-h-[44px] rounded-full border px-3 text-[12px] transition active:scale-[0.97] ${
-                        motivoLibre
-                          ? "border-black bg-white font-medium text-black"
-                          : "border-gray-200 bg-white text-gray-600 hover:border-black hover:text-black"
-                      }`}>
-                      {OTRO_MOTIVO}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                /* Los más usados, si los hay. Tocar uno ESCRIBE en el campo. */
-                motivosFrecuentes.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {motivosFrecuentes.map((m) => (
-                      <button key={m} type="button" onClick={() => setMotivoDia(m)}
-                        aria-pressed={motivoDia === m}
-                        className={`min-h-[44px] rounded-full border px-3 text-[12px] transition active:scale-[0.97] ${
-                          motivoDia === m
-                            ? "border-black bg-black text-white"
-                            : "border-gray-200 bg-white text-gray-600 hover:border-black hover:text-black"
-                        }`}>
-                        {m}
-                      </button>
-                    ))}
-                  </div>
-                )
-              )}
-              {/* El campo libre. Con el panel prendido sale al tocar «Otro…»
-                  (o de entrada, cuando la casilla no tiene motivo propio), con
-                  los más usados de 90 días al lado. */}
-              {seEscribeElMotivo && (
-                <>
-                  {PANEL_DEL_DIA_2026_09 && motivosDeOtro.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {motivosDeOtro.map((m) => (
-                        <button key={m} type="button" onClick={() => setMotivoDia(m)}
-                          aria-pressed={motivoDia === m}
-                          disabled={guardandoDia}
-                          className={`min-h-[44px] rounded-full border px-3 text-[12px] transition active:scale-[0.97] ${
-                            motivoDia === m
-                              ? "border-black bg-black text-white"
-                              : "border-gray-200 bg-white text-gray-600 hover:border-black hover:text-black"
-                          }`}>
-                          {m}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <input
-                    aria-labelledby={`porque-${codigo}-${d.fecha}`}
-                    value={motivoDia}
-                    onChange={(e) => setMotivoDia(e.target.value.slice(0, MOTIVO_MAX))}
-                    placeholder="Escribe el motivo…"
-                    disabled={guardandoDia}
-                    className="mt-1.5 min-h-[44px] w-full rounded-lg border border-gray-200 bg-white px-3 text-base outline-none transition focus:border-black sm:text-sm"
-                  />
-                </>
-              )}
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button type="button" onClick={() => void guardarElDia()}
                   disabled={Boolean(faltaDia) || guardandoDia}
@@ -2638,7 +2508,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
               ) : (
                 <p className="mt-1.5 text-[12px] text-gray-500">
                   No se borra nada: lo que marcó el reloj queda guardado y la corrección va encima,
-                  con tu nombre y este motivo.
+                  con tu nombre y la fecha.
                 </p>
               )}
             </div>
@@ -2780,7 +2650,8 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
               <>Reloj <span className="tabular-nums line-through decoration-blue-300">{c.relojHora}</span>{" "}
                 → <b className="tabular-nums">{c.hora}</b></>
             )}
-            {" · "}“{c.motivo}” · {c.creadaPor}{c.creadaEn ? ` · ${fechaCortaISO(c.creadaEn)}` : ""}
+            {/* 9-oct-2026: el motivo ya no se pide; las viejas conservan el suyo. */}
+            {" · "}{c.motivo ? <>“{c.motivo}” · </> : null}{c.creadaPor}{c.creadaEn ? ` · ${fechaCortaISO(c.creadaEn)}` : ""}
             {/* 🔴 «DESHACER» SE QUEDA, Y VIVE DONDE VIVE LO YA GUARDADO
                 (19-sep-2026). Editar una hora ya no obliga a deshacer primero
                 —eso lo resuelve el editor de arriba—, pero volver a lo que dijo

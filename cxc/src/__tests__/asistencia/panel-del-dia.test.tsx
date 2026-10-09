@@ -25,8 +25,8 @@ import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
 import { MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
 import { avisoEntradaTemprana } from "@/lib/asistencia/entrada-autorizada";
 import {
-  ARREGLAR_EL_DIA, MOTIVO_DE_LA_CASILLA, NOTA_NO_SE_BORRA_NADA, OTRO_MOTIVO,
-  TEXTO_REVISAR, chipRevisar, lineaDelReporte, motivoDeLaCasilla, motivosLibres,
+  ARREGLAR_EL_DIA, NOTA_NO_SE_BORRA_NADA,
+  TEXTO_REVISAR, chipRevisar, lineaDelReporte,
   seMuestraEntradaAutorizada, seOfreceArreglarElDia,
 } from "@/lib/asistencia/panel-del-dia";
 import { TEXTO_SALIDA_SOSPECHOSA } from "@/lib/asistencia/salida-sospechosa";
@@ -197,62 +197,26 @@ describe("A · tocar una hora abre SOLO esa casilla", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// B · EL MOTIVO QUE APLICA A ESA CASILLA
+// B · EL MOTIVO YA NO SE PIDE
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe("B · los motivos son de la casilla, no del día", () => {
-  it("🔴 los cuatro rótulos, parejos y en el orden de las columnas", () => {
-    expect([...MOTIVO_DE_LA_CASILLA]).toEqual([
-      "No marcó entrada",
-      "No marcó salida a almuerzo",
-      "No marcó regreso de almuerzo",
-      "No marcó salida",
-    ]);
-    expect(motivoDeLaCasilla(0)).toBe("No marcó entrada");
-    expect(motivoDeLaCasilla(3)).toBe("No marcó salida");
-    // Una marca suelta, fuera de las cuatro columnas: no tiene motivo propio.
-    expect(motivoDeLaCasilla(null)).toBeNull();
-    expect(motivoDeLaCasilla(4)).toBeNull();
-  });
-
-  it("🔴 el mismo motivo no se ofrece dos veces, aunque esté escrito distinto", () => {
-    // «no marco salida» y «No marcó salida» son la MISMA clave.
-    expect(motivosLibres(["no marco salida", "Se fue al banco"], "No marcó salida"))
-      .toEqual(["Se fue al banco"]);
-  });
-
-  it("🔴 tocar la SALIDA ofrece «No marcó salida», y ninguno de los otros tres", async () => {
-    servir(base());
+// 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+// (Eran cinco pruebas: un chip de motivo por casilla y «Otro…» con el campo libre.)
+describe("B · corregir una hora no pide motivo (9-oct-2026)", () => {
+  it("🔴 al tocar una hora NO hay chips de motivo, ni «Otro…», ni campo, ni asterisco", async () => {
+    const llamadas = servir(base());
     montar(<ReporteTab />);
     await abrirPersona();
-    fireEvent.click(screen.getByText("17:30:02"));
-    await screen.findByRole("button", { name: "No marcó salida" });
-    expect(screen.queryByRole("button", { name: "No marcó entrada" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "No marcó salida a almuerzo" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "No marcó regreso de almuerzo" })).toBeNull();
-    // 🩸 Y los cuatro frecuentes mal escritos NO están: viven bajo «Otro…».
-    expect(screen.queryByRole("button", { name: "no marco salida almuerzo" })).toBeNull();
-  });
-
-  it("🔴 tocar la ENTRADA ofrece «No marcó entrada»", async () => {
-    servir(base());
-    montar(<ReporteTab />);
-    await abrirPersona();
-    fireEvent.click(screen.getByText("08:04:11"));
-    await screen.findByRole("button", { name: "No marcó entrada" });
-    expect(screen.queryByRole("button", { name: "No marcó salida" })).toBeNull();
-  });
-
-  it("🔴 «Otro…» abre el campo libre con los más usados de 90 días", async () => {
-    servir(base());
-    montar(<ReporteTab />);
-    await abrirPersona();
-    fireEvent.click(screen.getByText("17:30:02"));
-    await screen.findByRole("button", { name: OTRO_MOTIVO });
-    expect(screen.queryByPlaceholderText("Escribe el motivo…")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: OTRO_MOTIVO }));
-    await screen.findByPlaceholderText("Escribe el motivo…");
-    expect(screen.getByRole("button", { name: "no marco salida almuerzo" })).toBeTruthy();
+    for (const hora of ["17:30:02", "08:04:11"]) {
+      fireEvent.click(screen.getByText(hora));
+      await waitFor(() => expect(camposHora()).toHaveLength(1));
+      expect(screen.queryByRole("button", { name: /^No marcó/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Otro…" })).toBeNull();
+      expect(screen.queryByPlaceholderText("Escribe el motivo…")).toBeNull();
+      expect(screen.queryByText(/^Motivo/)).toBeNull();
+      expect(screen.queryByRole("button", { name: "no marco salida almuerzo" })).toBeNull();
+    }
+    expect(llamadas.filter((l) => l.url.includes("/correcciones/motivos"))).toHaveLength(0);
   });
 });
 
@@ -298,7 +262,7 @@ describe("C · la entrada autorizada es de la Entrada", () => {
     montar(<ReporteTab />);
     await abrirPersona();
     fireEvent.click(screen.getByText("08:04:11"));
-    await screen.findByRole("button", { name: "No marcó entrada" });
+    await waitFor(() => expect(camposHora()).toHaveLength(1));
     expect(screen.queryByText("Hoy entraba a las")).toBeNull();
   });
 });
@@ -423,7 +387,8 @@ describe("F · «Arreglar el día» queda donde no hay hora que tocar", () => {
     fireEvent.click(screen.getByRole("button", { name: ARREGLAR_EL_DIA }));
     await waitFor(() => expect(camposHora()).toHaveLength(1));
     expect(camposHora()[0].getAttribute("aria-label")).toBe("Hora v0");
-    expect(screen.getByRole("button", { name: "No marcó entrada" })).toBeTruthy();
+    // 9-oct-2026: ya no ofrece motivo; con poner la hora alcanza.
+    expect(screen.queryByRole("button", { name: "No marcó entrada" })).toBeNull();
   });
 });
 
@@ -448,11 +413,8 @@ async function corregirLaSalidaYDevolverElCuerpo(): Promise<unknown> {
   const campo = camposHora().find((i) => i.getAttribute("aria-label") === "Hora m3")!;
   fireEvent.change(campo, { target: { value: "18:15:00" } });
 
-  // El porqué, escrito a mano en los dos casos. Prendido hay que pedir «Otro…».
-  const otro = screen.queryByRole("button", { name: OTRO_MOTIVO });
-  if (otro) fireEvent.click(otro);
-  const libre = await screen.findByPlaceholderText("Escribe el motivo…");
-  fireEvent.change(libre, { target: { value: "se le olvidó marcar" } });
+  // 📅 9-oct-2026 (Daniel): el porqué ya no se pide, ni prendido ni apagado.
+  expect(screen.queryByPlaceholderText("Escribe el motivo…")).toBeNull();
 
   const guardar = screen.getByRole("button", { name: /^Guardar/ });
   await waitFor(() => expect((guardar as HTMLButtonElement).disabled).toBe(false));
@@ -476,11 +438,10 @@ describe("G · lo que viaja al servidor no cambió", () => {
     const apagado = await corregirLaSalidaYDevolverElCuerpo();
 
     expect(prendido).toEqual(apagado);
-    // Y es lo de siempre: el día, el porqué y UN cambio sobre la marca tocada.
+    // Y es lo de siempre menos el porqué (9-oct-2026): el día y UN cambio sobre la marca tocada.
     expect(prendido).toEqual({
       codigo: "40",
       fecha: "2026-09-22",
-      motivo: "se le olvidó marcar",
       cambios: [{
         clave: "m3", tipo: "corregir", marcacionId: "m4", reemplaza: null, hora: "18:15:00",
       }],

@@ -7,6 +7,49 @@
 
 ---
 
+## 🔴 Corregir una hora ya NO pide motivo (9-oct-2026)
+
+Daniel, textual: **«quita lo de poner motivo al cambiar la hora en asistencia»**.
+
+**Qué cambió.** Cambiar, agregar o quitar una hora de marcación queda en *tocar, poner la hora,
+guardar*. Se fue el campo «Motivo \*», sus chips («No marcó entrada…», «Otro…», los más usados de
+90 días) y el freno «Falta: el porqué», en los dos lugares donde se pedía:
+
+- la fila del día del **Reporte** (tocar una hora o un hueco, «Arreglar el día», arrastrar una
+  hora, «Hoy entraba a las») — `ReporteTab.tsx` → `POST /api/asistencia/correcciones/dia`;
+- la ventana **«Corregir la hora / Quitar esta marcación»** — `CorregirMarcacionModal.tsx` →
+  `POST /api/asistencia/correcciones`.
+
+Las dos rutas dejaron de contestar 400 sin motivo.
+
+**🔴 El rastro NO se pierde.** Cada corrección sigue siendo una fila nueva en
+`asistencia_correcciones` con **quién** (`creada_por`, de la sesión, nunca del cuerpo), **cuándo**
+(`creada_en`), **antes** (la marcación del reloj, que sigue intacta en `asistencia_marcaciones`, y
+la corrección anterior, que se anula y no se borra) y **después** (`hora`). Lo mismo la entrada
+autorizada. Solo desaparece el texto del motivo. **Las correcciones viejas conservan el suyo** y se
+siguen leyendo en pantalla, Excel y PDF.
+
+**🔑 Sin migración.** La columna `motivo` sigue `NOT NULL CHECK (btrim(motivo) <> '')` en
+`asistencia_correcciones` y `asistencia_entradas_autorizadas`. Sin motivo se guarda la raya
+`SIN_MOTIVO` («—») y al leer vuelve a ser vacío (`normalizarMotivo` / `motivoLeido`,
+`correcciones.ts`). Si un día se relaja el CHECK, pasa a guardar NULL y se borra la raya.
+
+**Lo que NO se tocó.** 🔴 **«Justificar» SÍ lleva su motivo** (Constancia, Permiso personal…): ahí
+el motivo ES la justificación. La nota que el sistema escribe solo al arrastrar una hora («Marca
+movida de columna») sigue viajando: nadie la teclea.
+
+**⚠️ Quedó sin uso** (no se borró, para no mezclar limpieza con el ajuste):
+`GET /api/asistencia/correcciones/motivos`, `leerMotivosFrecuentes` y `motivos-frecuentes.ts`.
+
+**Candados.** `asistencia-correcciones` (sin motivo se guarda, con firma, persona, día y hora) ·
+`asistencia-editar-el-dia` (lib y pantalla) · `asistencia-corregir-hora` · `asistencia-marcas-de-mas`
+· `panel-del-dia` · `entrada-autorizada` · `asistencia-justificaciones-conducta` («Justificar»
+sigue contestando 400 «Falta el motivo»). Las pruebas que exigían el motivo cambiaron de dirección
+con nota fechada. **Todo lo que más abajo dice «el motivo es obligatorio» al corregir una hora es
+historia, no la regla vigente.**
+
+---
+
 ## 🔴 Las horas del día se arrastran de columna (25-sep-2026)
 
 **Qué aprobó Daniel.** Del mockup `asistencia-marcas-propuestas.html`, **solo la segunda idea**:
@@ -202,7 +245,7 @@ VIGENTES, y aquí quedan tal como estaban escritas:
 - 🔴 **UN PERMISO DE HORAS PERDONA LAS TRES COLUMNAS, CON LA MISMA REGLA (16-sep-2026).** `minutosPerdonadosDe` cruza la ventana del permiso con la del INCUMPLIMIENTO —tardanza · salida temprana · exceso de almuerzo— y perdona la **intersección**, capeada a SU propio bruto. 🔴 **Nada callado**: el día lleva los tres perdones por separado y el chip dice cuál y cuánto. Un permiso de horas **no justifica el día entero**.
 - 🔴 Una vacación **no es una justificación** (tabla propia; «Vacaciones» no está entre los motivos ni los retirados); **el motor las honra pase lo que pase** y un día de vacaciones **no genera horas, tardanza ni ausencia**. Sin marcar no cuesta nada; **«ya se le pagó» es lo ÚNICO que mueve plata**: ausencia de día completo (**8 h × rata**) en hábiles no feriados.
 - 🔴 Dar de baja a alguien con deuda **avisa** (`salida-con-deuda.ts`), y la deuda son las **tres cuentas** (`calcularSaldoPrestamo`). 🔴 Las columnas de dinero salen de **un solo lugar**: `columnas-dinero-planilla.ts` (**19**), leído por `PlanillaTab` y `PlanillaBoston`.
-- Corregir una hora: el porqué es obligatorio; los motivos frecuentes se derivan de lo guardado en **90 días** por clave normalizada (**igualdad exacta, nada por parecido**), **4** con **2+** usos (`motivos-frecuentes.ts`, solo lectura). *(Podada el 25-sep-2026 para hacer sitio a «las horas se arrastran de columna»; la mitad que importa —«Otro…» abre el campo libre con los más usados de 90 días— sigue dicha en la línea del panel del día.)*
+- Corregir una hora: 🔴 **el porqué ya NO se pide (9-oct-2026)**. *Antes:* el porqué es obligatorio; los motivos frecuentes se derivan de lo guardado en **90 días** por clave normalizada (**igualdad exacta, nada por parecido**), **4** con **2+** usos (`motivos-frecuentes.ts`, solo lectura). *(Podada el 25-sep-2026 para hacer sitio a «las horas se arrastran de columna»; la mitad que importa —«Otro…» abre el campo libre con los más usados de 90 días— sigue dicha en la línea del panel del día.)*
 
 ---
 
@@ -3050,7 +3093,7 @@ Briceida paga seguros: su bruto sube $12,92 y el seguro social y educativo suben
 - La quincena paga `salario ÷ 2`. Un **rango libre** prorratea por la fracción de QUINCENA cubierta y **no aplica los montos escritos a mano** — se dice en pantalla, en el Excel y en el PDF.
 - **El almuerzo es fijo: 30 min** (`ALMUERZO_FIJO_MIN`). El PUT lo escribe mire lo que mire el cuerpo.
 - Las marcaciones se miden **al segundo**; los umbrales de negocio siguen expresados en minutos.
-- 🔴 **La marcación del reloj nunca se edita ni se borra.** La corrección va ENCIMA, en `asistencia_correcciones` (motivo obligatorio, firma de la sesión, deshacer = `anulada_en`). Barrido estático prohíbe `update`/`delete`/`upsert` sobre `asistencia_marcaciones`.
+- 🔴 **La marcación del reloj nunca se edita ni se borra.** La corrección va ENCIMA, en `asistencia_correcciones` (firma de la sesión, deshacer = `anulada_en`; el motivo ya no se pide desde el 9-oct-2026). Barrido estático prohíbe `update`/`delete`/`upsert` sobre `asistencia_marcaciones`.
 - **Los días que no pasaron no se cuentan** (`fecha >= diaEnCurso`, con el día de Panamá).
 - 🔑 **Cuando el sistema no puede saber, se abstiene**: servicio profesional, ingreso o salida a mitad de período y justificación de período completo salen en «Tú decides» — sin número, fuera del total. (El rótulo se llamó «Decidilo vos» hasta el 1-sep-2026; se renombró por el candado de tuteo.) 🔴 **El servicio profesional no genera horas extra ni entra a Aprobaciones; solo tardanzas y ausencias** (3-sep-2026, Daniel: *«yulisa marca pero no deberia de calcular ya que es salario fijo, es solo para ver sus tardanzas y ausencias»*): `sinHorasExtra` en `armarLinea` deja en cero extra/excedente/domingo/feriado, `extraMedido` y `extraNoAprobada` en `null` —no sale en el aviso ámbar, no frena el cierre, `armarDiasAprobacion` no la ofrece— y en Planilla, Reporte, Excel y PDF esas columnas van con «—». Candados: `planilla-aviso-extras-sin-aprobar.test.ts` (g) · `aprobaciones-no-lista-servicio-profesional.test.ts` · `reporte-servicio-profesional-sin-extras.test.ts`.
 - 🔴 **APROBACIONES ES UNA SOLA LISTA DE DECISIONES: SÍ · NO · PENDIENTE (10-sep-2026, noche).** Daniel, textual: *«Aprobaciones es una sola lista de decisiones. Cada renglón es una persona en la quincena, con sus horas extra sumadas. Dos botones: Sí y No. Se decide, y el renglón se va»* · *«Cobra horas extra por default a todos sí»* · *«y si quiero poder ver por día y por persona? con un tab arriba que diga colaborador / día»*. 🩸 Hasta ese día `aprobado` era true/false y **`false` significaba PENDIENTE**: no existía «lo miré y NO se paga», y lo que nadie marcaba quedaba en el aviso ámbar y frenando el cierre para siempre. Columna **`decision`** (`'si' | 'no' | NULL`, migración `20261105120000`, **aplicada**; backfill acotado: 391 de 555 filas con `aprobado = true` → `'si'`, 0 `'no'`). 🔴 **`aprobado` se conserva y se escribe DERIVADO** (`decision = 'si'` ⇔ `aprobado = true`): el motor paga exactamente como antes. Un **`no`** no se paga (igual que pendiente) y **deja de ser pendiente**: `diasExtraNo` en `medirHoras` no lo aparta en `extraNoAprobada*`, así que ni aviso ámbar ni freno del cierre; los 30 min automáticos de ACS se siguen pagando igual (son «los minutos que no hay que aprobar»). Pendiente = sin fila o `decision IS NULL`, y es lo ÚNICO que avisa y frena.
@@ -3265,7 +3308,7 @@ Las únicas **4 marcas de teléfono** de toda la historia son las pruebas de Dan
 - **«Descuento por compras» y «Daño de mercancía» son LA MISMA línea**, no dos conceptos.
 - ⚠️ **Un colaborador sin cédula ni salario no siempre es un dato olvidado**: Daniel, *«creo que porque no tienen permiso de trabajo»*.
 - La incapacidad justificada **se paga**; «Trabajo fuera de la oficina» **no es ausencia**; un sueldo repartido saca la rata del **sueldo COMPLETO** y las partes deben sumar el salario de la ficha o se rechaza entero.
-- Corregir una hora: el porqué es obligatorio; los motivos frecuentes se derivan de lo guardado en **90 días** por clave normalizada (**igualdad exacta, nada por parecido**), **4** con **2+** usos (`motivos-frecuentes.ts`, solo lectura).
+- Corregir una hora: 🔴 **el porqué ya NO se pide (9-oct-2026)**. *Antes:* el porqué es obligatorio; los motivos frecuentes se derivan de lo guardado en **90 días** por clave normalizada (**igualdad exacta, nada por parecido**), **4** con **2+** usos (`motivos-frecuentes.ts`, solo lectura).
 - Candados: `asistencia-colaboradores-no-personas` · `asistencia-falta-configurar` · `asistencia-siete-pantallas` · `asistencia-lista-que-falta` · `planilla-elegir-quincena` · `asistencia-reglas-de-la-contable` · `asistencia-empresa-para-todo` · `asistencia-alcance-route` · `aprobaciones-por-persona` · `aprobaciones-optimista` · `vacaciones-el-motor-las-honra` · `asistencia-prestamo-planilla` · `planilla-sin-descontar` · `justificar-horas-solo-constancia` · `planilla-ajuste-por-concepto` · `planilla-antes-de-cerrar` · `asistencia-buscadores` · `prestamos-salida-con-deuda` · `asistencia-corregir-hora`.
 
 ### La Planilla Unida — los dos interruptores, PRENDIDOS en producción (11-sep-2026)

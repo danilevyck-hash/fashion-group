@@ -209,20 +209,19 @@ describe("2. 🔴 los motivos frecuentes se ARMAN SOLOS: 90 días, 2+ usos, máx
     expect(motivosFrecuentes([f("  ", "2026-09-01T00:00:00Z"), f("", "2026-09-01T00:00:00Z")], HOY)).toEqual([]);
   });
 
-  it("🔴 NINGUNA lista de motivos escrita a mano en la ventana ni en el módulo puro", () => {
+  // 📅 9-oct-2026 (Daniel: «quita lo de poner motivo al cambiar la hora en
+  // asistencia»): la ventana ya NO pide los motivos ni dibuja el campo.
+  it("🔴 NINGUNA lista de motivos escrita a mano, y la ventana ya no pide motivo", () => {
     for (const rel of ["app/asistencia/CorregirMarcacionModal.tsx", "lib/asistencia/motivos-frecuentes.ts"]) {
       const src = puro(rel);
       // Un arreglo literal de textos con espacios adentro es una lista de
       // motivos escrita a mano (los meses «ene, feb…» no llevan espacio).
       expect(src, rel).not.toMatch(/\[\s*"[^"\n]* [^"\n]*"\s*,/);
     }
-    // La ventana los PIDE a la ruta y los pinta desde el estado.
     const modal = puro("app/asistencia/CorregirMarcacionModal.tsx");
-    expect(modal).toMatch(/fetch\("\/api\/asistencia\/correcciones\/motivos"/);
-    expect(modal).toMatch(/frecuentes\.map\(/);
-    // Tocar un botón ESCRIBE en el campo; el campo es lo que se guarda.
-    expect(modal).toMatch(/onClick=\{\(\) => setMotivo\(m\)\}/);
-    expect(modal).toMatch(/motivo,\s*\}\),/);
+    expect(modal).not.toMatch(/correcciones\/motivos/);
+    expect(modal).not.toMatch(/setMotivo\(/);
+    expect(modal).not.toMatch(/motivo,\s*\}\),/);
   });
 });
 

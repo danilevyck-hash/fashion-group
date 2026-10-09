@@ -219,12 +219,11 @@ export default function HomePage() {
         {/* Grupos: cuadrícula de fichas (ícono de línea arriba, nombre debajo,
             sin subtítulo). Solo aparecen los módulos visibles según permisos
             (misma fuente que el sidebar: getVisibleGroups/getModulesInGroup). */}
-{INICIO_APPLE_2026_10 ? (
-          <>
-            {/* 🔴 INICIO ESTILO APPLE (`INICIO_APPLE_2026_10`). Celular: la
-                lista agrupada de Ajustes, la MISMA forma de la hoja «Más».
-                Computadora: ficha horizontal con el ícono a color, como la
-                barra lateral. */}
+        {/* 🔴 INICIO ESTILO APPLE (`INICIO_APPLE_2026_10`, prendido 9-oct-2026).
+            Celular: la lista agrupada de Ajustes, la MISMA forma de la hoja
+            «Más». Computadora: las fichas de siempre (Daniel: las horizontales
+            NO). */}
+        {INICIO_APPLE_2026_10 && (
             <div data-inicio="lista-celular" className="space-y-5 sm:hidden">
               {visibleGroups.map((g) => (
                 <section key={g.key}>
@@ -250,33 +249,8 @@ export default function HomePage() {
                 </section>
               ))}
             </div>
-            <div data-inicio="fichas" className="hidden space-y-6 sm:block">
-              {visibleGroups.map((g) => (
-                <section key={g.key}>
-                  <h2 className="text-xs font-medium uppercase tracking-wide mb-2 px-1 text-gray-400">{g.label}</h2>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                    {getModulesInGroup(g.key, role, fgModules).map((m) => {
-                      const ModIcon = m.icon;
-                      const tono = getModuleColorByKey(m.key);
-                      return (
-                        <Link
-                          key={m.key}
-                          href={m.href}
-                          onClick={() => recordModuleClick(m.key, userName)}
-                          className="group flex min-h-[56px] items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 transition hover:border-gray-400 hover:shadow-sm active:scale-[0.97]"
-                        >
-                          <ModIcon size={20} strokeWidth={1.75} className={`shrink-0 ${tono ? tono.text : "text-gray-500"}`} />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{m.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </>
-        ) : (
-        <div className="space-y-6">
+        )}
+        <div {...(INICIO_APPLE_2026_10 ? { "data-inicio": "fichas" } : {})} className={INICIO_APPLE_2026_10 ? "hidden space-y-6 sm:block" : "space-y-6"}>
           {visibleGroups.map((g) => {
             const modules = getModulesInGroup(g.key, role, fgModules);
             return (
@@ -304,7 +278,6 @@ export default function HomePage() {
             );
           })}
         </div>
-        )}
       </div>
     </div>
   );

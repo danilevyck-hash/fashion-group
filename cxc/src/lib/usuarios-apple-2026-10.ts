@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// USUARIOS, ESTILO APPLE (9-oct-2026, propuesta).
+// USUARIOS, ESTILO APPLE (9-oct-2026).
 //
 // La pregunta de la pantalla: «¿quién entra al sistema y con qué rol?».
 // Medido el 9-oct-2026: 17 usuarios, los 17 activos; ninguna visita
@@ -18,9 +18,10 @@
 //      se queda al final del renglón. Computadora: «＋ Nuevo usuario» en la
 //      fila de las pestañas; hoy ocupa una fila sola.
 //
-// `false` = la pantalla de hoy, byte por byte. Se prende con el «sí» de Daniel.
+// PRENDIDO el 9-oct-2026 con el «sí» de Daniel. `false` = la pantalla de antes,
+// byte por byte.
 // Candado: `src/__tests__/components/usuarios-apple-apagado.test.tsx`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** `false` = como hoy. Se prende con el «sí» de Daniel. */
-export const USUARIOS_APPLE_2026_10 = false;
+/** Prendido el 9-oct-2026 (Daniel). `false` = la pantalla de antes. */
+export const USUARIOS_APPLE_2026_10 = true;

@@ -58,7 +58,7 @@ describe("Préstamos — interruptor APAGADO = la pantalla de hoy", () => {
   });
 });
 
-describe("Préstamos — interruptor PRENDIDO = la propuesta", () => {
+describe("Préstamos — interruptor PRENDIDO (9-oct-2026, Daniel)", () => {
   it("arriba, Saldo total y Próximo descuento; el conteo se va", async () => {
     interruptor.prendido = true;
     const c = await montar();

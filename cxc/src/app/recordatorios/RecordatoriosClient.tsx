@@ -84,7 +84,6 @@ import { useAccionesCheque } from "./acciones-cheque";
 import PuertaRecordar from "./components/PuertaRecordar";
 import AgendaLista from "./components/AgendaLista";
 import CalendarioMes from "./components/CalendarioMes";
-import { RECORDATORIOS_APPLE_2026_10 } from "@/lib/recordatorios/apple-2026-10";
 import { Confirmaciones, DetalleCheque, ModalDelDia, ModalRebote } from "./components/ChequeModales";
 import {
   agruparAgenda,
@@ -501,20 +500,6 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
     }
   }
 
-  // UN solo botón de alta (la puerta única): se dibuja arriba (hoy) o en la
-  // fila de los controles (`RECORDATORIOS_APPLE_2026_10`).
-  const botonNuevo = (
-    <button
-      data-puerta-boton
-      onClick={() => setPuertaAbierta(true)}
-      disabled={!isOnline}
-      title={!isOnline ? "Sin conexión" : undefined}
-      className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-    >
-      ＋ Nuevo
-    </button>
-  );
-
   // ── Dibujo ────────────────────────────────────────────────────────────────
   const chequeDelDia = dayModal ? cheques.filter((c) => c.fecha_deposito === dayModal) : [];
   const recsDelDia = dayModal ? recordatorios.filter((r) => ocurreEn(r, dayModal)) : [];
@@ -566,14 +551,22 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
               {/* 🔴 UNA SOLA PUERTA (22-sep-2026). Acá había «Nuevo Cheque», y
                   la caja de escribir vivía aparte más abajo: dos puertas que no
                   se conocían. Daniel: «cheque es un motivo de recordatorio». */}
-              {!RECORDATORIOS_APPLE_2026_10 && botonNuevo}
+              <button
+                data-puerta-boton
+                onClick={() => setPuertaAbierta(true)}
+                disabled={!isOnline}
+                title={!isOnline ? "Sin conexión" : undefined}
+                className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ＋ Nuevo
+              </button>
             </div>
           </div>
 
           </div>
           {/* Modo (Lista / Calendario) + buscador. NO son pestañas: son dos
               formas de ver lo mismo. */}
-          <div {...(RECORDATORIOS_APPLE_2026_10 ? { "data-fila-controles": "" } : {})} className={barra ? "hidden" : "flex flex-col sm:flex-row sm:items-center gap-3 mb-6"}>
+          <div className={barra ? "hidden" : "flex flex-col sm:flex-row sm:items-center gap-3 mb-6"}>
             <div className={barra ? "hidden" : "flex gap-2 bg-gray-100 rounded-full p-0.5 w-fit"}>
               <button
                 type="button"
@@ -606,10 +599,6 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
                 />
               </div>
             )}
-            {/* 🔴 Estilo Apple: «＋ Nuevo» en la fila de los controles. */}
-            {RECORDATORIOS_APPLE_2026_10 && !barra && (
-              <div className={viewMode === "lista" ? undefined : "sm:ml-auto"}>{botonNuevo}</div>
-            )}
           </div>
 
           {viewMode === "lista" &&
@@ -633,7 +622,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
               Estaba arriba de la lista, con todo el ancho y nueve botones, y se
               usó DOS veces en 17 días mientras los cheques son 19 filas. La
               lista es lo que se viene a ver; esto es un atajo para una nota. */}
-          {viewMode === "lista" && !loading && !RECORDATORIOS_APPLE_2026_10 && (
+          {viewMode === "lista" && !loading && (
             <LineaNueva
               hoy={hoy}
               puedeElegirDestino={initialData.puedeElegirDestino}

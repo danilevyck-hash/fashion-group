@@ -23,14 +23,10 @@
  *   1. **Una casilla a la vez.** Se toca una hora (o un hueco) y SOLO esa celda
  *      se vuelve escribible, en su lugar. Las otras tres siguen tocables: tocar
  *      otra cambia de casilla. «Quitar» sale solo en la casilla abierta.
- *   2. **El motivo que aplica a ESA casilla, y nada más** (`motivoDeLaCasilla`):
- *      «No marcó entrada · No marcó salida a almuerzo · No marcó vuelta de
- *      almuerzo · No marcó salida». Rótulos parejos, en el orden de las cuatro
- *      columnas. Más «Otro…», que abre el campo libre con los motivos más
- *      usados de 90 días (`motivos-frecuentes.ts`, que NO se retira).
- *      🩸 Los cuatro chips que Daniel vio juntos eran justamente esos motivos
- *      frecuentes, mal escritos y desordenados: se ofrecían los cuatro sin
- *      importar qué casilla se tocó.
+ *   2. ~~El motivo que aplica a ESA casilla~~ — 🔴 RETIRADA el 9-oct-2026.
+ *      Daniel, textual: «quita lo de poner motivo al cambiar la hora en
+ *      asistencia». Ya no hay chips ni campo de motivo: se toca, se pone la
+ *      hora y se guarda. Queda quién, cuándo y la hora de antes y la de después.
  *   3. **«Hoy entraba a las» es de la ENTRADA** (`seMuestraEntradaAutorizada`):
  *      sale al tocar la primera columna y solo cuando ese día hay algo que
  *      decidir — el aviso de entrada temprana (≥ `avisoEntradaTempranaMin`, hoy
@@ -57,11 +53,10 @@
  * /api/asistencia/correcciones/dia` con el MISMO cuerpo: el día, el porqué y
  * los cambios que salen de `planDelDia` —que ya solo emitía las casillas
  * tocadas—. Editar sigue siendo anular y escribir, las dos filas quedan, el
- * motivo sigue siendo obligatorio y nada se aplica solo.
+ * motivo ya no se pide (9-oct-2026) y nada se aplica solo.
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { GUARDAR_EL_DIA } from "./editar-el-dia";
-import { claveMotivo, MAX_MOTIVOS_FRECUENTES } from "./motivos-frecuentes";
 import { lineaDelDia, textoDeshechas, textoRepetidas, type LineaDelDia, type MarcaParaResumir } from "./linea-del-dia";
 
 /**
@@ -77,52 +72,6 @@ export const PANEL_DEL_DIA_2026_09 = true;
 
 /** Los rótulos de las cuatro columnas del día, en su orden. */
 export const COLUMNAS_DEL_DIA = ["Entrada", "Salida almuerzo", "Regreso almuerzo", "Salida"] as const;
-
-/**
- * 🔴 EL MOTIVO DE CADA CASILLA. Rótulos parejos —todos «No marcó …»— y en el
- * orden de las columnas. Es una lista CERRADA de cuatro: la quinta casilla (una
- * marca suelta que no entra en las cuatro columnas) no tiene motivo propio.
- */
-export const MOTIVO_DE_LA_CASILLA = [
-  "No marcó entrada",
-  "No marcó salida a almuerzo",
-  "No marcó regreso de almuerzo",
-  "No marcó salida",
-] as const;
-
-/** Lo que dice el chip que abre el campo libre. */
-export const OTRO_MOTIVO = "Otro…";
-
-/** El motivo que aplica a la columna `c` (0..3). `null` fuera de las cuatro. */
-export function motivoDeLaCasilla(columna: number | null | undefined): string | null {
-  if (typeof columna !== "number" || !Number.isInteger(columna)) return null;
-  return MOTIVO_DE_LA_CASILLA[columna] ?? null;
-}
-
-/**
- * Los motivos que se ofrecen bajo «Otro…»: los más usados de 90 días, sin
- * repetir el que ya sale como chip propio de la casilla.
- *
- * 🔑 La comparación es por CLAVE (`claveMotivo`): minúsculas, sin acentos, un
- * solo espacio. «No marcó salida» y «no marco salida» son el mismo motivo, y no
- * se ofrece dos veces. Igualdad exacta sobre la clave, nunca por parecido.
- */
-export function motivosLibres(
-  frecuentes: readonly string[] | null | undefined,
-  propio: string | null,
-): string[] {
-  const clavePropia = propio ? claveMotivo(propio) : null;
-  const vistos = new Set<string>();
-  const salida: string[] = [];
-  for (const m of frecuentes ?? []) {
-    const k = claveMotivo(m);
-    if (!k || k === clavePropia || vistos.has(k)) continue;
-    vistos.add(k);
-    salida.push(m);
-    if (salida.length >= MAX_MOTIVOS_FRECUENTES) break;
-  }
-  return salida;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3 · «HOY ENTRABA A LAS»
@@ -266,7 +215,7 @@ export function rotuloGuardar(activo = PANEL_DEL_DIA_2026_09): string {
  */
 export const NOTA_NO_SE_BORRA_NADA =
   "No se borra nada: lo que marcó el reloj queda guardado y la corrección va encima, "
-  + "con tu nombre y este motivo.";
+  + "con tu nombre y la fecha.";
 
 /** El nombre accesible del ⓘ. Se lee solo, sin ver el ícono. */
 export const ROTULO_NOTA = "Qué pasa al guardar";

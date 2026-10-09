@@ -273,17 +273,17 @@ export const PORQUE = "Motivo";
  * Qué falta para poder guardar. `null` = se puede.
  *
  * ⚠️ El orden importa: primero lo que está MAL (una hora que no sirve), después
- * lo que FALTA (el porqué), y al final «no cambiaste nada» — que no es un error
- * sino que no hay nada que hacer.
+ * al final «no cambiaste nada» — que no es un error sino que no hay nada que
+ * hacer. (El porqué dejó de pedirse el 9-oct-2026.)
  */
-export function faltaParaGuardarElDia(plan: PlanDelDia, motivo: unknown): string | null {
+export function faltaParaGuardarElDia(plan: PlanDelDia): string | null {
   if (plan.invalidas.length > 0) {
     return plan.invalidas.length === 1
       ? "Hay una hora que no sirve"
       : `Hay ${plan.invalidas.length} horas que no sirven`;
   }
   if (plan.cambios.length === 0 && !plan.entradaAutorizada) return "Todavía no cambiaste nada";
-  if (!(typeof motivo === "string" && motivo.trim().length > 0)) return "Falta: el porqué";
+  // 9-oct-2026 (Daniel): el motivo ya no se pide.
   return null;
 }
 

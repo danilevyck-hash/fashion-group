@@ -38,6 +38,21 @@ const base = { codigo: "44", desde: "2026-08-03", hasta: "2026-08-03", motivo: "
 
 beforeEach(() => { insertados.length = 0; respuestas = []; });
 
+// 🔴 9-oct-2026 — Daniel quitó el motivo al CORREGIR UNA HORA («quita lo de poner
+// motivo al cambiar la hora en asistencia»). Eso NO toca las justificaciones:
+// acá el motivo ES la justificación. Este candado impide que alguien confunda
+// las dos cosas y lo afloje también acá.
+describe("🔴 «Justificar» SIGUE pidiendo su motivo", () => {
+  it("sin motivo (ausente, vacío o en espacios): 400 «Falta el motivo» y NO escribe", async () => {
+    for (const motivo of [undefined, "", "   "]) {
+      const res = await POST(pedido({ ...base, motivo }));
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("Falta el motivo");
+      expect(insertados).toHaveLength(0);
+    }
+  });
+});
+
 describe("🔴 los motivos retirados no se pueden guardar, ni por la puerta de atrás", () => {
   it("un motivo que la pantalla ya no ofrece se rechaza con 400 y NO escribe", async () => {
     for (const m of MOTIVOS_RETIRADOS) {

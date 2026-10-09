@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CANDADO — PRÉSTAMOS ESTILO APPLE (4-oct-2026, propuesta)
+// CANDADO — PRÉSTAMOS ESTILO APPLE (4-oct-2026)
 //
-// 1. Nace APAGADO: se prende solo con el «sí» de Daniel.
+// 1. PRENDIDO el 9-oct-2026 con el «sí» de Daniel.
 // 2. «Próximo descuento» es la suma de lo que proponen las funciones de la
 //    planilla (cada cuota capeada a SU saldo), no una cuenta nueva.
 // 3. Ningún número se mueve: ni una ruta ni el motor importan el interruptor.
@@ -20,8 +20,8 @@ import {
 const base = { saldoPrestamo: 0, saldoDano: 0, saldoTerceros: 0, cuota: 0, cuotaDano: 0, cuotaTerceros: 0 };
 
 describe("préstamos estilo Apple", () => {
-  it("nace apagado", () => {
-    expect(PRESTAMOS_APPLE_2026_10).toBe(false);
+  it("está PRENDIDO (9-oct-2026, Daniel)", () => {
+    expect(PRESTAMOS_APPLE_2026_10).toBe(true);
   });
 
   it("próximo descuento: las tres cuotas, cada una capeada a su saldo", () => {

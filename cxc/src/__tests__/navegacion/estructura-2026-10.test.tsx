@@ -208,7 +208,12 @@ describe("🔴 prendido, SOLO cambia la pantalla", () => {
     await waitFor(() => expect(document.querySelector("[data-menu-usuario]")).not.toBeNull());
     expect(screen.queryByText("Accesos frecuentes")).toBeNull();
     expect(screen.queryByLabelText("Modo oscuro")).toBeNull();
-    const hrefs = [...document.querySelectorAll("a")].map((a) => a.getAttribute("href")!).sort();
-    expect(hrefs).toEqual(modulosDeHoy("admin", null));
+    // 9-oct-2026 (`INICIO_APPLE_2026_10` prendido): cada módulo sale dos veces,
+    // en la lista del celular y en las fichas de la computadora. Las dos completas.
+    for (const zona of ["lista-celular", "fichas"]) {
+      const hrefs = [...document.querySelectorAll(`[data-inicio="${zona}"] a`)].map((a) => a.getAttribute("href")!).sort();
+      expect(hrefs, zona).toEqual(modulosDeHoy("admin", null));
+    }
+    expect(document.querySelectorAll("a").length).toBe(2 * modulosDeHoy("admin", null).length);
   });
 });

@@ -451,11 +451,13 @@ describe("🔴 Préstamos: el TOTAL SIGUE AL FILTRO", () => {
     expect(document.body.textContent).not.toContain("$300.00");
   });
 
-  it("🔴 y el encabezado dice cuántos se ven, no cuántos hay", async () => {
+  it("🔴 y el buscador dice cuántos se ven, de cuántos hay", async () => {
     await abrirPrestamos();
-    expect(document.body.textContent).toContain("2 colaboradores con saldo");
+    // 9-oct-2026 (`PRESTAMOS_APPLE_2026_10` prendido): el encabezado ya no
+    // cuenta colaboradores («son las filas»); el conteo queda en el buscador.
+    expect(document.body.textContent).not.toContain("colaboradores con saldo");
     teclear("alejandra");
-    await waitFor(() => expect(document.body.textContent).toContain("1 colaborador con saldo"));
+    await waitFor(() => expect(screen.queryAllByText(/Andrea Perez/).length).toBe(0));
     // 🔴 Y el buscador dice contra qué se recortó: sin eso, «$100.00» se lee
     // como la deuda de la empresa entera.
     expect(screen.getByTestId("conteo-busqueda").textContent).toBe("1 de 2 colaboradores");

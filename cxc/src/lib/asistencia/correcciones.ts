@@ -115,20 +115,29 @@ export interface CorreccionVisible {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * ¿Sirve este motivo?
+ * 🔴 EL MOTIVO YA NO SE PIDE (9-oct-2026). Daniel, textual: «quita lo de poner
+ * motivo al cambiar la hora en asistencia». Corregir una hora es tocar, poner
+ * la hora y guardar. El rastro NO se pierde: quién, cuándo, la hora del reloj
+ * y la corregida siguen quedando en la fila. Las correcciones viejas conservan
+ * el motivo que traían.
  *
- * 🔴 VACÍO O SOLO ESPACIOS NO SIRVE, y no es una formalidad: `NOT NULL` en la
- * base deja pasar `""` y `"   "`, que es exactamente lo que teclea quien quiere
- * saltarse el campo. Es la misma condición que el CHECK de la migración.
+ * ponytail: la columna `motivo` sigue `NOT NULL CHECK (btrim(motivo) <> '')`
+ * en las dos tablas, así que sin motivo se guarda esta raya y al leer vuelve
+ * a ser vacío (`motivoLeido`). Sin migración. Si un día se relaja el CHECK,
+ * esto pasa a guardar NULL y se borra la raya.
  */
-export function motivoValido(motivo: unknown): boolean {
-  return typeof motivo === "string" && motivo.trim().length > 0;
-}
+export const SIN_MOTIVO = "—";
 
-/** El motivo como se guarda: sin espacios de sobra y acotado. */
+/** El motivo como se guarda: sin espacios de sobra, acotado, y la raya si no hay. */
 export const MOTIVO_MAX = 300;
 export function normalizarMotivo(motivo: unknown): string {
-  return String(motivo ?? "").trim().slice(0, MOTIVO_MAX);
+  return (typeof motivo === "string" ? motivo : "").trim().slice(0, MOTIVO_MAX) || SIN_MOTIVO;
+}
+
+/** El motivo como se muestra: una corrección sin motivo no muestra nada. */
+export function motivoLeido(guardado: unknown): string {
+  const m = String(guardado ?? "").trim();
+  return m === SIN_MOTIVO ? "" : m;
 }
 
 /**
