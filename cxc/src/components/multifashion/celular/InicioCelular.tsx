@@ -32,6 +32,8 @@ import {
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
 import type { DetalleMensualResp } from "../MultifashionResumenView";
 import { filasDelAnio } from "@/lib/multifashion/apple";
+import { MULTIFASHION_GRAFICA_2026_10 } from "@/lib/multifashion/grafica-mes";
+import { GraficaDelMes } from "../GraficaDelMes";
 import { lineaMayoreo } from "@/lib/multifashion/retail-al-frente";
 
 export const TONO_CLASE: Record<TonoCelular, string> = {
@@ -184,7 +186,20 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
       </p>
       )}
 
-      {/* El día por día, sin ejes. */}
+      {/* El día por día, sin ejes. 🔴 `MULTIFASHION_GRAFICA_2026_10`: la gráfica
+          nueva, la misma de la computadora. */}
+      {MULTIFASHION_GRAFICA_2026_10 ? (
+        <div className="mt-5">
+          <GraficaDelMes
+            dias={data.dias}
+            year={year}
+            mes={mes}
+            esMesActual={data.is_mes_actual}
+            diaActual={data.dia_actual}
+            feriados={data.feriados ?? null}
+          />
+        </div>
+      ) : (
       <div
         data-celular="barras"
         role={MF_DIA_2026_10 ? "group" : "img"}
@@ -205,6 +220,7 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
           />
         ))}
       </div>
+      )}
       {habitos && (
         <p data-celular="habitos" className="mt-2 text-sm text-gray-500">{habitos}</p>
       )}

@@ -58,6 +58,8 @@ import { MULTIFASHION_CELULAR, type ClaveRenglon, type PantallaCelular } from "@
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
 import { AnioCelular, AnioGrande, InicioCelular, MesesDelAnio } from "./celular/InicioCelular";
 import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
+import { MULTIFASHION_GRAFICA_2026_10 } from "@/lib/multifashion/grafica-mes";
+import { GraficaDelMes } from "./GraficaDelMes";
 import { AtencionMultifashion, useMetaQueNoLlega } from "./PiezasApple";
 
 interface DiaRow {
@@ -471,6 +473,7 @@ export function MultifashionResumenView({
               mesMapAct={mesMapAct}
               mesMapPrev={mesMapPrev}
               year={year}
+              mes={mes}
               prevYear={prevYear}
               data={data}
               avisoTiendaAbrio={MULTIFASHION_APPLE_2026_10 ? null : tiendaAbrio}
@@ -513,6 +516,7 @@ export function MultifashionResumenView({
             mesMapAct={mesMapAct}
             mesMapPrev={mesMapPrev}
             year={year}
+            mes={mes}
             prevYear={prevYear}
             data={data}
           />
@@ -958,9 +962,10 @@ function LineaPatron({
 // diario + línea mes anterior). Año = acumulado del año vs año previo (el que
 // vivía en Overview). Un solo gráfico con switch.
 function ChartMesAnioMount({
-  chartView, setChartView, cumChart, mesMapAct, mesMapPrev, year, prevYear, data,
+  chartView, setChartView, cumChart, mesMapAct, mesMapPrev, year, mes, prevYear, data,
   avisoTiendaAbrio = null,
 }: {
+  mes: number;
   chartView: "mes" | "anio";
   setChartView: (v: "mes" | "anio") => void;
   cumChart: CumPoint[];
@@ -1000,7 +1005,22 @@ function ChartMesAnioMount({
       </div>
       {chartView === "mes" ? (
         <Card className="overflow-hidden p-3">
-          {hasData ? (
+          {hasData && MULTIFASHION_GRAFICA_2026_10 ? (
+            // 🔴 `MULTIFASHION_GRAFICA_2026_10`: la gráfica nueva, la misma del celular.
+            <div className="p-1">
+              <GraficaDelMes
+                dias={dias}
+                year={year}
+                mes={mes}
+                esMesActual={is_mes_actual}
+                diaActual={data.dia_actual}
+                feriados={data.feriados ?? null}
+              />
+              {avisoTiendaAbrio && (
+                <p data-aviso="tienda-abrio" className="mt-2 text-xs font-medium text-amber-700">{avisoTiendaAbrio}</p>
+              )}
+            </div>
+          ) : hasData ? (
             <>
               <VentasDiariasChart
                 chartData={chartData}
