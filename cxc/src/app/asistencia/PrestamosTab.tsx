@@ -76,6 +76,7 @@ import { useMovimientoForm } from "@/app/prestamos/components/useMovimientoForm"
 import { vidrioSobre } from "@/lib/ui/vidrio";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { PRESTAMOS_APPLE_2026_10, conAtencionArriba, totalProximoDescuento } from "@/lib/prestamos-apple-2026-10";
 
 interface FichaDeuda {
   id: string;
@@ -276,7 +277,8 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
   // 🔴 Por nombre y por código, sin acentos ni mayúsculas y por subcadena
   // exacta — nunca por parecido. Filtra lo ya cargado; cero peticiones nuevas.
   const { visibles, conteo, buscando, sinResultados } = useMemo(
-    () => vistaDeLista(fichas, busqueda, (f) => [f.nombre, f.codigo]),
+    // Estilo Apple (apagado): lo que requiere atención arriba, después el saldo mayor.
+    () => vistaDeLista(fichas && PRESTAMOS_APPLE_2026_10 ? conAtencionArriba(fichas) : fichas, busqueda, (f) => [f.nombre, f.codigo]),
     [fichas, busqueda],
   );
 
@@ -447,6 +449,19 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
 
   return (
     <div className="space-y-4">
+      {PRESTAMOS_APPLE_2026_10 ? (
+        // Estilo Apple (apagado): lo importante primero. El conteo se va: son las filas.
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div data-saldo-total-prestamos>
+            <p className="text-sm text-gray-500">Saldo total</p>
+            <p className="text-2xl font-semibold tabular-nums text-gray-900">{money(total)}</p>
+            <p className="text-sm text-gray-500">
+              Próximo descuento <span className="font-medium tabular-nums text-gray-900">{money(totalProximoDescuento(visibles))}</span>
+            </p>
+          </div>
+          {botonNuevo}
+        </div>
+      ) : (
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-gray-600">
           {visibles.length === 1 ? "1 colaborador con saldo" : `${visibles.length} colaboradores con saldo`}
@@ -456,6 +471,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
         </p>
         {botonNuevo}
       </div>
+      )}
 
       {/* 🔴 EL BUSCADOR CON BORDE Y LUPA, DEL ALTO DE LOS DEMÁS (29-sep-2026,
           audit visual aprobado por Daniel): 🩸 era una línea subrayada al lado
@@ -549,7 +565,40 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
 
       {/* En el celular, tarjetas: una tabla de 7 columnas en 390 px pide 200 px
           de arrastre lateral y nadie la lee. */}
-      {visibles.length > 0 && (
+      {visibles.length > 0 && PRESTAMOS_APPLE_2026_10 && (
+      // Estilo Apple (apagado): dos líneas y la tarjeta entera abre el detalle,
+      // donde están las cuentas y «Registrar abono».
+      <div className="space-y-2 lg:hidden">
+        {visibles.map((f) => {
+          const cuerpo = (
+            <>
+              <span className="flex items-baseline justify-between gap-2">
+                <span className="min-w-0 truncate text-sm font-medium text-gray-900">{capitalizarNombre(f.nombre)}</span>
+                <span className="shrink-0 text-sm font-medium tabular-nums text-gray-900">
+                  {money(f.saldo)}{puedeAnotar && <span className="ml-1 text-gray-400">›</span>}
+                </span>
+              </span>
+              <span className="mt-0.5 flex items-center gap-2 text-sm text-gray-500">
+                Cuota {money(cuotaPorQuincena(f))}
+                {!f.codigo && (
+                  <span className="font-medium text-amber-700">· Sin colaborador asignado</span>
+                )}
+              </span>
+            </>
+          );
+          return puedeAnotar ? (
+            <Link key={f.id} href={enlaceAPrestamos(f.id)} data-tarjeta-prestamo
+              className="block min-h-[44px] rounded-lg border border-gray-200 bg-white p-3 transition active:bg-gray-50">
+              {cuerpo}
+            </Link>
+          ) : (
+            <div key={f.id} data-tarjeta-prestamo className="block rounded-lg border border-gray-200 bg-white p-3">{cuerpo}</div>
+          );
+        })}
+      </div>
+      )}
+
+      {visibles.length > 0 && !PRESTAMOS_APPLE_2026_10 && (
       <div className="space-y-2 lg:hidden">
         {visibles.map((f) => (
           <div key={f.id} className="rounded-lg border border-gray-200 p-3">
