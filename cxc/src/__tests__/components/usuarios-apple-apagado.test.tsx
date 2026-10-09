@@ -59,7 +59,10 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); interrup
 
 describe("Usuarios — interruptor APAGADO = la pantalla de hoy", () => {
   it("la pestaña Usuarios: HTML idéntico al de origin/main", async () => {
-    expect((await pintar()).innerHTML).toMatchSnapshot();
+    // La fecha del `title` sale con `toLocaleString`, que depende del huso de
+    // la máquina (Panamá aquí, UTC en GitHub): se compara sin ella.
+    const html = (await pintar()).innerHTML.replace(/title="[^"]*\d:\d\d[^"]*"/g, 'title="(fecha)"');
+    expect(html).toMatchSnapshot();
   });
 });
 
