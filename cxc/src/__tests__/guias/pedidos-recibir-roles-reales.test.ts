@@ -19,9 +19,9 @@ const secretarias = PRODUCCION.filter((u) => u.role === "secretaria");
 const bodega = PRODUCCION.filter((u) => u.role === "bodega");
 
 const recibir = (u: (typeof PRODUCCION)[number]) => puedeMoverFlujoSimple({ desde: "preparado", hasta: "recibido", empresa_key: u.empresa }, u);
-const preparar = (u: (typeof PRODUCCION)[number]) => puedeMoverFlujoSimple({ desde: "pendiente", hasta: "preparado", empresa_key: u.empresa }, u);
+const preparar = (u: (typeof PRODUCCION)[number]) => puedeMoverFlujoSimple({ desde: "en_preparacion", hasta: "preparado", empresa_key: u.empresa }, u);
 const deshacerRecibido = (u: (typeof PRODUCCION)[number]) => puedeMoverFlujoSimple({ desde: "recibido", hasta: "preparado", empresa_key: u.empresa }, u);
-const deshacerPreparado = (u: (typeof PRODUCCION)[number]) => puedeMoverFlujoSimple({ desde: "preparado", hasta: "pendiente", empresa_key: u.empresa }, u);
+const deshacerPreparado = (u: (typeof PRODUCCION)[number]) => puedeMoverFlujoSimple({ desde: "preparado", hasta: "en_preparacion", empresa_key: u.empresa }, u);
 
 describe("🔒 quién marca qué, con los roles reales de producción", () => {
   it.each(secretarias)("$userName (secretaria) marca Recibido y NO Preparado", (u) => {

@@ -248,12 +248,15 @@ export function ConfirmModal({
   cancelLabel = "Cancelar",
   destructive = false,
   loading = false,
+  children,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
   title?: string;
   message?: string;
+  /** Un campo opcional entre el mensaje y los botones (p. ej. una nota). */
+  children?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
@@ -268,6 +271,7 @@ export function ConfirmModal({
       <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
         <h3 className="text-base font-medium mb-1">{title}</h3>
         {message && <p className="text-sm text-gray-500 mb-6">{message}</p>}
+        {children}
         <div className="flex gap-3 mt-4">
           <button
             onClick={onConfirm}

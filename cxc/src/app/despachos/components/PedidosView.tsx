@@ -37,6 +37,9 @@ import {
   PEDIDOS_FLUJO_SIMPLE_2026_10 as SIMPLE,
   ESTADOS_FLUJO_SIMPLE,
   ROTULO_ESTADO_FLUJO_SIMPLE,
+  PESTANA_FLUJO_SIMPLE,
+  MAX_NOTA_MUESTRA,
+  lineaEsperaMuestra,
   estadoFlujoSimpleLeido,
   validarCantidadBultos,
   ultimaFirmaFlujoSimple,
@@ -71,7 +74,7 @@ type Filtro = EstadoPedido | EstadoBultos | EstadoFlujoSimple;
  * Apagados los dos, quedan los de siempre.
  */
 const CHIPS: { value: Filtro; label: string }[] = SIMPLE
-  ? ESTADOS_FLUJO_SIMPLE.map((e) => ({ value: e, label: `${ROTULO_ESTADO_FLUJO_SIMPLE[e]}s` }))
+  ? ESTADOS_FLUJO_SIMPLE.map((e) => ({ value: e, label: PESTANA_FLUJO_SIMPLE[e] }))
   : BULTOS
   ? ESTADOS_BULTOS.map((e) => ({ value: e, label: `${ROTULO_ESTADO_BULTOS[e]}s` }))
   : [
@@ -86,7 +89,7 @@ const clave = (p: Pick<PedidoBodega, "empresa_key" | "pedido_switch_id">) => `${
 const rotuloDe = (e: PedidoBodega["estado"]): string =>
   e === "pendiente" || e === "preparado"
     ? ROTULO_ESTADO[e]
-    : e === "recibido"
+    : e === "recibido" || e === "en_preparacion"
     ? ROTULO_ESTADO_FLUJO_SIMPLE[e]
     : ROTULO_ESTADO_BULTOS[e];
 
@@ -143,7 +146,10 @@ export default function PedidosView({
       if (d.empresas?.length) setSusEmpresas(d.empresas);
       setError(false);
     } catch {
-      setError(true);
+      // Con la lista ya en pantalla (refresco al cambiar de pestaña), se deja
+      // lo que hay y se avisa; solo la primera carga cae al aviso rojo.
+      if (pedidos === null) setError(true);
+      else toast("No se pudo actualizar la lista. Intenta de nuevo.", "warning");
     }
   }
   useEffect(() => { void cargar(); }, []);
@@ -243,10 +249,12 @@ export default function PedidosView({
 
   /** Mueve el pedido, con los bultos si los hay. Optimista, revierte si falla. */
   async function moverSimple(p: PedidoBodega, destino: EstadoFlujoSimple, bultos?: number) {
-    const antes = { estado: p.estado, bultos: p.bultos };
-    // Volver a Pendiente borra los bultos anotados (el servidor hace lo mismo).
-    const bultosDespues = destino === "pendiente" ? null : bultos ?? p.bultos;
-    setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado: destino, bultos: bultosDespues } : x)));
+    const antes = { estado: p.estado, bultos: p.bultos, espera_muestra_desde: p.espera_muestra_desde, espera_muestra_nota: p.espera_muestra_nota };
+    // Volver a Pendiente o a En preparación borra los bultos anotados (el
+    // servidor hace lo mismo); marcar Preparado quita la espera de muestra.
+    const bultosDespues = destino === "pendiente" || destino === "en_preparacion" ? null : bultos ?? p.bultos;
+    const sinEspera = destino === "en_preparacion" ? {} : { espera_muestra_desde: null, espera_muestra_nota: null };
+    setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado: destino, bultos: bultosDespues, ...sinEspera } : x)));
     try {
       const r = await fetch("/api/guias/pedidos", {
         method: "PATCH",
@@ -276,6 +284,33 @@ export default function PedidosView({
     void moverSimple(p, "preparado", v.valor);
   }
 
+  // ── «En espera de muestra» (9-oct-2026) ─────────────────────────────────
+  // Un solo motivo, así que un solo botón y una nota opcional. Poner y quitar
+  // piden confirmar, con la misma ventana del sistema.
+  const [porMarcarMuestra, setPorMarcarMuestra] = useState<{ pedido: PedidoBodega; poner: boolean } | null>(null);
+  const [notaMuestra, setNotaMuestra] = useState("");
+
+  async function marcarEsperaMuestra() {
+    const pedir = porMarcarMuestra;
+    setPorMarcarMuestra(null);
+    if (!pedir) return;
+    const { pedido: p, poner } = pedir;
+    try {
+      const r = await fetch("/api/guias/pedidos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empresa_key: p.empresa_key, pedido_switch_id: p.pedido_switch_id, muestra: poner, nota: poner ? notaMuestra : undefined }),
+      });
+      const d = (await r.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!r.ok) throw new Error(typeof d?.error === "string" ? d.error : String(r.status));
+      setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, ...d } : x)));
+      setNotaMuestra("");
+    } catch (e) {
+      const msg = e instanceof Error && e.message.length < 90 ? e.message : "No se pudo guardar. Intenta de nuevo.";
+      toast(msg, "error");
+    }
+  }
+
   function confirmarSimple() {
     const pedir = porConfirmarSimple;
     setPorConfirmarSimple(null);
@@ -287,16 +322,23 @@ export default function PedidosView({
     if (destino === "recibido") {
       return { titulo, mensaje: "Queda recibido: confirmas que ya tienes el pedido en mano. Se cierra en Pedidos.", boton: "Marcar recibido" };
     }
+    if (destino === "en_preparacion" && estadoFlujoSimpleLeido(p.estado) === "pendiente") {
+      return { titulo, mensaje: "Confirmas que recibiste la hoja del pedido. Pasa a En preparación.", boton: "Iniciar preparación" };
+    }
     // 🔴 Deshacer (8-oct-2026): le toca a quien marcó el paso. El registro de
     // actividad guarda quién lo había marcado.
     const mensaje =
       destino === "pendiente"
-        ? "Vuelve a Pendiente: se quitan los bultos anotados y bodega lo prepara de nuevo."
-        : "Vuelve a Preparado: se quita la recepción. La firma de bodega se conserva.";
+        ? "Vuelve a Pendiente: bodega todavía no tiene la hoja del pedido."
+        : destino === "en_preparacion"
+          ? "Vuelve a En preparación: se quitan los bultos anotados."
+          : "Vuelve a Preparado: se quita la recepción. La firma de bodega se conserva.";
     return { titulo, mensaje, boton: `Volver a ${ROTULO_ESTADO_FLUJO_SIMPLE[destino]}` };
   }
 
   const firmasSimpleDe = (p: PedidoBodega): FirmasFlujoSimple => ({
+    en_preparacion_por: p.en_preparacion_por ?? null,
+    en_preparacion_en: p.en_preparacion_en ?? null,
     preparado_por: p.preparado_por ?? null,
     preparado_en: p.preparado_en ?? null,
     recibido_por: p.recibido_por ?? null,
@@ -325,7 +367,9 @@ export default function PedidosView({
     try {
       const { construirPdfPedidos } = await import("@/lib/guias/pdf-pedidos");
       // Con bultos el estado del título sale del rótulo nuevo; apagado, de los dos de siempre.
-      const titulo = BULTOS
+      const titulo = SIMPLE
+        ? `Pedidos · ${PESTANA_FLUJO_SIMPLE[filtro as EstadoFlujoSimple].toLowerCase()} · ${empresa === "todas" ? "Todas las empresas" : nombreCortoEmpresa(empresa)} · impreso ${fmtDate(hoy)}`
+        : BULTOS
         ? `Pedidos ${ROTULO_ESTADO_BULTOS[filtro as EstadoBultos].toLowerCase()}s · ${empresa === "todas" ? "Todas las empresas" : nombreCortoEmpresa(empresa)} · impreso ${fmtDate(hoy)}`
         : tituloPedidosImpresos(filtro as EstadoPedido, empresa === "todas" ? null : nombreCortoEmpresa(empresa), new Date());
       const doc = construirPdfPedidos(titulo, visibles, hoy);
@@ -352,7 +396,12 @@ export default function PedidosView({
             key={c.value}
             type="button"
             aria-pressed={filtro === c.value}
-            onClick={() => setFiltro(c.value)}
+            // 🔴 Cambiar de pestaña vuelve a leer la lista de la BASE (Daniel,
+            // 9-oct-2026: «que al poner uno de los filtros se actualice»), para
+            // ver lo que marcó otra persona. Instantáneo: se muestra lo que ya
+            // hay y se refresca encima. NUNCA llama a Switch: los pedidos
+            // nuevos siguen llegando por los crons y por «Actualizar».
+            onClick={() => { setFiltro(c.value); void cargar(); }}
             className={`relative h-9 rounded-full border px-3 text-[13px] font-medium transition active:scale-[0.97] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] ${
               filtro === c.value ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300 bg-white text-gray-700"
             }`}
@@ -535,8 +584,28 @@ export default function PedidosView({
     );
     if (e === "pendiente") {
       if (!puedeMarcar) return chipUnidades || <span className="text-gray-400">—</span>;
-      const valor = bultoEnFila[clave(p)] ?? "";
+      // 🔴 9-oct-2026: bodega confirma que le entregaron la hoja del pedido.
       return (
+        <div className={fila}>
+          {chipUnidades}
+          <button
+            type="button"
+            onClick={() => setPorConfirmarSimple({ pedido: p, destino: "en_preparacion" })}
+            className="h-9 whitespace-nowrap rounded-md bg-black px-3 text-xs font-medium text-white transition active:scale-[0.97]"
+          >
+            Iniciar preparación
+          </button>
+        </div>
+      );
+    }
+    if (e === "en_preparacion") {
+      if (!puedeMarcar) return chipUnidades || <span className="text-gray-400">—</span>;
+      const valor = bultoEnFila[clave(p)] ?? "";
+      const enEspera = !!p.espera_muestra_desde;
+      // Lo principal (bultos + Preparado) en una línea; lo secundario, debajo:
+      // en la computadora los cinco controles de corrido se salían de la tabla.
+      return (
+        <div className="flex flex-col items-end gap-1">
         <div className={fila}>
           {chipUnidades}
           <input
@@ -560,6 +629,18 @@ export default function PedidosView({
             Preparado
           </button>
         </div>
+        <div className={fila}>
+          {/* Un solo motivo, un solo botón (Daniel, 9-oct-2026). */}
+          <button
+            type="button"
+            onClick={() => setPorMarcarMuestra({ pedido: p, poner: !enEspera })}
+            className="h-7 whitespace-nowrap px-1 text-xs text-amber-700 underline-offset-2 hover:underline"
+          >
+            {enEspera ? "Quitar espera" : "En espera de muestra"}
+          </button>
+          {deshacer("pendiente")}
+        </div>
+        </div>
       );
     }
     // 🔴 LAS PIEZAS, JUNTO A LOS BULTOS (7-oct-2026, Daniel: «¿puedes poner la
@@ -577,14 +658,14 @@ export default function PedidosView({
         return puedeMarcar ? (
           <div className={fila}>
             {chipBultos}
-            {deshacer("pendiente")}
+            {deshacer("en_preparacion")}
           </div>
         ) : chipBultos;
       }
       return (
         <div className={fila}>
           {chipBultos}
-          {puedeMarcar && deshacer("pendiente")}
+          {puedeMarcar && deshacer("en_preparacion")}
           <button
             type="button"
             onClick={() => setPorConfirmarSimple({ pedido: p, destino: "recibido" })}
@@ -635,6 +716,21 @@ export default function PedidosView({
     return <span className="block text-xs font-medium text-amber-700">{lineaPreparadoHaceDias(dias)}</span>;
   };
 
+  /**
+   * 🔴 «En espera de muestra» (9-oct-2026): ámbar, con los días que lleva y la
+   * nota si tiene. Lo ve todo el que ve Pedidos.
+   */
+  const avisoEsperaMuestra = (p: PedidoBodega) => {
+    if (estadoFlujoSimpleLeido(p.estado) !== "en_preparacion" || !p.espera_muestra_desde) return null;
+    const dias = diasEnPreparado(p.espera_muestra_desde, new Date().toISOString());
+    return (
+      <span className="mt-0.5 block text-xs font-medium text-amber-700">
+        {lineaEsperaMuestra(dias)}
+        {p.espera_muestra_nota && <span className="block font-normal">{p.espera_muestra_nota}</span>}
+      </span>
+    );
+  };
+
   const tablaSimple = (
     <div className="-mx-4 border-y border-gray-200 bg-white sm:mx-0 sm:rounded-lg sm:border-x">
       <table className="w-full text-left text-xs sm:text-sm">
@@ -673,12 +769,15 @@ export default function PedidosView({
                 <td className="break-words px-1 py-2 sm:px-3">
                   <button type="button" onClick={() => setAbierto(detalleDe(p))} className="text-left">
                     <span className="font-medium text-blue-600 hover:text-blue-800">{p.cliente_nombre}</span>
-                    <span className="block whitespace-nowrap text-xs text-gray-500">
+                    {/* En el celular el renglón se parte: de corrido empujaba la
+                        columna de controles fuera de la pantalla. */}
+                    <span className="block text-xs text-gray-500 sm:whitespace-nowrap">
                       {p.secuencial}
                       {vendedorEnPantalla(p.vendedor_nombre) ? ` · ${vendedorEnPantalla(p.vendedor_nombre)}` : ""}
                     </span>
                     <span className="block text-xs text-gray-500 sm:hidden">{ultimaFirmaFlujoSimple(firmasSimpleDe(p))}</span>
                   </button>
+                  {avisoEsperaMuestra(p)}
                 </td>
                 <td
                   title={ultimaFirmaFlujoSimple(firmasSimpleDe(p)) ?? undefined}
@@ -911,6 +1010,7 @@ export default function PedidosView({
 
   const confirmacion = porConfirmar && textoDeConfirmar(porConfirmar.pedido, porConfirmar.destino);
   const confirmacionSimple = porConfirmarSimple && textoDeConfirmarSimple(porConfirmarSimple.pedido, porConfirmarSimple.destino);
+  const muestra = porMarcarMuestra;
 
   return (
     <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
@@ -938,6 +1038,34 @@ export default function PedidosView({
           message={confirmacionSimple.mensaje}
           confirmLabel={confirmacionSimple.boton}
         />
+      )}
+      {muestra && (
+        <ConfirmModal
+          open
+          onClose={() => { setPorMarcarMuestra(null); setNotaMuestra(""); }}
+          onConfirm={() => void marcarEsperaMuestra()}
+          title={`Pedido ${muestra.pedido.secuencial} · ${muestra.pedido.cliente_nombre}`}
+          message={
+            muestra.poner
+              ? "Queda En espera de muestra: le faltan piezas que bodega trae de otro lado."
+              : "Se quita la espera: la pieza ya llegó. Sigue En preparación."
+          }
+          confirmLabel={muestra.poner ? "Marcar en espera" : "Quitar espera"}
+        >
+          {muestra.poner && (
+            <label className="mb-2 block text-sm text-gray-700">
+              Observaciones (opcional)
+              <input
+                type="text"
+                value={notaMuestra}
+                maxLength={MAX_NOTA_MUESTRA}
+                onChange={(ev) => setNotaMuestra(ev.target.value)}
+                placeholder="Qué pieza falta"
+                className="mt-1 h-11 w-full rounded-md border border-gray-300 px-3 text-base focus:border-gray-900 focus:outline-none sm:h-10 sm:text-sm"
+              />
+            </label>
+          )}
+        </ConfirmModal>
       )}
       {barra && (
         <EnLaBarra

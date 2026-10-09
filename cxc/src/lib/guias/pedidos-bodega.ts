@@ -125,7 +125,7 @@ export function pedidoEntra(codigo: string | null | undefined, codigosConFicha: 
  * 🔴 Y con `PEDIDOS_FLUJO_SIMPLE_2026_10` (7-oct-2026) se suma `recibido` —
  * ver `pedidos-flujo-simple.ts`. Ningún valor viejo se renombra.
  */
-export type EstadoPedidoCualquiera = EstadoPedido | "verificado" | "recibido";
+export type EstadoPedidoCualquiera = EstadoPedido | "verificado" | "recibido" | "en_preparacion";
 
 export interface PedidoBodega {
   empresa_key: string;
@@ -156,6 +156,12 @@ export interface PedidoBodega {
   /** 🔴 Flujo simplificado (7-oct-2026): la firma de Recibido, el último paso. */
   recibido_por?: string | null;
   recibido_en?: string | null;
+  /** 🔴 9-oct-2026: la firma de «En preparación» y la marca «En espera de muestra». */
+  en_preparacion_por?: string | null;
+  en_preparacion_en?: string | null;
+  espera_muestra_desde?: string | null;
+  espera_muestra_por?: string | null;
+  espera_muestra_nota?: string | null;
   /**
    * 🔴 Cuántos artículos le faltan por poner en un bulto, y cuántos tiene en
    * total (7-oct-2026): es lo que apaga «Verificar» y dice QUÉ falta. Los cuenta
