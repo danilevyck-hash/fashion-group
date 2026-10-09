@@ -61,6 +61,7 @@ import {
   noMarcaRelojDeFila,
   cobraHorasExtraDeFila,
   leerTrabajaAfuera,
+  leerReponeTardanza,
   leerJustificaciones,
   leerVacaciones,
   leerRepartos,
@@ -391,7 +392,7 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas }, personasDb, afuera, correcciones, manualesLeidos, aprRes, repRes, horariosLeidos, jRes, vRes, fRes, entradasRes] = await Promise.all([
+    const [{ reglas }, personasDb, afuera, correcciones, manualesLeidos, aprRes, repRes, horariosLeidos, jRes, vRes, fRes, entradasRes, compensan] = await Promise.all([
       leerReglas(),
       leerPersonas(),
       // 🔴 QUIÉN TRABAJA AFUERA (14-sep-2026). Lectura APARTE y tolerante: con
@@ -429,6 +430,8 @@ export async function GET(req: NextRequest) {
       // 🔴 Las entradas autorizadas (24-sep-2026), la MISMA lectura que el
       // Reporte. Sin la tabla, vacío: nadie tiene, la planilla de siempre.
       leerEntradasAutorizadas(q.desde, hastaReloj),
+      // 🔴 Quién tiene «Compensación de tardanza» (9-oct-2026). Vacío = hoy.
+      leerReponeTardanza(),
     ]);
 
     const horarios = horariosLeidos.horarios;
@@ -591,6 +594,9 @@ export async function GET(req: NextRequest) {
       // de siempre, hasta el centavo. ⚠️ Solo el cuadro que se GENERA: una
       // quincena ya cerrada es su resultado congelado y no se recalcula.
       entradasAutorizadas: indexarEntradasAutorizadas(entradasRes.entradas),
+      // 🔴 Compensación de tardanza (9-oct-2026): el tiempo después de la
+      // salida borra tardanza del mismo día. Vacío = la planilla de siempre.
+      reponeTardanza: compensan,
       // 🔴 Los días laborables de cada quien (18-sep-2026). Vacío = lunes a
       // viernes para todos, la planilla de siempre.
       // ⚠️ Va ÚLTIMO a propósito: el candado `horario-configurable` lo exige.

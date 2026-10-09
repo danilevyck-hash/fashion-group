@@ -40,6 +40,7 @@
 
 import { COLUMNA_COBRA_HORAS_EXTRA, cobraHorasExtra } from "./cobra-horas-extra";
 import { COLUMNA_TRABAJA_AFUERA, esColumnaTrabajaAfueraFaltante, trabajaAfuera } from "./trabaja-afuera";
+import { COLUMNA_REPONE_TARDANZA, esColumnaReponeTardanzaFaltante, reponeTardanza } from "./repone-tardanza";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
@@ -326,6 +327,27 @@ export async function leerTrabajaAfuera(): Promise<ReadonlySet<string>> {
     : [];
   for (const f of filas) {
     if (trabajaAfuera(f.trabaja_afuera)) out.add(String(f.empleado_codigo));
+  }
+  return out;
+}
+
+/**
+ * 🔴 Quién tiene «Compensación de tardanza» (9-oct-2026). La MISMA forma que
+ * `leerTrabajaAfuera`, por la misma razón: lectura aparte que falla ABIERTA a
+ * «nadie la tiene» —el sistema de hoy— solo si el error nombra la columna.
+ * Con la columna en su `DEFAULT false`, vacío: no se mueve un centavo.
+ */
+export async function leerReponeTardanza(): Promise<ReadonlySet<string>> {
+  const { data, error } = await supabaseServer
+    .from(TABLA_PERSONAS)
+    .select(`empleado_codigo, ${COLUMNA_REPONE_TARDANZA}`);
+  if (error) {
+    if (esColumnaReponeTardanzaFaltante(error)) return new Set();
+    throw new Error(`No se pudo leer quién compensa tardanza: ${error.message}`);
+  }
+  const out = new Set<string>();
+  for (const f of (Array.isArray(data) ? data : []) as unknown as Array<{ empleado_codigo: unknown; repone_tardanza: unknown }>) {
+    if (reponeTardanza(f.repone_tardanza)) out.add(String(f.empleado_codigo));
   }
   return out;
 }

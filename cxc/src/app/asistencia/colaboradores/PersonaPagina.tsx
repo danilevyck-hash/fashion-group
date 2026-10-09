@@ -191,6 +191,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
           noMarcaReloj: b.noMarcaReloj,
           cobraHorasExtra: b.cobraHorasExtra,
           trabajaAfuera: b.trabajaAfuera,
+          reponeTardanza: b.reponeTardanza,
           posicion: b.posicion.trim(),
           cedula: b.cedula.trim(),
         }),
