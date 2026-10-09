@@ -209,7 +209,8 @@ export const ROTULO_ENTRADA_AUTORIZADA = "Hoy entraba a las";
 export const QUITAR_ENTRADA_AUTORIZADA = "Quitar";
 /** Lo que se lee bajo el día cuando hay una. */
 export function textoEntradaAutorizada(e: Pick<EntradaAutorizadaVisible, "hora" | "creadaPor" | "motivo">): string {
-  return `Entrada autorizada a las ${e.hora.slice(0, 5)} · ${e.creadaPor}: ${e.motivo}`;
+  // 9-oct-2026: el motivo ya no se pide; las viejas conservan el suyo.
+  return `Entrada autorizada a las ${e.hora.slice(0, 5)} · ${e.creadaPor}${e.motivo ? `: ${e.motivo}` : ""}`;
 }
 
 /** El chip del aviso: «llegó 61 min antes · ¿entrada autorizada?». */

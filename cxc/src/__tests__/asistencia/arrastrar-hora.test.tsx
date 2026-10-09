@@ -228,15 +228,17 @@ describe("B · arrastrar en el Reporte", () => {
     expect(camposHora()[0].value).toBe(SUELTA);
   });
 
-  it("🔴 y el porqué se escribe solo, con «Guardar» y «Cancelar»", async () => {
+  // 📅 9-oct-2026 (Daniel: «quita lo de poner motivo al cambiar la hora en
+  // asistencia»): el campo ya no se dibuja. La nota «Marca movida de columna»
+  // la sigue escribiendo el SISTEMA y viaja sola (prueba del cuerpo, abajo).
+  it("🔴 y NO se pide el porqué: quedan «Guardar» y «Cancelar»", async () => {
     servir();
     montar(<ReporteTab />);
     await abrirPersona();
     arrastrar(SUELTA, 1);
     await waitFor(() => expect(camposHora()).toHaveLength(1));
-    const porque = document.querySelector('input[placeholder="Escribe el motivo…"]') as HTMLInputElement;
-    expect(porque.value).toBe(MOTIVO_ARRASTRE);
-    expect(screen.getByRole("button", { name: "Guardar" })).toBeTruthy();
+    expect(document.querySelector('input[placeholder="Escribe el motivo…"]')).toBeNull();
+    expect((screen.getByRole("button", { name: "Guardar" }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeTruthy();
   });
 
@@ -278,8 +280,7 @@ describe("B · arrastrar en el Reporte", () => {
     expect(camposHora()[0].value).toBe("");
     fireEvent.click(screen.getByRole("button", { name: rotuloMoverAqui(SUELTA, 1) }));
     await waitFor(() => expect(camposHora()[0].value).toBe(SUELTA));
-    const porque = document.querySelector('input[placeholder="Escribe el motivo…"]') as HTMLInputElement;
-    expect(porque.value).toBe(MOTIVO_ARRASTRE);
+    expect(document.querySelector('input[placeholder="Escribe el motivo…"]')).toBeNull();
   });
 
   it("apagado, la hora NO se puede agarrar y todo queda como hoy", async () => {

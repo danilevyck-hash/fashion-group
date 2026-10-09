@@ -35,7 +35,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/re
 
 import { ToastProvider } from "@/components/ToastSystem";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
-import { OTRO_MOTIVO, rotuloGuardar } from "@/lib/asistencia/panel-del-dia";
+import { rotuloGuardar } from "@/lib/asistencia/panel-del-dia";
 import { ROTULO_SOLO_A_REVISAR } from "@/lib/asistencia/solo-a-revisar";
 import {
   ASISTENCIA_GUARDAR_SIN_SALTO, ROTULO_ANCLADA, TEXTO_ACTUALIZANDO,
@@ -197,11 +197,7 @@ async function corregirYGuardar() {
   fireEvent.click(await screen.findByText("08:00:00"));
   await waitFor(() => expect(camposHora().length).toBeGreaterThan(0));
   fireEvent.change(camposHora()[0], { target: { value: "08:10" } });
-  fireEvent.click(screen.getByRole("button", { name: OTRO_MOTIVO }));
-  fireEvent.change(
-    await screen.findByPlaceholderText("Escribe el motivo…"),
-    { target: { value: "se le olvidó marcar" } },
-  );
+  // 📅 9-oct-2026 (Daniel): el motivo ya no se pide; se guarda con solo la hora.
   fireEvent.click(screen.getByRole("button", { name: rotuloGuardar() }));
 }
 

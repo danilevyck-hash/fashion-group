@@ -400,11 +400,11 @@ describe("🔴 E. quitar una marcación del reloj", () => {
     expect(escrituras.filter((e) => e.tabla === "asistencia_marcaciones")).toEqual([]);
   });
 
-  it("🔴 el PORQUÉ sigue siendo obligatorio, y no se escribe nada sin él", async () => {
-    const r = await postear({ marcacionId: "m4", quita: true, motivo: "   " });
-    expect(r.status).toBe(400);
-    expect(String(r.json.error)).toContain("Sin razón");
-    expect(escrituras).toEqual([]);
+  // 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+  it("🔴 QUITAR ya no pide el porqué: se escribe con la firma y sin hora", async () => {
+    const r = await postear({ marcacionId: "m4", quita: true });
+    expect(r.status).toBe(200);
+    expect(escrituras).toHaveLength(1);
   });
 
   it("🔴 no se quita una marcación que no existe: sin `marcacionId`, 400", async () => {

@@ -93,10 +93,10 @@ function textoCorrecciones(d: { correcciones: DiaReporte["correcciones"] }): str
       // cuenta. 🩸 Sin esta rama el archivo escribía «Reloj 14:23:39 →
       // 14:23:39», que no explica nada y parece un error del sistema.
       c.quitada
-        ? `QUITADA ${c.hora} (el reloj la registró; no cuenta) — "${c.motivo}" — ${c.creadaPor}`
+        ? `QUITADA ${c.hora} (el reloj la registró; no cuenta) — ${c.motivo ? `"${c.motivo}" — ` : ""}${c.creadaPor}`
         : c.agregada
-          ? `AGREGADA ${c.hora} (el reloj no registró nada) — "${c.motivo}" — ${c.creadaPor}`
-          : `Reloj ${c.relojHora} → ${c.hora} — "${c.motivo}" — ${c.creadaPor}`,
+          ? `AGREGADA ${c.hora} (el reloj no registró nada) — ${c.motivo ? `"${c.motivo}" — ` : ""}${c.creadaPor}`
+          : `Reloj ${c.relojHora} → ${c.hora} — ${c.motivo ? `"${c.motivo}" — ` : ""}${c.creadaPor}`,
     )
     .join(" · ");
 }

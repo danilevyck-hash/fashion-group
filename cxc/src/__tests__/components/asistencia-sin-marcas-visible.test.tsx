@@ -218,7 +218,7 @@ vi.mock("@/lib/asistencia/exportar", () => ({
 }));
 vi.mock("@/lib/excel-export", () => ({ downloadWorkbook: vi.fn() }));
 
-import { ARREGLAR_EL_DIA, OTRO_MOTIVO, rotuloGuardar } from "@/lib/asistencia/panel-del-dia";
+import { ARREGLAR_EL_DIA, rotuloGuardar } from "@/lib/asistencia/panel-del-dia";
 import ReporteTab from "@/app/asistencia/ReporteTab";
 
 afterEach(() => {
@@ -289,7 +289,8 @@ describe("D · en la pantalla sale, lo dice y se puede corregir", () => {
     expect(screen.queryByText("Ausencia sin justificar")).toBeNull();
   });
 
-  it("🔴 se le puede AGREGAR una hora por la puerta de siempre, con motivo", async () => {
+  // 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+  it("🔴 se le puede AGREGAR una hora por la puerta de siempre, SIN motivo", async () => {
     const llamadas = servir();
     montar();
     fireEvent.click(await screen.findByText("Yeisibeth Muñoz"));
@@ -301,11 +302,7 @@ describe("D · en la pantalla sale, lo dice y se puede corregir", () => {
     fireEvent.click(screen.getAllByRole("button", { name: ARREGLAR_EL_DIA })[0]);
     await waitFor(() => expect(camposHora().length).toBeGreaterThan(0));
     fireEvent.change(camposHora()[0], { target: { value: "08:00" } });
-    fireEvent.click(screen.getByRole("button", { name: OTRO_MOTIVO }));
-    fireEvent.change(
-      await screen.findByPlaceholderText("Escribe el motivo…"),
-      { target: { value: "se le olvidó marcar" } },
-    );
+    expect(screen.queryByPlaceholderText("Escribe el motivo…")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: rotuloGuardar() }));
 
     await waitFor(() => {
@@ -314,7 +311,7 @@ describe("D · en la pantalla sale, lo dice y se puede corregir", () => {
     const body = JSON.parse(String(llamadas.find((l) => l.url.includes("/correcciones/dia"))?.init?.body));
     // 🔴 EL FORMATO DE LO QUE SE GUARDA NO CAMBIA: mismo cuerpo de siempre.
     expect(body.codigo).toBe(COD);
-    expect(body.motivo).toBe("se le olvidó marcar");
+    expect(body).not.toHaveProperty("motivo");
     expect(body.cambios).toHaveLength(1);
     expect(body.cambios[0]).toMatchObject({ tipo: "agregar", marcacionId: null, hora: "08:00:00" });
   });
