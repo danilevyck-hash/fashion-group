@@ -297,24 +297,22 @@ describe("🔴 4 · no se salta un paso", () => {
 });
 
 describe("🔴 5 · el recorte por empresa es POR PERSONA y es duro", () => {
-  it("Julio ve sus cinco y NUNCA Vistana", () => {
-    const suyas = empresasQueVe("julio", "bodega");
-    expect([...suyas]).toEqual(["fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"]);
-    expect(suyas).not.toContain("vistana");
-    expect(veLaEmpresa("vistana", "julio", "bodega")).toBe(false);
+  it("🔴 9-oct-2026: Julio y Rodrigo ven los pedidos de las 6 empresas del grupo", () => {
+    for (const quien of ["julio", "rodrigo"]) {
+      expect([...empresasQueVe(quien, "bodega")]).toEqual([...B2B_EMPRESA_KEYS]);
+      for (const e of B2B_EMPRESA_KEYS) expect(veLaEmpresa(e, quien, "bodega")).toBe(true);
+    }
   });
 
-  it("Rodrigo y Jorman SOLO ven Vistana", () => {
-    for (const quien of ["rodrigo", "jorman"]) {
-      expect([...empresasQueVe(quien, "bodega")]).toEqual(["vistana"]);
-      expect(veLaEmpresa("fashion_wear", quien, "bodega")).toBe(false);
-    }
+  it("Jorman SOLO ve Vistana (Daniel no lo nombró el 9-oct-2026)", () => {
+    expect([...empresasQueVe("jorman", "bodega")]).toEqual(["vistana"]);
+    expect(veLaEmpresa("fashion_wear", "jorman", "bodega")).toBe(false);
   });
 
   it("🔴 y si piden otra empresa, no la ven: `puedeMover` la rechaza", () => {
     const v = puedeMover(
-      { desde: "pendiente", hasta: "preparado", empresa_key: "vistana", preparado_por: null },
-      { role: "bodega", userName: "julio" },
+      { desde: "pendiente", hasta: "preparado", empresa_key: "fashion_wear", preparado_por: null },
+      { role: "bodega", userName: "jorman" },
     );
     expect(v).toEqual({ ok: false, error: "Ese pedido no es de una de tus empresas" });
   });
@@ -326,12 +324,12 @@ describe("🔴 5 · el recorte por empresa es POR PERSONA y es duro", () => {
 
   it("🔴 LA SECRETARIA VE LAS 6 (Daniel, 6-oct-2026), como todo el que no esté en la lista", () => {
     expect([...empresasQueVe("ana", "secretaria")]).toEqual([...B2B_EMPRESA_KEYS]);
-    expect(Object.keys(EMPRESAS_POR_PERSONA)).toEqual(["julio", "rodrigo", "jorman"]);
+    expect(Object.keys(EMPRESAS_POR_PERSONA)).toEqual(["jorman"]);
     expect([...empresasQueVe(null, "bodega")]).toEqual([...B2B_EMPRESA_KEYS]);
   });
 
   it("el nombre de usuario se compara en minúsculas y sin espacios de más", () => {
-    expect([...empresasQueVe("  JULIO ", "bodega")]).not.toContain("vistana");
+    expect([...empresasQueVe("  JORMAN ", "bodega")]).toEqual(["vistana"]);
   });
 
   it("toda empresa de la lista es una de las 6 del grupo: ni Boston ni Multifashion", () => {

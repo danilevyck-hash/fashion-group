@@ -115,7 +115,13 @@ describe("🔴 2 · «En espera de muestra»", () => {
     expect(lineaEsperaMuestra(2)).toBe("En espera de muestra · hace 2 días");
     expect(lineaEsperaMuestra(1)).toBe("En espera de muestra · hace 1 día");
     expect(lineaEsperaMuestra(0)).toBe("En espera de muestra · desde hoy");
-    expect(vista()).toMatch(/text-amber-700">\s*\{lineaEsperaMuestra\(dias\)\}/);
+    expect(vista()).toMatch(/text-amber-700">\s*\{lineaEsperaMuestra\(dias, p\.espera_muestra_por, p\.espera_muestra_desde\)\}/);
+  });
+
+  it("🔴 9-oct-2026: la espera muestra QUIÉN la marcó y A QUÉ HORA, como los otros pasos", () => {
+    // 19:15 UTC = 2:15 p. m. en Panamá
+    expect(lineaEsperaMuestra(2, "Julio", "2026-10-07T19:15:00.000Z")).toBe("En espera de muestra · Julio · 2:15 p. m. · hace 2 días");
+    expect(lineaEsperaMuestra(0, "Julio", "2026-10-09T15:00:00.000Z")).toBe("En espera de muestra · Julio · 10:00 a. m. · desde hoy");
   });
 
   it("queda en el registro de actividad al poner y al quitar", () => {

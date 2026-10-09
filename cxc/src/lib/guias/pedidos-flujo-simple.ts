@@ -301,10 +301,15 @@ export function columnasEsperaMuestra(
   return { espera_muestra_desde: ahora, espera_muestra_por: quien, espera_muestra_nota: n || null };
 }
 
-/** «En espera de muestra · hace 2 días» — la línea ámbar de la fila. */
-export function lineaEsperaMuestra(dias: number): string {
+/**
+ * «En espera de muestra · Julio · 2:15 p. m. · hace 2 días» — la línea ámbar de
+ * la fila, con la misma firma que los otros pasos (Daniel, 9-oct-2026: «que se
+ * pueda ver la marcación de bodega»). Sin firma guardada, solo los días.
+ */
+export function lineaEsperaMuestra(dias: number, por?: string | null, en?: string | null): string {
   const cuando = dias === 0 ? "desde hoy" : dias === 1 ? "hace 1 día" : `hace ${dias} días`;
-  return `En espera de muestra · ${cuando}`;
+  const firma = firmaEnColumnaFlujoSimple(por, en);
+  return `En espera de muestra · ${firma ? `${firma} · ` : ""}${cuando}`;
 }
 
 /** ¿Este cambio es deshacer un paso (ir hacia atrás)? */

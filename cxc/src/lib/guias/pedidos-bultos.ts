@@ -93,9 +93,10 @@ export const PEDIDOS_BULTOS_2026_10: boolean =
  * Admin pasa siempre, como en todo el sistema.
  */
 // ⚠️ Solo gente de BODEGA. La secretaria NO entra: ve las 6 (Daniel, 6-oct-2026).
+// 🔴 9-oct-2026: Julio y Rodrigo salen de la lista y ven las 6 (Daniel: «que
+// Julio y Rodrigo puedan ver todos los pedidos de la empresa»). Jorman sigue
+// solo con Vistana: Daniel no lo nombró.
 export const EMPRESAS_POR_PERSONA: Readonly<Record<string, readonly string[]>> = {
-  julio: ["fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"],
-  rodrigo: ["vistana"],
   jorman: ["vistana"],
 };
 
