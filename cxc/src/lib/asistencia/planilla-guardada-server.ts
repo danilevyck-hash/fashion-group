@@ -40,21 +40,6 @@ import { TABLA_AMARRE } from "./cierre-prestamo-server";
 export const TABLA_GUARDADA = "asistencia_planilla_guardada";
 export const TABLA_GUARDADA_LINEA = "asistencia_planilla_guardada_linea";
 
-/** Las dos columnas de «Tiempo no laborado» (migración 20261231140000). */
-const COLUMNAS_TIEMPO_NO_LABORADO = ["tiempo_no_laborado", "tiempo_no_laborado_min"] as const;
-
-/** ¿El error es que la base todavía no tiene esas columnas? */
-export function faltaColumnaTiempoNoLaborado(error: { message?: string } | null | undefined): boolean {
-  return !!error?.message && /tiempo_no_laborado/.test(error.message);
-}
-
-/** La fila sin esas dos columnas, para reintentar el cierre. */
-export function sinTiempoNoLaborado(fila: Record<string, unknown>): Record<string, unknown> {
-  const out = { ...fila };
-  for (const c of COLUMNAS_TIEMPO_NO_LABORADO) delete out[c];
-  return out;
-}
-
 /** Las columnas de la cabecera. Select EXPLÍCITO, nunca `*`. */
 const COLS_CABECERA =
   "id, empresa, desde, hasta, quincena, version, estado, cerrada_por, cerrada_en, "
@@ -251,17 +236,11 @@ export async function cerrarPlanilla(opts: {
   // De a 500 para no armar un cuerpo enorme. Hoy son 40 personas; el día que
   // alguien guarde un rango largo de las tres empresas, esto no cambia de forma.
   for (let i = 0; i < filas.length; i += 500) {
-    let { error } = await supabaseServer
+    // Sin reintento «sin `tiempo_no_laborado`» (retirado el 9-oct-2026, con la
+    // migración 20261231140000 ya aplicada): un cierre nunca entra sin ese monto.
+    const { error } = await supabaseServer
       .from(TABLA_GUARDADA_LINEA)
       .insert(filas.slice(i, i + 500));
-    // 🔴 FALLA ABIERTA (9-oct-2026): sin la migración 20261231140000 la base no
-    // tiene `tiempo_no_laborado[_min]`. El cierre entra igual, sin esas dos
-    // columnas: el monto ya está restado en `total_bruto` y `neto_pagar`.
-    if (faltaColumnaTiempoNoLaborado(error)) {
-      ({ error } = await supabaseServer
-        .from(TABLA_GUARDADA_LINEA)
-        .insert(filas.slice(i, i + 500).map(sinTiempoNoLaborado)));
-    }
     if (error) {
       throw new Error(`No se pudo guardar en ${TABLA_GUARDADA_LINEA}: ${error.message}`);
     }

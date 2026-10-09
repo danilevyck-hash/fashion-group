@@ -409,6 +409,45 @@ describe("5. planilla-guardada-server.ts — leer vacío ante un error abre el d
     expect(escrituras.filter((e) => e.op === "update")).toHaveLength(0);
   });
 
+  // 🔴 9-oct-2026: se retiró el reintento «sin `tiempo_no_laborado`». Con la
+  // migración 20261231140000 aplicada, cualquier error que nombrara la columna
+  // (un tipo, un CHECK) hacía entrar el cierre SIN ese monto y sin avisar.
+  const lineaConTiempoNoLaborado = () => ({
+    codigo: JULIO, nombre: "JULIO GARAY", etiqueta: "JULIO GARAY", empresa: "vistana",
+    empresaEtiqueta: "Vistana", salarioMensual: 1000, jornadaSemanal: 40, pagaSeguros: true,
+    noMarcaReloj: false, fueraDePlanilla: false, faltaConfigurar: false, decidirAMano: null,
+    parte: null, quincenalReferencia: 500, extraMedido: null, extraNoAprobada: null, extraAprobada: true,
+    horas: { tiempoNoLaboradoMin: 90 }, dinero: { tiempoNoLaborado: 5.78 },
+  } as unknown as import("@/lib/asistencia/planilla").LineaPlanilla);
+  const cerrarConTiempoNoLaborado = async () => {
+    const { cerrarPlanilla } = await import("@/lib/asistencia/planilla-guardada-server");
+    return cerrarPlanilla({
+      empresa: "vistana", desde: "2026-08-01", hasta: "2026-08-15", quincena: "2026-08-1",
+      factorBase: 1, usuario: "Angela", lineas: [lineaConTiempoNoLaborado()], yaGuardadas: [],
+    });
+  };
+  const insertsDeRenglones = () =>
+    escrituras.filter((e) => e.tabla === "asistencia_planilla_guardada_linea" && e.op === "insert");
+
+  it("el cierre guarda `tiempo_no_laborado` y sus minutos en el renglón", async () => {
+    expect((await cerrarConTiempoNoLaborado()).ok).toBe(true);
+    expect(insertsDeRenglones()).toHaveLength(1);
+    const [fila] = insertsDeRenglones()[0].payload as Array<Record<string, unknown>>;
+    expect(fila.tiempo_no_laborado).toBe(5.78);
+    expect(fila.tiempo_no_laborado_min).toBe(90);
+  });
+
+  it("🔴 un error del insert que NOMBRA `tiempo_no_laborado` lanza: no se reintenta sin la columna", async () => {
+    porTabla["asistencia_planilla_guardada_linea"] = {
+      data: null,
+      error: { code: "22003", message: 'numeric field overflow in column "tiempo_no_laborado"' },
+    };
+    await expect(cerrarConTiempoNoLaborado()).rejects.toThrow(/tiempo_no_laborado/);
+    // UN solo intento, con la columna puesta; y el commit nunca se escribió.
+    expect(insertsDeRenglones()).toHaveLength(1);
+    expect(escrituras.filter((e) => e.op === "update")).toHaveLength(0);
+  });
+
   it("🔴 reabrirPlanilla con PGRST205 lanza", async () => {
     porTabla["asistencia_planilla_guardada"] = { data: null, error: PGRST205("asistencia_planilla_guardada") };
     const { reabrirPlanilla } = await import("@/lib/asistencia/planilla-guardada-server");
