@@ -560,13 +560,6 @@ líneas. Es exactamente para lo que sirve el control.
 
 ---
 
-## Recordatorios estilo Apple — propuesta APAGADA (9-oct-2026, `RECORDATORIOS_APPLE_2026_10`)
+## Recordatorios estilo Apple — propuesta DESCARTADA (9-oct-2026)
 
-La pregunta de la pantalla: **«¿qué cheque viene y ya se depositó?»**. Medido el 9-oct-2026: 7 entradas del 25-sep al 9-oct, **todas de Angela y desde la computadora**; 27 cheques en la historia (8 nuevos desde septiembre) y **2 notas en toda la historia** (las dos de Daniel, 5 y 10-sep).
-
-1. **Lista agrupada**: los renglones de un grupo en UNA caja con separadores (`data-agenda-caja`); el borde rojo se queda solo en vencido y devuelto.
-2. **Dos líneas por cheque**: cliente y monto; fecha · N° · empresa. **Sale el chip «Pendiente»** (la lista solo muestra lo abierto): el chip queda para vencido, devuelto y depositado.
-3. **Computadora: «＋ Nuevo» en la fila de Lista | Calendario y el buscador** (`data-fila-controles`). Sigue habiendo UN solo botón de alta en el archivo (`botonNuevo`).
-4. **Sale el renglón «Nuevo recordatorio»** de abajo: 2 notas contra 27 cheques, menos de 1 de cada 10 (`docs/diseno.md` regla 5). La nota sigue en «＋ Nuevo» › Nota.
-
-El calendario NO se toca (Daniel, 22-sep). `false` = la pantalla de hoy: candado `src/__tests__/components/recordatorios-apple-apagado.test.tsx` (HTML de `origin/main` antes del cambio; prendido, rojo).
+Se programó apagada (`RECORDATORIOS_APPLE_2026_10`, PR #704: lista en cajas agrupadas, cheque en dos líneas, «＋ Nuevo» en la fila de controles, sin el renglón «Nuevo recordatorio»). Daniel la revisó el 9-oct-2026: **«no hacer ningún cambio»**. Se retiró el código y su interruptor; antes de borrar, el candado de «apagado = idéntico» pasó contra el código ya limpio (los dos archivos de pantalla quedaron byte por byte como antes del PR #704). La pantalla de Recordatorios no se rediseña sin que Daniel lo pida.
