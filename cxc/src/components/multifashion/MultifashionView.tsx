@@ -70,6 +70,8 @@ interface MultifashionViewProps {
   celular?: {
     pantalla: PantallaCelular;
     onAbrir: (clave: ClaveRenglon) => void;
+    /** `MULTIFASHION_APPLE_2026_10`: un mes tocado en «Año». */
+    onAbrirMes?: (anio: number, mes: number) => void;
   };
 }
 
@@ -113,6 +115,7 @@ export function MultifashionView({
             mes={mes}
             syncTick={syncTick}
             celular={celular ? { ...celular, periodo, corte } : undefined}
+            onVerMeta={() => onTabChange("vendedoras")}
           />
           )}
         </TabsContent>
