@@ -2470,3 +2470,37 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
 ## Guías › «Pedidos» para bodega (5-oct-2026)
 
 - 🔴 **Guías › «Pedidos», PRIMERA pestaña de bodega y admin** (5-oct-2026, `PEDIDOS_BODEGA_2026_10`, hoy `false`): los pedidos **Activo** de Switch (= sin facturar; facturado pasa a Inactivo, medido) que trae `sync-pedidos` a las 06:10 UTC a `switch_pedidos`; fuera `TCKCTA`, `12188` y quien no tiene ficha. **Dos estados** (Pendiente · Preparado) en `pedidos_bodega_estado`, con quién y cuándo; **sin enlace a Etiquetas ni a Guías**. Migración `20261230120000` **SIN aplicar**. Candado `guias/pedidos-bodega`.
+
+## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
+
+> Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.
+
+### Guías › panel 11-sep, destinos 7/10-sep, la lista 19-sep, el papel 25-sep, etiquetas 18-sep, pedidos 6-oct, nueva guía 1-oct
+
+**El panel y los defectos del 11-sep-2026.**
+
+- 🔴 **`/guias/nueva` rebota al vendedor en el SERVIDOR**; los roles de escritura viven en **`roles-escritura.ts`**, con barrido que prohíbe escribirlos a mano. ⚠️ El vendedor sigue viendo Guías en solo lectura.
+- ⚠️ **`GET /api/guias` deja las firmas afuera a propósito**: el papel se pide completo por `/api/guias/[id]`.
+- ⚠️ El borde izquierdo esmeralda de la fila **no se tocó** — decisión pendiente de Daniel.
+
+**La lista de destinos (7-sep-2026) y varios clientes (10-sep-2026).**
+
+- 🔴 **La lista de destinos del campo dirección es DEL EQUIPO, no de un navegador**: `guias_destino_lista` (`20261014120000`, **aplicada**), en Guías › Configuración. ⚠️ **NO se fusiona con `guias_destino_cliente`**. Agregar: admin · secretaria · bodega; quitar: admin · secretaria. 🔴 **Soft delete firmado, NUNCA DELETE**; el repetido se rechaza por `claveDestino` (exacto, jamás por parecido). **Sin la DDL falla ABIERTA** a `DESTINOS_BASE` y el GET contesta 200 vacío.
+- 🔴 **La semilla sale del uso REAL, nunca del `localStorage` de nadie**: **3+ usos**, grafía más usada, salvo la ya definida en `guias_destino_cliente`.
+- 🔴 **Una guía lleva facturas de VARIOS CLIENTES, de a UN CLIENTE A LA VEZ** (un renglón por cliente-empresa); **reusa el MISMO `ClientePicker`** y **nada de lo que se guarda cambia** (`GUIAS_ATAJOS_NUEVOS`).
+
+**La lista y «Definir» (19-sep-2026).**
+
+- 🔴 Encabezados + columna de **FECHA** (anchuras en UNA constante, compartida) · pie **«47 guías de 236»** · **borde de color solo si dice algo** · el aviso es un **PUNTO en columna que existe siempre** (`avisos-de-la-fila.ts`) · **buscar abre la VENTANA, no el filtro** · **releer no borra la lista en Configuración**. 🔴 **Y los BULTOS del pie siguen a lo que se ve** (22-sep): decía «30 guías de 236 · 8.433 bultos» y las 30 suman **1.629** —5,2 veces menos— (`sumarBultos`, `pie-de-la-lista.ts`; `guias-pie-de-bultos`). **Jorman** entra a «Despachado por» y 🔴 el campo **no se preselecciona**.
+
+🔴 **EL PAPEL DE LA GUÍA, HACIA ADELANTE (25-sep-2026, `GUIA_PAPEL_2026_09` en `lib/guias/papel-2026-09.ts`, hoy `true`)**: 🩸 con transportista externo las dos firmas salían cambiadas de caja, en **157 de las 222 guías externas vivas**. 🔴 **Nada se toca en la base.** ⚠️ `PrintDocument.tsx` todavía dice lo de antes: pendiente de Daniel. 🩸 Las ocho reglas del papel se podaron de aquí el 6-oct-2026 y viven VERBATIM en el postmortem › «…hasta el 6-oct-2026 — el papel de la guía». Candado `guias-papel-2026-09`.
+
+**Etiquetas para los bultos (18-sep-2026).**
+
+- 🔴 **Guías › «Etiquetas»** (admin · secretaria · bodega, `ETIQUETAS_ROLES` derivado de `GUIAS_WRITE_ROLES`; **NO** cuelga de `GUIAS_ATAJOS_NUEVOS`): se elige UNA factura de las 6 del grupo, se escriben los bultos y salen las hojas — carta en **cuartos, 4 por hoja**, jsPDF, con EMPRESA · fecha · Factura · Cliente · Destino · **«BULTO»** y debajo su número, y **sin** transportista, piezas, código de barras ni la dirección del directorio.
+- 🔴 **LOS TAMAÑOS SE PIDEN EN MILÍMETROS DE ALTURA DE MAYÚSCULA, NO EN PUNTOS** (20-sep-2026, `PT_PARA_MAYUSCULA`): bulto **11** · destino **7,5** · cliente **5,5** · factura **4**. El «1» entero y el «de 4» a la MITAD, misma línea — **nunca «1/4»**. El destino se lleva el hueco hasta la raya (`hastaY`).
+- 🔴 **El ESTADO SE DERIVA** de `guias_etiquetas.guia_item_id` (`20261207120000`, aplicada): sin renglón VIVO de guía VIVA vuelve sola a «Pendiente». 🔴 **El anti-duplicado (409) y el bloqueo de lo ya importado los decide el SERVIDOR**; soft delete FIRMADO con único **parcial** `WHERE NOT deleted`, así una factura borrada se puede volver a etiquetar. 🔴 **Falla ABIERTA sin la migración** y **la guía se sigue creando igual**: en `/guias/nueva` las etiquetadas solo LLENAN los renglones de siempre, juntas por cliente **y** empresa con los bultos sumados.
+- 🔴 **EL DESTINO LARGO SALE ENTERO: DOS FILAS ANTES QUE ACHICAR (22-sep-2026).** Daniel: *«los destino largos que se hagan en dos filas o achicar la letra»*. **El orden es la regla**: primero se parte en filas al tamaño de siempre (7,5 mm), SOLO por espacio y nunca a mitad de palabra; si ni así entra, se baja la letra de a 0,1 mm hasta el piso **`MAY_DESTINO_MINIMO = 3,4 mm`**, y el achique arrastra el bloque entero. Módulo puro `guias/etiqueta-destino.ts`. Candado `guias-etiqueta-destino-entero` (36 casos; 14 mutaciones, 14 cazadas).
+- 🔴 **Etiquetas POR ENVÍO** (1-oct-2026, `ETIQUETAS_POR_ENVIO`): postmortem › «Etiquetas por envío».
+- 🔴 **Pedidos: TRES estados y el detalle con BULTOS** (6-oct-2026, `PEDIDOS_BULTOS_2026_10`, prendido 6-oct-2026): Pendiente → **Preparado** (bodega o la secretaria) → **Verificado** (la secretaria, nunca bodega) → Etiquetas, y **nadie hace los dos pasos del mismo pedido, ni admin**; queda firmado quién y cuándo. Quién ve qué va **por EMPRESA y por PERSONA**, y lo decide el SERVIDOR. Migraciones aplicadas. Postmortem › «Pedidos con bultos». Candado `guias/pedidos-bultos`.
+- 🔴 **Nueva guía en UNA tabla, un renglón por envío, «Despachado por» al DESPACHAR** (1-oct-2026, `guias-2026-10.ts`): postmortem › «Nueva guía en una tabla».

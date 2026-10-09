@@ -759,3 +759,23 @@ Daniel, probando en su iPhone la barra de pestañas (`TAB_BAR_2026_10`): *«¿po
 - 🩸 **El «[» suelto en Asistencia** (barra v3.3, renglón 2): el período se declaraba encogible a 200 px y el chip «Empresa» subía a su lado tapando el 📅. Ahora el período no se encoge (`CLASE_PERIODO_EN_LA_BARRA`) y el chip baja solo si no cabe. Ventas no lleva chip en ese renglón.
 - 🔴 **Los minutos nunca con decimales** («1 tardanza de 27.83 min» → «27m 50s»): tarjeta y pie del celular, «Tardanzas (…)» de la planilla, la nota del comprobante, el freno del cierre, la nota del Excel de Aprobaciones, Boston y los textos del Reporte salen por `formato-tiempo.ts`. ⚠️ La opción «minutos» de Configuración (`formatoTiempo(…, "min")`) sigue mostrando decimales en las tablas: pendiente de Daniel.
 - Candados `hoja-mas` · `renglon-2-sin-encimar` · `minutos-sin-decimales`.
+
+## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
+
+> Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.
+
+### Navegación, 404 y papel — lo que se arregló el 17-sep-2026
+
+> 📄 Detalle, mediciones y candados: [docs/postmortems/navegacion.md](docs/postmortems/navegacion.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
+
+- 🔴 **«Ir al inicio» es LA CASA DEL ROL, no `/home`** (`lib/navegacion/casa-del-rol.ts`): una sola función para el redirect de `/home`, el 404 y el botón del encabezado. `gerente_acs` y `marcacion` tienen un módulo solo; `/home` los rebota. ⚠️ **Bodega NO está atrapado**: tiene cuatro módulos.
+- 🔴 **Hay un 404 propio y en español** (`src/app/not-found.tsx`): «Esta pantalla no existe», con «Ir al inicio» y «Volver» —éste solo si hay a dónde—.
+- 🔴 **El PDF de Comisiones dice el título UNA vez**, en la primera hoja (`lib/comisiones/pdf-comision.ts`). ⚠️ Los **nombres de columna SÍ se repiten** y el pie con la numeración no se toca. 🩸 `ImpresionComision.tsx` está muerto: el papel sale de `pdf-comision.ts`.
+- 🩸 **El CSV de Reclamos se retiró**: en ningún lado del sistema se exporta CSV. `csv-export.ts` queda rotulado y sin lectores; los dos Excel, intactos.
+- 🔴 **`/catalogo` y `/catalogos` redirigen** (307, fuente exacta) a `/catalogos/marcas`: el breadcrumb del propio hub caía ahí y daba el 404 de Next. Comprobantes monta el camino completo. ⚠️ El último tramo dice **«Comprobantes»**, no «Pedidos».
+- 🔴 **Los rubros de Reebok se ADMINISTRAN, no se programan** (`reebok_rubro_categoria`, Catálogos › Reebok): el espejo `REEBOK_CATEGORY_ESPERADAS` se DERIVA de ahí. Falla ABIERTA a las seis reglas del código; `CategoriaReebok` sigue CERRADO —calzado · ropa · accesorios— y **la marca manda antes que el rubro**.
+- 🔴 **Una descripción que «pasa» también queda registrada** (`origen = 'automatica'`, rotulada «Alta automática»), para poder darle fórmula después. Pasar no cambia de significado; se escribe al PROCESAR, nunca al descargar.
+- 🔴 **Préstamos tiene «Movimientos» por quincena** (`lib/asistencia/movimientos-quincena.ts`): cargos y descuentos, con una columna **Origen** que dice si lo anotó el CIERRE o una persona. La ventana termina en `finDeLaMedicion` — con `q.hasta` se caían los movimientos de un día 31.
+- ⚠️ **El Historial del depurador NO se divide en pestañas**: la tabla no guarda por dónde entró el archivo.
+- 🔴 **El primer pintado ya sabe quién mira** (19-sep): `useAuth` arranca con la semilla de la cookie firmada (`lib/sesion-semilla*.ts`, leída en el layout raíz; rol · módulos · `isOwner` · nombre, **nunca el token**) con la MISMA regla que el navegador (`tieneAccesoAlModulo`); sin acceso o sin semilla, `null` como antes, y `sessionStorage` sigue mandando al hidratar. ⚠️ `/home` no PINTA en el servidor. 🔴 Sin modo oscuro (2-oct-2026, `sin-modo-oscuro`).
+- 🔴 **Quien no tiene Inicio no lo ve ni un instante** (19-sep): el rebote a la casa del rol lo decide el SERVIDOR en `src/app/home/layout.tsx` —`leerSemillaDeSesion()` + la MISMA `casaDelRol`, `redirect()` antes de una sola línea de HTML—, así que `marcacion`, `gerente_acs` y `gerente_boston` nunca reciben el Inicio. 🔴 **Falla ABIERTA**: sin cookie, forjada o rol desconocido, no redirige y el efecto del navegador decide como siempre.

@@ -1379,3 +1379,18 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - **🔒 NEGOCIO PRIVADO** (`enviarNegocioPrivado`) — el resumen diario de ventas de ACS y el resumen mensual del grupo. Va al CHAT de sistema (privacidad) con el TRATO de negocio: **sin el prefijo `🔧 SISTEMA · `** y sin anti-ruido. Sale desde DOS lugares (el cron y la recuperación de `switch-reconciliacion`) que un candado exige que apunten al mismo destino.
 - **🔧 SISTEMA** — prefijo `🔧 SISTEMA · `. Regla de tres: **(1)** es real, **(2)** no se arregla solo, **(3)** alguien tiene que hacer algo. El texto dice qué pasó / qué significa / qué hacer, sin nombres de tabla ni códigos HTTP. Es el chat PRIVADO de Daniel (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`; no existe ninguna variable `*_SISTEMA`).
 - A dónde apunta cada canal se verifica sin escribirle a nadie: `GET /api/diag/canales-telegram` (`CRON_SECRET` o sesión de admin).
+
+## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
+
+> Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.
+
+### Crons › El lector de facturas avisa por Telegram (11-sep-2026)
+
+**El lector de facturas avisa por Telegram (11-sep-2026)** — la regla 2 sobre un servicio de afuera.
+
+- 🔴 **Avisan TRES causas y nada más** (`clasificarFalloAnthropic`): llave que no sirve (401/403 `authentication_error`/`permission_error`, y la llave AUSENTE), crédito agotado (402, o el 400 cuyo MENSAJE dice `credit balance`/`billing` — el texto, no el status) y tope de uso persistente (429 / `rate_limit_error`).
+- 🔴 **Lo que NO avisa es la mitad del diseño**: PDF ilegible, 400 de documento, timeout, 500 y 529 «overloaded» no suenan.
+- 🔑 «Persistente» está medido: el cliente fija `maxRetries: MAX_REINTENTOS` (**2**) a propósito, no por el default; si se toca, hay que repensar ese mensaje.
+- 🔴 Un solo punto de llamada a Anthropic: `src/lib/ia/anthropic.ts`, sin prompt ni modelo adentro (ningún `claude-…` ahí). El error se vuelve a lanzar tal cual: mismo 500, la pantalla no cambia.
+- 🔴 **Anti-loop de 7 días POR CAUSA** (`cron_email_errors.tipo` = `lector_facturas:<causa>`), marcado DESPUÉS de que Telegram confirme; la causa va en la llave para que una llave vencida no tape un crédito agotado posterior. Fail-OPEN, y avisar NUNCA lanza.
+- El mensaje manda a la pantalla exacta: llave → API Keys y luego Vercel (`ANTHROPIC_API_KEY`, Production); crédito → Billing; tope → Limits; y dice que no se perdió nada.
