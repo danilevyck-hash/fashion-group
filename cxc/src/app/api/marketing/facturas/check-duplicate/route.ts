@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { mismoNumeroDeFactura, numeroClave } from "@/lib/marketing/duplicado";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -10,8 +11,9 @@ export const fetchCache = "force-no-store";
 //   ?numero_factura=FE-0001&proveedor=Pintor%20XYZ&proyecto_id_actual=<uuid>
 //
 // Respuesta: { existe: boolean, facturas: [...] }
-// Solo facturas vigentes (anulado_en IS NULL). Matching case-insensitive con
-// trim en proveedor. numero_factura exacto.
+// Solo facturas vigentes (anulado_en IS NULL). Compara con
+// `mismoNumeroDeFactura` (duplicado.ts), la misma regla del freno al guardar:
+// número SIN ceros de relleno y proveedor normalizado con sus alias.
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
@@ -21,7 +23,12 @@ export async function GET(req: NextRequest) {
   const proveedor = (url.searchParams.get("proveedor") ?? "").trim();
   const proyectoIdActual = url.searchParams.get("proyecto_id_actual");
 
-  if (!numeroFactura || !proveedor) {
+  // Prefiltro en la base por el último tramo del número sin ceros: aparece
+  // tal cual dentro de cualquier grafía con ceros («7766» ⊂ «11-000007766»).
+  // Solo letras y dígitos, así que no trae comodines de LIKE.
+  const ultimoTramo = numeroClave(numeroFactura).split("-").pop() ?? "";
+
+  if (!ultimoTramo || !proveedor) {
     return NextResponse.json({ existe: false, facturas: [] });
   }
 
@@ -31,8 +38,7 @@ export async function GET(req: NextRequest) {
       .select(
         "id, numero_factura, proveedor, total, proyecto_id, created_at, fecha_factura, proyecto:mk_proyectos(id, nombre, tienda)",
       )
-      .eq("numero_factura", numeroFactura)
-      .ilike("proveedor", proveedor)
+      .ilike("numero_factura", `%${ultimoTramo}%`)
       .is("anulado_en", null);
     if (error) throw new Error(error.message);
 
@@ -50,7 +56,12 @@ export async function GET(req: NextRequest) {
         | null;
     };
 
-    const rows = (data ?? []) as unknown as Row[];
+    const rows = ((data ?? []) as unknown as Row[]).filter((r) =>
+      mismoNumeroDeFactura(
+        { numero: numeroFactura, proveedor },
+        { numero: r.numero_factura, proveedor: r.proveedor },
+      ),
+    );
     const facturas = rows.map((r) => {
       const proy = Array.isArray(r.proyecto) ? r.proyecto[0] : r.proyecto;
       const proyectoNombre =

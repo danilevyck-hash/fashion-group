@@ -44,7 +44,9 @@
 // ============================================================================
 
 import { TIENDA_GENERAL } from "./gasto";
-import { mismoProveedor, normalizarProveedor } from "./proveedor";
+// El proveedor se compara CON SUS ALIAS («Impreco» = «Impresora Comercial»):
+// la misma factura 0000062623 entró una vez con cada nombre (auditoría 8-oct-2026).
+import { claveDeProveedor, mismoProveedorConAlias } from "./proveedores-2026-10";
 
 /** Lo mínimo que hace falta mirar para saber si es el mismo gasto. */
 export interface HuellaDeGasto {
@@ -106,7 +108,7 @@ export function numerosSeContradicen(
  * nada. La tienda nunca falta: sin ella, «General».
  */
 export function claveDeDuplicado(g: HuellaDeGasto): string {
-  const p = normalizarProveedor(g.proveedor);
+  const p = claveDeProveedor(g.proveedor);
   const m = montoClave(g.monto);
   const f = String(g.fecha ?? "").slice(0, 10);
   if (p.length === 0 || m.length === 0 || !/^\d{4}-\d{2}-\d{2}$/.test(f)) return "";
@@ -116,7 +118,7 @@ export function claveDeDuplicado(g: HuellaDeGasto): string {
 /**
  * Busca el gasto ya guardado que es EL MISMO que el nuevo. `null` si no hay.
  *
- * Igualdad de la llave completa: proveedor por `mismoProveedor` (igualdad del
+ * Igualdad de la llave completa: proveedor por `mismoProveedorConAlias` (igualdad del
  * normalizado, nunca `includes`), monto a dos decimales, fecha exacta y la
  * misma tienda. Dos números de factura distintos lo descartan antes que nada.
  * Un `existentes` con la misma fila que se está editando se filtra por `id`.
@@ -130,10 +132,24 @@ export function buscarDuplicado<T extends HuellaDeGasto & { id?: string }>(
   for (const e of existentes) {
     if (nuevo.id && e.id && String(nuevo.id) === String(e.id)) continue;
     if (numerosSeContradicen(nuevo.numero, e.numero)) continue;
-    if (!mismoProveedor(nuevo.proveedor, e.proveedor)) continue;
+    if (!mismoProveedorConAlias(nuevo.proveedor, e.proveedor)) continue;
     if (claveDeDuplicado(e) === clave) return e;
   }
   return null;
+}
+
+/**
+ * ¿Es la MISMA factura por número? Mismo proveedor (con alias) y mismo número
+ * sin ceros de relleno. Es la comparación del AVISO mientras se escribe
+ * (`check-duplicate`): «11-000007766» y «11-00007766» de Confecciones Boston
+ * son la misma; antes el aviso comparaba el texto exacto y no avisaba.
+ */
+export function mismoNumeroDeFactura(
+  a: Pick<HuellaDeGasto, "proveedor" | "numero">,
+  b: Pick<HuellaDeGasto, "proveedor" | "numero">,
+): boolean {
+  const n = numeroClave(a.numero);
+  return n.length > 0 && n === numeroClave(b.numero) && mismoProveedorConAlias(a.proveedor, b.proveedor);
 }
 
 /** 🔴 ¿Es un duplicado? Si lo es, NO se guarda. */

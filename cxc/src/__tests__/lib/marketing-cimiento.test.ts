@@ -332,7 +332,11 @@ describe("4 · 🔴 el duplicado no se cuela", () => {
       claveDeDuplicado({ proveedor: "Impresora Comercial", monto: 55.6, fecha: "2026-04-08", tienda: "d-170" }),
     ).toBe("impresora comercial|55.60|2026-04-08|D-170");
     const src = codigo("src/lib/marketing/duplicado.ts");
-    expect(src).toMatch(/normalizarProveedor\(g\.proveedor\)/);
+    // Normalizado Y con alias (8-oct-2026): «Impreco» es «Impresora Comercial».
+    expect(src).toMatch(/claveDeProveedor\(g\.proveedor\)/);
+    expect(claveDeDuplicado({ proveedor: "Impreco", monto: 55.6, fecha: "2026-04-08" })).toBe(
+      "impresora comercial|55.60|2026-04-08|GENERAL",
+    );
     expect(src).toMatch(/toFixed\(2\)/);
     expect(src).toMatch(/tiendaClave\(g\.tienda\)/);
   });
