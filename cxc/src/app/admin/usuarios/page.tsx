@@ -16,6 +16,9 @@ import { modulosOfrecibles, moduloOfrecible } from "@/lib/modulos-ofrecibles";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
+import { USUARIOS_APPLE_2026_10 } from "@/lib/usuarios-apple-2026-10";
+import { SYSTEM_ROLE_KEYS } from "@/lib/modules";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 
 // Cargar Playfair Display sin contaminar otros módulos —
 // el <link> queda inerte si ya está en cache desde otra página.
@@ -245,6 +248,15 @@ function UsuariosPageInner() {
     setRevokingSession(null);
   }
 
+  // UN solo botón de alta: en su fila (hoy) o en la de las pestañas
+  // (`USUARIOS_APPLE_2026_10`, computadora).
+  const botonNuevoUsuario = (
+    <button onClick={openNewUser} className="text-sm bg-black text-white px-4 min-h-[44px] rounded-md hover:bg-gray-800 transition flex items-center gap-1.5 active:scale-[0.97]">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+      Nuevo usuario
+    </button>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Playfair Display para el título de página (carga lazy, no afecta otros módulos) */}
@@ -267,7 +279,7 @@ function UsuariosPageInner() {
             h1 de la página. */}
         <h1 className="sr-only">Usuarios</h1>
 
-        <Tabs value={tab} onValueChange={setTab}>
+        <Tabs value={tab} onValueChange={setTab} className={USUARIOS_APPLE_2026_10 ? "relative" : undefined}>
           <TabsList className="-mx-6 mb-6 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-6 p-0 md:mx-0 md:px-0">
             <TabsTrigger value="usuarios" className={TAB_TRIGGER_CLASS}>
               <UsersIcon className="hidden h-3.5 w-3.5 sm:block" /> Usuarios
@@ -285,15 +297,17 @@ function UsuariosPageInner() {
               </TabsTrigger>
             )}
           </TabsList>
+          {/* 🔴 Estilo Apple: en la computadora «＋ Nuevo usuario» va en la fila
+              de las pestañas, no en una fila sola. */}
+          {USUARIOS_APPLE_2026_10 && tab === "usuarios" && (
+            <div className="absolute right-0 top-0 hidden sm:block">{botonNuevoUsuario}</div>
+          )}
 
           <TabsContent value="usuarios" className="mt-0">
         {/* La fila del botón quedó con un solo hijo visible → `justify-end`:
             con `between` el botón se iría al borde izquierdo. */}
-        <div className="mb-8 flex items-end justify-end gap-4 flex-wrap">
-          <button onClick={openNewUser} className="text-sm bg-black text-white px-4 min-h-[44px] rounded-md hover:bg-gray-800 transition flex items-center gap-1.5 active:scale-[0.97]">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-            Nuevo usuario
-          </button>
+        <div className={USUARIOS_APPLE_2026_10 ? "mb-4 flex justify-end sm:hidden" : "mb-8 flex items-end justify-end gap-4 flex-wrap"}>
+          {botonNuevoUsuario}
         </div>
 
         {/* ══ Usuarios del sistema ══ */}
@@ -303,6 +317,14 @@ function UsuariosPageInner() {
           ) : fgUsers.length === 0 ? (
             <EmptyState title="No hay usuarios" actionLabel="+ Nuevo usuario" onAction={openNewUser} />
           ) : (
+            USUARIOS_APPLE_2026_10 ? (
+              <ListaPorRol
+                usuarios={fgUsers}
+                ultimaSesion={(n) => lastSeenByUser[n]}
+                onEditar={openEditUser}
+                onDesactivar={(u) => setDeactivateTarget({ id: u.id, name: u.name, active: u.active })}
+              />
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {fgUsers.map(u => {
                 const lastSeen = lastSeenByUser[u.name];
@@ -369,6 +391,7 @@ function UsuariosPageInner() {
                 );
               })}
             </div>
+            )
           )}
         </section>
 
@@ -735,6 +758,88 @@ function UsuariosPageInner() {
       />
 
       <Toast message={toast} />
+    </div>
+  );
+}
+
+
+// ─── Estilo Apple (`USUARIOS_APPLE_2026_10`) ─────────────────────────────────
+
+interface UsuarioDeLista { id: string; name: string; role: string; active: boolean; associated_company: string | null; modulos_override: string[] | null; }
+
+/** Agrupados por rol, en el orden de `SYSTEM_ROLES`; dentro, por nombre. */
+function ListaPorRol({
+  usuarios,
+  ultimaSesion,
+  onEditar,
+  onDesactivar,
+}: {
+  usuarios: UsuarioDeLista[];
+  ultimaSesion: (name: string) => string | undefined;
+  onEditar: (u: UsuarioDeLista) => void;
+  onDesactivar: (u: UsuarioDeLista) => void;
+}) {
+  const orden = (r: string) => {
+    const i = SYSTEM_ROLE_KEYS.indexOf(r);
+    return i === -1 ? SYSTEM_ROLE_KEYS.length : i;
+  };
+  const roles = [...new Set(usuarios.map((u) => u.role))].sort((a, b) => orden(a) - orden(b));
+  return (
+    <div className="space-y-5">
+      {roles.map((rol) => {
+        const delRol = usuarios
+          .filter((u) => u.role === rol)
+          .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+        return (
+          <section key={rol} data-usuarios-rol={rol}>
+            <h2 className="mb-1.5 px-1 text-xs font-medium uppercase tracking-wide text-gray-400">
+              {etiquetaDeRol(rol)} <span className="tabular-nums">· {delRol.length}</span>
+            </h2>
+            <div className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white">
+              {delRol.map((u) => {
+                const visto = ultimaSesion(u.name);
+                const personalizado = Array.isArray(u.modulos_override) && u.modulos_override.length > 0;
+                const detalle = [
+                  !u.active ? "Inactivo" : null,
+                  u.associated_company,
+                  personalizado ? "Permisos personalizados" : null,
+                  visto ? `Última sesión ${relativeTime(visto)}` : "Sin sesiones",
+                ].filter(Boolean).join(" · ");
+                return (
+                  <div key={u.id} data-usuario-fila={u.id} className={`flex items-center gap-3 pr-1 ${u.active ? "" : "opacity-60"}`}>
+                    <button
+                      type="button"
+                      onClick={() => onEditar(u)}
+                      aria-label={`Editar ${u.name}`}
+                      className="flex min-h-[56px] min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition hover:bg-gray-50"
+                    >
+                      <Avatar name={u.name} role={u.role} size="sm" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-gray-900">{capitalizarNombre(u.name)}</span>
+                        <span className="block text-xs text-gray-500">{detalle}</span>
+                      </span>
+                      <span aria-hidden="true" className="shrink-0 text-sm text-gray-300">›</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDesactivar(u)}
+                      title={u.active ? "Desactivar" : "Reactivar"}
+                      aria-label={`${u.active ? "Desactivar" : "Reactivar"} ${u.name}`}
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:text-red-600"
+                    >
+                      {u.active ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
