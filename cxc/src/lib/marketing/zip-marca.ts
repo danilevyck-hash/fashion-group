@@ -213,6 +213,8 @@ interface FacturaFila {
   se_reporta?: boolean | null;
   /** La tienda del GASTO (23-sep-2026). Ausente = la del proyecto. */
   tienda_codigo?: string | null;
+  /** Observaciones (opcionales). Solo para mostrarlas en Gastos. */
+  nota?: string | null;
 }
 interface EntregaFila {
   id: string;
@@ -418,7 +420,7 @@ async function leerFacturasConSeReporta(): Promise<ResultadoPg<FacturaFila[]>> {
     () =>
       supabaseServer
         .from("mk_facturas")
-        .select(`${COLUMNAS_FACTURA}, se_reporta, tienda_codigo, pct_a_la_marca`) as unknown as PromiseLike<
+        .select(`${COLUMNAS_FACTURA}, se_reporta, tienda_codigo, nota, pct_a_la_marca`) as unknown as PromiseLike<
         ResultadoPg<FacturaFila[]>
       >,
     () =>
@@ -1955,6 +1957,8 @@ export interface GastoDeLaLista {
   aCobrar: number;
   estado: EstadoDelGasto;
   motivo: MotivoNoRecuperable | null;
+  /** Las observaciones del gasto, si las hay. Solo se muestran. */
+  nota?: string | null;
   impulsadoraId: string | null;
   impulsadoraMes: string | null;
   periodoId: string | null;
@@ -2083,6 +2087,7 @@ async function listaDeGastos(
             pctALaMarca: f.pct_a_la_marca,
             seReporta: f.se_reporta,
           }),
+      nota: txt(f.nota) || null,
       impulsadoraId: f.impulsadora_id ? String(f.impulsadora_id) : null,
       impulsadoraMes: f.impulsadora_mes ? txt(f.impulsadora_mes).slice(0, 7) : null,
       periodoId: z?.periodoId ?? null,

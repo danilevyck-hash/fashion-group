@@ -20,7 +20,6 @@ import ClientePicker from "@/components/ClientePicker";
 import type { MkMarca } from "@/lib/marketing/types";
 import { ENLACE } from "@/lib/marketing/marketing-2026-10";
 import {
-  MOTIVOS_NO_RECUPERABLE,
   NO_RECUPERABLE,
   PCT_QUE_SE_COBRA,
   type DestinoDelCargo,
@@ -164,7 +163,9 @@ export function DestinoDelCargoBloque({
   const cambiar = (parte: Partial<DestinoDelCargo>) => onChange({ ...valor, ...parte });
   const tienda = valor.tienda;
   // 🔴 No recuperable: Marca y Tienda se ocultan (no se le cobra a nadie) y
-  // aparece el Motivo (8-oct-2026).
+  // quedan solo las observaciones, opcionales como en cualquier gasto. Sin
+  // «Motivo» aparte (Daniel, 8-oct-2026: «¿no es lo mismo como notas, de
+  // modo opcional?»).
   const noRecuperable = valor.pct === NO_RECUPERABLE;
 
   return (
@@ -217,28 +218,6 @@ export function DestinoDelCargoBloque({
       )}
 
       <SeCobraPct id="cargo-se-cobra" valor={valor.pct} onChange={(pct) => cambiar({ pct })} conNoRecuperable />
-
-      {noRecuperable && (
-        <div>
-          <div id="cargo-motivo" className="text-sm font-medium text-gray-700 mb-1">
-            Motivo
-          </div>
-          <div role="radiogroup" aria-labelledby="cargo-motivo" className="grid grid-cols-2 gap-2 sm:max-w-md">
-            {MOTIVOS_NO_RECUPERABLE.map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="radio"
-                aria-checked={valor.motivo === m}
-                onClick={() => cambiar({ motivo: m })}
-                className={`text-left ${OPCION(valor.motivo === m)}`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {verNota ? (
         <div>

@@ -401,7 +401,7 @@ describe("3 · la ficha es UNA tabla con facturas + muebles + impulsadora, y el 
     expect(pie.facturas + pie.muebles + pie.impulsadora).toBe(6);
     expect(screen.getByText(/6 gastos · irán al próximo ZIP de Calvin Klein y de Tommy Hilfiger/)).toBeTruthy();
     // Lo apagado se ve en gris y no suma; la cabecera lo dice.
-    expect(screen.getByText("No se reporta")).toBeTruthy();
+    expect(screen.getByText("No recuperable")).toBeTruthy();
     // La línea gris de la factura: N° · subtotal + ITBMS.
     expect(screen.getByText("factura N° 0000065407 · $623.01 + ITBMS $43.61")).toBeTruthy();
     expect(screen.getAllByText("mueble · precio reportado").length).toBe(2);

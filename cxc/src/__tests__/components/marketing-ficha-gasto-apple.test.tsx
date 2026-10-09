@@ -91,14 +91,15 @@ describe("7-oct-2026 · editar ya no es un asistente", () => {
     expect(screen.queryByText(/Compra en zona libre/)).toBeNull();
   });
 
-  it("«Se cobra a» con «A cargo de la empresa», no la rejilla de 5 marcas", () => {
+  it("«Se cobra a» con «No recuperable», no la rejilla de 5 marcas", () => {
     abrirEdicion();
     expect(screen.getByText("Se cobra a")).toBeTruthy();
-    expect(screen.getByText("A cargo de la empresa")).toBeTruthy();
+    expect(screen.getByText("No recuperable")).toBeTruthy();
+    expect(screen.queryByText("A cargo de la empresa")).toBeNull();
     expect(screen.queryByText("Marca del gasto")).toBeNull();
   });
 
-  it("elegir «A cargo de la empresa» y guardar manda marcasSeleccionadas vacío", async () => {
+  it("elegir «No recuperable» y guardar manda marcasSeleccionadas vacío", async () => {
     const onSubmit = abrirEdicion();
     fireEvent.change(screen.getByLabelText("Se cobra a"), {
       target: { value: "__empresa__" },

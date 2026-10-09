@@ -163,7 +163,7 @@ export function textoFaltaEnLaPuerta(faltantes: readonly FaltanteDeLaPuerta[]): 
   return `Falta: ${unirEnHumano(faltantes.map((f) => NOMBRE_FALTANTE[f]))}`;
 }
 
-/** La línea de arriba del formulario: «Tommy Hilfiger · City Mall (D-25) · No se reporta». */
+/** La línea de arriba del formulario: «Tommy Hilfiger · City Mall (D-25) · No recuperable». */
 export function resumenDelGasto(d: DatosDelGasto, marcaNombre: string | null): string {
   const partes: string[] = [];
   if (marcaNombre) partes.push(marcaNombre);
@@ -173,7 +173,7 @@ export function resumenDelGasto(d: DatosDelGasto, marcaNombre: string | null): s
   } else {
     partes.push(TIENDA_GENERAL);
   }
-  if (!d.seReporta) partes.push("No se reporta");
+  if (!d.seReporta) partes.push("No recuperable");
   return partes.join(" · ");
 }
 

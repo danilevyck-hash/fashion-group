@@ -207,11 +207,12 @@ export function esCuantoSeCobra(v: unknown): v is CuantoSeCobra {
 
 /**
  * 🔴 EL RÓTULO DE LO QUE NO SE LE COBRA A NADIE. Daniel lo dice «mi costo»; en
- * pantalla, en el Excel y en el papel va **«A cargo de la empresa»**. Ni un
+ * pantalla, en el Excel y en el papel va **«No recuperable»** (8-oct-2026: el
+ * nombre de ERP, el mismo en todo Marketing; antes decía otra cosa). Ni un
  * coloquialismo suyo sale a la pantalla; hay barrido
  * (`nombres-erp-prohibidos.test.ts` y `marketing-proveedores-2026-10.test.ts`).
  */
-export const ROTULO_A_CARGO_EMPRESA = "A cargo de la empresa";
+export const ROTULO_A_CARGO_EMPRESA = "No recuperable";
 
 /** El valor del desplegable que quiere decir «no se le cobra a ninguna marca». */
 export const VALOR_A_CARGO_EMPRESA = "__empresa__";

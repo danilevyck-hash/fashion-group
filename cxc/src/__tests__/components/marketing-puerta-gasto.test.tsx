@@ -408,7 +408,7 @@ describe("3 · 🔴 la tienda: del directorio, obligatoria si es de una tienda; 
     const d = { ...datosPorDefecto("factura"), tiendaCodigo: "d-30", esDeTienda: false, nota: "  Apertura   tienda " };
     expect(paraGuardar(d)).toEqual({ tiendaCodigo: null, seReporta: true, nota: "Apertura tienda" });
     expect(paraGuardar({ ...d, esDeTienda: true }).tiendaCodigo).toBe("D-30");
-    expect(resumenDelGasto({ ...d, esDeTienda: false, seReporta: false }, "Reebok")).toBe("Reebok · General · No se reporta");
+    expect(resumenDelGasto({ ...d, esDeTienda: false, seReporta: false }, "Reebok")).toBe("Reebok · General · No recuperable");
   });
 });
 

@@ -300,9 +300,9 @@ function Ficha({
                     <span className={r.recobra ? "text-gray-900" : "text-gray-500"}>
                       {r.destino}
                     </span>
-                    {!r.seReporta && (
+                    {!r.seReporta && r.destino !== ROTULO_A_CARGO_EMPRESA && (
                       <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                        No se reporta
+                        {ROTULO_A_CARGO_EMPRESA}
                       </span>
                     )}
                   </td>

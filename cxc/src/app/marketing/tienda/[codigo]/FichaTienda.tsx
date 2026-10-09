@@ -585,8 +585,8 @@ function FilaDeGasto({
         <div>{titulo}</div>
         <div className="text-[12px] text-gray-500">
           {detalle}
-          {!fila.seReporta && (
-            <span className="ml-2 rounded-md bg-gray-100 text-gray-500 px-1.5 py-0.5">No se reporta</span>
+          {!fila.seReporta && fila.marcaCodigo && (
+            <span className="ml-2 rounded-md bg-gray-100 text-gray-500 px-1.5 py-0.5">No recuperable</span>
           )}
         </div>
         {notaAbierta && (
