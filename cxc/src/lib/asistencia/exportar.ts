@@ -215,6 +215,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
           // columna. 🔑 El MISMO texto que el chip de la pantalla
           // (`textoPermisoDelDia`): el Excel es lo que se manda por correo y no
           // puede decir menos que la pantalla.
+          : d.permiso && d.permisoSeDescuenta ? d.permiso
           : d.permiso ? textoPermisoDelDia(d.permiso, {
             tardeMin: d.permisoPerdonaMin,
             salidaTempranaMin: d.permisoPerdonaSalidaMin,

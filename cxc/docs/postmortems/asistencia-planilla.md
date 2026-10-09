@@ -3302,6 +3302,16 @@ Daniel y la contable: las fiestas judías estaban cargadas en ⚙ › Feriados c
 - Medido el 30-sep-2026 en modo plan contra producción: 21-sep (Yom Kipur) → 0 deudas nuevas, 33 repetidas (las cargadas a mano), nadie marcó ese día; 12-sep (Rosh Hashaná, sábado) → nadie lo debe (nadie fuera de Multifashion trabaja sábado). Las 2 justificaciones del 21-sep sin deuda son las de sin salario (Yulissa Juárez, Daniel Levy).
 - ⚠️ Migración `20261222120000_asistencia_feriados_tipo.sql` escrita y SIN aplicar (marca 26 fiestas judías por lista de fechas y nombre). Sin ella todo es feriado, como antes, y la ruta rechaza (503) guardar un día libre. Candado `feriados-dia-libre`.
 
+## Tiempo fuera durante la jornada y «Permiso personal» (9-oct-2026)
+
+Daniel: *«¿cómo no se descuenta si alguien salió?»* y, sobre el permiso sin goce, *«(no me gustó ese nombre) es solo para saber que se le dio permiso; igual no se le paga»*.
+
+- 🩸 **Desde el 6-ago-2026 (`7ab10e9a`) la planilla nunca leyó el exceso de almuerzo**: solo tardanza y salida temprana. Con 6 marcas el segundo hueco no existía (510 min trabajados en vez de 390); con 4 marcas, un hueco de 14:00 a 16:00 era «almuerzo de 120» y solo se veía en el Reporte.
+- 🔴 **La regla, detrás de `DESCUENTA_TIEMPO_FUERA` (`tiempo-fuera.ts`, apagado)**: con 4 o 6 marcas se suman TODOS los huecos (2.ª–3.ª, 4.ª–5.ª), se resta el almuerzo permitido de su horario con la **gracia que ya existía** (`gracia_almuerzo_min`, 5 en la base: una puerta, 35 → 0 · 36 → 6) y lo que sobra va, minuto a minuto, a la columna **«Salida temprana»** (misma rata que la tardanza, mismo concepto del cierre y del corte, sin columna nueva en la base). Con 6 marcas se mide, pero el día SIGUE «a revisar» (pendiente de Daniel). Con 5, 7 u 8: a revisar y sin este descuento.
+- 🔴 **«Constancia» perdona** la intersección de su ventana con los huecos (nunca más que el exceso). **«Permiso personal»** se registra igual (horas obligatorias, mismos roles, desde «Justificar» o la ficha), **no perdona ni justifica nada** y se lee «Permiso personal · 14:00–16:00 · se descuenta». Solo se ofrece con el interruptor prendido.
+- 📏 **Simulación, 9-sep al 8-oct-2026 (3.295 marcas, solo lectura)**: con el motor apagado, IDÉNTICO a `origin/main`. Prendido: 14 días cambian, todos de 4 marcas (ningún día de 6 en el mes), −$9,58 en total; el mayor, Ángel Pizza (305) el 7-oct, 151 min ($5,95) con marcas 09:31 · 09:59 · 13:30 · 19:35 (parece una entrada repetida). Los días de 7 y 8 marcas de Jorman Hernández (5) siguen a revisar y no se descuentan.
+- 🔴 Las planillas cerradas no se recalculan: son el resultado congelado.
+
 ## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
 
 > Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.

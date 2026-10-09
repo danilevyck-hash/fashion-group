@@ -12,7 +12,7 @@ import { asistenciaRoles, diaLibreRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { alcanceDelRol, empresaEnAlcance, empresaForzada, rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { esDiaLibreDeLaEmpresa, MOTIVOS_JUSTIFICACION, motivoSeOfrece } from "@/lib/asistencia/motivos";
+import { esDiaLibreDeLaEmpresa, motivosParaElegir, motivoSeOfrece } from "@/lib/asistencia/motivos";
 import { avisoMigracionDiaLibre } from "@/lib/asistencia/dia-libre-empresa";
 import { cargarDeudasDiaLibre } from "@/lib/asistencia/dia-libre-empresa-server";
 import {
@@ -20,6 +20,7 @@ import {
   COLS_PERMISO_HORAS,
   esColumnaPermisoHorasFaltante,
   motivoAdmiteHoras,
+  motivoExigeHoras,
   ventanaDe,
 } from "@/lib/asistencia/permiso-horas";
 import { leerPersonasDelModulo } from "@/lib/asistencia/config-server";
@@ -75,7 +76,8 @@ export async function GET(req: NextRequest) {
     .filter((j) => !empresaFiltro || empresaDe.get(String(j.empleado_codigo)) === empresaFiltro);
   return NextResponse.json({
     justificaciones: lista,
-    motivos: MOTIVOS_JUSTIFICACION,
+    // Los siete de siempre; «Permiso personal» solo con su interruptor prendido.
+    motivos: motivosParaElegir(null),
     // El desplegable de personas también se recorta: nadie carga una
     // justificación a alguien que no es de su empresa.
     personas: personas.filter((p) => empresaEnAlcance(alcance, empresaDe.get(String(p.codigo)) ?? null)),
@@ -118,7 +120,7 @@ export async function POST(req: NextRequest) {
   // atrás. La lista vive en `motivos.ts`, no repetida acá.
   if (!motivoSeOfrece(motivo)) {
     return NextResponse.json(
-      { error: `Ese motivo ya no se usa. Selecciona uno de: ${MOTIVOS_JUSTIFICACION.join(" · ")}.` },
+      { error: `Ese motivo ya no se usa. Selecciona uno de: ${motivosParaElegir(null).join(" · ")}.` },
       { status: 400 },
     );
   }
@@ -135,7 +137,15 @@ export async function POST(req: NextRequest) {
   // rechaza, y se dice.
   if (pidioHoras && !motivoAdmiteHoras(motivo)) {
     return NextResponse.json(
-      { error: "Las horas solo van con Constancia. Los otros motivos cubren el día completo." },
+      { error: "Las horas solo van con Constancia o Permiso personal. Los otros motivos cubren el día completo." },
+      { status: 400 },
+    );
+  }
+  // 🔴 El permiso personal (9-oct-2026) no existe de día entero: sin horas no
+  // diría qué salida se autorizó.
+  if (!pidioHoras && motivoExigeHoras(motivo)) {
+    return NextResponse.json(
+      { error: "El permiso personal necesita la hora de salida y la de regreso." },
       { status: 400 },
     );
   }
