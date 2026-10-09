@@ -372,8 +372,9 @@ export interface DiaReporte {
   /**
    * 🔴 EL TIEMPO FUERA QUE LA PLANILLA DESCUENTA (9-oct-2026): todos los huecos
    * del día menos el almuerzo permitido, con su gracia y neto de Constancia.
-   * Solo viaja con `DESCUENTA_TIEMPO_FUERA` prendido y solo en días de 4 o 6
-   * marcas (con 5, 7 u 8 no se adivina: 0). Ausente = la planilla de hoy. Ver
+   * Solo viaja con `DESCUENTA_TIEMPO_FUERA` prendido y solo en días de 4
+   * marcas (con 5 o más no se adivina: 0, y el día queda a revisar). En la
+   * planilla va en SU columna, «Tiempo no laborado». Ausente = la planilla de hoy. Ver
    * `tiempo-fuera.ts`.
    */
   descuentaFueraMin?: number;
@@ -517,6 +518,12 @@ export interface PersonaReporte {
      * `diasARevisar`, nunca sumado.
      */
     diasEnCurso: number;
+    /**
+     * 🔴 «TIEMPO NO LABORADO» (9-oct-2026): lo que la planilla descuenta por el
+     * tiempo fuera durante la jornada (`descuentaFueraMin` de cada día). 0 con
+     * `DESCUENTA_TIEMPO_FUERA` apagado.
+     */
+    tiempoNoLaboradoMin: number;
     tiempoNoTrabajadoMin: number;
     /** Días de esta persona con al menos una hora corregida a mano. */
     diasCorregidos: number;
@@ -1216,9 +1223,9 @@ export function armarReporte(opts: {
       let permisoPerdonaAlmuerzoMin = 0;
       let almuerzoTomado = 0;
       // ── 🔴 EL TIEMPO FUERA DURANTE LA JORNADA (9-oct-2026) ─────────────────
-      // Con el interruptor prendido y 4 o 6 marcas: TODOS los huecos, menos el
+      // Con el interruptor prendido y 4 marcas: TODOS los huecos, menos el
       // almuerzo permitido (con su gracia, la misma puerta de siempre), menos
-      // lo que cubra una Constancia. Apagado, o con 5, 7 u 8 marcas: lo de
+      // lo que cubra una Constancia. Apagado, o con 5 o más marcas: lo de
       // siempre (2.ª a 3.ª marca). Ver `tiempo-fuera.ts`.
       const fueraNuevo = descuentaFuera && marcasMedibles(buenas.length);
       if (fueraNuevo) {
@@ -1333,8 +1340,8 @@ export function armarReporte(opts: {
       // 🔴 18-sep-2026: se cuenta DESPUÉS de olvidar la repetida. Un día de 5
       // con una repetida deja de estar a revisar; uno de 5 con una marca que
       // falta sigue estándolo.
-      // ⚠️ 9-oct-2026: un día de 6 marcas SIGUE a revisar aunque el tiempo fuera
-      // ya se mida (decisión pendiente de Daniel: ¿6 es un día bien marcado?).
+      // 🔴 9-oct-2026: 4 marcas por día (Daniel). Un día de 5 o más (solo puede
+      // venir del reloj físico) sigue a revisar y no descuenta tiempo fuera.
       const revisar = !enCurso && buenas.length !== 4;
       // 🔴 DOS MARCAS Y LA SEGUNDA MUY ANTES DE SU SALIDA (16-sep-2026): se
       // AVISA, no se calcula. Los minutos de arriba ya están decididos y esto
@@ -1404,6 +1411,7 @@ export function armarReporte(opts: {
       // días y no solo sobre los que tienen marcas: hoy, a las 8:59, la persona
       // todavía no marcó y ese día también está en curso.
       diasEnCurso: dias.filter((d) => d.enCurso).length,
+      tiempoNoLaboradoMin: conMarcas.reduce((a, d) => a + (d.descuentaFueraMin ?? 0), 0),
       tiempoNoTrabajadoMin: 0,
       // 🔑 Sobre TODOS los días, no solo `conMarcas`: si algún día una
       // corrección pudiera existir sobre un día sin marcas, contarla solo en
@@ -1413,8 +1421,12 @@ export function armarReporte(opts: {
       marcasRepetidas: dias.reduce((a, d) => a + d.repetidas.length, 0),
     };
     // El número de planilla: todo lo que no se trabajó, junto.
-    resumen.tiempoNoTrabajadoMin =
-      resumen.minutosTarde + resumen.excesoAlmuerzoMin + resumen.salidaTempranaMin;
+    // 🔴 Con el tiempo fuera prendido (9-oct-2026) suma lo que la planilla
+    // descuenta —«Tiempo no laborado»— en vez del exceso de almuerzo crudo,
+    // que en un día de 5 o más marcas no se descuenta (queda a revisar).
+    resumen.tiempoNoTrabajadoMin = resumen.minutosTarde
+      + (descuentaFuera ? resumen.tiempoNoLaboradoMin : resumen.excesoAlmuerzoMin)
+      + resumen.salidaTempranaMin;
 
     out.push({
       codigo,

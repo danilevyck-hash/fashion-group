@@ -158,7 +158,7 @@ export function diasSinMedir(
 }
 
 /**
- * 🔴 LOS OCHO CONCEPTOS QUE SALEN DEL RELOJ, y los únicos que se ajustan.
+ * 🔴 LOS NUEVE CONCEPTOS QUE SALEN DEL RELOJ, y los únicos que se ajustan.
  *
  * Los que RESTAN del sueldo van con signo `+` (se le descuenta después) y los
  * que SUMAN van con `−` (se le devuelve después). Está escrito así, con la
@@ -166,12 +166,14 @@ export function diasSinMedir(
  * decidir de qué lado cae en vez de quedarse afuera en silencio.
  *
  * 🩸 Eran SIETE hasta el 11-sep-2026: «Salida temprana» nació el 10-sep y se
- * quedó afuera. Daniel: *«la salida temprana incluirla»*.
+ * quedó afuera. Daniel: *«la salida temprana incluirla»*. Nueve desde el
+ * 9-oct-2026: «Tiempo no laborado» (el tiempo fuera durante la jornada).
  */
 export const CONCEPTOS_DEL_RELOJ = [
   { campo: "ausencias", signo: +1 },
   { campo: "tardanzas", signo: +1 },
   { campo: "salidaTemprana", signo: +1 },
+  { campo: "tiempoNoLaborado", signo: +1 },
   { campo: "extraDiurno", signo: -1 },
   { campo: "extraNocturno", signo: -1 },
   { campo: "excedente", signo: -1 },
@@ -179,7 +181,7 @@ export const CONCEPTOS_DEL_RELOJ = [
   { campo: "feriados", signo: -1 },
 ] as const satisfies readonly { campo: keyof DineroLinea; signo: 1 | -1 }[];
 
-/** Un concepto del reloj: los ocho campos de `CONCEPTOS_DEL_RELOJ`. */
+/** Un concepto del reloj: los nueve campos de `CONCEPTOS_DEL_RELOJ`. */
 export type CampoDelReloj = (typeof CONCEPTOS_DEL_RELOJ)[number]["campo"];
 
 /**
@@ -348,11 +350,12 @@ export const ROTULO_DEL_RELOJ: Readonly<Record<CampoDelReloj, string>> = {
   ausencias: "Ausencias",
   tardanzas: "Tardanzas",
   salidaTemprana: "Salida temprana",
+  tiempoNoLaborado: "Tiempo no laborado",
 };
 
 /** El orden en que se nombran las columnas: el del cuadro de la contable. */
 export const ORDEN_DEL_RELOJ: readonly CampoDelReloj[] = [
-  "extraDiurno", "ausencias", "tardanzas", "salidaTemprana", "extraNocturno", "excedente", "domingos", "feriados",
+  "extraDiurno", "ausencias", "tardanzas", "salidaTemprana", "tiempoNoLaborado", "extraNocturno", "excedente", "domingos", "feriados",
 ];
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];

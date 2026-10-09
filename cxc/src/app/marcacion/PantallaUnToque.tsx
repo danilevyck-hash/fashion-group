@@ -33,6 +33,7 @@ import {
   MARCACION_CUATRO_MARCAS,
   resumenDelDia,
   rotuloDeshacerDeLaMarca,
+  TEXTO_CUATRO_MARCAS_REGISTRADAS,
 } from "@/lib/marcacion/cuatro-marcas";
 import {
   CLASES_BOTON_UN_TOQUE,
@@ -245,6 +246,13 @@ export default function PantallaUnToque({
       {/* 🔴 EL BOTÓN, SIEMPRE EN EL MISMO PÍXEL. */}
       <div ref={cajon} data-boton-fijo {...{ [ATRIBUTO_BARRA_FIJA]: "" }} className={CLASES_CAJON_BOTON} style={{ paddingBottom: PADDING_ABAJO_BOTON }}>
         <div className="mx-auto w-full max-w-md">
+          {/* 🔴 9-oct-2026: máximo 4 marcas por día, dicho con su nombre. El
+              servidor rechaza la 5.ª igual (409, `avisoDiaCompleto`). */}
+          {boton.apagado && !marcando && MARCACION_CUATRO_MARCAS && (
+            <p data-cuatro-marcas className="mb-2 text-center text-[13px] text-gray-500">
+              {TEXTO_CUATRO_MARCAS_REGISTRADAS}
+            </p>
+          )}
           <button
             type="button"
             onClick={onTocarBoton}

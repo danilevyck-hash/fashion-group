@@ -202,7 +202,10 @@ describe("🔴 en la planilla: el recargo por la hora del día, y Aprobaciones",
       "domingoMin", "excedenteMin", "extraAutoMin", "extraDiurnoMin", "extraNoAprobadaDiurnoMin",
       "extraNoAprobadaDomFerMin", "extraNoAprobadaMin", "extraNoAprobadaNocturnoMin", "extraNocturnoMin",
       "feriadoMin", "jornadaDiariaMin", "sabadoMin", "salidaTempranaMin", "tardanzaDeDiasARevisarMin",
-      "tardanzaGraveDias", "tardanzaGraveMin", "tardanzaMin", "vacacionesDias", "vacacionesYaPagadasDias",
+      "tardanzaGraveDias", "tardanzaGraveMin", "tardanzaMin",
+      // 9-oct-2026: «Tiempo no laborado», su propia columna (migración aditiva).
+      "tiempoNoLaboradoMin",
+      "vacacionesDias", "vacacionesYaPagadasDias",
       "vacacionesYaPagadasMin",
     ]);
   });

@@ -1767,7 +1767,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                         {capitalizarNombre(l.etiqueta)}
                         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
                       </td>
-                      <td colSpan={18} className="px-2 py-2.5 text-[13px] text-gray-500">
+                      <td colSpan={ROTULOS_DINERO_PLANILLA.length} className="px-2 py-2.5 text-[13px] text-gray-500">
                         {MOTIVO_FUERA_DE_PLANILLA} · se le mide la asistencia, no se le calcula pago
                       </td>
                     </tr>
@@ -1782,7 +1782,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                         {capitalizarNombre(l.etiqueta)}
                         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
                       </td>
-                      <td colSpan={18} className="px-2 py-2.5 text-[13px] text-gray-600">
+                      <td colSpan={ROTULOS_DINERO_PLANILLA.length} className="px-2 py-2.5 text-[13px] text-gray-600">
                         {l.decidirAMano}
                         {l.quincenalReferencia !== null && (
                           <> — la quincena completa le daría <b>${$(l.quincenalReferencia)}</b></>
@@ -1796,7 +1796,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
                         {capitalizarNombre(l.etiqueta)}
                         <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
                       </td>
-                      <td colSpan={18} className="px-2 py-2.5 text-[13px] font-medium text-amber-800">
+                      <td colSpan={ROTULOS_DINERO_PLANILLA.length} className="px-2 py-2.5 text-[13px] font-medium text-amber-800">
                         falta configurar — {l.faltaConfigurar.join(" · ")}
                       </td>
                     </tr>
@@ -2436,6 +2436,7 @@ function Fila({
       </td>
       {num(d.tardanzas, "text-red-700", conAjuste("tardanzas"))}
       {num(d.salidaTemprana ?? 0, "text-red-700", conAjuste("salidaTemprana"))}
+      {num(d.tiempoNoLaborado ?? 0, "text-red-700", conAjuste("tiempoNoLaborado"))}
       {num(d.extraNocturno, "", conAjuste("extraNocturno"))}
       {num(d.excedente, "", conAjuste("excedente"))}
       {num(d.domingos, "", conAjuste("domingos"))}
@@ -2543,6 +2544,7 @@ function Tarjeta({
           {linea(`Ausencias (${textoAusencias(h)})`, d.ausencias, true)}
           {linea(`Tardanzas (${textoTardanzas(h)})`, d.tardanzas, true)}
           {linea(`Salida temprana (${Math.round(h.salidaTempranaMin ?? 0)} min)`, d.salidaTemprana ?? 0, true)}
+          {linea(`Tiempo no laborado (${Math.round(h.tiempoNoLaboradoMin ?? 0)} min)`, d.tiempoNoLaborado ?? 0, true)}
           <div className="mt-1 flex justify-between border-t border-gray-200 pt-1 font-semibold">
             <span>Total bruto</span>
             <span className="tabular-nums">${$(d.totalBruto)}</span>

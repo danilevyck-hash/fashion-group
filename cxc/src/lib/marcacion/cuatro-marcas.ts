@@ -162,10 +162,20 @@ export function estadoDelBotonHoy(marcasHoy: number): EstadoBoton {
   return MARCACION_CUATRO_MARCAS ? botonCuatroMarcas(marcasHoy) : estadoDelBoton(marcasHoy);
 }
 
+/**
+ * 🔴 MÁXIMO 4 MARCAS POR DÍA (9-oct-2026, Daniel: *«cada persona debería de
+ * poder marcar 4 veces nada más»*). Con eso cada día tiene un solo hueco, el
+ * almuerzo, y lo que pase del almuerzo permitido va a «Tiempo no laborado».
+ * Lo dice la pantalla bajo el botón apagado y lo contesta el servidor (409)
+ * a una 5.ª marca. El reloj físico no se puede frenar: un día suyo con 5 o
+ * más queda a revisar (`tiempo-fuera.ts`).
+ */
+export const TEXTO_CUATRO_MARCAS_REGISTRADAS = "Ya se registraron las 4 marcas del día.";
+
 /** Lo que contesta el servidor cuando el día ya está completo. */
 export function avisoDiaCompleto(): string {
-  const que = MARCACION_CUATRO_MARCAS ? "sus cuatro marcas" : "su entrada y su salida";
-  return `Ese día ya tiene ${que}. Si algo está mal, avísale a ${QUIEN_CORRIGE}.`;
+  const que = MARCACION_CUATRO_MARCAS ? TEXTO_CUATRO_MARCAS_REGISTRADAS : "Ese día ya tiene su entrada y su salida.";
+  return `${que} Si algo está mal, avísale a ${QUIEN_CORRIGE}.`;
 }
 
 /** «Deshacer la salida a almuerzo». Con el interruptor apagado dice lo de

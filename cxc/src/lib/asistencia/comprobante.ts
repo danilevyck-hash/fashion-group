@@ -173,6 +173,7 @@ export const CLAVES_RENGLON = [
   "ausencia",
   "tardanzas",
   "salidaTemprana",
+  "tiempoNoLaborado",
   "totalDevengado",
   "__deducciones",
   "seguroSocial",
@@ -322,6 +323,8 @@ export function armarComprobante(
       notaTardanza(linea.horas)),
     // 🔴 10-sep-2026: salir antes de la hora se descuenta (Daniel: «b, se descuenta obvio»).
     R("salidaTemprana", "SALIDA TEMPRANA", v(d?.salidaTemprana), "dato", false),
+    // 🔴 9-oct-2026: el tiempo fuera durante la jornada, en SU renglón.
+    R("tiempoNoLaborado", "TIEMPO NO LABORADO", v(d?.tiempoNoLaborado), "dato", false),
     R("totalDevengado", "TOTAL DEVENGADO", v(d?.totalBruto), "total", false),
 
     R("__deducciones", "DEDUCCIONES:", null, "seccion", false),

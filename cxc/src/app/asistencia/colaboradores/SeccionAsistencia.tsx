@@ -85,6 +85,11 @@ export default function SeccionAsistencia({ codigo, refresco }: {
             <Numero etiqueta="Faltas sin justificar" valor={String(r.ausenciasSinJustificar ?? 0)}
               ojo={Number(r.ausenciasSinJustificar ?? 0) > 0} />
             <Numero etiqueta="Horas extra" valor={tiempoDelDia(Number(r.extraMin ?? 0))} />
+            {/* 🔴 9-oct-2026: el tiempo fuera durante la jornada que se descuenta,
+                con el nombre de su columna de la planilla. Solo si hay. */}
+            {Number(r.tiempoNoLaboradoMin ?? 0) > 0 && (
+              <Numero etiqueta="Tiempo no laborado" valor={tiempoDelDia(Number(r.tiempoNoLaboradoMin))} ojo />
+            )}
           </dl>
 
           <Link

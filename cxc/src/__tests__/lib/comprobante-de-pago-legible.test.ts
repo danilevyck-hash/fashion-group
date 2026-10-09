@@ -175,7 +175,9 @@ describe("A. 🔴 NI UN CENTAVO SE MUEVE — la tanda real de Fashion Wear, 1–
     });
   });
 
-  it("cada hoja dibuja los MISMOS 22 montos que salieron impresos (rata + los 21 renglones)", () => {
+  // 🔴 9-oct-2026: + «TIEMPO NO LABORADO» (en 0.00 en esta tanda: no existía). Los
+  // montos impresos no se mueven; solo se agrega su renglón.
+  it("cada hoja dibuja los MISMOS montos que salieron impresos, más «Tiempo no laborado» en 0.00", () => {
     // 🔴 Medido del PDF de producción del 20-sep-2026, hoja por hoja.
     const ESPERADO: readonly (readonly string[])[] = TANDA.map((p) => [
       p.rata.toFixed(2),
@@ -188,6 +190,7 @@ describe("A. 🔴 NI UN CENTAVO SE MUEVE — la tanda real de Fashion Wear, 1–
       "0.00", // AUSENCIA
       "0.00", // TARDANZAS
       p.salidaTemprana.toFixed(2),
+      "0.00", // TIEMPO NO LABORADO (9-oct-2026)
       p.bruto.toFixed(2), // TOTAL DEVENGADO
       "0.00", // SEGURO SOCIAL
       "0.00", // SEGURO EDUCATIVO
@@ -273,6 +276,7 @@ describe("C. 🔴 NINGÚN TEXTO SIN SU ACENTO", () => {
     "DEDUCCIONES", "SEGURO", "SOCIAL", "EDUCATIVO", "IMPUESTO", "SOBRE", "LA",
     "RENTA", "DESCUENTOS", "PRÉSTAMO", "DESCUENTO", "A", "TERCEROS", "DAÑO",
     "MERCANCÍA", "OTROS", "SERVICIOS", "PAGAR",
+    "TIEMPO", "NO", "LABORADO",
     // El pie
     "RECIBÍ", "CONFORME", "CÉDULA", "FECHA",
   ]);

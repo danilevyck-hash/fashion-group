@@ -24,9 +24,9 @@
 
 import type { DineroLinea } from "./planilla";
 
-/** Los 19 campos que la tabla dibuja, en su orden. */
+/** Los 20 campos que la tabla dibuja, en su orden (+ «Tiempo no laborado», 9-oct-2026). */
 export const CAMPOS_DINERO_PLANILLA = [
-  "salarioQuincenal", "extraDiurno", "ausencias", "tardanzas", "salidaTemprana",
+  "salarioQuincenal", "extraDiurno", "ausencias", "tardanzas", "salidaTemprana", "tiempoNoLaborado",
   "extraNocturno", "excedente", "domingos", "feriados", "totalBruto",
   "seguroSocial", "seguroEducativo", "isr", "prestamo", "terceros",
   "mercancia", "totalDeducciones", "otrosServicios", "netoPagar",
@@ -54,6 +54,9 @@ export const COLUMNAS_DINERO_PLANILLA: readonly ColumnaDineroPlanilla[] = [
   // 🔴 10-sep-2026: la salida antes de la hora se descuenta. Es la columna que
   // a Boston le faltó.
   { campo: "salidaTemprana", rotulo: "Salida\ntemprana" },
+  // 🔴 9-oct-2026: el tiempo fuera durante la jornada, en SU columna (Daniel:
+  // que la contable no lo confunda con alguien que se fue temprano).
+  { campo: "tiempoNoLaborado", rotulo: "Tiempo no\nlaborado" },
   { campo: "extraNocturno", rotulo: "Extra\n1.50" },
   { campo: "excedente", rotulo: "Exce-\ndente" },
   { campo: "domingos", rotulo: "Domin-\ngos" },
@@ -80,8 +83,8 @@ export const ROTULOS_DINERO_PLANILLA: readonly string[] = COLUMNAS_DINERO_PLANIL
  * guardada de antes del 10-sep no la trae: ahí vale 0.
  */
 export type MontosPlanilla =
-  & Pick<DineroLinea, Exclude<CampoDineroPlanilla, "salidaTemprana">>
-  & { salidaTemprana?: number };
+  & Pick<DineroLinea, Exclude<CampoDineroPlanilla, "salidaTemprana" | "tiempoNoLaborado">>
+  & { salidaTemprana?: number; tiempoNoLaborado?: number };
 
 /** Los 19 montos, en el MISMO orden que `COLUMNAS_DINERO_PLANILLA`. */
 export function montosDePlanilla(d: MontosPlanilla): number[] {

@@ -17,12 +17,18 @@
  *      PUERTA, no un descuento — pasada, cuenta todo desde el minuto
  *      programado (`excesoAlmuerzoBrutoMin`).
  *   3. Lo que sobra se descuenta minuto por minuto, al valor del minuto de la
- *      tardanza. En la planilla va a la columna «Salida temprana» (misma rata,
- *      mismo concepto del cierre y del corte; sin columna nueva en la base).
+ *      tardanza. 🔴 Desde el 9-oct-2026 va en SU columna, «Tiempo no laborado»
+ *      (Daniel: que la contable no lo confunda con alguien que se fue
+ *      temprano). Misma rata; columna propia en la planilla, el Excel, el PDF,
+ *      el comprobante, el cierre y el corte.
  *   4. Una «Constancia» que cubre el hueco lo perdona (la intersección, como
  *      siempre). Un «Permiso personal» NO perdona nada: solo informa.
- *   5. Solo con 4 o 6 marcas. Con 5, 7, 8 o una suelta NO se adivina: el día
- *      sigue «a revisar» y este descuento no se aplica hasta que se arregle.
+ *   5. 🔴 SOLO CON 4 MARCAS (9-oct-2026, Daniel: *«cada persona debería de
+ *      poder marcar 4 veces nada más»*). El teléfono no deja marcar la 5.ª
+ *      (`cuatro-marcas.ts`, rechazado en el servidor). El reloj físico no se
+ *      puede frenar: un día con 5 o más marcas sigue «a revisar» y este
+ *      descuento NO se aplica hasta que alguien lo arregle. Con 1, 2 o 3
+ *      marcas, lo de siempre.
  *
  * 🔴 APAGADO = LA PLANILLA DE HOY, centavo por centavo (candado
  * `asistencia-tiempo-fuera.test.ts`). Las planillas cerradas no se recalculan
@@ -32,9 +38,9 @@
 /** 🔴 EL INTERRUPTOR. Lo prende Daniel después de ver la simulación. */
 export const DESCUENTA_TIEMPO_FUERA = false;
 
-/** ¿Este día se mide con la regla nueva? Solo 4 o 6 marcas. */
+/** ¿Este día se mide con la regla nueva? Solo con 4 marcas: un solo hueco, el almuerzo. */
 export function marcasMedibles(n: number): boolean {
-  return n === 4 || n === 6;
+  return n === 4;
 }
 
 /** Los huecos [salió, volvió] del día, en segundos: (2.ª,3.ª), (4.ª,5.ª). */

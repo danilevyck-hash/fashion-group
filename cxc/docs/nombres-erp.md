@@ -70,6 +70,8 @@ Cuando Daniel corrija un nombre («eso no se dice así»), para que quede atrapa
 | A quién se le cobra un gasto (Marketing) | Se cobra a (las 5 marcas, o «No recuperable») · Se cobra (Completo · Mitad) | A quién se le pasa, mi costo, costo propio, inventario propio, porcentajes en pantalla |
 | Adjunto de un gasto | Comprobante · Adjuntar comprobante | Foto o factura, Subir foto o factura |
 | Gasto sin tienda | Sin tienda (en el formulario; el cajón del reporte y del ZIP sigue siendo «General») | De una tienda, General (como botón) |
+| Tiempo fuera durante la jornada que pasa del almuerzo permitido (Asistencia, columna de la planilla, Reporte, Excel, PDF, comprobante y ficha; 9-oct-2026) | Tiempo no laborado (en el Reporte el total de la fila pasa a llamarse «Total») | Salida temprana (es otra cosa: se fue y no volvió), Tiempo fuera, Exceso de salida |
+| Tope de marcas del teléfono (Marcación, 9-oct-2026) | Ya se registraron las 4 marcas del día | Ya marcaste todo, Se acabaron tus marcas |
 | Salida autorizada en la jornada que igual se descuenta (Asistencia, motivo de justificación con horas; 9-oct-2026) | Permiso personal (se lee «Permiso personal · 14:00–16:00 · se descuenta») | Permiso sin goce, Justificado sin pago |
 | Rótulos de formulario | Sustantivo («Pago por planilla», «Marcación en reloj») | Preguntas («¿Qué…?», «¿Quién…?», «¿A quién…?»), salvo «¿Es X (D-25)?», que Daniel aprobó textual |
 | Reponer la tardanza quedándose más tarde el mismo día (ficha del colaborador, Asistencia) | Compensación de tardanza (opciones: «No, la tardanza se descuenta» · «Sí, con tiempo después de la salida») | Repone tardanza, Recupera tardanza, Repone |

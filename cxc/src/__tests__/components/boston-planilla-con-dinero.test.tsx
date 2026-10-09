@@ -50,7 +50,7 @@ vi.mock("@/components/ui/RangoFechas", () => ({
  *  pantallas leen `columnas-dinero-planilla.ts`, y este candado exige que lo
  *  que Boston dibuja sea EXACTAMENTE esa lista (con la columna nueva adentro). */
 const COLUMNAS = [
-  "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas", "Salida\ntemprana",
+  "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas", "Salida\ntemprana", "Tiempo no\nlaborado",
   "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
   "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
   "Mercan-\ncía", "Total\ndeducc.", "Otros\nservicios (+)", "Neto a\npagar",
@@ -173,7 +173,7 @@ describe("🔴 con los sueldos abiertos", () => {
     avisos: {},
   };
 
-  it("dibuja las 19 columnas del grupo, en su orden", async () => {
+  it("dibuja las 20 columnas del grupo, en su orden", async () => {
     responder(CON_DINERO);
     render(<PlanillaBoston />);
     elegirPeriodo();
