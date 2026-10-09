@@ -46,6 +46,9 @@ import { etiquetaPeriodo, type Periodo } from "@/lib/multifashion/periodo";
 import { ListaSeguimientoClientes } from "./ListaSeguimientoClientes";
 import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 import { RETAIL_AL_FRENTE, fueraDelRanking } from "@/lib/multifashion/retail-al-frente";
+import { MULTIFASHION_APPLE_2026_10, pieClientes } from "@/lib/multifashion/apple";
+import { NumeroGrande } from "./PiezasApple";
+import { Aviso } from "@/components/ui/Aviso";
 
 // "Escala compartida entre mayoreo y retail" vivía escrito DOS veces —una en la
 // lista vertical del celular, otra en la tira del escritorio— y por eso podían
@@ -280,6 +283,41 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
   // cuatro cuentas de las tarjetas no se tocan.
   if (RETAIL_AL_FRENTE) {
     const clientesLista = fidel ? fidel.clientes.filter((c) => !fueraDelRanking(c.cliente_switch_id)) : [];
+    // 🔴 `MULTIFASHION_APPLE_2026_10`: «Frecuentes» es EL número; las otras dos
+    // tarjetas van en su línea; enseguida la lista (con «No vuelven», lo que
+    // pide actuar) y la cobertura baja a la línea del pie. Mismos datos.
+    if (MULTIFASHION_APPLE_2026_10) {
+      const pie = pieClientes({
+        cobertura: cobertura.texto,
+        ventasAnonimas: retail?.ventas_anonimas ?? 0,
+        ticketsAnonimos: retail?.tickets_anonimos ?? 0,
+      });
+      return (
+        <div data-pestana="clientes-apple" className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
+          <h3 className="sr-only">Clientes · {periodoStr}</h3>
+          {errorMsg ? (
+            <Aviso tono="error" accion={{ texto: "Reintentar", onClick: () => { void mutate(); } }}>
+              No se pudo cargar la lista
+            </Aviso>
+          ) : loading && !retail ? (
+            <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-gray-500">
+              Cargando clientes…
+            </Card>
+          ) : (
+            <>
+              {fidel && (
+                <NumeroGrande
+                  monto={fidel.cards.frecuentes.toLocaleString("en-US")}
+                  linea={`frecuentes · ${fidel.cards.nuevos_mes.toLocaleString("en-US")} nuevos del mes · ${fidel.cards.cinco_pendiente.toLocaleString("en-US")} con descuento 5% pendiente`}
+                />
+              )}
+              {fidel && <ListaSeguimientoClientes clientes={clientesLista} hoy={fidel.hoy} conMonto />}
+              {pie && <p data-elemento="pie-clientes" className="text-xs text-gray-500 tabular-nums">{pie}</p>}
+            </>
+          )}
+        </div>
+      );
+    }
     return (
       <div data-pestana="clientes-minimo" className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
         {errorMsg ? (

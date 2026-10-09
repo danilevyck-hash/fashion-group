@@ -28,6 +28,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
@@ -58,6 +59,8 @@ import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import RangoFechas from "@/components/ui/RangoFechas";
 import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
+import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
+import { Aviso } from "@/components/ui/Aviso";
 
 // Fetcher puro del overview por año. SWR lo cachea por año → volver a un año ya
 // visto pinta al instante y revalida en background.
@@ -170,6 +173,19 @@ export function MultifashionShell({
     if (clave === "anio") { setPantallaRaw("anio"); return; }
     setSubtabRaw(clave);
   }, [setPantallaRaw, setSubtabRaw]);
+
+  // 🔴 `MULTIFASHION_APPLE_2026_10`: tocar un mes en «Año» abre ESE mes en el
+  // inicio. Los dos parámetros en UNA escritura (dos `useUrlState` seguidos se
+  // pisan: cada uno arma la URL desde la misma foto).
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const abrirMes = useCallback((anio: number, mes: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("mfPeriodo", periodoAUrl({ tipo: "mes", anio, mes }));
+    params.delete("mfCel");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [router, pathname, searchParams]);
 
   const encabezadoBase = encabezadoCelular({ tab, pantalla: pantallaCel, periodo, corte });
   // CALENDARIO_SIMPLE_2026_10: con un rango, «‹» dice el MES al que vuelve (el
@@ -435,11 +451,15 @@ export function MultifashionShell({
         <VentaHoyCard syncTick={syncTick} habilitado={authChecked} />
       </div>
 
-      {fetchError && (
+      {fetchError && (MULTIFASHION_APPLE_2026_10 ? (
+        <Aviso tono="error" className="mb-4" accion={{ texto: "Reintentar", onClick: () => { void mutate(); } }}>
+          No se pudo actualizar {etiquetaPeriodo(periodo).toLowerCase()}
+        </Aviso>
+      ) : (
         <div className="mb-4 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
           No se pudo actualizar {etiquetaPeriodo(periodo).toLowerCase()}: {fetchError}
         </div>
-      )}
+      ))}
 
       {/* Bloque 3 de 3: las pestañas y su contenido. */}
       {multi ? (
@@ -451,7 +471,7 @@ export function MultifashionShell({
           corte={corte}
           isClosedYear={isClosedYear}
           syncTick={syncTick}
-          celular={MULTIFASHION_CELULAR ? { pantalla: pantallaCel, onAbrir: abrirRenglon } : undefined}
+          celular={MULTIFASHION_CELULAR ? { pantalla: pantallaCel, onAbrir: abrirRenglon, onAbrirMes: abrirMes } : undefined}
         />
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">

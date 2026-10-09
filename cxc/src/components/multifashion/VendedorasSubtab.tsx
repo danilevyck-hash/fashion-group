@@ -41,7 +41,7 @@
 //    bono JUNTOS—; el canal lo dice la base por CÓDIGO, nunca el nombre.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { Info, Users } from "lucide-react";
@@ -87,6 +87,9 @@ import { RETAIL_AL_FRENTE, mesCerrado } from "@/lib/multifashion/retail-al-frent
 import { libroVendedoras, nombreArchivoVendedoras } from "@/lib/multifashion/vendedoras-excel";
 import { MULTIFASHION_CELULAR, montoCorto } from "@/lib/multifashion/celular";
 import { VendedorasCelular } from "./celular/VendedorasCelular";
+import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
+import { AtencionMultifashion, useMetaQueNoLlega } from "./PiezasApple";
+import { Aviso } from "@/components/ui/Aviso";
 import { workbookBlob } from "@/lib/excel-export";
 import { saveAs } from "file-saver";
 
@@ -163,6 +166,12 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   // La meta del celular abre la tarjeta de metas de siempre — no una nueva.
   const [metaAbiertaCel, setMetaAbiertaCel] = useState(false);
   const celular = MULTIFASHION_CELULAR && enCelular === true;
+  // 🔴 `MULTIFASHION_APPLE_2026_10`, SOLO en el módulo (el espejo de Comisiones
+  // no lleva `conMetas` y queda como está): la meta que no llega, ARRIBA. Sin
+  // número grande: el de esta pantalla es la barra «TOTAL A PAGAR».
+  const apple = MULTIFASHION_APPLE_2026_10 && conMetas === true;
+  const metaAtrasada = useMetaQueNoLlega(apple);
+  const metasRef = useRef<HTMLElement>(null);
 
   // Meses base relativos a hoy. Para año cerrado, "en curso" = Dic.
   // 🔴 UN SOLO CORTE DEL MES (23-sep-2026): cuando el módulo manda su `corte`
@@ -369,7 +378,21 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
 
   return (
     <div className="space-y-4">
-      {errorMsg && (
+      {apple && (
+        <AtencionMultifashion
+          meta={metaAtrasada}
+          onVerMeta={() => {
+            setMetaAbiertaCel(true);
+            metasRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        />
+      )}
+      {errorMsg && apple && (
+        <Aviso tono="error" accion={{ texto: "Reintentar", onClick: () => { void mutate(); } }}>
+          No se pudo cargar el ranking
+        </Aviso>
+      )}
+      {errorMsg && !apple && (
         <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
           No se pudo cargar el ranking: {errorMsg}
           <button onClick={() => mutate()} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
@@ -556,7 +579,7 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
           premio, las fechas y la historia) y después cuánto aportó cada una.
           Las dos leen la MISMA clave de SWR: se pide una sola vez. */}
       {conMetas && (
-        <section className={cn("space-y-4", celular ? "mt-4 sm:mt-8" : "mt-8")}>
+        <section ref={metasRef} className={cn("space-y-4", celular ? "mt-4 sm:mt-8" : "mt-8")}>
           <h3 className={cn("text-sm font-semibold text-gray-950", celular && "hidden sm:block")}>Metas</h3>
           <div data-celular={celular ? "metas" : undefined} className={celular && !metaAbiertaCel ? "hidden sm:block" : undefined}>
             <MetasSubtab />

@@ -56,7 +56,9 @@ import { diasSinVenta } from "@/lib/multifashion/resumen-minimo";
 import { ResumenMinimo, TarjetaAnio } from "./ResumenMinimo";
 import { MULTIFASHION_CELULAR, type ClaveRenglon, type PantallaCelular } from "@/lib/multifashion/celular";
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
-import { AnioCelular, InicioCelular } from "./celular/InicioCelular";
+import { AnioCelular, AnioGrande, InicioCelular, MesesDelAnio } from "./celular/InicioCelular";
+import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
+import { AtencionMultifashion, useMetaQueNoLlega } from "./PiezasApple";
 
 interface DiaRow {
   dia: number;
@@ -184,7 +186,10 @@ interface MultifashionResumenViewProps {
     corte: CortePeriodo;
     pantalla: PantallaCelular;
     onAbrir: (clave: ClaveRenglon) => void;
+    onAbrirMes?: (anio: number, mes: number) => void;
   };
+  /** `MULTIFASHION_APPLE_2026_10`: «Ver meta» del aviso de arriba. */
+  onVerMeta?: () => void;
 }
 
 const MESES_FULL = [
@@ -312,7 +317,7 @@ function buildCumulativeChart(act: MultifashionSerieAnio, prev: MultifashionSeri
 }
 
 export function MultifashionResumenView({
-  overview, selectedYear, isClosedYear, mes, syncTick = 0, celular,
+  overview, selectedYear, isClosedYear, mes, syncTick = 0, celular, onVerMeta,
 }: MultifashionResumenViewProps) {
   const year = selectedYear;
   const prevYear = year - 1;
@@ -376,6 +381,24 @@ export function MultifashionResumenView({
   const margenSub = buildMargenSub(overview.total.margen, overview.total.margenPrev, prevYear);
   const ytdSuffix = isClosedYear ? String(year) : "YTD";
 
+  // 🔴 `MULTIFASHION_APPLE_2026_10` (regla 5): lo que requiere atención sube
+  // ARRIBA —el mismo texto que antes iba en la leyenda del gráfico— y se suma
+  // la meta que no llega. Una sola cuenta para la computadora y el celular.
+  const tiendaAbrio = data
+    ? diasSinVenta({
+        dias: data.dias, isMesActual: data.is_mes_actual, diaActual: data.dia_actual,
+        year, mes, feriados: data.feriados ?? null,
+      }).texto
+    : null;
+  const metaAtrasada = useMetaQueNoLlega(MULTIFASHION_APPLE_2026_10);
+  const atencion = MULTIFASHION_APPLE_2026_10 ? (
+    <AtencionMultifashion
+      tiendaAbrio={tiendaAbrio}
+      meta={data?.is_mes_actual ? metaAtrasada : null}
+      onVerMeta={onVerMeta}
+    />
+  ) : null;
+
   return (
     <div className={cn("space-y-5", loading && data && "opacity-60 pointer-events-none transition-opacity")}>
       {/* La card de identidad (ícono + nombre de la tienda + pill de sync +
@@ -406,7 +429,12 @@ export function MultifashionResumenView({
         <div className="sm:hidden">
           {celular.pantalla === "anio" ? (
             <AnioCelular
-              tarjeta={<TarjetaAnio overview={overview} year={year} isClosedYear={isClosedYear} />}
+              tarjeta={MULTIFASHION_APPLE_2026_10 ? (
+                <>
+                  <AnioGrande overview={overview} year={year} />
+                  <MesesDelAnio overview={overview} year={year} onAbrirMes={celular.onAbrirMes} />
+                </>
+              ) : <TarjetaAnio overview={overview} year={year} isClosedYear={isClosedYear} />}
               acumulado={
                 <CumulativeChartCard
                   chart={cumChart}
@@ -424,6 +452,7 @@ export function MultifashionResumenView({
               periodo={celular.periodo}
               corte={celular.corte}
               onAbrir={celular.onAbrir}
+              atencion={atencion}
             />
           )}
         </div>
@@ -447,12 +476,10 @@ export function MultifashionResumenView({
               year={year}
               prevYear={prevYear}
               data={data}
-              avisoTiendaAbrio={diasSinVenta({
-                dias: data.dias, isMesActual: data.is_mes_actual, diaActual: data.dia_actual,
-                year, mes, feriados: data.feriados ?? null,
-              }).texto}
+              avisoTiendaAbrio={MULTIFASHION_APPLE_2026_10 ? null : tiendaAbrio}
             />
           }
+          atencion={atencion}
           mesAMes={
             <ComparativoInteranualCard
               meses={overview.retail.meses}

@@ -24,13 +24,15 @@ import { variacionPct } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import { conteoPorChip } from "@/lib/multifashion/clientes-seguimiento";
 import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
-import { lineaHabitos } from "@/lib/multifashion/resumen-minimo";
+import { lineaHabitos, mayoreoDelAnio } from "@/lib/multifashion/resumen-minimo";
 import {
-  MF_DIA_2026_10, barrasDelMes, lineaDelDia, lineaDelMes, montoCorto, renglonesDelInicio,
+  MF_DIA_2026_10, barrasDelMes, deltaCorto, lineaDelDia, lineaDelMes, montoCorto, renglonesDelInicio,
   type ClaveRenglon, type RenglonCelular, type TonoCelular,
 } from "@/lib/multifashion/celular";
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
 import type { DetalleMensualResp } from "../MultifashionResumenView";
+import { filasDelAnio } from "@/lib/multifashion/apple";
+import { lineaMayoreo } from "@/lib/multifashion/retail-al-frente";
 
 export const TONO_CLASE: Record<TonoCelular, string> = {
   sube: "text-emerald-700",
@@ -72,9 +74,11 @@ interface Props {
   corte: CortePeriodo;
   /** Abre uno de los cuatro renglones. */
   onAbrir: (clave: ClaveRenglon) => void;
+  /** Lo que requiere atención (`MULTIFASHION_APPLE_2026_10`), ARRIBA. */
+  atencion?: ReactNode;
 }
 
-export function InicioCelular({ data, overview, periodo, corte, onAbrir }: Props) {
+export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencion = null }: Props) {
   const { totales } = data;
   const year = periodo.tipo === "mes" ? periodo.anio : corte.anio;
   const mes = periodo.tipo === "mes" ? periodo.mes : corte.mes;
@@ -159,6 +163,7 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir }: Props
 
   return (
     <section data-celular="inicio" className="pb-8">
+      {atencion && <div className="mb-4">{atencion}</div>}
       {/* El mes, como número. */}
       <p data-celular="numero-del-mes" className="text-center text-[52px] font-light leading-none tracking-tight tabular-nums text-gray-950">
         {montoCorto(totales.ventas)}
@@ -251,5 +256,67 @@ export function AnioCelular({ tarjeta, acumulado }: { tarjeta: ReactNode; acumul
       {tarjeta}
       {acumulado}
     </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 `MULTIFASHION_APPLE_2026_10` — «Año» como el mes: UN número grande y los
+// meses en renglones; tocar uno abre ese mes. Mismas cuentas que `TarjetaAnio`
+// (proyección contra el cierre del año pasado) y que «Mes a mes».
+// ─────────────────────────────────────────────────────────────────────────────
+export function AnioGrande({ overview, year }: { overview: Multifashion; year: number }) {
+  const proy = overview.proyeccionCierre;
+  const delta = deltaCorto(proy.tiene_proyeccion ? variacionPct(proy.proyeccion ?? 0, proy.cierre_prev) : null);
+  const margen = overview.total.margen;
+  const mayoreo = lineaMayoreo(mayoreoDelAnio(overview.wholesale, overview.retail.ytdVentas));
+  return (
+    <div data-celular="anio-numero" className="pb-2 text-center">
+      <p className="text-[52px] font-light leading-none tracking-tight tabular-nums text-gray-950">
+        {montoCorto(overview.retail.ytdVentas)}
+      </p>
+      <p className="mt-2 text-sm text-gray-600">
+        {delta && <span className={cn("font-medium", TONO_CLASE[delta.tono])}>{delta.texto}</span>}
+        {delta && ` contra ${year - 1}`}
+        {delta && proy.tiene_proyeccion && " · "}
+        {proy.tiene_proyeccion && <span className="text-gray-900">proyección {montoCorto(proy.proyeccion ?? 0)}</span>}
+      </p>
+      {(margen != null || mayoreo) && (
+        <p className="mt-1 text-xs text-gray-500 tabular-nums">
+          {margen != null && Number.isFinite(margen) && `margen ${Math.round(margen * 100)} %`}
+          {margen != null && Number.isFinite(margen) && mayoreo && " · "}
+          {mayoreo}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function MesesDelAnio({ overview, year, onAbrirMes }: {
+  overview: Multifashion;
+  year: number;
+  onAbrirMes?: (anio: number, mes: number) => void;
+}) {
+  const filas = filasDelAnio(overview.retail.meses);
+  if (filas.length === 0) return null;
+  return (
+    <ul data-celular="anio-meses" className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      {filas.map((f) => (
+        <li key={f.mes} className="border-t border-gray-200 first:border-t-0">
+          <button
+            type="button"
+            data-mes={f.mes}
+            onClick={() => onAbrirMes?.(year, f.mes)}
+            className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2.5 text-left transition active:bg-gray-50"
+          >
+            <span className="min-w-0 flex-1 text-base text-gray-950">{f.titulo}</span>
+            <span className="flex shrink-0 items-baseline gap-1.5 text-base tabular-nums text-gray-950">
+              {f.monto}
+              {f.delta && <span className={cn("text-sm font-medium", TONO_CLASE[f.delta.tono])}>{f.delta.texto}</span>}
+              <span aria-hidden className="text-gray-400">›</span>
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

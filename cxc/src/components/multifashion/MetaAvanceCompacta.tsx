@@ -25,6 +25,8 @@ import { Pencil, TrendingDown, TrendingUp } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { textoAporteNoAsignado } from "@/lib/multifashion/metas-clave";
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
+import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 const FMT_FECHA = new Intl.DateTimeFormat("es-PA", { timeZone: "UTC", day: "numeric", month: "short" });
 const FMT_FECHA_ANIO = new Intl.DateTimeFormat("es-PA", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
@@ -74,7 +76,9 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
 
       {/* Cuánto llevamos · cuánto falta, en UNA línea. */}
       <p className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-2xl font-semibold tabular-nums tracking-tight text-gray-950">{fmtMoney(a.vendido)}</span>
+        <span className={MULTIFASHION_APPLE_2026_10
+          ? "text-3xl font-normal tabular-nums tracking-tight text-gray-950"
+          : "text-2xl font-semibold tabular-nums tracking-tight text-gray-950"}>{fmtMoney(a.vendido)}</span>
         <span className="text-sm text-gray-600">de {fmtMoney(a.objetivo)}</span>
         <span className="text-sm font-medium tabular-nums text-gray-700">· {pct(a.pctVendido)}</span>
         {a.estado === "en-curso" && !a.cumplida && (
@@ -101,11 +105,20 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
             <span className={a.alcanza ? "text-emerald-800" : "text-amber-800"}>
               · {`${a.alcanza ? "Excedente" : "Faltante"}${a.estado === "cerrada" ? "" : " proyectado"} ${fmtMoney(Math.abs(a.brechaProyectada ?? 0))}`}
             </span>
+            {MULTIFASHION_APPLE_2026_10 ? (
+              // 🔴 `MULTIFASHION_APPLE_2026_10`: la explicación, detrás del ⓘ.
+              <Ayuda titulo="Cómo se calcula">
+                {a.base === "temporada"
+                  ? "Por temporada: usa los meses fuertes y flojos del año pasado, día por día."
+                  : "Por días parejos: no hay año pasado para comparar."}
+              </Ayuda>
+            ) : (
             <span className="text-xs text-gray-500">
               {a.base === "temporada"
                 ? "(cuenta por temporada: ya sabe cuáles son los meses fuertes)"
                 : "(cuenta por días parejos: no hay año pasado para comparar)"}
             </span>
+            )}
           </>
         )}
       </p>

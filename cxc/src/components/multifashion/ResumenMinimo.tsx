@@ -38,6 +38,16 @@ import {
   comparativosDelMes, lineaHabitos, mayoreoDelAnio, mayoreoDelMes,
 } from "@/lib/multifashion/resumen-minimo";
 import type { DetalleMensualResp } from "./MultifashionResumenView";
+import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
+
+// 🔴 `MULTIFASHION_APPLE_2026_10` (regla 1): el mes es EL número —más grande y
+// sin negrita, como la barra v3.3— y las otras dos tarjetas lo acompañan.
+const NUM_MES = MULTIFASHION_APPLE_2026_10
+  ? "mt-1 text-4xl font-normal leading-tight tracking-tight tabular-nums text-gray-950"
+  : "mt-1 text-2xl font-semibold leading-tight tabular-nums text-gray-950";
+const NUM_TARJETA = MULTIFASHION_APPLE_2026_10
+  ? "mt-1 text-2xl font-normal leading-tight tabular-nums text-gray-950"
+  : "mt-1 text-2xl font-semibold leading-tight tabular-nums text-gray-950";
 
 const TONO: Record<ReturnType<typeof tonoDeltaRetail>, string> = {
   sube: "text-emerald-700",
@@ -67,9 +77,11 @@ interface Props {
   grafico: ReactNode;
   /** La tabla «Mes a mes» de siempre, que aquí vive PLEGADA. */
   mesAMes: ReactNode;
+  /** Lo que requiere atención, ARRIBA (`MULTIFASHION_APPLE_2026_10`). */
+  atencion?: ReactNode;
 }
 
-export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico, mesAMes }: Props) {
+export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico, mesAMes, atencion = null }: Props) {
   const [mesAMesAbierto, setMesAMesAbierto] = useState(false);
   const { totales, is_mes_actual } = data;
 
@@ -99,11 +111,12 @@ export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico
 
   return (
     <div className="space-y-5" data-pestana="resumen-minimo">
+      {atencion}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {/* 1 · Ventas del mes */}
         <Card data-elemento="ventas-del-mes" className="p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Ventas del mes</p>
-          <p className="mt-1 text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+          <p className={NUM_MES}>
             {fmtMoney(totales.ventas)}
           </p>
           <p className="mt-0.5 text-xs text-gray-500">
@@ -123,7 +136,7 @@ export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
             {hayProyeccion ? "Proyección de cierre" : "Margen tienda"}
           </p>
-          <p className="mt-1 text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+          <p className={NUM_TARJETA}>
             {hayProyeccion
               ? fmtMoney(totales.proyeccion_cierre as number)
               : hayMargen ? fmtMargen(totales.margen) : "—"}
@@ -187,7 +200,7 @@ export function TarjetaAnio({
       <Card data-elemento="anio" className="p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Año {year} · retail</p>
         <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
-          <span className="text-2xl font-semibold leading-tight tabular-nums text-gray-950">
+          <span className={MULTIFASHION_APPLE_2026_10 ? "text-2xl font-normal leading-tight tabular-nums text-gray-950" : "text-2xl font-semibold leading-tight tabular-nums text-gray-950"}>
             {fmtMoney(overview.retail.ytdVentas)}
           </span>
           {deltaAnio != null && (
