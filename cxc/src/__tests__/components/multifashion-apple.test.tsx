@@ -12,6 +12,8 @@
 //   4. El espejo de Comisiones NO cambia (la llave es `conMetas`).
 //   5. Ninguna pieza nueva se dibuja sin el interruptor: cada componente tocado
 //      la condiciona a `MULTIFASHION_APPLE_2026_10`.
+//   6. Clientes: el número grande es «No vuelven», el MISMO conteo del chip
+//      (Daniel, 9-oct-2026). Resumen: el aviso de la meta va sin «Ver meta».
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, afterEach } from "vitest";
@@ -19,8 +21,10 @@ import { readFileSync } from "fs";
 import path from "path";
 import { render, screen, cleanup } from "@testing-library/react";
 import {
-  MULTIFASHION_APPLE_2026_10, atencionesMultifashion, filasDelAnio, metaQueNoLlega, pieClientes,
+  MULTIFASHION_APPLE_2026_10, atencionesMultifashion, filasDelAnio, metaQueNoLlega, numeroNoVuelven, pieClientes,
 } from "@/lib/multifashion/apple";
+import { conteoPorChip } from "@/lib/multifashion/clientes-seguimiento";
+import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 import { baseDesdeRatio, variacionPct } from "@/lib/variacion";
 import { deltaCorto, montoCorto } from "@/lib/multifashion/celular";
 import { NumeroGrande } from "@/components/multifashion/PiezasApple";
@@ -93,6 +97,31 @@ describe("Clientes · la línea del pie", () => {
     expect(pieClientes({ cobertura: "62% de los tickets con nombre — el 70% de la venta", ventasAnonimas: 4_210.4, ticketsAnonimos: 120 }))
       .toBe("62% de los tickets con nombre — el 70% de la venta · mostrador $4,210 · 120 tickets aparte");
     expect(pieClientes({ cobertura: null, ventasAnonimas: 10, ticketsAnonimos: 1 })).toBeNull();
+  });
+});
+
+describe("Clientes · el número grande es «No vuelven»", () => {
+  it("el MISMO conteo que el chip, sobre la misma lista", () => {
+    const c = (id: number, dormido: boolean) =>
+      ({ cliente_switch_id: id, dormido, primera_compra_este_mes: false, dias_sin_comprar: dormido ? 90 : 5 }) as unknown as ClienteUniverso;
+    const lista = [c(101, true), c(102, true), c(103, false)];
+    expect(numeroNoVuelven(lista)).toBe(conteoPorChip(lista).no_vuelven);
+    expect(numeroNoVuelven([])).toBe(0);
+  });
+
+  it("la pantalla lo usa con la lista del chip y lo rotula «no vuelven»", () => {
+    const src = leer("src/components/multifashion/ClientesMultifashionSubtab.tsx");
+    expect(src).toMatch(/monto=\{numeroNoVuelven\(clientesLista\)\.toLocaleString\("en-US"\)\}/);
+    expect(src).toMatch(/linea=\{`no vuelven · /);
+    expect(src).toMatch(/<ListaSeguimientoClientes clientes=\{clientesLista\}/);
+  });
+});
+
+describe("Resumen · sin «Ver meta»", () => {
+  it("el Resumen no recibe ni pasa la acción; Vendedoras la conserva", () => {
+    expect(leer("src/components/multifashion/MultifashionResumenView.tsx")).not.toMatch(/onVerMeta/);
+    expect(leer("src/components/multifashion/MultifashionView.tsx")).not.toMatch(/onVerMeta/);
+    expect(leer("src/components/multifashion/VendedorasSubtab.tsx")).toMatch(/onVerMeta=/);
   });
 });
 

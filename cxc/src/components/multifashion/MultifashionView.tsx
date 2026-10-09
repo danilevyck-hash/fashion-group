@@ -115,7 +115,6 @@ export function MultifashionView({
             mes={mes}
             syncTick={syncTick}
             celular={celular ? { ...celular, periodo, corte } : undefined}
-            onVerMeta={() => onTabChange("vendedoras")}
           />
           )}
         </TabsContent>
