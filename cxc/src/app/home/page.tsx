@@ -18,6 +18,8 @@ import AppHeader from "@/components/AppHeader";
 import { TAB_BAR_2026_10 } from "@/lib/navegacion/tab-bar";
 import { CLAVE_NOMBRE_VISIBLE } from "@/lib/hooks/useNombreVisible";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+import { INICIO_APPLE_2026_10 } from "@/lib/navegacion/inicio-apple-2026-10";
+import { getModuleColorByKey } from "@/lib/moduleColors";
 
 // 🔴 Estructura estilo Apple (1-oct-2026): saludo y fecha con el botón del
 // usuario; sin «Accesos frecuentes», sin modo oscuro y sin el logo grande.
@@ -184,7 +186,7 @@ export default function HomePage() {
             cosas. Bodega aterriza en Guías, así que en la práctica los que
             recuperan la caja del Inicio son contabilidad y vendedor. */}
         {SEARCH_ROLES.includes(role) && (
-          <SearchBar />
+          INICIO_APPLE_2026_10 ? <SearchBar alineado /> : <SearchBar />
         )}
 
         {/* Tus frecuentes: los módulos más usados por el usuario (aprendido de
@@ -217,6 +219,63 @@ export default function HomePage() {
         {/* Grupos: cuadrícula de fichas (ícono de línea arriba, nombre debajo,
             sin subtítulo). Solo aparecen los módulos visibles según permisos
             (misma fuente que el sidebar: getVisibleGroups/getModulesInGroup). */}
+{INICIO_APPLE_2026_10 ? (
+          <>
+            {/* 🔴 INICIO ESTILO APPLE (`INICIO_APPLE_2026_10`). Celular: la
+                lista agrupada de Ajustes, la MISMA forma de la hoja «Más».
+                Computadora: ficha horizontal con el ícono a color, como la
+                barra lateral. */}
+            <div data-inicio="lista-celular" className="space-y-5 sm:hidden">
+              {visibleGroups.map((g) => (
+                <section key={g.key}>
+                  <h2 className="px-3.5 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">{g.label}</h2>
+                  <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                    {getModulesInGroup(g.key, role, fgModules).map((m) => {
+                      const ModIcon = m.icon;
+                      const tono = getModuleColorByKey(m.key);
+                      return (
+                        <Link
+                          key={m.key}
+                          href={m.href}
+                          onClick={() => recordModuleClick(m.key, userName)}
+                          className="flex min-h-[44px] items-center gap-3 border-t border-gray-100 px-3.5 py-2.5 text-[15px] text-gray-900 transition first:border-t-0 active:bg-gray-100"
+                        >
+                          <ModIcon size={18} strokeWidth={1.75} className={`shrink-0 ${tono ? tono.text : "text-gray-400"}`} />
+                          <span className="min-w-0 flex-1 truncate">{m.label}</span>
+                          <span aria-hidden="true" className="shrink-0 text-sm text-gray-300">›</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+            <div data-inicio="fichas" className="hidden space-y-6 sm:block">
+              {visibleGroups.map((g) => (
+                <section key={g.key}>
+                  <h2 className="text-xs font-medium uppercase tracking-wide mb-2 px-1 text-gray-400">{g.label}</h2>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                    {getModulesInGroup(g.key, role, fgModules).map((m) => {
+                      const ModIcon = m.icon;
+                      const tono = getModuleColorByKey(m.key);
+                      return (
+                        <Link
+                          key={m.key}
+                          href={m.href}
+                          onClick={() => recordModuleClick(m.key, userName)}
+                          className="group flex min-h-[56px] items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 transition hover:border-gray-400 hover:shadow-sm active:scale-[0.97]"
+                        >
+                          <ModIcon size={20} strokeWidth={1.75} className={`shrink-0 ${tono ? tono.text : "text-gray-500"}`} />
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{m.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </>
+        ) : (
         <div className="space-y-6">
           {visibleGroups.map((g) => {
             const modules = getModulesInGroup(g.key, role, fgModules);
@@ -245,6 +304,7 @@ export default function HomePage() {
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );
