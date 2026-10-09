@@ -36,6 +36,9 @@ import { SEGUNDOS_MARCA_REPETIDA, textoTodasLasMarcasConRepetidas } from "./marc
 // ver el encabezado de `pdf-pie.ts` para los milímetros que se perdían.
 import { ESTILO_UNICO, MARGEN_PAPEL, Y_CONTENIDO, cabeceraPapel, piePapel } from "@/lib/pdf-estilo";
 import { armarPie, dibujarPie } from "./pdf-pie";
+// 🔴 «Tiempo no laborado» (9-oct-2026): con el tiempo fuera prendido, la columna
+// del almuerzo dice lo que la planilla descuenta, con el nombre de la planilla.
+import { DESCUENTA_TIEMPO_FUERA as FUERA } from "./tiempo-fuera";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -166,7 +169,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     // y G) y siguen donde estaban, con el mismo contenido. Lo nuevo se INSERTA
     // después, nunca en el medio de ellas.
     "Todas las marcas","Cantidad de marcas",
-    "Tardanza (min)","Exceso de almuerzo (min)","Salida temprana (min)","Extra (min)",
+    "Tardanza (min)", FUERA ? "Tiempo no laborado (min)" : "Exceso de almuerzo (min)","Salida temprana (min)","Extra (min)",
     // 🔑 «Ausencia» a secas ya no alcanza: un día de trabajo fuera de la
     // oficina cae en esta misma columna y NO es una ausencia.
     "Trabajado (min)","Revisar","Ausencia / justificación","Corregido a mano",
@@ -197,7 +200,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
         d.repetidas?.length ? textoTodasLasMarcasConRepetidas(d.marcas, d.repetidas) : textoTodasLasMarcas(d.marcas),
         d.marcas.length || "",
         // 🔴 El servicio profesional no cuenta horas extra (3-sep-2026): «—».
-        n0(d.tardeMin), n0(d.excesoAlmuerzoMin), n0(d.salidaTempranaMin),
+        n0(d.tardeMin), n0(FUERA ? d.descuentaFueraMin ?? 0 : d.excesoAlmuerzoMin), n0(d.salidaTempranaMin),
         cuentaHorasExtra(p) ? n0(d.extraMin) : "—",
         n0(d.trabajadoMin),
         d.revisar ? "Revisar" : "",
@@ -250,7 +253,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     // 🔑 Columna propia, no sumada a las ausencias justificadas: son días
     // TRABAJADOS y meterlos en la misma cifra es lo que este motivo eliminó.
     "Ausencias justificadas","Días trabajando fuera","Tardanzas","Minutos tarde","…de días a revisar",
-    "Exceso de almuerzo (min)","Salida temprana (min)","Tiempo no trabajado (min)",
+    FUERA ? "Tiempo no laborado (min)" : "Exceso de almuerzo (min)","Salida temprana (min)",FUERA ? "Total (min)" : "Tiempo no trabajado (min)",
     "Extras (min)","Días a revisar","Días corregidos a mano",
     // 🔴 AL FINAL, no intercaladas: la columna «…de días a revisar» se pinta
     // en rojo por POSICIÓN (índice 9) y meter algo en el medio teñiría los
@@ -264,7 +267,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
       r.diasTrabajados, n0(r.ausenciasSinJustificar), n0(r.ausenciasJustificadas),
       n0(r.diasTrabajandoFuera),
       n0(r.vecesTarde), n0(r.minutosTarde), n0(r.minutosTardeDeDiasARevisar),
-      n0(r.excesoAlmuerzoMin), n0(r.salidaTempranaMin), n0(r.tiempoNoTrabajadoMin),
+      n0(FUERA ? r.tiempoNoLaboradoMin : r.excesoAlmuerzoMin), n0(r.salidaTempranaMin), n0(r.tiempoNoTrabajadoMin),
       cuentaHorasExtra(p) ? n0(r.extraMin) : "—", n0(r.diasARevisar), n0(r.diasCorregidos),
       n0(r.diasVacaciones), n0(r.diasVacacionesYaPagadas),
     ]);
@@ -277,7 +280,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     veces: a.veces + p.resumen.vecesTarde,
     tarde: a.tarde + p.resumen.minutosTarde,
     tardeRev: a.tardeRev + p.resumen.minutosTardeDeDiasARevisar,
-    almz: a.almz + p.resumen.excesoAlmuerzoMin,
+    almz: a.almz + (FUERA ? p.resumen.tiempoNoLaboradoMin : p.resumen.excesoAlmuerzoMin),
     temp: a.temp + p.resumen.salidaTempranaMin,
     noTrab: a.noTrab + p.resumen.tiempoNoTrabajadoMin,
     extra: a.extra + extraQueCuenta(p),
@@ -329,6 +332,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     ["Entrada", `8:00 a.m. con ${g.toleranciaTardanzaMin} minutos de tolerancia. Pasados los ${g.toleranciaTardanzaMin}, se cuenta desde las 8:00.`],
     // El almuerzo NO sale de `reglas`: es fijo y lo decide la empresa (ver ALMUERZO_POR_EMPRESA).
     ["Almuerzo", `${textoAlmuerzo()}. Se mide entre la 2ª y la 3ª marca del día.${g.graciaAlmuerzoMin > 0 ? ` Con ${g.graciaAlmuerzoMin} minutos de gracia: pasados, el exceso se descuenta entero desde el minuto programado.` : ""}`],
+    ...(FUERA ? [["Tiempo no laborado", "El tiempo fuera durante la jornada que pasa del almuerzo permitido, con su gracia. Va en la planilla en su propia columna, «Tiempo no laborado», separada de «Salida temprana»: la persona volvió. Solo en días de 4 marcas; un día con 5 o más queda a revisar y no se descuenta hasta que se arregle."]] : []),
     // 🔴 1-sep-2026: acá decía "y se le resta el atraso del mismo día". Ya no:
     // *"No, van separadas"*. El mínimo es una PUERTA, no un descuento —pasada,
     // se paga TODO desde el primer minuto— y el atraso se cobra por su lado.
@@ -416,13 +420,13 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     // planilla: un total que se lee sin saber que hay horas escritas a mano es
     // exactamente lo que no puede pasar.
     head: [["Colaborador", "Horario\nde salida", "Días", "Ausen-\ncias", "Tardan-\nzas", "Min\ntarde",
-            "Exceso de\nalmuerzo", "Salida\ntemprana", "Tiempo no\ntrabajado (min)", "Extras\n(min)", "A\nrevisar", "Días\ncorreg."]],
+            FUERA ? "Tiempo no\nlaborado" : "Exceso de\nalmuerzo", "Salida\ntemprana", FUERA ? "Total\n(min)" : "Tiempo no\ntrabajado (min)", "Extras\n(min)", "A\nrevisar", "Días\ncorreg."]],
     body: personas.map((p) => {
       const r = p.resumen;
       return [
         quien(p), p.salida, r.diasTrabajados,
         r.ausenciasSinJustificar || "", r.vecesTarde || "", n0(r.minutosTarde),
-        n0(r.excesoAlmuerzoMin), n0(r.salidaTempranaMin),
+        n0(FUERA ? r.tiempoNoLaboradoMin : r.excesoAlmuerzoMin), n0(r.salidaTempranaMin),
         n0(r.tiempoNoTrabajadoMin), cuentaHorasExtra(p) ? n0(r.extraMin) : "—", r.diasARevisar || "",
         r.diasCorregidos || "",
       ];

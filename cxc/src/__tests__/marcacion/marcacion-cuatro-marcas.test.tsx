@@ -449,7 +449,7 @@ describe("5 · apagado = las dos marcas de siempre", () => {
     expect(FUENTE_REGLA).toContain(
       'if (!MARCACION_CUATRO_MARCAS) return Math.floor(indice) <= 0 ? "entrada" : "salida";',
     );
-    expect(FUENTE_REGLA).toContain('MARCACION_CUATRO_MARCAS ? "sus cuatro marcas" : "su entrada y su salida"');
+    expect(FUENTE_REGLA).toContain('MARCACION_CUATRO_MARCAS ? TEXTO_CUATRO_MARCAS_REGISTRADAS : "Ese día ya tiene su entrada y su salida."');
     // Y la foto: apagado, la piden las dos marcas de siempre.
     expect(FUENTE_REGLA).toContain("if (!MARCACION_CUATRO_MARCAS) return true;");
   });
@@ -558,7 +558,7 @@ describe("8 · el servidor frena la quinta, con la MISMA regla", () => {
     expect(estadoDelBotonHoy(3).tipo).not.toBeNull();
     expect(estadoDelBotonHoy(4).tipo).toBeNull();
     expect(avisoDiaCompleto()).toBe(
-      "Ese día ya tiene sus cuatro marcas. Si algo está mal, avísale a Roxana.",
+      "Ya se registraron las 4 marcas del día. Si algo está mal, avísale a Roxana.",
     );
   });
 

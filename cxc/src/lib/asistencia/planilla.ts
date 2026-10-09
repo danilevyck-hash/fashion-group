@@ -491,6 +491,11 @@ export interface HorasPersona {
    *  (10-sep-2026, Daniel: *«si salió 20 minutos antes no debería de haber
    *  tolerancia»*). Se valúan como una tardanza. */
   salidaTempranaMin: number;
+  /** 🔴 «TIEMPO NO LABORADO» (9-oct-2026): el tiempo fuera durante la jornada
+   *  que pasa del almuerzo permitido (con su gracia), en SU columna, separado
+   *  de la salida temprana. Se valúa como una tardanza. Ver `tiempo-fuera.ts`.
+   *  Opcional: un cuadro de antes no lo trae y vale 0. */
+  tiempoNoLaboradoMin?: number;
   /** Ausencias sin justificar, en minutos de jornada. SE RESTAN. */
   ausenciaMin: number;
   ausenciaDias: number;
@@ -531,7 +536,7 @@ export const HORAS_CERO: HorasPersona = {
   extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0, extraNoAprobadaMin: 0,
   extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0, extraNoAprobadaDomFerMin: 0, extraAutoMin: 0,
   domingoMin: 0, feriadoMin: 0, tardanzaMin: 0,
-  tardanzaGraveMin: 0, tardanzaGraveDias: 0, salidaTempranaMin: 0,
+  tardanzaGraveMin: 0, tardanzaGraveDias: 0, salidaTempranaMin: 0, tiempoNoLaboradoMin: 0,
   ausenciaMin: 0, ausenciaDias: 0, ausenciaJustificadaDias: 0,
   vacacionesYaPagadasMin: 0, vacacionesYaPagadasDias: 0, vacacionesDias: 0,
   sabadoMin: 0, diasTrabajados: 0, diasARevisar: 0,
@@ -738,7 +743,7 @@ export function clasificarDia(
   HorasPersona,
   | "extraDiurnoMin" | "extraNocturnoMin" | "excedenteMin"
   | "domingoMin" | "feriadoMin" | "tardanzaMin" | "ausenciaMin" | "sabadoMin"
-  | "vacacionesYaPagadasMin" | "salidaTempranaMin"
+  | "vacacionesYaPagadasMin" | "salidaTempranaMin" | "tiempoNoLaboradoMin"
 > & {
   /**
    * 🔴 De `extraDiurnoMin`/`extraNocturnoMin`, lo que vino de la ENTRADA
@@ -751,7 +756,7 @@ export function clasificarDia(
   const cero = {
     extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0,
     domingoMin: 0, feriadoMin: 0, tardanzaMin: 0, ausenciaMin: 0, sabadoMin: 0,
-    vacacionesYaPagadasMin: 0, salidaTempranaMin: 0,
+    vacacionesYaPagadasMin: 0, salidaTempranaMin: 0, tiempoNoLaboradoMin: 0,
   };
   // 🔴 LABORABLE LO DICE EL MOTOR (`d.habil`, 18-sep-2026): lunes a viernes, o
   // los días de esa persona. Un día que no lo traiga cae al calendario de
@@ -808,13 +813,14 @@ export function clasificarDia(
   // al dinero tal cual. Caso real: María B. el 21-ago-2026 salió a las 12:04
   // p.m. (5,75 h) y la contable lo descontó; el sistema lo medía y no lo hacía.
   // 🔴 EL TIEMPO FUERA DURANTE LA JORNADA (9-oct-2026): lo que el motor dice
-  // que sobra del almuerzo permitido entra con la MISMA rata, en la misma
-  // columna (misma deducción, mismo concepto del cierre y del corte). Ausente
-  // —interruptor `DESCUENTA_TIEMPO_FUERA` apagado— suma 0: la planilla de hoy.
+  // que sobra del almuerzo permitido entra con la MISMA rata, en SU columna,
+  // «Tiempo no laborado» — nunca en «Salida temprana» (Daniel: que la contable
+  // no lo confunda con alguien que se fue temprano). Ausente —interruptor
+  // `DESCUENTA_TIEMPO_FUERA` apagado— vale 0: la planilla de hoy.
   const salidaTempranaMin = Math.max(0, d.salidaTempranaMin || 0);
-  const salidaYFueraMin = salidaTempranaMin + Math.max(0, d.descuentaFueraMin ?? 0);
+  const tiempoNoLaboradoMin = Math.max(0, d.descuentaFueraMin ?? 0);
   const extra = d.extraMin;
-  if (extra <= 0) return { ...cero, tardanzaMin, salidaTempranaMin: salidaYFueraMin };
+  if (extra <= 0) return { ...cero, tardanzaMin, salidaTempranaMin, tiempoNoLaboradoMin };
 
   const corte = hhmmAMin(reglas.horaCorteNocturno);
 
@@ -852,7 +858,8 @@ export function clasificarDia(
   return {
     ...cero,
     tardanzaMin,
-    salidaTempranaMin: salidaYFueraMin,
+    salidaTempranaMin,
+    tiempoNoLaboradoMin,
     extraDiurnoMin: diurno + entradaDiurno,
     extraNocturnoMin: nocturno + entradaNocturno,
     excedenteMin: 0,
@@ -987,6 +994,7 @@ export function medirHoras(
     }
     h.tardanzaMin += c.tardanzaMin;
     h.salidaTempranaMin += c.salidaTempranaMin;
+    h.tiempoNoLaboradoMin = (h.tiempoNoLaboradoMin ?? 0) + (c.tiempoNoLaboradoMin ?? 0);
     // 🔴 EL RÓTULO, NO EL DINERO. Un día de más de 30 minutos tarde se sigue
     // sumando entero a `tardanzaMin` —que es lo que se valúa— y además se
     // aparta acá para poder MOSTRARLO en la columna «Ausencia». El umbral se
@@ -1299,6 +1307,9 @@ export interface DineroLinea {
   tardanzas: number;
   /** 🔴 Lo que se descuenta por salir antes de la hora (10-sep-2026): minutos × valor del minuto. */
   salidaTemprana: number;
+  /** 🔴 «Tiempo no laborado» (9-oct-2026): el tiempo fuera durante la jornada
+   *  que pasa del almuerzo permitido, minutos × valor del minuto. Columna propia. */
+  tiempoNoLaborado: number;
   totalBruto: number;
   /**
    * El monto sobre el que se calcularon los seguros, cuando NO fue el bruto.
@@ -1522,7 +1533,7 @@ export interface LineaPlanilla {
     desde: string;
     hasta: string;
     reparto: Partial<Record<
-      "ausencias" | "tardanzas" | "salidaTemprana" | "extraDiurno" | "extraNocturno" | "excedente" | "domingos" | "feriados",
+      "ausencias" | "tardanzas" | "salidaTemprana" | "tiempoNoLaborado" | "extraDiurno" | "extraNocturno" | "excedente" | "domingos" | "feriados",
       number
     >>;
   };
@@ -1734,6 +1745,8 @@ export function calcularDinero(
   // 🔴 La salida temprana se valúa IGUAL que una tardanza: minutos × valor del
   // minuto (10-sep-2026). Columna propia para que se vea qué fue.
   const salidaTemprana = centavos((horas.salidaTempranaMin || 0) * valorMinuto);
+  // 🔴 El tiempo no laborado (9-oct-2026), con la MISMA rata y en SU columna.
+  const tiempoNoLaborado = centavos((horas.tiempoNoLaboradoMin || 0) * valorMinuto);
 
   // 🔴 LAS VACACIONES «YA PAGADAS» SE VALÚAN COMO UN DÍA NO TRABAJADO: jornada
   // × rata, SIN recargo, exactamente igual que una ausencia de día completo. No
@@ -1748,7 +1761,7 @@ export function calcularDinero(
 
   const totalBruto = centavos(
     salarioQuincenal + extraDiurno + extraNocturno + excedente + domingos + feriados
-    - ausencias - tardanzas - salidaTemprana,
+    - ausencias - tardanzas - salidaTemprana - tiempoNoLaborado,
   );
 
   // Los dos seguros salen del BRUTO, no del quincenal: así lo confirmó la
@@ -1831,7 +1844,7 @@ export function calcularDinero(
     rataHora, valorMinuto, salarioQuincenal,
     extraDiurno, extraNocturno, excedente, domingos, feriados,
     ausencias, ausenciaPorTardanza, ausenciaDeDiaCompleto, vacacionesYaPagadas,
-    tardanzas, salidaTemprana, totalBruto,
+    tardanzas, salidaTemprana, tiempoNoLaborado, totalBruto,
     // 🔑 `null` con los seguros apagados aunque haya base: ahí lo que hay que
     // mostrar es «sin seguros», no una base que no se usó para nada.
     baseSeguros: conSeguros ? basePropia : null,
@@ -2444,7 +2457,7 @@ export type TotalesPlanilla =
 export const TOTALES_CERO: TotalesPlanilla = {
   salarioQuincenal: 0, extraDiurno: 0, extraNocturno: 0, excedente: 0,
   domingos: 0, feriados: 0, ausencias: 0, ausenciaPorTardanza: 0,
-  ausenciaDeDiaCompleto: 0, vacacionesYaPagadas: 0, tardanzas: 0, salidaTemprana: 0, totalBruto: 0,
+  ausenciaDeDiaCompleto: 0, vacacionesYaPagadas: 0, tardanzas: 0, salidaTemprana: 0, tiempoNoLaborado: 0, totalBruto: 0,
   seguroSocial: 0, seguroEducativo: 0, isr: 0, prestamo: 0, terceros: 0,
   mercancia: 0, totalDeducciones: 0, otrosServicios: 0, netoPagar: 0,
   personas: 0, sinConfigurar: 0, fueraDePlanilla: 0, decidirAMano: 0,
@@ -2481,6 +2494,7 @@ export function totalizar(lineas: readonly LineaPlanilla[]): TotalesPlanilla {
     t.ausencias = centavos(t.ausencias + d.ausencias);
     t.tardanzas = centavos(t.tardanzas + d.tardanzas);
     t.salidaTemprana = centavos(t.salidaTemprana + d.salidaTemprana);
+    t.tiempoNoLaborado = centavos(t.tiempoNoLaborado + (d.tiempoNoLaborado ?? 0));
     t.totalBruto = centavos(t.totalBruto + d.totalBruto);
     // Los dos desgloses de la ausencia se suman para poder EXPLICAR el total
     // («de los $18,26 de ausencia, $12,40 son de días que llegó muy tarde»).

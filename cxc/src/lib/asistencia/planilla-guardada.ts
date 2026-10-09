@@ -161,6 +161,8 @@ export const COLUMNAS_DINERO: Record<keyof DineroLinea, string> = {
   // 🔴 10-sep-2026: la salida antes de la hora se descuenta (columna nueva,
   // migración 20261104120000). Son 25 cifras, no 24.
   salidaTemprana: "salida_temprana",
+  // 🔴 9-oct-2026: el tiempo no laborado, en su columna (migración 20261231140000).
+  tiempoNoLaborado: "tiempo_no_laborado",
   totalBruto: "total_bruto",
   baseSeguros: "base_seguros",
   seguroSocial: "seguro_social",
@@ -198,6 +200,8 @@ export const COLUMNAS_HORAS: Record<
   tardanzaGraveDias: "tardanza_grave_dias",
   // 🔴 10-sep-2026: la salida antes de la hora se descuenta (migración 20261104120000).
   salidaTempranaMin: "salida_temprana_min",
+  // 🔴 9-oct-2026: el tiempo no laborado (migración 20261231140000).
+  tiempoNoLaboradoMin: "tiempo_no_laborado_min",
   ausenciaMin: "ausencia_min",
   ausenciaDias: "ausencia_dias",
   ausenciaJustificadaDias: "ausencia_justificada_dias",

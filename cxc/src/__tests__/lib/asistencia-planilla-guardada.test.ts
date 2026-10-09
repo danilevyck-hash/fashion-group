@@ -93,12 +93,14 @@ describe("🔴 se congela TODO: las 24 cifras de dinero y las 20 del reloj", () 
     // 🔴 10-sep-2026 (tarde): dinero 24 → 25 (`salida_temprana`: salir antes de la
     // hora se descuenta, Daniel: «b, se descuenta obvio») y horas 21 → 22
     // (`salida_temprana_min`). Migración 20261104120000. La regla no cambió.
-    expect(dinero.length).toBe(25);
-    expect(horas.length).toBe(22);
-    expect(new Set(dinero).size).toBe(25);
-    expect(new Set(horas).size).toBe(22);
+    // 🔴 9-oct-2026: 25 → 26 y 22 → 23 (`tiempo_no_laborado[_min]`, migración
+    // 20261231140000, aditiva). La regla no cambió.
+    expect(dinero.length).toBe(26);
+    expect(horas.length).toBe(23);
+    expect(new Set(dinero).size).toBe(26);
+    expect(new Set(horas).size).toBe(23);
     // Una columna de dinero con el nombre de una de horas se pisaría en la fila.
-    expect(new Set([...dinero, ...horas]).size).toBe(47);
+    expect(new Set([...dinero, ...horas]).size).toBe(49);
   });
 
   it("la fila escrita trae TODAS las columnas, con el valor de la línea", () => {
@@ -440,6 +442,8 @@ describe("🔴 la migración sostiene lo que el código promete", () => {
     // toda columna de los dos mapas tiene que existir en ALGÚN SQL del repo.
     const TODAS = [SQL,
       leerMigracion("20261104120000_planilla_guardada_salida_temprana.sql"),
+      // 🔴 9-oct-2026: «Tiempo no laborado», su propia migración aditiva.
+      leerMigracion("20261231140000_planilla_guardada_tiempo_no_laborado.sql"),
       leerMigracion("20261028120000_planilla_unida.sql"),
       leerMigracion("20261101120000_acs_aprueba_daniel.sql"),
     ].join("\n");

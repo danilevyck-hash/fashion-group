@@ -410,7 +410,10 @@ describe("⚠️ décimo tercer mes y vacaciones: NO se provisionan", () => {
       // 🔴 10-sep-2026: «salidaTemprana» — salir antes de la hora se descuenta
       // (Daniel: «b, se descuenta obvio»). Sigue sin provisiones: ese es el candado.
       "salidaTemprana",
-      "tardanzas", "terceros", "totalBruto", "totalDeducciones", "valorMinuto",
+      "tardanzas", "terceros",
+      // 🔴 9-oct-2026: «tiempoNoLaborado», el tiempo fuera durante la jornada en su columna.
+      "tiempoNoLaborado",
+      "totalBruto", "totalDeducciones", "valorMinuto",
       "vacacionesYaPagadas",
     ].sort());
   });

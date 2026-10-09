@@ -18,6 +18,9 @@ import { etiquetaPersona } from "@/lib/asistencia/directorio";
 // en mayúsculas (10-sep-2026: el Reporte mezclaba «YULISSA JUAREZ» con «Andrea Perez»).
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { textoAlmuerzo, MINUTOS_TARDE_QUE_SON_AUSENCIA } from "@/lib/asistencia/config";
+// 🔴 «Tiempo no laborado» (9-oct-2026): con el tiempo fuera prendido, la columna
+// del almuerzo dice lo que la planilla DESCUENTA, con el nombre de la planilla.
+import { DESCUENTA_TIEMPO_FUERA as FUERA } from "@/lib/asistencia/tiempo-fuera";
 import { esTrabajoDeVendedor, textoDiaJustificado } from "@/lib/asistencia/motivos";
 import { textoDiaVacaciones } from "@/lib/asistencia/vacaciones";
 // 🔴 El texto del permiso sale de un módulo PURO, nunca escrito acá: la
@@ -524,7 +527,7 @@ export default function ReporteTab({ empresa = "" }: {
       case "ausencias": return r.ausenciasSinJustificar;
       case "tardanzas": return r.vecesTarde;
       case "tardanza": return r.minutosTarde;
-      case "almuerzo": return r.excesoAlmuerzoMin;
+      case "almuerzo": return FUERA ? r.tiempoNoLaboradoMin : r.excesoAlmuerzoMin;
       case "salida": return r.salidaTempranaMin;
       case "noTrabajado": return r.tiempoNoTrabajadoMin;
       case "extras": return cuentaHorasExtra(x) ? r.extraMin : null;
@@ -1065,9 +1068,9 @@ export default function ReporteTab({ empresa = "" }: {
                 <ThOrden col="tardanzas" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Tardanzas</ThOrden>
                 {/* 🔴 29-sep-2026: sin «Min»; la unidad la dice el número (h:mm o minutos). */}
                 <ThOrden col="tardanza" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Tardanza</ThOrden>
-                <ThOrden col="almuerzo" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Exceso de<br />almuerzo</ThOrden>
+                <ThOrden col="almuerzo" api={orden} derecha className="px-2 py-2.5 text-right font-medium">{FUERA ? <>Tiempo no<br />laborado</> : <>Exceso de<br />almuerzo</>}</ThOrden>
                 <ThOrden col="salida" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Salida<br />temprana</ThOrden>
-                <ThOrden col="noTrabajado" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Tiempo no<br />trabajado</ThOrden>
+                <ThOrden col="noTrabajado" api={orden} derecha className="px-2 py-2.5 text-right font-medium">{FUERA ? "Total" : <>Tiempo no<br />trabajado</>}</ThOrden>
                 <ThOrden col="extras" api={orden} derecha className="px-2 py-2.5 text-right font-medium">Extras</ThOrden>
                 {/* ══════════════════════════════════════════════════════════
                     🔴 «SOLO A REVISAR» VIVE EN SU COLUMNA (25-sep-2026)
@@ -1162,7 +1165,7 @@ export default function ReporteTab({ empresa = "" }: {
             {/* 🔴 1-sep-2026: la extra YA NO se netea contra el atraso del día.
                 Daniel, textual: *"No, van separadas"*. El mínimo es una PUERTA
                 —pasada, se paga desde el primer minuto— y el atraso sigue
-                descontándose por su lado, en «Tiempo no trabajado». El número
+                descontándose por su lado, en el total. El número
                 sale de las reglas configurables; el texto NUNCA lo cablea. */}
             {reglas?.extraMinimoMin ?? EXTRA_MINIMO_MIN} min y se pagan completas: el atraso del
             día se descuenta aparte, no se les resta.{" "}
@@ -1313,7 +1316,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
                 <th className="px-2 py-2 text-right font-medium">Regreso almuerzo</th>
                 <th className="px-2 py-2 text-right font-medium">Salida</th>
                 <th className="px-2 py-2 text-right font-medium">Tardanza</th>
-                <th className="px-2 py-2 text-right font-medium">Exceso de<br />almuerzo</th>
+                <th className="px-2 py-2 text-right font-medium">{FUERA ? <>Tiempo no<br />laborado</> : <>Exceso de<br />almuerzo</>}</th>
                 <th className="px-2 py-2 text-right font-medium">Extra</th>
                 <th className="px-2 py-2 text-left font-medium"></th>
               </tr></thead>
@@ -1514,7 +1517,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
         <td className="px-2 py-2.5 text-right">{r.minutosTarde
           ? <span className="font-medium tabular-nums text-amber-700">{formatoTiempo(r.minutosTarde, modoTiempo)}</span>
           : <span className="text-gray-300">—</span>}</td>
-        <td className="px-2 py-2.5 text-right text-gray-700">{t(r.excesoAlmuerzoMin, modoTiempo)}</td>
+        <td className="px-2 py-2.5 text-right text-gray-700">{t(FUERA ? r.tiempoNoLaboradoMin : r.excesoAlmuerzoMin, modoTiempo)}</td>
         <td className="px-2 py-2.5 text-right text-gray-700">{t(r.salidaTempranaMin, modoTiempo)}</td>
         <td className="px-2 py-2.5 text-right font-semibold text-gray-900">{t(r.tiempoNoTrabajadoMin, modoTiempo)}</td>
         {/* 🔴 El servicio profesional NO cuenta horas extra (3-sep-2026,
@@ -2192,7 +2195,7 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
                 </span>
               )
               : <span className="text-gray-300">—</span>}</td>
-            <td className="px-2 py-1.5 text-right text-gray-600">{dia(d.excesoAlmuerzoMin)}</td>
+            <td className="px-2 py-1.5 text-right text-gray-600">{dia(FUERA ? d.descuentaFueraMin ?? 0 : d.excesoAlmuerzoMin)}</td>
             <td className="px-2 py-1.5 text-right text-gray-600">{conExtra ? dia(d.extraMin) : sinExtra()}</td>
             <td className="whitespace-nowrap px-2 py-1.5">
               {/* ══════════════════════════════════════════════════════════

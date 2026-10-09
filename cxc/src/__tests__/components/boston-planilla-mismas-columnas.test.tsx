@@ -79,16 +79,18 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 // ═════════════════════════════════════════════════════════════════════════════
 describe("1. 🔴 UNA lista de columnas de dinero para las dos planillas", () => {
-  it("son 19, con «Salida temprana» entre Tardanzas y Extra 1.50", () => {
-    expect(COLUMNAS_DINERO_PLANILLA).toHaveLength(19);
+  it("son 20, con «Salida temprana» y «Tiempo no laborado» entre Tardanzas y Extra 1.50", () => {
+    expect(COLUMNAS_DINERO_PLANILLA).toHaveLength(20);
     expect(CAMPOS_DINERO_PLANILLA.indexOf("salidaTemprana")).toBe(CAMPOS_DINERO_PLANILLA.indexOf("tardanzas") + 1);
-    expect(CAMPOS_DINERO_PLANILLA.indexOf("extraNocturno")).toBe(CAMPOS_DINERO_PLANILLA.indexOf("salidaTemprana") + 1);
+    expect(CAMPOS_DINERO_PLANILLA.indexOf("tiempoNoLaborado")).toBe(CAMPOS_DINERO_PLANILLA.indexOf("salidaTemprana") + 1);
+    expect(CAMPOS_DINERO_PLANILLA.indexOf("extraNocturno")).toBe(CAMPOS_DINERO_PLANILLA.indexOf("tiempoNoLaborado") + 1);
+    expect(ROTULOS_DINERO_PLANILLA).toContain("Tiempo no\nlaborado");
     expect(ROTULOS_DINERO_PLANILLA).toContain("Salida\ntemprana");
     expect(ROTULOS_DINERO_PLANILLA.at(-1)).toBe("Neto a\npagar");
   });
-  it("`montosDePlanilla` devuelve los 19 en ese orden, y una respuesta vieja sin salidaTemprana vale 0 ahí", () => {
+  it("`montosDePlanilla` devuelve los 20 en ese orden, y una respuesta vieja sin salidaTemprana vale 0 ahí", () => {
     const m = montosDePlanilla(DINERO);
-    expect(m).toHaveLength(19);
+    expect(m).toHaveLength(20);
     expect(m[4]).toBe(11.83);
     expect(m.at(-1)).toBe(211.15);
     const { salidaTemprana: _s, ...vieja } = DINERO;

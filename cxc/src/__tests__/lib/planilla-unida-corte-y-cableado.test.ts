@@ -122,12 +122,13 @@ describe("B. EL AJUSTE — solo lo que sale del RELOJ, y el sueldo NUNCA", () =>
   // ⚠️ Eran SIETE hasta el 11-sep-2026. Daniel: *«la salida temprana incluirla»*
   // (nació el 10-sep, después del corte, y quedaba afuera). Cambió de número
   // con nota, no de regla: el sueldo sigue sin entrar nunca.
-  it("son OCHO conceptos, con su signo — la salida temprana descuenta, como la tardanza", () => {
+  // 🔴 NUEVE desde el 9-oct-2026: «Tiempo no laborado» descuenta, como la tardanza.
+  it("son NUEVE conceptos, con su signo — la salida temprana y el tiempo no laborado descuentan", () => {
     expect(CONCEPTOS_DEL_RELOJ.map((c) => c.campo).sort()).toEqual(
-      ["ausencias", "domingos", "excedente", "extraDiurno", "extraNocturno", "feriados", "salidaTemprana", "tardanzas"],
+      ["ausencias", "domingos", "excedente", "extraDiurno", "extraNocturno", "feriados", "salidaTemprana", "tardanzas", "tiempoNoLaborado"],
     );
     const suman = CONCEPTOS_DEL_RELOJ.filter((c) => c.signo === +1).map((c) => c.campo);
-    expect(suman.sort()).toEqual(["ausencias", "salidaTemprana", "tardanzas"]);
+    expect(suman.sort()).toEqual(["ausencias", "salidaTemprana", "tardanzas", "tiempoNoLaborado"]);
   });
 
   it("el aviso de pantalla distingue descontar de devolver, y calla en cero", () => {

@@ -51,7 +51,7 @@ const DINERO = (o: Partial<DineroLinea> = {}): DineroLinea => ({
   rataHora: 3, valorMinuto: 0.05, salarioQuincenal: 300,
   extraDiurno: 0, extraNocturno: 0, excedente: 0, domingos: 0, feriados: 0,
   ausencias: 0, ausenciaPorTardanza: 0, ausenciaDeDiaCompleto: 0, vacacionesYaPagadas: 0,
-  tardanzas: 0, salidaTemprana: 0, totalBruto: 300, baseSeguros: null,
+  tardanzas: 0, salidaTemprana: 0, tiempoNoLaborado: 0, totalBruto: 300, baseSeguros: null,
   seguroSocial: 29.25, seguroEducativo: 3.75, isr: 0, prestamo: 0, terceros: 0, mercancia: 0,
   totalDeducciones: 33, otrosServicios: 0, netoPagar: 267, ...o,
 });
@@ -110,12 +110,14 @@ describe("B. EL REPARTO — solo lo que sale del reloj, y cada cosa en la suya",
   // ⚠️ Eran SIETE hasta el 11-sep-2026. Daniel: *«la salida temprana incluirla»*
   // — «Salida temprana» nació el 10-sep, después del corte, y quedaba afuera
   // del ajuste. Cambió de número con nota, no de regla.
-  it("los OCHO conceptos entran, cada uno por su nombre — la salida temprana también", () => {
-    const todo = DINERO({ ausencias: 1, tardanzas: 2, salidaTemprana: 2.5, extraDiurno: 3, extraNocturno: 4, excedente: 5, domingos: 6, feriados: 7 });
+  // 🔴 NUEVE desde el 9-oct-2026: «Tiempo no laborado», con signo +.
+  it("los NUEVE conceptos entran, cada uno por su nombre — la salida temprana y el tiempo no laborado también", () => {
+    const todo = DINERO({ ausencias: 1, tardanzas: 2, salidaTemprana: 2.5, tiempoNoLaborado: 1.25, extraDiurno: 3, extraNocturno: 4, excedente: 5, domingos: 6, feriados: 7 });
     const r = repartirAjuste(todo);
     for (const { campo } of CONCEPTOS_DEL_RELOJ) expect(r[campo]).toBe(todo[campo]);
     expect(Object.keys(r).sort()).toEqual([...CONCEPTOS_DEL_RELOJ].map((c) => c.campo).sort());
-    expect(CONCEPTOS_DEL_RELOJ).toHaveLength(8);
+    expect(CONCEPTOS_DEL_RELOJ).toHaveLength(9);
+    expect(CONCEPTOS_DEL_RELOJ.find((c) => c.campo === "tiempoNoLaborado")?.signo).toBe(1);
     // Con signo +: se descuenta después, igual que la tardanza.
     expect(CONCEPTOS_DEL_RELOJ.find((c) => c.campo === "salidaTemprana")?.signo).toBe(1);
   });

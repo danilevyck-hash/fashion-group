@@ -338,14 +338,14 @@ const personaReporte = (i: number) => ({
     diasTrabajados: 10, ausenciasSinJustificar: 1, ausenciasJustificadas: 0, diasTrabajandoFuera: 2, diasVacaciones: 0,
     diasVacacionesYaPagadas: 0, vecesTarde: 3, minutosTarde: 45.5, minutosTardeDeDiasARevisar: 10, diasConPermiso: 0,
     minutosPerdonadosPorPermiso: 0, excesoAlmuerzoMin: 12, salidaTempranaMin: 5, extraMin: 30, diasARevisar: 2,
-    diasEnCurso: 0, tiempoNoTrabajadoMin: 62.5, diasCorregidos: 4, correcciones: 6,
+    diasEnCurso: 0, tiempoNoLaboradoMin: 0, tiempoNoTrabajadoMin: 62.5, diasCorregidos: 4, correcciones: 6,
   },
 }) as unknown as PersonaReporte;
 
 const DINERO = {
   rataHora: 4.81, valorMinuto: 0.08, salarioQuincenal: 500, extraDiurno: 12.34, extraNocturno: 0, excedente: 0,
   domingos: 0, feriados: 0, ausencias: 38.48, ausenciaPorTardanza: 8.12, ausenciaDeDiaCompleto: 0, vacacionesYaPagadas: 0,
-  tardanzas: 3.21, salidaTemprana: 0, totalBruto: 470.65, baseSeguros: null, seguroSocial: 46.83, seguroEducativo: 6.12,
+  tardanzas: 3.21, salidaTemprana: 0, tiempoNoLaborado: 0, totalBruto: 470.65, baseSeguros: null, seguroSocial: 46.83, seguroEducativo: 6.12,
   isr: 0, prestamo: 25, terceros: 0, mercancia: 0, totalDeducciones: 77.95, otrosServicios: 0, netoPagar: 392.7,
 } as unknown as DineroLinea;
 
