@@ -167,7 +167,8 @@ describe("Caja Menuda · sin la bajada del fondo fijo, y sin hueco donde estaba"
 import CorregirMarcacionModal from "@/app/asistencia/CorregirMarcacionModal";
 import { ToastProvider } from "@/components/ToastSystem";
 
-describe("Asistencia · el motivo sigue siendo OBLIGATORIO sin la frase que lo decía", () => {
+// 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+describe("Asistencia · corregir una hora ya no pide motivo (9-oct-2026)", () => {
   function pintar() {
     render(
       <ToastProvider>
@@ -191,20 +192,10 @@ describe("Asistencia · el motivo sigue siendo OBLIGATORIO sin la frase que lo d
     expect(screen.queryByText(/nadie va a acordarse/i)).toBeNull();
   });
 
-  it("🔴 el asterisco, el campo y el freno de guardar SIGUEN", () => {
+  it("🔴 el rótulo, el asterisco y el campo SE FUERON, y Guardar está prendido", () => {
     pintar();
-    // El rótulo con su `*`.
-    // 🔴 11-sep-2026: el rótulo pasó de «Por qué se corrige» a «Por qué» (mockup
-    // aprobado por Daniel); la REGLA de este candado —obligatorio, con
-    // asterisco, con freno— no cambió. Ver `asistencia-corregir-hora.test.tsx`.
-    // 1-oct-2026, Daniel: nombres normales de ERP («screen.getByText(/^Por qué/i).textContent» → «screen.getByText(/^Motivo/i).textContent»).
-    expect(screen.getByText(/^Motivo/i).textContent).toContain("*");
-    const motivo = document.querySelector("textarea") as HTMLTextAreaElement;
-    expect(motivo).toBeTruthy();
-    // Sin motivo, Guardar sigue apagado: la REGLA no se fue con el texto.
-    const guardar = screen.getByRole("button", { name: /Guardar/i }) as HTMLButtonElement;
-    expect(guardar.disabled).toBe(true);
-    fireEvent.change(motivo, { target: { value: "Se le dañó el carro, avisó" } });
+    expect(screen.queryByText(/^Motivo/i)).toBeNull();
+    expect(document.querySelector("textarea")).toBeNull();
     expect((screen.getByRole("button", { name: /Guardar/i }) as HTMLButtonElement).disabled).toBe(false);
   });
 });

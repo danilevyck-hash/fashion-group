@@ -46,7 +46,6 @@ import { diaPanama } from "@/lib/asistencia/reporte";
 import {
   avisoMigracionCorrecciones,
   fechaValida,
-  motivoValido,
   normalizarHora,
   normalizarMotivo,
 } from "@/lib/asistencia/correcciones";
@@ -123,15 +122,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
 
-    // 🔴 EL MOTIVO SE VALIDA PRIMERO Y NO SE NEGOCIA. Vacío o solo espacios no
-    // sirve: es lo que teclea quien quiere saltarse el campo, y sin razón
-    // escrita, en tres meses nadie sabe por qué esa hora difiere del reloj.
-    if (!motivoValido(body?.motivo)) {
-      return NextResponse.json(
-        { error: "Escribe por qué se corrige. Sin razón no se puede guardar." },
-        { status: 400 },
-      );
-    }
+    // 🔴 EL MOTIVO YA NO SE EXIGE (9-oct-2026, Daniel: «quita lo de poner
+    // motivo al cambiar la hora en asistencia»). Si llega uno se guarda; si no,
+    // queda la firma, la fecha y la hora de antes y la de después.
     const motivo = normalizarMotivo(body?.motivo);
 
     // 🔴 QUITAR NO LLEVA HORA, Y NO ES UN DESCUIDO: no vale ninguna, porque esa

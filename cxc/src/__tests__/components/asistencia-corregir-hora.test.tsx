@@ -70,31 +70,17 @@ describe("la ventana «Corregir la hora»", () => {
     expect(document.querySelector('input[type="text"]')).toBeNull();
   });
 
-  it("sin historia no hay botones; con historia salen los que manda la ruta y tocar uno escribe en el campo", async () => {
-    servir([["/correcciones/motivos", { motivos: ["Se le olvidó marcar", "Reloj sin internet"] }]]);
-    montar(<CorregirMarcacionModal marca={MARCA} onCerrar={() => {}} onGuardado={() => {}} />);
-    const chip = await screen.findByRole("button", { name: "Se le olvidó marcar" });
-    expect(screen.getByRole("button", { name: "Reloj sin internet" })).toBeTruthy();
-    const motivo = document.querySelector("textarea") as HTMLTextAreaElement;
-    expect(motivo.value).toBe("");
-    fireEvent.click(chip);
-    expect(motivo.value).toBe("Se le olvidó marcar");
-    expect(chip.getAttribute("aria-pressed")).toBe("true");
-    // Sigue siendo campo LIBRE: se puede seguir escribiendo encima.
-    fireEvent.change(motivo, { target: { value: "Se le olvidó marcar, avisó" } });
-    expect(motivo.value).toBe("Se le olvidó marcar, avisó");
-    expect(chip.getAttribute("aria-pressed")).toBe("false");
-  });
-
-  it("🔴 Guardar está apagado sin porqué y dice qué falta; con porqué se prende", async () => {
-    servir([["/correcciones/motivos", { motivos: [] }]]);
+  // 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+  it("🔴 NO HAY CAMPO DE MOTIVO ni botones de motivos, y Guardar está prendido con solo la hora", async () => {
+    const llamadas = servir([["/correcciones/motivos", { motivos: ["Se le olvidó marcar", "Reloj sin internet"] }]]);
     montar(<CorregirMarcacionModal marca={MARCA} onCerrar={() => {}} onGuardado={() => {}} />);
     await screen.findByText(/el reloj marcó/);
-    const guardar = screen.getByRole("button", { name: "Guardar" }) as HTMLButtonElement;
-    expect(guardar.disabled).toBe(true);
-    expect(screen.getByText(/Falta: el porqué/)).toBeTruthy();
-    fireEvent.change(document.querySelector("textarea") as HTMLTextAreaElement, { target: { value: "Avisó" } });
+    expect(document.querySelector("textarea")).toBeNull();
+    expect(screen.queryByText(/Motivo/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Se le olvidó marcar" })).toBeNull();
+    expect(llamadas.filter((l) => l.url.includes("/correcciones/motivos"))).toHaveLength(0);
     expect((screen.getByRole("button", { name: "Guardar" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText(/Falta/)).toBeNull();
     // «Cerrar» abajo (más la × de arriba, que también se llama así).
     expect(screen.getAllByRole("button", { name: "Cerrar" }).length).toBeGreaterThanOrEqual(1);
   });
@@ -109,14 +95,13 @@ describe("la ventana «Corregir la hora»", () => {
     await screen.findByText(/el reloj marcó/);
     // El iPhone devuelve solo HH:MM aunque el step sea 1.
     fireEvent.change(document.querySelector('input[type="time"]') as HTMLInputElement, { target: { value: "13:22" } });
-    fireEvent.change(document.querySelector("textarea") as HTMLTextAreaElement, { target: { value: "Avisó" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(onGuardado).toHaveBeenCalled());
     const post = llamadas.find((l) => l.init?.method === "POST");
     expect(post).toBeTruthy();
     const body = JSON.parse(String(post?.init?.body));
     expect(body.hora).toBe("13:22:02");
-    expect(body.motivo).toBe("Avisó");
+    expect(body).not.toHaveProperty("motivo"); // 9-oct-2026: ya no se pide
     expect(body.marcacionId).toBe("m1");
   });
 
@@ -129,7 +114,6 @@ describe("la ventana «Corregir la hora»", () => {
     montar(<CorregirMarcacionModal marca={MARCA} onCerrar={() => {}} onGuardado={onGuardado} />);
     await screen.findByText(/el reloj marcó/);
     fireEvent.change(document.querySelector('input[type="time"]') as HTMLInputElement, { target: { value: "08:00" } });
-    fireEvent.change(document.querySelector("textarea") as HTMLTextAreaElement, { target: { value: "Avisó" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(onGuardado).toHaveBeenCalled());
     const post = llamadas.find((l) => l.init?.method === "POST");
@@ -141,7 +125,7 @@ describe("la ventana «Corregir la hora»", () => {
     montar(<CorregirMarcacionModal marca={{ ...MARCA, marcacionId: null, relojHora: null }} onCerrar={() => {}} onGuardado={() => {}} />);
     expect(await screen.findByText("Yulissa Juárez · lun 31 ago · el reloj no registró nada")).toBeTruthy();
     expect((document.querySelector('input[type="time"]') as HTMLInputElement).value).toBe("");
-    expect(screen.getByText(/Falta: la hora y el porqué/)).toBeTruthy();
+    expect(screen.getByText(/Falta: la hora$/)).toBeTruthy(); // 9-oct-2026: el porqué ya no se pide
   });
 });
 

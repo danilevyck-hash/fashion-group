@@ -23,7 +23,8 @@ import {
   horaPanamaConSegundos,
   instantePanama,
   llaveDia,
-  motivoValido,
+  motivoLeido,
+  SIN_MOTIVO,
   normalizarHora,
   normalizarMotivo,
   type Correccion,
@@ -129,21 +130,23 @@ describe("🔴 ningún camino de la app edita ni borra la marcación del reloj",
 // 2. EL MOTIVO ES OBLIGATORIO
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("el motivo es obligatorio", () => {
-  it("vacío no sirve", () => {
-    expect(motivoValido("")).toBe(false);
+// 📅 9-oct-2026 — CAMBIÓ DE DIRECCIÓN POR DECISIÓN DE DANIEL, textual: «quita lo
+// de poner motivo al cambiar la hora en asistencia». Hasta hoy estas pruebas
+// exigían el motivo obligatorio (`motivoValido`, 400 sin él). Ahora corregir una
+// hora NO pide motivo; lo que NO se negocia es el rastro: quién, cuándo, antes
+// y después. La columna sigue `NOT NULL CHECK (btrim(motivo) <> '')`, así que
+// sin motivo se guarda la raya `SIN_MOTIVO` y al leer vuelve a ser vacío.
+describe("el motivo ya NO es obligatorio (9-oct-2026)", () => {
+  it("🔴 sin motivo se guarda la raya, que pasa el CHECK de la base", () => {
+    for (const nada of ["", "   ", "\t\n  ", null, undefined, 7]) {
+      expect(normalizarMotivo(nada)).toBe(SIN_MOTIVO);
+    }
+    expect(SIN_MOTIVO.trim()).not.toBe("");
   });
-  it("solo espacios TAMPOCO sirve — es lo que teclea quien quiere saltarse el campo", () => {
-    expect(motivoValido("   ")).toBe(false);
-    expect(motivoValido("\t\n  ")).toBe(false);
-  });
-  it("null, undefined y un número no sirven", () => {
-    expect(motivoValido(null)).toBe(false);
-    expect(motivoValido(undefined)).toBe(false);
-    expect(motivoValido(7)).toBe(false);
-  });
-  it("un texto de verdad sí", () => {
-    expect(motivoValido("se le dañó el carro, avisó")).toBe(true);
+  it("🔴 al leer, la raya vuelve a ser vacío y un motivo viejo se conserva", () => {
+    expect(motivoLeido(SIN_MOTIVO)).toBe("");
+    expect(motivoLeido(null)).toBe("");
+    expect(motivoLeido("se le dañó el carro, avisó")).toBe("se le dañó el carro, avisó");
   });
   it("se guarda sin espacios de sobra y acotado", () => {
     expect(normalizarMotivo("  se le dañó el carro  ")).toBe("se le dañó el carro");
@@ -512,16 +515,26 @@ describe("🔴 la ruta de correcciones — conducta", () => {
   beforeEach(() => { escrituras.length = 0; });
   afterEach(() => { vi.clearAllMocks(); });
 
-  it("sin motivo NO guarda nada", async () => {
-    const r = await pedir({ marcacionId: "m1", hora: "08:00", motivo: "" });
-    expect(r.status).toBe(400);
-    expect(escrituras).toEqual([]);
+  // 📅 9-oct-2026 (Daniel: «quita lo de poner motivo al cambiar la hora en
+  // asistencia»): antes eran dos pruebas que exigían 400 sin motivo.
+  it("🔴 SIN MOTIVO SE GUARDA, y queda quién, de quién, qué día y la hora nueva", async () => {
+    for (const cuerpo of [{}, { motivo: "" }, { motivo: "    " }]) {
+      escrituras.length = 0;
+      const r = await pedir({ marcacionId: "m1", hora: "08:00", ...cuerpo });
+      expect(r.status).toBe(200);
+      expect(escrituras).toHaveLength(1);
+      const p = escrituras[0].payload as Record<string, unknown>;
+      expect(p.marcacion_id).toBe("m1"); // el «antes» es la marca del reloj, intacta
+      expect(p.hora).toBe("08:00:00"); // el «después»
+      expect(p.creada_por).toBe("Angela"); // quién (el cuándo lo pone la base: `creada_en DEFAULT now()`)
+      expect(p.empleado_codigo).toBe("26");
+      expect(p.motivo).toBe(SIN_MOTIVO);
+    }
   });
 
-  it("con el motivo en espacios TAMPOCO guarda nada", async () => {
-    const r = await pedir({ marcacionId: "m1", hora: "08:00", motivo: "    " });
-    expect(r.status).toBe(400);
-    expect(escrituras).toEqual([]);
+  it("un motivo que llegue (el de arrastrar una hora) se guarda tal cual", async () => {
+    await pedir({ marcacionId: "m1", hora: "08:00", motivo: "  Marca movida de columna " });
+    expect((escrituras[0].payload as Record<string, unknown>).motivo).toBe("Marca movida de columna");
   });
 
   it("con hora inválida no guarda nada", async () => {

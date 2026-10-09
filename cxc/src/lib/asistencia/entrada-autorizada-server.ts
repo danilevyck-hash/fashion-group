@@ -13,6 +13,7 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { esTablaFaltante } from "./config";
+import { motivoLeido } from "./correcciones";
 import { TABLA_ENTRADAS_AUTORIZADAS, type EntradaAutorizada } from "./entrada-autorizada";
 
 const COLS = "id, empleado_codigo, fecha, hora, motivo, creada_por, creada_en";
@@ -34,7 +35,7 @@ function aEntrada(f: Fila): EntradaAutorizada {
     fecha: String(f.fecha).slice(0, 10),
     // Postgres devuelve `time` como "06:00:00"; se corta a los segundos.
     hora: String(f.hora ?? "").slice(0, 8),
-    motivo: String(f.motivo ?? ""),
+    motivo: motivoLeido(f.motivo),
     creadaPor: String(f.creada_por ?? ""),
     creadaEn: String(f.creada_en ?? ""),
   };

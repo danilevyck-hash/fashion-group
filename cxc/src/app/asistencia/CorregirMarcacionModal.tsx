@@ -17,10 +17,9 @@ import { Aviso } from "@/components/ui/Aviso";
  *     libre para escribir la hora, enreda. algo que se sienta más seguro y que
  *     el formato vaya con el módulo»*. Precargada con la hora del reloj; los
  *     segundos son opcionales (`completarSegundos`).
- *   · El porqué sigue OBLIGATORIO y campo libre, con hasta 4 botones de los
- *     motivos más escritos en 90 días (`/api/asistencia/correcciones/motivos`,
- *     regla en `lib/asistencia/motivos-frecuentes.ts`). Tocar uno pone el
- *     texto en el campo; el CAMPO es lo que se guarda.
+ *   · 🔴 9-oct-2026 (Daniel): «quita lo de poner motivo al cambiar la hora en
+ *     asistencia». El motivo ya NO se pide: queda quién, cuándo y la hora de
+ *     antes y la de después. Las correcciones viejas conservan el suyo.
  *   · Se fue el recuadro «Esto no se borra nunca…»: esa explicación se lee UNA
  *     vez en el «?» de la pestaña. Se fue «Como 8:00 o 17:04…»: con el selector
  *     no hay formato que explicar.
@@ -50,7 +49,7 @@ import { Aviso } from "@/components/ui/Aviso";
  *
  * 🔴 QUITAR NO BORRA NADA. `asistencia_marcaciones` es append-only y hay
  * barrido estático que lo exige: se escribe ENCIMA una corrección con
- * `quita = true`, con su motivo obligatorio, su firma y su «deshacer». La fila
+ * `quita = true`, con su firma y su «deshacer». La fila
  * del reloj queda para siempre — es la prueba de a qué hora marcó alguien, y
  * eso define un pago.
  *
@@ -66,9 +65,7 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import {
   completarSegundos,
   encabezadoCorreccion,
-  motivoValido,
   normalizarHora,
-  MOTIVO_MAX,
 } from "@/lib/asistencia/correcciones";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -119,38 +116,18 @@ export default function CorregirMarcacionModal({
     // guardaría sin querer.
     marca.correccionId ? "" : normalizarHora(marca.relojHora ?? "") ?? "",
   );
-  const [motivo, setMotivo] = useState("");
-  // Los botones de los motivos más usados. Arrancan vacíos y llegan solos;
-  // si la lectura falla, la ventana sirve igual con el campo libre.
-  const [frecuentes, setFrecuentes] = useState<string[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [montado, setMontado] = useState(false);
   useEffect(() => setMontado(true), []);
 
-  useEffect(() => {
-    if (marca.correccionId) return;
-    let vivo = true;
-    void fetch("/api/asistencia/correcciones/motivos", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!vivo) return;
-        const lista = Array.isArray(d?.motivos) ? d.motivos.filter((m: unknown) => typeof m === "string") : [];
-        setFrecuentes(lista);
-      })
-      .catch(() => { /* sin botones; el campo libre sigue */ });
-    return () => { vivo = false; };
-  }, [marca.correccionId]);
-
   const horaGuardar = completarSegundos(hora, marca.relojHora);
   const horaOk = horaGuardar !== null;
-  const razonOk = motivoValido(motivo);
-  // 🔴 QUITANDO NO SE PIDE HORA: no vale ninguna. Lo único obligatorio sigue
-  // siendo el porqué, igual que en las otras dos formas.
-  const puedeGuardar = (quitando ? razonOk : horaOk && razonOk) && !guardando;
+  // 🔴 9-oct-2026 (Daniel): «quita lo de poner motivo al cambiar la hora en
+  // asistencia». Quitando no se pide nada; corrigiendo o agregando, la hora.
+  const puedeGuardar = (quitando || horaOk) && !guardando;
 
   async function guardar() {
     // Botón apagado + este guard: el botón puede apagarse por CSS, la regla no.
-    if (!razonOk) return toast(quitando ? "Escribe por qué se quita" : "Escribe por qué se corrige", "error");
     if (!quitando && !horaGuardar) return toast("Selecciona la hora", "error");
     setGuardando(true);
     try {
@@ -166,7 +143,6 @@ export default function CorregirMarcacionModal({
           // medias: o quita una marcación que existe y no trae hora, o trae hora.
           hora: quitando ? null : horaGuardar,
           ...(quitando ? { quita: true } : {}),
-          motivo,
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -239,7 +215,7 @@ export default function CorregirMarcacionModal({
               <Aviso
                 tono="info"
               >
-                Corregida: <b>{marca.correccionMotivo}</b>
+                Corregida{marca.correccionMotivo ? <>: <b>{marca.correccionMotivo}</b></> : null}
                 <span className="block text-xs text-gray-500">{marca.correccionPor}{marca.correccionEn ? ` · ${cuandoBonito(marca.correccionEn)}` : ""}</span>
               </Aviso>
               <p className="text-[13px] text-gray-600">
@@ -301,46 +277,6 @@ export default function CorregirMarcacionModal({
               </label>
               )}
 
-              {/* 🩸 El rótulo NO envuelve los botones en un <label>: un botón es
-                  «labelable», así que el label se ataría al PRIMER botón y no
-                  al campo. El campo se rotula por `aria-labelledby`. */}
-              <div>
-                <span id="corregir-porque" className="block text-[13px] font-medium text-gray-700">
-                  Motivo <span className="text-red-600">*</span>
-                </span>
-                {/* Los más usados, si los hay. Tocar uno ESCRIBE en el campo;
-                    se puede seguir editando. Sin historia no se dibuja nada. */}
-                {frecuentes.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {frecuentes.map((m) => {
-                      const activo = motivo === m;
-                      return (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => setMotivo(m)}
-                          aria-pressed={activo}
-                          className={`min-h-[44px] rounded-full border px-3 text-[13px] transition active:scale-[0.97] ${
-                            activo
-                              ? "border-black bg-black text-white"
-                              : "border-gray-200 text-gray-600 hover:border-black hover:text-black"
-                          }`}
-                        >
-                          {m}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <textarea
-                  aria-labelledby="corregir-porque"
-                  value={motivo}
-                  onChange={(e) => setMotivo(e.target.value.slice(0, MOTIVO_MAX))}
-                  rows={2}
-                  placeholder="Escribe el motivo…"
-                  className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2 text-base outline-none transition focus:border-black sm:text-sm"
-                />
-              </div>
             </>
           )}
         </div>
@@ -380,8 +316,7 @@ export default function CorregirMarcacionModal({
             explicación se lee como "esta pantalla está rota". */}
         {!marca.correccionId && !puedeGuardar && !guardando && (
           <p className="border-t border-gray-100 px-5 py-2 text-right text-[12px] text-amber-700">
-            {/* Quitando no se pide hora: lo único que puede faltar es el porqué. */}
-            Falta{quitando ? ": el porqué" : !horaOk && !razonOk ? ": la hora y el porqué" : !horaOk ? ": la hora" : ": el porqué"}
+            Falta: la hora
           </p>
         )}
       </div>

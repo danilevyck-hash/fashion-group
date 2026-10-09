@@ -231,27 +231,25 @@ describe("B · editar una hora ya corregida no pide deshacer antes", () => {
 // C. EL MOTIVO ES OBLIGATORIO, Y EL BOTÓN APAGADO DICE QUÉ FALTA
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("C · el porqué sigue siendo obligatorio", () => {
+// 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+describe("C · el porqué ya NO se pide (9-oct-2026)", () => {
   const dia = { marcas: ["08:00:00"], marcasIds: ["m1"], correcciones: [] };
   const conCambio = planDelDia(casillasDelDia(dia), escritoDe({ [claveMarca(0)]: { hora: "08:30" } }));
 
-  it("con cambios y sin motivo no se guarda, y se dice qué falta", () => {
-    expect(faltaParaGuardarElDia(conCambio, "")).toBe("Falta: el porqué");
-    expect(faltaParaGuardarElDia(conCambio, "   ")).toBe("Falta: el porqué");
-  });
-
-  it("con cambios y motivo, se puede guardar", () => {
-    expect(faltaParaGuardarElDia(conCambio, "olvidó marcar")).toBeNull();
+  it("🔴 con cambios se puede guardar, sin escribir ningún motivo", () => {
+    expect(faltaParaGuardarElDia(conCambio)).toBeNull();
+    // La función ya no recibe el motivo: no hay forma de volver a exigirlo por descuido.
+    expect(faltaParaGuardarElDia.length).toBe(1);
   });
 
   it("sin cambios no hay nada que hacer, y tampoco se guarda", () => {
     const vacio = planDelDia(casillasDelDia(dia), new Map());
-    expect(faltaParaGuardarElDia(vacio, "lo que sea")).toBe("Todavía no cambiaste nada");
+    expect(faltaParaGuardarElDia(vacio)).toBe("Todavía no cambiaste nada");
   });
 
   it("una hora que no sirve FRENA el guardado antes que nada", () => {
     const malo = planDelDia(casillasDelDia(dia), escritoDe({ [claveMarca(0)]: { hora: "25:00" } }));
-    expect(faltaParaGuardarElDia(malo, "un motivo")).toBe("Hay una hora que no sirve");
+    expect(faltaParaGuardarElDia(malo)).toBe("Hay una hora que no sirve");
   });
 
   it("el resumen dice QUÉ se va a escribir antes de escribirlo", () => {
@@ -333,13 +331,17 @@ async function postDia(body: unknown) {
 describe("D · el servidor valida todo antes de escribir nada", () => {
   beforeEach(() => { escrituras.length = 0; });
 
-  it("sin motivo: 400 y CERO escrituras", async () => {
-    const r = await postDia({
-      codigo: "16", fecha: "2026-09-01", motivo: "  ",
-      cambios: [{ clave: "m0", tipo: "corregir", marcacionId: "m1", hora: "08:00:00" }],
-    });
-    expect(r.status).toBe(400);
-    expect(escrituras).toEqual([]);
+  // 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+  it("🔴 SIN MOTIVO SE GUARDA: 200 y la corrección escrita", async () => {
+    for (const motivo of [{}, { motivo: "  " }]) {
+      escrituras.length = 0;
+      const r = await postDia({
+        codigo: "16", fecha: "2026-09-01", ...motivo,
+        cambios: [{ clave: "m0", tipo: "corregir", marcacionId: "m1", hora: "08:00:00" }],
+      });
+      expect(r.status).toBe(200);
+      expect(escrituras.length).toBeGreaterThan(0);
+    }
   });
 
   it("una sola hora mala tumba el pedido ENTERO, sin escribir la buena", async () => {

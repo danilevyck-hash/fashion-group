@@ -22,7 +22,7 @@ import { GUARDAR_EL_DIA } from "@/lib/asistencia/editar-el-dia";
 // reescribió es cuántas casillas se abren de un toque. El rótulo del botón sale
 // del módulo (`rotuloGuardar`) para que el candado siga los dos estados del
 // interruptor sin cablear un texto.
-import { ARREGLAR_EL_DIA, OTRO_MOTIVO, rotuloGuardar } from "@/lib/asistencia/panel-del-dia";
+import { ARREGLAR_EL_DIA, rotuloGuardar } from "@/lib/asistencia/panel-del-dia";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
@@ -175,8 +175,9 @@ describe("A · se edita en la fila, no en una ventana", () => {
 // B. UN PORQUÉ, UN BOTÓN, UNA PETICIÓN CON TODO EL DÍA
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("B · un porqué y un botón para todo el día", () => {
-  it("🔴 el botón está apagado sin porqué y DICE qué falta", async () => {
+// 📅 9-oct-2026 — cambió de dirección por decisión de Daniel, textual: «quita lo de poner motivo al cambiar la hora en asistencia». Antes esta prueba exigía el motivo.
+describe("B · un botón para todo el día, sin porqué (9-oct-2026)", () => {
+  it("🔴 con la hora cambiada el botón se PRENDE: no hay campo de motivo ni nada que falte", async () => {
     servir(base());
     montar(<ReporteTab />);
     await abrirPersona();
@@ -187,28 +188,24 @@ describe("B · un porqué y un botón para todo el día", () => {
     expect(guardar().disabled).toBe(true);
     expect(screen.getByText("Todavía no cambiaste nada")).toBeTruthy();
     fireEvent.change(camposHora()[0], { target: { value: "08:00" } });
-    expect(guardar().disabled).toBe(true);
-    expect(screen.getByText("Falta: el porqué")).toBeTruthy();
+    expect(guardar().disabled).toBe(false);
+    expect(screen.queryByText(/Falta/)).toBeNull();
+    expect(screen.queryByPlaceholderText("Escribe el motivo…")).toBeNull();
+    expect(screen.queryByText(/^Motivo/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Otro…" })).toBeNull();
   });
 
-  it("los motivos más usados se piden UNA vez y tocar uno escribe en el campo", async () => {
+  it("🔴 los motivos más usados ya NO se piden ni se ofrecen", async () => {
     const llamadas = servir(base());
     montar(<ReporteTab />);
     await abrirPersona();
     fireEvent.click(screen.getByText("08:04:11"));
     await waitFor(() => expect(camposHora()).toHaveLength(1));
-    // Una sola lectura de motivos para toda la pantalla, no una por fila.
-    expect(llamadas.filter((l) => l.url.includes("/correcciones/motivos"))).toHaveLength(1);
-    // 🔄 25-sep-2026: los más usados siguen valiendo; viven bajo «Otro…», al
-    // lado del motivo que aplica a la casilla que se tocó.
-    fireEvent.click(screen.getByRole("button", { name: OTRO_MOTIVO }));
-    const chip = await screen.findByRole("button", { name: "Se le olvidó marcar" });
-    fireEvent.click(chip);
-    const porque = document.querySelector('input[placeholder="Escribe el motivo…"]') as HTMLInputElement;
-    expect(porque.value).toBe("Se le olvidó marcar");
+    expect(llamadas.filter((l) => l.url.includes("/correcciones/motivos"))).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Se le olvidó marcar" })).toBeNull();
   });
 
-  it("🔴 la casilla tocada viaja en UNA sola petición, con UN motivo, y la hora IGUAL no viaja", async () => {
+  it("🔴 la casilla tocada viaja en UNA sola petición, SIN motivo, y la hora IGUAL no viaja", async () => {
     const llamadas = servir(base());
     montar(<ReporteTab />);
     await abrirPersona();
@@ -223,11 +220,6 @@ describe("B · un porqué y un botón para todo el día", () => {
     // 🔄 25-sep-2026: se arregla UNA casilla por vez, así que la petición lleva
     // UN cambio —el de la hora que se tocó— y ni una de las otras tres.
     fireEvent.change(camposHora()[0], { target: { value: "08:00" } });
-    fireEvent.click(screen.getByRole("button", { name: OTRO_MOTIVO }));
-    fireEvent.change(
-      await screen.findByPlaceholderText("Escribe el motivo…"),
-      { target: { value: "el reloj se adelantó" } },
-    );
     fireEvent.click(screen.getByRole("button", { name: rotuloGuardar() }));
 
     await waitFor(() => {
@@ -237,7 +229,7 @@ describe("B · un porqué y un botón para todo el día", () => {
     const body = JSON.parse(String(post?.init?.body));
     expect(body.codigo).toBe("26");
     expect(body.fecha).toBe("2026-08-31");
-    expect(body.motivo).toBe("el reloj se adelantó");
+    expect(body).not.toHaveProperty("motivo");
     expect(body.cambios).toHaveLength(1);
     // 🔑 08:04:11 → «08:00»: la hora:minuto CAMBIÓ, así que los segundos del
     // reloj no se arrastran y va :00. Es la regla de `completarSegundos`.
@@ -252,11 +244,6 @@ describe("B · un porqué y un botón para todo el día", () => {
     fireEvent.click(within(fila).getByText("08:00:00"));
     await waitFor(() => expect(camposHora().length).toBeGreaterThan(0));
     fireEvent.change(camposHora()[0], { target: { value: "08:10" } });
-    fireEvent.click(screen.getByRole("button", { name: OTRO_MOTIVO }));
-    fireEvent.change(
-      await screen.findByPlaceholderText("Escribe el motivo…"),
-      { target: { value: "era la 8:10" } },
-    );
     fireEvent.click(screen.getByRole("button", { name: rotuloGuardar() }));
     await waitFor(() => {
       expect(llamadas.filter((l) => l.url.includes("/correcciones/dia"))).toHaveLength(1);
@@ -278,11 +265,6 @@ describe("B · un porqué y un botón para todo el día", () => {
     const quitar = screen.getAllByRole("button", { name: "Quitar" });
     expect(quitar).toHaveLength(1);
     fireEvent.click(quitar[0]);
-    fireEvent.click(screen.getByRole("button", { name: OTRO_MOTIVO }));
-    fireEvent.change(
-      await screen.findByPlaceholderText("Escribe el motivo…"),
-      { target: { value: "marcó dos veces" } },
-    );
     fireEvent.click(screen.getByRole("button", { name: rotuloGuardar() }));
     await waitFor(() => {
       expect(llamadas.filter((l) => l.url.includes("/correcciones/dia"))).toHaveLength(1);
