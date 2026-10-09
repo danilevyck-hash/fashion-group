@@ -4,6 +4,7 @@ import { CLAVE_SESION_DEL_NAVEGADOR } from "@/lib/sesion-entre-pestanas";
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
+import { LOGIN_RETOQUES_2026_10 as RETOQUES } from "@/lib/login-retoques-2026-10";
 
 function ForgotPassword() {
   const [show, setShow] = useState(false);
@@ -11,7 +12,7 @@ function ForgotPassword() {
     <div className="text-center">
       {/* 18px de alto al tacto. min-h-[44px] sin cambiar el tamaño de letra. */}
       <button type="button" onClick={() => setShow(!show)} className="inline-flex min-h-[44px] items-center justify-center px-4 text-xs text-gray-400 hover:text-gray-600 transition">
-        ¿Olvidaste tu contraseña?
+        {RETOQUES ? "Recuperar contraseña" : "¿Olvidaste tu contraseña?"}
       </button>
       {show && <p className="text-xs text-gray-500 mt-2">Contacta al administrador para restablecer tu contraseña. Una vez adentro, puedes cambiarla tú desde tu nombre, en «Contraseña».</p>}
     </div>
@@ -123,13 +124,15 @@ function LoginForm() {
         </div>
 
         <div>
+          {RETOQUES && <label htmlFor="contrasena" className="block text-xs text-gray-500 mb-1">Contraseña</label>}
           <div className="relative">
             <input
+              id={RETOQUES ? "contrasena" : undefined}
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(""); }}
-              placeholder="Contraseña"
-              className="w-full border border-gray-300 rounded px-4 py-3 text-sm focus:outline-none focus:border-black pr-16"
+              placeholder={RETOQUES ? undefined : "Contraseña"}
+              className={`w-full border border-gray-300 rounded px-4 py-3 text-sm focus:outline-none focus:border-black ${RETOQUES ? "pr-20" : "pr-16"}`}
               autoCapitalize="none"
               autoCorrect="off"
               autoFocus
@@ -137,9 +140,9 @@ function LoginForm() {
             />
             {/* Medía 19×18: imposible de pegarle con el pulgar. 44×44. */}
             <button type="button" onClick={() => setShowPassword(!showPassword)}
-              aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
-              className="absolute right-1 top-1/2 -translate-y-1/2 flex min-w-[44px] h-11 items-center justify-center px-1 text-gray-300 hover:text-gray-600 transition text-xs">
-              {showPassword ? "ocultar" : "ver"}
+              aria-label={showPassword ? "Ocultar contraseña" : RETOQUES ? "Mostrar contraseña" : "Ver contraseña"}
+              className={`absolute right-1 top-1/2 -translate-y-1/2 flex min-w-[44px] h-11 items-center justify-center ${RETOQUES ? "px-3 font-medium text-gray-600 hover:text-black" : "px-1 text-gray-300 hover:text-gray-600"} transition text-xs`}>
+              {RETOQUES ? (showPassword ? "Ocultar" : "Mostrar") : showPassword ? "ocultar" : "ver"}
             </button>
           </div>
         </div>
@@ -152,7 +155,7 @@ function LoginForm() {
           disabled={loading}
           className="w-full bg-black text-white py-3 rounded text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50"
         >
-          {loading ? "Verificando..." : "Ingresar"}
+          {RETOQUES ? (loading ? "Verificando…" : "Iniciar sesión") : loading ? "Verificando..." : "Ingresar"}
         </button>
 
         <ForgotPassword />
