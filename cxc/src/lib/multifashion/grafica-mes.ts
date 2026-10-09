@@ -21,8 +21,8 @@
 import { esDiaHabilTienda } from "@/lib/multifashion/resumen-minimo";
 import { lineaDelDia, montoCorto } from "@/lib/multifashion/celular";
 
-/** `false` = la gráfica de hoy. NACE APAGADO, separado del rediseño. */
-export const MULTIFASHION_GRAFICA_2026_10 = false;
+/** `false` = la gráfica de antes. Nació apagado, separado del rediseño; PRENDIDO el 9-oct-2026 (Daniel aprobó). */
+export const MULTIFASHION_GRAFICA_2026_10 = true;
 
 export type EstadoDia =
   | "venta"       // cerrado, con venta

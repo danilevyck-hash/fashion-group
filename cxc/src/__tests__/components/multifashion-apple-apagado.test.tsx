@@ -18,6 +18,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: { from: vi.fn(), rpc: vi.fn() },
 }));
+// 9-oct-2026: `MULTIFASHION_GRAFICA_2026_10` también quedó PRENDIDO (Daniel
+// aprobó la gráfica). Este candado es la pantalla de ANTES: la gráfica se fija
+// a `false` igual que el rediseño. La nueva la cuida `multifashion-grafica.test.ts`.
+vi.mock("@/lib/multifashion/grafica-mes", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/multifashion/grafica-mes")>()),
+  MULTIFASHION_GRAFICA_2026_10: false,
+}));
 vi.mock("@/lib/multifashion/apple", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/multifashion/apple")>()),
   MULTIFASHION_APPLE_2026_10: false,

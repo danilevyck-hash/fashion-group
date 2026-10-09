@@ -31,8 +31,9 @@ const julio = Array.from({ length: 31 }, (_, i) => {
 });
 
 describe("el interruptor", () => {
-  it("nace apagado y es OTRO que el del rediseño", () => {
-    expect(MULTIFASHION_GRAFICA_2026_10).toBe(false);
+  // 🔁 9-oct-2026: nació apagado; Daniel aprobó la gráfica y queda prendida.
+  it("prendido (Daniel lo aprobó) y es OTRO que el del rediseño", () => {
+    expect(MULTIFASHION_GRAFICA_2026_10).toBe(true);
     expect(leer("src/lib/multifashion/grafica-mes.ts")).not.toMatch(/MULTIFASHION_APPLE_2026_10/);
   });
 });
