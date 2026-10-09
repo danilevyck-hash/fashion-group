@@ -27,9 +27,20 @@
 // Y ADEMÁS un proveedor legítimo cuando fabrica (Daniel: *«Boston cuando
 // fabrica — NUNCA la marca»*). Borrar su nombre de la columna Proveedor dejaría
 // la fila sin quién hizo el trabajo. La regla 2 se aplica SOLO al concepto.
+//
+// 🔴 EXCEPCIÓN DE DANIEL (8-oct-2026) — EL ENCABEZADO DE LA EMPRESA SÍ SALE.
+// Aprobó el formato «C2» del Excel: cada fila con Monto · <empresa> · <marca>,
+// y a la pregunta de si el nombre de la empresa del grupo va en el encabezado
+// respondió *«1. sí»*. La excepción es SOLO ese encabezado
+// (`encabezadoDeLaEmpresa`): el concepto se sigue limpiando igual (regla 2),
+// y las reglas 1 y 3 no cambian.
 // ============================================================================
 
-import { EMPRESA_KEY_TO_NAME, EMPRESA_KEY_TO_NOMBRE_CORTO } from "@/lib/empresa-mapping";
+import {
+  EMPRESA_KEY_TO_NAME,
+  EMPRESA_KEY_TO_NOMBRE_CORTO,
+  nombreCortoEmpresa,
+} from "@/lib/empresa-mapping";
 import { EMPRESA_FISCAL } from "@/lib/cxc/empresa-fiscal";
 import { normalizarProveedor } from "./proveedor";
 
@@ -151,6 +162,20 @@ function indiceDelNombre(texto: string, nombrePlano: string): { desde: number; h
     desdeP = acum.indexOf(nombrePlano, desdeP + 1);
   }
   return { desde: -1, hasta: -1 };
+}
+
+/**
+ * El encabezado de la columna «lo que pone la empresa» del Excel C2: el nombre
+ * comercial CORTO de la empresa de la marca («Vistana», «Fashion Wear»), leído
+ * de `mk_marcas.empresa_codigo`. Nunca escrito a mano: si mañana una marca
+ * cambia de empresa, se cambia en la configuración de la marca y nada más.
+ *
+ * 🔴 Es la ÚNICA celda del papel donde puede salir el nombre de una empresa
+ * del grupo (decisión de Daniel, 8-oct-2026, ver el encabezado del módulo).
+ */
+export function encabezadoDeLaEmpresa(empresaCodigo: string | null | undefined): string {
+  const k = String(empresaCodigo ?? "").trim();
+  return k.length > 0 ? nombreCortoEmpresa(k) : "Empresa";
 }
 
 // ─── UNA sola grafía por proveedor ──────────────────────────────────────────

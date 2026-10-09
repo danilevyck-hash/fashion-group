@@ -180,6 +180,11 @@ export interface GastoXlsx {
   partes?: ParteMarca[];
   /** Total CON ITBMS (la columna que ya existía; no se toca). */
   total: number;
+  /**
+   * Formato C2: lo que dice la factura (columna «Monto»). La parte de la
+   * empresa es `monto − subtotal`. Sin dato = `subtotal` (la empresa en $0).
+   */
+  monto?: number;
   signed?: string;
   /** Texto del link ("Ver factura" por default, "Ver comprobante" en muebles). */
   etiquetaLink?: string;
@@ -256,7 +261,22 @@ export interface OpcionesResumenGastos {
    */
   titulo?: string;
   subtitulo?: string;
+  /**
+   * 🔴 FORMATO C2 (Daniel, 8-oct-2026): en vez de UNA columna de dinero, tres —
+   * «Monto» (lo que dice la factura) · <empresa> (lo que pone la empresa) ·
+   * `etiquetaMonto` (lo que se le cobra a la marca). Solo con
+   * `sinColumnasDeMarca`. Es el nombre de la empresa para el encabezado.
+   */
+  columnaEmpresa?: string;
 }
+
+/** Encabezado de la columna «lo que dice la factura» del formato C2. */
+export const COL_MONTO_FACTURA = "Monto";
+
+const r2 = (n: number): number => Math.round(n * 100) / 100;
+/** Σ de lo que dice la factura (formato C2). */
+const sumMontos = (gastos: ReadonlyArray<GastoXlsx>): number =>
+  r2(gastos.reduce((s, g) => s + (Number(g.monto ?? g.subtotal) || 0), 0));
 
 export function buildResumenGastosWorkbook(
   clientes: ReadonlyArray<ClienteResumenXlsx>,
@@ -265,6 +285,16 @@ export function buildResumenGastosWorkbook(
   const etiquetaMonto = opciones.etiquetaMonto || COL_SUBTOTAL;
   /** false = descarga de UNA marca: sin columnas de marca (ver la opción). */
   const conMarcas = !opciones.sinColumnasDeMarca;
+  /** Formato C2: Monto · empresa · marca (ver la opción). */
+  const conEmpresa = !conMarcas && !!opciones.columnaEmpresa;
+  const colsDinero = conEmpresa ? [COL_MONTO_FACTURA, opciones.columnaEmpresa!, etiquetaMonto] : [etiquetaMonto];
+  /** Las columnas de dinero de un grupo de gastos: [marca] o [monto, empresa, marca]. */
+  const dinero = (gastos: ReadonlyArray<GastoXlsx>): number[] => {
+    const marca = sumSubtotales(gastos);
+    if (!conEmpresa) return [marca];
+    const monto = sumMontos(gastos);
+    return [monto, r2(monto - marca), marca];
+  };
   const wb = XLSX.utils.book_new();
 
   // ── 🩸 "Otras marcas" APARECE SOLA CUANDO HAY ALGO QUE MOSTRAR ───────────
@@ -323,12 +353,12 @@ export function buildResumenGastosWorkbook(
     "# Gastos",
     "# Fotos",
     ...(conMarcas ? [COL_CALVIN, COL_TOMMY, ...(mostrarOtras ? [COL_OTRAS] : [])] : []),
-    etiquetaMonto,
+    ...colsDinero,
   ];
   /** Última columna de dinero (= Subtotal). */
   const C_RES_SUBTOTAL = headRes.length - 1;
   /** Primera columna de dinero: CK con marcas; el propio monto sin ellas. */
-  const C_RES_CK = conMarcas ? 4 : C_RES_SUBTOTAL;
+  const C_RES_CK = conMarcas ? 4 : C_RES_SUBTOTAL - (colsDinero.length - 1);
   const filaDeCliente = (c: ClienteResumenXlsx): (string | number)[] => {
     const s = conMarcas ? splitDeGastos(c.gastos) : null;
     return [
@@ -337,7 +367,7 @@ export function buildResumenGastosWorkbook(
       c.gastos.length,
       c.fotos.length,
       ...(s ? [s.ck, s.th, ...(mostrarOtras ? [s.otras] : [])] : []),
-      sumSubtotales(c.gastos),
+      ...dinero(c.gastos),
     ];
   };
 
@@ -359,7 +389,7 @@ export function buildResumenGastosWorkbook(
       todos.length,
       lista.reduce((n, c) => n + c.fotos.length, 0),
       ...(s ? [s.ck, s.th, ...(mostrarOtras ? [s.otras] : [])] : []),
-      sumSubtotales(todos),
+      ...dinero(todos),
     ];
   };
 
@@ -438,7 +468,9 @@ export function buildResumenGastosWorkbook(
         { wch: 14 },
         { wch: 18 },
       ]
-    : [{ wch: 32 }, { wch: 9 }, { wch: 8 }, { wch: 18 }];
+    : conEmpresa
+      ? [{ wch: 32 }, { wch: 9 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 18 }]
+      : [{ wch: 32 }, { wch: 9 }, { wch: 8 }, { wch: 18 }];
   wsR["!freeze"] = { xSplit: 0, ySplit: OFS + 1 } as unknown as Record<string, unknown>;
   if (OFS > 0) {
     styleCell(wsR, 0, 0, {
@@ -500,7 +532,7 @@ export function buildResumenGastosWorkbook(
     // Subtotal sigue con el formato de siempre. Es formato, no texto: la
     // celda sigue siendo 0 y las filas de TOTAL suman igual.
     for (let c = C_RES_CK; c <= C_RES_SUBTOTAL; c++)
-      fmtCell(wsR, r, c, c < C_RES_SUBTOTAL ? MONEY_FMT_GUION : MONEY_FMT);
+      fmtCell(wsR, r, c, c < C_RES_SUBTOTAL && !conEmpresa ? MONEY_FMT_GUION : MONEY_FMT);
   }
   XLSX.utils.book_append_sheet(wb, wsR, "Resumen");
 
@@ -527,7 +559,7 @@ export function buildResumenGastosWorkbook(
     ...(conMarcas ? ["Marca"] : []),
     "N° Factura",
     ...(conMarcas ? [COL_CALVIN, COL_TOMMY, ...(mostrarOtras ? [COL_OTRAS] : [])] : []),
-    etiquetaMonto,
+    ...colsDinero,
     "Comprobante",
   ];
   // Índices con nombre: hay ~10 lugares que dependían del número crudo.
@@ -535,7 +567,7 @@ export function buildResumenGastosWorkbook(
   const C_LINK = headG.length - 1;
   const C_SUBTOTAL = headG.length - 2;
   /** Primera columna de dinero: CK con marcas; el propio monto sin ellas. */
-  const C_CK = conMarcas ? 6 : C_SUBTOTAL;
+  const C_CK = conMarcas ? 6 : C_SUBTOTAL - (colsDinero.length - 1);
   /** Columnas de dinero de la hoja de detalle (todas van con formato moneda). */
   const esColMoneda = (c: number): boolean => c >= C_CK && c <= C_SUBTOTAL;
   for (const cli of clientes) {
@@ -574,7 +606,7 @@ export function buildResumenGastosWorkbook(
         ...(s ? [g.marca] : []),
         g.numero || "—",
         ...(s ? [s.ck, s.th, ...(mostrarOtras ? [s.otras] : [])] : []),
-        Number(g.subtotal) || 0,
+        ...dinero([g]),
         g.signed ? g.etiquetaLink || "Ver factura" : "—",
       ]);
     }
@@ -589,7 +621,7 @@ export function buildResumenGastosWorkbook(
       ...(totalesCli
         ? [totalesCli.ck, totalesCli.th, ...(mostrarOtras ? [totalesCli.otras] : [])]
         : []),
-      sumSubtotales(cli.gastos),
+      ...dinero(cli.gastos),
       "",
     ]);
     const subtotalRow = aoa.length - 1;
@@ -627,15 +659,27 @@ export function buildResumenGastosWorkbook(
           { wch: 18 },
           { wch: 16 },
         ]
-      : [
-          { wch: 12 },
-          { wch: 16 },
-          { wch: 40 },
-          { wch: 22 },
-          { wch: 16 },
-          { wch: 18 },
-          { wch: 16 },
-        ];
+      : conEmpresa
+        ? [
+            { wch: 12 },
+            { wch: 16 },
+            { wch: 40 },
+            { wch: 22 },
+            { wch: 16 },
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 18 },
+            { wch: 16 },
+          ]
+        : [
+            { wch: 12 },
+            { wch: 16 },
+            { wch: 40 },
+            { wch: 22 },
+            { wch: 16 },
+            { wch: 18 },
+            { wch: 16 },
+          ];
 
     // Links de gasto + SUM de cada columna de dinero en la fila Subtotal.
     cli.gastos.forEach((g, i) => {
@@ -688,7 +732,7 @@ export function buildResumenGastosWorkbook(
           alignment: { horizontal: esColMoneda(c) ? "right" : "left", wrapText: c === C_CONCEPTO },
           border: B,
         });
-        if (esColMoneda(c)) fmtCell(ws, r, c, c < C_SUBTOTAL ? MONEY_FMT_GUION : MONEY_FMT);
+        if (esColMoneda(c)) fmtCell(ws, r, c, c < C_SUBTOTAL && !conEmpresa ? MONEY_FMT_GUION : MONEY_FMT);
       }
     }
     // Fila Subtotal en banda PRI (totales estilo de la casa).
@@ -699,7 +743,7 @@ export function buildResumenGastosWorkbook(
         alignment: { horizontal: "right", vertical: "center" },
         border: B,
       });
-      if (esColMoneda(c)) fmtCell(ws, subtotalRow, c, c < C_SUBTOTAL ? MONEY_FMT_GUION : MONEY_FMT);
+      if (esColMoneda(c)) fmtCell(ws, subtotalRow, c, c < C_SUBTOTAL && !conEmpresa ? MONEY_FMT_GUION : MONEY_FMT);
     }
 
     // Link "Ver todas las facturas (N)" → PDF combinado del cliente.

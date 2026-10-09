@@ -96,6 +96,7 @@ import {
   montoDeLaMarca,
 } from "./proveedores-2026-10";
 import {
+  encabezadoDeLaEmpresa,
   grafiasUnicasDeProveedor,
   limpiarTextoParaLaMarca,
   porcionDeLaFactura,
@@ -530,6 +531,12 @@ interface GastoDeMarca {
   /** Código D-XXX del cliente, o null (General / sin código). */
   clienteCodigo: string | null;
   monto: number;
+  /**
+   * Formato C2 (8-oct-2026): lo que dice la factura (la parte de ESTA marca,
+   * antes de restar lo que pone la empresa). `monto` sigue siendo lo que se le
+   * cobra a la marca; la empresa pone `montoFactura − monto`.
+   */
+  montoFactura: number;
 }
 
 /**
@@ -736,6 +743,11 @@ export async function buildExcelDeMarca(op: ZipMarcaOpciones): Promise<ExcelDesc
 interface PrepDescarga {
   codigo: MarcaCodigo | typeof MULTIFASHION_KEY;
   marcaNombre: string;
+  /**
+   * Encabezado de la columna de la empresa (Excel C2), de
+   * `mk_marcas.empresa_codigo`. `undefined` = Multifashion: una sola columna.
+   */
+  empresaNombre?: string;
   /** `null` = Multifashion: tienda propia, sin períodos. */
   periodo: PeriodoDeMarca | null;
   usarCongelado: boolean;
@@ -948,7 +960,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones, ctx: CtxPreparacion
     ]));
   if (ctx.nombres === undefined && ctx.soloMontos) ctx.nombres = nombrePorCodigo;
 
-  const facturasDeMarca: Array<{ f: FacturaFila; monto: number }> = [];
+  const facturasDeMarca: Array<{ f: FacturaFila; monto: number; completo: number }> = [];
   if (marcaId) {
     for (const f of facturas) {
       if (f.anulado_en) continue;
@@ -970,6 +982,8 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones, ctx: CtxPreparacion
           rows,
           marcaId,
         ),
+        // Lo que dice la factura (columna «Monto» del Excel C2).
+        completo: porcionDeLaFactura(num(f.total), rows, marcaId),
       });
     }
   }
@@ -1015,7 +1029,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones, ctx: CtxPreparacion
     });
   } else {
     gastos = [
-      ...facturasDeMarca.map(({ f, monto }) => {
+      ...facturasDeMarca.map(({ f, monto, completo }) => {
         const p = f.proyecto_id ? proyectoById.get(String(f.proyecto_id)) : undefined;
         const cod = codigoDeTiendaDelGasto(f, p);
         return {
@@ -1034,6 +1048,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones, ctx: CtxPreparacion
           }),
           clienteCodigo: cod,
           monto,
+          montoFactura: completo,
         };
       }),
       ...entregasDeMarca.map(({ e, monto }) => {
@@ -1052,6 +1067,8 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones, ctx: CtxPreparacion
           }),
           clienteCodigo: cod,
           monto,
+          // El mobiliario lo paga entero la marca: la empresa no pone nada.
+          montoFactura: monto,
         };
       }),
     ];
@@ -1088,6 +1105,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones, ctx: CtxPreparacion
     return {
       codigo: marca,
       marcaNombre,
+      empresaNombre: encabezadoDeLaEmpresa(marcaFila?.empresa_codigo),
       periodo,
       usarCongelado,
       lineasSinMarca: usarCongelado ? lineasSinMarca : 0,
@@ -1115,6 +1133,7 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones, ctx: CtxPreparacion
   return {
     codigo: marca,
     marcaNombre,
+    empresaNombre: encabezadoDeLaEmpresa(marcaFila?.empresa_codigo),
     periodo,
     usarCongelado,
     lineasSinMarca: usarCongelado ? lineasSinMarca : 0,
@@ -1184,6 +1203,7 @@ async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
       carpeta: carpetaDeCliente(cod, p.tienda ?? null, nombrePorCodigo),
       clienteCodigo: cod,
       monto: round2(num(f.total)),
+      montoFactura: round2(num(f.total)),
     });
   }
   for (const e of entregas) {
@@ -1203,6 +1223,7 @@ async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
       carpeta: carpetaDeCliente(cod, p.tienda ?? null, nombrePorCodigo),
       clienteCodigo: cod,
       monto: round2(num(e.total)),
+      montoFactura: round2(num(e.total)),
     });
   }
   crudos.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
@@ -1472,7 +1493,9 @@ function armarWorkbookDescarga(prep: PrepDescarga): Buffer {
     marcaNombre: prep.marcaNombre,
   });
   const wb = buildResumenGastosWorkbook(clientes, {
-    etiquetaMonto: COL_TOTAL_MARCA,
+    // 🔴 Formato C2 (Daniel, 8-oct-2026): Monto · <empresa> · <marca>.
+    etiquetaMonto: prep.empresaNombre ? prep.marcaNombre : COL_TOTAL_MARCA,
+    columnaEmpresa: prep.empresaNombre,
     sinColumnasDeMarca: true,
     titulo: `FASHION GROUP — ${prep.marcaNombre}`,
     subtitulo: subtituloDescarga(prep),
@@ -1706,7 +1729,7 @@ async function leerNombresDeCliente(
 function congelarEnFilas(
   lineas: ReadonlyArray<LineaCongelada>,
   ctx: {
-    facturasDeMarca: ReadonlyArray<{ f: FacturaFila; monto: number }>;
+    facturasDeMarca: ReadonlyArray<{ f: FacturaFila; monto: number; completo: number }>;
     entregasDeMarca: ReadonlyArray<{ e: EntregaFila; monto: number }>;
     proyectoById: ReadonlyMap<string, ProyectoFila>;
     nombrePorCodigo: ReadonlyMap<string, string>;
@@ -1715,7 +1738,9 @@ function congelarEnFilas(
 ): GastoDeMarca[] {
   // Índices "consumibles": una línea congelada se aparea con UN documento vivo.
   const porFactura = new Map<string, FacturaFila[]>();
-  for (const { f } of ctx.facturasDeMarca) {
+  const vivoDe = new Map<FacturaFila, { monto: number; completo: number }>();
+  for (const { f, monto, completo } of ctx.facturasDeMarca) {
+    vivoDe.set(f, { monto, completo });
     const k = claveFacturaCongelada(
       txt(f.fecha_factura).slice(0, 10),
       txt(f.numero_factura),
@@ -1740,6 +1765,9 @@ function congelarEnFilas(
     // Solo las FACTURAS tienen impulsadora; se lee del documento vivo
     // apareado — una línea sin par no se inventa el dato, cae a General.
     let impulsadoraId: string | null = null;
+    // Lo que dice la factura (Excel C2). Sin par vivo, o si lo congelado ya no
+    // es lo que hoy se le cobra, la línea sale entera a la marca (empresa $0).
+    let montoFactura = l.monto;
     if (l.tipo === "factura") {
       const arr = porFactura.get(
         claveFacturaCongelada(l.fecha, l.numero, l.concepto, l.proveedor),
@@ -1748,6 +1776,8 @@ function congelarEnFilas(
       documentoId = f ? String(f.id) : null;
       periodoTrabajado = ctx.periodoTrabajadoDe(f);
       impulsadoraId = f?.impulsadora_id ?? null;
+      const vivo = f ? vivoDe.get(f) : undefined;
+      if (vivo && vivo.monto === l.monto) montoFactura = vivo.completo;
     } else {
       const arr = porEntrega.get(claveEntregaCongelada(l.fecha, l.notas));
       const e = arr?.shift();
@@ -1772,6 +1802,7 @@ function congelarEnFilas(
       // 🔴 EL MONTO SALE TAL CUAL DEL REPORTE. No se recalcula, no se redondea
       //    de vuelta, no se compara contra el documento vivo.
       monto: l.monto,
+      montoFactura,
     };
   });
 }
@@ -1832,6 +1863,7 @@ function armarClientes(
       // que el orden de la hoja no correspondiera con lo que la hoja muestra.
       subtotal: g.monto,
       total: g.monto,
+      monto: g.montoFactura,
       partes: [{ codigo: ctx.marcaCodigo, monto: g.monto }],
       signed: ctx.linkPorGasto.get(claveGasto(g)),
       etiquetaLink: g.tipo === "entrega" ? "Ver comprobante" : "Ver factura",

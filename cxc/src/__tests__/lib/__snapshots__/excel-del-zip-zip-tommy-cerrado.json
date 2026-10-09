@@ -17,10 +17,14 @@
      "FASHION GROUP — Tommy Hilfiger",
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "mid 2026 · cerrado",
+     null,
+     null,
      null,
      null,
      null
@@ -29,24 +33,32 @@
      "",
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "Cliente",
      "# Gastos",
      "# Fotos",
-     "Total"
+     "Monto",
+     "Fashion Wear",
+     "Tommy Hilfiger"
     ],
     [
      "City Mall David",
      1,
      1,
+     100,
+     0,
      100
     ],
     [
      "TOTAL",
      1,
      1,
+     100,
+     0,
      100
     ]
    ],
@@ -55,6 +67,8 @@
     32,
     9,
     8,
+    16,
+    16,
     18
    ],
    "combinadas": []
@@ -69,10 +83,14 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "Ver todas las facturas (1)",
+     null,
+     null,
      null,
      null,
      null,
@@ -86,7 +104,9 @@
      "Concepto",
      "Proveedor",
      "N° Factura",
-     "Total",
+     "Monto",
+     "Fashion Wear",
+     "Tommy Hilfiger",
      "Comprobante"
     ],
     [
@@ -95,6 +115,8 @@
      "letrero",
      "Proveedor, S.A.",
      "A-1",
+     100,
+     0,
      100,
      "Ver factura"
     ],
@@ -105,10 +127,14 @@
      "",
      "TOTALES",
      100,
+     0,
+     100,
      ""
     ],
     [
      "",
+     null,
+     null,
      null,
      null,
      null,
@@ -123,10 +149,14 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "Ver todas las fotos (1)",
+     null,
+     null,
      null,
      null,
      null,
@@ -152,7 +182,17 @@
      "SUM(F4:F4)"
     ],
     [
-     "G4",
+     "G5",
+     null,
+     "SUM(G4:G4)"
+    ],
+    [
+     "H5",
+     null,
+     "SUM(H4:H4)"
+    ],
+    [
+     "I4",
      "https://firmado/fact/f1.pdf",
      null
     ]
@@ -163,6 +203,8 @@
     40,
     22,
     16,
+    14,
+    14,
     18,
     16
    ],

@@ -25,10 +25,14 @@
      "FASHION GROUP — Tommy Hilfiger",
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "Período 2026 · período abierto — gastos al HOY",
+     null,
+     null,
      null,
      null,
      null
@@ -37,29 +41,39 @@
      "",
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "Cliente",
      "# Gastos",
      "# Fotos",
-     "Total"
+     "Monto",
+     "Fashion Wear",
+     "Tommy Hilfiger"
     ],
     [
      "Nova Lux, S.A.",
      2,
      0,
+     4680,
+     1070,
      3610
     ],
     [
      "City Mall David",
      1,
      1,
+     40,
+     0,
      40
     ],
     [
      "Impulsadoras",
      1,
+     0,
+     30,
      0,
      30
     ],
@@ -67,12 +81,16 @@
      "General",
      1,
      1,
+     20,
+     0,
      20
     ],
     [
      "TOTAL",
      5,
      2,
+     4770,
+     1070,
      3700
     ]
    ],
@@ -81,6 +99,8 @@
     32,
     9,
     8,
+    16,
+    16,
     18
    ],
    "combinadas": []
@@ -95,10 +115,14 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "Ver todas las facturas (1)",
+     null,
+     null,
      null,
      null,
      null,
@@ -112,7 +136,9 @@
      "Concepto",
      "Proveedor",
      "N° Factura",
-     "Total",
+     "Monto",
+     "Fashion Wear",
+     "Tommy Hilfiger",
      "Comprobante"
     ],
     [
@@ -121,6 +147,8 @@
      "Instalación de paneles",
      "Krysthel Morales",
      "0000062711",
+     2140,
+     1070,
      1070,
      "Ver factura"
     ],
@@ -131,6 +159,8 @@
      "Mobiliario",
      "ME-0007",
      2540,
+     0,
+     2540,
      "Ver comprobante"
     ],
     [
@@ -139,11 +169,15 @@
      "",
      "",
      "TOTALES",
+     4680,
+     1070,
      3610,
      ""
     ],
     [
      "",
+     null,
+     null,
      null,
      null,
      null,
@@ -158,6 +192,8 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
@@ -167,11 +203,15 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "(sin fotos)",
      "",
+     null,
+     null,
      null,
      null,
      null,
@@ -191,12 +231,22 @@
      "SUM(F4:F5)"
     ],
     [
-     "G4",
+     "G6",
+     null,
+     "SUM(G4:G5)"
+    ],
+    [
+     "H6",
+     null,
+     "SUM(H4:H5)"
+    ],
+    [
+     "I4",
      "https://firmado/fact/f6.pdf",
      null
     ],
     [
-     "G5",
+     "I5",
      "https://www.fashiongr.com/api/marketing/entregas-pdf/e2?t=VZNHJKUsASvVcVErYkOAJIjsmxJI2VKtL1kbI5MadME",
      null
     ]
@@ -207,6 +257,8 @@
     40,
     22,
     16,
+    14,
+    14,
     18,
     16
    ],
@@ -222,6 +274,8 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
@@ -230,7 +284,9 @@
      "Concepto",
      "Proveedor",
      "N° Factura",
-     "Total",
+     "Monto",
+     "Fashion Wear",
+     "Tommy Hilfiger",
      "Comprobante"
     ],
     [
@@ -239,6 +295,8 @@
      "muebles apertura",
      "Mobiliario",
      "ME-0007",
+     40,
+     0,
      40,
      "Ver comprobante"
     ],
@@ -249,10 +307,14 @@
      "",
      "TOTALES",
      40,
+     0,
+     40,
      ""
     ],
     [
      "",
+     null,
+     null,
      null,
      null,
      null,
@@ -267,10 +329,14 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "Ver todas las fotos (1)",
+     null,
+     null,
      null,
      null,
      null,
@@ -291,7 +357,17 @@
      "SUM(F3:F3)"
     ],
     [
-     "G3",
+     "G4",
+     null,
+     "SUM(G3:G3)"
+    ],
+    [
+     "H4",
+     null,
+     "SUM(H3:H3)"
+    ],
+    [
+     "I3",
      "https://www.fashiongr.com/api/marketing/entregas-pdf/e1?t=YyVAL4PWRvDID58enkQw4PF29s2tWuQaglbJvBDjU9I",
      null
     ]
@@ -302,6 +378,8 @@
     40,
     22,
     16,
+    14,
+    14,
     18,
     16
    ],
@@ -317,6 +395,8 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
@@ -325,7 +405,9 @@
      "Concepto",
      "Proveedor",
      "N° Factura",
-     "Total",
+     "Monto",
+     "Fashion Wear",
+     "Tommy Hilfiger",
      "Comprobante"
     ],
     [
@@ -334,6 +416,8 @@
      "pago impulsadora junio",
      "Proveedor, S.A.",
      "IMP-1",
+     30,
+     0,
      30,
      "Ver factura"
     ],
@@ -344,10 +428,14 @@
      "",
      "TOTALES",
      30,
+     0,
+     30,
      ""
     ],
     [
      "",
+     null,
+     null,
      null,
      null,
      null,
@@ -362,6 +450,8 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
@@ -371,11 +461,15 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "(sin fotos)",
      "",
+     null,
+     null,
      null,
      null,
      null,
@@ -390,7 +484,17 @@
      "SUM(F3:F3)"
     ],
     [
-     "G3",
+     "G4",
+     null,
+     "SUM(G3:G3)"
+    ],
+    [
+     "H4",
+     null,
+     "SUM(H3:H3)"
+    ],
+    [
+     "I3",
      "https://firmado/fact/f3.jpg",
      null
     ]
@@ -401,6 +505,8 @@
     40,
     22,
     16,
+    14,
+    14,
     18,
     16
    ],
@@ -416,6 +522,8 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
@@ -424,7 +532,9 @@
      "Concepto",
      "Proveedor",
      "N° Factura",
-     "Total",
+     "Monto",
+     "Fashion Wear",
+     "Tommy Hilfiger",
      "Comprobante"
     ],
     [
@@ -433,6 +543,8 @@
      "evento apertura",
      "Proveedor, S.A.",
      "EV-1",
+     20,
+     0,
      20,
      "Ver factura"
     ],
@@ -443,10 +555,14 @@
      "",
      "TOTALES",
      20,
+     0,
+     20,
      ""
     ],
     [
      "",
+     null,
+     null,
      null,
      null,
      null,
@@ -461,6 +577,8 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
@@ -470,11 +588,15 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "evento.jpg",
      "Ver foto",
+     null,
+     null,
      null,
      null,
      null,
@@ -494,7 +616,17 @@
      "SUM(F3:F3)"
     ],
     [
-     "G3",
+     "G4",
+     null,
+     "SUM(G3:G3)"
+    ],
+    [
+     "H4",
+     null,
+     "SUM(H3:H3)"
+    ],
+    [
+     "I3",
      "https://firmado/fact/f4.pdf",
      null
     ]
@@ -505,6 +637,8 @@
     40,
     22,
     16,
+    14,
+    14,
     18,
     16
    ],

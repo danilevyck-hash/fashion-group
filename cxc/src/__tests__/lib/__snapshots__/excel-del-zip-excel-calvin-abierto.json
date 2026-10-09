@@ -8,10 +8,14 @@
      "FASHION GROUP — Calvin Klein",
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "Período 2026 · período abierto — gastos al HOY",
+     null,
+     null,
      null,
      null,
      null
@@ -20,23 +24,31 @@
      "",
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "Cliente",
      "# Gastos",
      "# Fotos",
-     "Total"
+     "Monto",
+     "Vistana",
+     "Calvin Klein"
     ],
     [
      "Nova Lux, S.A.",
      1,
+     0,
+     3410,
      0,
      3410
     ],
     [
      "TOTAL",
      1,
+     0,
+     3410,
      0,
      3410
     ]
@@ -46,6 +58,8 @@
     32,
     9,
     8,
+    16,
+    16,
     18
    ],
    "combinadas": []
@@ -60,6 +74,8 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
@@ -68,7 +84,9 @@
      "Concepto",
      "Proveedor",
      "N° Factura",
-     "Total",
+     "Monto",
+     "Vistana",
+     "Calvin Klein",
      "Comprobante"
     ],
     [
@@ -77,6 +95,8 @@
      "Caja de luz",
      "Proveedor, S.A.",
      "0000062800",
+     3410,
+     0,
      3410,
      "—"
     ],
@@ -87,10 +107,14 @@
      "",
      "TOTALES",
      3410,
+     0,
+     3410,
      ""
     ],
     [
      "",
+     null,
+     null,
      null,
      null,
      null,
@@ -105,11 +129,15 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ],
     [
      "Archivo",
      "Foto",
+     null,
+     null,
      null,
      null,
      null,
@@ -123,6 +151,8 @@
      null,
      null,
      null,
+     null,
+     null,
      null
     ]
    ],
@@ -131,6 +161,16 @@
      "F4",
      null,
      "SUM(F3:F3)"
+    ],
+    [
+     "G4",
+     null,
+     "SUM(G3:G3)"
+    ],
+    [
+     "H4",
+     null,
+     "SUM(H3:H3)"
     ]
    ],
    "columnas": [
@@ -139,6 +179,8 @@
     40,
     22,
     16,
+    14,
+    14,
     18,
     16
    ],
