@@ -171,11 +171,14 @@ describe("2. 🔴 MULTIFASHION NUNCA LLEVA DEUDA DE DÍA LIBRE — la regla pura
   });
 
   it("la pantalla: a Multifashion se le ofrecen SEIS motivos, sin el día libre; a las otras, los siete", () => {
+    // 9-oct-2026: «Permiso personal» se suma a todos con el tiempo fuera prendido.
+    const todos = motivosParaElegir(null);
     const mf = motivosParaElegir(MF);
-    expect(mf).toHaveLength(MOTIVOS_JUSTIFICACION.length - 1);
+    expect(mf).toHaveLength(todos.length - 1);
     expect(mf).not.toContain(MOTIVO_DIA_LIBRE_EMPRESA);
-    expect(mf).toEqual(MOTIVOS_JUSTIFICACION.filter((m) => m !== MOTIVO_DIA_LIBRE_EMPRESA));
-    for (const e of [...OTRAS, null, undefined]) expect(motivosParaElegir(e), String(e)).toEqual(MOTIVOS_JUSTIFICACION);
+    expect(mf).toEqual(todos.filter((m) => m !== MOTIVO_DIA_LIBRE_EMPRESA));
+    expect(todos.filter((m) => m !== "Permiso personal")).toEqual([...MOTIVOS_JUSTIFICACION]);
+    for (const e of [...OTRAS, null, undefined]) expect(motivosParaElegir(e), String(e)).toEqual(todos);
   });
 
   it("el texto explica que se regala, no manda a ninguna pestaña vieja y no tiene voseo", () => {

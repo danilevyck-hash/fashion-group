@@ -11,7 +11,7 @@
  *
  * ── LA REGLA (con el interruptor prendido) ──────────────────────────────────
  *
- *   1. Se suman TODOS los huecos entre una salida y su regreso del día.
+ *   1. Con 4 marcas el único hueco es el almuerzo (2.ª a 3.ª marca).
  *   2. Se resta el almuerzo permitido de su horario (30 o 60). Con la MISMA
  *      gracia del almuerzo que ya existía (`gracia_almuerzo_min`, hoy 5): una
  *      PUERTA, no un descuento — pasada, cuenta todo desde el minuto
@@ -21,8 +21,8 @@
  *      (Daniel: que la contable no lo confunda con alguien que se fue
  *      temprano). Misma rata; columna propia en la planilla, el Excel, el PDF,
  *      el comprobante, el cierre y el corte.
- *   4. Una «Constancia» que cubre el hueco lo perdona (la intersección, como
- *      siempre). Un «Permiso personal» NO perdona nada: solo informa.
+ *   4. Una «Constancia» perdona lo que se solape con el EXCESO (desde el fin
+ *      del almuerzo permitido hasta el regreso), la regla de siempre. Un «Permiso personal» NO perdona nada: solo informa.
  *   5. 🔴 SOLO CON 4 MARCAS (9-oct-2026, Daniel: *«cada persona debería de
  *      poder marcar 4 veces nada más»*). El teléfono no deja marcar la 5.ª
  *      (`cuatro-marcas.ts`, rechazado en el servidor). El reloj físico no se
@@ -35,17 +35,11 @@
  * nunca: son el resultado congelado.
  * ────────────────────────────────────────────────────────────────────────── */
 
-/** 🔴 EL INTERRUPTOR. Lo prende Daniel después de ver la simulación. */
-export const DESCUENTA_TIEMPO_FUERA = false;
+/** 🔴 EL INTERRUPTOR. PRENDIDO el 9-oct-2026 (Daniel, después de ver la
+ *  simulación del último mes: 14 días, ~$9,58). `false` = la planilla de antes. */
+export const DESCUENTA_TIEMPO_FUERA = true;
 
 /** ¿Este día se mide con la regla nueva? Solo con 4 marcas: un solo hueco, el almuerzo. */
 export function marcasMedibles(n: number): boolean {
   return n === 4;
-}
-
-/** Los huecos [salió, volvió] del día, en segundos: (2.ª,3.ª), (4.ª,5.ª). */
-export function huecosDelDia(marcas: readonly number[]): Array<[number, number]> {
-  const out: Array<[number, number]> = [];
-  for (let i = 1; i + 1 < marcas.length; i += 2) out.push([marcas[i], marcas[i + 1]]);
-  return out;
 }

@@ -13,7 +13,7 @@ import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-li
 
 import { ToastProvider } from "@/components/ToastSystem";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
-import { MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
+import { MOTIVOS_JUSTIFICACION, motivosParaElegir } from "@/lib/asistencia/motivos";
 import CorregirMarcacionModal from "@/app/asistencia/CorregirMarcacionModal";
 // 🔑 EL PERÍODO DEL REPORTE VIVE EN LA URL desde el 16-sep-2026
 // (`?desde=&hasta=`, `useUrlState`), así que la pestaña necesita un router
@@ -215,7 +215,8 @@ describe("«Justificar» en la fila del día", () => {
     expect(screen.getByText("Yulissa Juarez · lun 31 ago")).toBeTruthy();
     // El MISMO formulario: motivo de la lista de siempre, nota, «Agregar».
     const select = document.querySelector("select") as HTMLSelectElement;
-    expect([...select.options].map((o) => o.value)).toEqual([...MOTIVOS_JUSTIFICACION]);
+    // 9-oct-2026: con el tiempo fuera prendido se suma «Permiso personal».
+    expect([...select.options].map((o) => o.value)).toEqual([...motivosParaElegir(null)]);
     const reportesAntes = llamadas.filter((l) => l.url.includes("/api/asistencia/reporte")).length;
     fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
     await waitFor(() => {

@@ -98,6 +98,8 @@ const ENTRADA = {
   horarios: [{ empleado_codigo: CODIGO, entrada: "08:00", salida: "17:00", almuerzo_minutos: 60 }],
   justificaciones: [], feriados: new Map<string, string>(), desde: DIA, hasta: DIA,
   reglas: REGLAS_DEFAULT,
+  // 9-oct-2026: este candado es de la PANTALLA; el tiempo no laborado tiene el suyo.
+  descuentaTiempoFuera: false,
 };
 
 describe("🔴 el mismo día, los mismos minutos y los mismos dólares", () => {
