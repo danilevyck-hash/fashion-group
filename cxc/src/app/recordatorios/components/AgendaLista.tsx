@@ -36,6 +36,7 @@ import { getCompanyDisplay } from "@/lib/companies";
 import { ETIQUETA_REPETICION } from "@/lib/recordatorios/recordatorio";
 import { iconoDeItem, motivoDeItem } from "@/lib/recordatorios/motivos";
 import type { GrupoDeAgenda, ItemAgenda } from "@/lib/recordatorios/agenda";
+import { RECORDATORIOS_APPLE_2026_10 } from "@/lib/recordatorios/apple-2026-10";
 
 interface Props {
   grupos: GrupoDeAgenda[];
@@ -49,6 +50,9 @@ interface Props {
   onRebotado: (id: string) => void;
   onRedepositar: (id: string) => void;
 }
+
+/** Estilo Apple: los renglones de un grupo en UNA caja con separadores. */
+const CAJA = "divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white";
 
 /** El borde izquierdo de color. Vencido y rebotado en rojo; el resto, neutro. */
 function bordeCheque(ve: string): string {
@@ -73,12 +77,18 @@ function FilaCheque({
   const c = item.cheque;
   const ve = item.ve;
   const abierto = ve === "pendiente" || ve === "vencido";
+  // 🔴 Estilo Apple (`RECORDATORIOS_APPLE_2026_10`): un renglón dentro de la
+  // caja del grupo, en dos líneas, y el chip solo cuando no es «pendiente».
+  const apple = RECORDATORIOS_APPLE_2026_10;
+  const borde = apple
+    ? ve === "vencido" || ve === "rebotado" ? "border-l-4 border-l-red-600" : ""
+    : `border border-gray-200 rounded-lg ${bordeCheque(ve)}`;
   return (
     <div
       data-cheque-fila={c.id}
-      className={`border border-gray-200 rounded-lg ${bordeCheque(ve)} ${ve === "depositado" ? "opacity-60" : ""}`}
+      className={`${borde} ${ve === "depositado" ? "opacity-60" : ""}`}
     >
-      <div className="px-4 py-3 cursor-pointer" onClick={() => onAbrir(c.id)}>
+      <div className={apple ? "px-4 pt-3 cursor-pointer" : "px-4 py-3 cursor-pointer"} onClick={() => onAbrir(c.id)}>
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 min-w-0">
             <span
@@ -96,13 +106,16 @@ function FilaCheque({
             ${fmt(c.monto)}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
-          <span data-cheque-campo="estado">
-            <StatusBadge estado={ve} />
-          </span>
-          <span className="text-xs text-gray-400">N° {c.numero_cheque}</span>
-          <span className="text-xs text-gray-400">· {getCompanyDisplay(c.empresa)}</span>
-          <span className="text-xs text-gray-400 ml-auto">{fmtDate(c.fecha_deposito)}</span>
+        <div className={apple ? "flex flex-wrap items-center gap-x-1 gap-y-1 mt-0.5 pl-6" : "flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5"}>
+          {apple && <span className="text-xs text-gray-500">{fmtDate(c.fecha_deposito)} ·</span>}
+          {(!apple || ve !== "pendiente") && (
+            <span data-cheque-campo="estado" className={apple ? "order-last ml-1" : undefined}>
+              <StatusBadge estado={ve} />
+            </span>
+          )}
+          <span className={apple ? "text-xs text-gray-500" : "text-xs text-gray-400"}>N° {c.numero_cheque}</span>
+          <span className={apple ? "text-xs text-gray-500" : "text-xs text-gray-400"}>· {getCompanyDisplay(c.empresa)}</span>
+          {!apple && <span className="text-xs text-gray-400 ml-auto">{fmtDate(c.fecha_deposito)}</span>}
         </div>
         {/* 🔴 Un cheque REBOTADO se queda en la lista, con su marca roja, hasta
             que se redeposite o se borre. Dejó de ser pestaña: era una pestaña
@@ -113,7 +126,7 @@ function FilaCheque({
           </div>
         )}
       </div>
-      <div className="flex flex-wrap gap-3 px-4 pb-2 -mt-1" onClick={(e) => e.stopPropagation()}>
+      <div className={apple ? "flex flex-wrap gap-3 px-4 pl-10" : "flex flex-wrap gap-3 px-4 pb-2 -mt-1"} onClick={(e) => e.stopPropagation()}>
         {abierto && (
           <button
             onClick={() => onDepositar(c.id)}
@@ -156,7 +169,9 @@ function FilaRecordatorio({
     <button
       data-recordatorio-fila={r.id}
       onClick={() => onAbrir(r.id)}
-      className="w-full text-left border border-gray-200 rounded-lg border-l-4 border-l-blue-400 px-4 py-3 hover:bg-gray-50 transition"
+      className={RECORDATORIOS_APPLE_2026_10
+        ? "w-full text-left px-4 py-3 hover:bg-gray-50 transition"
+        : "w-full text-left border border-gray-200 rounded-lg border-l-4 border-l-blue-400 px-4 py-3 hover:bg-gray-50 transition"}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="flex items-start gap-2 min-w-0">
@@ -224,7 +239,7 @@ export default function AgendaLista({
 }: Props) {
   if (buscando) {
     return (
-      <div data-agenda="busqueda" className="space-y-1.5">
+      <div data-agenda="busqueda" {...(RECORDATORIOS_APPLE_2026_10 ? { "data-agenda-caja": "" } : {})} className={RECORDATORIOS_APPLE_2026_10 ? CAJA : "space-y-1.5"}>
         {resultados.length === 0 ? (
           <p className="text-sm text-gray-500 py-16 text-center">
             Sin resultados para «{termino}»
@@ -260,7 +275,7 @@ export default function AgendaLista({
               <span className={`text-sm font-semibold ${g.color}`}>{g.label}</span>
               <span className="text-xs text-gray-400 tabular-nums">({g.items.length})</span>
             </div>
-            <div className="space-y-1.5">
+            <div {...(RECORDATORIOS_APPLE_2026_10 ? { "data-agenda-caja": "" } : {})} className={RECORDATORIOS_APPLE_2026_10 ? CAJA : "space-y-1.5"}>
               {g.items.map((item) => (
                 <Fila key={`${item.tipo}-${item.id}`} item={item} {...acciones} />
               ))}

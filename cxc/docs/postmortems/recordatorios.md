@@ -557,3 +557,16 @@ líneas. Es exactamente para lo que sirve el control.
 - 🔴 Un recordatorio NO se marca como hecho y un cheque que no se cobrará SE BORRA: no hay estado de completado. 🔴 El vencido sin marcar avisa UNA SOLA VEZ (`cheques.aviso_vencido_en`), marcado DESPUÉS de que Telegram confirme; un rebotado no avisa.
 - 🔴 A los 365 días un cheque DEPOSITADO se retira con soft delete (`deleted` + `deleted_at`), nunca un DELETE, y solo los depositados: lo que se debe se queda para siempre. Cuenta desde `fecha_depositado` (sin ella, `fecha_deposito`; nunca «hoy»).
 - Candados: `recordatorios-rediseno.test.ts` · `cheques-aviso-vencimiento.test.ts`.
+
+---
+
+## Recordatorios estilo Apple — propuesta APAGADA (9-oct-2026, `RECORDATORIOS_APPLE_2026_10`)
+
+La pregunta de la pantalla: **«¿qué cheque viene y ya se depositó?»**. Medido el 9-oct-2026: 7 entradas del 25-sep al 9-oct, **todas de Angela y desde la computadora**; 27 cheques en la historia (8 nuevos desde septiembre) y **2 notas en toda la historia** (las dos de Daniel, 5 y 10-sep).
+
+1. **Lista agrupada**: los renglones de un grupo en UNA caja con separadores (`data-agenda-caja`); el borde rojo se queda solo en vencido y devuelto.
+2. **Dos líneas por cheque**: cliente y monto; fecha · N° · empresa. **Sale el chip «Pendiente»** (la lista solo muestra lo abierto): el chip queda para vencido, devuelto y depositado.
+3. **Computadora: «＋ Nuevo» en la fila de Lista | Calendario y el buscador** (`data-fila-controles`). Sigue habiendo UN solo botón de alta en el archivo (`botonNuevo`).
+4. **Sale el renglón «Nuevo recordatorio»** de abajo: 2 notas contra 27 cheques, menos de 1 de cada 10 (`docs/diseno.md` regla 5). La nota sigue en «＋ Nuevo» › Nota.
+
+El calendario NO se toca (Daniel, 22-sep). `false` = la pantalla de hoy: candado `src/__tests__/components/recordatorios-apple-apagado.test.tsx` (HTML de `origin/main` antes del cambio; prendido, rojo).
