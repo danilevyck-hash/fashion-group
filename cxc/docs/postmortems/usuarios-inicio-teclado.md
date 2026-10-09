@@ -105,7 +105,7 @@ La pregunta de la pantalla: **«¿a qué módulo voy?»**. Medido 25-sep → 9-o
 
 ---
 
-## Usuarios estilo Apple — propuesta APAGADA (9-oct-2026, `USUARIOS_APPLE_2026_10`)
+## Usuarios estilo Apple — PRENDIDO (9-oct-2026, `USUARIOS_APPLE_2026_10`)
 
 La pregunta de la pantalla: **«¿quién entra al sistema y con qué rol?»**. Medido el 9-oct-2026: 17 usuarios, los 17 activos; ninguna visita registrada en dos semanas (uso ocasional, solo admin).
 
@@ -114,4 +114,4 @@ La pregunta de la pantalla: **«¿quién entra al sistema y con qué rol?»**. M
 3. **El nombre capitalizado en pantalla** (`capitalizarNombre`); el dato no se toca.
 4. **Tocar el renglón abre «Editar usuario»** (sale el lápiz); «Desactivar» al final del renglón. Computadora: **«＋ Nuevo usuario» en la fila de las pestañas** (un solo botón en el archivo, `botonNuevoUsuario`).
 
-`false` = la pantalla de hoy: candado `src/__tests__/components/usuarios-apple-apagado.test.tsx` (HTML de `origin/main` antes del cambio; prendido, rojo).
+**Prendido el 9-oct-2026** con el «sí» de Daniel. `false` = la pantalla de antes: candado `src/__tests__/components/usuarios-apple-apagado.test.tsx` (HTML de `origin/main` antes del cambio; prendido, rojo).

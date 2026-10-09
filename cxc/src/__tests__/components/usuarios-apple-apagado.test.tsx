@@ -5,8 +5,8 @@
 // Pinta la pestaña Usuarios con cinco usuarios de roles distintos (uno
 // inactivo, uno con permisos personalizados) y compara el HTML entero contra
 // `__snapshots__/usuarios-apple-apagado…`, sacado con el código de
-// `origin/main` ANTES del rediseño. Prendido, se pone rojo, y el bloque de
-// abajo dice qué trae la propuesta.
+// `origin/main` ANTES del rediseño. PRENDIDO el 9-oct-2026 (Daniel): el bloque
+// de abajo dice qué trae.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -66,7 +66,11 @@ describe("Usuarios — interruptor APAGADO = la pantalla de hoy", () => {
   });
 });
 
-describe("Usuarios — interruptor PRENDIDO = la propuesta", () => {
+describe("Usuarios — interruptor PRENDIDO (9-oct-2026, Daniel)", () => {
+  it("el interruptor está prendido", async () => {
+    const real = await vi.importActual<typeof import("@/lib/usuarios-apple-2026-10")>("@/lib/usuarios-apple-2026-10");
+    expect(real.USUARIOS_APPLE_2026_10).toBe(true);
+  });
   it("agrupada por rol, en el orden de los roles del sistema", async () => {
     interruptor.prendido = true;
     const c = await pintar();
