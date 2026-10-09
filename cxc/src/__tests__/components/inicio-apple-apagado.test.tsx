@@ -5,8 +5,9 @@
 // Monta `/home` como admin (21 módulos) y como secretaria (sus 11) y compara el
 // HTML entero contra `__snapshots__/inicio-apple-apagado…`. La foto se sacó con
 // el código de `origin/main` ANTES del rediseño: con el interruptor apagado, un
-// solo byte distinto pone esto rojo. Prendido, también se pone rojo (verificado
-// al escribirlo) y el bloque de abajo dice qué trae la propuesta.
+// solo byte distinto pone esto rojo. PRENDIDO el 9-oct-2026 (Daniel): celular
+// en lista y buscador alineado; en la computadora las fichas NO cambian (el
+// bloque de abajo lo amarra).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -60,23 +61,33 @@ describe("Inicio — interruptor APAGADO = la pantalla de hoy", () => {
   });
 });
 
-describe("Inicio — interruptor PRENDIDO = la propuesta", () => {
+describe("Inicio — interruptor PRENDIDO (9-oct-2026, Daniel)", () => {
+  it("el interruptor está prendido", async () => {
+    const real = await vi.importActual<typeof import("@/lib/navegacion/inicio-apple-2026-10")>("@/lib/navegacion/inicio-apple-2026-10");
+    expect(real.INICIO_APPLE_2026_10).toBe(true);
+  });
   it("celular: lista agrupada con filas de 44 px y el ícono a color", async () => {
     interruptor.prendido = true;
     const c = await montar("admin");
     const lista = c.querySelector('[data-inicio="lista-celular"]');
     expect(lista).not.toBeNull();
+    expect(lista!.className).toContain("sm:hidden");
     const filas = lista!.querySelectorAll("a");
     expect(filas.length).toBe(c.querySelectorAll('[data-inicio="fichas"] a').length);
     filas.forEach((a) => expect(a.className).toContain("min-h-[44px]"));
     expect(lista!.querySelector("svg")!.getAttribute("class")).not.toContain("text-gray-500");
   });
-  it("computadora: fichas horizontales con el ícono a color", async () => {
+  it("computadora: las fichas de los módulos quedan como estaban (Daniel: las horizontales NO)", async () => {
+    const apagado = (await montar("secretaria")).querySelector(".space-y-6")!;
+    const deAntes = apagado.innerHTML;
+    cleanup();
     interruptor.prendido = true;
-    const c = await montar("secretaria");
-    const fichas = c.querySelectorAll('[data-inicio="fichas"] a');
-    expect(fichas.length).toBe(SECRETARIA.length);
-    fichas.forEach((a) => expect(a.className).not.toContain("flex-col"));
+    const fichas = (await montar("secretaria")).querySelector('[data-inicio="fichas"]')!;
+    // Las MISMAS fichas, byte por byte; solo se esconden en el celular.
+    expect(fichas.innerHTML).toBe(deAntes);
+    expect(fichas.className).toBe("hidden space-y-6 sm:block");
+    expect(fichas.querySelectorAll("a").length).toBe(SECRETARIA.length);
+    fichas.querySelectorAll("a").forEach((a) => expect(a.className).toContain("flex-col"));
   });
   it("el buscador va alineado con el contenido", async () => {
     interruptor.prendido = true;
