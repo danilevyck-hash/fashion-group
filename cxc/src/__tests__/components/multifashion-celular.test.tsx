@@ -31,6 +31,13 @@ import path from "path";
 // rediseño). Estos candados describen la pantalla de ANTES, que sigue siendo la
 // del interruptor apagado: se fijan a `false` para que la vuelta atrás no se
 // rompa. La pantalla nueva la cuida `multifashion-apple.test.tsx`.
+// 9-oct-2026: `MULTIFASHION_GRAFICA_2026_10` también quedó PRENDIDO (Daniel
+// aprobó la gráfica). Este candado es la pantalla de ANTES: la gráfica se fija
+// a `false` igual que el rediseño. La nueva la cuida `multifashion-grafica.test.ts`.
+vi.mock("@/lib/multifashion/grafica-mes", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/multifashion/grafica-mes")>()),
+  MULTIFASHION_GRAFICA_2026_10: false,
+}));
 vi.mock("@/lib/multifashion/apple", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/multifashion/apple")>()),
   MULTIFASHION_APPLE_2026_10: false,
