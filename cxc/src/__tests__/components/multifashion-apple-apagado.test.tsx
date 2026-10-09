@@ -8,12 +8,19 @@
 // La foto se sacó con el código de `origin/main` ANTES del rediseño: si con el
 // interruptor apagado cambia un solo byte, esto se pone rojo. Prender el
 // interruptor también lo pone rojo (verificado al escribirlo).
+// 9-oct-2026: Daniel aprobó el rediseño y el interruptor quedó PRENDIDO. Esta
+// prueba lo fuerza a `false` con `vi.mock` para que apagarlo siga devolviendo
+// la pantalla de antes, byte por byte (la vuelta atrás queda garantizada).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: { from: vi.fn(), rpc: vi.fn() },
+}));
+vi.mock("@/lib/multifashion/apple", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/multifashion/apple")>()),
+  MULTIFASHION_APPLE_2026_10: false,
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),

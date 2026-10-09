@@ -35,8 +35,8 @@ import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 import { baseDesdeRatio, variacionPct } from "@/lib/variacion";
 import { deltaCorto, montoCorto, type TonoCelular } from "@/lib/multifashion/celular";
 
-/** `false` = Multifashion como hoy. NACE APAGADO. */
-export const MULTIFASHION_APPLE_2026_10 = false;
+/** `false` = Multifashion como antes. Nació apagado; PRENDIDO el 9-oct-2026 (Daniel aprobó). */
+export const MULTIFASHION_APPLE_2026_10 = true;
 
 // ── Lo que requiere atención ────────────────────────────────────────────────
 
