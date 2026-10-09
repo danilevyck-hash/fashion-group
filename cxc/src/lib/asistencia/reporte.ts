@@ -48,6 +48,10 @@
 //    otro— y encima invisible: no había forma de ver cuánta extra se había
 //    perdido por llegar tarde. Ahora cada regla cobra sola. La tardanza se
 //    sigue descontando, en `tiempoNoTrabajadoMin`, que es donde se mira.
+//    🔴 EXCEPCIÓN POR FICHA (9-oct-2026): con «Compensación de tardanza»
+//    prendida, el tiempo después de la salida SÍ borra la tardanza del mismo
+//    día, y solo lo que sobra pasa por la puerta del mínimo. Apagada (todos,
+//    por omisión), lo de arriba sin cambios. Ver `repone-tardanza.ts`.
 //    ⚠️ No hay ninguna regla especial a los 60 minutos: *"nada especial: se
 //    paga el tiempo exacto"*. Nadie agregue un redondeo a horas.
 //    ⚠️ Acá solo se MIDEN. Que sean pagables lo decide una persona aprobándolas
@@ -114,6 +118,7 @@ import { olvidarRepetidas, type MarcaRepetidaVisible } from "./marca-repetida";
 // haya pasado por el reloj, ese día no genera horas, ni tardanza, ni ausencia.
 import { vacacionDe, type DiaVacacion, type Vacacion } from "./vacaciones";
 import { diaFueraDeVigencia, type Vigencia } from "./vigencia";
+import { compensarTardanza } from "./repone-tardanza";
 // 🔴 LOS DÍAS Y LOS DOS HORARIOS, CONFIGURABLES (18-sep-2026). Qué días trabaja
 // cada quien (Multifashion, lunes a sábado) y con qué horario se mide el día
 // (lo decide la PRIMERA marca: teléfono → el de afuera). La regla vive en
@@ -790,6 +795,15 @@ export function armarReporte(opts: {
    * devuelve vacío. Quien no tiene autorización se mide como siempre.
    */
   entradasAutorizadas?: ReadonlyMap<string, EntradaAutorizada>;
+  /**
+   * 🔴 Los códigos con «Compensación de tardanza» en la ficha (9-oct-2026).
+   * Ver `repone-tardanza.ts`: el tiempo después de la salida borra tardanza
+   * del mismo día y solo lo que sobra pasa por la puerta de la hora extra.
+   *
+   * 🔑 SIN ESTO NADA CAMBIA: vacío por defecto y con la columna en su
+   * `DEFAULT false`. El motor da los mismos números que hoy.
+   */
+  reponeTardanza?: ReadonlySet<string>;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
   const vacaciones = opts.vacaciones ?? [];
@@ -1161,7 +1175,7 @@ export function armarReporte(opts: {
         // La marca CIERRA el atraso: se llegó tarde hasta que se marcó.
         desdeSeg: entradaProgSeg, hastaSeg: ent, bordeDelReloj: "fin",
       }));
-      const tardeMin = Math.max(0, tardeBrutaMin - permisoPerdonaMin);
+      const tardeAntesMin = Math.max(0, tardeBrutaMin - permisoPerdonaMin);
 
       // Regla 2. Solo se puede medir con 4 marcas (o más): las del medio son
       // el almuerzo. Con 2 marcas no hay almuerzo que medir.
@@ -1215,7 +1229,15 @@ export function armarReporte(opts: {
       // ⚠️ Y NO HAY NINGUNA REGLA ESPECIAL A LOS 60 MINUTOS. Preguntado si a
       //    la hora cumplida pasaba algo: *"nada especial: se paga el tiempo
       //    exacto"*. Nadie agregue acá un redondeo a horas.
-      const brutoSeg = soloUna ? 0 : Math.max(0, sal - salidaProgSeg);
+      // 🔴 COMPENSACIÓN DE TARDANZA (9-oct-2026), SOLO con la casilla de la
+      // ficha: el tiempo después de la salida borra tardanza del mismo día
+      // minuto por minuto, y la puerta del mínimo mira SOLO lo que sobra.
+      // Apagada, `compensarTardanza` devuelve lo que entró. Ver `repone-tardanza.ts`.
+      const { tardeMin, brutoSeg } = compensarTardanza(
+        opts.reponeTardanza?.has(codigo) === true,
+        tardeAntesMin,
+        soloUna ? 0 : Math.max(0, sal - salidaProgSeg),
+      );
       const extraMin = brutoSeg < extraMinimoSeg ? 0 : brutoSeg / 60;
 
       // ── 🔴 LA ENTRADA AUTORIZADA (24-sep-2026) ───────────────────────────
