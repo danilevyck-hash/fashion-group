@@ -46,7 +46,7 @@ import { etiquetaPeriodo, type Periodo } from "@/lib/multifashion/periodo";
 import { ListaSeguimientoClientes } from "./ListaSeguimientoClientes";
 import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 import { RETAIL_AL_FRENTE, fueraDelRanking } from "@/lib/multifashion/retail-al-frente";
-import { MULTIFASHION_APPLE_2026_10, pieClientes } from "@/lib/multifashion/apple";
+import { MULTIFASHION_APPLE_2026_10, numeroNoVuelven, pieClientes } from "@/lib/multifashion/apple";
 import { NumeroGrande } from "./PiezasApple";
 import { Aviso } from "@/components/ui/Aviso";
 
@@ -283,9 +283,11 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
   // cuatro cuentas de las tarjetas no se tocan.
   if (RETAIL_AL_FRENTE) {
     const clientesLista = fidel ? fidel.clientes.filter((c) => !fueraDelRanking(c.cliente_switch_id)) : [];
-    // 🔴 `MULTIFASHION_APPLE_2026_10`: «Frecuentes» es EL número; las otras dos
-    // tarjetas van en su línea; enseguida la lista (con «No vuelven», lo que
-    // pide actuar) y la cobertura baja a la línea del pie. Mismos datos.
+    // 🔴 `MULTIFASHION_APPLE_2026_10`: «No vuelven» es EL número (Daniel,
+    // 9-oct-2026: la lista con la que se hace algo) y sale de `conteoPorChip`
+    // sobre la MISMA lista que recibe el chip, así los dos dicen lo mismo.
+    // Las tres tarjetas van en su línea; enseguida la lista y la cobertura
+    // baja a la línea del pie. Mismos datos.
     if (MULTIFASHION_APPLE_2026_10) {
       const pie = pieClientes({
         cobertura: cobertura.texto,
@@ -307,8 +309,8 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
             <>
               {fidel && (
                 <NumeroGrande
-                  monto={fidel.cards.frecuentes.toLocaleString("en-US")}
-                  linea={`frecuentes · ${fidel.cards.nuevos_mes.toLocaleString("en-US")} nuevos del mes · ${fidel.cards.cinco_pendiente.toLocaleString("en-US")} con descuento 5% pendiente`}
+                  monto={numeroNoVuelven(clientesLista).toLocaleString("en-US")}
+                  linea={`no vuelven · ${fidel.cards.frecuentes.toLocaleString("en-US")} frecuentes · ${fidel.cards.nuevos_mes.toLocaleString("en-US")} nuevos del mes · ${fidel.cards.cinco_pendiente.toLocaleString("en-US")} con descuento 5% pendiente`}
                 />
               )}
               {fidel && <ListaSeguimientoClientes clientes={clientesLista} hoy={fidel.hoy} conMonto />}

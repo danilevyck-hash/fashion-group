@@ -14,9 +14,10 @@
 //     ventas que no son feriado, la meta que no llega) y el mes como EL número.
 //   · Año (celular): el año como número grande y los meses en renglones;
 //     tocar un mes lo abre.
-//   · Vendedoras: la meta que no llega, arriba («Ver meta»).
-//   · Clientes: «Frecuentes» como número grande, las otras dos tarjetas en su
-//     línea, enseguida la lista; la cobertura baja al pie.
+//   · Vendedoras: la meta que no llega, arriba («Ver meta»). En el Resumen el
+//     aviso va SIN «Ver meta» (Daniel, 9-oct-2026): la meta se ve en su lugar.
+//   · Clientes: «No vuelven» como número grande (Daniel, 9-oct-2026), las
+//     tres tarjetas en su línea, enseguida la lista; la cobertura baja al pie.
 //   · Metas: el vendido sin negrita y la explicación de la cuenta detrás del ⓘ.
 //   · Errores de carga: <Aviso tono="error"> con «Reintentar».
 // Lo que ya publicó `main` (frescura en la computadora, ‹ › del período,
@@ -29,6 +30,8 @@
 
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
 import type { RetailMonthly } from "@/components/ventas/types";
+import { conteoPorChip } from "@/lib/multifashion/clientes-seguimiento";
+import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 import { baseDesdeRatio, variacionPct } from "@/lib/variacion";
 import { deltaCorto, montoCorto, type TonoCelular } from "@/lib/multifashion/celular";
 
@@ -114,6 +117,13 @@ export function filasDelAnio(meses: readonly RetailMonthly[]): FilaMesDelAnio[] 
       delta: deltaCorto(variacionPct(m.ventas, baseDesdeRatio(m.ventas, m.vs2025))),
     }))
     .reverse();
+}
+
+// ── Clientes: el número grande ──────────────────────────────────────────────
+
+/** «No vuelven»: el MISMO conteo que el chip (`conteoPorChip`), sobre la misma lista. */
+export function numeroNoVuelven(clientes: readonly ClienteUniverso[]): number {
+  return conteoPorChip(clientes).no_vuelven;
 }
 
 // ── Las líneas del pie ──────────────────────────────────────────────────────

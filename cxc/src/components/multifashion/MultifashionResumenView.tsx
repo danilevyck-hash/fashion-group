@@ -188,8 +188,6 @@ interface MultifashionResumenViewProps {
     onAbrir: (clave: ClaveRenglon) => void;
     onAbrirMes?: (anio: number, mes: number) => void;
   };
-  /** `MULTIFASHION_APPLE_2026_10`: «Ver meta» del aviso de arriba. */
-  onVerMeta?: () => void;
 }
 
 const MESES_FULL = [
@@ -317,7 +315,7 @@ function buildCumulativeChart(act: MultifashionSerieAnio, prev: MultifashionSeri
 }
 
 export function MultifashionResumenView({
-  overview, selectedYear, isClosedYear, mes, syncTick = 0, celular, onVerMeta,
+  overview, selectedYear, isClosedYear, mes, syncTick = 0, celular,
 }: MultifashionResumenViewProps) {
   const year = selectedYear;
   const prevYear = year - 1;
@@ -395,7 +393,6 @@ export function MultifashionResumenView({
     <AtencionMultifashion
       tiendaAbrio={tiendaAbrio}
       meta={data?.is_mes_actual ? metaAtrasada : null}
-      onVerMeta={onVerMeta}
     />
   ) : null;
 
