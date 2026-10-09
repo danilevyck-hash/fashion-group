@@ -102,3 +102,16 @@ La pregunta de la pantalla: **«¿a qué módulo voy?»**. Medido 25-sep → 9-o
 - **Buscador** al ancho del contenido (`<SearchBar alineado />`), no centrado.
 
 `false` = el Inicio de hoy, byte por byte: candado `src/__tests__/components/inicio-apple-apagado.test.tsx` (foto del HTML tomada con el código de `origin/main` antes del cambio, admin y secretaria; prendido se pone rojo). Mockup con capturas reales: hoy vs recomendación. Se prende con el «sí» de Daniel.
+
+---
+
+## Usuarios estilo Apple — propuesta APAGADA (9-oct-2026, `USUARIOS_APPLE_2026_10`)
+
+La pregunta de la pantalla: **«¿quién entra al sistema y con qué rol?»**. Medido el 9-oct-2026: 17 usuarios, los 17 activos; ninguna visita registrada en dos semanas (uso ocasional, solo admin).
+
+1. **Agrupada por rol** en el orden de `SYSTEM_ROLES`, un renglón por persona (`ListaPorRol`), en vez de 17 tarjetas en orden de creación (celular: 3.300 px → 1.900).
+2. **Sale «Activo»** de los 17; solo se dice «Inactivo». Segunda línea: empresa · permisos personalizados · última sesión.
+3. **El nombre capitalizado en pantalla** (`capitalizarNombre`); el dato no se toca.
+4. **Tocar el renglón abre «Editar usuario»** (sale el lápiz); «Desactivar» al final del renglón. Computadora: **«＋ Nuevo usuario» en la fila de las pestañas** (un solo botón en el archivo, `botonNuevoUsuario`).
+
+`false` = la pantalla de hoy: candado `src/__tests__/components/usuarios-apple-apagado.test.tsx` (HTML de `origin/main` antes del cambio; prendido, rojo).
