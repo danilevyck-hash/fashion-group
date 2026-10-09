@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────────────
- * PRÉSTAMOS, ESTILO APPLE (4-oct-2026, propuesta). PURO: sin base ni red.
+ * PRÉSTAMOS, ESTILO APPLE (4-oct-2026). PURO: sin base ni red.
  *
  * La pregunta de la pantalla: «¿cuánto me deben y cuánto entra en la próxima
  * quincena?». Tres cambios en Asistencia › Préstamos (la de David es la MISMA
@@ -19,14 +19,14 @@
  * Es lo que la planilla PROPONE; lo escrito a mano en la fila y el recorte al
  * neto (`recortarAlNeto`) pueden bajarlo al cerrar.
  *
- * `false` = las dos pantallas de hoy, al pie de la letra. Se prende con el «sí»
- * de Daniel. Candado: `src/__tests__/prestamos-apple-2026-10.test.ts`.
+ * PRENDIDO el 9-oct-2026 con el «sí» de Daniel. `false` = la pantalla de antes,
+ * al pie de la letra. Candado: `src/__tests__/prestamos-apple-2026-10.test.ts`.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 import { montoDanoDeFicha, montoDeFicha, montoTercerosDeFicha } from "@/lib/asistencia/prestamos-planilla";
 
-/** `false` = como hoy. Se prende con el «sí» de Daniel. */
-export const PRESTAMOS_APPLE_2026_10 = false;
+/** Prendido el 9-oct-2026 (Daniel). `false` = la pantalla de antes. */
+export const PRESTAMOS_APPLE_2026_10 = true;
 
 export interface CuentasConCuota {
   saldoPrestamo: number;

@@ -579,7 +579,7 @@ verde.
 
 ---
 
-## Préstamos estilo Apple — propuesta APAGADA (4-oct-2026, al día el 9-oct, `PRESTAMOS_APPLE_2026_10`)
+## Préstamos estilo Apple — PRENDIDO el 9-oct-2026 (`PRESTAMOS_APPLE_2026_10`)
 
 🔴 **Préstamos no es un módulo aparte**: con `NEXT_PUBLIC_PLANILLA_UNIDA` prendido en producción desde el 11-sep, la ficha sale del menú y `/prestamos` redirige (307) a `/asistencia?tab=prestamos`. El rediseño es de **Asistencia › Préstamos** (`PrestamosTab.tsx`); Boston › Préstamos es la misma pestaña filtrada.
 

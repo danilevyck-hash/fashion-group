@@ -277,7 +277,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
   // 🔴 Por nombre y por código, sin acentos ni mayúsculas y por subcadena
   // exacta — nunca por parecido. Filtra lo ya cargado; cero peticiones nuevas.
   const { visibles, conteo, buscando, sinResultados } = useMemo(
-    // Estilo Apple (apagado): lo que requiere atención arriba, después el saldo mayor.
+    // Estilo Apple (prendido 9-oct-2026): lo que requiere atención arriba, después el saldo mayor.
     () => vistaDeLista(fichas && PRESTAMOS_APPLE_2026_10 ? conAtencionArriba(fichas) : fichas, busqueda, (f) => [f.nombre, f.codigo]),
     [fichas, busqueda],
   );
@@ -450,7 +450,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
   return (
     <div className="space-y-4">
       {PRESTAMOS_APPLE_2026_10 ? (
-        // Estilo Apple (apagado): lo importante primero. El conteo se va: son las filas.
+        // Estilo Apple (prendido 9-oct-2026): lo importante primero. El conteo se va: son las filas.
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div data-saldo-total-prestamos>
             <p className="text-sm text-gray-500">Saldo total</p>
@@ -566,7 +566,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
       {/* En el celular, tarjetas: una tabla de 7 columnas en 390 px pide 200 px
           de arrastre lateral y nadie la lee. */}
       {visibles.length > 0 && PRESTAMOS_APPLE_2026_10 && (
-      // Estilo Apple (apagado): dos líneas y la tarjeta entera abre el detalle,
+      // Estilo Apple (prendido 9-oct-2026): dos líneas y la tarjeta entera abre el detalle,
       // donde están las cuentas y «Registrar abono».
       <div className="space-y-2 lg:hidden">
         {visibles.map((f) => {
