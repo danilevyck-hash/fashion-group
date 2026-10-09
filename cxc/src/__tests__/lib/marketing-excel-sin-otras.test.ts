@@ -84,8 +84,10 @@ describe("🔴 el guion no puede romper las sumas", () => {
 
   it("solo lo usan las columnas de MARCA; el Subtotal mantiene el formato normal", () => {
     expect(zip).toContain("MONEY_FMT_GUION");
-    expect(zip).toMatch(/C_RES_SUBTOTAL \? MONEY_FMT_GUION : MONEY_FMT/);
-    expect(zip).toMatch(/C_SUBTOTAL \? MONEY_FMT_GUION : MONEY_FMT/);
+    // El formato C2 (Monto · empresa · marca, 8-oct-2026) no tiene columnas
+    // de marca: ahí las tres van con el formato normal.
+    expect(zip).toMatch(/C_RES_SUBTOTAL && !conEmpresa \? MONEY_FMT_GUION : MONEY_FMT/);
+    expect(zip).toMatch(/C_SUBTOTAL && !conEmpresa \? MONEY_FMT_GUION : MONEY_FMT/);
   });
 });
 

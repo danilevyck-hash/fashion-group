@@ -418,7 +418,8 @@ describe("ZIP por marca — General: los gastos SIN cliente", () => {
     const r = await buildZipDeMarca({ marcaCodigo: "TH" });
     const filas = await hojaResumen(r.buffer);
     const head = encabezado(filas);
-    expect(head).toContain("Total");
+    // Formato C2 (8-oct-2026): Monto · empresa · marca; la última es la marca.
+    expect(head.slice(-3)).toEqual(["Monto", "Fashion Wear", "Tommy Hilfiger"]);
     // El encabezado del ZIP global no puede filtrarse acá: los montos llevan ITBMS.
     expect(head).not.toContain("Subtotal (sin ITBMS)");
     const total = filas.find((f) => String(f[0] ?? "") === "TOTAL");
@@ -711,11 +712,11 @@ describe("el Excel de la descarga — formato viejo, sin columnas de marca", () 
     expect(String(filas[1][0])).toContain("Período 2026");
     expect(String(filas[1][0])).toContain("período abierto");
     const head = encabezado(filas);
-    // La marca va en el título, no en columnas: cada archivo ya es de UNA.
-    expect(head).toEqual(["Cliente", "# Gastos", "# Fotos", "Total"]);
+    // Sin las columnas de marca del ZIP global; formato C2 (Daniel,
+    // 8-oct-2026): Monto · la empresa de la marca · la marca.
+    expect(head).toEqual(["Cliente", "# Gastos", "# Fotos", "Monto", "Fashion Wear", "Tommy Hilfiger"]);
     expect(head).not.toContain("Marcas");
     expect(head).not.toContain("Calvin Klein");
-    expect(head).not.toContain("Tommy Hilfiger");
   });
 
   it("🔴 el botón Excel baja EL MISMO workbook que va dentro del ZIP", async () => {

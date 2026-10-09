@@ -402,7 +402,15 @@ describe("el Excel que va dentro del ZIP", () => {
     const junto = todo.join(" | ");
 
     expect(junto).not.toContain("sin reporte guardado");
-    expect(junto).not.toMatch(/Fashion Wear/i);
+    // 🔴 Daniel, 8-oct-2026 («1. sí»): el nombre de la empresa SÍ sale, pero
+    //    SOLO como encabezado de su columna (formato C2). En ninguna otra celda.
+    const encabezados = wb.SheetNames.map((n) =>
+      XLSX.utils.sheet_to_json<string[]>(wb.Sheets[n], { header: 1, raw: true }).find((f) => f.includes("Monto")),
+    );
+    for (const e of encabezados) expect(e).toContain("Fashion Wear");
+    const conLaEmpresa = todo.filter((c) => /Fashion Wear/i.test(c));
+    expect(conLaEmpresa.every((c) => c === "Fashion Wear")).toBe(true);
+    expect(conLaEmpresa.length).toBe(wb.SheetNames.length);
     expect(junto).toContain("Pago de espacio (mueble) en tienda");
     // UNA grafía del sufijo: ni «S a» ni «S.a.» sueltos.
     expect(junto).toContain("Impresora Comercial, S.A.");

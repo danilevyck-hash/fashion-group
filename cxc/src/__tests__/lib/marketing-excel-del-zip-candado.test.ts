@@ -10,6 +10,13 @@
 // del Marketing nuevo, sobre estos mismos datos. Si alguien mueve una columna,
 // cambia un rótulo o un monto, esto se pone rojo.
 //
+// 🔴 FORMATO C2 (Daniel lo aprobó el 8-oct-2026). La foto se volvió a sacar con
+// el formato C2: donde había UNA columna «Total», ahora van tres —
+// Monto (lo que dice la factura) · <empresa de la marca> · <marca> (lo que se
+// le cobra)—, en el Resumen y en cada hoja. Todo lo demás, idéntico, y los
+// totales a cobrar NO se movieron. Muestras aprobadas:
+// `~/Downloads/Excel Marketing - opciones/C2 - Empresa y marca - *.xlsx`.
+//
 // Y el número: lo que dice la pantalla nueva (`resumenesDeCobro`) es el total
 // del Excel, al centavo.
 // ============================================================================
@@ -400,5 +407,79 @@ describe("🔴 un gasto no recuperable no se le cobra a nadie", () => {
     const g = gastos.find((x) => x.id === "f-nr")!;
     expect(g.estado).toBe("no_recuperable");
     expect(g.aCobrar).toBe(0);
+  });
+});
+
+// 🔴 CANDADO — FORMATO C2: MONTO = EMPRESA + MARCA (8-oct-2026). Daniel aprobó
+// que cada fila diga lo que dice la factura, lo que pone la empresa y lo que se
+// le cobra a la marca. La columna de la marca es EL número de la portada; las
+// impulsadoras van al 100 % a la marca.
+describe("🔴 formato C2: Monto · empresa · marca", () => {
+  type Hoja = (string | number | null)[][];
+  const hojas = (xlsx: Buffer): Array<{ nombre: string; filas: Hoja }> => {
+    const wb = XLSX.read(xlsx, { type: "buffer" });
+    return wb.SheetNames.map((nombre) => ({
+      nombre,
+      filas: XLSX.utils.sheet_to_json<(string | number | null)[]>(wb.Sheets[nombre], { header: 1, raw: true, defval: null }),
+    }));
+  };
+  /** Las filas de dinero de una hoja: [monto, empresa, marca] bajo el encabezado «Monto». */
+  const dinero = (filas: Hoja, empresa: string, marca: string) => {
+    const h = filas.findIndex((f) => f.includes("Monto"));
+    expect(h).toBeGreaterThanOrEqual(0);
+    const c = filas[h].indexOf("Monto");
+    expect(filas[h].slice(c, c + 3)).toEqual(["Monto", empresa, marca]);
+    const cuerpo = filas.slice(h + 1).filter((f) => typeof f[c] === "number");
+    return { c, h, cuerpo };
+  };
+
+  for (const [codigo, empresa, marca] of [
+    ["TH", "Fashion Wear", "Tommy Hilfiger"],
+    ["CK", "Vistana", "Calvin Klein"],
+  ] as const) {
+    it(`${marca}: la columna de la marca suma lo que dice la portada, y Monto = ${empresa} + marca en cada fila`, async () => {
+      const { abiertos } = await resumenesDeCobro();
+      const portada = abiertos.find((a) => a.marcaCodigo === codigo)!.total;
+      const r = await buildExcelDeMarca({ marcaCodigo: codigo });
+      expect(r.total).toBe(portada);
+      for (const { nombre, filas } of hojas(r.buffer)) {
+        const { c, cuerpo } = dinero(filas, empresa, marca);
+        for (const f of cuerpo) {
+          const [m, e, k] = [f[c], f[c + 1], f[c + 2]] as number[];
+          expect(Math.round((e + k) * 100) / 100, `${nombre}: ${JSON.stringify(f)}`).toBe(m);
+          expect(e).toBeGreaterThanOrEqual(0);
+        }
+        if (nombre === "Resumen") {
+          const total = cuerpo.find((f) => f[0] === "TOTAL")!;
+          expect(total[c + 2]).toBe(portada);
+        }
+      }
+    });
+  }
+
+  it("la factura al 50 % sale entera en Monto y partida mitad y mitad", async () => {
+    const r = await buildExcelDeMarca({ marcaCodigo: "TH" });
+    const nova = hojas(r.buffer).find((h) => h.nombre === "Nova Lux, S.A.")!;
+    const { c } = dinero(nova.filas, "Fashion Wear", "Tommy Hilfiger");
+    const f = nova.filas.find((x) => x.includes("0000062711"))!;
+    expect([f[c], f[c + 1], f[c + 2]]).toEqual([2140, 1070, 1070]);
+  });
+
+  it("las impulsadoras van al 100 % a la marca: la empresa en $0", async () => {
+    const r = await buildExcelDeMarca({ marcaCodigo: "TH" });
+    const imp = hojas(r.buffer).find((h) => h.nombre === "Impulsadoras")!;
+    const { c, cuerpo } = dinero(imp.filas, "Fashion Wear", "Tommy Hilfiger");
+    expect(cuerpo.length).toBeGreaterThan(0);
+    for (const f of cuerpo) {
+      expect(f[c + 1]).toBe(0);
+      expect(f[c + 2]).toBe(f[c]);
+    }
+  });
+
+  it("el nombre de la empresa sale de la configuración de la marca, no escrito a mano", async () => {
+    tablas.mk_marcas.find((m) => m.codigo === "TH")!.empresa_codigo = "fashion_shoes";
+    const r = await buildExcelDeMarca({ marcaCodigo: "TH" });
+    const res = hojas(r.buffer)[0];
+    dinero(res.filas, "Fashion Shoes", "Tommy Hilfiger");
   });
 });
