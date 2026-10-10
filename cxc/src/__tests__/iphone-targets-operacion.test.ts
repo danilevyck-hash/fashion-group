@@ -131,7 +131,8 @@ describe("Targets de 44px", () => {
   });
 
   it("Login · ver contraseña y ¿olvidaste? llegan a 44", () => {
-    expect(login).toMatch(/aria-label=\{showPassword \? "Ocultar contraseña" : "Ver contraseña"\}/);
+    // 9-oct-2026: con `LOGIN_RETOQUES_2026_10` el rótulo accesible pasa a «Mostrar contraseña»; apagado sigue «Ver contraseña».
+    expect(login).toMatch(/aria-label=\{showPassword \? "Ocultar contraseña" : RETOQUES \? "Mostrar contraseña" : "Ver contraseña"\}/);
     expect(login).toMatch(/min-w-\[44px\] h-11/);
     expect(login).toMatch(/inline-flex min-h-\[44px\] items-center justify-center px-4 text-xs/);
   });
