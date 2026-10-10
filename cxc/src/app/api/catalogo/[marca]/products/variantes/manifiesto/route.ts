@@ -23,6 +23,7 @@ import {
   urlDeVariante,
   guardarFotoElegida,
   skusConFotoManual,
+  AVISO_SIN_CANDADO,
 } from "@/lib/catalogos/variantes-server";
 import { normalizarCodigo, type ManifiestoItem } from "@/lib/catalogos/fotos-b2b";
 
@@ -70,7 +71,10 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     if (row.sku) porCodigo.set(normalizarCodigo(row.sku), { id: String(row.id), sku: row.sku });
   }
 
-  const manuales = await skusConFotoManual(cfg);
+  // Sin la lista de fotos elegidas a mano no se asigna NINGUNA (ni se anota la
+  // carga): se corta antes de la primera escritura.
+  const manuales = await skusConFotoManual(cfg).catch(() => null);
+  if (!manuales) return NextResponse.json({ error: AVISO_SIN_CANDADO }, { status: 503 });
 
   let asignadas = 0;
   let saltadasManual = 0;

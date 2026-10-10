@@ -6,10 +6,8 @@
 // fotos-b2b.ts; aquí solo está el I/O contra Supabase Storage y el guardado de
 // la foto elegida en la tabla de productos.
 //
-// TOLERANCIA A DDL PENDIENTE: `foto_manual` (migración 20260725120000) puede no
-// existir todavía. Todo lo que la escribe/lee hace fallback silencioso: la
-// feature funciona igual, simplemente sin candado, hasta que Daniel corra la
-// DDL.
+// `foto_manual` existe en las cuatro marcas: lo que la lee o la escribe FALLA
+// si la base falla. Seguir «sin candado» es pisar la foto que alguien eligió.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -278,9 +276,14 @@ export async function guardarFotoElegida(
   invalidarCatalogoPublico(cfg.marca);
 }
 
+/** Aviso único de la carga por ZIP cuando no se puede leer el candado. */
+export const AVISO_SIN_CANDADO = "No se pudo comprobar las fotos elegidas a mano; no se cargó nada";
+
 /**
- * SKUs de la marca con la foto elegida a mano (foto_manual=true). Pre-migración
- * devuelve vacío: sin la columna no hay candados que respetar.
+ * SKUs de la marca con la foto elegida a mano (foto_manual=true).
+ *
+ * 🔴 LANZA si la consulta falla. Antes devolvía vacío, y «no pude preguntar»
+ * se leía como «no hay ninguna»: el ZIP seguía y pisaba las fotos elegidas.
  */
 export async function skusConFotoManual(cfg: MarcaConfig): Promise<Set<string>> {
   const db = await cfg.products.writeDb();
@@ -288,7 +291,7 @@ export async function skusConFotoManual(cfg: MarcaConfig): Promise<Set<string>> 
     .from(cfg.productsTable)
     .select("sku")
     .eq("foto_manual", true);
-  if (error) return new Set();
+  if (error) throw new Error(AVISO_SIN_CANDADO);
   return new Set((data ?? []).map((r) => String((r as { sku: string | null }).sku ?? "")).filter(Boolean));
 }
 

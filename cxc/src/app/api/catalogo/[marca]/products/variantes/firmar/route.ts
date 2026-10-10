@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminOSecretaria } from "@/lib/api-auth";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
-import { storageDbDe, BUCKET } from "@/lib/catalogos/variantes-server";
+import { storageDbDe, BUCKET, skusConFotoManual, AVISO_SIN_CANDADO } from "@/lib/catalogos/variantes-server";
 import {
   variantesRoot,
   pathDeVarianteValido,
@@ -45,6 +45,14 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   }
   if (paths.length > MAX_LOTE) {
     return NextResponse.json({ error: `Máximo ${MAX_LOTE} por lote` }, { status: 400 });
+  }
+
+  // Si hoy no se puede leer el candado de las fotos elegidas a mano, no se
+  // firma nada: el ZIP se detiene ANTES de subir la primera foto, no después.
+  try {
+    await skusConFotoManual(cfg);
+  } catch {
+    return NextResponse.json({ error: AVISO_SIN_CANDADO }, { status: 503 });
   }
 
   const root = variantesRoot(cfg.marca as StorageMarcaKey);
