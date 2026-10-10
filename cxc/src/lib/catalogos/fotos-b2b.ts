@@ -287,10 +287,3 @@ export interface ManifiestoItem {
   /** Vista elegida como foto de catálogo, o null si todas eran lifestyle. */
   elegida: number | null;
 }
-
-export interface ReporteZip {
-  asignadas: number;
-  sinMatch: string[];
-  manuales: number;
-  variantesSubidas: number;
-}

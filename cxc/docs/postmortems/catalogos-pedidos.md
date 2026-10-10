@@ -7,6 +7,44 @@
 
 ---
 
+## 🔴 FOTOS — ÚLTIMO UPLOAD MANDA (9-oct-2026)
+
+**Daniel, textual, 9-oct-2026: «Quiero que si subí una foto, y ya existe otra, que la reemplace.
+Último upload manda.»**
+
+**La regla:** toda carga de fotos hecha por una persona reemplaza la foto que hubiera, sea
+elegida a mano o no. Gana la última.
+
+| Carga | Qué hace |
+|---|---|
+| **ZIP del banco** (`variantes/manifiesto`) | Asigna su foto a **todos** los artículos que trae, también a los que tenían foto elegida a mano. Ya no consulta `foto_manual` (se quitaron `skusConFotoManual`, el aviso «No se pudo comprobar las fotos elegidas a mano…» y la ficha «N ya tenían foto elegida a mano»). |
+| **Foto suelta** (`upload` + `products`) | Reemplaza siempre: el archivo se guarda en la misma ruta por código (`upsert`) y `image_url` lleva un `?v=` nuevo, así que ni el navegador ni el almacenamiento sirven la anterior. |
+| **Elegir una variante** («Cambiar foto») | Igual: apunta a esa variante con `?v=` nuevo. |
+
+**Lo que esto reemplaza.** La regla del **25-jul-2026** (`20260725120000_foto_manual.sql`:
+«esta foto la elegí yo, no la toques» — anotada ahí como decisión de Daniel, sin cita textual) y
+su extensión del 11-sep-2026 («la foto subida a mano queda protegida»). Todo lo que este documento
+dice más abajo sobre «el ZIP respeta / se salta la foto elegida a mano» es **historia**, incluida
+la nota del mismo 9-oct sobre `skusConFotoManual`.
+
+**Procesos automáticos: nada cambia.** El único que toca productos solo es el sync de catálogo
+(los crons por marca y la reconciliación de Switch), y **nunca escribe `image_url`**, tenga o no
+`foto_manual` (candados `sync-respeta-foto-manual.test.ts` y `catalogo-sin-escrituras-iguales.test.ts`).
+No hay ningún relleno automático de fotos por código de artículo: el ZIP lo sube una persona.
+
+**`foto_manual` queda sin lectores.** Se sigue escribiendo (`true` foto suelta o variante elegida,
+`false` ZIP) pero ningún código la lee. **No se borró**: lo decide Daniel.
+
+**Del arreglo anterior del mismo día se conserva:** la foto suelta no se guarda a medias (la ruta
+de `products` no reintenta sin `foto_manual`) y el manifiesto solo lleva las fotos del ZIP cuya
+subida llegó al almacenamiento.
+
+**Caso que NO cambia:** si todas las fotos del ZIP para un artículo son de modelo (*lifestyle*),
+el ZIP no le asigna ninguna y el artículo conserva la que tenía.
+
+**Candado:** `src/__tests__/api/catalogo-ultimo-upload-manda.test.ts` (ZIP sobre foto elegida a
+mano → queda la del ZIP; foto suelta después → queda la suelta). Falla con el código anterior.
+
 ## 🔴 CATÁLOGOS EN EL CELULAR — «LO MISMO, ORDENADO»: LOS NUEVE CAMBIOS CHICOS (24-sep-2026)
 
 **Daniel, textual, sobre el mockup `cel-catalogos-orden.html`: «todo sí».** Y antes de eso, lo
@@ -666,12 +704,15 @@ columna; `skusConFotoManual` falla abierto), y el candado exige que siga siéndo
 
 **Candado:** `src/__tests__/lib/catalogo-calvin-foto-manual.test.ts` (13).
 
+> ⚠️ **Reemplazado el mismo 9-oct-2026 por «último upload manda»** (primera sección de este
+> documento): el ZIP ya no consulta las fotos elegidas a mano y `skusConFotoManual` se quitó.
+>
 > 🔴 **9-oct-2026 — ya NO falla abierto.** La columna existe en las cuatro marcas, así que
 > «no pude leer el candado» dejó de significar «no hay ninguno»: `skusConFotoManual` **lanza**, y
 > el ZIP se detiene con «No se pudo comprobar las fotos elegidas a mano; no se cargó nada» en sus
 > dos puertas (`firmar`, antes de subir la primera foto, y `manifiesto`, antes de la primera
 > escritura). La ruta de `products` tampoco reintenta ya sin `foto_manual`, y el manifiesto solo
-> lleva las fotos cuya subida llegó a Storage. Candado: `catalogo-zip-candado-foto-manual.test.ts`.
+> lleva las fotos cuya subida llegó a Storage. Candado (ya retirado): `catalogo-zip-candado-foto-manual.test.ts`.
 > Medido ese día: **54 fotos elegidas a mano** (Tommy 38, Reebok 16), las 54 con su archivo intacto;
 > el banco de Tommy (383 archivos) no se reescribe desde el 25-jul-2026 y `activity_logs` no tiene
 > ni una fila `catalogo_zip_b2b`.

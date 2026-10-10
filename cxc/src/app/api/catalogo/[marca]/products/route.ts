@@ -45,9 +45,8 @@ const CATALOGO_ROLES = catalogoRoles();
 // el sync deje de pisarlo (patrón oculto_manual).
 const EDITABLE_FIELDS = ["image_url", "badge"] as const;
 // `foto_manual` NO es un campo que se edite suelto: solo puede viajar como
-// `true` y junto con `image_url` — es el candado de «esta foto la eligió una
-// persona» que ya ponía el selector de variantes y que la subida a mano NO
-// ponía (11-sep-2026). Ponerlo en `false` sigue siendo cosa del sync.
+// `true` y junto con `image_url` — anota que «esta foto la subió una persona».
+// Desde el 9-oct-2026 no frena al ZIP («último upload manda»).
 const CANDADO_FOTO = "foto_manual";
 const MAX_NAME_LEN = 200;
 

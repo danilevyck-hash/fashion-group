@@ -298,7 +298,7 @@ group by table_name;
 | `gender` | 🤖 el cron | filtros del catálogo | Reebok `male` **230** · `female` **138** · `unisex` 19 · `kids` 4 (el 4-sep eran 231/137: un producto cambió de género en el sync del 5). Tommy `women` 285 · `men` 172 · `boys` 57 · `girls` 38. Calvin `women` 61 · `men` 30 · `boys` 2 · `girls` 1. Joybees `kids` 29 · `women` 26 · `unisex` 11 · `adults_m` 10 · `adults` 7 |
 | `active` | 🤖 el cron, con `esVisibleEnCatalogo` | todo | Reebok 232/391 · Tommy 460/552 · Calvin 84/94 · Joybees 81/83. ✅ **Igual el 5-sep** |
 | `image_url` | 🧑 **la persona** (subir foto, ZIP, VariantePicker) | catálogo, PDF, correo | 🔴 el sync **NUNCA la toca** |
-| `foto_manual` | 🧑 la persona (`VariantePicker`) | el manifiesto del ZIP, para no pisar | Tommy `true` 30 · **Reebok `false` en las 391** · Joybees 0 · 🔴 **Calvin NO TIENE la columna** (medido el 5-sep) |
+| `foto_manual` | 🧑 la persona (`VariantePicker`, foto suelta) | **nadie desde el 9-oct-2026** («último upload manda»: el ZIP ya no se la salta) | Tommy `true` 30 · **Reebok `false` en las 391** · Joybees 0 · 🔴 **Calvin NO TIENE la columna** (medido el 5-sep) |
 | `oculto_manual` | 🧑 la persona | `esVisibleEnCatalogo` | Tommy 16 · Calvin 6 · Reebok 1 |
 | `nombre_manual` | 🧑 la persona (solo Tommy y Calvin) | el sync, para no pisar el nombre | 🔴 **`false` en las 552 de Tommy y en las 94 de Calvin — nadie renombró nada nunca** |
 | `bulto_pzas` | 🧑 la persona (solo Tommy y Calvin) | 💰 el total del pedido | 🔴 Tommy: **51 de 552** llenas, todas con el valor **8**. Calvin: **0 de 94**. Joybees y Reebok **no tienen la columna**. ✅ **Igual el 5-sep** |
@@ -876,7 +876,7 @@ Switch. 🔴 **El que decide a nombre de quién sale el pedido sigue siendo el p
 | Renombrar una tabla `<marca>_orders` / `_order_items` / `_switch_envios` / `_pedidos_publicos` | **Todo el módulo de esa marca**: `MARCAS_CONFIG` las nombra por string, y además las RPC `<marca>_create_order`, `<marca>_order_replace_items` y `convert_<marca>_pedido_publico` las escriben desde SQL |
 | Quitar el **índice parcial único `(order_id) WHERE estado <> 'error'`** de `<marca>_switch_envios` | Se cae el **at-most-once**: dos toques a «Enviar» crean **dos pedidos en Switch**. Es el único candado real; el chequeo previo en JS es solo la primera línea |
 | Cambiar `bulto_pzas` o `category` en la tabla de productos | El **total del pedido queda mal escrito**, no solo mal mostrado: el checkout guarda el total calculado (bug **TOM-003**, $456 donde iban $304) |
-| Borrar `foto_manual` de la tabla de productos | El ZIP del B2B volvería a pisar las **389 fotos de Tommy que Daniel subió a mano** |
+| Borrar `foto_manual` de la tabla de productos | Desde el 9-oct-2026 nadie la lee («último upload manda»), pero las tres cargas de fotos la **escriben**: sin la columna, guardar una foto falla. No se borra sin quitar antes esas escrituras |
 | Borrar `oculto_manual` | `esVisibleEnCatalogo` deja de respetar el «Ocultar del catálogo» y el sync vuelve a encender productos apagados a propósito |
 | Borrar `nombre_manual` | El sync de Tommy/Calvin vuelve a pisar los nombres editados |
 | Cambiar `switch_clientes.activo` o `codigo` | El selector de cliente se vacía o pierde el mostrador → **el checkout no puede enviar** (422) |

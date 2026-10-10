@@ -2110,7 +2110,7 @@ ningún precio, existencia ni visibilidad de producto cambió; ningún cálculo 
 
 **Catálogos (las 4 marcas):**
 1. El chip «Escondidos (N)» aparece y desde ahí se puede «Mostrar» — `seAdministra` en `admin-chips.ts`.
-2. La foto subida a mano marca `foto_manual = true` (el servidor solo acepta `true` y con `image_url`).
+2. La foto subida a mano marca `foto_manual = true` (el servidor solo acepta `true` y con `image_url`). Desde el 9-oct-2026 eso ya no la protege del ZIP: «último upload manda».
 3. Bodega y `gerente_boston` ven el catálogo en solo lectura: sin «Agregar», carrito ni «Ver pedido»; la regla es `PEDIDO_ROLES` (`lib/catalogo/roles.ts`) y de ahí salen `createRoles`, el checkout, `send-order` y el detalle.
 4. `?tab=pedidos` viejo redirige ANTES del guard de administrar.
 5. `GET /orders/[id]` exige `COMPROBANTES_ROLES`; `/catalogo/[marca]/pedidos` tiene guard SSR.

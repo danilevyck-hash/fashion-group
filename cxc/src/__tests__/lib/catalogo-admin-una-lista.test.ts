@@ -241,7 +241,8 @@ describe("🔴 nada de esto puede volver a mostrar un producto escondido", () =>
       if (fuente !== upload) expect(fuente).not.toContain("foto_manual");
     }
     expect(upload).toContain("image_url: url, foto_manual: true");
-    // Y el ZIP sigue yendo por el único camino que respeta la foto elegida.
+    // El ZIP va por su único camino (que desde el 9-oct-2026 reemplaza también
+    // la foto elegida a mano: último upload manda).
     expect(subir).toContain("procesarZipB2B");
   });
 });

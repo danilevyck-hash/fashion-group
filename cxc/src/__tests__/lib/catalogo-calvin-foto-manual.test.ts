@@ -85,7 +85,7 @@ describe("la migración de Calvin es ADITIVA y no borra nada", () => {
 describe("el código trata a las cuatro marcas igual, y tolera que la DDL no haya corrido", () => {
   const server = readFileSync(path.join(RAIZ, "src/lib/catalogos/variantes-server.ts"), "utf8");
 
-  it("`skusConFotoManual` y `guardarFotoElegida` usan la tabla de la marca, no una lista de marcas", () => {
+  it("`guardarFotoElegida` usa la tabla de la marca, no una lista de marcas", () => {
     expect(server).toContain("cfg.productsTable");
     // Ninguna de las dos funciones puede nombrar una tabla concreta.
     for (const tabla of TABLAS) {
@@ -98,8 +98,7 @@ describe("el código trata a las cuatro marcas igual, y tolera que la DDL no hay
     expect(server).not.toMatch(/update\(\{ image_url: imageUrl \}\)/);
   });
 
-  it("🔴 si la consulta falla, `skusConFotoManual` LANZA: «no pude preguntar» no es «no hay ninguna»", () => {
-    expect(server).not.toMatch(/if \(error\) return new Set\(\)/);
-    expect(server).toMatch(/if \(error\) throw new Error\(AVISO_SIN_CANDADO\)/);
+  it("🔴 último upload manda (9-oct-2026): ya nadie lee la lista de fotos elegidas a mano", () => {
+    expect(server).not.toContain("skusConFotoManual");
   });
 });
