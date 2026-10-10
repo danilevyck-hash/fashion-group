@@ -1209,7 +1209,7 @@ Medido contra producción: **232 correcciones sobre 141 días de 33 personas**; 
 - 🔴 **Editar es editar, sin deshacer previo.** Cambiar una hora ya corregida **ANULA la anterior** (con firma, `anulada_en`) **y escribe la nueva**. Las dos filas quedan: lo que se ahorra es el viaje, no el rastro.
 - 🔴 **`asistencia_marcaciones` NO se edita ni se borra.** La ruta nueva no nombra esa tabla, no importa la base y no tiene un solo `.update(`/`.delete(`/`.upsert(` — hay barrido.
 - 🔴 **Nada se aplica solo.** Una casilla que nadie tocó no produce nada; una hora igual a la que ya valía, tampoco; vaciar una casilla NO borra la marca (quitar es otra cosa y se pide con su botón). Una hora que no sirve **se DICE** y frena el guardado, nunca se descarta en silencio.
-- 🔴 **El motivo sigue siendo OBLIGATORIO**, y es UNO para todo el día: la razón por la que ese día se tocó. Los motivos frecuentes se siguen derivando de lo guardado en 90 días — ahora se piden **una vez por pantalla**, no una por ventana.
+- ⚠️ *9-oct-2026: ya no es así; corregir una hora no pide motivo (PR #719) y se guarda «—». Lo que sigue es historia.* 🔴 **El motivo sigue siendo OBLIGATORIO**, y es UNO para todo el día: la razón por la que ese día se tocó. Los motivos frecuentes se siguen derivando de lo guardado en 90 días — ahora se piden **una vez por pantalla**, no una por ventana.
 - 🔴 **«Deshacer» se queda para lo ya guardado**, en la línea de la corrección (donde se lee «Reloj 08:14:22 → 08:00:00»). 🩸 Y ahora alcanza también a una marcación **QUITADA**, que hasta hoy no se podía deshacer por ninguna puerta: no está en `marcas`, así que la ventana nunca se abría sobre ella.
 - 🔴 **El servidor valida TODO antes de escribir NADA** (`POST /api/asistencia/correcciones/dia`): el motivo, cada hora, que lo que se quita exista en el reloj, que ninguna marcación venga dos veces (el único parcial reventaría a mitad de camino) y que **la persona y el día salgan de la MARCACIÓN**, nunca del navegador — aceptar el `fecha` del cuerpo dejaría mover horas de una quincena a otra.
 - **Interruptor `EDITAR_EL_DIA`** (`lib/asistencia/editar-el-dia.ts`), hoy en `true`. En `false` la pantalla es exactamente la de antes, con su ventana, sin migración de por medio.
@@ -3345,61 +3345,96 @@ Daniel y la contable: las fiestas judías estaban cargadas en ⚙ › Feriados c
 - Medido el 30-sep-2026 en modo plan contra producción: 21-sep (Yom Kipur) → 0 deudas nuevas, 33 repetidas (las cargadas a mano), nadie marcó ese día; 12-sep (Rosh Hashaná, sábado) → nadie lo debe (nadie fuera de Multifashion trabaja sábado). Las 2 justificaciones del 21-sep sin deuda son las de sin salario (Yulissa Juárez, Daniel Levy).
 - ⚠️ Migración `20261222120000_asistencia_feriados_tipo.sql` escrita y SIN aplicar (marca 26 fiestas judías por lista de fechas y nombre). Sin ella todo es feriado, como antes, y la ruta rechaza (503) guardar un día libre. Candado `feriados-dia-libre`.
 
+## Estado del módulo al 9-oct-2026 (lo publicado del 7 al 9-oct)
+
+Todo lo de abajo está en `main` y prendido. Las reglas enteras, en las secciones que se nombran.
+
+| Interruptor o dato | Dónde vive | Valor hoy | PR |
+|---|---|---|---|
+| `DESCUENTA_TIEMPO_FUERA` | `lib/asistencia/tiempo-fuera.ts` | `true` desde el 9-oct-2026 | #709 (apagado) → #712 (prendido) |
+| `PRESTAMOS_APPLE_2026_10` | `lib/prestamos-apple-2026-10.ts` | `true` desde el 9-oct-2026 | #706 (apagado) → #717 (prendido) |
+| `MARCACION_CUATRO_MARCAS` | `lib/marcacion/cuatro-marcas.ts` | `true` (sin cambio); ahora además es el tope: la 5.ª marca se rechaza | #711 |
+| «Compensación de tardanza» | `asistencia_personas.repone_tardanza`, **por ficha** (no es un interruptor del código) | `false` por omisión; al publicarse, 50 fichas y 0 prendidas | #708 |
+
+Sin interruptor, publicado prendido: corregir una hora sin motivo (#719), alta y baja de quien marca (#720) y la puerta única en Usuarios (#722).
+
+- **Tiempo no laborado**: lo que pasa del almuerzo permitido (gracia de 5 min) se descuenta en su columna; solo en días de 4 marcas. › «Tiempo fuera durante la jornada y Permiso personal».
+- **A revisar**: todo día cerrado que no tenga exactamente 4 marcas, incluido el de 2. Con 5 o más no se descuenta tiempo no laborado.
+- **Teléfono**: máximo 4 marcas por día; la 5.ª, 409.
+- **Permiso personal**: deja dicho que la salida fue autorizada; se descuenta igual.
+- **Compensación de tardanza**: por ficha; el tiempo después de la salida borra la tardanza del mismo día y no es extra. La gracia de la entrada decide una sola vez, al entrar. › «Compensación de tardanza, por colaborador».
+- **Corregir una hora**: no pide motivo; en la base se guarda «—». «Justificar» sí lo pide. › «Corregir una hora ya NO pide motivo», arriba del documento.
+- **Quien marca**: se crea y se da de baja en Usuarios («Marca asistencia»). › «Alta y baja de un colaborador que marca».
+- **Préstamos**: pantalla estilo Apple prendida; ningún número cambió. › `docs/postmortems/prestamos.md`.
+- Migraciones de estos días, las dos aplicadas en producción: `20270110120000` (`repone_tardanza`, PR #708) y `20261231140000` (`tiempo_no_laborado`, `tiempo_no_laborado_min`; PR #713).
+
 ## Tiempo fuera durante la jornada y «Permiso personal» (9-oct-2026)
 
 Daniel: *«¿cómo no se descuenta si alguien salió?»* y, sobre el permiso sin goce, *«(no me gustó ese nombre) es solo para saber que se le dio permiso; igual no se le paga»*.
 
 - 🩸 **Desde el 6-ago-2026 (`7ab10e9a`) la planilla nunca leyó el exceso de almuerzo**: solo tardanza y salida temprana. Con 6 marcas el segundo hueco no existía (510 min trabajados en vez de 390); con 4 marcas, un hueco de 14:00 a 16:00 era «almuerzo de 120» y solo se veía en el Reporte.
-- 🔴 **La regla, detrás de `DESCUENTA_TIEMPO_FUERA` (`tiempo-fuera.ts`, apagado)**: con 4 o 6 marcas se suman TODOS los huecos (2.ª–3.ª, 4.ª–5.ª), se resta el almuerzo permitido de su horario con la **gracia que ya existía** (`gracia_almuerzo_min`, 5 en la base: una puerta, 35 → 0 · 36 → 6) y lo que sobra va, minuto a minuto, a la columna **«Salida temprana»** (misma rata que la tardanza, mismo concepto del cierre y del corte, sin columna nueva en la base). Con 6 marcas se mide, pero el día SIGUE «a revisar» (pendiente de Daniel). Con 5, 7 u 8: a revisar y sin este descuento.
-- 🔴 **«Constancia» perdona** la intersección de su ventana con los huecos (nunca más que el exceso). **«Permiso personal»** se registra igual (horas obligatorias, mismos roles, desde «Justificar» o la ficha), **no perdona ni justifica nada** y se lee «Permiso personal · 14:00–16:00 · se descuenta». Solo se ofrece con el interruptor prendido.
-- 📏 **Simulación, 9-sep al 8-oct-2026 (3.295 marcas, solo lectura)**: con el motor apagado, IDÉNTICO a `origin/main`. Prendido: 14 días cambian, todos de 4 marcas (ningún día de 6 en el mes), −$9,58 en total; el mayor, Ángel Pizza (305) el 7-oct, 151 min ($5,95) con marcas 09:31 · 09:59 · 13:30 · 19:35 (parece una entrada repetida). Los días de 7 y 8 marcas de Jorman Hernández (5) siguen a revisar y no se descuentan.
+- 🔴 **`DESCUENTA_TIEMPO_FUERA = true` (`lib/asistencia/tiempo-fuera.ts`), PRENDIDO el 9-oct-2026 (PR #712).** Nació apagado esa mañana (PR #709); `false` = la planilla de antes, centavo por centavo (candado `asistencia-tiempo-fuera.test.ts`).
+- 🔴 **La regla vigente: solo se mide el día de 4 marcas** (`marcasMedibles`: `n === 4`). El único hueco es el almuerzo (2.ª a 3.ª marca): se le resta el almuerzo permitido de su horario con la **gracia que ya existía** (`gracia_almuerzo_min`, 5 en la base: una puerta, 35 → 0 · 36 → 6; `excesoAlmuerzoBrutoMin`) y lo que sobra se descuenta minuto a minuto, a la misma rata que la tardanza. *Corregido el 9-oct-2026:* la primera versión (PR #709) sumaba todos los huecos con 4 o 6 marcas; el PR #712 retiró ese camino.
+- 🔴 **Va en su propia columna, «Tiempo no laborado»** (PR #711), nunca en «Salida temprana» (que sigue siendo irse antes de la hora de salida). Planilla (grupo y Boston), detalle de la línea, Excel, PDF, comprobante de pago, cierre (`tiempo_no_laborado`, `tiempo_no_laborado_min`) y ajuste del corte (nueve conceptos). En el Reporte (pantalla, Excel y PDF) la columna del exceso de almuerzo se llama «Tiempo no laborado» y el total de la fila, «Total». La ficha del colaborador suma un número, «Tiempo no laborado», cuando lo hay. *Corregido el 9-oct-2026:* el PR #709 lo llevaba a «Salida temprana», sin columna en la base.
+- 🔴 **Días que no tienen 4 marcas: «a revisar»** (`reporte.ts`: `revisar = !enCurso && buenas.length !== 4`, contado después de olvidar las repetidas).
+  - **5 o más** (solo puede venir del reloj físico): a revisar y **sin** descuento de tiempo no laborado hasta que alguien lo arregle. Vale también para 6. *Corregido el 9-oct-2026:* antes decía «con 6 marcas se mide».
+  - **1, 2 o 3**: lo de siempre. 🔴 **El día de 2 marcas sigue saliendo «a revisar»**: sus números se calculan igual, no se mide almuerzo y no pasa limpio. Es la regla 5 del motor, de Daniel: *«quiero que sume lo que marca la persona pero si se detecta anomalía que también marque para revisar, quiero que las personas sepan marcar bien, es responsabilidad de ellos»*.
+- 🔴 **Máximo 4 marcas por día desde el teléfono** (PR #711, `lib/marcacion/cuatro-marcas.ts`): con el día completo el botón queda apagado y dice «Ya se registraron las 4 marcas del día.»; el servidor rechaza la 5.ª con **409** (`POST /api/marcacion`, la MISMA regla del botón: `estadoDelBotonHoy`) y contesta ese texto más «Si algo está mal, avísale a …». El reloj físico no se puede frenar. Candado `quinta-marca-rechazada`.
+- 🔴 **«Constancia» perdona** la parte de su ventana que cae sobre el exceso (desde el fin del almuerzo permitido hasta el regreso; nunca más que el exceso).
+- 🔴 **«Permiso personal»** (motivo de justificación, `MOTIVO_PERMISO_PERSONAL` en `motivos.ts`): **no perdona ni justifica nada**. No da ventana de perdón, no vuelve justificado el día y el motor descuenta igual; solo deja dicho que la salida fue autorizada. Lleva hora de salida y de regreso **obligatorias** (no existe de día entero: «El permiso personal necesita la hora de salida y la de regreso.»). Se lee «Permiso personal · 14:00–16:00 · se descuenta» y el formulario avisa «Deja registrado que la salida fue autorizada. El tiempo fuera se descuenta igual.». Se ofrece entre los motivos, después de «Constancia», **desde que el interruptor está prendido** (`motivosParaElegir`).
+- 🔴 **El cierre ya no reintenta sin `tiempo_no_laborado`** (PR #713, `planilla-guardada-server.ts`). La migración `20261231140000` está aplicada en producción y se retiró la guarda `faltaColumnaTiempoNoLaborado` / `sinTiempoNoLaborado`: reintentaba ante cualquier error que nombrara la columna, así que un cierre podía entrar sin ese monto y sin avisar. Hoy el insert de renglones hace un solo intento y, si falla, lanza su error.
+- 📏 **Simulación de la primera versión, 9-sep al 8-oct-2026 (3.295 marcas, solo lectura, PR #709)**: con el motor apagado, IDÉNTICO a `origin/main`. Prendido: 14 días cambian, todos de 4 marcas (ningún día de 6 en el mes), −$9,58 en total; el mayor, Ángel Pizza (305) el 7-oct, 151 min ($5,95) con marcas 09:31 · 09:59 · 13:30 · 19:35 (parece una entrada repetida). Los días de 7 y 8 marcas de Jorman Hernández (5) siguen a revisar y no se descuentan.
+- 📏 **Medido al prender, en solo lectura sobre las planillas abiertas (PR #712)**: 16–30 sep, 2 días, $0,75; 1–15 oct, 8 días, $7,51 (el mayor: código 305, 7-oct, $5,95).
 - 🔴 Las planillas cerradas no se recalculan: son el resultado congelado.
 
 ## Alta y baja de un colaborador que marca (9-oct-2026)
 
 Daniel: *«hoy agregué una, pero mañana puedo necesitar eliminarla y crear otra»* (las impulsadoras rotan). Para marcar desde el teléfono hacen falta dos cosas, y **ninguna es el rol**: el **permiso de Marcación** y que el **usuario esté vinculado a una ficha de colaborador**. Antes el vínculo no lo escribía ninguna pantalla (a Siney hubo que crearla por la base).
 
-### Dar de alta (una sola pantalla)
+🔴 **UNA SOLA PUERTA: USUARIOS.** Daniel, al ver el alta en Colaboradores: *«debe de ser en Usuarios»*. Crear a una persona —marque o no— se hace en **Usuarios**. Este es el procedimiento que se le explica.
 
-1. **Asistencia y planilla › Colaboradores › «+ Nuevo colaborador».**
-2. Llena **Nombre**, **Empresa**, **Código del reloj** y **Salario mensual**. Al seleccionar la empresa, debajo del código sale **«Siguiente código libre de Multifashion: 308 · Usar 308»**: toca **«Usar 308»**. Si la persona marca en un reloj físico, escribe el código de ese reloj.
-3. Revisa **«Horario»** (días, entrada y salida). Ya viene con el de la empresa.
-4. En **«Acceso»**, prende **«Marcación desde el teléfono»** y escribe la **«Contraseña inicial»** (mínimo 3 caracteres; no puede ser la de otra persona, porque en este sistema la contraseña es la identidad).
-5. Toca **«Guardar»**. Queda creada la ficha, su horario y su usuario (con el nombre de la ficha y el rol Marcación), ya vinculado. La persona entra con esa contraseña y ve solo Marcación.
+### Crear a alguien que marca
 
-- Si el código ya existe, **no se guarda nada** y el aviso dice de quién es: «El código 307 ya es de Siney Suyem. No se guardó nada. El siguiente código libre es 308.» Antes se pisaba la ficha de la otra persona sin avisar.
-- Si la contraseña ya la usa otra persona («Crea otra, esa no se puede»), tampoco se guarda nada: se cambia y se vuelve a tocar «Guardar».
-- El interruptor «Marcación desde el teléfono» lo ve solo el administrador (crear usuarios es suyo, igual que en Usuarios). Contabilidad crea la ficha con su horario, sin usuario.
+1. **Usuarios › «＋ Nuevo usuario».**
+2. **Nombre**, **Contraseña** y **Rol**. Con el rol **Marcación**, el interruptor **«Marca asistencia»** viene prendido; con cualquier otro rol, se prende a mano.
+3. En **«Colaborador»** queda **«Nuevo colaborador»**. Selecciona la **Empresa**: el **Código** se pone solo (el siguiente libre de esa empresa, se puede cambiar) y el **Horario** viene con el más usado ahí. Llena **Nombre completo**, **Cargo**, **Cédula**, **Salario mensual** y **Fecha de ingreso**.
+4. **«Guardar»**. Quedan creados el usuario, su ficha de colaborador, su horario y el vínculo, todo junto.
 
-### Alguien que ya tiene usuario (bodega, o cualquier rol) y también marca
+- Si la persona **ya tiene ficha** (alguien de bodega que ya está en planilla): en **«Colaborador»** se selecciona su nombre de la lista y no se llena nada más.
+- **Nada queda a medias**: código repetido, contraseña repetida («Crea otra, esa no se puede») o cualquier dato inválido se dicen al guardar y no se crea ni el usuario ni la ficha.
+- Si el rol no es Marcación ni Administrador, el permiso de Marcación se le suma solo a sus módulos (entra en su próximo inicio de sesión).
+- Lo obligatorio de la ficha: empresa, código y horario. Lo demás se puede completar después en Asistencia › Colaboradores.
 
-1. **Usuarios ›** toca a la persona (o **«＋ Nuevo usuario»**).
-2. En **«Colaborador»**, selecciona su ficha. La lista trae las fichas activas que no tienen usuario. **«Sin vincular»** quita el vínculo.
-3. Si su rol no es Marcación, prende **«Permisos personalizados»** y marca **Marcación** además de sus módulos.
-4. **«Guardar»**.
+### Darle o quitarle la marcación a alguien que ya existe
 
-Un colaborador tiene un solo usuario y la ficha tiene que existir: si no, el aviso lo dice («Ese colaborador ya está vinculado a otro usuario…»).
+**Usuarios ›** toca a la persona **›** prende o apaga **«Marca asistencia» › «Guardar»**. Apagado, queda sin vincular y sin el permiso de Marcación; su ficha no se toca.
 
-### Dar de baja (una sola pantalla)
+### Dar de baja
 
-1. **Asistencia y planilla › Colaboradores ›** toca a la persona **› «Editar»**.
-2. Abajo, en **«Salida»**, toca **«Dar de baja»**. Pon la **«Fecha de salida»** y el **«Motivo de salida»**.
-3. Deja marcada la casilla **«Desactivación del usuario …»** (viene marcada).
-4. **«Guardar»**. La ficha queda de baja y su usuario inactivo, con las sesiones cerradas.
+1. **Usuarios ›** en el renglón de la persona, **«Desactivar»**.
+2. La ventana trae marcada **«Baja del colaborador …»**, con la **Fecha de salida** de hoy. Selecciona el **Motivo de salida**.
+3. **«Desactivar»**. El usuario queda inactivo, con las sesiones cerradas, y su ficha dada de baja. Si tiene saldo en Préstamos, el aviso lo dice.
 
-- **Nada se borra**: la ficha, el usuario, las marcaciones y las planillas cerradas quedan como están. Para reactivar el usuario: Usuarios › «Reactivar».
+- **Nada se borra**: el usuario, la ficha, las marcaciones y las planillas cerradas quedan como están. Para volver: Usuarios › «Reactivar» (la fecha de salida se quita en Asistencia › Colaboradores › «Editar»).
 - 🔴 **Una ficha de baja no puede marcar aunque su usuario siga activo**: la ruta de marcar la rechaza desde el día siguiente a la fecha de salida («Tu ficha de colaborador está inactiva desde el …»). Su último día todavía marca.
+
+### Lo mismo desde Asistencia › Colaboradores (se quedó, no es el camino que se explica)
+
+- **«+ Nuevo colaborador»** trae «Horario», el código propuesto («Usar 308») y, para el administrador, **«Marcación desde el teléfono»** + «Contraseña inicial», que crea el usuario con el nombre de la ficha y el rol Marcación.
+- **«Editar» › «Salida» › «Dar de baja»** trae marcada **«Desactivación del usuario …»**.
+- Un código repetido se frena: «El código 307 ya es de Siney Suyem. No se guardó nada. El siguiente código libre es 308.» Antes se pisaba la ficha de la otra persona sin avisar.
 
 ### Cómo está hecho
 
 - `lib/usuarios/usuario-servidor.ts`: la revisión (`revisarUsuarioNuevo`: nombre, largo, nombre repetido, `contrasenaEnUso`), el alta con bcrypt (`insertarUsuario`) y activar/desactivar con cierre de sesiones (`cambiarActivo`). Las usan `/api/admin/users` y el `PUT /api/asistencia/configuracion`: un solo mecanismo.
 - `PUT /api/asistencia/configuracion`: con `alta: true` **inserta** (no upsert) y contesta **409** si el código tiene ficha; con `accesoMarcacion` revisa el usuario **antes** de escribir la ficha (o entra todo o nada) y exige administrador; con `desactivarUsuario` y fecha de salida desactiva el usuario vinculado.
 - El horario del alta sale de `horarioDeAlta` (08:00 → 17:00, días y almuerzo de la empresa) y se guarda por el `PUT /api/asistencia/horarios` de siempre.
-- El código propuesto (`siguienteDeLaSerie` + `siguienteCodigoLibre`): el mayor código numérico de la empresa más uno, **solo si está libre en todo el sistema** (sin ficha y sin marcaciones). Medido el 9-oct-2026: Multifashion 308 y Boston 57; Vistana y Fashion Wear no proponen nada (su siguiente ya es de otra empresa: los códigos del reloj físico se comparten).
+- El código propuesto (`siguienteDeLaSerie` + `siguienteCodigoLibre`): desde el mayor código numérico de la empresa más uno, **sube hasta el primero libre en todo el sistema** (sin ficha de ninguna empresa y sin marcaciones: los códigos del reloj físico se comparten). El horario y la jornada por omisión son **los más usados entre los activos de esa empresa** (`valoresPorOmision`); sin datos, 08:00 → 17:00.
+- Usuarios (`MarcaAsistencia.tsx`, `lib/usuarios/colaborador-desde-usuarios.ts`): el `POST`/`PUT /api/admin/users` con `colaborador` crea la ficha y el horario **llamando a las mismas dos puertas** (`PUT /api/asistencia/configuracion` con `alta: true` y `PUT /api/asistencia/horarios`), no una copia de su validación. Todo lo del usuario se revisa antes; si después algo falla, la ficha recién creada por esa misma petición se deshace (`deshacerFicha`). El `PATCH` con `baja` revisa fecha y motivo (`validarVigencia`) antes de tocar nada y escribe **solo** `fecha_salida` y `motivo_salida`.
 - `fg_users.empleado_codigo` ya tenía la llave foránea y el índice único (`20261125120000`): **sin migración**. `avisoDeVinculo` pone esos dos errores en palabras.
 - La ficha de baja: `lib/marcacion/ficha-de-baja.ts`, en el `POST /api/marcacion`; mira el día de la marca y falla abierta.
-- Candados: `asistencia/alta-baja-quien-marca.test.ts` (servidor; 9 casos fallan con el código de antes) y `asistencia/alta-baja-quien-marca-pantalla.test.tsx`.
-- ⚠️ Pendiente, no hecho: darle «Marcación desde el teléfono» a una ficha que ya existe se hace por Usuarios › «＋ Nuevo usuario» › «Colaborador»; el interruptor solo está en el alta.
+- Candados: `asistencia/alta-baja-quien-marca.test.ts` (servidor, 26 casos; 9 fallaban con el código de antes de la primera entrega) y `asistencia/alta-baja-quien-marca-pantalla.test.tsx`.
+- ⚠️ El permiso de Marcación que se suma a un rol que no lo trae viaja en la cookie: entra en el próximo inicio de sesión de esa persona.
 
 ## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
 
@@ -3421,11 +3456,11 @@ Un colaborador tiene un solo usuario y la ficha tiene que existir: si no, el avi
 - 🔴 **COLABORADORES: LA TABLA, DIRECTA (24-sep-2026)**: se fue la tarjeta plegable; el buscador y «+ Nuevo colaborador» entran a la fila de los chips. 🔴 **Ningún número se mueve**: ni el motor ni una ruta importan el interruptor (candados en `__tests__/asistencia/pantalla-*`).
 - 🔴 **LAS PESTAÑAS VIVAS, GUARDAR SIN SALTO Y QUIEN NO MARCÓ (24-sep-2026; detalle en el postmortem)**: la pestaña visitada se ESCONDE, no se desarma (`pestanas-vivas.ts`) —🩸 volver de Planilla perdía la quincena y **el corte volvía al propuesto (13/28)**—; quincena y corte viajan en `plQuincena`·`plCorte` y 🔴 **el cuadro generado NO se guarda**. Guardar una hora recarga en SILENCIO y **la fila recién corregida no se va**. Quien no marcó ni un día sale en GRIS, con sus días en cero y **ninguno ausencia** (`sin-marcas.ts`).
 - 🔴 **GRACIA DEL ALMUERZO: 5 MIN SOBRE LA DURACIÓN, UNA PARA LAS CUATRO (24-sep-2026)**: Daniel: *«60 que dura 65 no descuenta nada; 66 descuenta los 6»* — PUERTA, no descuento (`reglas-nuevas.ts`, `asistencia_reglas.gracia_almuerzo_min`). `GRACIA_ALMUERZO`; sin la columna, 0. Candado `gracia-almuerzo`.
-- 🔴 **ENTRADA AUTORIZADA POR DÍA (24-sep-2026)**: en «Arreglar el día», «Hoy entraba a las __:__» con motivo y firma (`asistencia_entradas_autorizadas`; se anula, nunca se borra); la extra de ENTRADA se mide desde esa hora —o la marca, si marcó después— hasta la entrada del horario, va a Aprobaciones y paga al recargo del día. Sin autorización, cero. `ENTRADA_AUTORIZADA`; candado `entrada-autorizada`.
+- 🔴 **ENTRADA AUTORIZADA POR DÍA (24-sep-2026)**: en «Arreglar el día», «Hoy entraba a las __:__» con motivo y firma [⚠️ 9-oct-2026: ya no pide motivo (PR #719); la firma sigue y en la base se guarda «—»] (`asistencia_entradas_autorizadas`; se anula, nunca se borra); la extra de ENTRADA se mide desde esa hora —o la marca, si marcó después— hasta la entrada del horario, va a Aprobaciones y paga al recargo del día. Sin autorización, cero. `ENTRADA_AUTORIZADA`; candado `entrada-autorizada`.
 - 🔴 **AVISO «llegó N min antes · ¿entrada autorizada?» SOLO desde 30 min (24-sep-2026)**, configurable (`aviso_entrada_temprana_min`); no cuenta ni frena. 🔴 **Ninguna quincena CERRADA cambia** (candado `quincena-cerrada-no-cambia`). Migración `20261219120000` **aplicada**.
 - 🔴 **LA FILA DE MANDOS, ARREGLADA (25-sep-2026, candado `fila-de-mandos`)**: el calendario del 📅 **cabe entero** (🩸 le faltaban 17 px y cortaba el DOMINGO); **«Solo a revisar» baja al encabezado de SU columna** (`?revisar=1` sigue); el «⇧» dice **«Descargar»**; **el «···» se quitó** —su panel estaba VACÍO—; y **los dos relojes son UNA pastilla con UN «Traer ahora» para los DOS** (`relojes-en-la-fila.ts`; con una empresa filtrada, solo su reloj). 🔴 La Planilla dice **«Corte del reloj · lee del 14 al 28 sep»** (`corte-del-reloj.ts`: desde = día SIGUIENTE al corte de la última CERRADA) y **el día abierto se resume en UNA línea** (`linea-del-dia.ts`; son **fotos del lugar, nunca «selfie»**). 🔑 Ningún número se mueve.
 - 🔴 **DE NOCHE Y EL FIN DE SEMANA, EL RELOJ APAGADO NO ALARMA (25-sep-2026)** — Daniel: *«es normal que se apaguen de noche y fines de semana»*. Fuera de su horario (Multifashion lun-sáb 10–18:30; las otras lun-vie 8–17, espejo de `reporte.ts`) y con la última lectura de **hoy o del último día hábil**, la pastilla va **gris**: «Reloj apagado · última lectura ayer 18:32»; en horario hábil sigue **ámbar** a los 12 min, y una lectura **más vieja** avisa a cualquier hora. un error del reloj nunca se calla; «Traer ahora» no cambia. `reloj-fuera-de-horario.ts`, candado igual.
-- 🔴 **EL PANEL DEL DÍA ABRE SOLO LA CASILLA QUE SE TOCÓ (25-sep-2026, `PANEL_DEL_DIA_2026_09`)**: una hora o un hueco abre ESA celda, con SU motivo (los cuatro «No marcó …») y «Otro…»; «Hoy entraba a las» solo en la Entrada y con aviso; **UN chip «Revisar»**; el teléfono y «ver fotos» se van a Marcaciones; «Arreglar el día», solo sin marcas. 🔑 **El POST no cambia.** Candado `panel-del-dia`.
+- 🔴 **EL PANEL DEL DÍA ABRE SOLO LA CASILLA QUE SE TOCÓ (25-sep-2026, `PANEL_DEL_DIA_2026_09`)**: una hora o un hueco abre ESA celda, con SU motivo (los cuatro «No marcó …») y «Otro…» [⚠️ 9-oct-2026: el motivo y sus chips se retiraron (PR #719)]; «Hoy entraba a las» solo en la Entrada y con aviso; **UN chip «Revisar»**; el teléfono y «ver fotos» se van a Marcaciones; «Arreglar el día», solo sin marcas. 🔑 **El POST no cambia.** Candado `panel-del-dia`.
 - 🔴 **LAS HORAS SE ARRASTRAN DE COLUMNA (25-sep, `ARRASTRAR_HORA`)**: solo a una columna VACÍA, en orden y del RELOJ; abre esa casilla con «Marca movida de columna» y **soltar NO guarda**. 🔑 Viaja lo IDÉNTICO a teclearla. ⚠️ Las columnas son POSICIONALES. Candado `arrastrar-hora`.
 - 🔴 **LAS MARCACIONES SE LEEN POR DÍA, NO POR CHIPS (25-sep-2026)**: el DÍA es el encabezado y dentro va UNA fila por colaborador («Entrada 08:59 · Almuerzo 18:01 – 18:01 · Salida 18:01»); arriba quedan el período y **UN** desplegable «Colaborador: todos» —**sin filtro de día ni de empresa**, que esa la manda el selector del módulo—. 🩸 Eran **37 renglones sueltos SIN fecha** bajo dos filas de chips. «Sin señal» es un PUNTO · el lugar UNA vez y en palabras («Paso Canoas · 46 km de la tienda», sin el código de mapa) · el atraso **solo si lo hubo** y 🔴 **nunca «llegó»: se dice «se envió»** (barrido) · se fue «Aparato» y queda un aviso ROJO solo si dos colaboradores usaron el mismo teléfono ese día · tocar la fila abre fotos, mapa y la nota. 🔴 **29-sep**: repetidas a ≤60 s = «Salida 18:00 ×3» (`olvidarRepetidas`, como la planilla); lugar en la línea del día si coincide; atraso solo en el tooltip del punto. Solo `admin`, solo lectura, **ningún número cambia**. `lib/asistencia/marcaciones-por-dia.ts`, interruptor `MARCACIONES_POR_DIA` (`false` = `marcaciones/PantallaDeAntes.tsx`, intacta). Candado `marcaciones-por-dia`.
 - 🩸 **DOS COSAS QUE SE DEJAN DE DIBUJAR (25-sep-2026, «3a»)**: la lista de **24 quincenas** de Préstamos › Movimientos —manda el selector único del módulo— y la franja amarilla de Colaboradores («N colaboradores todavía no salen en la planilla»), que ya vive en **«Antes de cerrar»** de la Planilla, que es donde frena el cierre. 🔑 **El dato no se pierde**: `avisoPendientes` sigue vivo. Interruptor `ASISTENCIA_SOBRA_3A`. Candado `sobra-3a`.
@@ -3462,6 +3497,9 @@ Un colaborador tiene un solo usuario y la ficha tiene que existir: si no, el avi
 ### «Compensación de tardanza», por colaborador (9-oct-2026)
 
 Daniel aprobó «Repone tardanza»: algunos colaboradores reponen la tardanza quedándose más tarde **ese mismo día**, sin descuento y sin cobrar extra por esos minutos. Es una excepción **por ficha** a la regla del 1-sep-2026 («tardanza y extra van separadas»).
+
+- 🔴 **Estado al 9-oct-2026: publicado (PR #708) y sin interruptor en el código; se prende persona por persona en la ficha.** La migración `20270110120000` está aplicada: 50 fichas, 0 prendidas al publicarse. Con la casilla apagada, el día se calcula igual que antes.
+- En la ficha se elige entre «No, la tardanza se descuenta» y «Sí, con tiempo después de la salida»; prendida, la ficha lleva la etiqueta «Compensación de tardanza».
 
 - 🔴 Casilla de la ficha (Editar › Excepciones): **«Compensación de tardanza»**, `asistencia_personas.repone_tardanza boolean NOT NULL DEFAULT false` (`20270110120000_asistencia_repone_tardanza.sql`, aditiva). **Por omisión apagada para todos.** Lectura aparte que falla ABIERTA (`leerReponeTardanza`), escritura aparte y solo si cambió, como «Trabajo fuera de oficina».
 - 🔴 La regla vive en `lib/asistencia/repone-tardanza.ts` (`compensarTardanza`) y el motor (`reporte.ts`) solo le pregunta: el bruto después de la salida se come la tardanza (ya neta de tolerancia y permiso) minuto por minuto, **sin límite**; la puerta del mínimo de extra (10 min), el 1,25/1,50 y Aprobaciones se aplican **solo a lo que sobra**. Como la extra que queda es el FINAL de la ventana (`[salida − extraMin, salida]`), el corte nocturno cae donde debe sin tocar `planilla.ts`.

@@ -2450,3 +2450,77 @@ Detalle entero (mediciones, citas, candados, mutaciones) en [postmortems/asisten
 
 - **Las 3 justificaciones duplicadas.** No hace falta arreglar nada: `asistencia_justificaciones` no tiene soft delete, pero el `DELETE /api/asistencia/justificaciones?id=` existe desde siempre y la sección «Justificaciones» de la ficha del colaborador ya lo llama — **se borran desde la ficha de esa persona**. Lo que no hay es forma de borrarlas desde la lista del período. Es decisión suya si quiere ese botón ahí.
 - **El interruptor `EDITAR_EL_DIA`** queda en `true`. Si al probarlo con la contadora algo no le gusta, se apaga en el código (`lib/asistencia/editar-el-dia.ts`) y la pantalla vuelve a la ventana de antes, sin migración.
+
+---
+
+# Lo que cambió del 7 al 9 de octubre de 2026
+
+> Escrito el 9-oct-2026 desde el historial de `main` (commits del 7-oct y solicitudes de cambio #663 a #722) y contrastado con el código. Cada fila trae su número: se puede comprobar con `gh pr view <n>`.
+>
+> ⚠️ Entre el 20-sep y el 6-oct-2026 este archivo no se actualizó: lo de esas fechas está en el postmortem de cada módulo (`docs/postmortems/`), no aquí.
+>
+> Cómo decide Daniel y cómo quiere que se le hable, tal como quedó estos días: [diseno.md](diseno.md) › «Lo más simple que funcione» y la skill `asi-se-construye` §§ 8, 16 y 17.
+
+## Cerrado (ya en producción)
+
+| tema | qué quedó |
+|---|---|
+| **Marketing** | Una sola pantalla, **Por cobrar · Gastos · Impulsadoras** (Mobiliario y Proveedores en «···»); las pantallas viejas se borraron (#679, #685, #690). Solo lo cobrable: factura al **50 % por defecto**, con 100 % y «No recuperable» a un toque (#689); **impulsadora siempre al 100 %** a su marca (#691); un gasto sin porcentaje escrito se cobra completo (#668). «No recuperable» lleva solo observación opcional (#692). **«Descargar ZIP» y «Cerrar» son acciones separadas** y «Excluir» deja un gasto fuera de ese cierre (#679). Excel de la marca **Monto · empresa · marca** (#693). El lector de facturas devuelve el proveedor que ya existe (#696) y el aviso de duplicado compara sin ceros de relleno y con alias (#695). Carpetas del ZIP: tienda del gasto → tienda del proyecto → «Impulsadoras» / «Mobiliario y exhibición» → «General». ⚠️ `MKT_SOLO_COBRABLE_2026_10` sigue `false` en código: la pantalla nueva lo prende por contexto; una factura sin tienda todavía puede caer en «Mobiliario y exhibición» por su concepto. Detalle: [postmortems/marketing-rediseno.md](postmortems/marketing-rediseno.md) › «Estado al 9-oct-2026». |
+| **Despachos › Pedidos** | El módulo se llama **Despachos** (`/despachos`; adentro Pedidos · Guías de despacho · Etiquetas · Configuración) y abre en Pedidos (#675). Estados **Pendiente → En preparación → Preparado → Recibido**, un paso a la vez, con «Volver a …» en la fila (#707, #687). En preparación y Preparado los marca **bodega, nunca secretaria** (#664); Recibido, la secretaria (#677). **Un número de bultos por pedido** y las unidades en la fila (#665, #687). **«En espera de muestra»**: marca de bodega sobre En preparación, con firma de quién y cuándo (#707, #710). Jorman ve solo Vistana; Julio, Rodrigo y el resto, las 6 empresas (#710). **Bodega sin precios y nadie ve «Total» en pantalla** (#663). |
+| **Despachos › Guías de despacho** | La lista se agrupa en **Hoy · Ayer · Esta semana · Semana pasada · Historial**, con el distintivo **«Pendiente»** en la que no se ha despachado (commits del 7-oct). **Entrar a Despachos no llama a Switch** (#680): las facturas del día se traen solas **cada hora**, de 6:50 a. m. a 6:00 p. m. de Panamá (#682). |
+| **Asistencia y planilla** | **«Tiempo no laborado»**: lo que pasa del almuerzo permitido se descuenta en su propia columna, solo en días de 4 marcas (`DESCUENTA_TIEMPO_FUERA`, prendido; #709, #711, #712, #713). **Máximo 4 marcas** desde el teléfono; la quinta se rechaza (#711). **«Permiso personal»**: registra que la salida se autorizó, igual se descuenta (#709). **«Compensación de tardanza»** por colaborador, apagada por omisión: el tiempo después de la salida repone la tardanza del mismo día y la gracia decide una sola vez, al entrar (#708). **Corregir una hora ya no pide motivo** (#719). **Quien marca se crea y se da de baja en Usuarios**, con «Marca asistencia» (#720, #722). El día que no tiene exactamente 4 marcas sigue «a revisar», también el de 2. |
+| **Multifashion** | Rediseño prendido (`MULTIFASHION_APPLE_2026_10`; #697, #698, #700) y **gráfica nueva de ventas diarias** prendida (`MULTIFASHION_GRAFICA_2026_10`; #699, #701). |
+| **Cuentas por cobrar** | **Un solo botón «Estado de cuenta»**, que abre el documento del grupo si el cliente debe en más de una empresa (#666, #669); el PDF se llama por el cliente y en la computadora siempre se descarga; la fecha sale en hora de Panamá, ya no la de mañana (#673). |
+| **Inicio · Usuarios · Préstamos** | Los tres rediseños prendidos el 9-oct: Inicio en parte —celular en lista y buscador alineado; las fichas de la computadora quedan como estaban— (#702, #714), Usuarios (#705, #715) y Préstamos, sin tocar ninguna regla de plata (#706, #717). |
+| **Recordatorios** | El rediseño se descartó y su código se retiró (#704, #718). La pantalla queda como estaba. |
+| **Gastos** | **Pausado, no roto**: se retiró el sync de egresos y sus alertas (commit `1766938b`, 7-oct). Cómo se reanuda: [gastos-pausado.md](gastos-pausado.md). |
+| **Telegram** | Los cobros del día van a **Alertas**, no a Negocio, a las 7:00 p. m., solo las 6 de Fashion Group y con el formato que dictó Daniel (#676, #686). El resumen de Multifashion sale 7:30 p. m. |
+| **Infraestructura** | Funciones en **Oregón (`pdx1`)**, junto a la base (#683). El **chequeo de tipos** pasó del build de Vercel a «pruebas» (#670, #674). Se publica **por solicitud de cambio**; `enforce_admins` prendido y apagarlo no es salida de emergencia (#667, #672). **Toda llamada a Switch sale sin caché** (#684). El **respaldo** ordena cada tabla por su llave real, ya no depende de una columna `id`, y avisa en el acto si falta una columna (#688). La sesión no se vuelve a preguntar en cada llamada (#678). Sin efectos que revelen contenido solo al pasar el mouse (commits `41dfb737`, `8244332f`). |
+
+**A medias (no cuenta como cerrado):**
+
+- **Inicio de sesión**: los 4 retoques de texto están en `main` apagados (#716, `LOGIN_RETOQUES_2026_10 = false`). Prenderlos, con el margen lateral en el celular, está **publicándose** (#721, abierta; al cierre de este bloque su chequeo «pruebas» estaba en rojo y no había entrado).
+- **Consulta de artículos**: rediseño en `main`, **apagado** (#703, `REFERENCIA_APPLE_2026_10 = false`). Se deja para el final.
+
+## Decisiones de Daniel
+
+| decisión | resultado |
+|---|---|
+| ¿Cuánto se le cobra a la marca por una impulsadora? | **Siempre el 100 %.** *«las impulsadoras son al 100 %. Ya definitivo: al 100 % la marca.»* (8-oct-2026, #691) |
+| ¿«No recuperable» lleva un campo de motivo? | **No: la observación opcional.** *«¿no es lo mismo como notas, de modo opcional?»* (8-oct-2026, #692) |
+| ¿El proveedor se registra con código? | **No: lo reconoce el lector.** *«¿o el proveedor puede salir de la factura con el lector de factura?»* (#696) |
+| ¿Se lleva el pago de la marca en el sistema? | **No.** *«solo mantenerlo ordenado para cerrar y se lo mando»* (7 al 9-oct-2026) |
+| ¿Hace falta una lista de etiquetas pendientes? | **No.** *«si no voy a etiquetar, no busco la factura»* (7 al 9-oct-2026); y *«no todas las facturas tienen que llevar etiqueta»* (7-oct-2026, commit `b1b94c29`) |
+| ¿Quién prepara un pedido? | **Bodega, nunca secretaria.** *«¿por qué Ángela puede preparar un pedido en su sistema? Ya habíamos hablado del tema»* (7-oct-2026, #664) |
+| ¿Bodega ve precios? | **No.** *«que ningún usuario con rol bodega vea precio, solo admin y secretaria»* y *«al abrir un pedido que no salga el total»* (7-oct-2026, #663) |
+| ¿Cómo se agrupan las guías? | *«quiero hasta semana pasada, después es historial»* (7-oct-2026, commit `aa6b6c01`) |
+| ¿Corregir una hora pide motivo? | **No.** *«quita lo de poner motivo al cambiar la hora en asistencia»* (9-oct-2026, #719) |
+| ¿Dónde se crea a quien marca? | **En Usuarios.** *«debe de ser en Usuarios»* (9-oct-2026, #722) |
+| ¿El día de 2 marcas pasa limpio? | **No: sigue «a revisar».** *«¿mal acostumbrarían al personal?»* (7 al 9-oct-2026) |
+| ¿A dónde van los cobros de Telegram? | *«Los cobros de Telegram deben llegar a Alertas, no a Negocio.»* (7-oct-2026, #676) |
+| ¿Se rediseña Recordatorios? | **No.** *«no hacer ningún cambio»* (9-oct-2026, #718) |
+| ¿Se sigue registrando Gastos? | **Pausado.** *«Apaga gasto»* (7-oct-2026, commit `1766938b`) |
+| ¿Quién cambia los datos de producción? | **Él.** *«tú no muevas facturas, solo dime y yo veo y lo hago»* (7 al 9-oct-2026). Las excepciones fueron puntuales y explícitas. |
+| ¿Qué nombres van en pantalla? | **Los de un ERP.** *«mi lenguaje es natural, en el sistema tiene que usar el de un ERP profesional»* (7 al 9-oct-2026) |
+| Vista general y Ventas Boston | Sin fecha. *«olvídalo»* por ahora (7 al 9-oct-2026): no se listan como pendiente hasta que él los vuelva a pedir. |
+
+## Pendientes vivos al 9-oct-2026
+
+**Del asistente:**
+
+- **Rediseño del detalle de la guía** — en curso, sin publicar (`GUIA_DETALLE_APPLE_2026_10 = false`).
+- **Consulta de artículos** — rediseño apagado; se prende al final.
+- **Limpieza de las ~20 guardas de «columna que falta»** — en curso. La de `tiempo_no_laborado` ya salió (#713).
+- **Recuperar las marcas del reloj de Boston del 5-oct** — en curso.
+- **La columna `motivo` de las correcciones sigue obligatoria en la base** y se guarda «—». Quitar la obligación pide una migración y el «sí» de Daniel.
+
+**Tarea de Daniel:**
+
+- Revisar qué facturas de Tommy van al 50 %.
+- El PDF cambiado de la 8123/8124.
+- El mes «abril 2024» del pago de Ana Trejos.
+- Los comprobantes de septiembre y octubre de las impulsadoras.
+- Salario, fecha de ingreso y cédula de Siney.
+- Prender «Compensación de tardanza» a quien apruebe (hoy nadie la tiene).
+- La marca doble de Ángel (305) del 7-oct.
+- Hablar con quienes no marcan el almuerzo y con Jorman, que marca 7-8 veces.

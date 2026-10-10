@@ -26,7 +26,7 @@ Préstamos y Recordatorios— están en sus propios archivos. ⚠️ `CLAUDE.md 
 
 | Módulo | `key` | `href` | `roles[]` del catálogo |
 |---|---|---|---|
-| Guías de Despacho | `guias` | `/guias` | admin · secretaria · bodega · vendedor |
+| **Despachos** (era «Guías de Despacho» hasta el 7-oct-2026) | `guias` | `/despachos` (era `/guias`, que redirige) | admin · secretaria · bodega · vendedor |
 | Packing Lists | `packing-lists` | `/packing-lists` | admin · secretaria · bodega |
 | Reclamos | `reclamos` | `/reclamos` | admin · secretaria |
 | Marketing | `marketing` | `/marketing` | admin · secretaria |
@@ -35,6 +35,42 @@ Préstamos y Recordatorios— están en sus propios archivos. ⚠️ `CLAUDE.md 
 ---
 
 # Guías de Despacho (`/guias`, key `guias`)
+
+> 🔴 **Al día el 9-oct-2026.** Desde el 7-oct-2026 este módulo se llama **Despachos** y vive en `/despachos`
+> (`src/app/despachos/`); la `key` sigue siendo `guias` y las rutas `/api/guias/**`. «Guías de despacho» es
+> ahora UNA de sus pestañas. Donde esta ficha dice `/guias…` o `src/app/guias/…`, hoy es `/despachos…` y
+> `src/app/despachos/…` (los enlaces viejos redirigen con 307). Las cifras siguen siendo las del 5-sep-2026:
+> no se volvieron a medir. El título se deja como estaba para no romper enlaces.
+
+## Estado al 9-oct-2026 — Despachos
+
+Comprobado contra el código publicado. El detalle, las citas y la tabla de interruptores viven en
+`docs/postmortems/guias.md` › «Despachos — estado al 9-oct-2026».
+
+- **Pestañas**: Pedidos · Guías de despacho · Etiquetas · Configuración. **Abre en Pedidos** para todos los
+  que la ven (admin · secretaria · bodega · vendedor). `?vista=guias|etiquetas|config` y `?pendientes=1`
+  abren donde dicen.
+- **Pedidos — cuatro estados**: Pendiente → En preparación → Preparado → Recibido. Llegan de Switch; aquí no
+  se crea ninguno. Un paso a la vez.
+- **Quién marca**: «En preparación» y «Preparado», **bodega** (y admin), nunca la secretaria; «Recibido», la
+  **secretaria** (y admin). El vendedor solo mira. Lo decide el servidor (`puedeMoverFlujoSimple`,
+  `src/lib/guias/pedidos-flujo-simple.ts`).
+- **Bultos**: un solo número por pedido (1 a 9999), escrito en la fila al marcar «Preparado».
+- **Unidades** del pedido en la fila, en todas las pestañas («84 unidades», «5 bultos · 620 unidades»).
+- **Deshacer** un paso en la fila, con confirmación: bodega deshace «En preparación» y «Preparado»; la
+  secretaria, «Recibido»; admin, todos. Queda en `activity_logs` (`deshacer_paso`).
+- **«En espera de muestra»**: marca de bodega sobre un pedido En preparación, con nota opcional; en la fila
+  sale en ámbar con quién y cuándo. Marcar «Preparado» la quita.
+- **Las pestañas de Pedidos refrescan** la lista desde la base al tocarlas; nunca llaman a Switch.
+- **Quién ve qué empresa**: Jorman, solo Vistana; Julio, Rodrigo y todos los demás, las 6
+  (`EMPRESAS_POR_PERSONA`, `src/lib/guias/pedidos-bultos.ts`).
+- **Precios**: a bodega no le viajan precio ni total (los recorta el servidor); la columna «Total» no está en
+  el detalle del pedido en pantalla para nadie. El papel del pedido sí los lleva.
+- **Guías de despacho**: grupos Hoy · Ayer · Esta semana · Semana pasada · Historial; distintivo «Pendiente»
+  solo en la guía sin despachar.
+- **Switch**: entrar al módulo no lo llama. Facturas del día por cron cada hora de 7 a. m. a 6 p. m. de Panamá
+  (13 entradas en `vercel.json`); pedidos, cuatro pasadas al día; o «Actualizar» (freno de 10 min).
+- **En curso, sin publicar**: el rediseño del detalle de la guía (`GUIA_DETALLE_APPLE_2026_10` = `false`).
 
 ## Qué es
 
@@ -99,6 +135,11 @@ pantalla (`src/app/guias/page.tsx`). No hay UI para encenderlo — lo usan los s
 
 ### 1 · `/guias` — la lista (pestaña «Guías»)
 
+> ⚠️ **9-oct-2026**: hoy es `/despachos?vista=guias`, pestaña «Guías de despacho», y ya no es la primera
+> (el módulo abre en Pedidos). La lista de abajo es la del 5-sep-2026: desde el 5-oct-2026 un toque abre la
+> guía —sin acordeón ni botón «Despachar»—, y desde el 7-oct-2026 se agrupa en Hoy · Ayer · Esta semana ·
+> Semana pasada · Historial, con «Pendientes de despacho» arriba.
+
 **Qué se ve.** Buscador (*«Buscar por transportista, cliente, factura o N° de guía…»*), interruptor
 «pendientes», y una fila por guía en orden de `numero` descendente. Cada fila colapsada dice
 N° (`GT-XXX`), fecha, transportista y un resumen del cliente. Al tocarla se despliega el acordeón con
@@ -119,8 +160,9 @@ los botones y cuenta lo que sale por `fetch`: abrir la lista es 100% lectura, pa
 **Entrar a Despachos NO llama a Switch** (7-oct-2026, aprobado por Daniel). Del 4-sep al 7-oct, abrir
 `/guias` y `/guias/nueva` disparaba `POST /api/guias/facturas-hoy`, que entra a Switch como `daniel`; Switch
 da un token por usuario y cada login lo sacaba de su panel. Hoy la pantalla muestra lo último sincronizado
-(`LineaDeFrescura`) y las facturas de hoy llegan por los crons de `switch-sync tipo=facturas` (6:50 · 10:00 ·
-14:00 · 18:00 Panamá) o con «Actualizar», que conserva el freno de 10 min por empresa del servidor. Candado:
+(`LineaDeFrescura`) y las facturas de hoy llegan por los crons de `switch-sync tipo=facturas` (desde el
+8-oct-2026, cada hora de 7 a. m. a 6 p. m. de Panamá: 13 pasadas, de 6:50 a 18:00; antes eran 6:50 · 10:00 ·
+14:00 · 18:00) o con «Actualizar», que conserva el freno de 10 min por empresa del servidor. Candado:
 `src/__tests__/components/despachos-sin-switch-al-entrar.test.tsx`.
 
 ### 2 · `/guias/nueva` — crear una guía
@@ -413,7 +455,7 @@ ayuda.
 | `GET /api/guias/facturas-cliente?codigo=D-XXX` | Las facturas del cliente en las 6 empresas del grupo, de **nuestra base** (`switch_facturas`), sin límite de días, tope 200. Trae `yaSalioEn` | Devuelve 500; el panel muestra vacío y se puede escribir a mano |
 | `POST /api/guias/facturas-hoy` | Pide a **Switch en vivo** las facturas de HOY de las 6 empresas, **en serie**, ventana de UN día | **Fail-open**: una empresa caída no frena a las demás ni a la pantalla. Cooldown de 10 min (`SYNC_NOW_COOLDOWN_MIN`), lock de `switch_sync_log`, y `logoutAllSwitchSessions()` en el `finally` |
 | `GET /api/guias/despachos-frecuentes?transportista=<uuid>` | Los juegos (receptor+cédula+placa) más usados de ese transportista, de las últimas 1.000 guías Completadas/Rechazadas | Devuelve `{juegos: []}` — nunca error |
-| El sync programado de facturas | Alimenta `switch_facturas`, que es de donde sale el panel. 11:50/15/19/23 UTC para las 8 empresas | El panel muestra facturas viejas y la etiqueta *«hasta las HH:MM»* lo dice |
+| El sync programado de facturas | Alimenta `switch_facturas`, que es de donde sale el panel. Desde el 8-oct-2026, 13 pasadas al día para las 8 empresas, de 11:50 a 23:00 UTC (6:50 a 18:00 de Panamá); antes eran 11:50/15/19/23 UTC | El panel muestra facturas viejas y la etiqueta *«hasta las HH:MM»* lo dice |
 
 ⚠️ **La sesión de Switch es por USUARIO**, y el sistema entra como `daniel`: el refresco de
 `facturas-hoy` puede chocar con un cron de la misma empresa. Es el mismo trade-off que «Actualizar
@@ -467,7 +509,8 @@ Cada regla con el archivo que la sostiene. Las que tocan plata o el papel firmad
 8. 🔴 **La lista NO despacha** — ni por swipe ni desplegando un formulario. Sus botones solo navegan.
    Candados: `guias-despacho-una-sola-puerta.test.ts` ·
    `components/guias-eliminar-en-la-fila.test.tsx` (17). Desde el 4-sep el candado admite **una sola**
-   salida que no es lectura: `/api/guias/facturas-hoy`.
+   salida que no es lectura: `/api/guias/facturas-hoy`. ⚠️ Desde el 7-oct-2026 ya no admite ninguna: abrir
+   la lista vuelve a ser 100% lectura.
 9. 🔴 **Las sugerencias de cliente NUNCA atan solas**, ni con un único candidato. El pareo es
    **exacto y normalizado, nunca por parecido**: `Outlet Duty Free N2` y `N3` son tiendas distintas.
    Candados: `clientes-sugerencias.test.ts` · `components/guias-sugerencias-cliente.test.tsx`.
@@ -542,7 +585,7 @@ semanas»*.
 - Los **botones de destino** y el **autollenado** de la dirección.
 - La ruta `/api/guias/frecuencias` **deja de mandar** `destinos` y `definidos`.
 - La **pestaña Configuración** (`hayConfig` la exige) — ni la pestaña ni la vista existen.
-- El **disparo automático** de `facturas-hoy` al abrir `/guias` y al entrar a `/guias/nueva`.
+- El **disparo automático** de `facturas-hoy` al abrir `/guias` y al entrar a `/guias/nueva`. ⚠️ Retirado el 7-oct-2026: ya no existe con el interruptor en ninguna posición; solo «Actualizar» lo dispara.
 
 **Qué NO cambia, con el interruptor en cualquier posición:** el payload que sale al guardar, las
 filas de `guia_items`, la guía impresa y el Excel. Hay candado que arma la misma guía por los dos
@@ -740,8 +783,8 @@ vez que sale mercancía.
 Escrito para alguien que no programa. **Usa una guía de prueba, no una real.**
 
 **A · Crear una guía con el panel de facturas**
-1. Entra a **Guías**. Espera unos segundos: al abrir la lista el sistema le pide a Switch las
-   facturas de hoy (no se ve nada, es callado).
+1. Entra a **Despachos** y toca la pestaña **Guías de despacho**. (Desde el 7-oct-2026 entrar ya no le
+   pide nada a Switch: si falta una factura de hoy, toca «Actualizar».)
 2. Toca **«+ Nueva guía»**.
 3. Pon la fecha de hoy, elige **Transportista** y uno de la lista, y escribe quién despacha.
 4. En el panel **«Facturas del cliente»**, elige un cliente que compre seguido (por ejemplo
@@ -792,7 +835,7 @@ Guías toca Switch en **un solo punto**, y por **API con token** (nunca por el p
 | Qué | Endpoint / reporte | Vía | Usuario | Cron que lo trae |
 |---|---|---|---|---|
 | Las facturas del cliente | **`GET /apifactura/lista`** (`client.ts`, `listFacturas`), con `desde/hasta/porPagina/paginaActual` | **API con token** (`SWITCH_<EMPRESA>_API_*`) | `SWITCH_<EMPRESA>_API_USER` — es **`daniel`** en 7 de 8 empresas | `switch-sync tipo=facturas`, las 8 empresas a **11:50 · 15:00 · 19:00 · 23:00 UTC** (06:50 · 10:00 · 14:00 · 18:00 Panamá), ventana de 7 días atrás. Cae en `switch_facturas` |
-| Las facturas de **HOY**, en vivo | El mismo `GET /apifactura/lista`, con ventana de **UN día** | **API con token** | el mismo | **Ninguno** — lo dispara `POST /api/guias/facturas-hoy` al abrir `/guias` |
+| Las facturas de **HOY**, en vivo | El mismo `GET /apifactura/lista`, con ventana de **UN día** | **API con token** | el mismo | **Ninguno** — lo dispara `POST /api/guias/facturas-hoy`, desde el 7-oct-2026 solo con «Actualizar» (antes, al abrir `/guias`) |
 
 **Lo que Guías descarta de la respuesta:** el sync guarda 20 campos y **tira `urlswitchpay`** (queda
 solo dentro de `raw_data`); Guías, a su vez, solo lee **4** de los que sí se guardaron

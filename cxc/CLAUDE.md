@@ -67,7 +67,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):
 - **Ventas y clientes:** Vista general, Ventas, CXC (`/cxc` — era `/admin`; el rótulo es «Cuentas por cobrar» y `/admin` redirige), Multifashion, **Confecciones Boston** (`/boston`, key `boston`), Clientes/Directorio (`/clientes`), Proveedores, **Consulta de artículos** (`/referencia`, key `referencia`; era «Referencia»), Catálogos (**CUATRO** marcas ENCENDIDAS: Reebok, Joybees, Tommy Hilfiger y **Calvin Klein**, cada una con su tarjeta en el hub /catalogos/marcas, su catálogo público compartible y su pedido público `/pedido-<marca>/[id]` accesibles sin sesión)
-- **Operación:** Guías de despacho, **Asistencia y planilla** (`/asistencia`, key `asistencia`), Reclamos, **Plantilla Switch** (`/productos/cargar`, key `cargar` — era *Depurador*; la key y la dirección NO cambiaron), Comisiones, Marketing, Caja menuda, **Gastos** (`/gastos-contabilidad`, key `gastos-contabilidad`; 2 pestañas: *Gastos* —Egresos Varios, fuente ÚNICA— y *Saldos de banco*), Préstamos, **Recordatorios** (`/recordatorios`, era `/cheques`; la `key` sigue siendo `cheques`)
+- **Operación:** **Despachos** (`/despachos`, key `guias`; era «Guías de despacho»; adentro Pedidos · Guías de despacho · Etiquetas · Configuración; `/guias…` redirige 307), **Asistencia y planilla** (`/asistencia`, key `asistencia`), Reclamos, **Plantilla Switch** (`/productos/cargar`, key `cargar` — era *Depurador*; la key y la dirección NO cambiaron), Comisiones, Marketing, Caja menuda, **Gastos** (`/gastos-contabilidad`, key `gastos-contabilidad`; 2 pestañas: *Gastos* —Egresos Varios, fuente ÚNICA— y *Saldos de banco*), Préstamos, **Recordatorios** (`/recordatorios`, era `/cheques`; la `key` sigue siendo `cheques`)
 - **Administración:** Usuarios. 🩸 **Data Health se fue de la pantalla el 11-sep-2026** (Daniel no lo usa) y **la medición se quedó ENTERA** — ver `docs/donde-vive-cada-dato.md` › `data_integrity_checks` y la skill `data-integrity`.
 
 > **Nacidos después del 5-jul-2026**: los cuatro módulos navegables `asistencia` · `gastos-contabilidad` · `referencia` · `boston`, más dos PÁGINAS públicas que **no son módulos** y por eso no tienen ficha ni entrada en `role_permissions`: `/pedido-tommy/[id]` y `/pedido-calvin/[id]`.
@@ -75,7 +75,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 
 ## Pendientes vivos
 
-🔴 **Lo que Daniel pidió y sigue sin hacerse vive en [docs/pendientes-vivos.md](docs/pendientes-vivos.md)** (24 puntos, **reauditados uno por uno el 18-sep-2026**: nueve estaban resueltos y el archivo no se había enterado). Ábrelo al empezar una sesión, junto con `docs/estado-actual.md`. Daniel: *«no te olvides de las cosas porque yo me olvido y se pasan cosas»*. 🔴 **Lo que mueve plata y sigue abierto**: Multifashion sin ninguna quincena cerrada (y Fashion Wear 1–15 sep reabierta) · el cuadre del estado de cuenta que llega vacío. 🔑 **Antes de construir lo que ahí falte, compruébalo contra el código y la base.**
+🔴 **Lo que Daniel pidió y sigue sin hacerse vive en [docs/pendientes-vivos.md](docs/pendientes-vivos.md)** (24 puntos, **reauditados uno por uno el 18-sep-2026**: nueve estaban resueltos y el archivo no se había enterado). Ábrelo al empezar una sesión, junto con `docs/estado-actual.md` (🔴 lo del **7 al 9-oct-2026** —cerrado, decisiones y pendientes— está ahí, en su bloque). Daniel: *«no te olvides de las cosas porque yo me olvido y se pasan cosas»*. 🔴 **Lo que mueve plata y sigue abierto**: Multifashion sin ninguna quincena cerrada (y Fashion Wear 1–15 sep reabierta) · el cuadre del estado de cuenta que llega vacío. 🔑 **Antes de construir lo que ahí falte, compruébalo contra el código y la base.**
 
 ## Invariantes por módulo
 
@@ -96,6 +96,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - `/api/clientes/[codigo]` pregunta `esCodigoDelGrupo()` y contesta **404**, nunca 403.
 - 🔴 **Su DIRECTORIO se refresca SEMANAL sin tocar al grupo**: `sync-clientes-boston` (domingos 07:10 UTC) escribe **SOLO `switch_clientes` de Boston**. Para marcar ausente: lista completa y sin encoger bajo el **70%**; vacía = error. Alerta B, **165 h**.
 - 🔴 **La secretaria cobra y ve el módulo** (`ROLES_CXC`). ⚠️ **Boston sigue afuera**: otra lista.
+- 🔴 **UN solo botón «Estado de cuenta» (7-oct-2026, `ESTADO_CUENTA_UN_BOTON_2026_10`, prendido)**: abre el documento del GRUPO si el cliente debe en más de una empresa; el PDF se llama por el cliente y en la computadora siempre se descarga; toda fecha del papel y del correo sale de `hoyPanama()`. 📄 Postmortem › 7-oct-2026.
 
 **La planilla de David = la de Yulissa** (hoy abre `PlanillaTab` en Asistencia; `PlanillaBoston` queda para el interruptor apagado): columnas de dinero de UN lugar (`columnas-dinero-planilla.ts`, 19) · mismo corte que la contadora (`corteParaBoston`; `planilla-guardada` le fuerza Boston, `?id=` ajeno → 404) · Préstamos suma las tres cuentas (`calcularSaldoPrestamo`).
 
@@ -116,7 +117,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - ⚠️ **La empresa acreedora sale de una lista ESCRITA A MANO** (`empresa-fiscal.ts`), no del `numero_fiscal`; **las OCHO cargadas**, y la que falte sale con su nombre corto, **nunca con datos de otra**.
 - 🔴 **AHÍ MISMO VIVE DÓNDE SE PAGA, CADA UNA EN SU CUENTA (20-sep-2026)**: las 8 salen por `lineasDePago`, en el PDF al pie de CADA hoja y en el correo con TODAS las del papel. **Falla ABIERTA**.
 - 🔴 **Boston FIRMA COMO BOSTON.** La casa se pregunta por `empresa_key` (`casa-del-papel.ts`): su papel sale **sin el logo del grupo y sin `fashiongr.com` en el pie**. ⚠️ Su correo sale por Resend desde `fashiongr.com`: **un dominio propio sigue pendiente**.
-### Guías — [docs/postmortems/guias.md](docs/postmortems/guias.md)
+### Despachos (era Guías) — [docs/postmortems/guias.md](docs/postmortems/guias.md)
 
 > 📄 Mediciones, citas de Daniel, candados, mutaciones y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar una pantalla suya.
 
@@ -139,7 +140,8 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **Guardar no reescribe la guía entera**: sin cambios no llama al servidor (`hayCambios`); los renglones viajan solo si cambiaron (`renglonesCambiaron`). ⚠️ Bodega sigue cambiando el cliente de un renglón y agregando renglones.
 - 🔴 **Compartir**: **SIEMPRE el PDF** (9-sep-2026), por la hoja de compartir del teléfono y en la computadora se descarga (`compartir-archivo.ts`, una sola puerta); el aparato se reconoce **por el dedo** (`aparato.ts`). El archivo se arma **sin un solo `await`**. `formatoParaCompartir` y `png-guia.ts` quedan retirados con su medición; imprimir no cambia.
 
-- 📄 **Panel y defectos (11-sep), lista de destinos y varios clientes (7/10-sep), la lista y «Definir» (19-sep), el papel (25-sep), Etiquetas (18-sep), Pedidos con bultos (6-oct) y Nueva guía en una tabla (1-oct-2026)**: verbatim en el postmortem › «Lo que decía CLAUDE.md hasta el 8-oct-2026».
+- 📄 **Panel y defectos (11-sep), lista de destinos y varios clientes (7/10-sep), la lista y «Definir» (19-sep), el papel (25-sep), Etiquetas (18-sep), Pedidos con bultos (6-oct; el flujo cambió el 7-oct, ver abajo) y Nueva guía en una tabla (1-oct-2026)**: verbatim en el postmortem › «Lo que decía CLAUDE.md hasta el 8-oct-2026».
+- 🔴 **Despachos › Pedidos (7 al 9-oct-2026)**: Pendiente → En preparación → Preparado → Recibido, un paso a la vez, con «Volver a …» en la fila; En preparación y Preparado los marca **bodega, nunca secretaria**; Recibido, la secretaria (lo decide el SERVIDOR); **UN número de bultos por pedido**; «En espera de muestra» es una marca con firma sobre En preparación; Jorman ve solo Vistana, el resto las 6; **bodega sin precios y nadie ve «Total» en pantalla**; el módulo abre en Pedidos. 🔴 **Guías de despacho** agrupa Hoy · Ayer · Esta semana · Semana pasada · Historial, con distintivo «Pendiente». 📄 Postmortem › «Despachos — estado al 9-oct-2026».
 ### Catálogos, pedidos y cotización — [docs/postmortems/catalogos-pedidos.md](docs/postmortems/catalogos-pedidos.md)
 
 > 📄 Mediciones, citas de Daniel, candados, mutaciones y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar una pantalla suya.
@@ -202,6 +204,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 Domingo y feriado trabajados **se aprueban** (`diasConExtra`, valuados con `recargoDomingoFeriado`); no aprobado no se paga, pero se ve. Al aprobar **manda el servidor**.
 - 🔴 «Aplica horas extra» (`cobra_horas_extra NOT NULL DEFAULT true`; **solo un `false` explícito apaga**): con `false` no entra a Aprobaciones ni frena el cierre, pero **sigue en planilla** con tardanzas, ausencias y salida temprana.
 - 🔴 **«Compensación de tardanza» (9-oct-2026, `repone_tardanza NOT NULL DEFAULT false`, `repone-tardanza.ts`)**: prendida en la ficha, el tiempo después de la salida borra tardanza del MISMO día minuto por minuto y no es extra; lo que sobra pasa por la puerta de 10 y Aprobaciones; la tolerancia decide al ENTRAR (9:15 → 18:05 descuenta 10). Apagada = lo de hoy (candado con septiembre real).
+- 🔴 **Quien marca se crea y se da de baja en USUARIOS (9-oct-2026)**: «Marca asistencia» en Nuevo y Editar usuario crea usuario + ficha + horario + vínculo juntos (nada queda a medias); «Desactivar» ofrece «Baja del colaborador»; una ficha de baja no marca. 🔴 **El día que no tiene exactamente 4 marcas sigue «a revisar», también el de 2** (decisión de Daniel: no se afloja). 📄 Postmortem › «Estado del módulo al 9-oct-2026».
 - 🔴 El descuento de préstamo **entra solo a la planilla; ya no se aprueba** (`prestamos-planilla.ts`): préstamo y terceros, cada cuota capeada a SU saldo; **lo escrito a mano manda, vacío = la cuota del módulo**; va a `dinero`, nunca a `manuales`. «Ya descontado» mira el ORIGEN del pago. `asistencia_prestamo_aprobado` **no se dropea**.
 - 🔴 Las casillas de préstamo y terceros tienen **tres estados**: `NULL` = cuota automática · `0` = esta quincena **no se descuenta** y el cierre **no anota pago** · monto = ese monto (`casilla-sin-descontar.ts`, misma función para pantalla y guardado). ⚠️ `mercancia`, `isr` y `otros_servicios` siguen `NOT NULL DEFAULT 0`.
 - 🔴 Las horas de una justificación **solo van con «Constancia»** (y «Permiso personal», que las exige) (`permiso-horas.ts`): la ruta rechaza con **400** un motivo de día completo que llegue con horas; el motor honra las horas guardadas sin mirar el motivo, **salvo «Permiso personal», que nunca perdona**.
@@ -209,7 +212,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 La salida temprana entra al ajuste del corte (`CONCEPTOS_DEL_RELOJ` son **nueve** con «Tiempo no laborado») y **los seguros se calculan sobre el bruto CON el ajuste** (`aplicarAjusteEnLinea`, respeta `paga_seguros`).
 - 🔴 El corte y el ajuste de los días sin medir entran **cada concepto en su columna — nunca una línea neta**, cada monto con SU rata (`corte-quincena.ts`). **El neto por persona no cambia.** 🔴 Y **los seguros SÍ se recalculan sobre el bruto CON el ajuste** desde el 11-sep-2026. ⚠️ No se tocan con `paga_seguros` apagado ni con base propia (`seguros_base_quincena`).
 - 🔴 **Lo que sale de la pantalla nunca se recorta** (Excel, PDF, cierre, lotes), salvo un botón que DIGA a cuántos afecta. ⚠️ Asistencia, Clientes y ⌘K buscan contra el SERVIDOR.
-- 🔴 **JUSTIFICAR SIGNIFICA QUE SE PAGA. No existe «justificado pero no se paga».** «Permiso personal» (9-oct-2026) no es eso: no justifica nada, solo registra que la salida se autorizó. La lista de motivos es **cerrada** (`motivos.ts`): Incapacidad · Catástrofe · Escolares · Trabajo de vendedor · Constancia.
+- 🔴 **JUSTIFICAR SIGNIFICA QUE SE PAGA. No existe «justificado pero no se paga».** «Permiso personal» (9-oct-2026) no es eso: no justifica nada, solo registra que la salida se autorizó. La lista de motivos es **cerrada**: `MOTIVOS_JUSTIFICACION` en `motivos.ts` (no la copies aquí).
 - 🔑 **Tres reglas de la planilla son de la CONTADORA (Yulissa), no de Daniel** — por eso no se renegocian con él: la información se configura en el perfil y de ahí se toma, nunca a mano; **terceros se maneja igual que un préstamo** (monto inicial + cuota quincenal); y **daño de mercancía permanece en blanco**, con la cantidad escrita quincena por quincena.
 - **«Descuento por compras» y «Daño de mercancía» son LA MISMA línea**, no dos conceptos.
 - ⚠️ **Un colaborador sin cédula ni salario no siempre es un dato olvidado** (puede no tener permiso de trabajo).
@@ -235,6 +238,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **LA CUOTA ES OBLIGATORIA al registrar Préstamo · Daño de mercancía · Descuento a terceros** (14-sep-2026); **un Pago no la pide**. 🩸 Sin cuota la deuda no se descontaba nunca sola. El botón apagado DICE qué falta («Falta: la cuota», visible). Regla en `lib/prestamos-registrar.ts`.
 - 🔴 **EL DESCUENTO NUNCA DEJA EL NETO EN NEGATIVO** (14-sep-2026; red de seguridad). `recortarAlNeto` (`neto-no-negativo.ts`) corre **al FINAL de la ruta**, achica **solo lo AUTOMÁTICO** (lo escrito a mano manda), en el orden **daño → terceros → préstamo**. **El saldo no baja por lo que no se cobró**: el cierre anota solo lo que entró. Se DICE en la celda y en «Antes de cerrar». **El ISR sigue a mano.**
 - 🔴 **Los movimientos de UNA quincena, en una pantalla y no en 31 fichas** (17-sep): vista «Movimientos» adentro de la pestaña, solo LECTURA, con «Origen» (Cierre de planilla o Manual).
+- **Préstamos estilo Apple** (`PRESTAMOS_APPLE_2026_10`, prendido el 9-oct-2026): cambia la pantalla («Saldo total», «Próximo descuento»), ninguna regla de plata.
 ### Navegación, 404 y papel — lo que se arregló el 17-sep-2026
 
 > 📄 Las once reglas (la casa del rol, el 404 propio, el PDF de Comisiones, el CSV retirado, `/catalogo`, los rubros de Reebok, «Alta automática», Movimientos, el Historial del depurador, el primer pintado, el rebote del Inicio): verbatim en [docs/postmortems/navegacion.md](docs/postmortems/navegacion.md) › «Lo que decía CLAUDE.md hasta el 8-oct-2026».
@@ -258,6 +262,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 > 📄 Mediciones, citas de Daniel, candados y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
 
 - `gastos-contabilidad`: Egresos Varios (fuente ÚNICA) y Saldos de banco. 🔴 Las 8 empresas se ven, pero sus gastos NUNCA se suman entre sí: ni total de grupo, ni pie de tabla, ni export; hay candado.
+- 🔴 **El registro de gastos está PAUSADO, no roto** (7-oct-2026, Daniel: «Apaga gasto»): sin cron `sync-egresos-varios` y sin sus alertas; cómo se reanuda, en [docs/gastos-pausado.md](docs/gastos-pausado.md).
 - El mayor contable se retiró; `mayor_lineas` y `mayor_importaciones` no se borran; build rojo si una migración las dropea.
 - `bancos_saldos` va con upsert `(empresa_key, fecha_dato)`: repetir la fecha corrige ESE día y nunca pisa otro. Cero `DELETE`.
 - 🩸 Un renglón ilegible de Switch NO desaparece: queda en `switch_sync_log.skip_details`, se dice en pantalla y avisa por 🔧 SISTEMA, anti-loop de 7 días por N. INTERNO, nunca por línea.
@@ -276,6 +281,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 - 🔴 NO SE PUEDE REGALAR UN MÓDULO QUE LA PANTALLA REBOTA: los ofrecibles de «permisos personalizados» se derivan (`src/lib/modulos-ofrecibles.ts`) —a un rol solo se le ofrece lo que `ALL_MODULES` le da— y el servidor lo rechaza igual (`/api/admin/users`).
 - ⚠️ El override REEMPLAZA la lista del rol en vez de sumarla, y la pantalla no lo dice. Decisión pendiente de Daniel.
+- **Inicio y Usuarios estilo Apple, prendidos el 9-oct-2026** (`INICIO_APPLE_2026_10`: celular en lista y buscador alineado, fichas de la computadora como estaban; `USUARIOS_APPLE_2026_10`: lista por rol, tocar el renglón edita). Recordatorios: el rediseño se DESCARTÓ y se retiró. Consulta de artículos: `REFERENCIA_APPLE_2026_10` apagado. 📄 El registro de overrides por usuario (Julio, Jorman) está en el postmortem.
 - 🔴 El teclado y el Inicio dejaron de prometer lo que no existe: se retiraron `useKeyboardShortcuts`, `useBadges`, `useSmartSuggestions`, `SuggestionCard` y `/api/home-stats`, sin lectores; queda `useSessionCheck`, desenchufado a propósito.
 ### Crons, alertas e infraestructura — [docs/postmortems/crons-alertas.md](docs/postmortems/crons-alertas.md)
 
@@ -290,8 +296,8 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 B mira cuándo se ESCRIBIÓ, nunca la fecha del dato; la tabla del DATO, no la del mecanismo (`egresos_varios`, no `egresos_importaciones`). Umbral **40 h**.
 - **Cuadre mensual de costo** (`cuadre-costo.ts`, misma pasada): por (empresa, mes cerrado), el Resumen contra `switch_costo_diario`; solo días comparables (ni el último del mes, ni sin fila, ni leídos antes de cerrar), **>2 % Y >$100**, **≥10 días**, anti-loop **7 días** por (empresa, mes), un mensaje por pasada. 🔴 Telegram, no Data Health.
 - 📊 NEGOCIO no tiene perilla de silenciar ni regla anti-ruido. Todo por `enviarNegocio`/`enviarNegocioPrivado`/`enviarSistema`; nadie llama `sendTelegramAlert` directo.
-- 🔴 El resumen diario de ACS va al chat PRIVADO, sin prefijo de sistema (`enviarNegocioPrivado`), desde DOS lugares que no se separan: el cron de la 01:00 y la recuperación de `switch-reconciliacion`.
-- 🔴 **Nada que no se pueda volver a conseguir se queda sin copia**: la base entera clasificada en `src/lib/backup/tablas.ts` (personas · congelada · switch · bitacora · retirada · vista), build ROJO si una tabla nueva queda sin clasificar o si se saca del respaldo algo que no vuelve. 🩸 Una PK que no sea `id` va en el `ORDER_BY` (`PK_QUE_NO_ES_ID`) o el respaldo sale incompleto. `switch_factura_lineas`, afuera a propósito.
+- 🔴 El resumen diario de ACS va al chat PRIVADO, sin prefijo de sistema (`enviarNegocioPrivado`), desde DOS lugares que no se separan: el cron de las 00:30 UTC (era 01:00 hasta el 6-oct-2026) y la recuperación de `switch-reconciliacion`.
+- 🔴 **Nada que no se pueda volver a conseguir se queda sin copia**: la base entera clasificada en `src/lib/backup/tablas.ts` (personas · congelada · switch · bitacora · retirada · vista), build ROJO si una tabla nueva queda sin clasificar o si se saca del respaldo algo que no vuelve. 🔴 Cada tabla se ordena por su llave REAL (`columnasDeOrden()`, lista única; ya no depende de una columna `id`) y un error de estructura avisa en el acto (8-oct-2026). `switch_factura_lineas`, afuera a propósito.
 - 🩸 `db-max-rows` = **1000** y corta EN SILENCIO: lo que pueda pasarlo usa `leerTodoPaginado` con `.order()` estable y `count: "exact"`; la columna única, de desempate.
 - Filtrar por año va por RANGO (`fecha >= … AND fecha < …`), nunca `EXTRACT(YEAR …)`: no es sargable.
 - **Guard de montos imposibles** en las 8 tablas de plata: `max(piso de la familia, 20 × récord de esa empresa)`. Se rechaza la fila, nunca se escribe un 0, y se dice en pantalla.
@@ -301,6 +307,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 El dedup de A y B se marca DESPUÉS de que Telegram confirme; igual la regla 2 y los crons. ⚠️ La regla 1 (`datos-frescos.ts`) marca antes, ventana de 20 h: **pendiente de unificar**.
 - ⚠️ `switch_recibos` y `switch_ingresos_mercancia` NO entran a la alerta B: recibos escribe solo lo que cambió y pasa las 40 h estando sano; ingresos reescribe **45 días** y la compra puede no ocurrir. No se agregan sin volver a medir.
 - ⚠️ El resumen «Switch estuvo caído… sin impacto» NO va a Telegram, con candado.
+- 🔴 **Infraestructura (7 y 8-oct-2026)**: las funciones corren en **Oregón** (`"regions": ["pdx1"]`, junto a la base) · **toda llamada a Switch sale con `cache: "no-store"`** (candado `switch-fetch-sin-cache`) · el chequeo de tipos corre en **«pruebas»**, no en el build de Vercel · las facturas del día se traen **cada hora** de 6:50 a 18:00 de Panamá (13 entradas). 📄 Postmortem › «Estado al 9-oct-2026».
 
 - 📄 **El lector de facturas avisa por Telegram (11-sep-2026)**: tres causas y nada más, un solo punto de llamada a Anthropic (`src/lib/ia/anthropic.ts`); verbatim en el postmortem › «Lo que decía CLAUDE.md hasta el 8-oct-2026».
 
@@ -353,7 +360,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 Una página del cliente (`/clientes/[codigo]`) y tres listas distintas: CXC y Ventas › Clientes no se tocan.
 - 🔴 Ficha: cuatro tarjetas, «Detalle por empresa» y «Últimos pagos» por FECHA; sin «Cobrado» ni paginación, con el ITBMS; se edita tocando el dato.
 - 🔴 Nunca `$0.00` en grande: «Sin compras en \<año\>», «Sin saldo», «Sin pagos» (`lib/clientes/ficha.ts`); el cero neto es correcto —las NC restan— y `estadoDeCompras` lo separa de «acreditado».
-- 🔴 «Enviar estado de cuenta» y «Estado de cuenta (N)» abren la MISMA `HojaCobrar` y `EstadoCuentaDrawer` del CXC (`CobrarEnFicha.tsx`): deshacer 5 s, 6 empresas en el servidor, 403 a bodega.
+- 🔴 «Enviar estado de cuenta» y «Estado de cuenta (N)» (en CxC, desde el 7-oct-2026, un solo botón «Estado de cuenta») abren la MISMA `HojaCobrar` y `EstadoCuentaDrawer` del CXC (`CobrarEnFicha.tsx`): deshacer 5 s, 6 empresas en el servidor, 403 a bodega.
 - 🔴 «Últimos pagos» reusa `lib/cxc/pagos-por-fecha.ts`: sin retenciones ni recibos en cero.
 - 🔴 Lista: el directorio entero con scroll, sin páginas ni corte por «activos»; chips calculados («Con saldo» = saldo ≠ 0) y faltantes en rojo. 🩸 Sin provincia.
 - 🔴 El ausente (`ausente_desde`) no sale en la lista ni en la búsqueda global; ⚠️ su ficha SÍ abre por enlace directo, con «Ya no está en Switch».
@@ -374,16 +381,17 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - Metas configurables; la grupal mide TODA la venta de la tienda y los participantes solo definen a quién se le muestra el aporte; nunca se reparte un objetivo solo.
 - Telegram de ACS: UNA línea arriba/abajo del ritmo — `ritmo` = venta del año pasado al mismo corte × (objetivo ÷ venta del rango un año antes), % = vendido ÷ ritmo − 1; sin meta vigente no sale, falla abierto (`meta-ritmo.ts`).
 - **Productos › «Stock»** (5-oct-2026): ACS en `switch_articulo_info`, cron 04:00 UTC.
+- **Rediseño y gráfica de ventas diarias, prendidos el 9-oct-2026** (`MULTIFASHION_APPLE_2026_10` · `MULTIFASHION_GRAFICA_2026_10`, interruptores separados): Resumen sin «Ver meta», Clientes con «No vuelven» como número grande. 📄 Postmortem › «Estado al 9-oct-2026».
 - `claveVendedora` agrupa por igualdad exacta normalizada, nunca por parecido; la venta de hoy sale de `retail-dia.ts` con frescura; la «marca» de Switch es marca + departamento y lo desconocido cae en «Otros».
 
 - 📄 **La tarjeta de la meta y el Telegram (23-sep), el rediseño (6-sep), retail al frente (23-sep), el celular y la línea bajo la vendedora (24-sep-2026)**: verbatim en el postmortem › «Lo que decía CLAUDE.md hasta el 8-oct-2026».
 
-### Marketing › el rediseño — Tiendas y Marcas (23-sep-2026) — [docs/postmortems/marketing-rediseno.md](docs/postmortems/marketing-rediseno.md)
+### Marketing — Por cobrar · Gastos · Impulsadoras (8-oct-2026) — [docs/postmortems/marketing-rediseno.md](docs/postmortems/marketing-rediseno.md)
 
-> 📄 Las piezas A–D, los remates, el freno por tienda, el celular, las fotos y las citas de Daniel: el postmortem › §§ 1–15. Léelo antes de tocar una pantalla.
+> 📄 Las reglas vivas y los interruptores: el postmortem › «Estado al 9-oct-2026 — reglas vivas». Las §§ 1–16 son historia y nombran pantallas borradas el 8-oct-2026.
 
-- 🔴 **DOS PUERTAS: TIENDAS (dónde se gasta: se registra, edita y anula ahí) y MARCAS (a quién se le pasa: se cierra y se manda el ZIP).** Abre en **Tiendas** (nombre del DIRECTORIO por código, lo reportado como único monto), con pestañas Tiendas · Marcas · Impulsadoras · Mobiliario; la ficha es **UNA tabla por fecha** («···» edita y anula); la marca, su período abierto con **UNA línea por tienda** y **sin proyectos** (**Reportes se fue**). `MARKETING_TIENDAS_Y_MARCAS` (hoy `true`). Candado `marketing-tiendas-y-marcas`.
-- 🔴 **MULTIFASHION ES UNA TIENDA (D-108) Y NO APARECE EN NINGUNA MARCA — UNA regla** (`gastoEsDeMultifashion`) en portada, marca, reporte y ZIP; un gasto es factura · mueble · impulsadora con **UNA marca**, su tienda o «General», `se_reporta` prendido (apagado no suma ni va al ZIP); duplicado = proveedor normalizado + monto + fecha + **tienda**, salvo números distintos. Sus cuatro migraciones, **aplicadas** (📄 postmortem § 12).
+- 🔴 **SOLO LO COBRABLE, EN UNA PANTALLA** (`/marketing`: Por cobrar · Gastos · Impulsadoras; Mobiliario y Proveedores en «···»; la portada Tiendas · Marcas se borró). Factura al **50 % por defecto** (100 % y «No recuperable» a un toque); **impulsadora SIEMPRE al 100 % a su marca**; sin porcentaje escrito se cobra COMPLETO y solo el 0 escrito lo saca. **«No recuperable»** lleva solo Observaciones opcionales, sin «Motivo». **«Descargar ZIP» y «Cerrar» son dos acciones**, y «Excluir» deja un gasto fuera de ESE cierre. Excel de la marca: **Monto · empresa · marca**, un solo constructor. 🔴 **Lo mismo da UN número en todas las pantallas.** ⚠️ `MKT_SOLO_COBRABLE_2026_10` sigue `false` en código: la pantalla nueva lo prende por contexto, y lo que lee la constante directo (carpeta del ZIP sin tienda, rutas viejas) sigue como antes.
+- 🔴 **MULTIFASHION ES UNA TIENDA (D-108) Y NO APARECE EN NINGUNA MARCA — UNA regla** (`gastoEsDeMultifashion`) en portada, marca, reporte y ZIP; un gasto es factura · mueble · impulsadora con **UNA marca**, su tienda o «General», `se_reporta` prendido (apagado no suma ni va al ZIP); duplicado = proveedor normalizado (con alias) + monto + fecha + **tienda**, salvo números distintos (comparados sin ceros de relleno); el lector de facturas devuelve el proveedor que ya existe o «Proveedor nuevo». Sus cuatro migraciones, **aplicadas** (📄 postmortem § 12).
 - 🔴 **CONTABILIDAD ENTRA SOLO A MIRAR** (`lib/marketing/roles.ts`: `ROLES_MARKETING` lee, `ROLES_MARKETING_ESCRITURA` escribe; las rutas que escriben contestan 403).
 
 - 📄 **El período manda (23-sep), el celular, la foto de una tienda y escanear la factura (24-sep-2026)**: verbatim en el postmortem › «Lo que decía CLAUDE.md hasta el 8-oct-2026».
@@ -412,6 +420,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 📄 **Quién entra a cada módulo se anota (25-sep-2026, `REGISTRO_DE_VISITAS`)**: verbatim en [docs/postmortems/auth-sesiones.md](docs/postmortems/auth-sesiones.md) › «Lo que decía CLAUDE.md hasta el 8-oct-2026».
 - Rate limiting: login en Supabase (`login_attempts` + RPC `register_login_failure`/`clear_login_attempts`), por IP — 5 fallos en 15 min → lockout 15 min (`src/lib/login-rate-limit.ts`, fail-open). Reemplazó el Map en-memoria (inefectivo en serverless).
 - Login case-insensitive (autocapitalizar iPhone); input con autoCapitalize=none, autoCorrect=off. Nombre + rol visibles en header y drawer. «Forgot password» → "Contacta al administrador".
+- Retoques de texto del inicio de sesión: `LOGIN_RETOQUES_2026_10` (`false` en `main`; prenderlo está publicándose en la solicitud #721). 📄 [docs/postmortems/auth-sesiones.md](docs/postmortems/auth-sesiones.md).
 ## Base de datos
 
 > 📄 Los conteos medidos, las tablas retiradas y el detalle: [docs/donde-vive-cada-dato.md](docs/donde-vive-cada-dato.md) y [docs/postmortems/crons-alertas.md](docs/postmortems/crons-alertas.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
@@ -450,10 +459,10 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 ## Crons (vercel.json)
 
-🗓️ **La tabla completa (81 entradas, con horarios UTC y el porqué de cada hueco) vive en [docs/crons.md](docs/crons.md)** (movida desde aquí el 14-sep-2026). Las reglas que no cambian:
+🗓️ **La tabla completa (93 entradas, con horarios UTC y el porqué de cada hueco) vive en [docs/crons.md](docs/crons.md)** (movida desde aquí el 14-sep-2026). Las reglas que no cambian:
 - **Una entrada de cron = una ocurrencia al día.** Para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`). Biyección `vercel.json` ↔ registro de código, candado `cron-registro.test.ts`. Límite Vercel Pro: 100 cron jobs/proyecto.
 - Crons que tocan la **MISMA empresa** en Switch van **≥ 15 min** separados (`SEPARACION_MINIMA_MIN`): Switch admite un solo token válido por USUARIO. Los de login web, de madrugada de Panamá.
-- Dos crons no diarios: `catalogos-fotos-resumen` (lunes 13:30) y `grupo-resumen-mensual` (día 1, 13:00). Uno semanal que toca Switch: `sync-clientes-boston` (domingos 07:10).
+- Tres crons no diarios: `catalogos-fotos-resumen` (lunes 13:30), `reclamos-viejos` (lunes 14:00) y `grupo-resumen-mensual` (día 1, 13:00). Uno semanal que toca Switch: `sync-clientes-boston` (domingos 07:10).
 - Al agregar o quitar una entrada, actualiza `docs/crons.md` a mano: el candado protege el código, no la tabla.
 
 ## Alertas a Telegram — DOS canales, TRES formas de mandar
@@ -462,7 +471,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivado` / `enviarSistema`). **Nadie llama `sendTelegramAlert` directo** (barrido). Son dos CHATS con reglas **opuestas** y tres tratos:
 - **📊 NEGOCIO** — pedidos, guías, cheques por vencer, fotos faltantes. **NINGUNA regla anti-ruido aplica**; `enviarNegocio` no tiene perilla de silenciar, y que no exista es la garantía. Es un **GRUPO de tres** con el celular de la empresa, no el chat de Daniel. Los textos no se tocan.
-- **🔒 NEGOCIO PRIVADO** (`enviarNegocioPrivado`) — el resumen diario de ventas de ACS y el resumen mensual del grupo. Va al CHAT de sistema (privacidad) con el TRATO de negocio: **sin el prefijo `🔧 SISTEMA · `** y sin anti-ruido. Sale desde DOS lugares (el cron y la recuperación de `switch-reconciliacion`) que un candado exige que apunten al mismo destino.
+- **🔒 NEGOCIO PRIVADO** (`enviarNegocioPrivado`) — el resumen diario de ventas de ACS (7:30 p. m. de Panamá), el resumen mensual del grupo y **los cobros del día** (7:00 p. m., solo las 6 de Fashion Group, formato dictado por Daniel; 7-oct-2026: «Los cobros de Telegram deben llegar a Alertas, no a Negocio.»). Va al CHAT de sistema (privacidad) con el TRATO de negocio: **sin el prefijo `🔧 SISTEMA · `** y sin anti-ruido. Sale desde DOS lugares (el cron y la recuperación de `switch-reconciliacion`) que un candado exige que apunten al mismo destino.
 - **🔧 SISTEMA** — prefijo `🔧 SISTEMA · `. Regla de tres: **(1)** es real, **(2)** no se arregla solo, **(3)** alguien tiene que hacer algo. El texto dice qué pasó / qué significa / qué hacer, sin nombres de tabla ni códigos HTTP. Es el chat PRIVADO de Daniel (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`; no existe ninguna variable `*_SISTEMA`).
 - A dónde apunta cada canal se verifica sin escribirle a nadie: `GET /api/diag/canales-telegram` (`CRON_SECRET` o sesión de admin).
 ## PWA (iOS)
@@ -480,7 +489,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - **Buttons:** `rounded-md`, `bg-black text-white`, `active:scale-[0.97]`. **Cards:** `rounded-lg`, `border border-gray-200`. **Tables:** sticky headers, `tabular-nums`, `ScrollableTable` con gradientes, `SwipeableRow` en móvil. **Modals:** `ConfirmModal`, `ConfirmDeleteModal` (destructivo, 1 s de espera), `BottomSheet` (móvil).
 - **Module colors:** 🔴 la lista viva son **22 módulos** en `src/lib/moduleColors.ts` (2px de acento en el encabezado; los 4 últimos entraron el 24-sep-2026 para el menú del celular y NO pintan el encabezado). **No la copies aquí: léela en el archivo**, que es el único lugar donde está completa.
 - **Animations:** `AccordionContent` (CSS grid 250ms), transiciones de página (slide/crossfade 180ms), count-up de KPI, flash de depósito, shake del saldo, resalte de fila nueva.
-- 🔴 **Barras pegajosas: se pegan DEBAJO del encabezado, nunca encima** (11-sep-2026; [docs/postmortems/barras-pegajosas.md](docs/postmortems/barras-pegajosas.md)). El encabezado NO tiene alto fijo: se MIDE con `ResizeObserver` y viaja en `--fg-altura-encabezado`. **La única forma de pegar una barra de contenido es `CLASE_BARRA_PEGAJOSA`** (`src/lib/ui/barra-pegajosa.ts`), con z-index 9 bajo el 10 del encabezado. Un `<thead>` o la cabecera de un modal con `sticky top-0` se pegan a SU contenedor y se dejan como están. ⚠️ Pendiente de Daniel: los dos `sticky top-0` del overlay de Marketing › Proyecto.
+- 🔴 **Barras pegajosas: se pegan DEBAJO del encabezado, nunca encima** (11-sep-2026; [docs/postmortems/barras-pegajosas.md](docs/postmortems/barras-pegajosas.md)). El encabezado NO tiene alto fijo: se MIDE con `ResizeObserver` y viaja en `--fg-altura-encabezado`. **La única forma de pegar una barra de contenido es `CLASE_BARRA_PEGAJOSA`** (`src/lib/ui/barra-pegajosa.ts`), con z-index 9 bajo el 10 del encabezado. Un `<thead>` o la cabecera de un modal con `sticky top-0` se pegan a SU contenedor y se dejan como están.
 ## UX Principles
 
 > 📄 Detalle, mediciones y citas: [docs/postmortems/diseno-y-ux.md](docs/postmortems/diseno-y-ux.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
@@ -509,7 +518,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 
 > 📄 El bloque ENTERO, verbatim: [docs/postmortems/usuarios-inicio-teclado.md](docs/postmortems/usuarios-inicio-teclado.md) › «Lo que decía CLAUDE.md hasta el 22-sep-2026».
 
-- **Búsqueda global:** 8 módulos (CXC, Reclamos, Guías, Directorio, Cheques, Ventas, Préstamos, Caja) y los mismos CINCO roles de siempre (`SEARCH_ROLES`). 🔴 **Cada resultado LLEVA a donde dice**: la guía a `/guias/<id>`, el cliente a `/clientes/<codigo>`, el de Ventas a `?tab=clientes&cliente=<CÓDIGO>` y el gasto de Caja a su período `/caja/<id>`. 🔴 El código del cliente de Ventas sale del **puente por ID** (`switch_facturas` → `switch_clientes` → `codigo`), **nunca del nombre**. ⚠️ El gasto de Caja no queda resaltado dentro de su período: pendiente, no olvido.
+- **Búsqueda global:** 8 módulos (CXC, Reclamos, Guías, Directorio, Cheques, Ventas, Préstamos, Caja) y los mismos CINCO roles de siempre (`SEARCH_ROLES`). 🔴 **Cada resultado LLEVA a donde dice**: la guía a `/despachos/<id>`, el cliente a `/clientes/<codigo>`, el de Ventas a `?tab=clientes&cliente=<CÓDIGO>` y el gasto de Caja a su período `/caja/<id>`. 🔴 El código del cliente de Ventas sale del **puente por ID** (`switch_facturas` → `switch_clientes` → `codigo`), **nunca del nombre**. ⚠️ El gasto de Caja no queda resaltado dentro de su período: pendiente, no olvido.
 - 🩸 **Tres cosas que esta lista prometía y NO EXISTÍAN EN NINGUNA PANTALLA** (retiradas el 11-sep-2026): el feed «Acciones pendientes», los contadores del 🔔 y las 💡 sugerencias. ⚠️ La **campana 🔔 SÍ funciona** (`NotificationCenter`). Candado `inicio-sin-promesas.test.ts`.
 - Spotlight («cheques que vencen mañana» → ⚡ deep link) · búsquedas recientes · Smart defaults (`fg_last_*`) · sin borrador automático, salvo las firmas del despacho (1-oct-2026) · time grouping · 🩸 sin hover-preview (7-oct-2026; antes vivía en Ventas › Clientes) · filtros en la URL y filas/scroll que sobreviven la navegación · banner «Sin conexión» informativo, **sin lectura offline**.
 ## Exports
@@ -529,7 +538,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 ## Testing
 ```bash
 npm test          # Vitest — 17.500 pruebas. Las corre también GitHub Actions y el gancho antes de subir. 🔴 Una prueba aguanta 20 s y `waitFor` 10 s (`vitest.config.ts`): GitHub es lento y con topes iguales la prueba moría al reintentar.
-npx next build    # El build tiene que pasar antes de subir
+npx next build    # El build tiene que pasar antes de subir. El chequeo de tipos corre en «pruebas» de GitHub (7-oct-2026), ya no en el build de Vercel
 ```
 
 ## 🔴 El conector de Supabase — leer es libre, escribir se pregunta
@@ -543,12 +552,13 @@ npx next build    # El build tiene que pasar antes de subir
 
 ## Deploy
 ```bash
-git push origin main   # Auto-deploy via Vercel
+# 🔴 Se publica por SOLICITUD DE CAMBIO (7-oct-2026): rama en worktree → gh pr create --base main → gh pr merge <n> --auto --squash.
+# El push directo a main ya no entra (enforce_admins). Nunca --force, --admin ni apagar la protección. Ver docs/seguridad/publicar-por-solicitud-de-cambio.md
 npm run migrar supabase/migrations/<archivo>.sql   # Aplica UNA migración a Supabase (muestra qué corre, pide «¿Aplicar? [s/N]», registra en schema_migrations). `-- --dry-run` solo muestra; `-- --forzar` repite una ya registrada. Token: SUPABASE_ACCESS_TOKEN en .env.local (https://supabase.com/dashboard/account/tokens)
 ```
 
 ## Regla de Calidad
-- Todo código debe funcionar a la primera. No pushear sin verificar el flujo completo end-to-end.
+- Todo código debe funcionar a la primera. No publicar sin verificar el flujo completo end-to-end.
 - Verificar: datos fluyen escritura → DB → lectura → UI
 - Auth en serverless: usar tokens HMAC firmados, NO Maps en memoria
 - No hacer fire-and-forget (.then().catch()) para operaciones críticas — siempre await

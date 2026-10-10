@@ -56,6 +56,10 @@ rama propia  →  solicitud de cambio  →  integración automática  →  verde
 **La integración automática a nivel de repositorio ya está prendida**
 (`allow_auto_merge = true`, 7-oct-2026). No hay que volver a activarla.
 
+Leído de nuevo el 9-oct-2026 (solo `GET`): `enforce_admins = true`, chequeos
+obligatorios `Vercel` y `pruebas`, `allow_auto_merge = true`. Todo lo que entró a
+`main` del 8 al 9-oct-2026 entró por solicitud de cambio con squash.
+
 ## 3. Lo que NUNCA se hace
 
 - ❌ **Nunca `--force`**, de ninguna forma, sobre `main`.
@@ -91,9 +95,12 @@ comm -12 <(git diff --name-only $(git merge-base origin/main origin/<rama-a>) or
 ## 5. La cola de Vercel es el cuello de botella real
 
 Este proyecto construye **una vista previa a la vez**. Las vistas previas de las
-demás solicitudes esperan en fila, y cada build toma ~3 min —pero una que se
-cuelga en `Linting and checking validity of types` puede retener el turno
-**media hora o más**, y detrás no avanza nada.
+demás solicitudes esperan en fila, y cada build toma ~3 min.
+
+> 🔁 Corregido el 9-oct-2026: aquí decía que una vista previa colgada en
+> `Linting and checking validity of types` podía retener el turno media hora o
+> más. Desde #670 (7-oct-2026) el build de Vercel ya no chequea tipos, así que
+> ese cuelgue solo puede pasarle a una rama creada antes de #670 (ver 5.1).
 
 Por eso el chequeo `Vercel` puede quedar en `pending` mucho después de que
 `pruebas` ya esté en verde. **Eso no es una falla y no se fuerza:**

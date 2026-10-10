@@ -4,6 +4,10 @@
 > Egresos Varios) muestra "pausado" en vez de un número, o porque Vista General y Rentabilidad
 > dicen "Módulo pausado" / "Gastos pausado" para cada empresa: **no investigues esto como un
 > bug**. Es exactamente lo que se apagó, y por qué, abajo.
+>
+> **Verificado contra el código el 9-oct-2026**: la pausa sigue vigente tal como se describe aquí
+> (el cron no está en `vercel.json`, las dos alertas siguen retiradas y los textos de pantalla
+> dicen «pausado»). Nada de esto cambió entre el 7 y el 9 de octubre.
 
 ## La decisión
 
@@ -26,7 +30,7 @@ las 10:35 UTC (05:35 a.m. Panamá), abriendo sesión web en Switch para las 7 em
 Confecciones Boston (`changesession=SI`, que expulsa a quien esté en el panel — a Daniel) y
 reescribiendo el año completo enero-diciembre con filas idénticas.
 
-Se retiró de tres lugares, los tres el mismo día:
+Se retiró de `vercel.json` y de tres listas de `cron-telemetry.ts`, todo el mismo día:
 
 - **`cxc/vercel.json`** — se borró la entrada `{ "path": "/api/cron/sync-egresos-varios", "schedule": "35 10 * * *" }`.
 - **`cxc/src/lib/cron-telemetry.ts` › `SEED_TOLERANT_CRONS`** — se quitó la línea `"sync-egresos-varios"` (quedó un comentario fechado en su lugar).
@@ -38,8 +42,8 @@ Se retiró de tres lugares, los tres el mismo día:
 función ni agregar un nombre a una lista aparte — el watchdog de Telegram deja de exigirle un
 success reciente automáticamente.
 
-**El route y la librería del sync NO se borraron** (`sync-egresos-varios.ts`,
-`sync-cuentas-contables.ts`): siguen ahí para una corrida manual el día que haga falta, y para
+**El route y la librería del sync NO se borraron** (`src/lib/switch-api/sync-egresos-varios.ts`,
+`src/lib/switch-api/sync-cuentas-contables.ts`): siguen ahí para una corrida manual el día que haga falta, y para
 reactivar el cron sin tener que reescribir nada.
 
 ### 2. Los dos avisos de Telegram que se iban a disparar solos

@@ -42,6 +42,9 @@ Lectura independiente (`GET`, no el resultado del propio `POST`) contra
 { "enabled": true }
 ```
 
+Leído de nuevo el 9-oct-2026 (solo `GET`): sigue en `true`, con `Vercel` y
+`pruebas` como chequeos obligatorios.
+
 ## ⚠️ Cómo cambia el comportamiento del push de ahora en adelante
 
 Antes de este cambio, el repo publicaba empujando commits DIRECTO a `main`,

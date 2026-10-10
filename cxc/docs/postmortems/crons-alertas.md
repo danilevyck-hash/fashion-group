@@ -1394,3 +1394,92 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - 🔴 Un solo punto de llamada a Anthropic: `src/lib/ia/anthropic.ts`, sin prompt ni modelo adentro (ningún `claude-…` ahí). El error se vuelve a lanzar tal cual: mismo 500, la pantalla no cambia.
 - 🔴 **Anti-loop de 7 días POR CAUSA** (`cron_email_errors.tipo` = `lector_facturas:<causa>`), marcado DESPUÉS de que Telegram confirme; la causa va en la llave para que una llave vencida no tape un crédito agotado posterior. Fail-OPEN, y avisar NUNCA lanza.
 - El mensaje manda a la pantalla exacta: llave → API Keys y luego Vercel (`ANTHROPIC_API_KEY`, Production); crédito → Billing; tope → Limits; y dice que no se perdió nada.
+
+## Estado al 9-oct-2026: Telegram de cobros, crons e infraestructura (lo trabajado del 7 al 9-oct-2026)
+
+> Reglas vigentes, comprobadas contra el código de `origin/main` el 9-oct-2026. Donde una sección anterior de este archivo diga otra cosa, vale esta. Las secciones «verbatim» de arriba no se tocan.
+
+### Telegram › Cobros del día
+
+- **Sale a las 00:00 UTC = 7:00 p. m. de Panamá** (`/api/cron/cobros-del-dia`, `0 0 * * *`), 45 min después del último `sync-recibos` (23:15 UTC). No toca Switch.
+- 🔴 **Va al chat de ALERTAS, no a 📊 NEGOCIO** (#676). Daniel, 7-oct-2026: *«Los cobros de Telegram deben llegar a Alertas, no a Negocio.»* «Alertas» es el chat privado de Daniel con `@fashiongr_alertas_bot`. Se manda por `enviarNegocioPrivado`: sin el prefijo `🔧 SISTEMA · ` y sin reglas anti-ruido. Nació el 6-oct-2026 por 📊 NEGOCIO (`5fbc3831`) y se mudó al día siguiente.
+- 🔴 **Solo Fashion Group**: las 6 empresas de `CXC_GRUPO_EMPRESA_KEYS`. Boston y Multifashion quedan fuera (`b63b2b6b`, 6-oct-2026). Fuera también `CLIENTES_FUERA` (`TCKCTA`, `12188`, `D-108`, `D-38`), las retenciones y los recibos en cero.
+- **Sin cobros, o con el total del día en cero, no manda nada.**
+- **Formato vigente** (#686, dictado por Daniel el 7-oct-2026; lo arma `mensajeCobrosDelDia` en `src/lib/cxc/cobros-del-dia.ts`):
+
+  ```
+  💰 Cobros de hoy · $47,095 · 2 pagos
+
+  Fashion Shoes
+  • Outlet Duty Free N3, S.A. · $43,095 · al día ✓
+  • Sport Fashion · $4,000 · le quedan +90 d $21,494
+  ```
+
+  - Encabezado: total del día y número de líneas; con una sola dice «1 pago».
+  - Una línea en blanco después del encabezado y entre empresas.
+  - Una línea por cliente y empresa: varios recibos del mismo cliente se suman en una.
+  - Empresas ordenadas por lo cobrado en cada una; clientes, por monto.
+  - Montos en dólares enteros, con coma de miles.
+  - `le quedan +90 d $X` es el saldo de más de 90 días de la cartera de CxC (91-120 más 121 y más). Un pago registrado después de la foto de la cartera se le resta.
+  - Sin saldo a +90 dice `al día ✓`, aunque el cliente deba en 31-90. No hay tramo intermedio.
+  - Máximo 15 líneas (`MAX_COBROS_EN_AVISO`); si hay más, cierra con `y N más · Ver en CxC https://www.fashiongr.com/cxc`.
+- ⚠️ Un recibo registrado después de las 6:15 p. m. no sale ni hoy ni mañana (comentario de la ruta).
+- `?test=true` devuelve el mensaje sin mandarlo; `?fecha=AAAA-MM-DD` arma el de otro día.
+- Candados: `src/__tests__/cxc/cobros-del-dia.test.ts` (el ejemplo exacto de Daniel y los bordes) y `src/__tests__/lib/cobros-a-alertas.test.ts` (cobros a Alertas y el mapa completo de qué archivo manda por qué canal).
+- Sin mover, siguen en 📊 NEGOCIO: `cheques-alert` y `reclamos-viejos` (#676 los dejó «en duda, sin mover»).
+
+### Telegram › Lo que sale por `enviarNegocioPrivado` hoy
+
+- Según el mapa de `cobros-a-alertas.test.ts`: `cobros-del-dia`, `acs-resumen-diario`, `grupo-resumen-mensual`, `switch-reconciliacion`, `prestamos/movimientos`, `asistencia/mismo-aparato-io.ts` y `cheques-alert.ts`.
+- **El resumen diario de Multifashion (`acs-resumen-diario`) sale a las 00:30 UTC = 7:30 p. m. de Panamá** desde el 6-oct-2026 (`b63b2b6b`). Donde este archivo o `CLAUDE.md` digan «el cron de la 01:00», hoy es el de las 00:30.
+- A las 7:00 p. m. no se puede: el sync de cierre de facturas arranca a las 00:15 UTC y el mensaje saldría sin la línea «Hoy».
+
+### Crons › Facturas del día cada hora (#682, 8-oct-2026)
+
+- `switch-sync tipo=facturas` de las 8 empresas: **13 entradas**, de 7 a. m. a 6 p. m. de Panamá.
+
+  | UTC (`vercel.json`) | 11:50 | 12:30 | 13:30 | 14:15 | 15:00 | 16:45 | 17:30 | 18:40 | 19:00 | 20:20 | 21:40 | 22:30 | 23:00 |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | Panamá (UTC−5) | 06:50 | 07:30 | 08:30 | 09:15 | 10:00 | 11:45 | 12:30 | 13:40 | 14:00 | 15:20 | 16:40 | 17:30 | 18:00 |
+
+- 9 entradas nuevas en `vercel.json` y en `SWITCH_CRON_ENTRADAS` (`src/lib/cron-telemetry.ts`). Los slots, los latidos y el umbral de alertas se derivan de esa lista.
+- Retiradas `facturas-1300/1700/2100` (solo american_classic): las cubren las nuevas. `esSlotRetirado` evita que sus filas viejas alerten.
+- Sigue la entrada de las 00:15 UTC solo de american_classic (sync de cierre).
+- Cada una queda a 15 min o más de toda otra entrada de Switch que comparta empresa. Candado: `src/__tests__/lib/cron-calendario.test.ts`.
+- El hueco de 10:00 a 11:45 de Panamá no se puede partir sin mover otros crons (#682).
+- Total del proyecto: **93 de 100** entradas de cron.
+
+### Infraestructura › Funciones en Oregón (#683, 8-oct-2026)
+
+- `vercel.json` lleva `"regions": ["pdx1"]`. La base está en Oregón (Supabase `us-west-2`) y las funciones corrían en Virginia (`iad1`).
+- Medido el 8-oct-2026 en vistas previas de cada región (#683): la consulta liviana a la base bajó de 281 ms a 63 ms de mediana; cada llamada a Switch, que está en Panamá, sube unos 70 ms.
+- Para volver atrás: borrar la línea `regions` y desplegar.
+
+### Switch › Toda llamada sale sin el caché de Next (#684, 8-oct-2026)
+
+- Los `fetch` hacia Switch viven en dos archivos: `src/lib/switch-api/client.ts` (`rawCall`) y `src/lib/switch-api/web-client.ts`. Los tres `fetch(` llevan `cache: "no-store"`.
+- Por qué: Next 14.2 guarda por omisión en su Data Cache los `fetch` de servidor, incluso POST y con `Authorization`, cuando en la misma petición no hubo antes un `fetch` sin caché. Los crons se salvaban porque tocan Supabase antes que Switch; una ruta que llamaba a Switch primero repetía la respuesta.
+- Candado: `src/__tests__/switch-fetch-sin-cache.test.ts`. Falla si un `fetch(` de `src/lib/switch-api/` no lleva `cache: "no-store"` y si un cron que importa `@/lib/switch-api` deja de declarar `force-dynamic`.
+
+### Respaldo › Cada tabla por su llave real (#688, 8-oct-2026)
+
+- 🩸 El respaldo de las 06:00 UTC del 8-oct-2026 salió 500: pedía `mk_proveedor_alias.id`, que no existe (su llave es `alias_normalizado`). Solo esa tabla quedó afuera. El aviso no llegó porque esperaba a la corrida de las 10:30, que iba a fallar igual.
+- **Una sola lista de llaves**: `columnasDeOrden()` en `src/lib/backup/tablas.ts` (`PK_QUE_NO_ES_ID`, y `id` para el resto). La ruta ya no tiene su copia `ORDER_BY`.
+- Si la columna de orden no existe y la tabla cabe en una página, se copia sin orden y queda en el registro de errores (`…_sin_orden`); si no cabe, falla y dice qué tabla.
+- **Un error de estructura avisa en el acto** al chat de Alertas (`enviarSistema`), sin esperar a la segunda oportunidad: columna o tabla que no existe, o permiso denegado.
+- Candado: parte D de `src/__tests__/lib/backup-nada-sin-copia.test.ts`. Lee las migraciones y falla si una tabla respaldada no tiene su columna de orden, si no se ordena por su llave primaria o si la ruta vuelve a tener una lista propia.
+- El grupo `switch` suma `switch_pedidos` y `pedidos_lineas`.
+
+### Rendimiento › La sesión no se vuelve a preguntar en cada llamada (#678, 7-oct-2026)
+
+- El middleware recuerda 60 s por instancia la sesión ya comprobada contra `user_sessions` (`src/lib/session-valid-cache.ts`, `TTL_SESION_VALIDA_MS`). Solo guarda un «sí» definitivo: el «no» y el «sí por las dudas» se vuelven a preguntar.
+- Riesgo aceptado: una sesión revocada puede seguir viva hasta 60 s en la instancia que ya la había validado.
+- `/api/guias/frecuencias`: sus cuatro lecturas salen juntas. `/api/cxc/aging`: `lineaDeRechazos` va en paralelo con la cartera.
+- `leerTodoPaginado` acepta `simultaneas`, que vale 1 por omisión; lo usa el directorio de clientes.
+- Candados: `src/__tests__/lib/sesion-valida-en-cache.test.ts` y `src/__tests__/lib/paginado-simultaneo.test.ts`.
+
+### Publicación › Solicitud de cambio y chequeo de tipos (#667, #670, #672, #674, 7-oct-2026)
+
+- Se publica por solicitud de cambio: rama → `gh pr create --base main` → `gh pr merge <n> --auto --squash`. Detalle en [`../seguridad/publicar-por-solicitud-de-cambio.md`](../seguridad/publicar-por-solicitud-de-cambio.md).
+- Apagar `enforce_admins` no es salida de emergencia; tampoco `--force` ni `gh pr merge --admin`. Ver [`../seguridad/github-enforce-admins.md`](../seguridad/github-enforce-admins.md).
+- El chequeo de tipos salió del build de Vercel (`typescript.ignoreBuildErrors: true` en `next.config.js`) y pasó al workflow «pruebas» (paso «Chequeo de tipos», `npm run typecheck`, antes de las pruebas). El build se colgaba en ese paso hasta el límite de 45 min y frenaba la cola de vistas previas.

@@ -4,6 +4,17 @@
 > Ningún número sale de la documentación: los que no cuadran con `CLAUDE.md` van con 🩸.
 > Daniel, textual: *«Pero asistencia no se hizo con el enfoque que estamos teniendo con los otros módulos ya terminados»*.
 
+> ⚠️ **Al día 9-oct-2026.** Este mapa es la foto del 5-sep-2026 y sus mediciones no se rehicieron. Lo que cambió del 7 al 9-oct-2026 en el código publicado (reglas enteras en `docs/postmortems/asistencia-planilla.md` › «Estado del módulo al 9-oct-2026»):
+>
+> - **Corregir una hora ya no pide motivo** (PR #719): tocar la hora, escribir, «Guardar». En la base se guarda «—». «Justificar» sí pide motivo.
+> - **«Tiempo no laborado»** (PR #709, #711, #712, #713): lo que pasa del almuerzo permitido, con su gracia de 5 min, se descuenta en su propia columna; solo en días de 4 marcas. `DESCUENTA_TIEMPO_FUERA = true`.
+> - **«A revisar»** es todo día cerrado que no tenga exactamente 4 marcas (el de 2 también). Con 5 o más no se descuenta tiempo no laborado.
+> - **Máximo 4 marcas por día desde el teléfono** (PR #711): el servidor rechaza la 5.ª con 409.
+> - **«Permiso personal»**, motivo de justificación nuevo: lleva horas obligatorias y no perdona nada; se descuenta igual.
+> - **«Compensación de tardanza»** por colaborador (PR #708), casilla de la ficha, apagada por omisión.
+> - **Alta y baja de quien marca** (PR #720, #722): se hace en Usuarios, con el interruptor «Marca asistencia»; crea usuario, ficha, horario y vínculo juntos, y «Desactivar» ofrece «Baja del colaborador».
+> - **Asistencia › Préstamos estilo Apple** prendido (`PRESTAMOS_APPLE_2026_10 = true`, PR #706 y #717); ningún número cambió.
+
 ## Lo primero, en cuatro líneas
 
 | | |
@@ -361,6 +372,7 @@ Las cinco tareas que **los datos demuestran** que se hacen, no las que el códig
 | Fijar el rango | 2 |
 | **Encontrar los días malos: no hay filtro.** Abrir a las 32-37 personas una por una y leer sus días | **~37** |
 | Por cada arreglo: tocar la hora · escribir · motivo · Guardar | 4 |
+| ⚠️ *Desde el 9-oct-2026 (PR #719) el motivo ya no se pide: tocar la hora · escribir · Guardar* | *3* |
 
 - En septiembre hay **43 días a revisar repartidos entre 32 personas**: para encontrarlos hay que abrir 32 filas y leer **133 renglones**.
 - La pantalla ya calcula el chip «Revisar» por día, pero **no hay forma de filtrar por él**.
@@ -397,6 +409,8 @@ El motivo y la fecha se teclean **11 veces idénticos**. El campo Persona es un 
 - **Pero 4 de los 13 son casi siempre lo mismo y podrían venir puestos**: jornada (24 de 37 en 40 h), horario de entrada (8:00 en las 40), almuerzo (30 en las 40) y horario de salida (2 valores en toda la empresa).
 
 **La versión corta: un aviso en la barra («2 códigos marcan y no tienen ficha») + la ficha nueva abierta con los 4 valores por defecto puestos. → de «nadie se entera» a 1 toque + 7 campos.**
+
+⚠️ **Al día 9-oct-2026 (PR #720, #722):** el alta ya trae valores puestos. En Usuarios › «＋ Nuevo usuario» › «Marca asistencia», al seleccionar la empresa el código se propone solo (el siguiente libre en todo el sistema, editable) y el horario y la jornada vienen con los más usados entre los activos de esa empresa (sin datos, 08:00 → 17:00). Asistencia › Colaboradores › «+ Nuevo colaborador» también propone el código («Usar 308») y trae «Horario». Un código repetido se frena con 409 y no se guarda nada. El aviso de códigos que marcan sin ficha no cambió estos días.
 
 ---
 
@@ -563,3 +577,7 @@ Quitar un feriado o una justificación convierte ese día en **una ausencia de 8
 | La pestaña Vacaciones **se queda** | *«vacaciones quedamos que sí, déjalo, solo que hazlo bien»* | 1-sep-2026 |
 | El servicio profesional no genera horas extra | *«yulisa marca pero no debería de calcular ya que es salario fijo»* | 3-sep-2026 |
 | Décimo tercer mes y vacaciones **no** se provisionan | *«se registran cuando se pagan»* | 13-ago-2026 |
+| El tiempo fuera durante la jornada **se descuenta** («Tiempo no laborado») | *«¿cómo no se descuenta si alguien salió?»* | 9-oct-2026 |
+| «Permiso personal» deja constancia del permiso y **no** se paga | *«es solo para saber que se le dio permiso; igual no se le paga»* | 9-oct-2026 |
+| Corregir una hora **no** pide motivo | *«quita lo de poner motivo al cambiar la hora en asistencia»* | 9-oct-2026 |
+| Quien marca se crea y se da de baja en **Usuarios** | *«debe de ser en Usuarios»* | 9-oct-2026 |

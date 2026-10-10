@@ -2,6 +2,14 @@
 
 > Medido contra producción el **5-sep-2026**. Ningún número sale de la documentación.
 > Solo lectura. Este archivo no toca una línea del sistema.
+>
+> 🔴 **Al día el 9-oct-2026 — lo que cambió desde esta medición** (comprobado contra el código publicado; las cifras de abajo NO se volvieron a medir):
+> - El módulo se llama **Despachos** y vive en `/despachos` desde el 7-oct-2026 (`src/app/despachos/`; la `key` sigue siendo `guias` y las rutas `/api/guias/**`). Donde este mapa dice `/guias…` o `src/app/guias/…`, hoy es `/despachos…` y `src/app/despachos/…`; los enlaces viejos redirigen.
+> - Este mapa describe solo la pestaña **Guías de despacho**. El módulo tiene hoy cuatro: **Pedidos · Guías de despacho · Etiquetas · Configuración**, y abre en **Pedidos**. Pedidos y Etiquetas no existían el 5-sep-2026 y no están medidos aquí.
+> - La lista ya no es la de esta medición: sección «Pendientes de despacho» arriba y grupos **Hoy · Ayer · Esta semana · Semana pasada · Historial**; un toque abre la guía (sin acordeón); el distintivo «Pendiente» va en la guía sin despachar.
+> - **Entrar al módulo no llama a Switch** (7-oct-2026): las facturas del día llegan por cron, cada hora de 7 a. m. a 6 p. m. de Panamá, o con «Actualizar».
+> - El estado «Rechazada», que abajo figura como «nadie usa», se retiró.
+> - Reglas vigentes y lista de interruptores: [`docs/postmortems/guias.md`](../postmortems/guias.md) › «Despachos — estado al 9-oct-2026».
 
 ---
 

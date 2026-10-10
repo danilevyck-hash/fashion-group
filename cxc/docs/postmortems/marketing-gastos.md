@@ -1,6 +1,12 @@
 # Marketing › gastos y facturas — el porqué
 
 > Post-mortem de «+ Registrar gasto», la factura en PDF y los proyectos eliminados de Marketing. Nació el 14-sep-2026 al mover acá, verbatim, lo que CLAUDE.md decía (10/11-sep-2026). El inventario de Mobiliario tiene su propio archivo: [marketing-mobiliario.md](marketing-mobiliario.md).
+>
+> **Estado al 9-oct-2026** (el texto de abajo es historia y no se cambió):
+> - `MARKETING_PDF_EN_LA_PUERTA` está en **`true`**, no en `false`.
+> - `FacturasSection` y la pantalla del proyecto se borraron (#690). La puerta es «＋ Gasto» en Marketing › Gastos, con un solo botón «Subir factura».
+> - Los tipos de gasto se llaman Factura de un proveedor · Entrega de mobiliario · Pago de impulsadora.
+> - Las reglas vigentes del registro (50 % por defecto, No recuperable, proveedor reconocido, duplicados) están en [marketing-rediseno.md](marketing-rediseno.md) › «Estado al 9-oct-2026 — reglas vivas».
 
 
 ---

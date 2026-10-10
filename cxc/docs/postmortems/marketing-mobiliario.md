@@ -4,6 +4,13 @@
 > **Nada se resumió ni se borró: el contenido es verbatim**, con sus «Daniel, textual»,
 > sus mediciones, sus «Candados», sus «Verificado por mutación» y sus 🩸.
 > La REGLA vigente (sin la historia) vive en «Invariantes por módulo» de `cxc/CLAUDE.md`.
+>
+> **Estado al 9-oct-2026** (el texto de abajo es historia y no se cambió):
+> - Mobiliario se abre desde «···» en `/marketing` (`/marketing/mobiliario`); ya no es una pestaña. Sus reglas de piezas y bultos no cambiaron.
+> - `EntregasSection` se borró con la pantalla del proyecto (#690). El formulario vivo es `EntregaForm`.
+> - En pantalla el tipo de gasto se llama «Entrega de mobiliario» (94d81a34). Se cobra a la marca por su total, sin porcentaje (#689).
+> - Crear, editar y borrar una entrega deja registro en `activity_logs`; al editar, el formulario muestra «Modificado por … · fecha» con el historial (22776eb5).
+> - En el ZIP de la marca, una entrega con tienda va a la carpeta de su tienda; sin tienda, a «Mobiliario y exhibición» (15a6ffb4, 29330754).
 
 ---
 

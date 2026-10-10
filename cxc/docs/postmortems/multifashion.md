@@ -626,9 +626,21 @@ Nueve mutaciones probadas a mano, **nueve cazadas**:
 - ⚠️ **El renglón de Vendedoras, el de Productos y el de Clientes piden su dato al abrir** (tres peticiones más, en paralelo y con la MISMA clave de SWR que su pestaña, así que tocar el renglón abre una pantalla ya cargada). Mientras no llegan, el renglón se dibuja con su nombre y **sin número** — nunca un `$0` inventado.
 - ⚠️ El corte `sm` (640 px) es el de la casa; un iPad sigue viendo la pantalla de computadora.
 
-## Como un ERP hecho por Apple (4-oct-2026, propuesta; puesta al día el 8-oct-2026)
+## Como un ERP hecho por Apple (4-oct-2026; puesta al día el 8-oct-2026; PRENDIDO el 9-oct-2026)
 
-> Daniel, 4-oct-2026: todo el sistema rediseñado módulo por módulo «como un ERP hecho por Apple», con cinco reglas: (1) lo importante primero, con un número grande; (2) un toque para el detalle; (3) frescura con el componente común; (4) el mismo selector de período; (5) lo que requiere atención, arriba. Programado detrás de `MULTIFASHION_APPLE_2026_10` (`lib/multifashion/apple.ts`), **apagado**: se prende con su «sí».
+> Daniel, 4-oct-2026: todo el sistema rediseñado módulo por módulo «como un ERP hecho por Apple», con cinco reglas: (1) lo importante primero, con un número grande; (2) un toque para el detalle; (3) frescura con el componente común; (4) el mismo selector de período; (5) lo que requiere atención, arriba. Programado detrás de `MULTIFASHION_APPLE_2026_10` (`lib/multifashion/apple.ts`). Nació apagado (PR #697) y quedó **PRENDIDO el 9-oct-2026** (PR #700, Daniel lo aprobó).
+
+### Estado al 9-oct-2026 (lo que está publicado)
+
+- `MULTIFASHION_APPLE_2026_10 = true` (`lib/multifashion/apple.ts`) y `MULTIFASHION_GRAFICA_2026_10 = true` (`lib/multifashion/grafica-mes.ts`). Son dos interruptores separados: apagar uno no apaga el otro. `false` = la pantalla (o la gráfica) de antes.
+- **Resumen**: arriba, en `<Aviso>`, lo que requiere atención —«Sáb 12 sin ventas y no es feriado» y «Meta …: faltante proyectado $…»—. El aviso de la meta va **sin «Ver meta»** (PR #698): la meta se ve en Vendedoras. «Ventas del mes» es el número grande, sin negrita.
+- **Vendedoras**: la meta que no llega, arriba, y aquí **sí** con «Ver meta» (baja a la tarjeta). Solo en el módulo (`conMetas`); el espejo de Comisiones no la muestra.
+- **Clientes**: el número grande es **«No vuelven»** (PR #698), con el mismo conteo que su chip (`numeroNoVuelven` → `conteoPorChip` sobre la misma lista). En su línea: «N frecuentes · N nuevos del mes · N con descuento 5% pendiente». Enseguida la lista; la cobertura y el mostrador, en la línea del pie.
+- **Año (celular)**: el año como número grande y los meses en renglones; tocar un mes lo abre.
+- **Metas**: el vendido sin negrita y la explicación de la cuenta detrás del ⓘ.
+- **Errores de carga**: `<Aviso tono="error">` con «Reintentar».
+- **Gráfica de ventas diarias** (PR #699 apagada, PR #701 prendida): una sola pieza para la computadora y el celular (`GraficaDelMes`). Barras por día, sin eje; arriba «Promedio diario $… · N días» y, al tocar o pasar el mouse por un día, ese día y su monto. El último día cerrado va destacado y el día en curso dice «Hoy» en el eje. Un día en $0 sale en ámbar si es hábil y no es feriado (la misma regla del aviso, `diasSinVenta`; sin feriados leídos no se acusa) y en gris si es domingo o feriado. La línea del año pasado salió de la gráfica: el % contra el año pasado ya está en el número grande del mes.
+- 🔴 Ningún cálculo cambió: los días, montos y tiquetes son los de `detalle-mensual`; el promedio es la venta de los días ya cerrados entre esos días.
 
 ### Puesta al día sobre el `main` del 8-oct-2026
 
@@ -642,26 +654,29 @@ El trabajo del 4-oct nunca se publicó y partía de un `main` 141 cambios atrás
 
 ### Qué cambia, pestaña por pestaña
 
+> Tabla de la propuesta del 8-oct. Dos filas cambiaron antes de prender (PR #698) y están corregidas aquí; lo publicado es el «Estado al 9-oct-2026» de arriba.
+
 | Pestaña | Cambio | Regla |
 |---|---|---|
 | Todas | Los errores de carga en `<Aviso tono="error">` con «Reintentar» (eran cajas naranjas). | paleta |
-| Resumen | Arriba, en `<Aviso>`: «Sáb 12 y lun 21 sin ventas y no son feriado» (salía en la leyenda del gráfico) y, en el mes en curso, «Meta Viaje playa: faltante proyectado $31,674 · Ver meta». | 5 · 2 |
+| Resumen | Arriba, en `<Aviso>`: «Sáb 12 y lun 21 sin ventas y no son feriado» (salía en la leyenda del gráfico) y, en el mes en curso, «Meta Viaje playa: faltante proyectado $31,674», **sin «Ver meta»** (9-oct-2026, PR #698; la propuesta lo traía). | 5 · 2 |
 | Resumen | «Ventas del mes» es EL número (text-4xl, sin negrita); las otras dos tarjetas sin negrita. | 1 |
 | Año (celular) | El año como número grande («▲ 16 % contra 2025 · proyección …», margen y mayoreo en su línea) y los meses en renglones; tocar uno abre ese mes. Misma cuenta que «Mes a mes» (`baseDesdeRatio` + `variacionPct`). | 1 · 2 |
 | Vendedoras | La meta que no llega, arriba, con «Ver meta» (baja a la tarjeta). Solo en el módulo (`conMetas`). La secretaria la ve: lee metas (`ROLES_LECTURA_METAS`). | 5 |
-| Clientes | «Frecuentes» como número grande, «nuevos del mes» y «descuento 5% pendiente» en su línea, y enseguida la lista (abre en «No vuelven»). La cobertura y el mostrador, al pie. Se fue la nota «El estado "usado" del 5% se activa cuando corra la migración». | 1 · 5 · pie |
+| Clientes | **«No vuelven» como número grande** (9-oct-2026, PR #698; la propuesta decía «Frecuentes»), «frecuentes», «nuevos del mes» y «descuento 5% pendiente» en su línea, y enseguida la lista (abre en «No vuelven»). La cobertura y el mostrador, al pie. Se fue la nota «El estado "usado" del 5% se activa cuando corra la migración». | 1 · 5 · pie |
 | Metas | El vendido sin negrita y «(cuenta por temporada: …)» detrás de un ⓘ «Cómo se calcula». | pie |
 
 ### Candados
 
 - `src/__tests__/components/multifashion-apple-apagado.test.tsx` — **apagado = la pantalla de hoy, byte por byte**: monta Resumen (computadora, celular e «Año»), Vendedoras (computadora y celular, con una meta que no llega) y Clientes con datos fijos y compara el HTML entero contra la foto sacada con el código de `origin/main` ANTES del rediseño. Verificado: con el interruptor prendido, los seis se ponen rojos.
-- `src/__tests__/components/multifashion-apple.test.tsx` — el interruptor nace en `false`; la meta solo cuando el servidor dice `alcanza === false`; el orden de los avisos y que no pregunten; los meses del año con la misma cuenta que «Mes a mes»; el número sin negrita; Comisiones sin `conMetas`.
-- Al prender: `multifashion-retail-al-frente` (conteos y textos de Clientes) y la foto de `multifashion-apple-apagado` se actualizan fechados.
+- `src/__tests__/components/multifashion-apple.test.tsx` — (el interruptor nació en `false`; desde el 9-oct-2026 es `true`) la meta solo cuando el servidor dice `alcanza === false`; el orden de los avisos y que no pregunten; los meses del año con la misma cuenta que «Mes a mes»; el número sin negrita; Comisiones sin `conMetas`.
+- Al prender (9-oct-2026, PR #700 y #701): los candados de la pantalla de antes fijan los dos interruptores en `false` con `vi.mock`, así que apagar cualquiera sigue devolviendo la pantalla o la gráfica anterior.
+- `src/__tests__/lib/multifashion-grafica.test.ts` — la gráfica nueva (estados de cada día, promedio, la regla del día en $0).
 
 ### Pendientes y dudas para Daniel
 
-- ⚠️ El número grande de Clientes: se eligió «Frecuentes». La alternativa es «No vuelven» (lo que pide actuar), que ya dice su chip.
-- ⚠️ «Ver meta» en la computadora del Resumen lleva a Vendedoras; la tarjeta de la meta está al final de esa pestaña.
+- ✅ Resuelto el 9-oct-2026 (PR #698): el número grande de Clientes es «No vuelven» (la propuesta traía «Frecuentes»).
+- ✅ Resuelto el 9-oct-2026 (PR #698): el Resumen ya no lleva «Ver meta»; el enlace queda solo en Vendedoras.
 
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
