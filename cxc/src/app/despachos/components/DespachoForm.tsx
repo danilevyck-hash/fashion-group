@@ -11,7 +11,7 @@ import {
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
 import { juegosQueCoinciden, type JuegoDespacho } from "@/lib/guias/juegos-despacho";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
-import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
+import { GUIA_DETALLE_APPLE_2026_10, GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import { useDespachadores } from "./useDespachadores";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,6 +136,15 @@ export default function DespachoForm({
    * opciones aparecen recién al teclear las primeras letras.
    */
   const [buscandoJuego, setBuscandoJuego] = useState(false);
+  /**
+   * 🔴 9-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`, apagado), igual que «Guardar
+   * guía»: el botón no se apaga y el «Falta: …» sale al TOCARLO, con todo lo que
+   * falta en una línea (diseno.md, regla 7). Sin faltas, despacha como siempre.
+   */
+  const v2 = GUIA_DETALLE_APPLE_2026_10;
+  const [intentado, setIntentado] = useState(false);
+  /** Prendido, «Despachar» solo se apaga mientras guarda (pisa el `disabled` de siempre). */
+  const soloAlGuardar: { disabled?: boolean } = v2 ? { disabled: bSaving } : {};
 
   // Warn before leaving if user has filled any field
   const isDirty = useMemo(
@@ -169,7 +178,8 @@ export default function DespachoForm({
   const puedeDespachar = faltantes.length === 0;
 
   function handleConfirmar() {
-    if (!puedeDespachar || bSaving) return;
+    if (bSaving) return;
+    if (!puedeDespachar) { setIntentado(true); return; }
     // Se prefiere lo que tiene el canvas; si está limpio, lo último que avisó
     // `onChange` o la firma guardada que se restauró tras una recarga
     // (1-oct-2026: de todo el despacho, solo las firmas se guardan).
@@ -199,7 +209,23 @@ export default function DespachoForm({
   return (
     <div className="space-y-4">
       {/* Cómo sale la mercancía — se MUESTRA lo que ya se eligió al crearla. */}
-      {mostrarModo && (
+      {mostrarModo && v2 && !cambiandoModo && (
+        /* 🔴 9-oct-2026: una línea, no una tarjeta. Ya se eligió al crear la
+           guía y casi nunca se cambia aquí (1 de 37 desde el 1-sep-2026). */
+        <div data-tipo-despacho-linea className="flex items-center justify-between gap-3 px-1">
+          <span className="text-sm text-gray-500 break-words">
+            Tipo de despacho: <span className="font-medium text-gray-900">{ETIQUETA_TIPO_DESPACHO[tipoDespacho]}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setCambiandoModo(true)}
+            className="text-sm text-blue-600 hover:text-blue-800 transition inline-flex items-center min-h-[44px] px-2 shrink-0"
+          >
+            Cambiar
+          </button>
+        </div>
+      )}
+      {mostrarModo && !(v2 && !cambiandoModo) && (
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <span className="text-xs uppercase tracking-wide text-gray-400 mb-2 block">
           Tipo de despacho
@@ -247,7 +273,7 @@ export default function DespachoForm({
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         {/* 🔴 EL BLOQUE FIJO DE JUEGOS FRECUENTES SE FUE DE ACÁ: hoy es el
             autocompletado del campo «Recibido por», más abajo. Ver la cabecera. */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className={v2 ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" : "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"}>
           {/* ⚠️ La placa SOLO existe con transportista externo. Ver la cabecera. */}
           {externo && (
             <div>
@@ -382,16 +408,20 @@ export default function DespachoForm({
           type="button"
           onClick={handleConfirmar}
           disabled={!puedeDespachar || bSaving}
-          className={`w-full rounded-lg text-base font-semibold min-h-[52px] transition-all ${
-            puedeDespachar && !bSaving
+          /* Con el interruptor prendido solo se apaga mientras guarda: lo que falta se dice al tocarlo. */
+          {...soloAlGuardar}
+          className={`w-full ${v2 ? "rounded-md" : "rounded-lg"} text-base font-semibold min-h-[52px] transition-all ${
+            v2 && !bSaving
+              ? "bg-black text-white hover:bg-gray-800 active:scale-[0.99]"
+              : puedeDespachar && !bSaving
               ? "bg-emerald-700 text-white hover:bg-emerald-800 active:scale-[0.99]"
               : "bg-gray-300 text-white cursor-not-allowed"
           }`}
         >
           {bSaving ? "Guardando…" : "Despachar"}
         </button>
-        {!puedeDespachar && (
-          <p className="mt-2 text-sm font-medium text-amber-700 text-center">
+        {!puedeDespachar && (!v2 || intentado) && (
+          <p role={v2 ? "alert" : undefined} className="mt-2 text-sm font-medium text-amber-700 text-center">
             {textoFalta(faltantes)}
           </p>
         )}

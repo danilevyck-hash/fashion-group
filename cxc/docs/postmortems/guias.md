@@ -2602,3 +2602,14 @@ Los dos últimos admiten además una variable para prenderlos en local (`NEXT_PU
 **Migraciones de Pedidos de estos días**: `20270103120000_pedidos_flujo_simple.sql` (7-oct-2026) y `20270109120000_pedidos_en_preparacion.sql` (9-oct-2026), las dos aditivas —ensanchan el CHECK y agregan columnas en NULL— y aplicadas según `275b0f56` y #707.
 
 **Candados**: `pedidos-flujo-simple` · `pedidos-en-preparacion` · `pedidos-recibir-roles-reales` · `despachos-abre-en-pedidos` · `despachos-sin-switch-al-entrar` · `guias-grupos-fecha-2026-10` · `guias-pendiente-con-barra` · `cron-calendario`.
+
+
+## Detalle de la guía, segunda pasada estilo Apple (9-oct-2026, apagado)
+
+Interruptor `GUIA_DETALLE_APPLE_2026_10` (`src/lib/guias/guias-2026-10.ts`), **apagado**: lo prende Daniel. Lo que traía desde el 2-oct (marco compacto y una fila por envío) ya estaba en producción desde el 5-oct, porque se prendió junto con `GUIAS_LISTA_APPLE_2026_10`; el interruptor era un no-op y su candado miraba una combinación que ya no existe en producción. Ahora gobierna la segunda pasada.
+
+- **Uso medido (1-sep a 9-oct-2026, solo lectura):** 40 guías creadas (Angela 24, Andrea 15) y 39 despachadas, 37 por Bodega, que entra desde el celular (24 de sus 26 visitas). Mediana de 46 minutos entre crear y despachar. 31 ediciones de envíos en 13 guías, todas de secretaría. 29 N° del transportista anotados, 12 de ellos después de despachar. Observaciones en 14 de 37 guías. Imprimir y Compartir no dejan registro: no se pudo medir y no se escondió ninguno.
+- **Lo que cambia al prender:** «Despachada» junto al título; observaciones antes de los envíos; en la despachada se van «Ya despachada» y «Tipo de despacho», entra «Despachado por» y el N° del transportista común se dice una vez; en la pendiente se van la frase y el rótulo repetidos del N° del transportista, «Tipo de despacho» pasa a una línea, los cuatro datos van en una fila y «Despachar» es negro, no se apaga y dice todo lo que falta al tocarlo; en el celular los tres botones van en una fila.
+- **Lo que no cambia:** el PUT del despacho, las reglas del servidor, las cajas (mismos `id`), el papel.
+- **Candados:** `guias-detalle-apple-apagado.test.tsx` (apagado = HTML de `origin/main`, byte por byte, en cinco estados; y la pantalla prendida) y `guias-detalle-apple.test.tsx` (PUT idéntico).
+
