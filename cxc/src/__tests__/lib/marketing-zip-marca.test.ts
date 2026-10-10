@@ -655,42 +655,34 @@ describe("ZIP por marca — carpetas por concepto (Impulsadoras y Mobiliario y e
     }
   });
 
-  // 🔴 7-oct-2026: las 26 entregas vivas YA tienen tienda y nunca llegan a
-  // `carpetaSinClientePorConcepto` — quedaban 5 FACTURAS sin tienda ni
-  // impulsadora (compras de mobiliario, $22.416,50 medidos) cayendo a
-  // General porque la regla solo miraba `tipo === "entrega"`. Ahora también
-  // mira el CONCEPTO (`PALABRAS_MOBILIARIO_SIN_TIENDA`).
-  it("EN VIVO: una FACTURA sin tienda ni impulsadora cuyo concepto es «Muebles» va a Mobiliario y exhibición", async () => {
-    tablas.mk_facturas.push(fact("f6", null, "MOB-1", "2026-06-12", "Muebles", 300));
-    tablas.mk_factura_marcas.push({ factura_id: "f6", marca_id: M_TH, porcentaje: 100 });
-    tablas.mk_periodo_documentos.push(sello(P_ABIERTO, "factura", "f6"));
+  // 🔴 CANDADO (9-oct-2026, decisión de Daniel): la carpeta sale de la tienda
+  // de la factura, SIN ADIVINAR por el texto del concepto. Una factura sin
+  // tienda ni impulsadora va a «General» diga lo que diga su concepto.
+  // 🩸 Antes «Muebles», «Tazas» y «Barras Planas» la mandaban a «Mobiliario y
+  // exhibición».
+  it("EN VIVO: una FACTURA sin tienda ni impulsadora NO cae en Mobiliario y exhibición por su concepto — va a General", async () => {
+    tablas.mk_facturas.push(
+      fact("f6", null, "MOB-1", "2026-06-12", "Muebles", 300),
+      fact("f7", null, "MOB-2", "2026-06-13", "Tazas", 50),
+      fact("f8", null, "MOB-3", "2026-06-14", "Barras Planas (60 unidades a 8.50 c/u)", 545.7),
+    );
+    for (const id of ["f6", "f7", "f8"]) {
+      tablas.mk_factura_marcas.push({ factura_id: id, marca_id: M_TH, porcentaje: 100 });
+      tablas.mk_periodo_documentos.push(sello(P_ABIERTO, "factura", id));
+    }
     tablas.mk_adjuntos.push(adj("a8", "pdf_factura", "f6", null, "fact/f6.pdf", "factura-muebles.pdf"));
     storage["fact/f6.pdf"] = Buffer.from("bytes");
     const r = await buildZipDeMarca({ marcaCodigo: "TH" });
     const paths = await rutas(r.buffer);
-    expect(paths.some((p) => p.startsWith("Mobiliario y exhibición/facturas/"))).toBe(true);
-    expect(r.carpetas).toContain("Mobiliario y exhibición");
-  });
-
-  it("EN VIVO: la misma factura, con «Tazas» o «Barras Planas» (normalizado, sin acentos), también va a Mobiliario y exhibición", async () => {
-    tablas.mk_facturas.push(
-      fact("f6", null, "MOB-1", "2026-06-12", "Tazas", 50),
-      fact("f7", null, "MOB-2", "2026-06-13", "Barras Planas (60 unidades a 8.50 c/u)", 545.7),
-    );
-    tablas.mk_factura_marcas.push(
-      { factura_id: "f6", marca_id: M_TH, porcentaje: 100 },
-      { factura_id: "f7", marca_id: M_TH, porcentaje: 100 },
-    );
-    tablas.mk_periodo_documentos.push(
-      sello(P_ABIERTO, "factura", "f6"),
-      sello(P_ABIERTO, "factura", "f7"),
-    );
-    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    expect(paths.some((p) => p.startsWith("Mobiliario y exhibición/"))).toBe(false);
+    expect(r.carpetas).not.toContain("Mobiliario y exhibición");
+    expect(paths.some((p) => p.startsWith("General/facturas/"))).toBe(true);
     const etiquetas = (await hojaResumen(r.buffer)).map((f) => String(f[0] ?? ""));
-    expect(etiquetas).toContain("Mobiliario y exhibición");
+    expect(etiquetas).not.toContain("Mobiliario y exhibición");
+    expect(etiquetas).toContain("General");
   });
 
-  it("EN VIVO: un evento sin tienda cuyo concepto NO es de mobiliario sigue en General", async () => {
+  it("EN VIVO: un evento sin tienda ni impulsadora va a General", async () => {
     // f4 (fixture base) es "evento apertura", sin cliente ni impulsadora.
     const r = await buildZipDeMarca({ marcaCodigo: "TH" });
     const etiquetas = (await hojaResumen(r.buffer)).map((f) => String(f[0] ?? ""));

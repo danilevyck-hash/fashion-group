@@ -184,14 +184,6 @@ describe("solo lo cobrable · al editar, «No recuperable»", () => {
 });
 
 describe("solo lo cobrable · las reglas", () => {
-  it("la carpeta del ZIP de una factura vieja sin tienda: las 4 de Boston a mobiliario, el resto a General", () => {
-    const c = { mobiliario: "Mobiliario y exhibición", general: "General" };
-    expect(lib.carpetaDeFacturaSinTienda("f60ad102-cfc4-4e0e-955d-040c14136f6e", c)).toBe("Mobiliario y exhibición");
-    expect(lib.carpetaDeFacturaSinTienda("a76a1606-fbfa-4321-bee4-a8aac787930c", c)).toBe("Mobiliario y exhibición");
-    expect(lib.carpetaDeFacturaSinTienda("cualquier-otra", c)).toBe("General");
-    expect(lib.carpetaDeFacturaSinTienda(null, c)).toBe("General");
-  });
-
   it("la tienda es obligatoria y se guarda en mayúsculas", () => {
     const propia = (c: string) => c === "D-108";
     expect(lib.faltaEnElDestino({ marcaId: "", tienda: null, pct: null }, propia)).toEqual(["la marca", "la tienda", "cuánto se cobra"]);

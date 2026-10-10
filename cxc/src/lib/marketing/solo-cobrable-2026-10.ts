@@ -14,10 +14,10 @@
 //      «Se cobra» suma «No recuperable»: así Daniel pasa él mismo una factura
 //      ya cargada (las de Boston, la #145) fuera de la marca y del ZIP.
 //   2. EL ZIP — la carpeta sale de lo elegido: la tienda, «Impulsadoras» o
-//      «Mobiliario y exhibición» (la entrega). Ya no se adivina por el texto
-//      del concepto. Las facturas viejas sin tienda no se tocan: las 4 que esa
-//      regla mandaba a «Mobiliario y exhibición» siguen ahí, por su id; otra
-//      cualquiera sin tienda cae en «General», el cajón de siempre.
+//      «Mobiliario y exhibición» (la entrega). No se adivina por el texto del
+//      concepto ni por una lista de ids: una factura sin tienda cae en
+//      «General». Desde el 9-oct-2026 esto NO depende del interruptor: vive
+//      en `zip-marca.ts › carpetaSinTienda` y vale siempre.
 //   3. LA PORTADA abre en Marcas: una fila por marca con lo pendiente del
 //      período abierto, ya con el 50 % aplicado, sin las marcas vacías.
 //   4. NO RECUPERABLE — una pestaña al final, solo de consulta, con lo que ya
@@ -93,38 +93,6 @@ export function tiendaQueSeGuarda(t: TiendaDelCargo): string | null {
   if (t === null) return null;
   const c = t.codigo.trim().toUpperCase();
   return c.length > 0 ? c : null;
-}
-
-// ─── 2 · LA CARPETA DEL ZIP ─────────────────────────────────────────────────
-
-/**
- * 🔴 LAS FACTURAS VIEJAS SIN TIENDA, CONGELADAS POR ID (medido en producción
- * el 7-oct-2026, solo lectura). Son las 4 de Confecciones Boston («Muebles» ×3,
- * «Tazas» ×1, $21,870.80) que la regla por concepto mandaba a «Mobiliario y
- * exhibición». Siguen cayendo ahí sin tocar la base. La quinta sin tienda, la
- * #145, no es cobrable y no entra a ningún ZIP. Cuando Daniel las pase a
- * «No recuperable», salen del ZIP solas y esta lista queda sin efecto.
- */
-export const FACTURAS_SIN_TIENDA_DE_MOBILIARIO = new Set<string>([
-  "a76a1606-fbfa-4321-bee4-a8aac787930c", // 11-00007766 · Muebles
-  "f60ad102-cfc4-4e0e-955d-040c14136f6e", // 11-000007766 · Tazas
-  "31696b75-22d3-4261-93e7-6fb12731a07c", // 11-0000007756 · Muebles
-  "4123aefb-f38c-4651-ab3b-ea4f2fbc4a45", // 00000007757 · Muebles
-]);
-
-/**
- * La carpeta de una FACTURA sin tienda y sin impulsadora, con el interruptor
- * prendido. Desde el registro nuevo ya no nace ninguna (la tienda es
- * obligatoria): solo llegan las viejas. Sin adivinar: o es una de las 4 de
- * mobiliario, o va al cajón de siempre.
- */
-export function carpetaDeFacturaSinTienda(
-  documentoId: string | null | undefined,
-  carpetas: { mobiliario: string; general: string },
-): string {
-  return FACTURAS_SIN_TIENDA_DE_MOBILIARIO.has(String(documentoId ?? "").trim())
-    ? carpetas.mobiliario
-    : carpetas.general;
 }
 
 // ─── 3 · LA PORTADA ─────────────────────────────────────────────────────────
