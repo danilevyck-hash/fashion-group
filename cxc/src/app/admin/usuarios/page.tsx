@@ -108,7 +108,11 @@ function UsuariosPageInner() {
   const [revokeTarget, setRevokeTarget] = useState<{ id: string; userName: string } | null>(null);
 
   // Usuarios del sistema (fg_users)
-  interface FgUser { id: string; name: string; role: string; active: boolean; associated_company: string | null; modulos_override: string[] | null; }
+  interface FgUser { id: string; name: string; role: string; active: boolean; associated_company: string | null; modulos_override: string[] | null; empleado_codigo?: string | null; }
+  // 🔴 «Colaborador» (9-oct-2026): la ficha de Asistencia por la que este
+  // usuario marca. Sirve para cualquier rol (un bodega que también marca).
+  const [colaboradores, setColaboradores] = useState<{ codigo: string; nombre: string | null }[]>([]);
+  const [uColaborador, setUColaborador] = useState("");
   const [fgUsers, setFgUsers] = useState<FgUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -158,6 +162,8 @@ function UsuariosPageInner() {
       const res = await fetch("/api/admin/users");
       if (res.status === 401) { sessionStorage.clear(); window.location.href = "/"; return; }
       if (res.ok) setFgUsers(await res.json());
+      const rc = await fetch("/api/admin/users/colaboradores");
+      if (rc.ok) setColaboradores(await rc.json());
     } catch { showToast("Error al cargar usuarios"); }
     setLoadingUsers(false);
   }, []);
@@ -180,11 +186,12 @@ function UsuariosPageInner() {
 
   function openNewUser() {
     setEditUserId(null); setUName(""); setUPassword(""); setURole("vendedor"); setUCompany("");
-    setCustomPerms(false); setUModules([]);
+    setCustomPerms(false); setUModules([]); setUColaborador("");
     setShowUserModal(true);
   }
   function openEditUser(u: FgUser) {
     setEditUserId(u.id); setUName(u.name); setUPassword(""); setURole(u.role); setUCompany(u.associated_company || "");
+    setUColaborador(u.empleado_codigo || "");
     const hasOverride = Array.isArray(u.modulos_override) && u.modulos_override.length > 0;
     setCustomPerms(hasOverride);
     setUModules(hasOverride ? [...u.modulos_override!] : []);
@@ -207,6 +214,7 @@ function UsuariosPageInner() {
         name: uName.trim(),
         role: uRole,
         associated_company: uCompany || null,
+        empleado_codigo: uColaborador || null,
         // Se manda solo lo que ese ROL puede abrir: si alguien cambia el rol
         // con casillas ya marcadas, las que el nuevo rol no alcanza se caen
         // acá en vez de guardarse para rebotar después (el servidor también
@@ -504,6 +512,33 @@ function UsuariosPageInner() {
                       Cambiar tu propio rol te quitará acceso de administrador.
                     </p>
                   )}
+                </div>
+
+                {/* 🔴 «Colaborador» (9-oct-2026): fichas activas sin usuario
+                    vinculado (más la suya). Opcional; vacío = sin vincular. */}
+                <div data-testid="usuario-colaborador">
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <label htmlFor="usuario-colaborador-campo" className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em]">
+                      Colaborador <span className="font-normal text-gray-400 normal-case">(opcional)</span>
+                    </label>
+                    <Ayuda titulo="Información" className="-my-2 shrink-0">
+                      <p>La ficha de Asistencia por la que este usuario marca desde el teléfono. Para marcar necesita, además, el permiso de Marcación (por su rol o en permisos personalizados).</p>
+                    </Ayuda>
+                  </div>
+                  <select
+                    id="usuario-colaborador-campo"
+                    value={uColaborador}
+                    onChange={e => setUColaborador(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm focus:outline-none focus:border-gray-900 transition"
+                  >
+                    <option value="">Sin vincular</option>
+                    {uColaborador && !colaboradores.some(c => c.codigo === uColaborador) && (
+                      <option value={uColaborador}>Código {uColaborador}</option>
+                    )}
+                    {colaboradores
+                      .filter(c => c.codigo === uColaborador || !fgUsers.some(u => u.id !== editUserId && u.empleado_codigo === c.codigo))
+                      .map(c => <option key={c.codigo} value={c.codigo}>{c.nombre || "Sin nombre"} · {c.codigo}</option>)}
+                  </select>
                 </div>
 
                 <div>

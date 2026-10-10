@@ -40,6 +40,7 @@ import {
 } from "@/lib/asistencia/ficha-de-configuracion";
 import { leerInsumosDeUnaPersona } from "@/lib/asistencia/ficha-de-configuracion-server";
 import { leerReponeTardanza, leerTrabajaAfuera } from "@/lib/asistencia/config-server";
+import { usuarioDelColaborador } from "@/lib/usuarios/usuario-servidor";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -70,8 +71,13 @@ export async function GET(req: NextRequest) {
       ? { ...armarPersonaDeConfiguracion(insumos).persona, trabajaAfuera: afuera.has(codigo), reponeTardanza: compensan.has(codigo) }
       : null;
 
+    // El usuario vinculado a la ficha (9-oct-2026): al dar de baja se ofrece
+    // desactivarlo ahí mismo. Va APARTE de `persona`, que es la ficha.
+    const usuario = persona ? await usuarioDelColaborador(codigo).catch(() => null) : null;
+
     return NextResponse.json({
       persona,
+      usuario: usuario ? { name: usuario.name, active: usuario.active } : null,
       // Las reglas viajan porque la respuesta de la lista también las manda y
       // la pantalla es la misma. Salen del MISMO `leerReglas`.
       reglas: insumos?.reglas ?? REGLAS_DEFAULT,

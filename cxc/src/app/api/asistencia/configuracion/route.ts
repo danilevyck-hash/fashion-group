@@ -86,6 +86,12 @@ import {
   type MarcaPosterior,
 } from "@/lib/asistencia/vigencia";
 
+// 🔴 ALTA Y BAJA EN UNA SOLA PASADA (9-oct-2026). Ver `alta-colaborador.ts`.
+import { avisoCodigoRepetido } from "@/lib/asistencia/alta-colaborador";
+import { siguienteCodigoLibre } from "@/lib/asistencia/alta-colaborador-server";
+import { ROL_MARCACION } from "@/lib/marcacion/rol";
+import { cambiarActivo, insertarUsuario, revisarUsuarioNuevo, usuarioDelColaborador } from "@/lib/usuarios/usuario-servidor";
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -412,10 +418,50 @@ export async function PUT(req: NextRequest) {
   // ya es `numeric` (verificado por PostgREST: acepta `12.5`). Hoy un error de
   // la base es un 500 con el mensaje — reintentar sin una columna guardaría la
   // ficha SIN el dato que la contadora tecleó, en silencio.
-  const { error } = await supabaseServer
-    .from(TABLA_PERSONAS)
-    .upsert(conPapel, { onConflict: "empleado_codigo" });
+  //
+  // 🔴 EL ALTA NO PISA A NADIE (9-oct-2026). «+ Nuevo colaborador» manda
+  // `alta: true`: si el código ya tiene ficha, se frena con 409 y no se escribe
+  // nada (antes el upsert pisaba la ficha de otra persona sin avisar). Y si
+  // viene «Marcación desde el teléfono», todo lo que puede frenar al usuario
+  // —contraseña corta o repetida, nombre repetido— se revisa ANTES de escribir
+  // la ficha: o entra todo, o nada.
+  const esAlta = b?.alta === true;
+  const acceso = esAlta ? (b?.accesoMarcacion as { password?: unknown } | null | undefined) : null;
+  if (acceso) {
+    // Crear usuarios es del administrador, igual que en la pantalla de Usuarios.
+    if (auth.role !== "admin") {
+      return NextResponse.json(
+        { error: "Solo un administrador crea usuarios. Apaga «Marcación desde el teléfono» y guarda la ficha." },
+        { status: 403 },
+      );
+    }
+    const fallo = await revisarUsuarioNuevo(p.nombre, acceso.password);
+    if (fallo) return NextResponse.json({ error: fallo.error }, { status: fallo.status });
+  }
+  if (esAlta) {
+    const { data: ya } = await supabaseServer
+      .from(TABLA_PERSONAS)
+      .select("empleado_codigo, nombre")
+      .eq("empleado_codigo", p.codigo)
+      .maybeSingle();
+    if (ya) {
+      const sugerido = await siguienteCodigoLibre(p.empresa).catch(() => null);
+      return NextResponse.json(
+        { error: avisoCodigoRepetido(p.codigo, (ya as { nombre?: string | null }).nombre, sugerido) },
+        { status: 409 },
+      );
+    }
+  }
 
+  // El alta INSERTA (dos altas a la vez con el mismo código: la segunda choca
+  // con la llave y no pisa); editar sigue siendo el upsert de siempre.
+  const { error } = esAlta
+    ? await supabaseServer.from(TABLA_PERSONAS).insert(conPapel)
+    : await supabaseServer.from(TABLA_PERSONAS).upsert(conPapel, { onConflict: "empleado_codigo" });
+
+  if (error && esAlta && (error as { code?: string }).code === "23505") {
+    return NextResponse.json({ error: avisoCodigoRepetido(p.codigo, null) }, { status: 409 });
+  }
   if (error) {
     console.error("[asistencia/configuracion PUT]", error.message);
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
@@ -470,5 +516,29 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, cobraHorasExtra: cobraHorasExtraValor, trabajaAfuera: trabajaAfueraValor, reponeTardanza: reponeTardanzaValor } });
+  // 🔴 «Marcación desde el teléfono»: el usuario nace con el rol Marcación y
+  // vinculado a esta ficha, por la MISMA función de la pantalla de Usuarios.
+  let usuario: string | null = null;
+  let avisoUsuario: string | null = null;
+  if (acceso) {
+    const r = await insertarUsuario({
+      name: p.nombre, password: String(acceso.password), role: ROL_MARCACION, empleado_codigo: p.codigo,
+    });
+    if (r.ok) usuario = String(r.user.name);
+    else avisoUsuario = "La ficha se guardó, pero no se pudo crear el usuario. Créalo en Usuarios › Nuevo usuario y selecciona el colaborador.";
+  }
+
+  // 🔴 LA BAJA DESACTIVA SU USUARIO EN LA MISMA PASADA, si viene la casilla y
+  // hay fecha de salida. Nada se borra: el usuario queda inactivo y sin sesiones.
+  let usuarioDesactivado: string | null = null;
+  if (b?.desactivarUsuario === true && v.fechaSalida && puedeTocarLaFicha) {
+    const u = await usuarioDelColaborador(p.codigo);
+    if (u?.active) {
+      const r = await cambiarActivo(u.id, false);
+      if (r.ok) usuarioDesactivado = r.name;
+      else avisoUsuario = `La ficha se guardó, pero el usuario ${u.name} sigue activo: ${r.error}`;
+    }
+  }
+
+  return NextResponse.json({ ok: true, usuario, usuarioDesactivado, avisoUsuario, persona: { ...p, ...v, servicioProfesional, pagaSeguros, baseSeguros, noMarcaReloj: noMarcaRelojValor, cobraHorasExtra: cobraHorasExtraValor, trabajaAfuera: trabajaAfueraValor, reponeTardanza: reponeTardanzaValor } });
 }
