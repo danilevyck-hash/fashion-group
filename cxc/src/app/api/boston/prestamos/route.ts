@@ -73,7 +73,6 @@ interface EmpleadoFila {
 const SELECT_FICHA =
   "id, nombre, empresa, deduccion_quincenal, deduccion_terceros, deduccion_dano, prestamos_movimientos(concepto, monto, estado, deleted, fecha, cuenta)";
 /** Sin la columna de terceros (DDL pendiente) se lee sin ella: la cuota es la del préstamo. */
-const SELECT_FICHA_SIN_TERCEROS = SELECT_FICHA.replace("deduccion_terceros, ", "");
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, rolesModuloBoston());
@@ -91,8 +90,7 @@ export async function GET(req: NextRequest) {
       .select(select)
       .or("deleted.is.null,deleted.eq.false")
       .order("nombre", { ascending: true });
-  let { data, error } = await leer(SELECT_FICHA);
-  if (error && /deduccion_terceros/.test(error.message)) ({ data, error } = await leer(SELECT_FICHA_SIN_TERCEROS));
+  const { data, error } = await leer(SELECT_FICHA);
 
   if (error) {
     console.error(`[boston/prestamos] ${error.message}`);

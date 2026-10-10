@@ -16,7 +16,7 @@
 //   3. 🔴 Pasado el plazo la limpieza borra el ARCHIVO y la FILA SE QUEDA (sin
 //      botón); un día antes no toca nada. El test lo DERIVA de la constante
 //      —tenía 91 y 89 escritos a mano y se cayó al mover el plazo—.
-//      DDL pendiente → no-op limpio.
+//      Un error de la base → avería (ok:false), no «DDL pendiente».
 //   4. El POST JSON de siempre sigue andando (fila sin archivo, como las ~140
 //      corridas viejas — gris, sin botón).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -275,11 +275,13 @@ describe("🔴 pasado el plazo se borra el ARCHIVO y la fila con los totales SE 
     expect(r2.borrados).toBe(0);
   });
 
-  it("DDL pendiente → no-op limpio (nada que limpiar, no una avería)", async () => {
+  it("🔴 un error de la base que nombra la columna ES una avería: ya no se lee como «DDL pendiente»", async () => {
+    // La columna existe (9-oct-2026). Antes este error salía `ok: true` y la
+    // limpieza podía quedarse meses sin correr sin que nadie se enterara.
     estado.columnaArchivo = false;
     const r = await runLimpiezaArchivosDepurador();
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
     expect(r.borrados).toBe(0);
-    expect(r.detail).toContain("pendiente");
+    expect(r.detail).toContain("archivo_path");
   });
 });

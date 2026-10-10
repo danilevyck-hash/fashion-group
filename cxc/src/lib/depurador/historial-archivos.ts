@@ -79,14 +79,7 @@ export async function runLimpiezaArchivosDepurador(now: Date = new Date()): Prom
     .lt("created_at", cutoff)
     .limit(500);
 
-  if (error) {
-    // DDL pendiente: la columna archivo_path no existe todavía → nada que
-    // limpiar, no es una avería.
-    if (/archivo_path/.test(error.message) || error.code === "42703") {
-      return { ok: true, detail: "columna archivo_path pendiente de DDL — nada que limpiar", borrados: 0, cutoff };
-    }
-    return { ok: false, detail: error.message, borrados: 0, cutoff };
-  }
+  if (error) return { ok: false, detail: error.message, borrados: 0, cutoff };
 
   const filas = (data ?? []) as { id: string; archivo_path: string }[];
   if (filas.length === 0) return { ok: true, detail: "sin candidatos", borrados: 0, cutoff };
