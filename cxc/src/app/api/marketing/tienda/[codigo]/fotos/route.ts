@@ -10,8 +10,8 @@
 // y viaja con su `periodo` puesto SOLO si ese sello ya cerró: la cuadrícula de
 // la ficha filtra con el mismo chip que la lista de gastos (`fotos-periodo.ts`).
 //
-// 🔴 Falla ABIERTA: sin la columna contesta 200 con lista vacía y lo dice en
-// `sinMigracion`, igual que el resto del rediseño; sin la regla nueva, el POST
+// Las columnas `tienda_codigo` y `periodo_id` existen (9-oct-2026): un error
+// de lectura o de escritura falla con su error. Sin la regla nueva, el POST
 // avisa en español y BORRA del cajón el archivo que acababa de subir.
 // ============================================================================
 
@@ -20,7 +20,6 @@ import { requireRole } from "@/lib/requireRole";
 import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { supabaseServer } from "@/lib/supabase-server";
 import { firmarAdjuntos } from "@/lib/marketing/storage";
-import { esColumnaAusente, sinColumnasDelRediseno } from "@/lib/marketing/columnas-opcionales";
 import { esCodigoGeneral, VISTA_TIENDA } from "@/lib/marketing/vista-tienda";
 import { TIENDA_GENERAL } from "@/lib/marketing/gasto";
 import {
@@ -72,10 +71,7 @@ export async function GET(
       .eq("tipo", "foto_proyecto")
       .eq("tienda_codigo", codigo)
       .order("created_at", { ascending: false });
-    if (error) {
-      if (esColumnaAusente(error)) return NextResponse.json([]);
-      throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
     const filas = (data ?? []) as MkAdjunto[];
     const firmados = await firmarAdjuntos(filas);
     // 🔴 El período de cada foto: solo si su sello ya CERRÓ. Sin la columna
@@ -135,8 +131,7 @@ async function conSuPeriodo(
  * SERVIDOR valida que sea de una marca con gasto ABIERTO en ESTA tienda. Lo
  * que no cuadra es 400 en español y el archivo se borra del cajón.
  *
- * 🔴 Falla ABIERTA: sin la columna, se guarda como antes —sin tienda ni
- * sello— y se dice en el log; la foto NO se pierde. 🩸 Y si la base rechaza
+ * 🩸 Si la base rechaza
  * la fila por la regla vieja (`mk_adjuntos_destino_chk` exige proyecto), el
  * aviso sale EN ESPAÑOL y el archivo recién subido se BORRA del cajón: cada
  * intento fallido dejaba un huérfano (4 medidos el 24-sep-2026).
@@ -205,33 +200,11 @@ export async function POST(
     const periodoId = destino.periodoId;
     const conTienda: Record<string, unknown> = { ...base, tienda_codigo: codigo };
     if (periodoId) conTienda.periodo_id = periodoId;
-    let { data, error } = await supabaseServer
+    const { data, error } = await supabaseServer
       .from("mk_adjuntos")
       .insert(conTienda)
       .select()
       .single();
-    // Sin `periodo_id` (la migración todavía no corrió) se reintenta sin el
-    // sello: la foto se guarda igual y se ve bajo «Abierto».
-    if (error && periodoId && esColumnaAusente(error)) {
-      console.warn(
-        "[marketing/fotos-periodo] mk_adjuntos.periodo_id no existe; la foto se guarda sin sello.",
-      );
-      ({ data, error } = await supabaseServer
-        .from("mk_adjuntos")
-        .insert({ ...base, tienda_codigo: codigo })
-        .select()
-        .single());
-    }
-    if (error && esColumnaAusente(error)) {
-      console.warn(
-        "[marketing/rediseño] mk_adjuntos.tienda_codigo no existe; la foto se guarda sin tienda.",
-      );
-      ({ data, error } = await supabaseServer
-        .from("mk_adjuntos")
-        .insert(sinColumnasDelRediseno(base))
-        .select()
-        .single());
-    }
     // 🩸 La regla vieja todavía exige proyecto: el archivo ya está subido, así
     // que se BORRA y se avisa en español. Nunca el texto crudo de Postgres.
     if (error && esLaReglaDeDestino(error)) {

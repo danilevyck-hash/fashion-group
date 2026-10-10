@@ -34,7 +34,6 @@
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { conRespaldoSinColumnas } from "./columnas-opcionales";
 import { buscarDuplicado, type HuellaDeGasto } from "./duplicado";
 import {
   ErrorGastoDuplicado,
@@ -78,21 +77,12 @@ export async function frenarFacturaDuplicada(
   if (!MARKETING_PUERTA_GASTO) return;
   const fecha = String(nuevo.fecha ?? "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return;
-  // `tienda_codigo` es del rediseño: si la base todavía no la tuviera, se
-  // relee sin ella y todas las filas cuentan como «General» — el freno queda
-  // MÁS suelto, nunca más apretado. Falla ABIERTA.
-  const pedir = (columnas: string) =>
-    supabaseServer
-      .from("mk_facturas")
-      .select(columnas)
-      .is("anulado_en", null)
-      .is("impulsadora_id", null)
-      .eq("fecha_factura", fecha);
-  const { resultado } = await conRespaldoSinColumnas<unknown[]>(
-    () => pedir("id, numero_factura, proveedor, total, fecha_factura, tienda_codigo"),
-    () => pedir("id, numero_factura, proveedor, total, fecha_factura"),
-  );
-  const { data, error } = resultado;
+  const { data, error } = await supabaseServer
+    .from("mk_facturas")
+    .select("id, numero_factura, proveedor, total, fecha_factura, tienda_codigo")
+    .is("anulado_en", null)
+    .is("impulsadora_id", null)
+    .eq("fecha_factura", fecha);
   if (error) throw new Error(`duplicado[lookup]: ${error.message}`);
   const existentes = ((data ?? []) as FilaFactura[]).map((r) =>
     huellaDeFila(r, r.fecha_factura, r.tienda_codigo ?? null),
@@ -111,20 +101,11 @@ export async function frenarPagoDuplicado(
   nuevo: HuellaDeGasto,
 ): Promise<void> {
   if (!MARKETING_PUERTA_GASTO) return;
-  // `periodo_desde` llegó con la migración 20260727140000; si la base no la
-  // tuviera, se relee sin ella y la fecha del pago es `impulsadora_mes`
-  // (falla abierta, como `hayColumnasPeriodo` en `impulsadoras.ts`).
-  const pedir = (columnas: string) =>
-    supabaseServer
-      .from("mk_facturas")
-      .select(columnas)
-      .is("anulado_en", null)
-      .eq("impulsadora_id", impulsadoraId);
-  const { resultado } = await conRespaldoSinColumnas<unknown[]>(
-    () => pedir("id, numero_factura, proveedor, total, fecha_factura, periodo_desde, impulsadora_mes"),
-    () => pedir("id, numero_factura, proveedor, total, fecha_factura, impulsadora_mes"),
-  );
-  const { data, error } = resultado;
+  const { data, error } = await supabaseServer
+    .from("mk_facturas")
+    .select("id, numero_factura, proveedor, total, fecha_factura, periodo_desde, impulsadora_mes")
+    .is("anulado_en", null)
+    .eq("impulsadora_id", impulsadoraId);
   if (error) throw new Error(`duplicado[lookup]: ${error.message}`);
   // La «tienda» de un pago es LA IMPULSADORA, la misma para las dos partes:
   // así el freno mira lo de siempre y no se parte por el `tienda_codigo` que

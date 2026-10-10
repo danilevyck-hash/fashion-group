@@ -9,7 +9,6 @@
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { esColumnaAusente } from "./columnas-opcionales";
 import { esPathStorage } from "./storage";
 import {
   marcasAbiertasOrdenadas,
@@ -58,11 +57,11 @@ export async function marcasAbiertasDeLaTienda(
         .select("id, created_at")
         .eq("tienda_codigo", tienda),
     ]);
-    if (facRes.error && !esColumnaAusente(facRes.error)) {
+    if (facRes.error) {
       avisar("facturas", facRes.error.message);
       return [];
     }
-    if (entRes.error && !esColumnaAusente(entRes.error)) {
+    if (entRes.error) {
       avisar("entregas", entRes.error.message);
       return [];
     }
@@ -171,7 +170,7 @@ export async function leerPeriodosDeFotos(
       .select("id, nombre, nombre_al_cerrar, proveedor_key, estado, cerrado_en")
       .in("id", limpios);
     if (error) {
-      if (!esColumnaAusente(error)) avisar("leerPeriodosDeFotos", error.message);
+      avisar("leerPeriodosDeFotos", error.message);
       return out;
     }
     for (const p of (data ?? []) as Fila[]) {

@@ -26,10 +26,12 @@ interface FacturaFila {
 interface EstadoDb {
   /** Pagos ya registrados que devuelve mk_facturas. */
   facturas: FacturaFila[];
-  /** false = migración 20260727140000 SIN correr (columnas ausentes). */
+  /** false = la base contesta con error al leer las columnas del período. */
   columnasPeriodo: boolean;
   /** Inserts capturados por tabla. */
   inserts: Record<string, Record<string, unknown>[]>;
+  /** Si viene, el insert en `mk_facturas` contesta con este error. */
+  errorAlInsertar?: { code: string; message: string };
 }
 
 const ERROR_COL = {
@@ -78,7 +80,10 @@ function makeDb(estado: EstadoDb) {
           (estado.inserts[tabla] ??= []).push(fila);
           return {
             select: () => ({
-              single: async () => ({ data: { id: `id-${(estado.inserts[tabla] ?? []).length}` }, error: null }),
+              single: async () =>
+                tabla === "mk_facturas" && estado.errorAlInsertar
+                  ? { data: null, error: estado.errorAlInsertar }
+                  : { data: { id: `id-${(estado.inserts[tabla] ?? []).length}` }, error: null },
             }),
             then: (res: (v: unknown) => unknown) => res({ data: null, error: null }),
           };
@@ -257,23 +262,43 @@ describe("registrarPagoImpulsadora — quincenas", () => {
     ).rejects.toThrow("El comprobante es obligatorio");
   });
 
-  it("SIN la migración corrida: guarda igual, sin las columnas nuevas", async () => {
+  it("🔴 un error de la base que nombra la columna NO se traga: el pago falla y no se guarda a medias", async () => {
+    // Hasta el 9-oct-2026 este error se leía como «falta la migración» y el
+    // pago se guardaba SIN su período. La columna existe: el error es de verdad.
     const estado = estadoBase({ columnasPeriodo: false });
     const { registrarPagoImpulsadora } = await cargarLib(estado);
 
-    const res = await registrarPagoImpulsadora("imp-1", {
-      desde: "2026-07-01",
-      hasta: "2026-07-15",
-      monto: 400,
-      comprobante,
-    });
+    await expect(
+      registrarPagoImpulsadora("imp-1", {
+        desde: "2026-07-01",
+        hasta: "2026-07-15",
+        monto: 400,
+        comprobante,
+      }),
+    ).rejects.toThrow(/periodo_desde/);
+    expect(estado.inserts["mk_facturas"]).toBeUndefined();
+  });
 
-    expect(res.facturasCreadas).toBe(1);
-    const f = estado.inserts["mk_facturas"][0];
-    expect(f.periodo_desde).toBeUndefined();
-    expect(f.impulsadora_mes).toBe("2026-07-01");
-    // El período no se pierde: queda escrito en el concepto del gasto.
-    expect(f.concepto).toBe("Impulsadora Ana Pérez — 1–15 de julio 2026");
+  it("🔴 un error de ESCRITURA que nombra una columna no se reintenta sin ella", async () => {
+    const estado = estadoBase({
+      errorAlInsertar: {
+        code: "PGRST204",
+        message: "Could not find the 'se_reporta' column of 'mk_facturas' in the schema cache",
+      },
+    });
+    const { registrarPagoImpulsadora } = await cargarLib(estado);
+
+    await expect(
+      registrarPagoImpulsadora("imp-1", {
+        desde: "2026-07-01",
+        hasta: "2026-07-15",
+        monto: 400,
+        comprobante,
+        seReporta: false,
+      } as never),
+    ).rejects.toThrow(/se_reporta/);
+    // UN solo intento: antes venía un segundo insert, sin las columnas nuevas.
+    expect(estado.inserts["mk_facturas"]).toHaveLength(1);
   });
 });
 

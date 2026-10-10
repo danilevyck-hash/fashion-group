@@ -26,11 +26,7 @@ import { mesActualISO, mesAnteriorISO } from "./meses";
 import { bloquePorMarcaId, sellarDocumento } from "./periodos-io";
 import { esMarcaCodigo } from "./bloques";
 import { exigirUnaMarca } from "./gasto";
-import {
-  conRespaldoSinColumnas,
-  sinColumnasDelRediseno,
-} from "./columnas-opcionales";
-import { columnasDelGasto, traeColumnasDelGasto } from "./puerta-gasto";
+import { columnasDelGasto } from "./puerta-gasto";
 import {
   exigirTiendaDelDirectorio,
   frenarPagoDuplicado,
@@ -93,21 +89,6 @@ async function cargarSplits(
   return out;
 }
 
-// ¿Existen ya periodo_desde/periodo_hasta en mk_facturas? Se memoiza el "sí"
-// (la migración no se desaplica); el "no" se reintenta en cada llamada para que
-// el día que Daniel corra el DDL empiece a guardar el rango sin redeploy.
-let periodoDisponible: boolean | null = null;
-async function hayColumnasPeriodo(): Promise<boolean> {
-  if (periodoDisponible) return true;
-  const { error } = await supabaseServer
-    .from("mk_facturas")
-    .select("periodo_desde")
-    .limit(1);
-  const ok = !error;
-  if (ok) periodoDisponible = true;
-  return ok;
-}
-
 interface FilaPagoRaw {
   impulsadora_id: string;
   impulsadora_mes: string | null;
@@ -115,31 +96,16 @@ interface FilaPagoRaw {
   periodo_hasta?: string | null;
 }
 
-// TOLERANCIA A DDL PENDIENTE: periodo_desde/periodo_hasta (migración
-// 20260727140000) pueden no existir todavía. Si PostgREST se queja de esas
-// columnas, se relee solo con impulsadora_mes y todo el módulo sigue vivo
-// tratando cada pago como un mes completo (que es lo que eran antes).
 async function leerPagosRaw(
   impulsadoraIds: ReadonlyArray<string>,
 ): Promise<FilaPagoRaw[]> {
-  const consultar = (cols: string) =>
-    supabaseServer
-      .from("mk_facturas")
-      .select(cols)
-      .in("impulsadora_id", impulsadoraIds)
-      .is("anulado_en", null);
-
-  const conPeriodo = await consultar(
-    "impulsadora_id, impulsadora_mes, periodo_desde, periodo_hasta",
-  );
-  if (!conPeriodo.error) return (conPeriodo.data ?? []) as unknown as FilaPagoRaw[];
-  if (!/periodo_desde|periodo_hasta/.test(conPeriodo.error.message)) {
-    throw new Error(`leerPagosRaw: ${conPeriodo.error.message}`);
-  }
-
-  const sinPeriodo = await consultar("impulsadora_id, impulsadora_mes");
-  if (sinPeriodo.error) throw new Error(`leerPagosRaw: ${sinPeriodo.error.message}`);
-  return (sinPeriodo.data ?? []) as unknown as FilaPagoRaw[];
+  const { data, error } = await supabaseServer
+    .from("mk_facturas")
+    .select("impulsadora_id, impulsadora_mes, periodo_desde, periodo_hasta")
+    .in("impulsadora_id", impulsadoraIds)
+    .is("anulado_en", null);
+  if (error) throw new Error(`leerPagosRaw: ${error.message}`);
+  return (data ?? []) as unknown as FilaPagoRaw[];
 }
 
 /**
@@ -500,13 +466,7 @@ export async function registrarPagoImpulsadora(
   const fechaFactura = hoyPanama();
   const porciones = repartirMonto(monto, split);
 
-  // Pre-migración 20260727140000 el rango no se puede guardar: el pago igual se
-  // registra (con impulsadora_mes, como siempre) en vez de reventar. El
-  // concepto ya lleva el período escrito, así que el dato no se pierde.
-  const guardarPeriodo = await hayColumnasPeriodo();
-  const colsPeriodo = guardarPeriodo
-    ? { periodo_desde: desde, periodo_hasta: hasta }
-    : {};
+  const colsPeriodo = { periodo_desde: desde, periodo_hasta: hasta };
 
   const creadas: string[] = [];
   // Qué marca le tocó a cada factura creada, para sellarla al final. Se anota
@@ -532,16 +492,11 @@ export async function registrarPagoImpulsadora(
         grupo_legacy: false,
         ...cols,
       };
-      const insertar = (fila: Record<string, unknown>) =>
-        supabaseServer.from("mk_facturas").insert(fila).select("id").single();
-      const { resultado } = traeColumnasDelGasto(cols)
-        ? await conRespaldoSinColumnas(
-            () => insertar(filaPago),
-            () => insertar(sinColumnasDelRediseno(filaPago)),
-            (m) => console.error(m),
-          )
-        : { resultado: await insertar(filaPago) };
-      const { data: facData, error: facErr } = resultado;
+      const { data: facData, error: facErr } = await supabaseServer
+        .from("mk_facturas")
+        .insert(filaPago)
+        .select("id")
+        .single();
       if (facErr || !facData) {
         throw new Error(facErr?.message ?? "no se creó la factura");
       }
@@ -704,10 +659,8 @@ export async function historialPagosImpulsadora(
 ): Promise<PagoHistorial[]> {
   if (!impulsadoraId) throw new Error("impulsadoraId requerido");
 
-  const conPeriodo = await hayColumnasPeriodo();
   const cols =
-    "id, numero_factura, impulsadora_mes, concepto, fecha_factura, created_at, total, anulado_en, anulado_motivo" +
-    (conPeriodo ? ", periodo_desde, periodo_hasta" : "");
+    "id, numero_factura, impulsadora_mes, concepto, fecha_factura, created_at, total, anulado_en, anulado_motivo, periodo_desde, periodo_hasta";
 
   const { data, error } = await supabaseServer
     .from("mk_facturas")

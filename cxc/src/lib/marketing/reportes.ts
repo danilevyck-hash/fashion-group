@@ -21,7 +21,7 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { getMarcas } from "./queries";
 import type { MkMarca } from "./types";
-import { conRespaldoSinColumnas, completarGasto, completarPeriodo } from "./columnas-opcionales";
+import { completarGasto, completarPeriodo } from "./columnas-opcionales";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { tiendasPorPeriodo, type PeriodoDelGasto, type TiendasPorPeriodo } from "./periodo-manda";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
@@ -338,24 +338,12 @@ async function cargarGastosDelRediseno(): Promise<{
   nombres: NombresDeMarca;
 }> {
   const [factRes, fmRes, entRes, proyRes, marcas] = await Promise.all([
-    conRespaldoSinColumnas<FacturaGasto[]>(
-      () =>
-        supabaseServer
-          .from("mk_facturas")
-          .select(`${COLS_FACTURA_GASTO}, se_reporta, tienda_codigo`)
-          .is("anulado_en", null),
-      () => supabaseServer.from("mk_facturas").select(COLS_FACTURA_GASTO).is("anulado_en", null),
-      avisar,
-    ).then((r) => r.resultado),
+    supabaseServer
+      .from("mk_facturas")
+      .select(`${COLS_FACTURA_GASTO}, se_reporta, tienda_codigo`)
+      .is("anulado_en", null),
     supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id"),
-    conRespaldoSinColumnas<EntregaGasto[]>(
-      () =>
-        supabaseServer
-          .from("mk_entregas_muebles")
-          .select(`${COLS_ENTREGA_GASTO}, se_reporta, tienda_codigo`),
-      () => supabaseServer.from("mk_entregas_muebles").select(COLS_ENTREGA_GASTO),
-      avisar,
-    ).then((r) => r.resultado),
+    supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA_GASTO}, se_reporta, tienda_codigo`),
     supabaseServer.from("mk_proyectos").select("id, tienda, tienda_codigo").is("anulado_en", null),
     getMarcas(),
   ]);
@@ -494,15 +482,10 @@ async function cargarGastosDelRediseno(): Promise<{
 
 /** Los períodos CERRADOS, por id, con el nombre del cierre y su casa. */
 async function cargarPeriodosCerrados(): Promise<Map<string, PeriodoDelGasto>> {
-  const { resultado } = await conRespaldoSinColumnas<Array<Record<string, unknown>>>(
-    () =>
-      supabaseServer
-        .from("mk_periodos")
-        .select("id, nombre, proveedor_key, cerrado_en, nombre_al_cerrar")
-        .eq("estado", "cerrado"),
-    () => supabaseServer.from("mk_periodos").select("id, nombre, proveedor_key, cerrado_en").eq("estado", "cerrado"),
-    avisar,
-  );
+  const resultado = await supabaseServer
+    .from("mk_periodos")
+    .select("id, nombre, proveedor_key, cerrado_en, nombre_al_cerrar")
+    .eq("estado", "cerrado");
   if (resultado.error) throw new Error(`reportes[periodos]: ${resultado.error.message}`);
   const out = new Map<string, PeriodoDelGasto>();
   for (const cruda of resultado.data ?? []) {

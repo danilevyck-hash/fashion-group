@@ -126,12 +126,11 @@ describe("el interruptor", () => {
     expect(src).toContain("Rollback: fallo al asignar la marca");
   });
 
-  it("la columna nueva falla ABIERTA (sin la migración, nada se rompe)", () => {
-    const src = leer("src/lib/marketing/mutations.ts");
-    expect(src).toContain('"pct_a_la_marca"');
+  it("la columna nueva YA existe (9-oct-2026): se escribe directo, sin reintento que la quite", () => {
+    const src = sinComentarios(leer("src/lib/marketing/mutations.ts"));
+    expect(src).not.toMatch(/conRespaldoSinColumnas|sinColumnasDelRediseno/);
     const cols = leer("src/lib/marketing/columnas-opcionales.ts");
     expect(cols).toContain("COLUMNAS_DE_PROVEEDORES");
-    expect(cols).toContain("...Object.keys(COLUMNAS_DE_PROVEEDORES)");
   });
 
   it("🩸 el `porcentaje` de `mk_factura_marcas` NO se reusa (58 filas dicen 50 = 100 %)", () => {
