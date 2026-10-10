@@ -14,16 +14,16 @@
 //   <Cliente>/facturas/          los comprobantes
 //   <Cliente>/fotos/             las fotos de instalación
 //   Impulsadoras/…               ← pago mensual de quien cubre TODA la marca
-//   Mobiliario y exhibición/…    ← compra al proveedor antes de repartirse
+//   Mobiliario y exhibición/…    ← la entrega de mobiliario sin tienda todavía
 //   General/facturas/            ← el resto sin cliente (eventos, catálogos):
 //   General/fotos/                 comprobantes Y fotos
 //
 // Lo único que cambia respecto del ZIP global: el contenido va filtrado a UNA
 // marca y UN período, el nombre de cada comprobante lleva la marca, y el
-// gasto SIN cliente se agrupa por CONCEPTO antes de caer a **General**
-// (Daniel, 1-oct-2026: 28 gastos · $40.337,50 medidos, dos conceptos limpios:
-// Impulsadoras y Mobiliario y exhibición). La meta es que General quede
-// vacía — se queda como última red, no como destino.
+// gasto SIN cliente va a la carpeta de su TIPO de documento (el pago de
+// impulsadora, la entrega de mobiliario) antes de caer a **General**. Nunca
+// se adivina por el texto del concepto (Daniel, 9-oct-2026). La meta es que
+// General quede vacía — se queda como última red, no como destino.
 //
 // ────────────────────────────────────────────────────────────────────────────
 // 🔴 LA PLATA SE CONGELA, LOS PAPELES NO.
@@ -85,8 +85,6 @@ import { MARKETING_FOTOS_CON_PERIODO } from "./fotos-periodo";
 import type { ResultadoPg } from "./columnas-opcionales";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "./zip-e-impulsadoras";
 import {
-  MKT_SOLO_COBRABLE_2026_10,
-  carpetaDeFacturaSinTienda,
   motivoNoRecuperable,
   type MotivoNoRecuperable,
 } from "./solo-cobrable-2026-10";
@@ -574,86 +572,48 @@ function carpetaDeCliente(
 }
 
 /**
- * Carpetas por CONCEPTO para el gasto sin tienda — Daniel aprobó separarlas
- * de «General» (28 gastos · $40.337,50 medidos en producción, 1-oct-2026).
+ * 🔴 LA CARPETA SALE DE LA TIENDA DEL GASTO, SIN ADIVINAR (Daniel, 9-oct-2026:
+ * cada factura va a una tienda). Para el gasto SIN tienda solo cuenta lo que
+ * el documento ES, nunca lo que dice su concepto:
  *
  *   · Impulsadoras (`impulsadora_id`): el pago mensual de la persona que
  *     cubre TODA la marca — nunca tiene una tienda que mirar.
- *   · Mobiliario y exhibición (`tipo === "entrega"`): la compra al PROVEEDOR
- *     antes de repartirse entre varias tiendas — por eso nace sin proyecto.
- *     (El mueble que YA se repartió entra por su código, antes de llegar
- *     aquí: esta regla solo corre cuando no hay tienda que lo reciba.)
- *   · Mobiliario y exhibición, también por el CONCEPTO (7-oct-2026): las 26
- *     entregas vivas YA tienen tienda y nunca llegan aquí, pero quedaban 5
- *     FACTURAS del proveedor ($22.416,50 medidos) que tampoco tienen tienda ni
- *     impulsadora — compras de mobiliario que todavía no se repartieron. La
- *     tabla no tiene columna de categoría y el proveedor no sirve de ancla
- *     (4 son de Confecciones Boston, 1 es de otra persona): lo único firme
- *     que las junta es el CONCEPTO. Lista a mano en
- *     `PALABRAS_MOBILIARIO_SIN_TIENDA`, abajo — agregar una palabra ahí no
- *     toca esta función.
+ *   · Mobiliario y exhibición (`tipo === "entrega"`): la entrega de mobiliario
+ *     que todavía no tiene tienda. Es su tipo de documento, no una conjetura.
+ *   · General: toda otra factura sin tienda. Último recurso — la meta es que
+ *     quede vacía (medido en producción el 9-oct-2026, solo lectura: 0).
  *
- * Lo demás (eventos, catálogos…) sigue en General — la meta es que ahí no
- * quede nada, pero se queda como última red.
+ * 🩸 Hasta el 9-oct-2026 una factura sin tienda caía en «Mobiliario y
+ * exhibición» si su concepto decía «mueble», «tazas» o «barras planas», y
+ * antes de eso por una lista de 4 ids. Las dos reglas se fueron.
  */
 export const CARPETA_IMPULSADORAS = "Impulsadoras";
 export const CARPETA_MOBILIARIO_Y_EXHIBICION = "Mobiliario y exhibición";
 
-/**
- * 🔴 ÚLTIMO RECURSO, SIN OTRO DATO FIRME (7-oct-2026). Medido contra las 5
- * facturas vivas sin tienda ni impulsadora: «Muebles» (×3) · «Tazas» (×1,
- * mismo pedido de mobiliario que trae tazas de exhibición) · «Barras Planas»
- * (×1, varillas para armar la estructura). Comparación normalizada (sin
- * acentos, minúsculas, `norm()`), por `includes` — así «Muebles para la
- * vitrina» también cae. Agregar un término nuevo es editar ESTA lista, nunca
- * la función de abajo.
- */
-export const PALABRAS_MOBILIARIO_SIN_TIENDA = ["mueble", "tazas", "barras planas"];
-
-function esConceptoDeMobiliario(concepto: string | null | undefined): boolean {
-  const c = norm(concepto);
-  return !!c && PALABRAS_MOBILIARIO_SIN_TIENDA.some((palabra) => c.includes(palabra));
-}
-
-function carpetaSinClientePorConcepto(ctx: {
+interface DocumentoSinTienda {
   tipo: "factura" | "entrega";
   impulsadoraId?: string | null;
-  concepto?: string | null;
-  documentoId?: string | null;
-}): string {
-  if (ctx.tipo === "entrega") return CARPETA_MOBILIARIO_Y_EXHIBICION;
-  if (txt(ctx.impulsadoraId)) return CARPETA_IMPULSADORAS;
-  // 🔴 SOLO LO COBRABLE (7-oct-2026, apagado): la carpeta sale de lo elegido
-  // al registrar, sin adivinar por el concepto. Una factura nueva siempre trae
-  // tienda; las viejas sin tienda: las 4 de mobiliario por id, el resto General.
-  if (MKT_SOLO_COBRABLE_2026_10) {
-    return carpetaDeFacturaSinTienda(ctx.documentoId, {
-      mobiliario: CARPETA_MOBILIARIO_Y_EXHIBICION,
-      general: CARPETA_GENERAL,
-    });
-  }
-  if (esConceptoDeMobiliario(ctx.concepto)) return CARPETA_MOBILIARIO_Y_EXHIBICION;
+}
+
+function carpetaSinTienda(doc: DocumentoSinTienda): string {
+  if (doc.tipo === "entrega") return CARPETA_MOBILIARIO_Y_EXHIBICION;
+  if (txt(doc.impulsadoraId)) return CARPETA_IMPULSADORAS;
   return CARPETA_GENERAL;
 }
 
 /**
- * Carpeta de un gasto DE MARCA (en vivo o congelado): si `carpetaDeCliente`
- * cayó en General por falta de tienda, pregunta el CONCEPTO antes de
- * resignarse. Multifashion no la necesita: ahí todo gasto YA tiene tienda.
+ * Carpeta de un gasto DE MARCA (en vivo o congelado): la de su tienda; sin
+ * tienda, la de su tipo de documento. Multifashion no la necesita: ahí todo
+ * gasto YA tiene tienda.
  */
 function carpetaDeGasto(
   codigo: string | null,
   texto: string | null,
   nombrePorCodigo: ReadonlyMap<string, string>,
-  concepto: {
-    tipo: "factura" | "entrega";
-    impulsadoraId?: string | null;
-    concepto?: string | null;
-    documentoId?: string | null;
-  },
+  doc: DocumentoSinTienda,
 ): string {
   const base = carpetaDeCliente(codigo, texto, nombrePorCodigo);
-  return base === CARPETA_GENERAL ? carpetaSinClientePorConcepto(concepto) : base;
+  return base === CARPETA_GENERAL ? carpetaSinTienda(doc) : base;
 }
 
 // ----------------------------------------------------------------------------
@@ -1009,8 +969,6 @@ async function prepararDescargaDeMarca(op: ZipMarcaOpciones, ctx: CtxPreparacion
           carpeta: carpetaDeGasto(cod, p?.tienda ?? null, nombrePorCodigo, {
             tipo: "factura",
             impulsadoraId: f.impulsadora_id,
-            concepto: f.concepto,
-            documentoId: String(f.id),
           }),
           clienteCodigo: cod,
           monto,
@@ -1761,8 +1719,6 @@ function congelarEnFilas(
       carpeta: carpetaDeGasto(l.clienteCodigo, l.cliente, ctx.nombrePorCodigo, {
         tipo: l.tipo,
         impulsadoraId,
-        concepto: l.concepto,
-        documentoId,
       }),
       clienteCodigo: l.clienteCodigo,
       // 🔴 EL MONTO SALE TAL CUAL DEL REPORTE. No se recalcula, no se redondea

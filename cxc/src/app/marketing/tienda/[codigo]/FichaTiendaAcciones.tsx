@@ -28,7 +28,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { ModalOverlay } from "@/components/ui";
-import { FacturaForm } from "@/components/marketing";
+import { FacturaForm, UltimoCambio } from "@/components/marketing";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import { MARKETING_PUERTA_GASTO } from "@/lib/marketing/puerta-gasto";
 import { DIAS_PARA_BORRAR_ANULADOS } from "@/lib/marketing/periodo-manda";
@@ -187,9 +187,15 @@ function EditarFactura({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-semibold text-gray-900">
-            Editar factura {factura?.numero_factura ?? fila.numero ?? ""}
-          </h3>
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-gray-900">
+              Editar factura {factura?.numero_factura ?? fila.numero ?? ""}
+            </h3>
+            {/* 🔴 Quién tocó la factura (7-oct-2026). Se perdió con la pantalla
+                vieja (#690) y Daniel lo usa: no se quita de esta ficha. La
+                entrega lo trae en `EntregaForm`. */}
+            <UltimoCambio entityType="mk_facturas" entityId={fila.id} className="mt-0.5" />
+          </div>
           <button
             type="button"
             onClick={onCerrar}
