@@ -13,7 +13,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const interruptor = vi.hoisted(() => ({ prendido: false }));
+const interruptor = vi.hoisted(() => ({ prendido: false, query: "" }));
 vi.mock("@/lib/login-retoques-2026-10", () => ({
   get LOGIN_RETOQUES_2026_10() { return interruptor.prendido; },
 }));
@@ -21,7 +21,7 @@ const ROUTER = vi.hoisted(() => ({ push: () => {}, replace: () => {}, refresh: (
 vi.mock("next/navigation", () => ({
   useRouter: () => ROUTER,
   usePathname: () => "/",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(interruptor.query),
 }));
 
 import { render, cleanup, act, fireEvent, waitFor } from "@testing-library/react";
@@ -37,7 +37,7 @@ beforeEach(() => {
     return { ok: false, status: 401, json: async () => ({ error: "Contraseña incorrecta" }) };
   }));
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); interruptor.prendido = false; });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); interruptor.prendido = false; interruptor.query = ""; });
 
 async function montar() {
   let vista: ReturnType<typeof render> | undefined;
@@ -93,7 +93,7 @@ describe("Inicio de sesión — interruptor PRENDIDO = los 4 retoques", () => {
     expect(b.textContent).toBe("Recuperar contraseña");
     expect(c.textContent).not.toContain("¿");
     fireEvent.click(b);
-    expect(c.textContent).toContain("Contacta al administrador para restablecer tu contraseña.");
+    expect(c.textContent).toContain("El administrador restablece la contraseña. Después de iniciar sesión, se cambia en el menú del usuario › Cambiar contraseña.");
   });
   it("3 · «Mostrar» / «Ocultar», con su nombre accesible", async () => {
     const c = await montar();
@@ -109,6 +109,10 @@ describe("Inicio de sesión — interruptor PRENDIDO = los 4 retoques", () => {
   it("4 · el botón dice «Iniciar sesión»", async () => {
     const c = await montar();
     expect(c.querySelector('button[type="submit"]')!.textContent).toBe("Iniciar sesión");
+  });
+  it("5 · en el celular, el margen lateral normal del sistema (px-4)", async () => {
+    const c = await montar();
+    expect(c.querySelector("form")!.parentElement!.className).toContain("px-4");
   });
 });
 
@@ -127,4 +131,32 @@ describe("Inicio de sesión — lo que NO cambia, prendido o apagado", () => {
       expect(c.querySelector("p.text-red-600")!.textContent).toBe("Contraseña incorrecta");
     });
   }
+});
+
+// 9-oct-2026 — tres mejoras que Daniel aprobó, encima de los retoques.
+describe("Inicio de sesión — prendido: llavero, foco tras el error y avisos", () => {
+  beforeEach(() => { interruptor.prendido = true; });
+
+  it("el campo se declara como la contraseña actual, para que el llavero la ofrezca", async () => {
+    const c = await montar();
+    expect(campo(c).getAttribute("autocomplete")).toBe("current-password");
+    expect(campo(c).getAttribute("name")).toBe("password");
+    expect(c.querySelectorAll("input").length).toBe(1); // sin campo de usuario oculto
+  });
+  it("contraseña incorrecta: se anuncia, y el campo recupera el foco con el texto seleccionado", async () => {
+    const c = await montar();
+    await enviarMala(c);
+    expect(c.querySelector('[role="alert"]')!.textContent).toBe("Contraseña incorrecta");
+    await waitFor(() => expect(document.activeElement).toBe(campo(c)));
+    expect([campo(c).selectionStart, campo(c).selectionEnd]).toEqual([0, "no-es-esta".length]);
+  });
+  it("sesión expirada: sin segunda persona, y el aviso se quita al escribir (nunca dos avisos juntos)", async () => {
+    interruptor.query = "expired=1";
+    const c = await montar();
+    expect(c.textContent).toContain("La sesión expiró.");
+    expect(c.textContent).not.toMatch(/\b[Tt]u\b/);
+    await enviarMala(c);
+    expect(c.textContent).not.toContain("La sesión expiró.");
+    expect(c.querySelectorAll("p").length).toBe(1);
+  });
 });

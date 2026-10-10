@@ -36,7 +36,6 @@ const TECHOS: Record<string, number> = {
   "src/components/catalogo/PedidoPublicoClient.tsx": 2,
   "src/components/catalogo/ComprobantesPanel.tsx": 2,
   "src/app/reclamos/components/ReclamoDetail.tsx": 2,
-  "src/app/page.tsx": 2,
   "src/app/marketing/components/CerrarPeriodoModal.tsx": 2,
   "src/app/marcacion/PantallaDeAntes.tsx": 2,
   "src/app/asistencia/PlanillaTab.tsx": 2,

@@ -886,6 +886,12 @@ botón **ver/ocultar** de 44×44, botón **«Ingresar»** («Verificando…» mi
 **«¿Olvidaste tu contraseña?»** → «Contacta al administrador para restablecer tu contraseña.»
 Con `?expired=1` sale además: «Tu sesión expiró. Inicia sesión de nuevo.»
 
+**Desde el 9-oct-2026** (`LOGIN_RETOQUES_2026_10` prendido): rótulo «Contraseña» encima del campo,
+**Mostrar/Ocultar**, botón **«Iniciar sesión»**, **«Recuperar contraseña»** → «El administrador
+restablece la contraseña. Después de iniciar sesión, se cambia en el menú del usuario › Cambiar
+contraseña.», y con `?expired=1`: «La sesión expiró.» (se quita al escribir). El campo lleva
+`autocomplete="current-password"` y, tras un error, recupera el foco con el texto seleccionado.
+
 ### ⚠️ Lo que cambió hoy (commit `0f6b6bd6`, 3-sep-2026 22:49)
 
 **Con el pase vigente se entra directo, sin escribir la contraseña.**
@@ -927,7 +933,8 @@ gerente_acs 26 · gerente_boston 5.
 ## El login con contraseña (`POST /api/auth`)
 
 1. **Rate limit por IP antes de gastar bcrypt.** Tabla `login_attempts` + RPC
-   `register_login_failure` / `clear_login_attempts`: 5 fallos en 15 min → lockout 15 min,
+   `register_login_failure` / `clear_login_attempts`: **100** fallos en 15 min → lockout 15 min
+   (era 5 hasta el 9-oct-2026; hoy es solo un freno contra programas automáticos, ver `MAX_FAILS`),
    respuesta **429** con `Retry-After` y el texto «Demasiados intentos fallidos. Intenta de nuevo en
    unos minutos.» **Fail-open** (`src/lib/login-rate-limit.ts`). Reemplazó un `Map` en memoria, que
    en serverless no servía de nada.
@@ -1088,8 +1095,8 @@ punta a punta del login, la desactivación, el candado anti-lockout y la reanuda
 Dos más, específicas de esta sección:
 
 **F) Que el rate limit funcione:**
-1. En una ventana de incógnito, escribe **5 contraseñas equivocadas** seguidas.
-2. **Qué debería pasar:** al 6º intento aparece *«Demasiados intentos fallidos. Intenta de nuevo en
+1. Con un programa (a mano no se llega), envía **100 contraseñas equivocadas** seguidas.
+2. **Qué debería pasar:** en el intento 101 aparece *«Demasiados intentos fallidos. Intenta de nuevo en
    unos minutos.»* y el bloqueo dura 15 minutos.
 3. **Dónde confirmar:** la tabla `login_attempts` tiene una fila con tu IP y `locked_until` en el
    futuro.
