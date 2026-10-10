@@ -185,13 +185,7 @@ export default function ClienteDetail({
       // directorio en memoria: la app navega sin recargar, así que ese caché
       // sobreviviría a esta edición y seguiría mostrando el dato viejo.
       invalidarDirectorioClientes();
-      // ⚠️ La migración del contacto la corre Daniel: si todavía no corrió, lo
-      // demás SÍ se guardó y hay que decir qué no.
-      setToast(
-        campo === "contacto" && json.contactoGuardado === false && valor.trim() !== ""
-          ? "Cliente guardado. El contacto todavía no se puede guardar"
-          : "Cliente guardado",
-      );
+      setToast("Cliente guardado");
     } catch {
       setError("No se pudo guardar. Intenta de nuevo en unos segundos.");
     }

@@ -112,10 +112,10 @@ describe("la ficha del cliente", () => {
     expect(src).toContain('if ("contacto" in body) allowed.contacto');
   });
 
-  it("⚠️ si la DDL todavía no corrió, lo DEMÁS se guarda igual", () => {
+  it("🔴 la columna existe (9-oct-2026): la escritura va entera, sin reintento que quite el contacto", () => {
     const src = sinComentarios(leer("src/app/api/clientes/[codigo]/route.ts"));
-    expect(src).toContain("faltaColumnaContacto");
-    expect(src).toContain("contactoGuardado");
+    expect(src).not.toContain("faltaColumnaContacto");
+    expect(src).not.toContain("contactoGuardado");
   });
 
   it("🔴 la puerta de mundo sigue cerrada: un código de Boston contesta 404", () => {
@@ -152,10 +152,10 @@ describe("el saludo del cobro usa el contacto cuando lo hay", () => {
     expect(src).toMatch(/cuentas\.length === 1 \? await contactoDe/);
   });
 
-  it("el CXC lee el contacto EN VIVO del maestro, tolerando que la DDL no corra", () => {
+  it("el CXC lee el contacto EN VIVO del maestro, sin relectura que lo deje fuera", () => {
     const src = sinComentarios(leer("src/app/api/cxc/aging/route.ts"));
     expect(src).toContain("COLS_CON_CONTACTO");
-    expect(src).toContain("COLS_SIN_CONTACTO");
-    expect(src).toContain("faltaColumnaContacto");
+    expect(src).not.toContain("COLS_SIN_CONTACTO");
+    expect(src).not.toContain("faltaColumnaContacto");
   });
 });

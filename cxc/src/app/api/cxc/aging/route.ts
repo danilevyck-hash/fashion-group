@@ -52,9 +52,7 @@ export const dynamic = "force-dynamic";
  * 🔴 `contacto` (el NOMBRE de la persona con quien se habla) se agregó el
  * 5-sep-2026 y viene de acá, no de la vista: la vista lo devuelve
  * `''::text` HARDCODEADO porque hasta hoy no había dónde guardarlo. Es una
- * columna nueva (migración `20260926120000_clientes_master_contacto.sql`) y
- * la lectura es TOLERANTE: si la DDL todavía no corrió se relee sin ella y no
- * cambia nada más de la pantalla. */
+ * columna de la migración `20260926120000_clientes_master_contacto.sql`. */
 interface ContactoMaestro {
   codigo: string;
   email: string | null;
@@ -63,29 +61,20 @@ interface ContactoMaestro {
   contacto?: string | null;
 }
 
-/** Columnas del maestro, con y sin la columna nueva. */
 const COLS_CON_CONTACTO = "codigo, email, telefono, celular, contacto";
-const COLS_SIN_CONTACTO = "codigo, email, telefono, celular";
-
-/** ¿El error de PostgREST es «todavía no existe la columna `contacto`»? */
-function faltaColumnaContacto(e: unknown): boolean {
-  const msg = e instanceof Error ? e.message : String(e ?? "");
-  return /\bcontacto\b/i.test(msg) &&
-    /does not exist|schema cache|could not find|42703|PGRST204/i.test(msg);
-}
 
 /** Tope por lote del `.in()`. Muy por debajo de `db-max-rows` (1000). */
 const LOTE_CODIGOS = 300;
 
 async function contactoEnVivo(codigos: string[]): Promise<Map<string, ContactoMaestro>> {
   const mapa = new Map<string, ContactoMaestro>();
-  const leerLote = (cols: string, lote: string[]) =>
+  const leerLote = (lote: string[]) =>
     leerTodoPaginado<ContactoMaestro>(
       "clientes_master (contacto del CXC)",
       (pedirCount, desde, hasta) =>
         supabaseServer
           .from("clientes_master")
-          .select(cols, pedirCount ? { count: "exact" } : {})
+          .select(COLS_CON_CONTACTO, pedirCount ? { count: "exact" } : {})
           .in("codigo", lote)
           .eq("deleted", false)
           .order("codigo", { ascending: true })
@@ -93,16 +82,7 @@ async function contactoEnVivo(codigos: string[]): Promise<Map<string, ContactoMa
     );
   for (let i = 0; i < codigos.length; i += LOTE_CODIGOS) {
     const lote = codigos.slice(i, i + LOTE_CODIGOS);
-    let filas: ContactoMaestro[];
-    try {
-      filas = await leerLote(COLS_CON_CONTACTO, lote);
-    } catch (e) {
-      // La DDL todavía no corrió: se relee sin la columna nueva. Solo se
-      // reintenta cuando el error NOMBRA la columna — ante un permiso denegado
-      // o un timeout se propaga, que es lo que corresponde.
-      if (!faltaColumnaContacto(e)) throw e;
-      filas = await leerLote(COLS_SIN_CONTACTO, lote);
-    }
+    const filas = await leerLote(lote);
     for (const f of filas) if (f.codigo) mapa.set(f.codigo, f);
   }
   return mapa;

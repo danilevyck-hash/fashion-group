@@ -122,15 +122,12 @@ describe("dónde SÍ vive", () => {
     expect(src).toContain(".sort(");
   });
 
-  it("⚠️ y el sync NO se cae si la columna todavía no existe", () => {
-    // La migración la corre Daniel. Sin este reintento, el refresco fiscal de
-    // los 150 clientes se caería entero por una columna nueva.
+  it("🔴 la columna existe (9-oct-2026): el sync ya no reescribe el lote sin la dirección", () => {
+    // El reintento saltaba ante CUALQUIER error del upsert y guardaba el lote
+    // sin `direccion_switch`. Ahora un error de escritura falla con su error.
     const src = leer("src/lib/switch-api/sync-clientes-master.ts");
-    expect(src).toContain("sinColumnaDireccion");
-    expect(src).toContain("function sinDireccion");
-    // Se QUITA la columna, no se manda `null`: un null la borraría de todos si
-    // la columna sí existiera.
-    expect(src).toContain("delete copia.direccion_switch");
+    expect(src).not.toContain("sinColumnaDireccion");
+    expect(src).not.toContain("function sinDireccion");
   });
 
   it("la ficha tolera que la columna no exista todavía", () => {

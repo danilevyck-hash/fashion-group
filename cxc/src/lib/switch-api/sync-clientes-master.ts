@@ -77,15 +77,6 @@ function direccionDeLasFilas(filas: SwitchClienteRow[]): string | null {
   return candidatas[0] ?? null;
 }
 
-/** El MISMO renglón sin `direccion_switch`, para reintentar cuando la columna
- *  todavía no existe. Se quita la columna, no se manda `null`: mandar null
- *  BORRARÍA la dirección de todos si la columna sí existiera. */
-function sinDireccion(fila: MasterUpsertRow): MasterUpsertRow {
-  const copia = { ...fila };
-  delete copia.direccion_switch;
-  return copia;
-}
-
 interface SwitchClienteRow {
   empresa_key: string;
   codigo: string | null;
@@ -112,7 +103,7 @@ interface MasterUpsertRow {
    *  refresca (telefono/celular/email/notas/contacto los escribe la gente y
    *  nunca se pisan). ⚠️ **No alimenta los destinos de Guías** — ver
    *  `lib/clientes/direccion-switch.ts` y la migración 20260930120000.
-   *  Ausente mientras esa DDL no corra: el upsert reintenta sin ella. */
+   */
   direccion_switch?: string | null;
   last_synced_at: string;
 }
@@ -208,18 +199,16 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
   //    vez de seguir con menos.
   //    Se piden también `activo` y `ausente_desde` (los escribe sync-empresa
   //    cuando Switch deja de mandar un cliente) para la pasada de AUSENTES de
-  //    más abajo. Si esa DDL (20260723110000) no corrió en este entorno, el
-  //    select de respaldo va sin las dos columnas y la pasada se OMITE — el
-  //    refresco fiscal no depende de ellas.
-  const leerEspejo = (conAusencia: boolean) =>
+  //    más abajo. Las dos columnas existen (9-oct-2026): si la lectura falla,
+  //    el sync falla con su error en vez de releer sin ellas.
+  const leerEspejo = () =>
     leerTodoPaginado<SwitchClienteRow>(
       "switch_clientes (maestro de clientes)",
       (pedirCount, from, to) =>
         supabaseServer
           .from("switch_clientes")
           .select(
-            "empresa_key, codigo, nombre, razonsocial, identificacion, raw_data, synced_at" +
-              (conAusencia ? ", activo, ausente_desde" : ""),
+            "empresa_key, codigo, nombre, razonsocial, identificacion, raw_data, synced_at, activo, ausente_desde",
             pedirCount ? { count: "exact" } : {},
           )
           .in("empresa_key", [...EMPRESAS_DEL_GRUPO])
@@ -229,15 +218,9 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
 
   let rows: SwitchClienteRow[];
   try {
-    rows = await leerEspejo(true);
-  } catch {
-    // Columna `activo`/`ausente_desde` pendiente u otro rechazo del select
-    // largo: el refresco fiscal tiene que seguir andando igual que siempre.
-    try {
-      rows = await leerEspejo(false);
-    } catch (e) {
-      return { ok: false, ...empty, error: e instanceof Error ? e.message : String(e) };
-    }
+    rows = await leerEspejo();
+  } catch (e) {
+    return { ok: false, ...empty, error: e instanceof Error ? e.message : String(e) };
   }
 
   // 2. Agrupar por codigo: switch_clientes tiene una fila por (empresa, cliente).
@@ -318,29 +301,13 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
   // 4. UPSERT onConflict=codigo. Al no incluir telefono/celular/email/notas/
   //    contacto/provincia en el payload, merge-duplicates deja esas columnas
   //    intactas — son las que escribe la gente.
-  //
-  //    🔴 `direccion_switch` PUEDE NO EXISTIR TODAVÍA (migración 20260930120000,
-  //    la corre Daniel). Si el upsert la rechaza, se reintenta el MISMO lote sin
-  //    esa columna: el refresco fiscal de los 150 clientes no puede caerse
-  //    entero por una columna nueva que todavía no está.
   const BATCH = 500;
   let upserted = 0;
-  let sinColumnaDireccion = false;
   for (let i = 0; i < payload.length; i += BATCH) {
     const slice = payload.slice(i, i + BATCH);
-    const escribir = (conDireccion: boolean) =>
-      supabaseServer
-        .from("clientes_master")
-        .upsert(conDireccion ? slice : slice.map(sinDireccion), {
-          onConflict: "codigo",
-          ignoreDuplicates: false,
-        });
-    let { error: upErr } = await escribir(!sinColumnaDireccion);
-    if (upErr && !sinColumnaDireccion) {
-      console.error(`[sync clientes_master] WARNING direccion_switch (¿DDL 20260930120000 pendiente?): ${upErr.message}`);
-      sinColumnaDireccion = true;
-      ({ error: upErr } = await escribir(false));
-    }
+    const { error: upErr } = await supabaseServer
+      .from("clientes_master")
+      .upsert(slice, { onConflict: "codigo", ignoreDuplicates: false });
     if (upErr) {
       return {
         ok: false,

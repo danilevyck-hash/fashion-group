@@ -193,15 +193,6 @@ interface PatchBody {
   notas?: string | null;
 }
 
-/** ¿El error de PostgREST es «todavía no existe la columna `contacto`»? */
-function faltaColumnaContacto(err: { code?: string; message?: string } | null): boolean {
-  if (!err) return false;
-  const msg = err.message ?? "";
-  if (!/\bcontacto\b/i.test(msg)) return false;
-  return /does not exist|schema cache|could not find/i.test(msg) ||
-    err.code === "42703" || err.code === "PGRST204";
-}
-
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ codigo: string }> }) {
   const authError = requireAuth(req, WRITE_ROLES);
   if (authError) return authError;
@@ -237,34 +228,13 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ codigo: s
     return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
   }
 
-  const escribir = (campos: PatchBody) =>
-    supabaseServer
-      .from("clientes_master")
-      .update(campos)
-      .eq("codigo", codigo)
-      .eq("deleted", false)
-      .select()
-      .maybeSingle();
-
-  let { data, error } = await escribir(allowed);
-
-  // La migración `20260926120000_clientes_master_contacto.sql` todavía no
-  // corrió: se guarda lo demás y se avisa que el contacto no se pudo guardar.
-  // Fallar entero dejaría sin guardar un teléfono corregido por una columna que
-  // no existe.
-  let contactoGuardado = "contacto" in allowed;
-  if (faltaColumnaContacto(error)) {
-    contactoGuardado = false;
-    const { contacto: _sinColumna, ...resto } = allowed;
-    void _sinColumna;
-    if (Object.keys(resto).length === 0) {
-      return NextResponse.json(
-        { error: "Todavía no se puede guardar el contacto. Falta un ajuste en la base de datos." },
-        { status: 503 },
-      );
-    }
-    ({ data, error } = await escribir(resto));
-  }
+  const { data, error } = await supabaseServer
+    .from("clientes_master")
+    .update(allowed)
+    .eq("codigo", codigo)
+    .eq("deleted", false)
+    .select()
+    .maybeSingle();
 
   if (error) {
     console.error("[api/clientes/codigo] patch error:", error.message);
@@ -277,5 +247,5 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ codigo: s
   // instancia: en serverless otra puede seguir sirviendo lo viejo hasta que
   // venza el TTL — por eso el TTL es corto y no se depende solo de acá.
   invalidarDirectorioServidor();
-  return NextResponse.json({ ok: true, cliente: data, contactoGuardado });
+  return NextResponse.json({ ok: true, cliente: data });
 }
