@@ -14,8 +14,7 @@ import { AVISO_CONTRASENA_CORTA, LARGO_MINIMO_CONTRASENA } from "@/lib/auth/cont
 // que tiene su propio encabezado). Es para TODOS los roles.
 //
 // Lo que decide está en el servidor (`PUT /api/auth/contrasena`): que la actual
-// sea la de hoy, que la nueva no sea la de otra persona («Crea otra, esa no se
-// puede»), y que se cierren las otras sesiones. Acá solo se pide y se dice.
+// sea la de hoy, que la nueva no sea la de otra persona (`AVISO_CONTRASENA_REPETIDA`), y que se cierren las otras sesiones. Acá solo se pide y se dice.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // 🔴 EL LARGO MÍNIMO NO SE ESCRIBE ACÁ (19-sep-2026). Sale de

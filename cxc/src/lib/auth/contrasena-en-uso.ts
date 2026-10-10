@@ -43,8 +43,12 @@ export const LARGO_MINIMO_CONTRASENA = 3;
 /** Lo que se le dice a quien escribe una más corta. */
 export const AVISO_CONTRASENA_CORTA = `La contraseña tiene que tener al menos ${LARGO_MINIMO_CONTRASENA} caracteres.`;
 
-/** Daniel, textual, para quien elige una contraseña que ya usa otra persona. */
-export const AVISO_CONTRASENA_REPETIDA = "Crea otra, esa no se puede";
+/**
+ * Para quien elige una contraseña que ya usa otra persona. Texto de ERP, sin
+ * segunda persona y sin decir de quién es (Daniel, 9-oct-2026; antes «Crea
+ * otra, esa no se puede»).
+ */
+export const AVISO_CONTRASENA_REPETIDA = "Esa contraseña ya está en uso. Se requiere una distinta.";
 
 export function esHashBcrypt(s: string | null | undefined): boolean {
   return typeof s === "string" && (s.startsWith("$2a$") || s.startsWith("$2b$"));
