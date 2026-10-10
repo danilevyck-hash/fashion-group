@@ -18,6 +18,10 @@ import {
   insertarUsuario,
   revisarUsuarioNuevo,
 } from "@/lib/usuarios/usuario-servidor";
+// 🔴 UNA SOLA PUERTA: USUARIOS (9-oct-2026). Ver ese archivo.
+import {
+  crearFichaConHorario, darDeBaja, deshacerFicha, revisarBaja, type ColaboradorNuevo,
+} from "@/lib/usuarios/colaborador-desde-usuarios";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +91,8 @@ export async function POST(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
   if (authError) return authError;
 
-  const { name, password, role, associated_company, modulos_override, empleado_codigo } = await req.json();
+  const { name, password, role, associated_company, modulos_override, empleado_codigo, colaborador } =
+    (await req.json()) as Record<string, unknown> & { colaborador?: ColaboradorNuevo | null; modulos_override?: string[] | null };
 
   // 🔴 Nombre, largo mínimo (3, Daniel 19-sep-2026), nombre repetido y
   // contraseña repetida (`contrasenaEnUso`: el login no pide usuario, la
@@ -99,9 +104,27 @@ export async function POST(req: NextRequest) {
   const validationError = validateRoleAndModulos(role, modulos_override);
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
+  // 🔴 «Marca asistencia» con una persona SIN ficha: se crean aquí su ficha y
+  // su horario. Todo lo del usuario ya se revisó arriba; si después el usuario
+  // no entra, la ficha recién creada se deshace. No queda nada a medias.
+  let codigo = empleado_codigo as string | null | undefined;
+  let fichaNueva = false;
+  if (colaborador) {
+    const f = await crearFichaConHorario(req, colaborador, String(name));
+    if (!f.ok) return NextResponse.json({ error: f.error }, { status: f.status });
+    codigo = f.codigo;
+    fichaNueva = true;
+  }
+
   // «Colaborador» (opcional): la ficha por la que este usuario marca.
-  const r = await insertarUsuario({ name, password, role, associated_company, modulos_override, empleado_codigo });
-  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  const r = await insertarUsuario({
+    name: String(name), password: String(password), role: role as string | null,
+    associated_company: associated_company as string | null, modulos_override, empleado_codigo: codigo,
+  });
+  if (!r.ok) {
+    if (fichaNueva && codigo) await deshacerFicha(codigo);
+    return NextResponse.json({ error: r.error }, { status: r.status });
+  }
 
   // modulos_override (array) = permisos custom por usuario; null = hereda del rol.
   return NextResponse.json(r.user);
@@ -111,7 +134,7 @@ export async function PUT(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
   if (authError) return authError;
 
-  const { id, name, password, role, associated_company, modulos_override, empleado_codigo } = await req.json();
+  const { id, name, password, role, associated_company, modulos_override, empleado_codigo, colaborador } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   const validationError = validateRoleAndModulos(role, modulos_override);
@@ -166,7 +189,20 @@ export async function PUT(req: NextRequest) {
   // «Colaborador»: `undefined` = no se toca; vacío o `null` = sin vincular.
   if (empleado_codigo !== undefined) update.empleado_codigo = codigoDeColaborador(empleado_codigo);
 
+  // 🔴 «Marca asistencia» prendido en Editar para alguien SIN ficha: se crea
+  // aquí, con el nombre del usuario si no viene otro. Si el usuario no se
+  // puede actualizar, la ficha recién creada se deshace.
+  let fichaNueva: string | null = null;
+  if (colaborador) {
+    const nombreActual = update.name ?? (await supabaseServer.from("fg_users").select("name").eq("id", id).maybeSingle()).data?.name ?? "";
+    const f = await crearFichaConHorario(req, colaborador as ColaboradorNuevo, String(nombreActual));
+    if (!f.ok) return NextResponse.json({ error: f.error }, { status: f.status });
+    fichaNueva = f.codigo;
+    update.empleado_codigo = f.codigo;
+  }
+
   const { error } = await supabaseServer.from("fg_users").update(update).eq("id", id);
+  if (error && fichaNueva) await deshacerFicha(fichaNueva);
   if (error) {
     // La base exige que la ficha exista y que tenga un solo usuario: se dice en palabras.
     const vinculo = avisoDeVinculo(error);
@@ -182,12 +218,30 @@ export async function PATCH(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
   if (authError) return authError;
 
-  const { id, active } = await req.json();
+  const { id, active, baja } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  // 🔴 «Desactivar» ofrece dar de baja la ficha ahí mismo (9-oct-2026). La
+  // baja se REVISA antes de tocar nada; se escribe después de desactivar.
+  let bajaLista: { codigo: string; fechaSalida: string; motivoSalida: string } | null = null;
+  if (active === false && baja) {
+    const { data: u } = await supabaseServer.from("fg_users").select("empleado_codigo").eq("id", id).maybeSingle();
+    const codigo = codigoDeColaborador((u as { empleado_codigo?: string | null } | null)?.empleado_codigo);
+    if (codigo) {
+      const rb = await revisarBaja(codigo, baja);
+      if (!rb.ok) return NextResponse.json({ error: rb.error }, { status: rb.status });
+      bajaLista = { codigo, fechaSalida: rb.fechaSalida, motivoSalida: rb.motivoSalida };
+    }
+  }
 
   // El guard del único administrador y el corte de sesiones al desactivar
   // viven en `cambiarActivo` (la baja de un colaborador usa el mismo).
   const r = await cambiarActivo(id, active);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  if (bajaLista) {
+    const b = await darDeBaja(bajaLista.codigo, bajaLista.fechaSalida, bajaLista.motivoSalida);
+    if (!b.ok) return NextResponse.json({ error: b.error }, { status: b.status });
+    return NextResponse.json({ ok: true, sesionesRevocadas: r.sesionesRevocadas, fichaDeBaja: true, aviso: b.aviso });
+  }
   return NextResponse.json({ ok: true, sesionesRevocadas: r.sesionesRevocadas });
 }
