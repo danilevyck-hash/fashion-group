@@ -43,6 +43,13 @@ import { useDespachadores } from "./useDespachadores";
 // Las reglas de qué falta viven en `@/lib/guias/falta-para-despachar` — las
 // mismas que aplica el servidor.
 //
+// 🔴 CAMBIO DE DECISIÓN (Daniel, 9-oct-2026, al aprobar el rediseño del detalle,
+// `GUIA_DETALLE_APPLE_2026_10`): «Despachar» queda SIEMPRE PRENDIDO (negro) y al
+// tocarlo dice TODO lo que falta en una línea, igual que «Guardar guía». Antes
+// él mismo había decidido «el botón se apaga y dice qué falta» (el párrafo de
+// arriba); lo eligió expresamente al ver las dos pantallas. Con el interruptor
+// apagado vuelve la regla anterior. Lo que exige el servidor NO cambió.
+//
 // 🔴 LOS JUEGOS FRECUENTES SON UN AUTOCOMPLETADO, NO UN BLOQUE FIJO
 // (25-ago-2026). Daniel, textual: *«lo de poner transporte frecuente no le
 // gusta, quita espacio, que sea solo al escribir primeras 2 o 3 letras que
@@ -137,7 +144,7 @@ export default function DespachoForm({
    */
   const [buscandoJuego, setBuscandoJuego] = useState(false);
   /**
-   * 🔴 9-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`, apagado), igual que «Guardar
+   * 🔴 9-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`, prendido), igual que «Guardar
    * guía»: el botón no se apaga y el «Falta: …» sale al TOCARLO, con todo lo que
    * falta en una línea (diseno.md, regla 7). Sin faltas, despacha como siempre.
    */

@@ -2411,7 +2411,7 @@ Daniel: *«¿y si quiero mandar algo extra de la bodega que no está en el siste
 
 Interruptor `GUIAS_LISTA_APPLE_2026_10` en `lib/guias/lista-apple-2026-10.ts`, **prendido el 5-oct-2026** (Daniel aprobó las capturas: «sigue»; «Vincular cliente» queda con «Editar» y el detalle compacto se prende con esto). Solo pantalla: ninguna lectura, guardado ni papel cambia.
 - **Lista**: arriba «3 guías hoy · 1 pendiente de despacho»; las pendientes de CUALQUIER fecha en su sección «Pendientes de despacho» (se va el aviso ámbar que repetía esas filas); el resto sigue al período con el MISMO selector de Ventas y Comisiones (`ComisionesPeriodo`, abre en el mes en curso, recordado en la sesión), en vez de «último mes + Ver guías más viejas»; buscar sigue buscando en todas. Un toque abre `/guias/[id]`: se van el acordeón (un segundo detalle) y el botón «Despachar» (iba a la misma página).
-- **Detalle**: toma el marco compacto del 2-oct (`GUIA_DETALLE_APPLE_2026_10`) y el chip «Pendiente» junto al título. ⚠️ Aclarado el 9-oct-2026: la constante `GUIA_DETALLE_APPLE_2026_10` sigue en `false`; el marco compacto se ve porque `/despachos/[id]` y `ListaEnvios` preguntan `GUIA_DETALLE_APPLE_2026_10 || GUIAS_LISTA_APPLE_2026_10`.
+- **Detalle**: toma el marco compacto del 2-oct (`GUIA_DETALLE_APPLE_2026_10`) y el chip «Pendiente» junto al título. ⚠️ Aclarado el 9-oct-2026: en ese momento la constante `GUIA_DETALLE_APPLE_2026_10` seguía en `false` (se prendió el 9-oct-2026 con la segunda pasada); el marco compacto se ve porque `/despachos/[id]` y `ListaEnvios` preguntan `GUIA_DETALLE_APPLE_2026_10 || GUIAS_LISTA_APPLE_2026_10`.
 - **Etiquetas › envíos**: arriba «4 envíos hoy · 1 pendiente de guía» (los chips dejan de contar); en el celular, tarjetas de dos líneas en vez de la tabla de 720 px con arrastre lateral.
 - ⚠️ «Vincular cliente» vivía solo en el acordeón: con el interruptor prendido, el cliente se corrige con «Editar» en el detalle (permitido también en una despachada).
 - Candado `guias-lista-apple-2026-10`.
@@ -2574,7 +2574,7 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
 
 **Pendiente vivo**
 
-- **Rediseño del detalle de la guía: en curso, sin publicar.** En el código publicado `GUIA_DETALLE_APPLE_2026_10` sigue en `false` y no hay ningún cambio nuevo del detalle. Existe la rama local `rediseno/guia-detalle-apple`, sin commits por delante de `origin/main` al 9-oct-2026 y sin PR abierto.
+- **Rediseño del detalle de la guía: aprobado y prendido el 9-oct-2026** (`GUIA_DETALLE_APPLE_2026_10 = true`, #726 y la corrección del N° del transportista por envío). Ver la sección de abajo.
 
 **Interruptores del módulo, al 9-oct-2026**
 
@@ -2586,7 +2586,7 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
 | `GUIA_NUEVA_2026_10` | `guias-2026-10.ts` | `true` |
 | `ETIQUETAS_2026_10` | `guias-2026-10.ts` | `true` |
 | `GUIA_APPLE_2026_10` | `guias-2026-10.ts` | `true` |
-| `GUIA_DETALLE_APPLE_2026_10` | `guias-2026-10.ts` | **`false`** |
+| `GUIA_DETALLE_APPLE_2026_10` | `guias-2026-10.ts` | `true` |
 | `ETIQUETAS_TRASLADO_2026_10` | `guias-2026-10.ts` | `true` |
 | `GUIA_AGREGAR_TRASLADO_2026_10` | `guias-2026-10.ts` | `true` |
 | `GUIAS_LISTA_APPLE_2026_10` | `lista-apple-2026-10.ts` | `true` |
@@ -2604,12 +2604,14 @@ Los dos últimos admiten además una variable para prenderlos en local (`NEXT_PU
 **Candados**: `pedidos-flujo-simple` · `pedidos-en-preparacion` · `pedidos-recibir-roles-reales` · `despachos-abre-en-pedidos` · `despachos-sin-switch-al-entrar` · `guias-grupos-fecha-2026-10` · `guias-pendiente-con-barra` · `cron-calendario`.
 
 
-## Detalle de la guía, segunda pasada estilo Apple (9-oct-2026, apagado)
+## Detalle de la guía, segunda pasada estilo Apple (9-oct-2026, prendido)
 
-Interruptor `GUIA_DETALLE_APPLE_2026_10` (`src/lib/guias/guias-2026-10.ts`), **apagado**: lo prende Daniel. Lo que traía desde el 2-oct (marco compacto y una fila por envío) ya estaba en producción desde el 5-oct, porque se prendió junto con `GUIAS_LISTA_APPLE_2026_10`; el interruptor era un no-op y su candado miraba una combinación que ya no existe en producción. Ahora gobierna la segunda pasada.
+Interruptor `GUIA_DETALLE_APPLE_2026_10` (`src/lib/guias/guias-2026-10.ts`), **prendido el 9-oct-2026** con el «sí» de Daniel al mockup (`false` = la pantalla de antes). Lo que traía desde el 2-oct (marco compacto y una fila por envío) ya estaba en producción desde el 5-oct, porque se prendió junto con `GUIAS_LISTA_APPLE_2026_10`; el interruptor era un no-op y su candado miraba una combinación que ya no existe en producción. Ahora gobierna la segunda pasada.
 
 - **Uso medido (1-sep a 9-oct-2026, solo lectura):** 40 guías creadas (Angela 24, Andrea 15) y 39 despachadas, 37 por Bodega, que entra desde el celular (24 de sus 26 visitas). Mediana de 46 minutos entre crear y despachar. 31 ediciones de envíos en 13 guías, todas de secretaría. 29 N° del transportista anotados, 12 de ellos después de despachar. Observaciones en 14 de 37 guías. Imprimir y Compartir no dejan registro: no se pudo medir y no se escondió ninguno.
-- **Lo que cambia al prender:** «Despachada» junto al título; observaciones antes de los envíos; en la despachada se van «Ya despachada» y «Tipo de despacho», entra «Despachado por» y el N° del transportista común se dice una vez; en la pendiente se van la frase y el rótulo repetidos del N° del transportista, «Tipo de despacho» pasa a una línea, los cuatro datos van en una fila y «Despachar» es negro, no se apaga y dice todo lo que falta al tocarlo; en el celular los tres botones van en una fila.
+- **Lo que cambia al prender:** «Despachada» junto al título; observaciones antes de los envíos; en la despachada se van «Ya despachada» y «Tipo de despacho», entra «Despachado por» y el N° del transportista se muestra en cada envío; en la pendiente se van la frase y el rótulo repetidos del N° del transportista, «Tipo de despacho» pasa a una línea, los cuatro datos van en una fila y «Despachar» es negro, no se apaga y dice todo lo que falta al tocarlo; en el celular los tres botones van en una fila.
+- 🔴 **El N° del transportista es por envío, no por guía** (corrección de Daniel al aprobar, 9-oct-2026: *«El N.º del transportista es por envío, no por guía»*). La propuesta lo decía una sola vez cuando era el mismo en todos los envíos; eso se quitó. Cada envío muestra el suyo, siempre, aunque se repita. En la pendiente, la frase del número anotado al crear ya no dice «para toda la guía»: dice que lo lleva cada envío que no tenga el suyo.
+- 🔴 **Cambio de decisión: «Despachar» queda siempre prendido** (Daniel, 9-oct-2026). La regla anterior, también suya, era «el botón se apaga y dice qué falta» (`Despachar` deshabilitado con «Falta: …» debajo). Al ver las dos pantallas eligió expresamente la otra: el botón va negro y siempre se puede tocar; al tocarlo con faltas dice TODO lo que falta en una línea y no envía nada, igual que «Guardar guía». Con el interruptor apagado vuelve la regla anterior. Lo que se guarda al despachar y lo que exige el servidor no cambió.
 - **Lo que no cambia:** el PUT del despacho, las reglas del servidor, las cajas (mismos `id`), el papel.
-- **Candados:** `guias-detalle-apple-apagado.test.tsx` (apagado = HTML de `origin/main`, byte por byte, en cinco estados; y la pantalla prendida) y `guias-detalle-apple.test.tsx` (PUT idéntico).
+- **Candados:** `guias-detalle-apple-apagado.test.tsx` (apagado = HTML de antes, byte por byte, en cinco estados; y la pantalla prendida, con cada envío mostrando su N° del transportista aunque sea el mismo) y `guias-detalle-apple.test.tsx` (PUT idéntico).
 

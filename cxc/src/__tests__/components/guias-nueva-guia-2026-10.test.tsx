@@ -38,6 +38,8 @@ vi.mock("@/components/AppHeader", () => ({ default: () => <div /> }));
 vi.mock("@/lib/guias/guias-2026-10", async (orig) => ({
   ...(await orig<typeof import("@/lib/guias/guias-2026-10")>()),
   GUIA_APPLE_2026_10: false,
+  // 9-oct-2026: «Despachar» siempre prendido lo fija `guias-detalle-apple-apagado.test.tsx`.
+  GUIA_DETALLE_APPLE_2026_10: false,
 }));
 
 function memStorage(): Storage {

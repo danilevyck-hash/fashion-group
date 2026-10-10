@@ -70,7 +70,7 @@ Comprobado contra el código publicado. El detalle, las citas y la tabla de inte
   solo en la guía sin despachar.
 - **Switch**: entrar al módulo no lo llama. Facturas del día por cron cada hora de 7 a. m. a 6 p. m. de Panamá
   (13 entradas en `vercel.json`); pedidos, cuatro pasadas al día; o «Actualizar» (freno de 10 min).
-- **En curso, sin publicar**: el rediseño del detalle de la guía (`GUIA_DETALLE_APPLE_2026_10` = `false`).
+- **Detalle de la guía, rediseño prendido el 9-oct-2026** (`GUIA_DETALLE_APPLE_2026_10` = `true`): «Despachar» siempre prendido, dice todo lo que falta al tocarlo; el N° del transportista se muestra en cada envío.
 
 ## Qué es
 

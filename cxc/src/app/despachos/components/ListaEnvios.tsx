@@ -78,8 +78,6 @@ export interface ListaEnviosProps {
   setBultos?: (idx: number, v: string) => void;
   /** El rol de quien está despachando, para la línea en vivo («↑ 7 → 8, bodega»). */
   rol?: string | null;
-  /** 9-oct-2026: el N° del transportista cuando TODOS los envíos llevan el mismo; se dice una vez, arriba. */
-  numeroComun?: string;
 }
 
 export default function ListaEnvios({
@@ -92,7 +90,6 @@ export default function ListaEnvios({
   bultosPorLinea,
   setBultos,
   rol,
-  numeroComun,
 }: ListaEnviosProps) {
   if (GUIA_DETALLE_APPLE_2026_10 || GUIAS_LISTA_APPLE_2026_10) {
     return (
@@ -106,7 +103,6 @@ export default function ListaEnvios({
         bultosPorLinea={bultosPorLinea}
         setBultos={setBultos}
         rol={rol}
-        numeroComun={numeroComun}
       />
     );
   }
