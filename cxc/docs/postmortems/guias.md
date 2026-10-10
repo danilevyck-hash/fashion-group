@@ -4,6 +4,8 @@
 > **Nada se resumió ni se borró: el contenido es verbatim**, con sus «Daniel, textual»,
 > sus mediciones, sus «Candados», sus «Verificado por mutación» y sus 🩸.
 > La REGLA vigente (sin la historia) vive en «Invariantes por módulo» de `cxc/CLAUDE.md`.
+>
+> 🔴 **Desde el 7-oct-2026 el módulo se llama «Despachos»** (`/despachos`; la `key` sigue siendo `guias` y `/api/guias/**` no cambió; commit `e573dc5b`). Sus pestañas: **Pedidos · Guías de despacho · Etiquetas · Configuración**. Donde este archivo dice «Guías ›» o `/guias`, es la historia tal como se escribió. **El estado vigente está al final: «Despachos — estado al 9-oct-2026».**
 
 ---
 
@@ -2395,11 +2397,13 @@ Sin migración. Candados: `lib/guias-nueva-guia-2026-10` · `components/guias-nu
 
 ## Etiquetas · Traslado sin factura (2-oct-2026, propuesta)
 
-Daniel: *«¿y si quiero mandar algo extra de la bodega que no está en el sistema?»* (muebles, ganchos, paneles). Interruptor `ETIQUETAS_TRASLADO_2026_10` en `lib/guias/guias-2026-10.ts`, **hoy `false`**.
+> ⚠️ **Corregido el 9-oct-2026**: este texto decía «hoy `false`» y «migración escrita, SIN aplicar». En el código publicado `ETIQUETAS_TRASLADO_2026_10 = true`, y su comentario dice que Daniel lo aprobó el 2-oct-2026 («sigue») y que la migración `20261226120000` se aplicó ese mismo día.
+
+Daniel: *«¿y si quiero mandar algo extra de la bodega que no está en el sistema?»* (muebles, ganchos, paneles). Interruptor `ETIQUETAS_TRASLADO_2026_10` en `lib/guias/guias-2026-10.ts`, **`true`** (al escribirse esta sección estaba en `false`).
 
 - **Cómo era**: Etiquetas exigía una factura de Switch (`validarEtiquetaNueva`: sin `switch_factura_id` → 400; la columna es `NOT NULL`). El único traslado sin factura vivía en Nueva guía (texto `Traslado` en `facturas`, empresa a mano), **sin etiquetas** y con bultos editables.
 - **Propuesta**: en Etiquetas › Nuevo envío, debajo del cliente, «Facturas | Traslado (sin factura)». El traslado pide empresa (a mano, nace vacía) · «Contenido» (≤ 15, se guarda en `nota`) · bultos · destino. Se guarda UNA fila: `switch_factura_id` NULL y `secuencial` = `Traslado`. El papel dice **TRASLADO** donde va la factura y el contenido en la línea de la nota, con rótulo «Contenido». En Nueva guía entra como un envío más (`marcarEnvio`): `Traslado` en facturas, bultos 🔒 y el contenido como una línea en Observaciones («Traslado <cliente>: <contenido>», que sale al desmarcar; lo escrito no se pisa).
-- 🔴 La numeración 1..N del envío y «lo impreso no se cambia» son las de todo envío. Sin columna nueva: solo la migración `20261226120000` (**escrita, SIN aplicar**), que afloja `switch_factura_id` y exige contenido al traslado. Sin ella, el POST contesta 503 y lo dice.
+- 🔴 La numeración 1..N del envío y «lo impreso no se cambia» son las de todo envío. Sin columna nueva: solo la migración `20261226120000` (aplicada el 2-oct-2026; al escribirse esto estaba sin aplicar), que afloja `switch_factura_id` y exige contenido al traslado. Sin ella, el POST contesta 503 y lo dice.
 - Candado `guias-etiquetas-traslado`.
 - 🔴 **«Traslado» es un chip de la fila de EMPRESA** (2-oct-2026, Daniel: *«traslado sin factura es como si fuese una empresa»*): la pantalla preguntaba DOS veces por la empresa (la fila de las facturas y otra de chips dentro del traslado). Hoy hay UNA fila —las empresas del cliente y al final «Traslado»—: empresa → sus facturas; Traslado → Contenido · Bultos · un desplegable chico «Empresa: Ninguna» (solo sin facturas marcadas). Se fueron la fila «+ Traslado (sin factura)» y la segunda fila de chips. Tocar «Traslado» con facturas marcadas lo AGREGA al mismo envío sin borrarlas (volver a la empresa las muestra marcadas); «Quitar traslado» lo saca. Nada de lo que se guarda cambia. Candado `guias-etiquetas-traslado-orden` (una sola fila de empresa).
 
@@ -2407,7 +2411,7 @@ Daniel: *«¿y si quiero mandar algo extra de la bodega que no está en el siste
 
 Interruptor `GUIAS_LISTA_APPLE_2026_10` en `lib/guias/lista-apple-2026-10.ts`, **prendido el 5-oct-2026** (Daniel aprobó las capturas: «sigue»; «Vincular cliente» queda con «Editar» y el detalle compacto se prende con esto). Solo pantalla: ninguna lectura, guardado ni papel cambia.
 - **Lista**: arriba «3 guías hoy · 1 pendiente de despacho»; las pendientes de CUALQUIER fecha en su sección «Pendientes de despacho» (se va el aviso ámbar que repetía esas filas); el resto sigue al período con el MISMO selector de Ventas y Comisiones (`ComisionesPeriodo`, abre en el mes en curso, recordado en la sesión), en vez de «último mes + Ver guías más viejas»; buscar sigue buscando en todas. Un toque abre `/guias/[id]`: se van el acordeón (un segundo detalle) y el botón «Despachar» (iba a la misma página).
-- **Detalle**: toma el marco compacto del 2-oct (`GUIA_DETALLE_APPLE_2026_10`) y el chip «Pendiente» junto al título.
+- **Detalle**: toma el marco compacto del 2-oct (`GUIA_DETALLE_APPLE_2026_10`) y el chip «Pendiente» junto al título. ⚠️ Aclarado el 9-oct-2026: la constante `GUIA_DETALLE_APPLE_2026_10` sigue en `false`; el marco compacto se ve porque `/despachos/[id]` y `ListaEnvios` preguntan `GUIA_DETALLE_APPLE_2026_10 || GUIAS_LISTA_APPLE_2026_10`.
 - **Etiquetas › envíos**: arriba «4 envíos hoy · 1 pendiente de guía» (los chips dejan de contar); en el celular, tarjetas de dos líneas en vez de la tabla de 720 px con arrastre lateral.
 - ⚠️ «Vincular cliente» vivía solo en el acordeón: con el interruptor prendido, el cliente se corrige con «Editar» en el detalle (permitido también en una despachada).
 - Candado `guias-lista-apple-2026-10`.
@@ -2428,6 +2432,17 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
 🔴 **EL PAPEL DE LA GUÍA, HACIA ADELANTE (25-sep-2026, `GUIA_PAPEL_2026_09` en `lib/guias/papel-2026-09.ts`, hoy `true`)**: 🩸 con transportista externo las dos firmas salían **cambiadas de caja** —la del transportista bajo «Despachado por» y la de quien despacha bajo «Recibido Conforme»—, en **157 de las 222 guías externas vivas**; en entrega directa estaban bien y no se mueven. Además: título **«GUÍA DE TRANSPORTE EXTERNO»** o **«DE ENTREGA DIRECTA»** y se va la fila «TIPO»; **«DIRECCIÓN» → «DESTINO»**; los renglones del mismo cliente juntos con el **nombre repetido en TODOS** (Daniel: *«que se repita para que no haya confusión»*) y raya gris entre clientes; firmas pegadas bajo observaciones y pie legal al pie —con varias hojas, en la **ÚLTIMA**—. 🔴 **Nada se toca en la base** y el total de bultos no se mueve. ⚠️ `PrintDocument.tsx` (la vista previa) todavía dice lo de antes: pendiente de Daniel. Candado `guias-papel-2026-09`, que LEE el PDF con pdfjs.
 
 ## Pedidos con bultos — TRES estados y el detalle (6-oct-2026)
+
+> 🔴 **REEMPLAZADO EL 7-OCT-2026 — esta sección es historia.** Al día siguiente Daniel simplificó el flujo (`PEDIDOS_FLUJO_SIMPLE_2026_10`, prendido el 7-oct-2026, commit `275b0f56`) y el 9-oct-2026 sumó un paso (#707). `PEDIDOS_BULTOS_2026_10` sigue en `true`, pero donde los dos flujos difieren manda el simplificado. Lo que **ya no es cierto** de lo de abajo:
+> - **Estados**: ya no son tres ni existe «Verificado» en pantalla. Son **Pendiente → En preparación → Preparado → Recibido**.
+> - **Quién marca**: «Preparado» lo marca **solo bodega** (y admin), nunca la secretaria (#664); «Recibido», la secretaria (y admin). La regla «quien preparó no puede verificar» no existe en el flujo simplificado.
+> - **Bultos**: **un solo número por pedido**, escrito en la fila. No hay bulto por artículo: el detalle es de solo lectura, sin casillas ni columna «Bulto».
+> - **Quién ve qué empresa** (decisión 2): desde el 9-oct-2026 solo **Jorman** está recortado (Vistana); **Julio y Rodrigo ven las 6** (#710).
+> - **Total** (decisión 5): la columna «Total» se quitó del detalle en pantalla **para todos los roles** (#663); el papel la conserva.
+> - **Etiquetas** (decisión 7): en el flujo simplificado Pedidos termina en «Recibido» y **no crea ningún envío de Etiquetas**.
+> - **Migraciones**: donde abajo dice «SIN aplicar» para `20261231120000` y `20261231130000`, el comentario del interruptor en `pedidos-bultos.ts` dice que quedaron aplicadas antes de prenderlo el 6-oct-2026.
+>
+> Lo vigente: «Despachos — estado al 9-oct-2026», al final.
 
 > Interruptor `PEDIDOS_BULTOS_2026_10` (`src/lib/guias/pedidos-bultos.ts`), **prendido el 6-oct-2026** con el «sí» de Daniel, después de ver las capturas y el papel con el pie de Switch. `false` sigue siendo la vuelta atrás: devuelve la pantalla publicada del 5-oct, intacta, porque los lectores de la lista toleran que falten las columnas nuevas. Candado `src/__tests__/guias/pedidos-bultos.test.ts`.
 >
@@ -2469,11 +2484,15 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
 
 ## Guías › «Pedidos» para bodega (5-oct-2026)
 
+> ⚠️ **Corregido el 9-oct-2026**: `PEDIDOS_BODEGA_2026_10` está en **`true`** (abajo dice «hoy `false`»). La pestaña la ven los cuatro roles del módulo y el módulo **abre en ella** (#675). `sync-pedidos` ya no corre a las 06:10 UTC: son cuatro pasadas de día (13:10 · 15:40 · 18:20 · 20:45 UTC, `vercel.json`). Los dos estados pasaron a cuatro. Lo vigente: «Despachos — estado al 9-oct-2026», al final.
+
 - 🔴 **Guías › «Pedidos», PRIMERA pestaña de bodega y admin** (5-oct-2026, `PEDIDOS_BODEGA_2026_10`, hoy `false`): los pedidos **Activo** de Switch (= sin facturar; facturado pasa a Inactivo, medido) que trae `sync-pedidos` a las 06:10 UTC a `switch_pedidos`; fuera `TCKCTA`, `12188` y quien no tiene ficha. **Dos estados** (Pendiente · Preparado) en `pedidos_bodega_estado`, con quién y cuándo; **sin enlace a Etiquetas ni a Guías**. Migración `20261230120000` **SIN aplicar**. Candado `guias/pedidos-bodega`.
 
 ## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
 
 > Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.
+>
+> ⚠️ **9-oct-2026**: de este bloque, la línea «Pedidos: TRES estados y el detalle con BULTOS» **ya no es la regla vigente** (se deja verbatim como historia). Lo vigente: «Despachos — estado al 9-oct-2026», al final.
 
 ### Guías › panel 11-sep, destinos 7/10-sep, la lista 19-sep, el papel 25-sep, etiquetas 18-sep, pedidos 6-oct, nueva guía 1-oct
 
@@ -2504,3 +2523,82 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
 - 🔴 **Etiquetas POR ENVÍO** (1-oct-2026, `ETIQUETAS_POR_ENVIO`): postmortem › «Etiquetas por envío».
 - 🔴 **Pedidos: TRES estados y el detalle con BULTOS** (6-oct-2026, `PEDIDOS_BULTOS_2026_10`, prendido 6-oct-2026): Pendiente → **Preparado** (bodega o la secretaria) → **Verificado** (la secretaria, nunca bodega) → Etiquetas, y **nadie hace los dos pasos del mismo pedido, ni admin**; queda firmado quién y cuándo. Quién ve qué va **por EMPRESA y por PERSONA**, y lo decide el SERVIDOR. Migraciones aplicadas. Postmortem › «Pedidos con bultos». Candado `guias/pedidos-bultos`.
 - 🔴 **Nueva guía en UNA tabla, un renglón por envío, «Despachado por» al DESPACHAR** (1-oct-2026, `guias-2026-10.ts`): postmortem › «Nueva guía en una tabla».
+
+## Despachos — estado al 9-oct-2026
+
+> Reglas vigentes, comprobadas contra el código publicado (`origin/main` `e696f4f3`) y los PR #663 · #664 · #665 · #675 · #677 · #680 · #682 · #687 · #707 · #710, más los commits del 7-oct-2026. Sin narrar el proceso: la historia está en las secciones de arriba y en cada PR.
+
+**El módulo**
+
+- Se llama **Despachos** y vive en `/despachos` (7-oct-2026, `e573dc5b`). La `key` sigue siendo `guias` (`role_permissions`, overrides) y las rutas siguen en `/api/guias/**`. Los enlaces viejos `/guias…` redirigen (307) a `/despachos…` conservando la consulta (`middleware.ts`).
+- Pestañas, en este orden: **Pedidos · Guías de despacho · Etiquetas · Configuración** (`src/app/despachos/page.tsx`). «Etiquetas» se llamó «Bultos» unas horas del 7-oct-2026 y volvió a «Etiquetas» con el flujo simplificado (Daniel: *«que diga etiqueta, no bultos»*, `d2677055`).
+- **Abre en Pedidos** para todos los que ven esa pestaña (admin · secretaria · bodega · vendedor) (#675). `?vista=guias|etiquetas|config` y `?pendientes=1` siguen abriendo donde dicen.
+
+**Despachos › Pedidos** (`src/lib/guias/pedidos-flujo-simple.ts`, `PedidosView.tsx`, `/api/guias/pedidos`)
+
+- Los pedidos nacen en Switch (los «Activo», sin facturar); aquí no se crea ninguno. Fuera `TCKCTA`, `12188` y quien no tiene ficha.
+- **Cuatro estados**: Pendiente → **En preparación** → Preparado → Recibido (#707, 9-oct-2026). Pestañas de la lista: «Pendientes» · «En preparación» · «Preparados» · «Recibidos». Un paso a la vez, hacia adelante o hacia atrás.
+- **Quién marca cada paso** (lo decide el servidor, `puedeMoverFlujoSimple`; la pantalla lee las mismas listas):
+
+  | Paso | Quién | Botón |
+  |---|---|---|
+  | Pendiente | Nadie: llega de Switch | — |
+  | En preparación | Bodega (y admin): confirma que recibió la hoja del pedido | «Iniciar preparación», con confirmación |
+  | Preparado | **Solo bodega** (y admin), **nunca la secretaria** (#664) | «Preparado», tras escribir los bultos; sin ventana de confirmación |
+  | Recibido | **Secretaria** (y admin) (#664, #677) | «Recibir», con confirmación |
+
+- El vendedor solo mira.
+- **Un solo número de bultos por pedido** (entero de 1 a 9999), escrito en la fila al marcar «Preparado». No hay bulto por artículo; el detalle del pedido es de solo lectura.
+- **Unidades en la fila**, en todas las pestañas y también para quien solo mira: «84 unidades» en Pendientes y «5 bultos · 620 unidades» después (#665, #687). Sin dato se muestra «—», nunca un cero. El texto dice siempre «unidades».
+- **Deshacer un paso en la fila**, con confirmación (#687, #707): «Volver a Pendiente» y «Volver a En preparación» son de bodega; «Volver a Preparado», de la secretaria; admin, todos. Volver a En preparación o a Pendiente borra los bultos anotados; volver a Pendiente deja la fila sin firmas. La firma anterior queda en `activity_logs` (`deshacer_paso`, con la fila de antes).
+- **Firma de cada paso**: quién y cuándo (`en_preparacion_por/_en`, `preparado_por/_en`, `recibido_por/_en`); la lista muestra el último paso dado, «Recibido · Angela · 4:15 p. m.».
+- **«En espera de muestra»** (#707, #710): no es un estado, es una marca que solo existe sobre «En preparación» (en el código y con un CHECK en la base). La pone y la quita bodega (o admin) con un solo botón —«En espera de muestra» / «Quitar espera»—, con confirmación y una nota opcional de hasta 200 caracteres. En la fila sale en ámbar **con firma**: «En espera de muestra · Julio · 2:15 p. m. · hace 2 días», y la nota debajo. Marcar «Preparado» la quita sola. Queda en `activity_logs` al ponerla y al quitarla.
+- **Aviso de Preparado sin recibir**: a los 2 días (`PREPARADO_VIEJO_DIAS`) la fila dice «Preparado hace N días» en ámbar.
+- **Las pestañas refrescan** (#707): tocar una vuelve a leer la lista de la base. Nunca llama a Switch.
+- **«Actualizar»** (línea «Actualizado hace X min») dispara el mismo sync de pedidos por `sync-now`, con su freno de 10 min. Los pedidos nuevos llegan por el cron `sync-pedidos`, cuatro pasadas al día (8:10 a. m. · 10:40 a. m. · 1:20 p. m. · 3:45 p. m. de Panamá).
+- **Pedidos termina en «Recibido»**: no crea envío de Etiquetas ni detecta la factura de Switch.
+- **El rechazo nombra la sesión que llegó** (#677): ««Recibido» lo marca la secretaria. La sesión abierta es de jorman (bodega).» Una pestaña que queda con la sesión de otra persona vuelve a «/» (`lib/sesion-entre-pestanas.ts`).
+
+**Quién ve qué**
+
+- **Por empresa** (`EMPRESAS_POR_PERSONA` → `empresasQueVe`, lo aplica el servidor en GET, PATCH, detalle y papel): **Jorman ve solo Vistana**; **Julio y Rodrigo ven las 6** (#710, 9-oct-2026); admin, la secretaria y cualquiera que no esté en la lista, las 6.
+- **Precios** (#663): bodega no recibe precio ni total —el servidor los manda en `null` (`veLaPlata`: solo admin y secretaria)—. La columna **«Total» no está en el detalle en pantalla para ningún rol**. El papel del pedido conserva Precio y Total y se imprime «Con precios» o «Sin precios». En el selector de facturas del cliente (Nueva guía y Etiquetas) el total de cada factura tampoco le viaja a bodega.
+
+**Despachos › Guías de despacho**
+
+- **Grupos de fecha**: Hoy · Ayer · Esta semana · Semana pasada · Historial, con una línea tenue y aire entre grupos (`GUIAS_GRUPOS_FECHA_2026_10`, prendido el 7-oct-2026, `af53e751`). Un grupo sin guías no se dibuja. Arriba sigue «Pendientes de despacho».
+- **Distintivo «Pendiente»**: solo en la guía sin despachar, en la línea de abajo de la fila (destino · bultos · transportista), y se ve con y sin la barra del celular (`4a39e288`). Una guía despachada no lleva distintivo.
+- **Entrar a Despachos no llama a Switch** (#680): ni `/despachos` ni `/despachos/nueva` disparan `POST /api/guias/facturas-hoy`. Esa lectura solo sale con «Actualizar», con el freno de 10 min por empresa.
+- **Facturas del día, cada hora de 7 a. m. a 6 p. m. de Panamá** (#682): 13 entradas de `switch-sync tipo=facturas` en `vercel.json`, las 8 empresas — 6:50 · 7:30 · 8:30 · 9:15 · 10:00 · 11:45 · 12:30 · 1:40 · 2:00 · 3:20 · 4:40 · 5:30 · 6:00 (hora de Panamá).
+- **No toda factura lleva etiqueta** (`b1b94c29`): no hay lista de «pendientes de etiqueta» ni aviso.
+
+**Pendiente vivo**
+
+- **Rediseño del detalle de la guía: en curso, sin publicar.** En el código publicado `GUIA_DETALLE_APPLE_2026_10` sigue en `false` y no hay ningún cambio nuevo del detalle. Existe la rama local `rediseno/guia-detalle-apple`, sin commits por delante de `origin/main` al 9-oct-2026 y sin PR abierto.
+
+**Interruptores del módulo, al 9-oct-2026**
+
+| Interruptor | Archivo (`src/lib/guias/`) | Valor |
+|---|---|---|
+| `GUIAS_ATAJOS_NUEVOS` | `atajos-facturas.ts` | `true` |
+| `GUIA_PAPEL_2026_09` | `papel-2026-09.ts` | `true` |
+| `ETIQUETAS_POR_ENVIO` | `etiquetas-por-envio.ts` | `true` |
+| `GUIA_NUEVA_2026_10` | `guias-2026-10.ts` | `true` |
+| `ETIQUETAS_2026_10` | `guias-2026-10.ts` | `true` |
+| `GUIA_APPLE_2026_10` | `guias-2026-10.ts` | `true` |
+| `GUIA_DETALLE_APPLE_2026_10` | `guias-2026-10.ts` | **`false`** |
+| `ETIQUETAS_TRASLADO_2026_10` | `guias-2026-10.ts` | `true` |
+| `GUIA_AGREGAR_TRASLADO_2026_10` | `guias-2026-10.ts` | `true` |
+| `GUIAS_LISTA_APPLE_2026_10` | `lista-apple-2026-10.ts` | `true` |
+| `GUIAS_GRUPOS_FECHA_2026_10` | `grupos-fecha-2026-10.ts` | `true` |
+| `PEDIDOS_BODEGA_2026_10` | `pedidos-bodega.ts` | `true` |
+| `PEDIDOS_TABLA_2026_10` | `pedidos-bodega.ts` | `true` |
+| `PEDIDOS_POR_EMPRESA_2026_10` | `pedidos-bodega.ts` | `true` |
+| `PEDIDOS_BULTOS_2026_10` (`PEDIDOS_BULTOS_EN_CODIGO`) | `pedidos-bultos.ts` | `true` |
+| `PEDIDOS_FLUJO_SIMPLE_2026_10` (`PEDIDOS_FLUJO_SIMPLE_EN_CODIGO`) | `pedidos-flujo-simple.ts` | `true` |
+
+Los dos últimos admiten además una variable para prenderlos en local (`NEXT_PUBLIC_PEDIDOS_BULTOS`, `NEXT_PUBLIC_PEDIDOS_FLUJO_SIMPLE`); en producción manda la constante.
+
+**Migraciones de Pedidos de estos días**: `20270103120000_pedidos_flujo_simple.sql` (7-oct-2026) y `20270109120000_pedidos_en_preparacion.sql` (9-oct-2026), las dos aditivas —ensanchan el CHECK y agregan columnas en NULL— y aplicadas según `275b0f56` y #707.
+
+**Candados**: `pedidos-flujo-simple` · `pedidos-en-preparacion` · `pedidos-recibir-roles-reales` · `despachos-abre-en-pedidos` · `despachos-sin-switch-al-entrar` · `guias-grupos-fecha-2026-10` · `guias-pendiente-con-barra` · `cron-calendario`.

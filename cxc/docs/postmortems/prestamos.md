@@ -589,4 +589,8 @@ Medido 25-sep → 9-oct: 8 entradas, todas de Contabilidad y desde la computador
 2. **Abre con lo que requiere atención arriba** (`conAtencionArriba`): sin colaborador asignado primero, después saldo mayor. Ordenar tocando el encabezado no cambia.
 3. **Celular: dos líneas por colaborador** (nombre · saldo; cuota) y la tarjeta entera abre `/prestamos/<id>`, donde está el abono.
 
+- **Historia del interruptor**: entró apagado en el PR #706 (rama `prestamos-apple`, del 4/5-oct) y se prendió en el PR #717 el 9-oct-2026, con la aprobación de Daniel. El archivo es `src/lib/prestamos-apple-2026-10.ts`; `false` devuelve la pantalla de antes.
+- **Reglas de plata, intactas**: «Próximo descuento» no es una cuenta nueva; es lo que la planilla PROPONE, y lo escrito a mano en la fila y el recorte al neto (`recortarAlNeto`) pueden bajarlo al cerrar. El abono, las cuotas, el saldo y el pago que escribe el cierre no se tocaron.
+- La ficha sin colaborador asignado dice «No está vinculado a ningún colaborador: la planilla no le puede descontar.»
+
 Ningún número cambia; ni una ruta ni `lib/asistencia` importan el interruptor (candado `prestamos-apple-2026-10`). `false` = la pestaña de hoy: candado `src/__tests__/components/prestamos-apple-apagado.test.tsx` (HTML del `PrestamosTab.tsx` de `origin/main` antes de traer el rediseño; prendido, rojo).

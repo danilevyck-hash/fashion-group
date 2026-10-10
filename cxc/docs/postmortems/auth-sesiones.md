@@ -37,3 +37,17 @@
 ### Auth › quién entra a cada módulo se anota (25-sep-2026)
 
 - 🔴 **QUIÉN ENTRA A CADA MÓDULO SE ANOTA (25-sep-2026, `REGISTRO_DE_VISITAS` en `lib/visitas/registro.ts`, hoy `true`)**: al cambiar de módulo el navegador avisa por `POST /api/visitas` —como mucho **una vez por módulo cada 10 min por pestaña**, sin `await` y con `.catch()`, como el recorte de `last_seen`— y el servidor SUMA en `visitas_modulo` (día de Panamá · persona · módulo · aparato). 🔴 **El quién sale de la cookie FIRMADA, nunca del cuerpo**; una key fuera de `ALL_MODULES` es **400** y sin sesión **204**. Se mira en **Usuarios › «Actividad»**, SOLO admin, 30 días; el cron `cleanup-sessions` borra a los **180 días** (sin entrada nueva de cron). 🔴 Falla ABIERTA sin la migración `20261221120000`, **aplicada el 25-sep-2026**. Candado `visitas/registro-de-visitas`.
+
+---
+
+## Inicio de sesión — 4 retoques de texto (9-oct-2026, `LOGIN_RETOQUES_2026_10`)
+
+Estado al 9-oct-2026: en `main` el interruptor está **apagado** (`LOGIN_RETOQUES_2026_10 = false`, `lib/login-retoques-2026-10.ts`, PR #716). Prenderlo está **publicándose (PR #721)**: Daniel aprobó los cuatro retoques, y ese PR además le da al formulario el margen lateral del sistema en el celular (`px-4`; en la computadora no cambia nada).
+
+- 🔴 **Solo textos y presentación.** La autenticación, la validación, las contraseñas y los mensajes de error del servidor no se tocan (Daniel: «no hagas nada con las contraseñas»). El envío a `/api/auth` es el mismo prendido o apagado.
+- Con el interruptor prendido:
+  1. Rótulo «Contraseña» encima del campo; reemplaza al texto de ayuda de adentro, que se borra al escribir.
+  2. «¿Olvidaste tu contraseña?» pasa a «Recuperar contraseña».
+  3. «ver» / «ocultar» pasan a «Mostrar» / «Ocultar».
+  4. El botón «Ingresar» pasa a «Iniciar sesión»; mientras carga, «Verificando…».
+- `false` = la pantalla de antes, byte por byte. Candado `src/__tests__/components/login-retoques-apagado.test.tsx` (HTML apagado idéntico en 4 estados; prendido, los 4 retoques).

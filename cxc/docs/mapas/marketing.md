@@ -3,6 +3,8 @@
 > Medido contra producción el **5-sep-2026** (SQL de solo lectura) y contra el código de `main`.
 > Todo número se remidió: nada se copió de `CLAUDE.md` ni del post-mortem.
 > Lo que no se pudo medir dice **«no medido»** y por qué.
+>
+> ⚠️ **Al 9-oct-2026 este mapa es una foto del 5-sep-2026**: los números no se remidieron y varias pantallas que describe ya no existen (#690). Hoy `/marketing` tiene las pestañas Por cobrar · Gastos · Impulsadoras, con Mobiliario y Proveedores en «···», y entran `admin`, `secretaria` y `contabilidad` (esta última solo mira; `src/lib/marketing/roles.ts`). El estado y las reglas vigentes están en [docs/postmortems/marketing-rediseno.md](../postmortems/marketing-rediseno.md) › «Estado al 9-oct-2026 — reglas vivas».
 
 ---
 

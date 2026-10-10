@@ -1486,6 +1486,27 @@ Cartera del grupo leída de `switch_estadocuenta_aging_mv` acotada a las 6: **21
 
 ---
 
+## 🔴 UN SOLO BOTÓN «ESTADO DE CUENTA», Y EL DEL GRUPO POR OMISIÓN (7-oct-2026, PRENDIDO)
+
+Interruptor `ESTADO_CUENTA_UN_BOTON_2026_10 = true` (`lib/cxc/estado-cuenta-un-boton-2026-10.ts`). Nació apagado (PR #666) y se prendió el 7-oct-2026 (PR #669): Daniel escribió «Aprobado» sobre el mockup HOY vs RECOMENDACIÓN. `false` = todo como antes.
+
+- 🔴 **Un solo botón, «Estado de cuenta»**, en la tarjeta del cliente de Cuentas por Cobrar (computadora y celular) y en la ficha del cliente. Antes había dos para el mismo trabajo: «Enviar estado de cuenta» (enviaba) y «Estado de cuenta» (solo mostraba). Abre la hoja «Cobrar» de siempre: correo · WhatsApp · copiar · descargar PDF. El cajón de solo lectura (`EstadoCuentaDrawer`) ya no se abre desde ahí.
+- 🔴 **Por omisión se descarga el documento del GRUPO**: cuando el cliente debe en más de una empresa, el PDF abre con una hoja de grupo (total arriba y el desglose por empresa con sus tres tramos). Con una sola empresa esa hoja no se dibuja.
+- 🔴 **Descargar respeta el filtro de empresa; enviar no.** Con la lista filtrada a una empresa, el PDF que se descarga es el de esa empresa (se pide a `/api/cxc/estado-cuenta/[codigo]?empresa=`) y el archivo lleva el nombre de la empresa al final. Lo que se ENVÍA por correo o WhatsApp sigue sin mirar el filtro (`empresasDelEnvio()`).
+- 🔴 **El archivo se llama por el cliente, no por su código** (commit `bb44d482`, 7-oct-2026): «Estado de cuenta - Lutylui - 7 oct 2026.pdf» en lugar de «Estado-cuenta-D-98-2026-10-07.pdf». Usa el mismo nombre que se imprime en el papel (`nombreDelPapel`), sin los caracteres que rompen la descarga en Mac o Windows y con tope de largo. Mismo formato en la descarga de a uno, el lote y los adjuntos del correo.
+- 🔴 **En la computadora «Descargar PDF» SIEMPRE descarga** (commit `bb44d482`). 🩸 `navigator.canShare({files})` contesta que sí también en Chrome y Safari de escritorio: el botón abría la hoja nativa del sistema y se quedaba ocupado. Ahora se pregunta por el aparato (`aparatoDeQuienMira()`, `lib/aparato.ts`, la misma regla de «Compartir» en Guías): en el celular se comparte por `compartirArchivo`; en la computadora se descarga.
+- 🔴 **La fecha es la de PANAMÁ, no la de mañana** (PR #673, 7-oct-2026). 🩸 Desde las 7 p. m. de Panamá (00:00 UTC) el estado de cuenta salía fechado al día siguiente. Todo pasa por `hoyPanama()` (`lib/fecha-panama.ts`): el nombre del archivo (de a uno y el lote), el «Fecha:» del encabezado y el «Generado …» del pie, el mes del asunto del correo y el «hoy» de la marca de último envío de Boston.
+- Nada contable cambió.
+- Candados: `estado-cuenta-un-boton-2026-10.test.tsx` · `cxc-estado-cuenta-un-boton.test.tsx` · `pdf-estado-cuenta-grupo.test.ts` (fija el día con `vi.setSystemTime`, con el proceso en UTC) · `cxc-nombre-de-archivo-del-pdf.test.ts`.
+
+## 🔴 NADA SE REVELA SOLO AL PASAR EL MOUSE (7-oct-2026, commits `41dfb737` y `8244332f`)
+
+Daniel: «quítame el hover que no me gusta… lo vi en CxC, y creo que en Ventas, pero busca dónde está y quítalo».
+
+- En Cuentas por Cobrar (`ContactPanel`, `BostonTab`) se retiraron los desgloses finos por tramo que solo se veían al pasar el mouse (`cursor-help`).
+- La regla, para todo el sistema: ningún contenido depende del mouse. Lo que explicaba algo solo al pasar el mouse (íconos «ⓘ» y «?») se abre con un toque, con el componente `Tooltip`.
+- Se conservan el resaltado de la fila y el cambio de color de un botón al pasar el mouse: son señal, no contenido.
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.
@@ -1615,7 +1636,7 @@ Cartera del grupo leída de `switch_estadocuenta_aging_mv` acotada a las 6: **21
 
 **El rediseño.** Vive en **`/cxc`**; `/admin` EXACTO redirige 307 con su query.
 
-- 🔴 **Cobra todo el que ve el módulo**, por la única puerta «Enviar estado de cuenta» (correo con **Deshacer de 5 s**).
+- 🔴 **Cobra todo el que ve el módulo**, por la única puerta «Enviar estado de cuenta» (correo con **Deshacer de 5 s**). ⚠️ *Nota del 9-oct-2026: desde el 7-oct-2026 ese botón se llama «Estado de cuenta» (§ «Un solo botón «Estado de cuenta»», arriba).*
 - 🔴 **Abre por «más viejo sin pagar»** (20-sep, `ORDEN_AL_ABRIR`, override anclado a «Total pendiente»); el que nunca pagó primero y **los días se ven SIEMPRE en la fila**.
 - 🔴 **El papel y el Excel cierran con el total de la PANTALLA** (20-sep): bloque «Saldo a favor (N)» y «Total general».
 - 🔴 **La tira dice plata, no conteos** (20-sep).

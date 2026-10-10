@@ -3,6 +3,80 @@
 > Nació el 22-sep-2026 con la PRIMERA de cinco piezas del rediseño de Marketing: el cimiento. Acá vive, verbatim, lo que Daniel definió ese día; qué módulos puros existen y cómo se usan; qué migraciones hay que aplicar y en qué orden; y **qué le toca a cada una de las otras cuatro piezas**, con los archivos que cada una toca, para que no se pisen.
 >
 > Los otros dos postmortems del módulo siguen vigentes: [marketing-gastos.md](marketing-gastos.md) (la puerta «＋ Registrar gasto» y el PDF con IA) y [marketing-mobiliario.md](marketing-mobiliario.md) (el inventario en PIEZAS, que **no se toca**).
+>
+> ⚠️ **Las §§ 1–16 son historia fechada.** Lo que vale hoy es la sección que sigue. Varias pantallas que esas secciones nombran ya no existen (borradas en #690): `PortadaTiendasYMarcas`, `PortadaTiendas`, `PortadaAbiertosCerrados`, `InicioMarketing`, `ReportesTabs`, `ImpulsadorasView`, `ProyectoOverlay`, `FacturasSection`, `EntregasSection`, `VistaTiendaAnterior`.
+
+---
+
+## Estado al 9-oct-2026 — reglas vivas
+
+Comprobado contra el código de `main` (e696f4f3). Los PR entre paréntesis.
+
+**Pantalla**
+
+- `/marketing` es **una sola pantalla** para los tres roles de Marketing (`MarketingNuevo`, #679 · #685): pestañas **Por cobrar · Gastos · Impulsadoras**, y en «···» **Mobiliario** y **Proveedores**. La portada de pestañas Tiendas · Marcas y la pantalla de antes se borraron (#690). Siguen vivas `/marketing/tienda/[codigo]`, `/marketing/[marca]`, `/marketing/mobiliario` y las galerías.
+- **Contabilidad solo mira**: sin «＋ Gasto», «Cerrar», «Subir comprobante» ni editar; las rutas que escriben contestan 403 (`ROLES_MARKETING_ESCRITURA`).
+- **Un solo número por marca**: la portada, el detalle del cobro, el cierre, la lista de Gastos y el Excel salen de `resumenesDeCobro` (`/api/marketing/cobros`), el mismo cálculo del ZIP.
+
+**Por cobrar**
+
+- Una tarjeta por marca: total, cantidad de gastos, «desde» y el aviso «N tiendas sin fotos». Debajo, **Cobros anteriores** (fecha, marca, monto, «ZIP»), solo de consulta. Sin «Registrar pago».
+- El cobro de una marca agrupa los gastos por carpeta del ZIP. **«Descargar ZIP» y «Cerrar» son dos acciones separadas**: descargar no cierra nada y lleva todo lo abierto.
+- **«Excluir»** deja un gasto fuera de este cierre: se le quita la asignación al período y pasa al cierre siguiente, sin cambiar (`cobros/cerrar-cobro.ts`). Tiene que quedar al menos un gasto incluido. El ZIP del cierre lleva solo lo incluido.
+- Al confirmar el cierre se avisan las tiendas sin fotos, con «Subir fotos»; el aviso no frena.
+
+**Gastos**
+
+- Una lista con facturas, mobiliario y pagos de impulsadora. Filtros con su nombre: **Marca · Tienda · Tipo · Estado**; abre en Estado «Por cobrar»; «Quitar filtros» (#689). Sin opción «Sin tienda».
+- Estados: **Por cobrar · Cobrado · No recuperable**. Columnas: Fecha · Gasto · Tipo · Marca · Tienda · Monto · Se cobra · Monto a cobrar · Estado.
+- «＋ Gasto» ofrece tres tipos: Factura de un proveedor · Entrega de mobiliario · Pago de impulsadora. La factura se registra en una pantalla: un solo botón **«Subir factura»** → datos leídos → Marca → Tienda (obligatoria) → Se cobra.
+
+**Cuánto se cobra**
+
+- **Factura**: «Se cobra» viene en **50 %** al registrar (`PCT_AL_REGISTRAR`), con 100 % y No recuperable a un toque (#689). Al editar no se aplica ningún valor por defecto.
+- **Un gasto sin porcentaje escrito se cobra completo** (#668): solo el **0 escrito** en `mk_facturas.pct_a_la_marca` saca el gasto del papel (`aCargoDeLaEmpresa` mira el `null` antes de convertir). `mk_factura_marcas.porcentaje` no se usa para esto.
+- **Pago de impulsadora: siempre 100 % a su marca** (#691). El formulario muestra el texto fijo «Se cobra: 100 % a la marca» y el servidor nunca escribe `pct_a_la_marca` en ese pago.
+- **Entrega de mobiliario**: se cobra por su total, sin porcentaje.
+- **No recuperable** = `pct_a_la_marca` 0 + `se_reporta` false. Se elige al registrar o al editar. Al registrar oculta Marca y Tienda y deja solo **Observaciones, opcional**; **no hay campo Motivo** (#692). No suma a ninguna marca ni entra a ningún ZIP. En la lista la observación sale debajo del estado. «A cargo de la empresa», «No se reporta» y «Sin marca» ya no se muestran: todo dice «No recuperable».
+
+**ZIP y Excel**
+
+- Carpeta de cada gasto, en este orden (`zip-marca.ts`): tienda del gasto → tienda del proyecto → sin tienda: entrega = **«Mobiliario y exhibición»**, pago de impulsadora = **«Impulsadoras»**, factura cuyo concepto contiene una palabra de `PALABRAS_MOBILIARIO_SIN_TIENDA` (mueble · tazas · barras planas) = «Mobiliario y exhibición» → **«General»**.
+- ⚠️ La regla «sin adivinar por el concepto» de #671 (`carpetaDeFacturaSinTienda`, las 4 de Boston por id) **no está activa**: `zip-marca.ts` lee la constante `MKT_SOLO_COBRABLE_2026_10`, que sigue en `false`. Desde el registro nuevo la tienda es obligatoria, así que solo afecta a facturas viejas sin tienda.
+- **Excel de la marca en formato C2** (#693): tres columnas de dinero, **Monto · <empresa> · <marca>**, con total al pie, en el Resumen y en cada hoja. Monto = empresa + marca. El nombre de la empresa sale de `mk_marcas.empresa_codigo` (`encabezadoDeLaEmpresa`). Impulsadoras y mobiliario: empresa en $0. Un solo constructor (`armarWorkbookDescarga`) para el ZIP, el botón Excel y el reporte del período. Multifashion no cambió.
+
+**Proveedor y duplicados**
+
+- El lector de facturas (`/api/marketing/ia/leer-factura`) devuelve el **proveedor que ya existe** cuando lo reconoce (nombre normalizado, alias de `mk_proveedor_alias` sobre `ALIAS_DE_PROVEEDOR`, o parecido claro); si no, queda lo leído y el campo dice «Proveedor nuevo». Falla abierta (#696).
+- El aviso de duplicado al escribir (`facturas/check-duplicate`) y el freno al guardar comparan igual: **número sin ceros de relleno + proveedor normalizado con alias** (`mismoNumeroDeFactura`, `duplicado.ts`, #695).
+- Proveedores: «Recobrado» = facturas selladas a un período cerrado; «Por cobrar» aparte (#671).
+
+**Auditoría** (22776eb5)
+
+- Crear, editar y anular una factura, y crear, editar y borrar una entrega de mobiliario, dejan registro en `activity_logs` (`logAudit`) con antes/después y usuario. Lectura: `GET /api/marketing/historial` (roles de Marketing).
+- ⚠️ La línea «Modificado por … · fecha» (`UltimoCambio`) hoy solo se dibuja en la entrega de mobiliario (`EntregaForm`). La de la factura vivía en `FacturasSection`, borrada en #690: el registro de facturas se sigue escribiendo, pero la ficha de la factura no lo muestra.
+
+**Interruptores**
+
+| Interruptor | Archivo (`src/lib/marketing/`) | Valor |
+|---|---|---|
+| `ROLES_MARKETING_NUEVO` | `marketing-nuevo.ts` | `ROLES_MARKETING` (admin · secretaria · contabilidad). `[]` lo apaga |
+| `MKT_SOLO_COBRABLE_2026_10` | `solo-cobrable-2026-10.ts` | `false` (ver abajo) |
+| `MKT_PROVEEDORES_2026_10` | `proveedores-2026-10.ts` | `true` |
+| `FICHA_GASTO_2026_10` | `ficha-gasto-2026-10.ts` | `true` |
+| `MARKETING_APPLE_2026_10` | `marketing-2026-10.ts` | `true` |
+| `MARKETING_APPLE_V2_2026_10` | `marketing-2026-10-v2.ts` | `true` |
+| `MARKETING_V2_PROYECTO` | `marketing-2026-10-v2.ts` | `false` (nadie la lee fuera de su archivo) |
+| `MARKETING_PUERTA_GASTO` | `puerta-gasto.ts` | `true` |
+| `MARKETING_PDF_EN_LA_PUERTA` | `pdf-en-la-puerta.ts` | `true` |
+| `MARKETING_PORTADA_REDISENO` | `portada-rediseno.ts` | `true` |
+| `MARKETING_TIENDAS_Y_MARCAS` | `tiendas-y-marcas.ts` | `true` |
+| `MARKETING_FOTOS_CON_PERIODO` | `fotos-periodo.ts` | `true` |
+| `MARKETING_CELULAR` | `celular.ts` | `true` |
+
+🔴 **«Solo lo cobrable» se prende por pantalla, no por la constante.** `MarketingNuevo` envuelve su contenido en `SoloCobrableContexto` con valor `true` (`solo-cobrable-contexto.ts`), y lo leen con `useSoloCobrable()` el registro (`PuertaGasto`, `FacturaForm`), la ficha del gasto (`FichaTiendaAcciones`), Proveedores y el pago de impulsadora. Lo que lee la **constante** directamente sigue apagado: la carpeta del ZIP sin tienda (`zip-marca.ts`), la suma de `/api/marketing/inicio`, las rutas `periodos/[id]/tiendas-sin-foto` y `no-recuperable` (contestan 404) y el cierre de `/marketing/[marca]` (`PaginaMarca`, `CerrarPeriodoModal`). Fuera de `MarketingNuevo` (por ejemplo `/marketing/tienda/[codigo]`) el contexto vale lo de la constante.
+
+**Candados**: `marketing-nuevo-apagado` · `marketing-nuevo-50-y-filtros` · `marketing-no-recuperable-sin-motivo` · `marketing-impulsadoras-pago` · `marketing-excel-del-zip-candado` · `marketing-proveedores-2026-10` · `marketing-proveedor-reconocido` · `marketing-aviso-duplicado-sin-ceros` · `marketing-auditoria-gastos` · `marketing-solo-cobrable-2026-10` · `marketing-solo-cobrable-apagado`.
 
 ---
 
@@ -966,9 +1040,11 @@ O sea: **3 de las 4 tiendas con gastos abiertos hoy necesitan la pregunta**. No 
 
 ## Marketing V2 (6-oct-2026) — `MARKETING_APPLE_V2_2026_10`, prendido
 
-Daniel aprobó las capturas el 6-oct-2026. Registrar pago: período en chips (1ª quincena · 2ª quincena · Mes completo · Rango), distribución y concepto en gris, sin asterisco y lo que falta se dice al tocar «Guardar pago» (misma regla de `puedeGuardar`). Galería: «Fotos de la tienda · N» y las ✕ solo con «Editar» también en la computadora. ⚠️ Proyecto y facturas (`ProyectoOverlay` · `FacturasSection`) traen su V2 detrás de `MARKETING_V2_PROYECTO = false`: esa ventana no tiene puerta desde el 23-sep y se dejó como estaba. La galería pública no cambia. Candado `marketing-apple-v2-2026-10`.
+Daniel aprobó las capturas el 6-oct-2026. Registrar pago: período en chips (1ª quincena · 2ª quincena · Mes completo · Rango), distribución y concepto en gris, sin asterisco y lo que falta se dice al tocar «Guardar pago» (misma regla de `puedeGuardar`). Galería: «Fotos de la tienda · N» y las ✕ solo con «Editar» también en la computadora. ⚠️ Proyecto y facturas (`ProyectoOverlay` · `FacturasSection`) traían su V2 detrás de `MARKETING_V2_PROYECTO = false`; las dos pantallas se borraron en #690 y la constante quedó sin lector. «Registrar pago» en el Marketing nuevo se abre como «Subir comprobante» desde Impulsadoras. La galería pública no cambia. Candado `marketing-apple-v2-2026-10`.
 
-## Solo lo cobrable (7-oct-2026) — APAGADO hasta el «sí» de Daniel
+## Solo lo cobrable (7-oct-2026) — prendido dentro del Marketing nuevo desde el 8-oct-2026
+
+> **Estado al 9-oct-2026.** La constante `MKT_SOLO_COBRABLE_2026_10` sigue en `false`, pero el Marketing nuevo (#679, para todos los roles desde #685) prende estas reglas dentro de su pantalla con `SoloCobrableContexto`. De la lista de abajo, **cambió después**: «Se cobra» viene en 50 % y ofrece «No recuperable» también al registrar (#689, #692); la portada es «Por cobrar», no «Marcas» (#679); la pestaña «No recuperable» se borró con la portada vieja (#690) y lo no recuperable se ve en Gastos con ese estado; el aviso de tiendas sin foto vive en el cierre del cobro. **No quedó activa** la regla del ZIP «sin adivinar por el concepto»: `zip-marca.ts` lee la constante. Detalle en «Estado al 9-oct-2026 — reglas vivas», arriba.
 
 Interruptor `MKT_SOLO_COBRABLE_2026_10` (`src/lib/marketing/solo-cobrable-2026-10.ts`). Daniel: *«Quiero poder registrar todo lo cobrable a las marcas, de manera ordenada, minimalista. Solo lo cobrable»* · *«cada factura va a una tienda, no a varias»* · sobre la 7766 de Boston: *«no debería ni ir, es no cobrable, solo registrado»*.
 
