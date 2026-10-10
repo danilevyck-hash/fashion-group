@@ -293,7 +293,7 @@ describe("🔴 la PC de la oficina tiene el programa VIEJO, y hay que cambiarlo"
   it("la versión se lee del propio archivo, no de una lista aparte", () => {
     expect(versionDe('export const VERSION = "1.1.0";')).toBe("1.1.0");
     expect(versionDe("sin version")).toBeNull();
-    expect(versionDe(leer(`${CARPETA}/config.mjs`))).toBe("1.2.0");
+    expect(versionDe(leer(`${CARPETA}/config.mjs`))).toBe("1.3.0");
   });
 
   it("🔴 con la misma versión NO se toca nada (correrlo dos veces es seguro)", () => {
@@ -355,7 +355,7 @@ describe("🔴 el .bat lleva el agente NUEVO adentro, entero", () => {
   });
 
   it("🔴 el que viaja es el que sabe leer DOS relojes", () => {
-    expect(versionDe(paquete["config.mjs"])).toBe("1.2.0");
+    expect(versionDe(paquete["config.mjs"])).toBe("1.3.0");
     expect(paquete["agente.mjs"]).toContain("darRonda");
     expect(paquete["ronda.mjs"]).toContain("nuevosEstados");
   });

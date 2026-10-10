@@ -7,6 +7,106 @@
 
 ---
 
+## 🔴 Un hueco del reloj no se cierra solo (9-oct-2026) — y el plazo pasa a 30 días
+
+Daniel, textual: **«para recuperar lo del 5 de octubre y evitar que pase en un futuro, se debe
+hacer automático, ¿no? … No me llenes de avisos innecesarios»**. Y sobre el plazo: **lo máximo
+que de verdad se puede recuperar del reloj, no un número arbitrario; si se puede, 30 días**.
+
+### Cómo funciona de verdad
+
+- Los relojes **no suben nada por internet**. Un programa en la PC de la oficina
+  (`scripts/agente-reloj/`) los lee cada 3 minutos y manda las marcas a
+  `/api/asistencia/ingest`. Con la PC apagada no entra nada, pero el reloj las guarda.
+- **Quién decide cuántos días pedir: el programa de la PC**, pero con UN solo dato, que le da el
+  servidor en cada vuelta: `asistencia_dispositivos.leido_hasta` («hasta acá llegó todo»). Si
+  eso queda antes de su ventana normal (3 días), barre largo; si no, pide los 3 de siempre. El
+  barrido largo se intenta al prender la PC y, como mucho, cada 6 horas (`decidirVentana` en
+  `vuelta.mjs`).
+- O sea: **quien maneja `leido_hasta` maneja qué se vuelve a pedir**, y eso es del servidor.
+- El programa **no se actualiza solo** en la PC: viaja adentro de
+  `agregar-reloj-multifashion.bat` y alguien le da doble clic (pasos en `INSTALAR-WINDOWS.md`).
+
+### 🩸 El caso, medido contra producción
+
+La PC se apagó el lunes **5-oct a las 14:25** y volvió el jueves 8. Reloj de Boston
+(`reloj cboston`): la última marca del 5 que entró es la de las **14:24:51** (número interno
+63779) y la primera del 6 es la 63942: **163 números de salto**, contra 17 de una noche normal
+de ese reloj. El 5 tiene 84 marcas; los días vecinos, entre 115 y 132.
+
+El jueves 8 el reloj de Multifashion entró a las 12:43 con todo, tarde del 5 incluida (su
+barrido largo salió bien). El de Boston entró **46 minutos después**, a las 13:29, y solo con
+el 6, 7 y 8: su primer intento —el barrido largo— no llegó a leer el reloj, el programa ya lo
+había anotado como hecho, y la vuelta siguiente pidió la ventana normal. El servidor movió
+`leido_hasta` al 8 **porque cualquier lote lo movía a su última marca**. Hueco «cerrado», ~45
+marcas sin subir, 25 días-persona «a revisar».
+
+### La regla (`decidirLeidoHasta` en `src/lib/asistencia/agente.ts`, pura)
+
+`leido_hasta` solo avanza cuando las marcas llegaron **sin saltos**. Con un hueco abierto:
+
+1. Un lote que solo trae la ventana normal **no lo mueve**. Las marcas se guardan igual; el
+   hueco sigue abierto y el programa lo vuelve a pedir, las veces que haga falta.
+2. Un lote con eventos **más viejos que la ventana normal** solo puede venir de un barrido
+   largo —que arranca antes del hueco y manda todo en orden—: ese sí avanza.
+3. Si el hueco es **más viejo que lo que el programa alcanza**, caduca: avanza igual, queda en
+   el registro del servidor y en `activity_logs` (`hueco_caducado`, con el reloj, desde y hasta).
+   **Sin aviso.**
+4. Nunca retrocede.
+
+Las marcas repetidas no se duplican: la llave única `(dispositivo, evento_id)` con
+`ignoreDuplicates` las ignora, así que volver a barrer lo mismo no cuesta nada.
+
+⚠️ **Por qué no se usa la numeración interna del reloj.** Cuenta también las huellas no
+reconocidas y las puertas (el 66% de los eventos). Medido desde el 1-sep: en Multifashion el
+salto entre dos marcas seguidas es de **46 en una noche normal y hasta 189 en un fin de semana
+largo**; el hueco real de Boston fueron 163. No hay un umbral que los separe. El criterio que
+quedó es exacto: es el mismo que usa el programa para decidir si barre largo.
+
+⚠️ Límite conocido: el programa de la PC reintenta el barrido largo al prender y cada 6 horas,
+no en cada vuelta (así no castiga a un reloj que está fallando). Cambiar eso es tocar el
+programa; no hizo falta.
+
+### El plazo: 30 días, en un solo lugar
+
+`DIAS_RECUPERACION_AGENTE` (`agente.ts`), espejo de `VENTANA_RECUPERACION_DIAS_DEFAULT` del
+programa (`config.mjs`); un candado los compara. Eran 15.
+
+- **El reloj no es el límite**: el 6-ago-2026 entregó julio entero (8.785 eventos, 36 días
+  atrás) en un solo pedido. El límite era la ventana del programa.
+- 30 días son ~9.000 eventos y ~900 preguntas al reloj: varios minutos, solo cuando hay hueco
+  (y los lunes, por el fin de semana).
+- El programa de 30 días es la **versión 1.3.0** y llega a la PC con un doble clic. Hasta
+  entonces la PC pide 15, y el servidor **lo sabe por la versión** que el programa manda
+  (`diasQueAlcanza`): no le atribuye 30 a un programa que pide 15.
+
+### El 5-oct
+
+Se devolvió el `leido_hasta` de `reloj cboston` a la última marca que sí entró ese día
+(`2026-10-05T19:24:51Z`, las 14:24:51 de Panamá). Es una fila de estado, no una marca: **no se
+escribió ni se inventó ninguna**. El valor anterior quedó guardado fuera del repo. El reloj de
+Multifashion no tiene hueco (se revisaron sus saltos desde el 1-sep).
+
+### La corrección a mano de ese día (Rodrigo Miranda, código 13)
+
+Daniel había corregido su 5-oct: la entrada real de las 07:32:55 quedó en 08:00 y **agregó**
+una salida a las 19:00. Las correcciones van encima de las marcas y no se tocan solas:
+
+- La entrada corregida **manda**: sigue en 08:00.
+- La salida agregada **no se duplica ni se pisa**: si el reloj trae una salida real de esa
+  tarde, el día queda con las dos y pasa a «a revisar» (marcas impares), hasta que Daniel quite
+  la que sobra. No se borró nada.
+
+### Candados
+
+`src/__tests__/lib/asistencia-hueco-no-se-cierra-solo.test.ts` corre el programa REAL de la PC
+contra la regla real del servidor: un barrido que falla no cierra el hueco · se vuelve a pedir
+hasta que entra · las repetidas no se duplican · un hueco viejo caduca solo y queda anotado ·
+el programa viejo cuenta 15 · el plazo es uno solo. **Verificado por mutación**: con la regla
+de antes fallan 6.
+
+---
+
 ## 🔴 Corregir una hora ya NO pide motivo (9-oct-2026)
 
 Daniel, textual: **«quita lo de poner motivo al cambiar la hora en asistencia»**.

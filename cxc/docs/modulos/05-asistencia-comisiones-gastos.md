@@ -371,7 +371,7 @@ calcula un solo dólar. Salen del cuadro (`separarSinFicha`) y se muestran UNA v
 - Cron **`/api/cron/asistencia-vigia`** — **15:00, 20:00 y 22:15 UTC** (10:00 a.m., 3:00 p.m. y
   5:15 p.m. Panamá, todos los días, 3 entradas en `vercel.json`): si el reloj lleva **+6 h**
   (`HORAS_PARA_VIGIA`) sin reportar, avisa. Y una segunda regla: si quedó un **hueco de más de
-  15 días** (`DIAS_RECUPERACION_AGENTE`) que el agente ya no puede rellenar solo, avisa una vez
+  30 días** (`DIAS_RECUPERACION_AGENTE`; 15 con el programa anterior al 1.3.0) que el agente ya no puede rellenar solo, avisa una vez
   y avisa cuando se cierra.
 - **La pantalla lo dice sola**: el banner `EstadoReloj` muestra `al_dia / callado (>12 min) /
   con_error / nunca`, la versión del agente y un botón **«Traer ahora»** que escribe `pedido_en`
@@ -709,7 +709,7 @@ columnas de extra, y **no** puede aparecer en Aprobaciones ni frenar el cierre.
 |---|---|---|
 | **La PC de la oficina se apaga** | el agente deja de traer marcaciones; el reloj las guarda pero su memoria es limitada | el banner pasa a «callado» a los **12 min**; a las **6 h** sale 🔧 SISTEMA por el vigía (15:00/20:00/22:15 UTC) |
 | **El agente pierde acceso al reloj** (IP, clave, red) | lo mismo, pero con motivo | el agente reporta el error; a los **3 fallos seguidos** sale 🔧 SISTEMA con lo que dijo el reloj |
-| **Un hueco de más de 15 días** | el agente ya no lo puede rellenar solo (`VENTANA_DIAS` es 3) | aviso 🔧 SISTEMA de «hueco viejo», y otro cuando se cierra. Se arregla subiendo `VENTANA_DIAS` a 45 una vuelta y volviéndolo a 3 |
+| **Un hueco de más de 30 días** (15 mientras la PC tenga el programa anterior al 1.3.0) | el agente ya no lo puede rellenar solo | con la PC prendida **caduca solo** y queda en el registro (`hueco_caducado`), sin aviso; con la PC apagada sale el aviso 🔧 SISTEMA de «hueco viejo» de siempre. Ver «Un hueco no se cierra solo» en `docs/postmortems/asistencia-planilla.md` |
 | **Hikvision cambia un nombre de campo** (`serialNo`, `time`, `employeeNoString`) | los eventos se **descartan con motivo**, no se guardan mal | el ingest devuelve `descartados` y lo escribe en el log del servidor; el reporte se queda sin días. 🔴 Todo se interpreta en UN archivo: `src/lib/asistencia/ingest.ts` |
 | **Alguien cambia `DISPOSITIVO` en el `.env` del agente** | las 6.081 marcaciones se re-guardan con otra llave → **horas al doble** | el `.env.ejemplo` lo advierte en mayúsculas. No hay candado automático |
 | **`ASISTENCIA_INGEST_SECRET` rota sin actualizar la PC** | 401 en cada vuelta | el agente lo reporta como error → 3 fallos → 🔧 SISTEMA |
