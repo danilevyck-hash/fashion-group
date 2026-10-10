@@ -14,6 +14,7 @@ import { EMPRESAS_ASISTENCIA, etiquetaEmpresa } from "@/lib/asistencia/config";
 import { DIAS_ELEGIBLES, DIAS_SEMANA_CORTO, ROTULO_DIAS } from "@/lib/asistencia/horario-configurable";
 import { leerHora24 } from "@/lib/asistencia/hora-24";
 import { ROTULO_MARCA_ASISTENCIA, type ValoresPorOmision } from "@/lib/asistencia/alta-colaborador";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export interface EstadoMarca {
   prendido: boolean;
@@ -75,6 +76,13 @@ export default function MarcaAsistencia({ valor: m, onCambio, fichasLibres, nomb
   // Al seleccionar la empresa: el siguiente código libre de su serie y el
   // horario y la jornada más usados ahí. Todo queda visible y editable.
   const nueva = m.prendido && !m.colaborador;
+  // 🔴 Una ficha nueva nace con la fecha de ingreso de HOY, visible y editable
+  // (10-oct-2026, alta real de prueba): sin esa fecha, el Reporte le cobraba
+  // como ausencias los días de la quincena anteriores a su alta (6 en la prueba).
+  useEffect(() => {
+    if (nueva && !m.fechaIngreso) onCambio({ ...m, fechaIngreso: hoyPanama() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nueva]);
   useEffect(() => {
     if (!nueva || !m.empresa) return;
     let vivo = true;

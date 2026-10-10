@@ -10,6 +10,7 @@ import { useState } from "react";
 import FichaEditar, { borradorDe, type BorradorFicha } from "@/app/asistencia/colaboradores/FichaEditar";
 import { horarioDeAlta } from "@/lib/asistencia/alta-colaborador";
 import { ToastProvider } from "@/components/ToastSystem";
+import { hoyPanama } from "@/lib/fecha-panama";
 import MarcaAsistencia, {
   MARCA_APAGADA, cuerpoDeColaborador, faltaEnMarca, type EstadoMarca,
 } from "@/app/admin/usuarios/MarcaAsistencia";
@@ -121,6 +122,19 @@ describe("🔴 Usuarios › «Marca asistencia»: una sola puerta", () => {
     }
     expect(screen.getByText("Fecha de ingreso")).toBeTruthy();
     expect(screen.getByRole("group", { name: "Días que trabaja" })).toBeTruthy();
+  });
+
+  it("una ficha nueva nace con la fecha de ingreso de hoy; quien ya tiene ficha, sin tocar", () => {
+    // Sin fecha de ingreso, el Reporte le cuenta como ausencias los días anteriores a su alta.
+    let ultimo: EstadoMarca | null = null;
+    render(<Bloque visto={(m) => { ultimo = m; }} />);
+    expect(ultimo!.fechaIngreso).toBe("");
+    fireEvent.click(screen.getByRole("switch", { name: "Marca asistencia" }));
+    expect(ultimo!.fechaIngreso).toBe(hoyPanama());
+    expect(cuerpoDeColaborador(ultimo!).fechaIngreso).toBe(hoyPanama());
+    cleanup();
+    render(<Bloque inicial={{ prendido: true, colaborador: "305" }} visto={(m) => { ultimo = m; }} />);
+    expect(ultimo!.fechaIngreso).toBe("");
   });
 
   it("quien ya tiene ficha se selecciona de la lista, y no se le piden datos", () => {
