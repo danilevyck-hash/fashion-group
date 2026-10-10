@@ -59,7 +59,29 @@ export const GUIA_APPLE_2026_10 = true;
  *    celular se apila.
  *  🔴 Solo cambia la pantalla: mismas cajas, mismos setters, el PUT del
  *  despacho es idéntico (candado `guias-detalle-apple.test.tsx`).
- *  `false` = la pantalla de hoy. */
+ *
+ *  ⚠️ 5-oct-2026: lo de arriba (marco compacto y una fila por envío) YA está en
+ *  producción: se prendió junto con `GUIAS_LISTA_APPLE_2026_10`.
+ *
+ *  🔴 9-oct-2026 — SEGUNDA PASADA, apagada (este interruptor ahora gobierna esto).
+ *  La pantalla contesta «¿qué va en esta guía y ya salió?». Medido del 1-sep al
+ *  9-oct-2026: 39 despachos, 37 de Bodega (desde el celular); 12 de 29 N° del
+ *  transportista se anotaron después de despachar; observaciones en 14 de 37.
+ *  · «Despachada» junto al título (antes solo «Pendiente» tenía distintivo).
+ *  · Observaciones ANTES de los envíos.
+ *  · Ya despachada: sin el título «Ya despachada» ni «Tipo de despacho» (lo dice
+ *    la línea de datos); entra «Despachado por»; el N° del transportista, si es
+ *    el mismo en todos los envíos, se dice una sola vez.
+ *  · Pendiente: «N° del transportista» solo en la caja (se van la frase y el
+ *    rótulo de columna); «Tipo de despacho» en una línea con «Cambiar»; los
+ *    cuatro datos en una fila; «Despachar» negro que no se apaga y dice TODO lo
+ *    que falta al tocarlo (como «Guardar guía»).
+ *  · Celular: Editar · Imprimir · Compartir en una sola fila.
+ *  🔴 Solo pantalla: el PUT del despacho es idéntico y el servidor sigue
+ *  exigiendo lo mismo. Imprimir y Compartir no dejan registro: no se midieron y
+ *  por eso no se escondió ninguno.
+ *  `false` = la pantalla de hoy, byte por byte (candado
+ *  `guias-detalle-apple-apagado.test.tsx`). */
 export const GUIA_DETALLE_APPLE_2026_10 = false;
 
 /** 🔴 ETIQUETAS · TRASLADO SIN FACTURA (2-oct-2026). Daniel aprobó el

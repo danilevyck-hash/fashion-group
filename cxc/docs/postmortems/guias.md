@@ -2504,3 +2504,14 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
 - 🔴 **Etiquetas POR ENVÍO** (1-oct-2026, `ETIQUETAS_POR_ENVIO`): postmortem › «Etiquetas por envío».
 - 🔴 **Pedidos: TRES estados y el detalle con BULTOS** (6-oct-2026, `PEDIDOS_BULTOS_2026_10`, prendido 6-oct-2026): Pendiente → **Preparado** (bodega o la secretaria) → **Verificado** (la secretaria, nunca bodega) → Etiquetas, y **nadie hace los dos pasos del mismo pedido, ni admin**; queda firmado quién y cuándo. Quién ve qué va **por EMPRESA y por PERSONA**, y lo decide el SERVIDOR. Migraciones aplicadas. Postmortem › «Pedidos con bultos». Candado `guias/pedidos-bultos`.
 - 🔴 **Nueva guía en UNA tabla, un renglón por envío, «Despachado por» al DESPACHAR** (1-oct-2026, `guias-2026-10.ts`): postmortem › «Nueva guía en una tabla».
+
+
+## Detalle de la guía, segunda pasada estilo Apple (9-oct-2026, apagado)
+
+Interruptor `GUIA_DETALLE_APPLE_2026_10` (`src/lib/guias/guias-2026-10.ts`), **apagado**: lo prende Daniel. Lo que traía desde el 2-oct (marco compacto y una fila por envío) ya estaba en producción desde el 5-oct, porque se prendió junto con `GUIAS_LISTA_APPLE_2026_10`; el interruptor era un no-op y su candado miraba una combinación que ya no existe en producción. Ahora gobierna la segunda pasada.
+
+- **Uso medido (1-sep a 9-oct-2026, solo lectura):** 40 guías creadas (Angela 24, Andrea 15) y 39 despachadas, 37 por Bodega, que entra desde el celular (24 de sus 26 visitas). Mediana de 46 minutos entre crear y despachar. 31 ediciones de envíos en 13 guías, todas de secretaría. 29 N° del transportista anotados, 12 de ellos después de despachar. Observaciones en 14 de 37 guías. Imprimir y Compartir no dejan registro: no se pudo medir y no se escondió ninguno.
+- **Lo que cambia al prender:** «Despachada» junto al título; observaciones antes de los envíos; en la despachada se van «Ya despachada» y «Tipo de despacho», entra «Despachado por» y el N° del transportista común se dice una vez; en la pendiente se van la frase y el rótulo repetidos del N° del transportista, «Tipo de despacho» pasa a una línea, los cuatro datos van en una fila y «Despachar» es negro, no se apaga y dice todo lo que falta al tocarlo; en el celular los tres botones van en una fila.
+- **Lo que no cambia:** el PUT del despacho, las reglas del servidor, las cajas (mismos `id`), el papel.
+- **Candados:** `guias-detalle-apple-apagado.test.tsx` (apagado = HTML de `origin/main`, byte por byte, en cinco estados; y la pantalla prendida) y `guias-detalle-apple.test.tsx` (PUT idéntico).
+

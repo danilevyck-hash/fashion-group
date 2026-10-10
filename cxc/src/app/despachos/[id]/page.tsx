@@ -62,6 +62,7 @@ import {
   ETIQUETA_TIPO_DESPACHO,
   esEntregaDirecta,
   guiaSinNumeroTransp,
+  numeroTranspImpreso,
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
@@ -221,6 +222,22 @@ export default function GuiaPage() {
   // así que el detalle toma el marco compacto del 2-oct y dice su estado.
   const apple = GUIA_DETALLE_APPLE_2026_10 || GUIAS_LISTA_APPLE_2026_10;
   /**
+   * 🔴 9-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`, apagado): la segunda pasada del
+   * detalle, medida contra el uso real. La pantalla contesta «¿qué va en esta
+   * guía y ya salió?»: el estado va junto al título también cuando ya salió, las
+   * observaciones se leen ANTES de los envíos, y nada se dice dos veces.
+   * `false` = la pantalla de hoy, byte por byte (`guias-detalle-apple-apagado`).
+   */
+  const v2 = GUIA_DETALLE_APPLE_2026_10;
+  /** El N° del transportista cuando TODOS los envíos llevan el mismo: se dice una vez. */
+  const numerosTransp = g ? items.map((i) => numeroTranspImpreso(i.numero_guia_transp, g.numero_guia_transp) || "") : [];
+  const numeroComun =
+    v2 && s.despachada && numerosTransp.length > 1 && numerosTransp[0] && numerosTransp.every((n) => n === numerosTransp[0])
+      ? numerosTransp[0]
+      : "";
+  /** Los tres botones caben en UNA fila del celular (ninguno queda solo abajo). */
+  const BOTON_ACCION = `inline-flex items-center justify-center gap-1.5 min-h-[44px] ${v2 ? "flex-1 sm:flex-none px-2 sm:px-3.5" : "px-3.5"} rounded-md border border-gray-200 text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition`;
+  /**
    * 🔴 2-oct-2026 (`DOS_COLUMNAS_2026_10`, apagado: Daniel las rechazó): desde 1024 px, 2 columnas —los
    * datos, avisos, observaciones y despacho a la izquierda; los envíos a la
    * derecha—. Solo cambia dónde se dibuja: el orden en el celular es el mismo.
@@ -269,6 +286,24 @@ export default function GuiaPage() {
    * lista no despacha ni por swipe ni desplegando nada.
    */
   const bloqueDespacho = !g ? null : s.despachada ? (
+    v2 ? (
+      /* 🔴 9-oct-2026: sin el título «Ya despachada» (lo dice el distintivo de
+         arriba) y sin «Tipo de despacho» (lo dice la línea de datos). Entra
+         «Despachado por», que se pide al despachar y aquí no se veía. */
+      <div data-despacho-hecho className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {esEntregaDirecta(g) && g.transportista && (
+            <Dato etiqueta="Tipo de despacho" valor={ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]} />
+          )}
+          <Dato etiqueta="Recibido por" valor={g.receptor_nombre || ""} />
+          <Dato etiqueta="Cédula" valor={cedulaParaMostrar(g.cedula)} />
+          {!esEntregaDirecta(g) && <Dato etiqueta="Placa" valor={sinCeroPelado(g.placa)} />}
+          {g.nombre_chofer && <Dato etiqueta="Chofer" valor={g.nombre_chofer} />}
+          <Dato etiqueta="Despachado por" valor={g.entregado_por || ""} />
+        </div>
+        <FirmasPlegadas guia={g} directa={esEntregaDirecta(g)} />
+      </div>
+    ) : (
     /* Ya despachada: lo que se firmó, de solo lectura. */
     <div className="rounded-lg border border-gray-200 bg-white p-4">
       <span className="text-xs uppercase tracking-wide text-gray-400 block mb-3">
@@ -298,6 +333,7 @@ export default function GuiaPage() {
           🔴 Al FIRMAR no cambió nada: `DespachoForm` sigue igual. */}
       <FirmasPlegadas guia={g} directa={esEntregaDirecta(g)} />
     </div>
+    )
   ) : puedeDespachar ? (
     <DespachoForm
       tipoDespacho={s.tipoDespacho}
@@ -337,6 +373,27 @@ export default function GuiaPage() {
       Esta guía todavía no se despachó. Solo bodega, secretaría o un
       administrador pueden despacharla.
     </p>
+  );
+
+  /** Las observaciones: con `v2` van ANTES de los envíos (se leen antes de cargar el camión). */
+  const observaciones = !g ? null : (
+    <>
+              {observacionesVisibles(g.observaciones) && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <span className="text-xs uppercase tracking-wide text-amber-700 block mb-1">
+                    Observaciones
+                  </span>
+                  {/* Medido sobre las 36 notas reales de producción: mediana 32
+                      caracteres, la más larga 83, máximo 2 líneas. Es texto
+                      CORTO — se lee de un vistazo y NO se trunca (`break-words`
+                      parte una palabra larga en vez de desbordar; `pre-wrap`
+                      respeta el salto de línea de la única nota que lo tiene). */}
+                  <p className="text-sm text-amber-900 whitespace-pre-wrap break-words">
+                    {observacionesVisibles(g.observaciones)}
+                  </p>
+                </div>
+              )}
+    </>
   );
 
   return (
@@ -402,6 +459,9 @@ export default function GuiaPage() {
             {GUIAS_LISTA_APPLE_2026_10 && g && !s.despachada && (
               <span data-estado-guia className="shrink-0"><StatusBadge estado="pendiente" /></span>
             )}
+            {v2 && g && s.despachada && (
+              <span data-estado-guia className="shrink-0"><StatusBadge estado="despachada" /></span>
+            )}
           </div>
 
           {s.loading ? (
@@ -450,12 +510,12 @@ export default function GuiaPage() {
                       buscar otro «Imprimir»).
                     · «Compartir» abre la hoja del celular con el PDF.
                     Daniel, puntos 10 y 11. */}
-                <div className={apple ? "flex flex-wrap items-center gap-2 sm:shrink-0" : "mt-3 flex flex-wrap items-center gap-2"}>
+                <div className={v2 ? "flex items-center gap-2 sm:shrink-0" : apple ? "flex flex-wrap items-center gap-2 sm:shrink-0" : "mt-3 flex flex-wrap items-center gap-2"}>
                   {puedeEditar && (
                     <button
                       type="button"
                       onClick={() => cambiarModo(true)}
-                      className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-md border border-gray-200 text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition"
+                      className={BOTON_ACCION}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 20h9" />
@@ -476,7 +536,7 @@ export default function GuiaPage() {
                         }
                       });
                     }}
-                    className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-md border border-gray-200 text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition"
+                    className={BOTON_ACCION}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="6 9 6 2 18 2 18 9" />
@@ -494,7 +554,7 @@ export default function GuiaPage() {
                           if (r === "descargado") s.showToast("Guía descargada — revisa tu carpeta de descargas");
                         });
                     }}
-                    className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-md border border-gray-200 text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition"
+                    className={BOTON_ACCION}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 16V4" />
@@ -558,6 +618,7 @@ export default function GuiaPage() {
                   otra forma de editar, son parte de DESPACHAR — se llenan con
                   el papel del chofer en la mano y se confirman con las firmas,
                   en el mismo acto. */}
+              {v2 && observaciones}
               {enLaDerecha(<ListaEnvios
                 items={items}
                 numeroGuiaCabecera={g.numero_guia_transp}
@@ -575,6 +636,7 @@ export default function GuiaPage() {
                 bultosPorLinea={s.bultosPorLinea}
                 setBultos={s.setBultos}
                 rol={role}
+                numeroComun={numeroComun}
               />)}
 
               {/* 🔴 LAS OBSERVACIONES, DONDE SE CARGA EL CAMIÓN.
@@ -592,21 +654,7 @@ export default function GuiaPage() {
                   ⚠️ Y se muestra TAL CUAL está guardada. Hay basura adentro
                   (GT-124 tiene "|", GT-001 tiene "S1373259"): filtrarla o
                   "limpiarla" es decisión de Daniel, no de esta pantalla. */}
-              {observacionesVisibles(g.observaciones) && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <span className="text-xs uppercase tracking-wide text-amber-700 block mb-1">
-                    Observaciones
-                  </span>
-                  {/* Medido sobre las 36 notas reales de producción: mediana 32
-                      caracteres, la más larga 83, máximo 2 líneas. Es texto
-                      CORTO — se lee de un vistazo y NO se trunca (`break-words`
-                      parte una palabra larga en vez de desbordar; `pre-wrap`
-                      respeta el salto de línea de la única nota que lo tiene). */}
-                  <p className="text-sm text-amber-900 whitespace-pre-wrap break-words">
-                    {observacionesVisibles(g.observaciones)}
-                  </p>
-                </div>
-              )}
+              {!v2 && observaciones}
 
               {bloqueDespacho}
             </div>

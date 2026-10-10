@@ -26,6 +26,7 @@ import ResumenEnvio from "./ResumenEnvio";
 import { numeroTranspImpreso } from "@/lib/guias/modo-despacho";
 import { textoCorreccionEnVivo, textoCorreccionGuardada } from "@/lib/guias/bultos-correccion";
 import { bultosBloqueadosPorEtiquetas } from "@/lib/guias/etiquetas-por-envio";
+import { GUIA_DETALLE_APPLE_2026_10 } from "@/lib/guias/guias-2026-10";
 
 /** 44 px con el dedo, denso con mouse. Sin `w-full`: el ancho lo pone cada caja. */
 const CAJA =
@@ -52,7 +53,13 @@ export default function ListaEnviosApple({
   bultosPorLinea,
   setBultos,
   rol,
+  numeroComun,
 }: ListaEnviosProps) {
+  // 🔴 9-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`, apagado): «N° del transportista»
+  // se decía tres veces (rótulo de columna, frase y texto de la caja). Queda el
+  // texto de la caja; la frase solo si al crear la guía ya se anotó un número.
+  const v2 = GUIA_DETALLE_APPLE_2026_10;
+  const cabecera = String(numeroGuiaCabecera ?? "").trim();
   const conTransp = editable && externo;
   const puedeContar = editable && Boolean(setBultos);
   return (
@@ -60,14 +67,24 @@ export default function ListaEnviosApple({
       <div className="mb-2 flex items-end justify-between gap-4">
         <h2 className="text-[15px] font-semibold">Envíos</h2>
         {/* Los rótulos de las columnas, una sola vez y solo en la computadora. */}
-        {(puedeContar || conTransp) && items.length > 0 && (
+        {numeroComun && (
+          <span data-numero-comun className="text-xs text-gray-500">
+            N° del transportista: <span className="font-medium text-gray-700">{numeroComun}</span>
+          </span>
+        )}
+        {(puedeContar || (conTransp && !v2)) && items.length > 0 && (
           <div aria-hidden="true" className="hidden sm:flex items-center gap-2 px-4 text-xs text-gray-500">
             {puedeContar && <span className={`${ANCHO_BULTOS} text-right`}>Bultos</span>}
-            {conTransp && <span className="w-[184px]">N° del transportista</span>}
+            {conTransp && <span className="w-[184px]">{v2 ? "" : "N° del transportista"}</span>}
           </div>
         )}
       </div>
-      {conTransp && items.length > 0 && (
+      {conTransp && items.length > 0 && v2 && cabecera && (
+        <p className="mb-2 text-xs text-gray-500">
+          Al crear la guía se anotó <span className="font-medium text-gray-700">{cabecera}</span> para toda la guía.
+        </p>
+      )}
+      {conTransp && items.length > 0 && !v2 && (
         <p className="mb-2 text-xs text-gray-500">
           Anota el N° que te dio el transportista; si no dio ninguno, se despacha igual.
           {String(numeroGuiaCabecera ?? "").trim() ? (
@@ -140,7 +157,7 @@ export default function ListaEnviosApple({
                       className={`${CAJA} min-w-0 flex-1 sm:flex-none ${ANCHO_TRANSP}`}
                     />
                   </>
-                ) : editable ? null : (
+                ) : editable || numeroComun ? null : (
                   <span className="text-xs text-gray-500 whitespace-nowrap sm:ml-2">
                     N° del transportista:{" "}
                     <span className="font-medium text-gray-700">
