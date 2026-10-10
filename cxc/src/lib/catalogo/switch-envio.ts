@@ -381,17 +381,14 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
   //
   // ⚠️ `documento` se guarda para poder DECIR después qué se mandó, y va en su
   // propia columna (no adentro de `payload`): `payload` es el cuerpo EXACTO que
-  // recibió Switch y ese cuerpo no lleva el campo. La escritura tolera que la
-  // columna todavía no exista —el DDL puede estar pendiente— y en ese caso
-  // guarda la fila igual: quedarse sin poder enviar por una etiqueta sería
-  // peor que no tener la etiqueta.
+  // recibió Switch y ese cuerpo no lleva el campo.
   const payload = { vendedorId: p.vendedorId, clienteId: p.clienteId, articulos };
   const fila = { order_id: p.orderId, estado: "pendiente", payload };
-  let insercion = await p.db.from(p.enviosTable).insert({ ...fila, documento }).select("id").single();
-  if (insercion.error && /documento|column/i.test(insercion.error.message || "")) {
-    insercion = await p.db.from(p.enviosTable).insert(fila).select("id").single();
-  }
-  const { data: envio, error: envioErr } = insercion;
+  const { data: envio, error: envioErr } = await p.db
+    .from(p.enviosTable)
+    .insert({ ...fila, documento })
+    .select("id")
+    .single();
   if (envioErr || !envio) {
     // 23505 = otro envío ganó la carrera (índice parcial)
     if (envioErr?.code === "23505") return { kind: "carrera" };

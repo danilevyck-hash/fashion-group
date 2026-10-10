@@ -134,9 +134,7 @@ export async function agregarExclusion(
   creadoPor: string,
 ): Promise<ResultadoAlta> {
   const { excluye_venta, excluye_cobro, ...resto } = valor;
-  // Las dos marcadas es el DEFAULT de la tabla: no se mandan, así el alta
-  // sigue funcionando mientras la DDL de las casillas no corra. Con una
-  // apagada sí viajan — y si la columna no existe, falla cerrado y lo dice.
+  // Las dos marcadas es el DEFAULT de la tabla: no hace falta mandarlas.
   const casillas = excluye_venta && excluye_cobro ? {} : { excluye_venta, excluye_cobro };
   const { data, error } = await supabaseServer
     .from(TABLA_EXCLUSION)
@@ -149,9 +147,6 @@ export async function agregarExclusion(
     }
     if (error.code === "42P01" || /relation .* does not exist|PGRST205/i.test(error.message ?? "")) {
       return { ok: false, status: 503, error: "Falta correr la migración de comision_exclusion" };
-    }
-    if (error.code === "PGRST204" || error.code === "42703" || /column .* does not exist|excluye_/i.test(error.message ?? "")) {
-      return { ok: false, status: 503, error: "Falta correr la migración de Venta y Cobro por separado (20260913120000)" };
     }
     return { ok: false, status: 500, error: "No se pudo guardar. Intenta de nuevo en unos segundos." };
   }
@@ -202,9 +197,6 @@ export async function cambiarCasillasExclusion(
     .eq("activa", true)
     .select("id");
   if (error) {
-    if (error.code === "PGRST204" || error.code === "42703" || /column .* does not exist/i.test(error.message ?? "")) {
-      return { ok: false, status: 503, error: "Falta correr la migración de Venta y Cobro por separado (20260913120000)" };
-    }
     return { ok: false, status: 500, error: "No se pudo guardar. Intenta de nuevo en unos segundos." };
   }
   if (!data || data.length === 0) {

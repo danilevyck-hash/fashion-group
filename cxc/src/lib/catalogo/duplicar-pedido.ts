@@ -104,17 +104,8 @@ export async function handleDuplicarPedido(
     }
   }
 
-  // ── DDL disponible? (probe barato de la columna reemplaza_a) ──
   const probe = await db.from(cfg.ordersTable).select("id, reemplaza_a").eq("id", orderId).maybeSingle();
-  if (probe.error) {
-    if (/reemplaza_a|column/i.test(probe.error.message)) {
-      return NextResponse.json(
-        { error: "Duplicar no está disponible todavía — falta correr la migración 20260722120000 en la base de datos." },
-        { status: 503 },
-      );
-    }
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
+  if (probe.error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
   if (!probe.data) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
 
   // ── Solo pedidos realmente bloqueados por Switch se duplican ──
@@ -138,31 +129,21 @@ export async function handleDuplicarPedido(
     return NextResponse.json({ ok: true, id: existente.id, order_number: existente.order_number, yaExistia: true });
   }
 
-  // ── Pedido original (cliente + items). cliente/vendedor_switch_id pueden no
-  //    existir aún (DDL 20260705120000 pendiente) → reintento sin ellas. ──
+  // ── Pedido original (cliente + items). ──
   const itemCols = `product_id, sku, name, image_url, quantity, unit_price${cfg.itemsHasPreorder ? ", is_preorder" : ""}`;
-  let original: OriginalRow | null = null;
-  for (const withIds of [true, false]) {
-    const cols = `id, order_number, client_name, vendor_name, client_email, comment${withIds ? ", cliente_switch_id, vendedor_switch_id" : ""}, ${cfg.itemsRelation}(${itemCols})`;
-    const { data, error } = await db.from(cfg.ordersTable).select(cols).eq("id", orderId).single();
-    if (!error && data) {
-      const row = data as unknown as Record<string, unknown>;
-      original = {
-        client_name: (row.client_name as string) ?? null,
-        vendor_name: (row.vendor_name as string) ?? null,
-        client_email: (row.client_email as string) ?? null,
-        comment: (row.comment as string) ?? null,
-        cliente_switch_id: (row.cliente_switch_id as number) ?? null,
-        vendedor_switch_id: (row.vendedor_switch_id as number) ?? null,
-        items: (row[cfg.itemsRelation] as ItemRow[]) ?? [],
-      };
-      break;
-    }
-    if (error && !/cliente_switch_id|vendedor_switch_id|column/i.test(error.message)) {
-      return NextResponse.json({ error: "Error interno" }, { status: 500 });
-    }
-  }
-  if (!original) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  const cols = `id, order_number, client_name, vendor_name, client_email, comment, cliente_switch_id, vendedor_switch_id, ${cfg.itemsRelation}(${itemCols})`;
+  const leido = await db.from(cfg.ordersTable).select(cols).eq("id", orderId).single();
+  if (leido.error || !leido.data) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  const row = leido.data as unknown as Record<string, unknown>;
+  const original: OriginalRow = {
+    client_name: (row.client_name as string) ?? null,
+    vendor_name: (row.vendor_name as string) ?? null,
+    client_email: (row.client_email as string) ?? null,
+    comment: (row.comment as string) ?? null,
+    cliente_switch_id: (row.cliente_switch_id as number) ?? null,
+    vendedor_switch_id: (row.vendedor_switch_id as number) ?? null,
+    items: (row[cfg.itemsRelation] as ItemRow[]) ?? [],
+  };
   if (!original.items.length) {
     return NextResponse.json({ error: "El pedido no tiene productos para duplicar" }, { status: 400 });
   }
@@ -236,12 +217,7 @@ export async function handleDuplicarPedido(
   if (eligioCliente) update.cliente_switch_id = clienteElegido;
   else if (!clienteCambio && original.cliente_switch_id != null) update.cliente_switch_id = original.cliente_switch_id;
   if (vendedorClonId != null) update.vendedor_switch_id = vendedorClonId;
-  let upErr = (await db.from(cfg.ordersTable).update(update).eq("id", order_id)).error;
-  if (upErr && /cliente_switch_id|vendedor_switch_id/i.test(upErr.message)) {
-    const soloTraza: Record<string, unknown> = { reemplaza_a: orderId };
-    if (original.comment) soloTraza.comment = original.comment;
-    upErr = (await db.from(cfg.ordersTable).update(soloTraza).eq("id", order_id)).error;
-  }
+  const upErr = (await db.from(cfg.ordersTable).update(update).eq("id", order_id)).error;
   if (upErr) {
     // El duplicado quedó creado pero SIN marca de reemplazo → avisar claro
     // (sin la marca no saldría el recordatorio anti-duplicado al enviarlo).

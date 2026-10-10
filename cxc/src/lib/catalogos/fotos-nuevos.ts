@@ -139,9 +139,6 @@ export async function avisarNuevosSinFoto(
     // Orden por `sku`: es único en las 3 tablas (es la llave con la que el motor
     // matchea) y acá el orden de presentación no importa — los códigos se
     // ordenan A-Z después, en `planAvisoNuevos`.
-    //
-    // `oculto_manual` puede no existir todavía (DDL pendiente): mismo fallback
-    // pre-migración que usa el motor de sync.
     const COLS = "sku, image_url, active, created_at";
     const leer = (cols: string) =>
       leerTodoPaginado<FilaSinFoto>(`${cfg.productsTable} (aviso fotos nuevas)`, (pedirCount, desde, hasta) =>
@@ -155,13 +152,7 @@ export async function avisarNuevosSinFoto(
     try {
       filas = await leer(`${COLS}, oculto_manual`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!msg.includes("oculto_manual")) return VACIO(`leer ${cfg.productsTable}: ${msg}`);
-      try {
-        filas = await leer(COLS);
-      } catch (err2) {
-        return VACIO(`leer ${cfg.productsTable}: ${err2 instanceof Error ? err2.message : String(err2)}`);
-      }
+      return VACIO(`leer ${cfg.productsTable}: ${err instanceof Error ? err.message : String(err)}`);
     }
     // Guard: tabla vacía = query rara o marca sin activar. No se siembra ni se
     // avisa con cero filas — sembrar con la tabla vacía escondería el atraso

@@ -167,19 +167,13 @@ export async function palabraDelEnvioActivo(
   enviosTable: string,
   orderId: string,
 ): Promise<string | null> {
-  const filtrar = (cols: string) =>
-    db
-      .from(enviosTable)
-      .select(cols)
-      .eq("order_id", orderId)
-      .in("estado", ESTADOS_EN_SWITCH as string[])
-      .limit(1)
-      .maybeSingle();
-
-  let leido = await filtrar("estado, documento");
-  if (leido.error && /documento|column/i.test(leido.error.message || "")) {
-    leido = await filtrar("estado");
-  }
+  const leido = await db
+    .from(enviosTable)
+    .select("estado, documento")
+    .eq("order_id", orderId)
+    .in("estado", ESTADOS_EN_SWITCH as string[])
+    .limit(1)
+    .maybeSingle();
   if (leido.error || !leido.data) return null;
   return palabraEnSwitch(leido.data as EnvioParaPalabra);
 }

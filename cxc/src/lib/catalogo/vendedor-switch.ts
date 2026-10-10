@@ -267,10 +267,8 @@ export function listarVendedores(empresaKey: string): Promise<ListaVendedores> {
 /**
  * Lee el vendedor guardado en un pedido (para heredarlo al duplicarlo).
  *
- * Tolera la DDL 20260705120000 pendiente: sin la columna se devuelve el pedido
- * con `vendedor_switch_id: null`, que es exactamente lo que significa. Devuelve
- * `null` solo si el pedido no existe o la lectura falló — quien llama decide,
- * nunca se inventa un vendedor.
+ * Devuelve `null` si el pedido no existe o la lectura falló — quien llama
+ * decide, nunca se inventa un vendedor.
  */
 export async function leerVendedorDePedido(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -283,26 +281,15 @@ export async function leerVendedorDePedido(
     .select("vendedor_switch_id, vendor_name")
     .eq("id", orderId)
     .maybeSingle();
-  if (!error && data) {
-    return {
-      vendedor_switch_id: (data.vendedor_switch_id as number | null) ?? null,
-      vendor_name: (data.vendor_name as string | null) ?? null,
-    };
-  }
-  if (!error || !/vendedor_switch_id|column/i.test(error.message ?? "")) return null;
-  const { data: soloNombre } = await db
-    .from(ordersTable)
-    .select("vendor_name")
-    .eq("id", orderId)
-    .maybeSingle();
-  if (!soloNombre) return null;
-  return { vendedor_switch_id: null, vendor_name: (soloNombre.vendor_name as string | null) ?? null };
+  if (error || !data) return null;
+  return {
+    vendedor_switch_id: (data.vendedor_switch_id as number | null) ?? null,
+    vendor_name: (data.vendor_name as string | null) ?? null,
+  };
 }
 
 /**
- * Escribe `vendedor_switch_id` en un pedido, tolerando la DDL 20260705120000
- * pendiente (misma tolerancia que el checkout y el duplicar). Devuelve `false`
- * si la columna no existe — el pedido queda como estaba.
+ * Escribe `vendedor_switch_id` en un pedido. Si la escritura falla, lanza.
  */
 export async function guardarVendedorSwitchEnPedido(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -311,7 +298,7 @@ export async function guardarVendedorSwitchEnPedido(
   orderId: string,
   vendedorSwitchId: number,
   vendedorNombre: string | null,
-): Promise<boolean> {
+): Promise<void> {
   const patch: Record<string, unknown> = {
     vendedor_switch_id: vendedorSwitchId,
     updated_at: new Date().toISOString(),
@@ -320,7 +307,5 @@ export async function guardarVendedorSwitchEnPedido(
   // `vendor_name`: dejarlo con el vendedor viejo sería una pantalla mintiendo.
   if (vendedorNombre) patch.vendor_name = vendedorNombre;
   const { error } = await db.from(ordersTable).update(patch).eq("id", orderId);
-  if (!error) return true;
-  if (/vendedor_switch_id|column/i.test(error.message ?? "")) return false;
-  throw new Error(error.message ?? "No se pudo guardar el vendedor del pedido");
+  if (error) throw new Error(error.message ?? "No se pudo guardar el vendedor del pedido");
 }

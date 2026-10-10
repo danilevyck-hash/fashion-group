@@ -116,7 +116,7 @@ describe("POST /orders/[id]/duplicar", () => {
     }
   });
 
-  it("503 con mensaje claro si la columna reemplaza_a no existe (DDL 20260722120000 pendiente)", async () => {
+  it("🔴 un error de la base que nombra `reemplaza_a` ya no se lee como «falta la migración»: 500", async () => {
     reebokDb.queue("reebok_orders", {
       data: null,
       error: { message: 'column "reemplaza_a" does not exist' },
@@ -124,8 +124,8 @@ describe("POST /orders/[id]/duplicar", () => {
     const res = await rDuplicar(makeReq("/x", { method: "POST", role: "admin" }), {
       params: { id: OID },
     });
-    expect(res.status).toBe(503);
-    expect((await res.json()).error).toContain("20260722120000");
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).not.toContain("20260722120000");
   });
 
   it("404 si el pedido no existe", async () => {

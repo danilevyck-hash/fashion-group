@@ -48,16 +48,10 @@ export interface DescuentoFila {
   empresa_key: string;
   concepto: string;
   monto: number;
-  /** Ausentes mientras la DDL 20261007120000 no corra: se leen como «sin límite». */
+  /** `null` = sin límite. */
   desde: string | null;
   hasta: string | null;
 }
-
-/** Lo que la DDL de vigencia todavía no creó: se dice, no se guarda a medias. */
-const faltaLaDdl = (msg: string): boolean =>
-  /column .* does not exist|PGRST204|42703/i.test(msg) && /desde|hasta/i.test(msg);
-
-const AVISO_SIN_DDL = "Falta correr la migración de las fechas del descuento (20261007120000)";
 
 function normalizarFila(f: Record<string, unknown>): DescuentoFila {
   return {
@@ -203,9 +197,6 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
-    if (faltaLaDdl(error.message ?? "")) {
-      return NextResponse.json({ error: AVISO_SIN_DDL }, { status: 503 });
-    }
     return NextResponse.json(
       { error: "No se pudo guardar. Intenta de nuevo en unos segundos." },
       { status: 500 },
@@ -240,9 +231,6 @@ export async function PATCH(req: NextRequest) {
     .eq("activo", true)
     .select("id");
   if (error) {
-    if (faltaLaDdl(error.message ?? "")) {
-      return NextResponse.json({ error: AVISO_SIN_DDL }, { status: 503 });
-    }
     return NextResponse.json(
       { error: "No se pudo guardar. Intenta de nuevo en unos segundos." },
       { status: 500 },

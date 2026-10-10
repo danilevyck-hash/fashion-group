@@ -92,17 +92,6 @@ const COLUMNAS_ENVIO = COLUMNAS + ", envio_id, orden_en_envio, nota";
 export const AVISO_MIGRACION_TRASLADO =
   "Falta correr la migración de traslados sin factura (20261226120000 y 20261227120000)";
 
-export const AVISO_MIGRACION_ENVIO =
-  "Falta correr la migración de envíos de etiquetas (20261224120000)";
-
-/**
- * ¿El error es «esa columna no existe»? Es lo que contesta la base mientras la
- * migración de envíos no corra: se vuelve a leer con las columnas de siempre.
- */
-export function esColumnaAusente(code: string | undefined, message: string | undefined): boolean {
-  return code === "42703" || code === "PGRST204" || /column .* does not exist|Could not find the '.*' column/i.test(message ?? "");
-}
-
 /** Una fila cruda, ya con su estado derivado. `envio_id ?? id`: falla ABIERTA. */
 function aEtiqueta(f: FilaCruda, guiaNumero: number | null): EtiquetaFila {
   return {
@@ -145,14 +134,7 @@ export async function leerEtiquetas(): Promise<EtiquetaFila[]> {
           .order("id", { ascending: true })
           .range(desde, hasta),
     );
-  // 🔴 FALLA ABIERTA sin la migración de envíos: se lee con las columnas de
-  // siempre y cada fila queda como un envío de una factura.
   const filas = await leer(COLUMNAS_ENVIO)
-    .catch((e: unknown) => {
-      const err = e as { code?: string; message?: string };
-      if (esColumnaAusente(err?.code, err?.message)) return leer(COLUMNAS);
-      throw e;
-    })
     .catch((e: unknown) => {
       const err = e as { code?: string; message?: string };
       throw errorDeTabla(err?.code, err?.message ?? String(e));
@@ -220,8 +202,7 @@ export async function leerEtiqueta(id: number): Promise<EtiquetaFila | null> {
     .eq("id", id)
     .eq("deleted", false)
     .maybeSingle();
-  let { data, error } = await leer(COLUMNAS_ENVIO);
-  if (error && esColumnaAusente(error.code, error.message)) ({ data, error } = await leer(COLUMNAS));
+  const { data, error } = await leer(COLUMNAS_ENVIO);
   if (error) throw errorDeTabla(error.code, error.message);
   if (!data) return null;
   const f = data as unknown as FilaCruda;
@@ -573,13 +554,7 @@ export async function crearEnvio(
     nota: f.nota,
   }));
 
-  let { data, error } = await supabaseServer.from(TABLA_ETIQUETAS).insert(filas).select(COLUMNAS_ENVIO);
-  if (error && esColumnaAusente(error.code, error.message)) {
-    const simple = envio.facturas.length === 1 && envio.facturas[0].nota === null;
-    if (!simple) return { ok: false, status: 503, error: AVISO_MIGRACION_ENVIO };
-    const sinEnvio = filas.map(({ envio_id: _e, orden_en_envio: _o, nota: _n, ...resto }) => resto);
-    ({ data, error } = await supabaseServer.from(TABLA_ETIQUETAS).insert(sinEnvio).select(COLUMNAS));
-  }
+  const { data, error } = await supabaseServer.from(TABLA_ETIQUETAS).insert(filas).select(COLUMNAS_ENVIO);
   if (error) {
     // 🔴 Sin la migración `20261226120000` la columna sigue NOT NULL: el traslado
     // no se guarda y se DICE (falla abierta: lo demás funciona igual).
@@ -701,17 +676,12 @@ export async function reatarEtiquetas(
   if (viejos.length === 0 || nuevos.length === 0) return { reatadas, bultosPorRenglon };
   try {
     // 🔴 1-oct-2026: con el envío y la factura de cada etiqueta, para atar POR
-    // ENVÍO. Sin la migración de envíos, cada etiqueta es su propio envío.
-    const leer = (columnas: string) =>
-      supabaseServer
-        .from(TABLA_ETIQUETAS)
-        .select(columnas)
-        .in("guia_item_id", viejos.map((v) => v.id))
-        .eq("deleted", false);
-    let { data, error } = await leer(COLUMNAS_ATADAS + ", secuencial, envio_id");
-    if (error && esColumnaAusente(error.code, error.message)) {
-      ({ data, error } = await leer(COLUMNAS_ATADAS + ", secuencial"));
-    }
+    // ENVÍO.
+    const { data, error } = await supabaseServer
+      .from(TABLA_ETIQUETAS)
+      .select(COLUMNAS_ATADAS + ", secuencial, envio_id")
+      .in("guia_item_id", viejos.map((v) => v.id))
+      .eq("deleted", false);
     if (error || !Array.isArray(data) || data.length === 0) return { reatadas, bultosPorRenglon };
     const atadas = data as unknown as Array<{
       id: number;

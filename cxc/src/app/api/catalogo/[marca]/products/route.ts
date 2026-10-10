@@ -100,14 +100,9 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       return query;
     };
 
-    // Fallback pre-migración (DDL 20260723120000): si oculto_manual aún no
-    // existe, se responde el catálogo activo sin la columna.
     let { data, error } = await buildQuery(adminScope ? `${pcfg.cols},oculto_manual` : pcfg.cols, adminScope);
-    if (error && error.message.includes("oculto_manual")) {
-      ({ data, error } = await buildQuery(pcfg.cols, false));
-    }
-    // Mismo respaldo para `bulto_pzas` (Tommy, DDL 20260806120000): sin él, la
-    // pantalla de administrar no carga NINGÚN producto hasta que se corra.
+    // 🔴 SE QUEDA el respaldo de `bulto_pzas`: la columna todavía NO existe en
+    // `products` (Reebok) ni en `joybees_products` (verificado el 9-oct-2026).
     if (error && error.message.includes("bulto_pzas")) {
       ({ data, error } = await buildQuery(sinColumna(pcfg.cols, "bulto_pzas"), false));
     }
@@ -136,14 +131,10 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     return query;
   };
 
-  // `oculto_manual` (toggle "Ocultar del catálogo") con fallback pre-migración
-  // (DDL 20260723120000): si la columna no existe aún, se responde sin ella.
+  // `oculto_manual` = el toggle "Ocultar del catálogo".
   let { data, error } = await buildQuery(`${pcfg.cols},oculto_manual`);
-  if (error && error.message.includes("oculto_manual")) {
-    ({ data, error } = await buildQuery(pcfg.cols));
-  }
   if (error && error.message.includes("bulto_pzas")) {
-    ({ data, error } = await buildQuery(sinColumna(pcfg.cols, "bulto_pzas")));
+    ({ data, error } = await buildQuery(sinColumna(`${pcfg.cols},oculto_manual`, "bulto_pzas")));
   }
   if (error) {
     console.error(error);
@@ -323,12 +314,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
     .select("id,sku,existencia,keep_visible,badge,oculto_manual")
     .eq(pcfg.idField, idValue)
     .maybeSingle();
-  if (readErr) {
-    const msg = readErr.message.includes("oculto_manual")
-      ? "Falta correr la migración 20260723120000 (columna oculto_manual)."
-      : readErr.message;
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
+  if (readErr) return NextResponse.json({ error: readErr.message }, { status: 500 });
   if (!prod) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
 
   const active = esVisibleEnCatalogo({
