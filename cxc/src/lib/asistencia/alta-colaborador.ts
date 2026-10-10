@@ -95,3 +95,24 @@ export function cuerpoDelHorario(codigo: string, nombre: string | null, h: Horar
     ? { ...base, diasLaborables: h.diasLaborables, entradaAfuera: h.entradaAfuera, salidaAfuera: h.salidaAfuera }
     : base;
 }
+
+/** Con qué nace el bloque «Marca asistencia» de Usuarios para una empresa. */
+export interface ValoresPorOmision {
+  entrada: string;
+  salida: string;
+  diasLaborables: number[];
+  almuerzoMinutos: number;
+  jornadaSemanal: number;
+}
+
+/** El valor que más se repite; en un empate, el primero que apareció. `null` sin datos. */
+export function masUsado(valores: readonly string[]): string | null {
+  const cuenta = new Map<string, number>();
+  for (const v of valores) cuenta.set(v, (cuenta.get(v) ?? 0) + 1);
+  let mejor: string | null = null;
+  for (const [v, n] of cuenta) if (mejor === null || n > (cuenta.get(mejor) ?? 0)) mejor = v;
+  return mejor;
+}
+
+/** El interruptor de Usuarios › Nuevo / Editar usuario. */
+export const ROTULO_MARCA_ASISTENCIA = "Marca asistencia";

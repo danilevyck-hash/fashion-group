@@ -19,6 +19,11 @@ import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import { USUARIOS_APPLE_2026_10 } from "@/lib/usuarios-apple-2026-10";
 import { SYSTEM_ROLE_KEYS } from "@/lib/modules";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+import MarcaAsistencia, { MARCA_APAGADA, cuerpoDeColaborador, faltaEnMarca, type EstadoMarca } from "./MarcaAsistencia";
+import CampoFecha from "@/components/ui/CampoFecha";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { MOTIVOS_SALIDA, OPCION_MOTIVO } from "@/lib/asistencia/vigencia";
+import { MODULO_MARCACION, ROLES_MODULO_MARCACION } from "@/lib/marcacion/rol";
 
 // Cargar Playfair Display sin contaminar otros módulos —
 // el <link> queda inerte si ya está en cache desde otra página.
@@ -112,7 +117,12 @@ function UsuariosPageInner() {
   // 🔴 «Colaborador» (9-oct-2026): la ficha de Asistencia por la que este
   // usuario marca. Sirve para cualquier rol (un bodega que también marca).
   const [colaboradores, setColaboradores] = useState<{ codigo: string; nombre: string | null }[]>([]);
-  const [uColaborador, setUColaborador] = useState("");
+  // 🔴 UNA SOLA PUERTA (9-oct-2026, Daniel: «debe de ser en Usuarios»): el
+  // interruptor «Marca asistencia» lleva el colaborador —uno que ya tiene
+  // ficha, o los datos de una ficha nueva—. Ver `MarcaAsistencia.tsx`.
+  const [uMarca, setUMarca] = useState<EstadoMarca>(MARCA_APAGADA);
+  // Al «Desactivar» a quien tiene ficha activa se ofrece darla de baja ahí mismo.
+  const [baja, setBaja] = useState({ dar: true, fecha: "", motivo: "" });
   const [fgUsers, setFgUsers] = useState<FgUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -186,12 +196,12 @@ function UsuariosPageInner() {
 
   function openNewUser() {
     setEditUserId(null); setUName(""); setUPassword(""); setURole("vendedor"); setUCompany("");
-    setCustomPerms(false); setUModules([]); setUColaborador("");
+    setCustomPerms(false); setUModules([]); setUMarca(MARCA_APAGADA);
     setShowUserModal(true);
   }
   function openEditUser(u: FgUser) {
     setEditUserId(u.id); setUName(u.name); setUPassword(""); setURole(u.role); setUCompany(u.associated_company || "");
-    setUColaborador(u.empleado_codigo || "");
+    setUMarca({ ...MARCA_APAGADA, prendido: !!u.empleado_codigo, colaborador: u.empleado_codigo || "" });
     const hasOverride = Array.isArray(u.modulos_override) && u.modulos_override.length > 0;
     setCustomPerms(hasOverride);
     setUModules(hasOverride ? [...u.modulos_override!] : []);
@@ -207,6 +217,17 @@ function UsuariosPageInner() {
       showToast("Selecciona al menos un módulo o desactiva los permisos personalizados.");
       return;
     }
+    // «Marca asistencia»: con ficha nueva, lo que falta se dice junto al guardar.
+    const faltan = faltaEnMarca(uMarca);
+    if (faltan.length > 0) { showToast(`Falta ${faltan.join(", ")}.`); return; }
+    // Marcar necesita el permiso de Marcación además del vínculo: si su rol no
+    // lo trae, se suma a sus módulos; apagado, se quita.
+    const base = customPerms ? uModules.filter((k) => moduloOfrecible(uRole, k)) : null;
+    const porRol = (ROLES_MODULO_MARCACION as readonly string[]).includes(uRole);
+    const modulos = uMarca.prendido && !porRol
+      ? Array.from(new Set([...(base ?? getDefaultModulesForRole(uRole)), MODULO_MARCACION]))
+      : base && !uMarca.prendido ? base.filter((k) => k !== MODULO_MARCACION) : base;
+    const fichaNueva = uMarca.prendido && !uMarca.colaborador;
     setSavingUser(true);
     try {
       const body: Record<string, unknown> = {
@@ -214,12 +235,15 @@ function UsuariosPageInner() {
         name: uName.trim(),
         role: uRole,
         associated_company: uCompany || null,
-        empleado_codigo: uColaborador || null,
         // Se manda solo lo que ese ROL puede abrir: si alguien cambia el rol
         // con casillas ya marcadas, las que el nuevo rol no alcanza se caen
         // acá en vez de guardarse para rebotar después (el servidor también
         // las rechaza).
-        modulos_override: customPerms ? uModules.filter((k) => moduloOfrecible(uRole, k)) : null,
+        modulos_override: modulos,
+        // Apagado = sin vincular. Prendido: su ficha, o los datos de una nueva.
+        ...(fichaNueva
+          ? { colaborador: cuerpoDeColaborador(uMarca) }
+          : { empleado_codigo: uMarca.prendido ? uMarca.colaborador : null }),
       };
       if (uPassword.trim()) body.password = uPassword.trim();
       const method = editUserId ? "PUT" : "POST";
@@ -229,11 +253,21 @@ function UsuariosPageInner() {
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSavingUser(false);
   }
-  async function toggleUserActive(id: string, active: boolean) {
+  // ¿Este usuario tiene una ficha ACTIVA? (la lista de colaboradores trae solo activas)
+  const fichaActivaDe = (id: string | undefined) => {
+    const codigo = fgUsers.find((u) => u.id === id)?.empleado_codigo;
+    return codigo ? colaboradores.find((c) => c.codigo === codigo) ?? null : null;
+  };
+  function pedirDesactivar(u: { id: string; name: string; active: boolean }) {
+    setBaja({ dar: true, fecha: hoyPanama(), motivo: "" });
+    setDeactivateTarget({ id: u.id, name: u.name, active: u.active });
+  }
+  async function toggleUserActive(id: string, active: boolean, conBaja?: { fechaSalida: string; motivoSalida: string }) {
     try {
-      const res = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, active }) });
-      if (res.ok) showToast(active ? "Usuario activado" : "Usuario desactivado");
-      else showToast("Error al actualizar");
+      const res = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, active, ...(conBaja ? { baja: conBaja } : {}) }) });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) showToast(active ? "Usuario activado" : d.fichaDeBaja ? `Usuario desactivado y colaborador dado de baja${d.aviso ? ` · ${d.aviso}` : ""}` : "Usuario desactivado");
+      else showToast(d.error || "Error al actualizar");
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     loadFgUsers();
   }
@@ -330,7 +364,7 @@ function UsuariosPageInner() {
                 usuarios={fgUsers}
                 ultimaSesion={(n) => lastSeenByUser[n]}
                 onEditar={openEditUser}
-                onDesactivar={(u) => setDeactivateTarget({ id: u.id, name: u.name, active: u.active })}
+                onDesactivar={pedirDesactivar}
               />
             ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -381,7 +415,7 @@ function UsuariosPageInner() {
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
                         </button>
                         <button
-                          onClick={() => setDeactivateTarget({ id: u.id, name: u.name, active: u.active })}
+                          onClick={() => pedirDesactivar(u)}
                           title={u.active ? "Desactivar" : "Reactivar"}
                           aria-label={`${u.active ? "Desactivar" : "Reactivar"} ${u.name}`}
                           className="text-gray-400 hover:text-red-600 h-11 w-11 inline-flex items-center justify-center rounded transition-colors"
@@ -493,7 +527,11 @@ function UsuariosPageInner() {
                       al desplegarlo. text-base en móvil, text-sm desde sm. */}
                   <select
                     value={uRole}
-                    onChange={e => setURole(e.target.value)}
+                    onChange={e => {
+                      setURole(e.target.value);
+                      // Quien solo marca, marca: el interruptor viene prendido.
+                      if (e.target.value === "marcacion") setUMarca(m => ({ ...m, prendido: true }));
+                    }}
                     className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm focus:outline-none focus:border-gray-900 transition"
                   >
                     <option value="admin">Administrador — acceso total</option>
@@ -514,32 +552,14 @@ function UsuariosPageInner() {
                   )}
                 </div>
 
-                {/* 🔴 «Colaborador» (9-oct-2026): fichas activas sin usuario
-                    vinculado (más la suya). Opcional; vacío = sin vincular. */}
-                <div data-testid="usuario-colaborador">
-                  <div className="flex items-center gap-1 mb-1.5">
-                    <label htmlFor="usuario-colaborador-campo" className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em]">
-                      Colaborador <span className="font-normal text-gray-400 normal-case">(opcional)</span>
-                    </label>
-                    <Ayuda titulo="Información" className="-my-2 shrink-0">
-                      <p>La ficha de Asistencia por la que este usuario marca desde el teléfono. Para marcar necesita, además, el permiso de Marcación (por su rol o en permisos personalizados).</p>
-                    </Ayuda>
-                  </div>
-                  <select
-                    id="usuario-colaborador-campo"
-                    value={uColaborador}
-                    onChange={e => setUColaborador(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm focus:outline-none focus:border-gray-900 transition"
-                  >
-                    <option value="">Sin vincular</option>
-                    {uColaborador && !colaboradores.some(c => c.codigo === uColaborador) && (
-                      <option value={uColaborador}>Código {uColaborador}</option>
-                    )}
-                    {colaboradores
-                      .filter(c => c.codigo === uColaborador || !fgUsers.some(u => u.id !== editUserId && u.empleado_codigo === c.codigo))
-                      .map(c => <option key={c.codigo} value={c.codigo}>{c.nombre || "Sin nombre"} · {c.codigo}</option>)}
-                  </select>
-                </div>
+                {/* 🔴 «Marca asistencia» (9-oct-2026): una sola puerta. Prendido,
+                    se selecciona su colaborador o se llenan los datos de uno nuevo. */}
+                <MarcaAsistencia
+                  valor={uMarca}
+                  onCambio={setUMarca}
+                  nombreDelUsuario={uName.trim()}
+                  fichasLibres={colaboradores.filter(c => c.codigo === uMarca.colaborador || !fgUsers.some(u => u.id !== editUserId && u.empleado_codigo === c.codigo))}
+                />
 
                 <div>
                   {/* El ⓘ va FUERA de la <label>: un <button> adentro haría que
@@ -769,7 +789,14 @@ function UsuariosPageInner() {
       <ConfirmModal
         open={!!deactivateTarget}
         onClose={() => setDeactivateTarget(null)}
-        onConfirm={() => { if (deactivateTarget) { toggleUserActive(deactivateTarget.id, !deactivateTarget.active); setDeactivateTarget(null); } }}
+        onConfirm={() => {
+          if (!deactivateTarget) return;
+          const conBaja = deactivateTarget.active && baja.dar && !!fichaActivaDe(deactivateTarget.id);
+          // El motivo es obligatorio en una baja: se dice y la ventana sigue abierta.
+          if (conBaja && (!baja.fecha || !baja.motivo)) { showToast("Selecciona la fecha y el motivo de salida."); return; }
+          toggleUserActive(deactivateTarget.id, !deactivateTarget.active, conBaja ? { fechaSalida: baja.fecha, motivoSalida: baja.motivo } : undefined);
+          setDeactivateTarget(null);
+        }}
         title={deactivateTarget?.active ? "Desactivar usuario" : "Reactivar usuario"}
         message={deactivateTarget?.active
           ? (deactivateTarget?.id === currentUserId
@@ -780,7 +807,36 @@ function UsuariosPageInner() {
             : `¿Reactivar a ${deactivateTarget?.name}? Podrá iniciar sesión de nuevo.`)}
         confirmLabel={deactivateTarget?.active ? "Desactivar" : "Reactivar"}
         destructive={deactivateTarget?.active || false}
-      />
+      >
+        {/* 🔴 LA BAJA DESDE USUARIOS (9-oct-2026): si tiene ficha activa, se da
+            de baja aquí mismo, marcado por omisión. Nada se elimina. */}
+        {deactivateTarget?.active && fichaActivaDe(deactivateTarget.id) && (
+          <div data-testid="desactivar-con-baja" className="-mt-2 space-y-3 text-left">
+            <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5">
+              <input type="checkbox" className="h-4 w-4 accent-gray-900" checked={baja.dar}
+                onChange={e => setBaja(b => ({ ...b, dar: e.target.checked }))} />
+              <span className="text-sm text-gray-900">Baja del colaborador {fichaActivaDe(deactivateTarget.id)?.nombre ?? ""}</span>
+            </label>
+            {baja.dar && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <span className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em] block mb-1.5">Fecha de salida</span>
+                  <CampoFecha className="min-h-[44px] w-full rounded-md border border-gray-200 px-3 text-base sm:text-sm"
+                    value={baja.fecha} onChange={e => setBaja(b => ({ ...b, fecha: e.target.value }))} />
+                </div>
+                <div>
+                  <label htmlFor="baja-motivo" className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em] block mb-1.5">Motivo de salida</label>
+                  <select id="baja-motivo" value={baja.motivo} onChange={e => setBaja(b => ({ ...b, motivo: e.target.value }))}
+                    className="min-h-[44px] w-full rounded-md border border-gray-200 bg-white px-3 text-base sm:text-sm">
+                    <option value="">Seleccionar motivo</option>
+                    {MOTIVOS_SALIDA.map(m => <option key={m} value={m}>{OPCION_MOTIVO[m]}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </ConfirmModal>
 
       <ConfirmModal
         open={!!revokeTarget}

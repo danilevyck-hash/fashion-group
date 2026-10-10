@@ -3359,47 +3359,50 @@ Daniel: *«¿cómo no se descuenta si alguien salió?»* y, sobre el permiso sin
 
 Daniel: *«hoy agregué una, pero mañana puedo necesitar eliminarla y crear otra»* (las impulsadoras rotan). Para marcar desde el teléfono hacen falta dos cosas, y **ninguna es el rol**: el **permiso de Marcación** y que el **usuario esté vinculado a una ficha de colaborador**. Antes el vínculo no lo escribía ninguna pantalla (a Siney hubo que crearla por la base).
 
-### Dar de alta (una sola pantalla)
+🔴 **UNA SOLA PUERTA: USUARIOS.** Daniel, al ver el alta en Colaboradores: *«debe de ser en Usuarios»*. Crear a una persona —marque o no— se hace en **Usuarios**. Este es el procedimiento que se le explica.
 
-1. **Asistencia y planilla › Colaboradores › «+ Nuevo colaborador».**
-2. Llena **Nombre**, **Empresa**, **Código del reloj** y **Salario mensual**. Al seleccionar la empresa, debajo del código sale **«Siguiente código libre de Multifashion: 308 · Usar 308»**: toca **«Usar 308»**. Si la persona marca en un reloj físico, escribe el código de ese reloj.
-3. Revisa **«Horario»** (días, entrada y salida). Ya viene con el de la empresa.
-4. En **«Acceso»**, prende **«Marcación desde el teléfono»** y escribe la **«Contraseña inicial»** (mínimo 3 caracteres; no puede ser la de otra persona, porque en este sistema la contraseña es la identidad).
-5. Toca **«Guardar»**. Queda creada la ficha, su horario y su usuario (con el nombre de la ficha y el rol Marcación), ya vinculado. La persona entra con esa contraseña y ve solo Marcación.
+### Crear a alguien que marca
 
-- Si el código ya existe, **no se guarda nada** y el aviso dice de quién es: «El código 307 ya es de Siney Suyem. No se guardó nada. El siguiente código libre es 308.» Antes se pisaba la ficha de la otra persona sin avisar.
-- Si la contraseña ya la usa otra persona («Crea otra, esa no se puede»), tampoco se guarda nada: se cambia y se vuelve a tocar «Guardar».
-- El interruptor «Marcación desde el teléfono» lo ve solo el administrador (crear usuarios es suyo, igual que en Usuarios). Contabilidad crea la ficha con su horario, sin usuario.
+1. **Usuarios › «＋ Nuevo usuario».**
+2. **Nombre**, **Contraseña** y **Rol**. Con el rol **Marcación**, el interruptor **«Marca asistencia»** viene prendido; con cualquier otro rol, se prende a mano.
+3. En **«Colaborador»** queda **«Nuevo colaborador»**. Selecciona la **Empresa**: el **Código** se pone solo (el siguiente libre de esa empresa, se puede cambiar) y el **Horario** viene con el más usado ahí. Llena **Nombre completo**, **Cargo**, **Cédula**, **Salario mensual** y **Fecha de ingreso**.
+4. **«Guardar»**. Quedan creados el usuario, su ficha de colaborador, su horario y el vínculo, todo junto.
 
-### Alguien que ya tiene usuario (bodega, o cualquier rol) y también marca
+- Si la persona **ya tiene ficha** (alguien de bodega que ya está en planilla): en **«Colaborador»** se selecciona su nombre de la lista y no se llena nada más.
+- **Nada queda a medias**: código repetido, contraseña repetida («Crea otra, esa no se puede») o cualquier dato inválido se dicen al guardar y no se crea ni el usuario ni la ficha.
+- Si el rol no es Marcación ni Administrador, el permiso de Marcación se le suma solo a sus módulos (entra en su próximo inicio de sesión).
+- Lo obligatorio de la ficha: empresa, código y horario. Lo demás se puede completar después en Asistencia › Colaboradores.
 
-1. **Usuarios ›** toca a la persona (o **«＋ Nuevo usuario»**).
-2. En **«Colaborador»**, selecciona su ficha. La lista trae las fichas activas que no tienen usuario. **«Sin vincular»** quita el vínculo.
-3. Si su rol no es Marcación, prende **«Permisos personalizados»** y marca **Marcación** además de sus módulos.
-4. **«Guardar»**.
+### Darle o quitarle la marcación a alguien que ya existe
 
-Un colaborador tiene un solo usuario y la ficha tiene que existir: si no, el aviso lo dice («Ese colaborador ya está vinculado a otro usuario…»).
+**Usuarios ›** toca a la persona **›** prende o apaga **«Marca asistencia» › «Guardar»**. Apagado, queda sin vincular y sin el permiso de Marcación; su ficha no se toca.
 
-### Dar de baja (una sola pantalla)
+### Dar de baja
 
-1. **Asistencia y planilla › Colaboradores ›** toca a la persona **› «Editar»**.
-2. Abajo, en **«Salida»**, toca **«Dar de baja»**. Pon la **«Fecha de salida»** y el **«Motivo de salida»**.
-3. Deja marcada la casilla **«Desactivación del usuario …»** (viene marcada).
-4. **«Guardar»**. La ficha queda de baja y su usuario inactivo, con las sesiones cerradas.
+1. **Usuarios ›** en el renglón de la persona, **«Desactivar»**.
+2. La ventana trae marcada **«Baja del colaborador …»**, con la **Fecha de salida** de hoy. Selecciona el **Motivo de salida**.
+3. **«Desactivar»**. El usuario queda inactivo, con las sesiones cerradas, y su ficha dada de baja. Si tiene saldo en Préstamos, el aviso lo dice.
 
-- **Nada se borra**: la ficha, el usuario, las marcaciones y las planillas cerradas quedan como están. Para reactivar el usuario: Usuarios › «Reactivar».
+- **Nada se borra**: el usuario, la ficha, las marcaciones y las planillas cerradas quedan como están. Para volver: Usuarios › «Reactivar» (la fecha de salida se quita en Asistencia › Colaboradores › «Editar»).
 - 🔴 **Una ficha de baja no puede marcar aunque su usuario siga activo**: la ruta de marcar la rechaza desde el día siguiente a la fecha de salida («Tu ficha de colaborador está inactiva desde el …»). Su último día todavía marca.
+
+### Lo mismo desde Asistencia › Colaboradores (se quedó, no es el camino que se explica)
+
+- **«+ Nuevo colaborador»** trae «Horario», el código propuesto («Usar 308») y, para el administrador, **«Marcación desde el teléfono»** + «Contraseña inicial», que crea el usuario con el nombre de la ficha y el rol Marcación.
+- **«Editar» › «Salida» › «Dar de baja»** trae marcada **«Desactivación del usuario …»**.
+- Un código repetido se frena: «El código 307 ya es de Siney Suyem. No se guardó nada. El siguiente código libre es 308.» Antes se pisaba la ficha de la otra persona sin avisar.
 
 ### Cómo está hecho
 
 - `lib/usuarios/usuario-servidor.ts`: la revisión (`revisarUsuarioNuevo`: nombre, largo, nombre repetido, `contrasenaEnUso`), el alta con bcrypt (`insertarUsuario`) y activar/desactivar con cierre de sesiones (`cambiarActivo`). Las usan `/api/admin/users` y el `PUT /api/asistencia/configuracion`: un solo mecanismo.
 - `PUT /api/asistencia/configuracion`: con `alta: true` **inserta** (no upsert) y contesta **409** si el código tiene ficha; con `accesoMarcacion` revisa el usuario **antes** de escribir la ficha (o entra todo o nada) y exige administrador; con `desactivarUsuario` y fecha de salida desactiva el usuario vinculado.
 - El horario del alta sale de `horarioDeAlta` (08:00 → 17:00, días y almuerzo de la empresa) y se guarda por el `PUT /api/asistencia/horarios` de siempre.
-- El código propuesto (`siguienteDeLaSerie` + `siguienteCodigoLibre`): el mayor código numérico de la empresa más uno, **solo si está libre en todo el sistema** (sin ficha y sin marcaciones). Medido el 9-oct-2026: Multifashion 308 y Boston 57; Vistana y Fashion Wear no proponen nada (su siguiente ya es de otra empresa: los códigos del reloj físico se comparten).
+- El código propuesto (`siguienteDeLaSerie` + `siguienteCodigoLibre`): desde el mayor código numérico de la empresa más uno, **sube hasta el primero libre en todo el sistema** (sin ficha de ninguna empresa y sin marcaciones: los códigos del reloj físico se comparten). El horario y la jornada por omisión son **los más usados entre los activos de esa empresa** (`valoresPorOmision`); sin datos, 08:00 → 17:00.
+- Usuarios (`MarcaAsistencia.tsx`, `lib/usuarios/colaborador-desde-usuarios.ts`): el `POST`/`PUT /api/admin/users` con `colaborador` crea la ficha y el horario **llamando a las mismas dos puertas** (`PUT /api/asistencia/configuracion` con `alta: true` y `PUT /api/asistencia/horarios`), no una copia de su validación. Todo lo del usuario se revisa antes; si después algo falla, la ficha recién creada por esa misma petición se deshace (`deshacerFicha`). El `PATCH` con `baja` revisa fecha y motivo (`validarVigencia`) antes de tocar nada y escribe **solo** `fecha_salida` y `motivo_salida`.
 - `fg_users.empleado_codigo` ya tenía la llave foránea y el índice único (`20261125120000`): **sin migración**. `avisoDeVinculo` pone esos dos errores en palabras.
 - La ficha de baja: `lib/marcacion/ficha-de-baja.ts`, en el `POST /api/marcacion`; mira el día de la marca y falla abierta.
-- Candados: `asistencia/alta-baja-quien-marca.test.ts` (servidor; 9 casos fallan con el código de antes) y `asistencia/alta-baja-quien-marca-pantalla.test.tsx`.
-- ⚠️ Pendiente, no hecho: darle «Marcación desde el teléfono» a una ficha que ya existe se hace por Usuarios › «＋ Nuevo usuario» › «Colaborador»; el interruptor solo está en el alta.
+- Candados: `asistencia/alta-baja-quien-marca.test.ts` (servidor, 26 casos; 9 fallaban con el código de antes de la primera entrega) y `asistencia/alta-baja-quien-marca-pantalla.test.tsx`.
+- ⚠️ El permiso de Marcación que se suma a un rol que no lo trae viaja en la cookie: entra en el próximo inicio de sesión de esa persona.
 
 ## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
 

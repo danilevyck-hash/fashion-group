@@ -10,6 +10,9 @@ import { useState } from "react";
 import FichaEditar, { borradorDe, type BorradorFicha } from "@/app/asistencia/colaboradores/FichaEditar";
 import { horarioDeAlta } from "@/lib/asistencia/alta-colaborador";
 import { ToastProvider } from "@/components/ToastSystem";
+import MarcaAsistencia, {
+  MARCA_APAGADA, cuerpoDeColaborador, faltaEnMarca, type EstadoMarca,
+} from "@/app/admin/usuarios/MarcaAsistencia";
 
 afterEach(cleanup);
 const leer = (...p: string[]) => fs.readFileSync(path.join(process.cwd(), ...p), "utf8");
@@ -98,11 +101,56 @@ describe("🔴 «Dar de baja» ofrece desactivar el usuario, marcado", () => {
   });
 });
 
-describe("🔴 Usuarios tiene el campo «Colaborador»", () => {
-  it("lo dibuja, ofrece «Sin vincular» y lo manda al guardar", () => {
+describe("🔴 Usuarios › «Marca asistencia»: una sola puerta", () => {
+  function Bloque({ inicial, visto }: { inicial?: Partial<EstadoMarca>; visto?: (m: EstadoMarca) => void }) {
+    const [m, setM] = useState<EstadoMarca>({ ...MARCA_APAGADA, ...inicial });
+    visto?.(m);
+    return <MarcaAsistencia valor={m} onCambio={setM} nombreDelUsuario="maria"
+      fichasLibres={[{ codigo: "305", nombre: "Angel Pizza" }]} />;
+  }
+
+  it("apagado no pide nada; prendido ofrece «Nuevo colaborador» con sus datos y horario", () => {
+    render(<Bloque />);
+    const sw = screen.getByRole("switch", { name: "Marca asistencia" });
+    expect(sw.getAttribute("aria-checked")).toBe("false");
+    expect(screen.queryByLabelText("Colaborador")).toBeNull();
+    fireEvent.click(sw);
+    expect((screen.getByLabelText("Colaborador") as HTMLSelectElement).value).toBe("");
+    for (const campo of ["Empresa", "Código", "Nombre completo", "Cargo", "Cédula", "Salario mensual", "Entrada", "Salida"]) {
+      expect(screen.getByLabelText(campo), campo).toBeTruthy();
+    }
+    expect(screen.getByText("Fecha de ingreso")).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Días que trabaja" })).toBeTruthy();
+  });
+
+  it("quien ya tiene ficha se selecciona de la lista, y no se le piden datos", () => {
+    let ultimo: EstadoMarca | null = null;
+    render(<Bloque inicial={{ prendido: true }} visto={(m) => { ultimo = m; }} />);
+    fireEvent.change(screen.getByLabelText("Colaborador"), { target: { value: "305" } });
+    expect(ultimo!.colaborador).toBe("305");
+    expect(screen.queryByLabelText("Empresa")).toBeNull();
+    expect(faltaEnMarca(ultimo!)).toEqual([]);
+  });
+
+  it("lo que falta se dice, y el cuerpo lleva los datos de la ficha nueva", () => {
+    const m: EstadoMarca = { ...MARCA_APAGADA, prendido: true };
+    expect(faltaEnMarca(m)).toEqual(["la empresa", "el código"]);
+    expect(faltaEnMarca({ ...MARCA_APAGADA })).toEqual([]);
+    const lleno = { ...m, empresa: "american_classic", codigo: " 308 ", salario: "650", entrada: "900", salida: "18:00", dias: [1, 2, 3, 4, 5, 6], jornada: 48 };
+    expect(cuerpoDeColaborador(lleno)).toMatchObject({
+      codigo: "308", empresa: "american_classic", salarioMensual: 650, jornadaSemanal: 48,
+      horario: { entrada: "09:00", salida: "18:00", diasLaborables: [1, 2, 3, 4, 5, 6] },
+    });
+  });
+
+  it("la pantalla lo usa al crear y al editar, suma el permiso de Marcación y ofrece la baja al desactivar", () => {
     const src = leer("src", "app", "admin", "usuarios", "page.tsx");
-    expect(src).toContain('data-testid="usuario-colaborador"');
-    expect(src).toContain("Sin vincular");
-    expect(src).toContain("empleado_codigo: uColaborador || null");
+    expect(src).toContain("<MarcaAsistencia");
+    expect(src).toContain("colaborador: cuerpoDeColaborador(uMarca)");
+    expect(src).toContain("empleado_codigo: uMarca.prendido ? uMarca.colaborador : null");
+    expect(src).toContain("MODULO_MARCACION");
+    expect(src).toContain('if (e.target.value === "marcacion") setUMarca');
+    expect(src).toContain('data-testid="desactivar-con-baja"');
+    expect(src).toContain("baja: conBaja");
   });
 });
