@@ -227,10 +227,7 @@ export async function POST(req: NextRequest) {
           enviado_por: (usuario?.name as string | null) ?? auth.userName ?? auth.userId ?? "desconocido",
           resultado: "ok",
         };
-        let err = (await supabaseServer.from("cxc_emails_enviados").insert({ ...fila, canal: "correo" })).error;
-        if (err && /\bcanal\b/i.test(err.message ?? "")) {
-          err = (await supabaseServer.from("cxc_emails_enviados").insert(fila)).error;
-        }
+        const err = (await supabaseServer.from("cxc_emails_enviados").insert({ ...fila, canal: "correo" })).error;
         if (err) console.error(`[cxc/cobrar-lote] bitácora ${c.data.codigo}: ${err.message}`);
       }
     } catch (e) {

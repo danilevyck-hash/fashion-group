@@ -175,11 +175,17 @@ describe("🔴 el correo lo anota quien sabe si SALIÓ", () => {
     expect(src.indexOf("ok = true")).toBeLessThan(src.indexOf('canal: "correo"'));
   });
 
-  it("⚠️ si la columna `canal` todavía no existe, la anotación se guarda igual", () => {
-    for (const rel of ["src/app/api/cxc/envios/route.ts", "src/app/api/cxc/enviar-email/route.ts"]) {
+  it("🔴 la columna `canal` existe (9-oct-2026): la anotación no se reintenta sin ella", () => {
+    for (const rel of [
+      "src/app/api/cxc/envios/route.ts",
+      "src/app/api/cxc/enviar-email/route.ts",
+      "src/app/api/cxc/cobrar-lote/route.ts",
+      "src/app/api/cxc/boston/enviar-email/route.ts",
+    ]) {
       const src = sinComentarios(leer(rel));
       expect(src, rel).toMatch(/canal\b/);
-      expect(src, rel).toMatch(/\\b?canal\\b?\/i|faltaColumnaCanal/);
+      expect(src, rel).not.toMatch(/\\b?canal\\b?\/i|faltaColumnaCanal/);
+      expect(src, rel).not.toMatch(/\.insert\(fila\)/);
     }
   });
 

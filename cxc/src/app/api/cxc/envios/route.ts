@@ -27,11 +27,9 @@
 // cobro de Boston pintaría su marca gris en el CXC del grupo. Un badge también
 // es mezclar.
 //
-// ⚠️ La columna `canal` puede NO EXISTIR todavía (migración
-// 20260927120000_cxc_envios_canal.sql, la corre Daniel a mano). Las dos puntas
-// FALLAN ABIERTO: sin la columna, el POST guarda la fila igual (sin canal) y el
-// GET devuelve el mapa vacío → la marca gris no se dibuja y nada más cambia.
-// Nunca se pierde un envío por una DDL que todavía no corrió.
+// La columna `canal` existe (migración 20260927120000, verificada el
+// 9-oct-2026): el POST la escribe siempre y un error falla con su error. El GET
+// sigue fallando abierto —la marca es una ayuda—, pero lo dice en el log.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -46,15 +44,6 @@ export const fetchCache = "force-no-store";
 // Los MISMOS roles que ven el CXC del grupo. Daniel: cobrar lo puede hacer
 // todo el que entra al módulo — no se agrega una restricción nueva.
 const CXC_ROLES = ["admin", "secretaria", "vendedor"];
-
-/** ¿El error de PostgREST es «todavía no existe la columna `canal`»? */
-function faltaColumnaCanal(err: { code?: string; message?: string } | null): boolean {
-  if (!err) return false;
-  const msg = err.message ?? "";
-  if (!/\bcanal\b/i.test(msg)) return false;
-  return /does not exist|schema cache|could not find/i.test(msg) ||
-    err.code === "42703" || err.code === "PGRST204";
-}
 
 interface UltimoEnvio {
   canal: CanalEnvio;
@@ -79,9 +68,7 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     // Falla abierto: la marca es una ayuda, no un número de plata.
-    if (!faltaColumnaCanal(error)) {
-      console.error(`[cxc/envios] ${error.message}`);
-    }
+    console.error(`[cxc/envios] ${error.message}`);
     return NextResponse.json({ porCodigo: {} });
   }
 
@@ -142,20 +129,13 @@ export async function POST(req: NextRequest) {
     resultado: "ok",
   };
 
-  let { error } = await supabaseServer
+  const { error } = await supabaseServer
     .from("cxc_emails_enviados")
     .insert({ ...fila, canal });
-
-  // La DDL todavía no corrió: se guarda igual, sin canal. Perder la anotación
-  // sería peor que perder la marca gris.
-  if (faltaColumnaCanal(error)) {
-    ({ error } = await supabaseServer.from("cxc_emails_enviados").insert(fila));
-    if (!error) return NextResponse.json({ ok: true, canalGuardado: false });
-  }
 
   if (error) {
     console.error(`[cxc/envios] insert: ${error.message}`);
     return NextResponse.json({ error: "No se pudo registrar el envío" }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, canalGuardado: true });
+  return NextResponse.json({ ok: true });
 }

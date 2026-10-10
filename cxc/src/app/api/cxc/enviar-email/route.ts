@@ -373,13 +373,8 @@ export async function POST(req: NextRequest) {
       resultado,
     };
     // `canal` distingue el correo del WhatsApp y del copiar, que desde el
-    // 5-sep-2026 también dejan rastro (ver `/api/cxc/envios`). Si la DDL
-    // 20260927120000 todavía no corrió, se guarda igual SIN canal: perder la
-    // anotación de un correo que ya salió sería peor que perder la marca gris.
-    let logErr = (await supabaseServer.from("cxc_emails_enviados").insert({ ...fila, canal: "correo" })).error;
-    if (logErr && /\bcanal\b/i.test(logErr.message ?? "")) {
-      logErr = (await supabaseServer.from("cxc_emails_enviados").insert(fila)).error;
-    }
+    // 5-sep-2026 también dejan rastro (ver `/api/cxc/envios`).
+    const logErr = (await supabaseServer.from("cxc_emails_enviados").insert({ ...fila, canal: "correo" })).error;
     if (logErr) {
       logged = false;
       console.error(`[cxc/enviar-email] bitácora: ${logErr.message}`);

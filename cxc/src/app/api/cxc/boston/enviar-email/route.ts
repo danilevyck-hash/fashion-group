@@ -274,12 +274,7 @@ export async function POST(req: NextRequest) {
       enviado_por: remitente?.name ?? auth.userName ?? auth.userId ?? "desconocido",
       resultado: "ok",
     };
-    let logErr = (await supabaseServer.from("cxc_emails_enviados").insert({ ...fila, canal: "correo" })).error;
-    // Mientras la DDL 20260927120000 no corra se guarda igual, sin canal:
-    // perder la anotación de un correo que ya salió es peor que perder la marca.
-    if (logErr && /\bcanal\b/i.test(logErr.message ?? "")) {
-      logErr = (await supabaseServer.from("cxc_emails_enviados").insert(fila)).error;
-    }
+    const logErr = (await supabaseServer.from("cxc_emails_enviados").insert({ ...fila, canal: "correo" })).error;
     if (logErr) {
       logged = false;
       console.error(`[cxc/boston/enviar-email] bitácora: ${logErr.message}`);
