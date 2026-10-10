@@ -6,21 +6,19 @@
 // leer sin ella y TODO es feriado: exactamente lo de antes.
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { esColumnaTipoFaltante, separarFeriados, type FilaFeriado } from "./feriados";
+import { separarFeriados, type FilaFeriado } from "./feriados";
 
 export async function leerFeriados(desde: string, hasta: string): Promise<{
   feriados: Map<string, string>;
   diasLibres: Map<string, string>;
   faltaColumna: boolean;
 }> {
-  const leer = (cols: string) =>
-    supabaseServer.from("asistencia_feriados").select(cols).gte("fecha", desde).lte("fecha", hasta);
-  let { data, error } = await leer("fecha, nombre, tipo");
-  let faltaColumna = false;
-  if (esColumnaTipoFaltante(error)) {
-    faltaColumna = true;
-    ({ data, error } = await leer("fecha, nombre"));
-  }
+  const { data, error } = await supabaseServer
+    .from("asistencia_feriados")
+    .select("fecha, nombre, tipo")
+    .gte("fecha", desde)
+    .lte("fecha", hasta);
   if (error) throw new Error(error.message);
-  return { ...separarFeriados((data ?? []) as unknown as FilaFeriado[]), faltaColumna };
+  // `faltaColumna` se conserva (siempre `false` desde el 9-oct-2026) porque quien llama lo lee.
+  return { ...separarFeriados((data ?? []) as unknown as FilaFeriado[]), faltaColumna: false };
 }

@@ -27,11 +27,9 @@ import {
 } from "@/lib/marcacion/estado-server";
 import { borrarSelfies, subirSelfie } from "@/lib/marcacion/selfie-servidor";
 import {
-  AVISO_FALTA_MIGRACION,
   AVISO_SIN_CODIGO as SIN_CODIGO,
   DISPOSITIVO_TELEFONO,
   diaPanamaDe,
-  faltaLaMigracion,
   horaQueCuenta,
   marcasDelDia,
   rutaDeSelfie,
@@ -41,7 +39,6 @@ import { avisoDiaCompleto, estadoDelBotonHoy, pideFoto } from "@/lib/marcacion/c
 // 🔴 LO QUE NACIÓ EL 25-sep-2026, y las dos cosas fallan ABIERTAS: sin la
 // migración `20261220120000` la marca entra igual, sin calle y sin sello.
 import { CAMPO_APARATO, selloValido } from "@/lib/marcacion/sello-del-aparato";
-import { faltaUnaColumnaNueva, sinLasColumnasNuevas } from "@/lib/marcacion/columnas-nuevas";
 import { lugarTextoDeLaMarca } from "@/lib/marcacion/lugar-al-marcar";
 import { revisarMismoAparato } from "@/lib/asistencia/mismo-aparato-io";
 import { avisoSiEstaDeBaja } from "@/lib/marcacion/ficha-de-baja";
@@ -216,21 +213,13 @@ export async function POST(req: NextRequest) {
       aparato_id: aparatoId,
     };
 
-    let { error } = await guardarMarcaciones([fila]);
-    // 🔴 FALLA ABIERTA: sin las columnas nuevas, la marca de siempre entra tal
-    // cual. Lo único que se pierde es la calle y el sello.
-    if (faltaUnaColumnaNueva(error)) {
-      ({ error } = await guardarMarcaciones([sinLasColumnasNuevas(fila)]));
-    }
+    const { error } = await guardarMarcaciones([fila]);
 
     if (error) {
       // La fila no entró: la foto no se queda suelta en el bucket. Una marca
       // del almuerzo no subió ninguna: no hay nada que borrar.
       if (subida) await borrarSelfies([subida]);
       subida = null;
-      if (faltaLaMigracion(error)) {
-        return NextResponse.json({ error: AVISO_FALTA_MIGRACION }, { status: 503 });
-      }
       throw new Error(error.message);
     }
 

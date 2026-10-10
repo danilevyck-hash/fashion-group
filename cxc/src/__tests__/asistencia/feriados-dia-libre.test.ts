@@ -133,25 +133,25 @@ describe("a. 🔴 EL TIPO: la ruta de Feriados y la pantalla", () => {
     expect(db.insertados).toEqual([]);
   });
 
-  it("🔴 sin la migración: el feriado se guarda como siempre y el día libre NO (503)", async () => {
+  it("🔴 un error de escritura que nombra `tipo` NO se traga: ni feriado ni día libre se guardan sin su tipo", async () => {
+    // La columna existe (9-oct-2026). Antes el feriado se reescribía SIN tipo.
     db.sinColumnaTipo = true;
-    expect((await post({ fecha: "2026-10-21", nombre: "Cierre", tipo: "feriado" })).status).toBe(200);
-    expect(db.upserts).toEqual([{ fecha: "2026-10-21", nombre: "Cierre" }]);
-    const r = await post({ fecha: "2026-10-20", nombre: "Cierre", tipo: "dia_libre" });
-    expect(r.status).toBe(503);
-    expect((await r.json()).error).toMatch(/20261222120000_asistencia_feriados_tipo\.sql/);
-    expect(db.upserts).toHaveLength(1);
+    for (const tipo of ["feriado", "dia_libre"]) {
+      const r = await post({ fecha: "2026-10-21", nombre: "Cierre", tipo });
+      expect(r.status).toBe(500);
+      expect((await r.json()).error).not.toMatch(/20261222120000_asistencia_feriados_tipo\.sql/);
+    }
+    expect(db.upserts).toHaveLength(0);
   });
 
-  it("el GET devuelve el tipo; sin la columna, todo es feriado", async () => {
+  it("el GET devuelve el tipo; un error que nombra la columna ya no se lee como «todo es feriado»", async () => {
     const { GET } = await import("@/app/api/asistencia/feriados/route");
     const req = () => ({ nextUrl: new URL("http://x/api/asistencia/feriados?anio=2026") }) as never;
     const con = await (await GET(req())).json();
     expect(con.feriados.map((f: { tipo: string }) => f.tipo)).toEqual(["dia_libre", "feriado", "dia_libre"]);
+    expect(con.faltaMigracionTipo).toBe(false);
     db.sinColumnaTipo = true;
-    const sin = await (await GET(req())).json();
-    expect(sin.feriados.every((f: { tipo: string }) => f.tipo === "feriado")).toBe(true);
-    expect(sin.faltaMigracionTipo).toBe(true);
+    expect((await GET(req())).status).toBe(500);
   });
 
   it("la pantalla: el tipo se elige con ControlSegmentado, la lista dice «debe las horas» y cambiar es el mismo POST", () => {
@@ -272,10 +272,11 @@ describe("c. 🔴 LA DEUDA SOLA: idempotente, sin Multifashion y sin quien traba
     expect(plan.deudas.map((d) => d.codigo)).toEqual(["42"]);
   });
 
-  it("sin la migración de feriados no hay días libres y no se escribe nada", async () => {
+  it("🔴 si la lectura de feriados falla, la deuda NO se calcula a ciegas: falla y no se escribe nada", async () => {
+    // Antes un error que nombrara `tipo` se leía como «no hay días libres» y
+    // la planilla seguía sin las deudas. Ahora falla con su error.
     db.sinColumnaTipo = true;
-    const r = await asegurar();
-    expect(r.fechas).toEqual([]);
+    await expect(asegurar()).rejects.toThrow(/tipo/);
     expect(db.insertados).toEqual([]);
   });
 

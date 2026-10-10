@@ -33,7 +33,6 @@ import {
   COLUMNA_SALIDA_AFUERA,
   avisoMigracionHorario,
   diasLaborablesDeEmpresa,
-  esColumnaHorarioFaltante,
   limpiaHora,
   normalizarDiasLaborables,
   validarDiasLaborables,
@@ -169,35 +168,19 @@ async function leerPrevia(codigo: string): Promise<{
   dias: number[] | null;
   entradaAfuera: string | null;
   salidaAfuera: string | null;
-  faltaMigracion: boolean;
 }> {
   const conNuevas = await supabaseServer
     .from(TABLA_HORARIOS)
     .select(`entrada, ${COLUMNA_DIAS_LABORABLES}, ${COLUMNA_ENTRADA_AFUERA}, ${COLUMNA_SALIDA_AFUERA}`)
     .eq("empleado_codigo", codigo)
     .maybeSingle();
-  if (!conNuevas.error) {
-    const f = (conNuevas.data ?? null) as Record<string, unknown> | null;
-    return {
-      entrada: f?.entrada ? String(f.entrada).slice(0, 5) : null,
-      dias: normalizarDiasLaborables(f?.[COLUMNA_DIAS_LABORABLES]),
-      entradaAfuera: limpiaHora(f?.[COLUMNA_ENTRADA_AFUERA]),
-      salidaAfuera: limpiaHora(f?.[COLUMNA_SALIDA_AFUERA]),
-      faltaMigracion: false,
-    };
-  }
-  if (!esColumnaHorarioFaltante(conNuevas.error)) throw new Error(conNuevas.error.message);
-  const base = await supabaseServer
-    .from(TABLA_HORARIOS)
-    .select("entrada")
-    .eq("empleado_codigo", codigo)
-    .maybeSingle();
-  if (base.error) throw new Error(base.error.message);
-  const f = (base.data ?? null) as { entrada?: unknown } | null;
+  if (conNuevas.error) throw new Error(conNuevas.error.message);
+  const f = (conNuevas.data ?? null) as Record<string, unknown> | null;
   return {
     entrada: f?.entrada ? String(f.entrada).slice(0, 5) : null,
-    dias: null, entradaAfuera: null, salidaAfuera: null,
-    faltaMigracion: true,
+    dias: normalizarDiasLaborables(f?.[COLUMNA_DIAS_LABORABLES]),
+    entradaAfuera: limpiaHora(f?.[COLUMNA_ENTRADA_AFUERA]),
+    salidaAfuera: limpiaHora(f?.[COLUMNA_SALIDA_AFUERA]),
   };
 }
 
@@ -259,27 +242,16 @@ export async function PUT(req: NextRequest) {
     almuerzo_minutos: almuerzo,
     updated_at: new Date().toISOString(),
   };
-  // 🔴 Lo nuevo entra solo con la migración corrida. Lo que el cuerpo NO
-  // trae se conserva: guardar la salida no borra los días ni el horario de
-  // afuera de nadie.
-  const pidioNuevo =
-    body.diasLaborables !== undefined || body.entradaAfuera !== undefined || body.salidaAfuera !== undefined;
-  const fila = previa.faltaMigracion
-    ? base
-    : {
-        ...base,
-        [COLUMNA_DIAS_LABORABLES]: body.diasLaborables !== undefined ? diasV.valor : previa.dias,
-        [COLUMNA_ENTRADA_AFUERA]: body.entradaAfuera !== undefined ? entradaAfueraV.valor : previa.entradaAfuera,
-        [COLUMNA_SALIDA_AFUERA]: body.salidaAfuera !== undefined ? salidaAfueraV.valor : previa.salidaAfuera,
-      };
+  // 🔴 Lo que el cuerpo NO trae se conserva: guardar la salida no borra los
+  // días ni el horario de afuera de nadie.
+  const fila = {
+    ...base,
+    [COLUMNA_DIAS_LABORABLES]: body.diasLaborables !== undefined ? diasV.valor : previa.dias,
+    [COLUMNA_ENTRADA_AFUERA]: body.entradaAfuera !== undefined ? entradaAfueraV.valor : previa.entradaAfuera,
+    [COLUMNA_SALIDA_AFUERA]: body.salidaAfuera !== undefined ? salidaAfueraV.valor : previa.salidaAfuera,
+  };
 
   const { error } = await supabaseServer.from(TABLA_HORARIOS).upsert(fila, { onConflict: "empleado_codigo" });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  // Se guardó la salida (y la entrada), pero lo nuevo no tiene dónde caer: se
-  // DICE, no se calla. La pantalla no manda estos campos mientras el GET avise,
-  // así que llegar acá es raro; igual se contesta con la verdad.
-  if (previa.faltaMigracion && pidioNuevo) {
-    return NextResponse.json({ ok: true, faltaMigracion: avisoMigracionHorario() });
-  }
   return NextResponse.json({ ok: true });
 }

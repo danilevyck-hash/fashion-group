@@ -129,25 +129,24 @@ describe("🔴 el permiso de horas: las dos, o ninguna", () => {
     }
   });
 
-  it("🩸 SIN LAS COLUMNAS: una justificación de día entero sigue guardándose", async () => {
+  it("🔴 un error de escritura que nombra las columnas NO se traga: día entero", async () => {
+    // Hasta el 9-oct-2026 se leía como «falta la migración» y se reinsertaba
+    // sin las columnas. Existen: el error falla con su error, sin reintento.
     respuestas = [{ error: { code: "42703", message: "column hora_desde does not exist" } }];
     const res = await POST(pedido(base));
-    expect(res.status).toBe(200);
-    // Se reintentó sin las columnas, y la justificación quedó guardada.
-    expect(insertados).toHaveLength(2);
-    expect("hora_desde" in insertados[1]).toBe(false);
-    expect(insertados[1].motivo).toBe("Escolares");
+    expect(res.status).toBe(500);
+    expect(insertados).toHaveLength(1);
   });
 
-  it("🔴 SIN LAS COLUMNAS: un permiso de horas NO se guarda a medias", async () => {
+  it("🔴 un error de escritura que nombra las columnas NO se traga: permiso de horas", async () => {
     // 🩸 Una justificación que se traga las horas pasa a justificar el DÍA
     // ENTERO —ocho horas de sueldo— y nadie sabría por qué.
     respuestas = [{ error: { code: "42703", message: "column hora_desde does not exist" } }];
     const res = await POST(pedido({ ...constancia, horaDesde: "08:00", horaHasta: "10:00" }));
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(500);
     const d = await res.json();
-    expect(d.faltaMigracionHoras).toBe(true);
-    expect(d.error).toContain(MIGRACION_PERMISO_HORAS);
+    expect(d.faltaMigracionHoras).toBeUndefined();
+    expect(d.error).not.toContain(MIGRACION_PERMISO_HORAS);
     // Y NO se reintentó: una sola escritura, la que falló.
     expect(insertados).toHaveLength(1);
   });

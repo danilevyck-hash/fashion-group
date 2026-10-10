@@ -22,7 +22,6 @@ import {
   COLUMNA_DIAS_LABORABLES,
   COLUMNA_ENTRADA_AFUERA,
   COLUMNA_SALIDA_AFUERA,
-  esColumnaHorarioFaltante,
   limpiaHora,
   normalizarDiasLaborables,
 } from "./horario-configurable";
@@ -44,8 +43,8 @@ export interface HorarioLeido extends HorarioPersona {
 
 export interface HorariosLeidos {
   horarios: HorarioLeido[];
-  /** `true` = las columnas nuevas no existen todavía: días y horario de afuera
-   *  vienen vacíos y todo se comporta como siempre. */
+  /** SIEMPRE `false` desde el 9-oct-2026: las columnas existen. Se conserva
+   *  porque las pantallas y la planilla lo leen. */
   faltaMigracion: boolean;
 }
 
@@ -76,20 +75,10 @@ function aHorario(f: FilaCruda): HorarioLeido {
 
 /** TODOS los horarios guardados. Ver el encabezado. */
 export async function leerHorarios(): Promise<HorariosLeidos> {
-  const conNuevas = await supabaseServer.from(TABLA_HORARIOS).select(COLS_CON_CONFIGURABLE);
-  if (!conNuevas.error) {
-    return {
-      horarios: ((conNuevas.data ?? []) as unknown as FilaCruda[]).map(aHorario),
-      faltaMigracion: false,
-    };
-  }
-  if (!esColumnaHorarioFaltante(conNuevas.error)) {
-    throw new Error(`No se pudieron leer los horarios: ${conNuevas.error.message}`);
-  }
-  const base = await supabaseServer.from(TABLA_HORARIOS).select(COLS_BASE);
-  if (base.error) throw new Error(`No se pudieron leer los horarios: ${base.error.message}`);
+  const { data, error } = await supabaseServer.from(TABLA_HORARIOS).select(COLS_CON_CONFIGURABLE);
+  if (error) throw new Error(`No se pudieron leer los horarios: ${error.message}`);
   return {
-    horarios: ((base.data ?? []) as unknown as FilaCruda[]).map(aHorario),
-    faltaMigracion: true,
+    horarios: ((data ?? []) as unknown as FilaCruda[]).map(aHorario),
+    faltaMigracion: false,
   };
 }

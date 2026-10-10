@@ -8,7 +8,7 @@ import { requireAsistencia } from "@/lib/asistencia/guard";
 import { rechazarLoDelGrupo } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { esColumnaTipoFaltante, MIGRACION_FERIADOS_TIPO, TIPOS_FERIADO, tipoFeriado } from "@/lib/asistencia/feriados";
+import { TIPOS_FERIADO, tipoFeriado } from "@/lib/asistencia/feriados";
 import { asegurarDeudasDeDiasLibres } from "@/lib/asistencia/dia-libre-empresa-server";
 
 export const dynamic = "force-dynamic";
@@ -22,15 +22,13 @@ export async function GET(req: NextRequest) {
     if (/^\d{4}$/.test(anio)) q = q.gte("fecha", `${anio}-01-01`).lte("fecha", `${anio}-12-31`);
     return q;
   };
-  // 🔴 Sin la columna `tipo` (30-sep-2026) se lee como antes y todo es feriado.
-  let { data, error } = await leer("fecha, nombre, tipo");
-  const faltaColumna = esColumnaTipoFaltante(error);
-  if (faltaColumna) ({ data, error } = await leer("fecha, nombre"));
+  const { data, error } = await leer("fecha, nombre, tipo");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const filas = (data ?? []) as unknown as { fecha: string; nombre: string; tipo?: string }[];
   return NextResponse.json({
     feriados: filas.map((f) => ({ fecha: f.fecha, nombre: f.nombre, tipo: tipoFeriado(f.tipo) })),
-    faltaMigracionTipo: faltaColumna,
+    // Se conserva porque la pantalla lo lee; fijo desde el 9-oct-2026 (la columna existe).
+    faltaMigracionTipo: false,
   });
 }
 
@@ -53,20 +51,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Tipo inválido" }, { status: 400 });
   }
   const tipo = tipoFeriado(b.tipo);
-  let { error } = await supabaseServer
+  const { error } = await supabaseServer
     .from("asistencia_feriados")
     .upsert({ fecha, nombre, tipo }, { onConflict: "fecha" });
-  if (esColumnaTipoFaltante(error)) {
-    // Sin la migración, un feriado se guarda como siempre; un día libre NO:
-    // guardarlo como feriado lo pagaría sin deuda, que es justo el error.
-    if (tipo === "dia_libre") {
-      return NextResponse.json(
-        { error: `Todavía no se pueden guardar días libres: pídele a Daniel que corra el archivo ${MIGRACION_FERIADOS_TIPO} en Supabase.` },
-        { status: 503 },
-      );
-    }
-    ({ error } = await supabaseServer.from("asistencia_feriados").upsert({ fecha, nombre }, { onConflict: "fecha" }));
-  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   // 🔴 UN DÍA LIBRE QUE YA PASÓ: la deuda nace ahora (los que vienen nacen al
   // generar la planilla, cuando el día ya pasó). Misma puerta, idempotente.

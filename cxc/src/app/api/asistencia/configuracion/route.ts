@@ -26,11 +26,11 @@
 
 import { COLUMNA_COBRA_HORAS_EXTRA, validarCobraHorasExtra } from "@/lib/asistencia/cobra-horas-extra";
 import {
-  avisoMigracionTrabajaAfuera, COLUMNA_TRABAJA_AFUERA, esColumnaTrabajaAfueraFaltante, validarTrabajaAfuera,
+  COLUMNA_TRABAJA_AFUERA, validarTrabajaAfuera,
 } from "@/lib/asistencia/trabaja-afuera";
 import { leerReponeTardanza, leerTrabajaAfuera } from "@/lib/asistencia/config-server";
 import {
-  avisoMigracionReponeTardanza, COLUMNA_REPONE_TARDANZA, esColumnaReponeTardanzaFaltante, validarReponeTardanza,
+  COLUMNA_REPONE_TARDANZA, validarReponeTardanza,
 } from "@/lib/asistencia/repone-tardanza";
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
@@ -477,13 +477,9 @@ export async function PUT(req: NextRequest) {
   // misma lectura tolerante del GET): con la casilla en su valor de siempre no
   // se escribe nada, y la ficha se guarda exactamente como hasta hoy.
   //
-  //   · Cambió y la columna existe → se escribe (true o false).
-  //   · Cambió a `true` y la columna NO existe → error con el nombre del
-  //     archivo. Un «guardado» que se traga la casilla es peor que un error: la
-  //     persona seguiría con ausencias y nadie lo vería hasta el día de pago.
-  //     Lo demás de la ficha YA quedó guardado, y el aviso lo dice. (Sin `503`:
-  //     esta ruta no contesta «falta un paso» desde el 3-sep-2026, hay candado.)
-  //   · Cualquier otro error → 500, como el upsert.
+  //   · Cambió → se escribe (true o false).
+  //   · Cualquier error → 500, como el upsert. La columna existe desde el
+  //     9-oct-2026: ya no hay aviso de «falta la migración».
   const afueraHoy = (await leerTrabajaAfuera()).has(p.codigo);
   if (afueraHoy !== trabajaAfueraValor) {
     const escr = await supabaseServer
@@ -491,9 +487,6 @@ export async function PUT(req: NextRequest) {
       .update({ [COLUMNA_TRABAJA_AFUERA]: trabajaAfueraValor })
       .eq("empleado_codigo", p.codigo);
     if (escr.error) {
-      if (esColumnaTrabajaAfueraFaltante(escr.error)) {
-        return NextResponse.json({ error: avisoMigracionTrabajaAfuera() }, { status: 500 });
-      }
       console.error("[asistencia/configuracion PUT trabaja_afuera]", escr.error.message);
       return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
     }
@@ -508,9 +501,6 @@ export async function PUT(req: NextRequest) {
       .update({ [COLUMNA_REPONE_TARDANZA]: reponeTardanzaValor })
       .eq("empleado_codigo", p.codigo);
     if (escr.error) {
-      if (esColumnaReponeTardanzaFaltante(escr.error)) {
-        return NextResponse.json({ error: avisoMigracionReponeTardanza() }, { status: 500 });
-      }
       console.error("[asistencia/configuracion PUT repone_tardanza]", escr.error.message);
       return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
     }

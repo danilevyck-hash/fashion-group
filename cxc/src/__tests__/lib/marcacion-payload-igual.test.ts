@@ -174,8 +174,8 @@ describe("lo que el servidor exige no cambió", () => {
     expect(RUTA).not.toMatch(/aparato[^\n]*status:\s*4\d\d/i);
   });
 
-  it("🔴 sin la migración la marca entra igual — falla ABIERTA", () => {
-    expect(RUTA).toContain("faltaUnaColumnaNueva(error)");
-    expect(RUTA).toContain("sinLasColumnasNuevas(fila)");
+  it("🔴 las columnas existen (9-oct-2026): la marca ya no se reescribe sin la calle ni el sello", () => {
+    expect(RUTA).not.toContain("faltaUnaColumnaNueva");
+    expect(RUTA).not.toContain("sinLasColumnasNuevas");
   });
 });

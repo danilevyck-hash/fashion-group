@@ -39,8 +39,8 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { COLUMNA_COBRA_HORAS_EXTRA, cobraHorasExtra } from "./cobra-horas-extra";
-import { COLUMNA_TRABAJA_AFUERA, esColumnaTrabajaAfueraFaltante, trabajaAfuera } from "./trabaja-afuera";
-import { COLUMNA_REPONE_TARDANZA, esColumnaReponeTardanzaFaltante, reponeTardanza } from "./repone-tardanza";
+import { COLUMNA_TRABAJA_AFUERA, trabajaAfuera } from "./trabaja-afuera";
+import { COLUMNA_REPONE_TARDANZA, reponeTardanza } from "./repone-tardanza";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
@@ -317,10 +317,7 @@ export async function leerTrabajaAfuera(): Promise<ReadonlySet<string>> {
   const { data, error } = await supabaseServer
     .from(TABLA_PERSONAS)
     .select(`empleado_codigo, ${COLUMNA_TRABAJA_AFUERA}`);
-  if (error) {
-    if (esColumnaTrabajaAfueraFaltante(error)) return new Set();
-    throw new Error(`No se pudo leer quién trabaja afuera: ${error.message}`);
-  }
+  if (error) throw new Error(`No se pudo leer quién trabaja afuera: ${error.message}`);
   const out = new Set<string>();
   const filas = Array.isArray(data)
     ? (data as unknown as Array<{ empleado_codigo: unknown; trabaja_afuera: unknown }>)
@@ -341,10 +338,7 @@ export async function leerReponeTardanza(): Promise<ReadonlySet<string>> {
   const { data, error } = await supabaseServer
     .from(TABLA_PERSONAS)
     .select(`empleado_codigo, ${COLUMNA_REPONE_TARDANZA}`);
-  if (error) {
-    if (esColumnaReponeTardanzaFaltante(error)) return new Set();
-    throw new Error(`No se pudo leer quién compensa tardanza: ${error.message}`);
-  }
+  if (error) throw new Error(`No se pudo leer quién compensa tardanza: ${error.message}`);
   const out = new Set<string>();
   for (const f of (Array.isArray(data) ? data : []) as unknown as Array<{ empleado_codigo: unknown; repone_tardanza: unknown }>) {
     if (reponeTardanza(f.repone_tardanza)) out.add(String(f.empleado_codigo));

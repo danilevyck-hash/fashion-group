@@ -378,10 +378,11 @@ describe("7. 🔴 las rutas y la pantalla van por la fuente ÚNICA", () => {
       expect(src, nombre).toMatch(/leerHorarios\(\)/);
       expect(src, nombre).not.toMatch(/from\("asistencia_horarios"\)\s*\.select\(/);
     }
-    // Y la única lectura vive en `horarios-server.ts`, tolerante a la migración.
+    // Y la única lectura vive en `horarios-server.ts`. Las columnas existen
+    // (9-oct-2026): ya no relee sin ellas.
     const server = puro("src/lib/asistencia/horarios-server.ts");
-    expect(server).toMatch(/esColumnaHorarioFaltante\(conNuevas\.error\)/);
-    expect(server).toMatch(/faltaMigracion: true/);
+    expect(server).not.toMatch(/esColumnaHorarioFaltante/);
+    expect(server).not.toMatch(/faltaMigracion: true/);
   });
 
   it("las dos rutas del motor piden el `dispositivo` y pasan `diasLaborables`", () => {
@@ -483,17 +484,13 @@ describe("8. el PUT de Horarios", () => {
     expect(upserts).toHaveLength(0);
   });
 
-  it("🔴 sin la migración: guarda entrada y salida como siempre, no escribe las columnas nuevas y lo DICE", async () => {
+  it("🔴 un error de la base que nombra las columnas NO se traga: no se guarda el horario a medias", async () => {
+    // Antes se guardaban entrada y salida SIN los días ni el horario de afuera
+    // y se contestaba 200. Las columnas existen (9-oct-2026).
     faltaColumna = true;
     const { PUT } = await import("@/app/api/asistencia/horarios/route");
     const res = await PUT(pedido({ codigo: MF, salida: "18:30", diasLaborables: [1, 2, 3, 4, 5, 6] }));
-    const d = await res.json();
-    expect(res.status).toBe(200);
-    expect(upserts[0]).toMatchObject({ entrada: "10:00", salida: "18:30", almuerzo_minutos: 60 });
-    expect(upserts[0]).not.toHaveProperty("dias_laborables");
-    expect(d.faltaMigracion).toContain(MIGRACION_HORARIO_CONFIGURABLE);
-    upserts.length = 0;
-    const ok = await (await PUT(pedido({ codigo: MF, salida: "18:30" }))).json();
-    expect(ok).toEqual({ ok: true });
+    expect(res.status).toBeGreaterThanOrEqual(500);
+    expect(upserts).toHaveLength(0);
   });
 });
