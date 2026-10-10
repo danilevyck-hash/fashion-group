@@ -9,6 +9,15 @@ import {
   LARGO_MINIMO_CONTRASENA,
   contrasenaEnUso,
 } from "@/lib/auth/contrasena-en-uso";
+import {
+  COLUMNAS_DE_USUARIO,
+  avisoDeVinculo,
+  cambiarActivo,
+  codigoDeColaborador,
+  dejariaSinAdministrador as wouldLeaveNoActiveAdmin,
+  insertarUsuario,
+  revisarUsuarioNuevo,
+} from "@/lib/usuarios/usuario-servidor";
 
 export const dynamic = "force-dynamic";
 
@@ -47,20 +56,9 @@ function validateRoleAndModulos(role: unknown, modulos_override: unknown): strin
   return null;
 }
 
-/**
- * ¿Aplicar este cambio (desactivar o quitar el rol admin) al usuario `targetId`
- * dejaría al sistema con CERO administradores activos? Previene el auto-lockout:
- * que nadie pueda volver a entrar a administrar.
- */
-async function wouldLeaveNoActiveAdmin(targetId: string): Promise<boolean> {
-  const { data } = await supabaseServer
-    .from("fg_users")
-    .select("id")
-    .eq("role", "admin")
-    .eq("active", true);
-  const activeAdmins = data || [];
-  return activeAdmins.length === 1 && activeAdmins[0].id === targetId;
-}
+// `wouldLeaveNoActiveAdmin`, el alta y el activar/desactivar viven en
+// `lib/usuarios/usuario-servidor.ts` (9-oct-2026): los usa también el alta de un
+// colaborador con «Marcación desde el teléfono» y su baja.
 
 // ¿La contraseña ya la usa otro? — `contrasenaEnUso` (`lib/auth/contrasena-en-uso.ts`),
 // la MISMA comprobación que usa el cambio de contraseña propio (14-sep-2026).
@@ -75,9 +73,7 @@ export async function GET(req: NextRequest) {
   // leyendo la actual.)
   const { data: users, error } = await supabaseServer
     .from("fg_users")
-    .select(
-      "id, name, role, active, associated_company, modulos_override, is_owner, created_at, updated_at",
-    )
+    .select(COLUMNAS_DE_USUARIO)
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: "Error al cargar" }, { status: 500 });
@@ -91,58 +87,31 @@ export async function POST(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
   if (authError) return authError;
 
-  const { name, password, role, associated_company, modulos_override } = await req.json();
-  if (!name || !password) return NextResponse.json({ error: "Nombre y contraseña requeridos" }, { status: 400 });
-  if (name.trim().length < 3) return NextResponse.json({ error: "El nombre debe tener al menos 3 caracteres" }, { status: 400 });
-  // 🔴 LA CONTRASEÑA SOLO TIENE UN LÍMITE: TRES CARACTERES (19-sep-2026).
-  // Daniel, textual: *«que las contraseñas que los usuarios cambien no tenga
-  // limite de nada, minimo 3 caracteres nada mas»*. El 15-sep había dicho *«lo
-  // quiero sin restricciones»* y se quitó el mínimo de 8 entero; ahora queda el
-  // piso de 3, que sale de `contrasena-en-uso.ts` —el MISMO número que leen la
-  // ventana de «Cambiar mi contraseña» y la ruta propia—.
-  // ⚠️ Se le dijo el riesgo y lo decidió igual: en este sistema la contraseña ES
-  // la identidad (el login no pide usuario), así que una corta es entrar como
-  // esa persona. Lo que SIGUE en pie es que no puede repetir la de otro
-  // (`contrasenaEnUso`), que es lo que impide que dos personas colisionen.
-  if (String(password).length < LARGO_MINIMO_CONTRASENA) {
-    return NextResponse.json({ error: AVISO_CONTRASENA_CORTA }, { status: 400 });
-  }
+  const { name, password, role, associated_company, modulos_override, empleado_codigo } = await req.json();
+
+  // 🔴 Nombre, largo mínimo (3, Daniel 19-sep-2026), nombre repetido y
+  // contraseña repetida (`contrasenaEnUso`: el login no pide usuario, la
+  // contraseña ES la identidad) — en `revisarUsuarioNuevo`, la MISMA revisión
+  // del alta de un colaborador con acceso.
+  const fallo = await revisarUsuarioNuevo(name, password);
+  if (fallo) return NextResponse.json({ error: fallo.error }, { status: fallo.status });
 
   const validationError = validateRoleAndModulos(role, modulos_override);
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
-  // Check for duplicate name
-  const { data: existing } = await supabaseServer.from("fg_users").select("id").eq("name", name.trim()).limit(1);
-  if (existing && existing.length > 0) return NextResponse.json({ error: "Ya existe un usuario con ese nombre" }, { status: 400 });
-
-  // Unicidad de contraseña (login password-only → colisión = login ambiguo).
-  if (await contrasenaEnUso(password)) {
-    return NextResponse.json({ error: AVISO_CONTRASENA_REPETIDA }, { status: 400 });
-  }
-
-  const bcrypt = (await import("bcryptjs")).default;
-  const hashed = await bcrypt.hash(password, 10);
-
-  const overrideVal = Array.isArray(modulos_override) && modulos_override.length > 0 ? modulos_override : null;
-  const { data: user, error } = await supabaseServer
-    .from("fg_users")
-    .insert({ name: name.trim(), password: hashed, role: role || "vendedor", associated_company: associated_company || null, modulos_override: overrideVal })
-    // Columnas explícitas SIN `password`: nunca devolver el hash bcrypt al cliente
-    // (igual que el GET). El alta no necesita leer la contraseña recién escrita.
-    .select("id, name, role, active, associated_company, modulos_override, is_owner, created_at, updated_at")
-    .single();
-
-  if (error) return NextResponse.json({ error: "Error al crear usuario" }, { status: 500 });
+  // «Colaborador» (opcional): la ficha por la que este usuario marca.
+  const r = await insertarUsuario({ name, password, role, associated_company, modulos_override, empleado_codigo });
+  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
 
   // modulos_override (array) = permisos custom por usuario; null = hereda del rol.
-  return NextResponse.json(user);
+  return NextResponse.json(r.user);
 }
 
 export async function PUT(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
   if (authError) return authError;
 
-  const { id, name, password, role, associated_company, modulos_override } = await req.json();
+  const { id, name, password, role, associated_company, modulos_override, empleado_codigo } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   const validationError = validateRoleAndModulos(role, modulos_override);
@@ -194,8 +163,16 @@ export async function PUT(req: NextRequest) {
     update.modulos_override = Array.isArray(modulos_override) && modulos_override.length > 0 ? modulos_override : null;
   }
 
+  // «Colaborador»: `undefined` = no se toca; vacío o `null` = sin vincular.
+  if (empleado_codigo !== undefined) update.empleado_codigo = codigoDeColaborador(empleado_codigo);
+
   const { error } = await supabaseServer.from("fg_users").update(update).eq("id", id);
-  if (error) return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
+  if (error) {
+    // La base exige que la ficha exista y que tenga un solo usuario: se dice en palabras.
+    const vinculo = avisoDeVinculo(error);
+    if (vinculo) return NextResponse.json({ error: vinculo }, { status: 409 });
+    return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
+  }
 
   // modulos_override (array) = permisos custom por usuario; null = hereda del rol.
   return NextResponse.json({ ok: true });
@@ -208,38 +185,9 @@ export async function PATCH(req: NextRequest) {
   const { id, active } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
-  // Guard de auto-lockout: desactivar al único admin activo dejaría el sistema
-  // sin nadie que pueda administrar.
-  if (active === false && (await wouldLeaveNoActiveAdmin(id))) {
-    return NextResponse.json(
-      { error: "No puedes desactivar al único administrador activo." },
-      { status: 400 },
-    );
-  }
-
-  const { data: updatedUser, error } = await supabaseServer
-    .from("fg_users")
-    .update({ active, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select("name")
-    .single();
-
-  if (error || !updatedUser) return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
-
-  // Al DESACTIVAR, revocar sus sesiones vivas. El middleware valida
-  // user_sessions.revoked (no fg_users.active), así que sin esto un usuario
-  // desactivado con sesión abierta seguiría entrando hasta que expire/revoque.
-  // user_sessions se relaciona por user_name (nombre único, lo enforce la API).
-  let sesionesRevocadas = 0;
-  if (active === false) {
-    const { data: revoked } = await supabaseServer
-      .from("user_sessions")
-      .update({ revoked: true })
-      .eq("user_name", updatedUser.name)
-      .eq("revoked", false)
-      .select("id");
-    sesionesRevocadas = revoked?.length ?? 0;
-  }
-
-  return NextResponse.json({ ok: true, sesionesRevocadas });
+  // El guard del único administrador y el corte de sesiones al desactivar
+  // viven en `cambiarActivo` (la baja de un colaborador usa el mismo).
+  const r = await cambiarActivo(id, active);
+  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  return NextResponse.json({ ok: true, sesionesRevocadas: r.sesionesRevocadas });
 }

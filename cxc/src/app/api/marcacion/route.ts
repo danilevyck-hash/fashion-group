@@ -44,6 +44,7 @@ import { CAMPO_APARATO, selloValido } from "@/lib/marcacion/sello-del-aparato";
 import { faltaUnaColumnaNueva, sinLasColumnasNuevas } from "@/lib/marcacion/columnas-nuevas";
 import { lugarTextoDeLaMarca } from "@/lib/marcacion/lugar-al-marcar";
 import { revisarMismoAparato } from "@/lib/asistencia/mismo-aparato-io";
+import { avisoSiEstaDeBaja } from "@/lib/marcacion/ficha-de-baja";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -149,6 +150,12 @@ export async function POST(req: NextRequest) {
     }
 
     const fecha = diaPanamaDe(cuando.ocurrioEn);
+
+    // 🔴 UNA FICHA DADA DE BAJA NO MARCA (9-oct-2026), aunque su usuario siga
+    // activo. Se mira el día DE LA MARCA: una marca sin señal de su último día
+    // que llega tarde sí entra. Ver `ficha-de-baja.ts` (falla abierta).
+    const baja = await avisoSiEstaDeBaja(codigo, fecha);
+    if (baja) return NextResponse.json({ error: baja }, { status: 409 });
 
     // 🔴 LAS MARCAS DEL DÍA Y NI UNA MÁS, comprobado en el SERVIDOR. Desde el
     // 24-sep-2026 son CUATRO (`cuatro-marcas.ts`); con ese interruptor apagado,

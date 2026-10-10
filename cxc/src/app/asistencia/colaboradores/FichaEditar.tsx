@@ -68,6 +68,10 @@ import {
   PREGUNTA_MARCA_RELOJ,
 } from "@/lib/asistencia/sueldo-fijo";
 import { MOTIVOS_SALIDA, OPCION_MOTIVO } from "@/lib/asistencia/vigencia";
+import {
+  AYUDA_ACCESO_MARCACION, AYUDA_DESACTIVAR_USUARIO, ROTULO_ACCESO_MARCACION, ROTULO_CONTRASENA_INICIAL,
+  rotuloDesactivarUsuario, textoSugerencia,
+} from "@/lib/asistencia/alta-colaborador";
 import CedulaFoto from "./CedulaFoto";
 import type { HorarioDeLaPagina, PermisosDeLaPagina, PersonaDeLaPagina } from "./tipos";
 import CampoFecha from "@/components/ui/CampoFecha";
@@ -92,6 +96,11 @@ export interface BorradorFicha {
   reponeTardanza: boolean;
   fechaSalida: string;
   motivoSalida: string;
+  /** Solo en el alta (9-oct-2026): crea su usuario de Marcación, vinculado. */
+  accesoMarcacion: boolean;
+  contrasenaInicial: string;
+  /** Solo al dar de baja: desactiva su usuario en la misma pasada. Sí por defecto. */
+  desactivarUsuario: boolean;
 }
 
 /** El borrador que sale de una ficha. Una ficha nueva arranca en los defaults
@@ -115,6 +124,9 @@ export function borradorDe(p: PersonaDeLaPagina | null, codigo: string): Borrado
     reponeTardanza: p?.reponeTardanza ?? false,
     fechaSalida: p?.fechaSalida ?? "",
     motivoSalida: p?.motivoSalida ?? "",
+    accesoMarcacion: false,
+    contrasenaInicial: "",
+    desactivarUsuario: true,
   };
 }
 
@@ -129,7 +141,7 @@ const CAMPO =
 
 export default function FichaEditar({
   borrador: b, onCambio, onGuardar, onCancelar, guardando, nueva, permisos, puedeEditar, onCambioFoto, deudaPrestamo,
-  horario, onCambioHorario,
+  horario, onCambioHorario, puedeDarAcceso = false, usuario = null, codigoSugerido = null,
 }: {
   borrador: BorradorFicha;
   onCambio: (b: BorradorFicha) => void;
@@ -145,6 +157,12 @@ export default function FichaEditar({
   /** Su horario. `null` = todavía no marcó en el reloj: no hay fila que editar. */
   horario?: HorarioDeLaPagina | null;
   onCambioHorario?: (h: HorarioDeLaPagina) => void;
+  /** Crear usuarios es del administrador: solo a él se le ofrece el interruptor. */
+  puedeDarAcceso?: boolean;
+  /** El usuario vinculado a esta ficha, si tiene. */
+  usuario?: { name: string; active: boolean } | null;
+  /** El siguiente código libre de la serie de la empresa elegida, si lo hay. */
+  codigoSugerido?: string | null;
 }) {
   const [verExcepciones, setVerExcepciones] = useState(() => tieneExcepciones(b));
   const [verBaja, setVerBaja] = useState(() => !!b.fechaSalida);
@@ -156,6 +174,7 @@ export default function FichaEditar({
     b.codigo.trim() === "" ? "el código" : null,
     b.nombre.trim() === "" ? "el nombre" : null,
     b.empresa === "" ? "la empresa" : null,
+    nueva && b.accesoMarcacion && b.contrasenaInicial.trim() === "" ? "la contraseña inicial" : null,
   ].filter(Boolean) as string[];
   const puedeGuardar = faltan.length === 0 && !guardando && puedeEditar;
 
@@ -176,10 +195,24 @@ export default function FichaEditar({
       {/* ── DATOS ───────────────────────────────────────────────────────── */}
       <div className="grid gap-3 px-4 py-3 sm:grid-cols-2">
         {nueva && (
-          <Campo etiqueta="Código del reloj" ayuda="El número con el que marca. No se puede cambiar después.">
-            <input className={CAMPO} value={b.codigo} inputMode="numeric"
-              onChange={(e) => set({ codigo: e.target.value })} />
-          </Campo>
+          <div>
+            <Campo etiqueta="Código del reloj" ayuda="El número con el que marca. No se puede cambiar después.">
+              <input className={CAMPO} value={b.codigo} inputMode="numeric"
+                onChange={(e) => set({ codigo: e.target.value })} />
+            </Campo>
+            {/* 🔴 El siguiente de la serie de SU empresa (9-oct-2026), solo si
+                está libre en todo el sistema. Se ofrece, no se pone solo: quien
+                marca en un reloj físico trae el código de ese reloj. */}
+            {codigoSugerido && b.empresa && b.codigo.trim() !== codigoSugerido && (
+              <p data-testid="alta-sugerencia-codigo" className="mt-1 flex flex-wrap items-center gap-x-2 text-[12px] text-gray-500">
+                <span>{textoSugerencia(b.empresa, codigoSugerido)}</span>
+                <button type="button" onClick={() => set({ codigo: codigoSugerido })}
+                  className="-my-2 min-h-[44px] text-blue-600 transition hover:text-blue-800">
+                  Usar {codigoSugerido}
+                </button>
+              </p>
+            )}
+          </div>
         )}
         <Campo etiqueta="Nombre">
           <input className={CAMPO} value={b.nombre} onChange={(e) => set({ nombre: e.target.value })} />
@@ -239,7 +272,7 @@ export default function FichaEditar({
           Daniel, desde esta ficha: «¿dónde?» — el horario solo estaba en la
           sección plegada al final de la lista. Acá se guarda con Guardar,
           como el resto de la ficha; la lista sigue guardando sola. */}
-      {!nueva && horario && onCambioHorario && (
+      {horario && onCambioHorario && (
         <>
           <p className="border-t border-gray-100 px-4 pt-3 text-[11px] font-medium uppercase tracking-wide text-gray-400">
             Horario
@@ -291,6 +324,41 @@ export default function FichaEditar({
             </p>
           </div>
         </>
+      )}
+
+      {/* ── ACCESO (9-oct-2026) ─────────────────────────────────────────
+          El alta en una sola pasada: prendido, al guardar se crea su usuario
+          con el permiso de Marcación, vinculado a esta ficha. Solo en el alta
+          y solo para el administrador; a una ficha que ya existe se le vincula
+          un usuario desde Usuarios › «Colaborador». */}
+      {nueva && puedeDarAcceso && (
+        <div data-testid="alta-acceso" className="border-t border-gray-100 px-4 py-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Acceso</p>
+          <div className="mt-2 flex min-h-[44px] items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-gray-900">{ROTULO_ACCESO_MARCACION}</p>
+              <p className="text-[11.5px] text-gray-400">{AYUDA_ACCESO_MARCACION}</p>
+            </div>
+            <button type="button" role="switch" aria-checked={b.accesoMarcacion} aria-label={ROTULO_ACCESO_MARCACION}
+              onClick={() => set({ accesoMarcacion: !b.accesoMarcacion })}
+              className={`relative inline-flex h-[31px] w-[51px] shrink-0 items-center rounded-full transition ${
+                b.accesoMarcacion ? "bg-emerald-600" : "bg-gray-300"
+              }`}>
+              <span className={`inline-block h-[27px] w-[27px] rounded-full bg-white shadow transition ${
+                b.accesoMarcacion ? "translate-x-[22px]" : "translate-x-[2px]"
+              }`} />
+            </button>
+          </div>
+          {b.accesoMarcacion && (
+            <div className="mt-3 sm:max-w-xs">
+              <Campo etiqueta={ROTULO_CONTRASENA_INICIAL}>
+                <input className={CAMPO} value={b.contrasenaInicial} autoComplete="off" autoCapitalize="none"
+                  autoCorrect="off" spellCheck={false}
+                  onChange={(e) => set({ contrasenaInicial: e.target.value })} />
+              </Campo>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── EXCEPCIONES (plegadas) ──────────────────────────────────────── */}
@@ -419,6 +487,21 @@ export default function FichaEditar({
                   ))}
                 </select>
               </Campo>
+              {/* 🔴 LA BAJA EN UNA SOLA PASADA (9-oct-2026): si la ficha tiene
+                  un usuario activo, se desactiva con el mismo Guardar. Viene
+                  marcada: una ficha de baja con su usuario vivo era el olvido. */}
+              {usuario?.active && (
+                <label data-testid="baja-desactivar-usuario"
+                  className="flex min-h-[44px] cursor-pointer items-center gap-2.5 sm:col-span-2">
+                  <input type="checkbox" className="h-4 w-4 accent-gray-900" checked={b.desactivarUsuario}
+                    disabled={!!permisos && !permisos.puedeDarDeBaja}
+                    onChange={(e) => set({ desactivarUsuario: e.target.checked })} />
+                  <span>
+                    <span className="block text-sm text-gray-900">{rotuloDesactivarUsuario(usuario.name)}</span>
+                    <span className="block text-[11.5px] text-gray-400">{AYUDA_DESACTIVAR_USUARIO}</span>
+                  </span>
+                </label>
+              )}
               <p className="text-[12px] text-gray-500 sm:col-span-2">
                 {/* 🔴 NO HAY BOTÓN DE BORRAR, y nunca lo va a haber: borrar la
                     ficha se lleva el nombre, el salario y la empresa, o sea

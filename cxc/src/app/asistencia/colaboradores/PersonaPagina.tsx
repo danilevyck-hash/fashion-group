@@ -32,6 +32,7 @@ import {
 import { tituloDePersona } from "@/lib/asistencia/ficha-persona";
 import { avisoGuardadoConSalida } from "@/lib/asistencia/salida-con-deuda";
 import { textoConfirmar } from "@/lib/asistencia/codigos-ignorados";
+import { cuerpoDelHorario, horarioDeAlta } from "@/lib/asistencia/alta-colaborador";
 import FichaTexto from "./FichaTexto";
 import FichaEditar, { type BorradorFicha, borradorDe } from "./FichaEditar";
 import SeccionPrestamos from "./SeccionPrestamos";
@@ -68,6 +69,10 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
   const [horario, setHorario] = useState<HorarioDeLaPagina | null>(null);
   const [horarioBorrador, setHorarioBorrador] = useState<HorarioDeLaPagina | null>(null);
   const [horarioCompleto, setHorarioCompleto] = useState(true);
+  /** El usuario vinculado a la ficha: al dar de baja se ofrece desactivarlo. */
+  const [usuario, setUsuario] = useState<{ name: string; active: boolean } | null>(null);
+  /** El siguiente código libre de la serie de la empresa elegida (solo en el alta). */
+  const [codigoSugerido, setCodigoSugerido] = useState<string | null>(null);
   /** Sube de a uno para que las secciones vuelvan a leer después de guardar. */
   const [refresco, setRefresco] = useState(0);
 
@@ -110,6 +115,7 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
       // `null` = o no existe, o el código está ignorado — exactamente lo que
       // devolvía el `find` sobre la lista, que ya venía sin los ignorados.
       setPersona((d.persona ?? null) as PersonaDeLaPagina | null);
+      setUsuario(d.usuario ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
     } finally {
@@ -161,6 +167,24 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
     if (editando) setHorarioBorrador((h) => h ?? horario);
   }, [editando, horario]);
 
+  // 🔴 EL ALTA EN UNA SOLA PASADA (9-oct-2026). La ficha nueva trae su horario
+  // en el formulario —el de siempre de su empresa hasta que se toque— y el
+  // almuerzo es el de la empresa elegida, que no se escribe.
+  const empresaDelAlta = nueva ? (borrador?.empresa ?? "") : "";
+  const horarioDelFormulario: HorarioDeLaPagina | null = nueva
+    ? { ...(horarioBorrador ?? horarioDeAlta(empresaDelAlta)), almuerzoMinutos: horarioDeAlta(empresaDelAlta).almuerzoMinutos }
+    : horarioBorrador;
+  // Y se le propone el siguiente código de la serie de esa empresa, si lo hay.
+  useEffect(() => {
+    if (!empresaDelAlta) { setCodigoSugerido(null); return; }
+    let vivo = true;
+    fetch(`/api/asistencia/configuracion/siguiente-codigo?empresa=${encodeURIComponent(empresaDelAlta)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { codigo: null }))
+      .then((d) => { if (vivo) setCodigoSugerido(d.codigo ?? null); })
+      .catch(() => { if (vivo) setCodigoSugerido(null); });
+    return () => { vivo = false; };
+  }, [empresaDelAlta]);
+
   function abrirEditar() {
     setBorrador(borradorDe(persona, nueva ? "" : codigo));
     setHorarioBorrador(horario);
@@ -194,12 +218,29 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
           reponeTardanza: b.reponeTardanza,
           posicion: b.posicion.trim(),
           cedula: b.cedula.trim(),
+          // 🔴 El alta se dice: un código que ya existe se frena, no se pisa.
+          ...(nueva ? {
+            alta: true,
+            accesoMarcacion: b.accesoMarcacion ? { password: b.contrasenaInicial.trim() } : null,
+          } : {}),
+          // La baja desactiva su usuario en la misma pasada (casilla marcada).
+          desactivarUsuario: !!(b.fechaSalida && usuario?.active && b.desactivarUsuario),
         }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error ?? "No se pudo guardar");
+      // 🔴 En el alta el horario se guarda SIEMPRE, por la MISMA puerta que usa
+      // la lista. Si falla, la ficha ya existe: se dice y se sigue a su página.
+      if (nueva && horarioDelFormulario) {
+        const rh = await fetch("/api/asistencia/horarios", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(cuerpoDelHorario(b.codigo.trim(), b.nombre.trim(), horarioDelFormulario, horarioCompleto)),
+        }).catch(() => null);
+        if (!rh?.ok) toast("La ficha se guardó, pero no el horario. Revísalo en Editar.", "error");
+      }
       // El horario, solo si cambió, por la MISMA puerta que usa la lista.
-      if (horarioBorrador && JSON.stringify(horarioBorrador) !== JSON.stringify(horario)) {
+      if (!nueva && horarioBorrador && JSON.stringify(horarioBorrador) !== JSON.stringify(horario)) {
         const h = horarioBorrador;
         const rh = await fetch("/api/asistencia/horarios", {
           method: "PUT",
@@ -220,8 +261,10 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
       if (b.fechaSalida) {
         toast(avisoGuardadoConSalida(titulo, b.fechaSalida, deuda), deuda > 0 ? "warning" : "success");
       } else {
-        toast("Ficha guardada", "success");
+        toast(d.usuario ? `Ficha guardada · usuario ${d.usuario} creado` : "Ficha guardada", "success");
       }
+      if (d.usuarioDesactivado) toast(`Usuario ${d.usuarioDesactivado} desactivado`, "success");
+      if (d.avisoUsuario) toast(d.avisoUsuario, "warning");
       await cargar();
       setRefresco((n) => n + 1);
       setEditando(false);
@@ -295,8 +338,11 @@ export default function PersonaPagina({ codigo }: { codigo: string }) {
                 nueva={nueva}
                 permisos={permisos}
                 deudaPrestamo={persona?.deudaPrestamo ?? 0}
-                horario={horarioBorrador}
+                horario={horarioDelFormulario}
                 onCambioHorario={setHorarioBorrador}
+                puedeDarAcceso={rol === "admin"}
+                usuario={usuario}
+                codigoSugerido={codigoSugerido}
                 puedeEditar={puedeEditar}
                 onCambioFoto={() => setRefresco((n) => n + 1)}
               />

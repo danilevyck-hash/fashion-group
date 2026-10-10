@@ -122,8 +122,20 @@ describe("🔴 nadie le cambia la contraseña a nadie", () => {
       .filter((rel) => /bcrypt\.hash\(/.test(sinComentarios(leer(rel))))
       .sort();
     // La propia (cookie) y la del admin (`requireAuth(req, ["admin"])`).
-    expect(escriben).toEqual([RUTA_ADMIN, RUTA_PROPIA].sort());
+    // 🔑 9-oct-2026: el ALTA de un usuario se mudó a `usuario-servidor.ts`
+    // (`insertarUsuario`) para que «+ Nuevo colaborador» con «Marcación desde
+    // el teléfono» use el MISMO hash. Siguen siendo dos puertas de administrador
+    // y la propia: la ruta de la ficha exige `admin` antes de crear el usuario.
+    const ALTA_COMPARTIDA = "src/lib/usuarios/usuario-servidor.ts";
+    expect(escriben).toEqual([RUTA_ADMIN, RUTA_PROPIA, ALTA_COMPARTIDA].sort());
     expect(sinComentarios(leer(RUTA_ADMIN))).toContain('requireAuth(req, ["admin"])');
+    const llaman = anda(path.join(RAIZ, "src"))
+      .map((abs) => path.relative(RAIZ, abs))
+      .filter((rel) => /insertarUsuario\(/.test(sinComentarios(leer(rel))) && rel !== ALTA_COMPARTIDA)
+      .sort();
+    const RUTA_FICHA = "src/app/api/asistencia/configuracion/route.ts";
+    expect(llaman).toEqual([RUTA_ADMIN, RUTA_FICHA].sort());
+    expect(sinComentarios(leer(RUTA_FICHA))).toContain('auth.role !== "admin"');
   });
 
   it("🔴 un usuario sin contraseña de verdad no se puede «confirmar» a sí mismo", () => {
