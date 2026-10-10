@@ -143,6 +143,8 @@ export default function DespachoForm({
    */
   const v2 = GUIA_DETALLE_APPLE_2026_10;
   const [intentado, setIntentado] = useState(false);
+  /** Prendido, «Despachar» solo se apaga mientras guarda (pisa el `disabled` de siempre). */
+  const soloAlGuardar: { disabled?: boolean } = v2 ? { disabled: bSaving } : {};
 
   // Warn before leaving if user has filled any field
   const isDirty = useMemo(
@@ -407,7 +409,7 @@ export default function DespachoForm({
           onClick={handleConfirmar}
           disabled={!puedeDespachar || bSaving}
           /* Con el interruptor prendido solo se apaga mientras guarda: lo que falta se dice al tocarlo. */
-          {...(v2 ? { disabled: bSaving } : {})}
+          {...soloAlGuardar}
           className={`w-full ${v2 ? "rounded-md" : "rounded-lg"} text-base font-semibold min-h-[52px] transition-all ${
             v2 && !bSaving
               ? "bg-black text-white hover:bg-gray-800 active:scale-[0.99]"
