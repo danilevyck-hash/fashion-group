@@ -8,7 +8,10 @@
 //   · un código repetido se frena y no pisa nada;
 //   · el campo «Colaborador» de Usuarios vincula y quita el vínculo;
 //   · dar de baja desactiva el usuario (y sin la casilla, no);
-//   · una ficha de baja no puede marcar, aunque su usuario siga activo.
+//   · una ficha de baja no puede marcar, aunque su usuario siga activo;
+//   · UNA SOLA PUERTA, USUARIOS (Daniel: «debe de ser en Usuarios»): «＋ Nuevo
+//     usuario» con «Marca asistencia» crea usuario + ficha + horario + vínculo
+//     sin dejar nada a medias, y «Desactivar» da de baja la ficha.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AVISO_CONTRASENA_REPETIDA } from "@/lib/auth/contrasena-en-uso";
@@ -16,6 +19,7 @@ import { AVISO_CONTRASENA_REPETIDA } from "@/lib/auth/contrasena-en-uso";
 type Fila = Record<string, unknown>;
 const db: Record<string, Fila[]> = {};
 let rol = "admin";
+let fallaElUsuario = false;
 const marcasGuardadas: unknown[] = [];
 
 /** Las dos reglas que la base de verdad hace cumplir sobre el vínculo. */
@@ -36,10 +40,11 @@ function restriccion(t: string, nueva: Fila, vieja: Fila | null) {
 
 function tabla(t: string) {
   const filtros: ((r: Fila) => boolean)[] = [];
-  let op: { tipo: "select" | "insert" | "update" | "upsert"; datos?: Fila; clave?: string } = { tipo: "select" };
+  let op: { tipo: "select" | "insert" | "update" | "upsert" | "delete"; datos?: Fila; clave?: string } = { tipo: "select" };
   let tope: number | undefined;
   const correr = (): { data: Fila[] | null; error: { code?: string; message: string } | null } => {
     const filas = (db[t] ??= []);
+    if (op.tipo === "insert" && t === "fg_users" && fallaElUsuario) return { data: null, error: { message: "se cayó la base" } };
     if (op.tipo === "insert") {
       const fila: Fila = t === "fg_users" ? { id: crypto.randomUUID(), active: true, ...op.datos } : { ...op.datos };
       const err = restriccion(t, fila, null);
@@ -54,6 +59,10 @@ function tabla(t: string) {
       return { data: [op.datos!], error: null };
     }
     const sel = filas.filter((r) => filtros.every((f) => f(r)));
+    if (op.tipo === "delete") {
+      db[t] = filas.filter((r) => !sel.includes(r));
+      return { data: sel, error: null };
+    }
     if (op.tipo === "update") {
       for (const r of sel) {
         const err = restriccion(t, { ...r, ...op.datos }, r);
@@ -68,6 +77,7 @@ function tabla(t: string) {
     select: () => b,
     insert: (d: Fila) => { op = { tipo: "insert", datos: d }; return b; },
     update: (d: Fila) => { op = { tipo: "update", datos: d }; return b; },
+    delete: () => { op = { tipo: "delete" }; return b; },
     upsert: (d: Fila, o: { onConflict: string }) => { op = { tipo: "upsert", datos: d, clave: o.onConflict }; return b; },
     eq: (c: string, v: unknown) => { filtros.push((r) => r[c] === v); return b; },
     neq: (c: string, v: unknown) => { filtros.push((r) => r[c] !== v); return b; },
@@ -96,6 +106,7 @@ vi.mock("@/lib/asistencia/config-server", async (orig) => ({
   leerTrabajaAfuera: async () => new Set<string>(),
   leerReponeTardanza: async () => new Set<string>(),
 }));
+vi.mock("@/lib/prestamos-lista-server", () => ({ leerDeudaPorCodigo: async () => new Map([["307", 120]]) }));
 // La ruta de marcar, con lo de afuera apagado (igual que `quinta-marca-rechazada`).
 vi.mock("@/lib/marcacion/acceso", () => ({
   requireMarcacion: () => ({ role: "marcacion", userId: "u-siney", userName: "siney" }),
@@ -117,7 +128,7 @@ vi.mock("@/lib/marcacion/estado-server", () => ({
   nombreDeLaFicha: async () => "Siney Suyem",
 }));
 
-async function pedir(ruta: string, metodo: "POST" | "PUT", cuerpo: unknown) {
+async function pedir(ruta: string, metodo: "POST" | "PUT" | "PATCH", cuerpo: unknown) {
   const mod = (await import(`@/app/api/${ruta}/route`)) as Record<string, (r: unknown) => Promise<Response>>;
   const { NextRequest } = await import("next/server");
   return mod[metodo](new NextRequest(`http://x/api/${ruta}`, {
@@ -133,6 +144,7 @@ const diasDesdeHoy = (n: number) => new Date(Date.now() - 5 * 3600_000 + n * 86_
 
 beforeEach(async () => {
   rol = "admin";
+  fallaElUsuario = false;
   marcasGuardadas.length = 0;
   const bcrypt = (await import("bcryptjs")).default;
   db.asistencia_personas = [
@@ -312,5 +324,110 @@ describe("🔴 una ficha de baja no puede marcar, aunque su usuario siga activo"
     ficha("307")!.fecha_salida = null;
     expect((await marcar()).status).toBe(200);
     expect(marcasGuardadas).toHaveLength(2);
+  });
+});
+
+describe("🔴 una sola puerta: Usuarios › «＋ Nuevo usuario» con «Marca asistencia»", () => {
+  const COLABORADOR = {
+    codigo: "308", nombre: "María Pérez", empresa: "american_classic", posicion: "Impulsadora", cedula: "8-123-456",
+    salarioMensual: 650, jornadaSemanal: 48, fechaIngreso: "2026-10-12",
+    horario: { entrada: "09:00", salida: "18:00", diasLaborables: [1, 2, 3, 4, 5, 6], entradaAfuera: null, salidaAfuera: null },
+  };
+  const NUEVA = { name: "maria", password: "maria2026", role: "marcacion", colaborador: COLABORADOR };
+
+  it("crea el usuario, su ficha, su horario y el vínculo, todo junto", async () => {
+    const res = await pedir("admin/users", "POST", NUEVA);
+    expect(res.status).toBe(200);
+    expect(usuario("maria")).toMatchObject({ role: "marcacion", empleado_codigo: "308", active: true });
+    expect(ficha("308")).toMatchObject({
+      nombre: "María Pérez", empresa: "american_classic", salario_mensual: 650, jornada_semanal: 48, fecha_ingreso: "2026-10-12",
+    });
+    expect(db.asistencia_horarios.find((h) => h.empleado_codigo === "308")).toMatchObject({
+      entrada: "09:00", salida: "18:00", almuerzo_minutos: 60,
+    });
+  });
+
+  it("sin nombre de ficha, la ficha lleva el del usuario", async () => {
+    await pedir("admin/users", "POST", { ...NUEVA, colaborador: { ...COLABORADOR, nombre: "" } });
+    expect(ficha("308")?.nombre).toBe("maria");
+  });
+
+  it("🔴 contraseña repetida: ni usuario ni ficha", async () => {
+    const res = await pedir("admin/users", "POST", { ...NUEVA, password: "siney123" });
+    expect(res.status).toBe(400);
+    expect(ficha("308")).toBeUndefined();
+    expect(usuario("maria")).toBeUndefined();
+  });
+
+  it("🔴 código repetido: se frena con su aviso y no se crea el usuario", async () => {
+    const res = await pedir("admin/users", "POST", { ...NUEVA, colaborador: { ...COLABORADOR, codigo: "307" } });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain("El código 307 ya es de Siney Suyem");
+    expect(usuario("maria")).toBeUndefined();
+    expect(ficha("307")?.nombre).toBe("Siney Suyem");
+  });
+
+  it("🔴 si el usuario no entra, la ficha y el horario recién creados se deshacen: nada a medias", async () => {
+    fallaElUsuario = true;
+    const res = await pedir("admin/users", "POST", NUEVA);
+    expect(res.status).toBe(500);
+    expect(ficha("308")).toBeUndefined();
+    expect(db.asistencia_horarios).toHaveLength(0);
+    expect(db.asistencia_personas).toHaveLength(2); // las de siempre, intactas
+  });
+
+  it("«Editar usuario»: prenderlo a alguien sin ficha se la crea y lo vincula", async () => {
+    const res = await pedir("admin/users", "PUT", { id: "u-angel", colaborador: { ...COLABORADOR, nombre: "" } });
+    expect(res.status).toBe(200);
+    expect(usuario("angel")?.empleado_codigo).toBe("308");
+    expect(ficha("308")?.nombre).toBe("angel");
+  });
+
+  it("el horario y la jornada por omisión son los MÁS USADOS", async () => {
+    const { masUsado } = await import("@/lib/asistencia/alta-colaborador");
+    expect(masUsado(["09:00|18:00", "08:00|17:00", "09:00|18:00"])).toBe("09:00|18:00");
+    expect(masUsado([])).toBeNull();
+    db.asistencia_horarios = [
+      { empleado_codigo: "305", entrada: "09:00:00", salida: "18:30:00", dias_laborables: [1, 2, 3, 4, 5, 6] },
+      { empleado_codigo: "307", entrada: "09:00:00", salida: "18:30:00", dias_laborables: [1, 2, 3, 4, 5, 6] },
+    ];
+    ficha("305")!.jornada_semanal = 48; ficha("307")!.jornada_semanal = 48;
+    const { valoresPorOmision, siguienteCodigoLibre } = await import("@/lib/asistencia/alta-colaborador-server");
+    expect(await valoresPorOmision("american_classic")).toMatchObject({
+      entrada: "09:00", salida: "18:30", diasLaborables: [1, 2, 3, 4, 5, 6], jornadaSemanal: 48,
+    });
+    // El código sube hasta el primero libre en TODO el sistema.
+    db.asistencia_personas.push({ empleado_codigo: "308", nombre: "Otra empresa", empresa: "vistana" });
+    expect(await siguienteCodigoLibre("american_classic")).toBe("309");
+  });
+});
+
+describe("🔴 Usuarios › «Desactivar» da de baja la ficha ahí mismo", () => {
+  it("con la baja: usuario inactivo, ficha con fecha y motivo, lo demás intacto; avisa el saldo en Préstamos", async () => {
+    const res = await pedir("admin/users", "PATCH", {
+      id: "u-siney", active: false, baja: { fechaSalida: "2026-10-09", motivoSalida: "renuncia" },
+    });
+    expect(res.status).toBe(200);
+    const j = await res.json();
+    expect(j.fichaDeBaja).toBe(true);
+    expect(j.aviso).toContain("Préstamos");
+    expect(usuario("siney")?.active).toBe(false);
+    expect(ficha("307")).toMatchObject({
+      fecha_salida: "2026-10-09", motivo_salida: "renuncia", nombre: "Siney Suyem", salario_mensual: 650,
+    });
+    expect(db.user_sessions[0].revoked).toBe(true);
+  });
+
+  it("🔴 una baja sin motivo no desactiva a nadie", async () => {
+    const res = await pedir("admin/users", "PATCH", { id: "u-siney", active: false, baja: { fechaSalida: "2026-10-09" } });
+    expect(res.status).toBe(400);
+    expect(usuario("siney")?.active).toBe(true);
+    expect(ficha("307")?.fecha_salida).toBeNull();
+  });
+
+  it("sin la casilla, solo se desactiva el usuario", async () => {
+    expect((await pedir("admin/users", "PATCH", { id: "u-siney", active: false })).status).toBe(200);
+    expect(usuario("siney")?.active).toBe(false);
+    expect(ficha("307")?.fecha_salida).toBeNull();
   });
 });

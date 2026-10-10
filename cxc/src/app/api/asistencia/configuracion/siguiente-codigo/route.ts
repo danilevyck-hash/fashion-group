@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
-import { siguienteCodigoLibre } from "@/lib/asistencia/alta-colaborador-server";
+import { siguienteCodigoLibre, valoresPorOmision } from "@/lib/asistencia/alta-colaborador-server";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,9 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const empresa = (req.nextUrl.searchParams.get("empresa") ?? "").trim();
   try {
-    return NextResponse.json({ codigo: await siguienteCodigoLibre(empresa) });
+    // `porOmision`: el horario y la jornada más usados en esa empresa.
+    const [codigo, porOmision] = await Promise.all([siguienteCodigoLibre(empresa), valoresPorOmision(empresa)]);
+    return NextResponse.json({ codigo, porOmision });
   } catch {
     return NextResponse.json({ codigo: null });
   }
