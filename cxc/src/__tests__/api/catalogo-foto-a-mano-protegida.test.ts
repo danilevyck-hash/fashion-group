@@ -65,15 +65,15 @@ describe("🔴 subir una foto a mano marca foto_manual = true (las dos formas de
     expect(updateDe(mainDb, "joybees_products")).toEqual({ image_url: FOTO, foto_manual: true });
   });
 
-  it("sin la columna (DDL pendiente) la foto se guarda igual, sin el candado", async () => {
+  it("🔴 un error que nombra `foto_manual` ya NO se reintenta sin el candado: 500 y un solo UPDATE", async () => {
     reebokDb.queue(
       "products",
       { data: null, error: { message: 'column "foto_manual" does not exist' } },
       { data: { id: PID, image_url: FOTO } },
     );
     const res = await rPut(makeReq("/x", { method: "PUT", body: { id: PID, image_url: FOTO, foto_manual: true }, role: "admin" }));
-    expect(res.status).toBe(200);
-    expect(updateDe(reebokDb, "products", 1)).toEqual({ image_url: FOTO });
+    expect(res.status).toBe(500);
+    expect(reebokDb.chainsFor("products")).toHaveLength(1);
   });
 });
 

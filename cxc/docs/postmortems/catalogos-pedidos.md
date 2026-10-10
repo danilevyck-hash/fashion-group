@@ -666,6 +666,16 @@ columna; `skusConFotoManual` falla abierto), y el candado exige que siga siéndo
 
 **Candado:** `src/__tests__/lib/catalogo-calvin-foto-manual.test.ts` (13).
 
+> 🔴 **9-oct-2026 — ya NO falla abierto.** La columna existe en las cuatro marcas, así que
+> «no pude leer el candado» dejó de significar «no hay ninguno»: `skusConFotoManual` **lanza**, y
+> el ZIP se detiene con «No se pudo comprobar las fotos elegidas a mano; no se cargó nada» en sus
+> dos puertas (`firmar`, antes de subir la primera foto, y `manifiesto`, antes de la primera
+> escritura). La ruta de `products` tampoco reintenta ya sin `foto_manual`, y el manifiesto solo
+> lleva las fotos cuya subida llegó a Storage. Candado: `catalogo-zip-candado-foto-manual.test.ts`.
+> Medido ese día: **54 fotos elegidas a mano** (Tommy 38, Reebok 16), las 54 con su archivo intacto;
+> el banco de Tommy (383 archivos) no se reescribe desde el 25-jul-2026 y `activity_logs` no tiene
+> ni una fila `catalogo_zip_b2b`.
+
 ### 3 · 🩸 LA PANTALLA DE ADMINISTRAR NO COMPROBABA NINGÚN ROL
 
 `src/app/catalogos/admin/[marca]/page.tsx` resolvía la marca y montaba el

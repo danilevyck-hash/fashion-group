@@ -98,7 +98,8 @@ describe("el código trata a las cuatro marcas igual, y tolera que la DDL no hay
     expect(server).not.toMatch(/update\(\{ image_url: imageUrl \}\)/);
   });
 
-  it("sin la columna, `skusConFotoManual` devuelve vacío (no rompe el ZIP)", () => {
-    expect(server).toMatch(/if \(error\) return new Set\(\)/);
+  it("🔴 si la consulta falla, `skusConFotoManual` LANZA: «no pude preguntar» no es «no hay ninguna»", () => {
+    expect(server).not.toMatch(/if \(error\) return new Set\(\)/);
+    expect(server).toMatch(/if \(error\) throw new Error\(AVISO_SIN_CANDADO\)/);
   });
 });

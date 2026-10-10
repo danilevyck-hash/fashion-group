@@ -256,12 +256,6 @@ async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextRes
     }
     ({ data, error } = await guardar(sinColumna(pcfg.cols, "bulto_pzas")));
   }
-  if (error?.message?.includes(CANDADO_FOTO) && CANDADO_FOTO in updates) {
-    // Mismo respaldo que `guardarFotoElegida`: sin la columna (DDL pendiente)
-    // la foto se guarda igual; lo único que no queda es el candado.
-    delete updates[CANDADO_FOTO];
-    ({ data, error } = await guardar(pcfg.cols));
-  }
   if (error) {
     console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });

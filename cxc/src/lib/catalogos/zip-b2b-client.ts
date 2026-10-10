@@ -225,6 +225,9 @@ export async function procesarZipB2B(file: File, opts: OpcionesZip): Promise<Res
   }
 
   let subidas = 0;
+  // Solo lo que de verdad llegó a Storage entra al manifiesto: una foto cuya
+  // subida falló no puede quedar elegida (el producto apuntaría a la nada).
+  const llegaron = new Set<string>();
   onProgreso({ fase: "subiendo", hechas: 0, total: todas.length });
   for (let i = 0; i < todas.length; i += LOTE) {
     const lote = todas.slice(i, i + LOTE);
@@ -235,6 +238,7 @@ export async function procesarZipB2B(file: File, opts: OpcionesZip): Promise<Res
         if (!url) return;
         await subirFirmado(url, l.blob);
         subidas++;
+        llegaron.add(l.path);
       }),
       SUBIDAS_EN_PARALELO,
       () => onProgreso({ fase: "subiendo", hechas: Math.min(todas.length, subidas), total: todas.length }),
@@ -244,9 +248,12 @@ export async function procesarZipB2B(file: File, opts: OpcionesZip): Promise<Res
   // ── Manifiesto (una sola escritura a la DB) ──
   onProgreso({ fase: "guardando", hechas: todas.length, total: todas.length });
   const items: ManifiestoItem[] = [];
-  for (const [codigo, fotos] of porCodigo) {
+  for (const [codigo, todasLasFotos] of porCodigo) {
+    const sku = skuPorCodigo.get(codigo)!;
+    const fotos = todasLasFotos.filter((f) => llegaron.has(variantePath(marca, sku, f.vista)));
+    if (fotos.length === 0) continue;
     items.push({
-      sku: skuPorCodigo.get(codigo)!,
+      sku,
       variantes: fotos.map((f) => f.vista).sort((a, b) => a - b),
       elegida: elegirVistaDefault(fotos.map((f) => ({ vista: f.vista, lifestyle: f.lifestyle }))),
     });
