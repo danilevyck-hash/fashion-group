@@ -287,11 +287,6 @@ export default function SubirFotos({
             <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium">
               {zipResultado.asignadas} fotos asignadas
             </span>
-            {zipResultado.manuales > 0 && (
-              <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">
-                {zipResultado.manuales} ya tenían foto elegida a mano
-              </span>
-            )}
             {zipResultado.sinMatch.length > 0 && (
               <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-700 font-medium">
                 {zipResultado.sinMatch.length} códigos sin producto

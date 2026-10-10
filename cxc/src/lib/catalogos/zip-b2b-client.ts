@@ -43,7 +43,6 @@ export interface ProgresoZip {
 
 export interface ResultadoZip {
   asignadas: number;
-  manuales: number;
   sinMatch: string[];
   errores: string[];
   variantesSubidas: number;
@@ -270,7 +269,6 @@ export async function procesarZipB2B(file: File, opts: OpcionesZip): Promise<Res
   }
   const guardado = (await res.json()) as {
     asignadas: number;
-    manuales: number;
     sinMatch: string[];
     errores: string[];
   };
@@ -278,7 +276,6 @@ export async function procesarZipB2B(file: File, opts: OpcionesZip): Promise<Res
   onProgreso({ fase: "listo", hechas: total, total });
   return {
     asignadas: guardado.asignadas,
-    manuales: guardado.manuales,
     sinMatch: [...new Set([...sinMatch, ...guardado.sinMatch])],
     errores: guardado.errores,
     variantesSubidas: subidas,

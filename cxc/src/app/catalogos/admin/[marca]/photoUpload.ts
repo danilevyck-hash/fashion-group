@@ -145,11 +145,8 @@ export async function uploadProductPhoto(
     // tienen allow-list y mandar el producto entero pisaría active/stock/price
     // del cron.
     //
-    // 🩸 `foto_manual: true` (11-sep-2026): la foto subida a mano es una
-    // ELECCIÓN, igual que elegir una variante del ZIP, y sin el candado el
-    // próximo ZIP del banco B2B la pisaba sin avisar. Medido: Reebok 0 fotos
-    // protegidas de 390, Joybees 0 de 81, Calvin 0 de 89 — la foto que más
-    // trabajo costó era la única reemplazable.
+    // `foto_manual: true` anota que la subió una persona. Ya NO la protege de
+    // un ZIP posterior: «último upload manda» (Daniel, 9-oct-2026).
     const body =
       theme.admin.productEdit.idField === "id"
         ? { id: producto.id, image_url: url, foto_manual: true }

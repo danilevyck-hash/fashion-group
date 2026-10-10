@@ -203,6 +203,8 @@ Consecuencia: en Reebok, Tommy y Joybees el cliente lee *«Ojo: hay N producto(s
 
 ### 🩸9 · Calvin tampoco tiene `foto_manual`: la foto elegida a mano no queda protegida
 
+> ⚠️ **9-oct-2026 — ya no aplica.** «Último upload manda» (Daniel): el ZIP reemplaza también la foto elegida a mano y nadie lee `foto_manual`. Ver `docs/postmortems/catalogos-pedidos.md`, primera sección.
+
 `foto_manual = true` es el candado que impide que la asignación automática del ZIP pise una foto que alguien eligió a mano. Reebok, Tommy y Joybees lo tienen; **Calvin no**. `variantes-server.ts:282` es tolerante: guarda la foto y sigue **sin el candado**.
 
 Medido: Tommy tiene 30 fotos marcadas a mano protegidas. Calvin no puede tener ninguna.

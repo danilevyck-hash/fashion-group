@@ -1,5 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// LA FOTO SUBIDA A MANO QUEDA PROTEGIDA (11-sep-2026)
+// LA FOTO SUBIDA A MANO QUEDA ANOTADA CON `foto_manual` (11-sep-2026)
+//
+// ⚠️ 9-oct-2026 — «último upload manda» (Daniel): `foto_manual` ya NO protege
+// la foto de un ZIP posterior (candado: `catalogo-ultimo-upload-manda.test.ts`).
+// Lo de abajo sigue fijando qué acepta la ruta; la historia es la de entonces.
 //
 // 🩸 La subida mandaba solo `image_url` y la allow-list de la ruta rechazaba
 // `foto_manual`; elegir una variante del ZIP sí ponía el candado. Medido contra

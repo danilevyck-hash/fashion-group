@@ -6,8 +6,8 @@
 //                                                     (habilita el botón sin
 //                                                      N peticiones)
 //   POST { sku, vista } → elige esa variante como foto del producto:
-//         image_url apunta a esa variante y foto_manual=true (candado contra
-//         la asignación automática del ZIP).
+//         image_url apunta a esa variante y foto_manual=true (queda anotado;
+//         un ZIP posterior la reemplaza: último upload manda, 9-oct-2026).
 //
 // Auth: requireAdminOSecretaria (admin + secretaria) — los mismos roles que ya editan
 // products. Selects explícitos y respeto de los quirks por marca vía

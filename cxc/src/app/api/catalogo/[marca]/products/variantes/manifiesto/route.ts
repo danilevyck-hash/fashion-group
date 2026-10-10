@@ -5,11 +5,12 @@
 // aquí solo se decide qué producto se queda con qué foto:
 //
 //   POST { items: [{ sku, variantes: [n...], elegida: n|null }] }
-//     → { asignadas, manuales, sinMatch: [...], errores: [...] }
+//     → { asignadas, sinMatch: [...], errores: [...] }
 //
-// REGLA CLAVE — no pisar elecciones manuales: si el producto tiene
-// foto_manual=true (alguien eligió su foto a mano en el admin), sus variantes
-// quedan guardadas pero su image_url NO se toca. Se cuenta en `manuales`.
+// REGLA — ÚLTIMO UPLOAD MANDA (Daniel, 9-oct-2026: «Quiero que si subí una
+// foto, y ya existe otra, que la reemplace. Último upload manda.»): la foto del
+// ZIP reemplaza la que hubiera, también la elegida a mano. Antes esas se
+// saltaban (`foto_manual`, 25-jul-2026).
 //
 // Idempotente: volver a subir el mismo ZIP produce el mismo resultado.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,8 +23,6 @@ import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import {
   urlDeVariante,
   guardarFotoElegida,
-  skusConFotoManual,
-  AVISO_SIN_CANDADO,
 } from "@/lib/catalogos/variantes-server";
 import { normalizarCodigo, type ManifiestoItem } from "@/lib/catalogos/fotos-b2b";
 
@@ -71,13 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     if (row.sku) porCodigo.set(normalizarCodigo(row.sku), { id: String(row.id), sku: row.sku });
   }
 
-  // Sin la lista de fotos elegidas a mano no se asigna NINGUNA (ni se anota la
-  // carga): se corta antes de la primera escritura.
-  const manuales = await skusConFotoManual(cfg).catch(() => null);
-  if (!manuales) return NextResponse.json({ error: AVISO_SIN_CANDADO }, { status: 503 });
-
   let asignadas = 0;
-  let saltadasManual = 0;
   const sinMatch: string[] = [];
   const errores: string[] = [];
 
@@ -88,10 +81,6 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
       continue;
     }
     if (item.elegida == null) continue; // todas sus vistas eran lifestyle → sin foto
-    if (manuales.has(prod.sku)) {
-      saltadasManual++;
-      continue;
-    }
     // La elegida tiene que ser una de las que el navegador dice haber subido.
     if (item.variantes.length > 0 && !item.variantes.includes(item.elegida)) {
       errores.push(`${prod.sku}: la foto elegida no se subió`);
@@ -100,8 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     try {
       const url = await urlDeVariante(cfg, prod.sku, item.elegida, { verificar: false });
       const idValue = cfg.products.idField === "id" ? prod.id : prod.sku;
-      // manual=false: la puso el proceso automático, sigue siendo reemplazable
-      // por un ZIP posterior (y elegible a mano, que sí pone el candado).
+      // manual=false: la vista la eligió el ZIP, no una persona una por una.
       await guardarFotoElegida(cfg, idValue, url, false);
       asignadas++;
     } catch (err) {
@@ -114,9 +102,9 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     s?.role || "admin",
     "catalogo_zip_b2b",
     cfg.marca,
-    { productos: items.length, asignadas, sinMatch: sinMatch.length, manuales: saltadasManual },
+    { productos: items.length, asignadas, sinMatch: sinMatch.length },
     s?.userName,
   );
 
-  return NextResponse.json({ asignadas, manuales: saltadasManual, sinMatch, errores });
+  return NextResponse.json({ asignadas, sinMatch, errores });
 }
