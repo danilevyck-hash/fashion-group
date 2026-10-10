@@ -53,17 +53,11 @@ function leerFacturas(cols: string, etiqueta: string): Promise<FilaFactura[]> {
   );
 }
 
-/** ¿El error de PostgREST es «todavía no existe `descuento_global_pct`»? */
-function faltaColumnaDel5(err: unknown): boolean {
-  return err instanceof Error && /descuento_global_pct/.test(err.message);
-}
-
 /**
  * Trae el directorio de la tienda y sus facturas, completos.
  *
- * Falla ABIERTA en un solo punto: si la columna del 5 % no existe todavía, se
- * vuelve a leer sin ella y `detalleActivo` sale en `false`. Todo lo demás
- * —quién es cliente, cuándo vino, cuánto compró— no depende de esa migración.
+ * `detalleActivo` se conserva en la respuesta (siempre `true` desde el
+ * 9-oct-2026: la columna del 5 % existe) porque la pantalla lo lee.
  */
 export async function leerUniversoDeClientes(): Promise<LecturaDelUniverso> {
   const registrados = await leerTodoPaginado<FilaRegistrado>(
@@ -81,18 +75,9 @@ export async function leerUniversoDeClientes(): Promise<LecturaDelUniverso> {
         .range(desde, hasta),
   );
 
-  try {
-    const facturas = await leerFacturas(
-      COLS_FACTURA_CON_5,
-      "switch_facturas (clientes de Multifashion)",
-    );
-    return { registrados, facturas, detalleActivo: true };
-  } catch (err) {
-    if (!faltaColumnaDel5(err)) throw err;
-    const facturas = await leerFacturas(
-      COLS_FACTURA,
-      "switch_facturas (clientes de Multifashion, pre-DDL)",
-    );
-    return { registrados, facturas, detalleActivo: false };
-  }
+  const facturas = await leerFacturas(
+    COLS_FACTURA_CON_5,
+    "switch_facturas (clientes de Multifashion)",
+  );
+  return { registrados, facturas, detalleActivo: true };
 }

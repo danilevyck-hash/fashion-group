@@ -293,44 +293,18 @@ async function seedTasasGlobal(vendedores: Set<string>): Promise<number> {
 // ─── Persistencia ────────────────────────────────────────────────────────────
 // Llave preferida: (empresa_key, secuencial, fecha) — separa las ERAS de
 // secuenciales reiniciados (DDL 20260723120000, índice único
-// ux_sfu_empresa_secuencial_fecha + columna switch_id). TOLERANTE a que la DDL
-// aún no haya corrido: si el upsert falla con 42P10 (índice único ausente) o
-// PGRST204 (columna switch_id desconocida), cae a la llave legacy
-// (empresa_key, secuencial) sin switch_id. El flag es por-proceso (serverless:
-// se re-evalúa en cada invocación; cuando Daniel corra la DDL, el siguiente
-// sync usa la llave nueva solo).
-
-let llaveEraDisponible: boolean | null = null; // null = aún no probada en este proceso
-
-const ES_ERROR_DDL_PENDIENTE = (code: string | undefined): boolean =>
-  code === "42P10" || code === "PGRST204";
+// ux_sfu_empresa_secuencial_fecha + columna switch_id). El índice y la columna
+// existen en producción (verificado el 9-oct-2026): ya no se cae a la llave
+// vieja (empresa_key, secuencial) sin `switch_id` — un error falla con su error.
 
 async function upsertCacheRows(rows: ReturnType<typeof toCacheRow>[]): Promise<void> {
   const CHUNK = 500;
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
-    if (llaveEraDisponible !== false) {
-      const { error } = await supabaseServer
-        .from("switch_factura_utilidad")
-        .upsert(chunk, { onConflict: "empresa_key,secuencial,fecha" });
-      if (!error) {
-        llaveEraDisponible = true;
-        continue;
-      }
-      if (!ES_ERROR_DDL_PENDIENTE(error.code)) {
-        throw new Error(`upsert switch_factura_utilidad: ${error.message}`);
-      }
-      console.error(
-        `[sync-utilidad] llave por era no disponible (DDL 20260723120000 pendiente): ${error.message} — fallback a llave legacy (empresa_key, secuencial)`,
-      );
-      llaveEraDisponible = false;
-    }
-    // Modo legacy: sin columna switch_id y con la llave vieja.
-    const legacy = chunk.map(({ switch_id: _switchId, ...r }) => r);
     const { error } = await supabaseServer
       .from("switch_factura_utilidad")
-      .upsert(legacy, { onConflict: "empresa_key,secuencial" });
-    if (error) throw new Error(`upsert switch_factura_utilidad (legacy): ${error.message}`);
+      .upsert(chunk, { onConflict: "empresa_key,secuencial,fecha" });
+    if (error) throw new Error(`upsert switch_factura_utilidad: ${error.message}`);
   }
 }
 
