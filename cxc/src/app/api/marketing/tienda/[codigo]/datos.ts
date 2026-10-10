@@ -16,8 +16,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 import {
   completarGasto,
   completarPeriodo,
-  conRespaldoSinColumnas,
-  esColumnaAusente,
 } from "@/lib/marketing/columnas-opcionales";
 import type { PeriodoDelGasto } from "@/lib/marketing/periodo-manda";
 import { seReportaDe, tipoDeFila, TIENDA_GENERAL } from "@/lib/marketing/gasto";
@@ -75,18 +73,6 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
   const general = esCodigoGeneral(codigoCrudo);
   const codigo = general ? null : String(codigoCrudo ?? "").trim().toUpperCase();
 
-  const vacio = (sinMigracion: boolean, nombre: string, enElDirectorio: boolean | null): DatosDeLaTienda => ({
-    codigo,
-    nombre,
-    enElDirectorio,
-    grupos: [],
-    totales: { reportado: 0, noReportado: 0, cantidadReportada: 0, cantidadNoReportada: 0 },
-    fotos: 0,
-    sinMigracion,
-    filas: [],
-    anuladas: [],
-  });
-
   // ── El nombre: del directorio, por CÓDIGO ──────────────────────────────────
   let nombreDirectorio: string | null = null;
   let enElDirectorio: boolean | null = general ? null : false;
@@ -118,10 +104,7 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
   const facturasRes = await (codigo
     ? facturasVivasQ.eq("tienda_codigo", codigo)
     : facturasVivasQ.is("tienda_codigo", null));
-  if (facturasRes.error) {
-    if (esColumnaAusente(facturasRes.error)) return vacio(true, nombre, enElDirectorio);
-    throw new Error(facturasRes.error.message);
-  }
+  if (facturasRes.error) throw new Error(facturasRes.error.message);
 
   // ── Los muebles entregados ─────────────────────────────────────────────────
   const entregasQ = supabaseServer
@@ -130,10 +113,7 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
   const entregasRes = await (codigo
     ? entregasQ.eq("tienda_codigo", codigo)
     : entregasQ.is("tienda_codigo", null));
-  if (entregasRes.error) {
-    if (esColumnaAusente(entregasRes.error)) return vacio(true, nombre, enElDirectorio);
-    throw new Error(entregasRes.error.message);
-  }
+  if (entregasRes.error) throw new Error(entregasRes.error.message);
 
   const facturas = ((facturasRes.data ?? []) as unknown as Fila[]).map((f) => completarGasto(f));
   const entregas = (entregasRes.data ?? []).map((e) => completarGasto(e as Fila));
@@ -213,15 +193,10 @@ export async function leerDatosDeLaTienda(codigoCrudo: string): Promise<DatosDeL
   };
   const periodoPorId = new Map<string, PeriodoLeido>();
   if (idsPeriodo.length > 0) {
-    // `nombre_al_cerrar` es columna del rediseño: se lee con respaldo.
-    const { resultado } = await conRespaldoSinColumnas<Fila[]>(
-      () =>
-        supabaseServer
-          .from("mk_periodos")
-          .select("id, nombre, estado, proveedor_key, cerrado_en, nombre_al_cerrar")
-          .in("id", idsPeriodo),
-      () => supabaseServer.from("mk_periodos").select("id, nombre, estado, proveedor_key, cerrado_en").in("id", idsPeriodo),
-    );
+    const resultado = await supabaseServer
+      .from("mk_periodos")
+      .select("id, nombre, estado, proveedor_key, cerrado_en, nombre_al_cerrar")
+      .in("id", idsPeriodo);
     for (const cruda of (resultado.data ?? []) as Fila[]) {
       const p = completarPeriodo(cruda);
       const estado = String(p.estado ?? "");

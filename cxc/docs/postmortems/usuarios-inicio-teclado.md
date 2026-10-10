@@ -115,3 +115,24 @@ La pregunta de la pantalla: **«¿quién entra al sistema y con qué rol?»**. M
 4. **Tocar el renglón abre «Editar usuario»** (sale el lápiz); «Desactivar» al final del renglón. Computadora: **«＋ Nuevo usuario» en la fila de las pestañas** (un solo botón en el archivo, `botonNuevoUsuario`).
 
 **Prendido el 9-oct-2026** con el «sí» de Daniel. `false` = la pantalla de antes: candado `src/__tests__/components/usuarios-apple-apagado.test.tsx` (HTML de `origin/main` antes del cambio; prendido, rojo).
+
+PR: #705 (nació apagado) y #715 (prendido). El Inicio: #702 (nació apagado) y #714 (prendido en parte).
+
+---
+
+## Una sola puerta: quien marca se crea y se da de baja en Usuarios — PUBLICADO (9-oct-2026, PR #722)
+
+Daniel, al ver el alta en Colaboradores (PR #720): **«debe de ser en Usuarios»**. Crear a una persona —marque o no— se hace en Usuarios. Sin interruptor y sin migración: se publicó prendido.
+
+- **«＋ Nuevo usuario» y «Editar usuario» llevan el interruptor «Marca asistencia»** (`MarcaAsistencia.tsx`, rótulo `ROTULO_MARCA_ASISTENCIA`). Prendido, en «Colaborador» se selecciona la ficha que ya existe o «Nuevo colaborador», y ahí mismo se llenan: Empresa · Código · Nombre completo · Cargo · Cédula · Salario mensual · Fecha de ingreso · Horario (Entrada, Salida y los días).
+- **Para guardar una ficha nueva hacen falta** la empresa, el código y las horas de entrada y de salida (`faltaEnMarca`); lo que falta se dice junto al botón de guardar.
+- **Al guardar se crean juntos** el usuario, la ficha, el horario y el vínculo (`empleado_codigo`). 🔴 La ficha y el horario entran por las mismas dos rutas de Asistencia (`PUT /api/asistencia/configuracion` con `alta: true` y `PUT /api/asistencia/horarios`): se llaman sus funciones, no hay una segunda validación (`lib/usuarios/colaborador-desde-usuarios.ts`).
+- 🔴 **Nada queda a medias**: lo del usuario se revisa antes; si el usuario no se puede crear o actualizar, la ficha recién creada por esa petición se deshace (`deshacerFicha`).
+- **«Desactivar»** a quien tiene ficha activa ofrece la casilla **«Baja del colaborador»**, marcada por omisión, con «Fecha de salida» y «Motivo de salida» (obligatorios si la casilla está marcada: «Selecciona la fecha y el motivo de salida.»). La baja se revisa antes de tocar nada y se escribe después de desactivar. Nada se elimina.
+- Candados: `src/__tests__/asistencia/alta-baja-quien-marca.test.ts` y `alta-baja-quien-marca-pantalla.test.tsx`. El procedimiento de Asistencia vive en `docs/postmortems/asistencia-planilla.md`.
+
+## Julio y Jorman — contraseña inicial (7-oct-2026, commit `29fce725`)
+
+- Sus dos filas existían sin contraseña utilizable (un marcador que no es un hash; el inicio de sesión salta a quien no tiene hash). El 7-oct-2026 se les puso la contraseña inicial con el mismo mecanismo de la pantalla de Usuarios (`bcrypt.hash(x, 10)` y `contrasenaEnUso`), solo a esas dos filas y solo mientras tuvieran el marcador. Cada uno la cambia después.
+- 🔴 **No existe una marca de «debe cambiarla al entrar»**: `fg_users` no tiene esa columna ni hay pantalla que la lea.
+- Sus overrides (sin Asistencia) están en la tabla «Registro de overrides por usuario», arriba (commits `58e682ca` y `47694c26`).

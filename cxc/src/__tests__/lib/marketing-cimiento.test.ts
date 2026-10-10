@@ -86,9 +86,7 @@ import {
   COLUMNAS_DEL_PERIODO,
   completarGasto,
   completarPeriodo,
-  conRespaldoSinColumnas,
   esColumnaAusente,
-  sinColumnasDelRediseno,
 } from "@/lib/marketing/columnas-opcionales";
 import { CLASIFICACION } from "@/lib/backup/tablas";
 import { formatearFecha } from "@/lib/marketing/normalizar";
@@ -405,8 +403,9 @@ describe("4 · 🔴 el duplicado no se cuela", () => {
 
   it("🔴 las tres puertas del servidor mandan la tienda y el número", () => {
     const server = codigo("src/lib/marketing/puerta-gasto-server.ts");
-    // La factura lee `tienda_codigo` con respaldo (falla ABIERTA sin la columna).
-    expect(server).toMatch(/conRespaldoSinColumnas[\s\S]*?fecha_factura, tienda_codigo/);
+    // La factura lee `tienda_codigo` directo: la columna existe (9-oct-2026).
+    expect(server).toMatch(/fecha_factura, tienda_codigo/);
+    expect(server).not.toMatch(/conRespaldoSinColumnas/);
     expect(server).toMatch(/huellaDeFila\(r, r\.fecha_factura, r\.tienda_codigo \?\? null\)/);
     // En un pago de impulsadora la «tienda» es LA IMPULSADORA.
     expect(server).toMatch(/buscarDuplicado\(\{ \.\.\.nuevo, tienda: impulsadoraId \}/);
@@ -520,34 +519,9 @@ describe("6 · 🔴 sin la migración, el código se porta como hoy", () => {
     });
   });
 
-  it("con la columna ausente relee SIN ella y avisa; con otro error, lo devuelve tal cual", async () => {
-    const avisos: string[] = [];
-    const r1 = await conRespaldoSinColumnas(
-      async () => ({ data: null, error: { code: "PGRST204", message: "Could not find the 'se_reporta' column" } }),
-      async () => ({ data: [{ id: "f1" }], error: null }),
-      (m) => avisos.push(m),
-    );
-    expect(r1.conLasColumnas).toBe(false);
-    expect(r1.resultado.data).toEqual([{ id: "f1" }]);
-    expect(avisos).toHaveLength(1);
-    expect(avisos[0]).toMatch(/se sigue como antes de la migración/);
-
-    const r2 = await conRespaldoSinColumnas(
-      async () => ({ data: [{ id: "f1", se_reporta: false }], error: null }),
-      async () => { throw new Error("no debía llamarse"); },
-    );
-    expect(r2.conLasColumnas).toBe(true);
-
-    const timeout = { code: "57014", message: "statement timeout" };
-    const r3 = await conRespaldoSinColumnas(
-      async () => ({ data: null, error: timeout }),
-      async () => { throw new Error("no debía llamarse"); },
-    );
-    expect(r3.resultado.error).toBe(timeout);
-  });
-
-  it("para reintentar una escritura se quitan SOLO las columnas del rediseño", () => {
-    expect(sinColumnasDelRediseno({ total: 1, se_reporta: false, tienda_codigo: "D-25", nota: "x", nota_credito: "nc", zips_bajados: [] })).toEqual({ total: 1 });
+  it("🔴 la tolerancia se retiró (9-oct-2026): ya no hay relectura ni reescritura sin las columnas", () => {
+    const modulo = codigo("src/lib/marketing/columnas-opcionales.ts");
+    expect(modulo).not.toMatch(/conRespaldoSinColumnas|sinColumnasDelRediseno/);
   });
 
   it("🔴 los tipos del rediseño son OPCIONALES en `types.ts` (la migración puede no estar)", () => {

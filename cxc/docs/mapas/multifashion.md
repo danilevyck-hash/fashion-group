@@ -34,6 +34,22 @@
 > § 7 «falta poder bajar algo a Excel».
 >
 > ---
+>
+> ## ⚠️ 9-oct-2026 — «Como un ERP hecho por Apple» y la gráfica nueva, PRENDIDOS
+>
+> `MULTIFASHION_APPLE_2026_10 = true` (PR #697, #698, #700) y `MULTIFASHION_GRAFICA_2026_10 = true`
+> (PR #699, #701). El detalle vive en `docs/postmortems/multifashion.md` § «Como un ERP hecho por
+> Apple». Lo que este mapa describe y **ya no es así**:
+>
+> | Lo que dice el mapa | Hoy |
+> |---|---|
+> | Resumen: los días en $0 se leen en la leyenda del gráfico | Arriba, en un aviso: «Sáb 12 sin ventas y no es feriado» y la meta que no llega (sin «Ver meta»). «Ventas del mes» es el número grande |
+> | El gráfico de ventas diarias con eje y la línea del año pasado | Barras por día, sin eje: «Promedio diario», el último día cerrado destacado, «Hoy» en el eje, día hábil en $0 en ámbar. La misma pieza en la computadora y en el celular |
+> | Clientes: cuatro tarjetas | «No vuelven» como número grande; frecuentes, nuevos del mes y descuento 5% pendiente en su línea; la cobertura al pie |
+> | Vendedoras | La meta que no llega, arriba, con «Ver meta» |
+> | 🩸 #10 «seis pantallas imprimen el error crudo» | El error de carga del módulo y el de Clientes salen en un aviso con «Reintentar», sin el texto crudo (las demás pantallas no se revisaron el 9-oct) |
+>
+> ---
 
 ---
 

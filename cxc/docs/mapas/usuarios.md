@@ -2,6 +2,18 @@
 
 > Medido contra producción el **5-sep-2026** (SQL de solo lectura + `src/app/admin/usuarios/**`, `src/app/api/admin/users/`, `src/lib/modules.ts`, `src/lib/sesion-payload.ts`).
 > Ruta: `/admin/usuarios`. Key del módulo: `usuarios`. **Ningún dato de este mapa incluye contraseñas, hashes, tokens ni correos.**
+>
+> ## ⚠️ 9-oct-2026 — Qué de este mapa quedó viejo
+>
+> El porqué de cada punto vive en `docs/postmortems/usuarios-inicio-teclado.md`.
+>
+> | Lo que dice el mapa | Hoy |
+> |---|---|
+> | «trae una segunda pestaña, Data Health» | **Se fue de la pantalla el 11-sep-2026.** La medición sigue entera |
+> | 11 usuarios | **17 usuarios, los 17 activos** (medido el 9-oct-2026) |
+> | Una tarjeta por usuario, en orden de creación, con «Activo» en cada una | **Lista agrupada por rol**, un renglón por persona; solo se dice «Inactivo»; el nombre capitalizado en pantalla; tocar el renglón abre «Editar usuario»; «＋ Nuevo usuario» en la fila de las pestañas (`USUARIOS_APPLE_2026_10 = true`, PR #705 y #715) |
+> | Con lista propia de módulos: solo las 2 secretarias | Además rodrigo, angel, julio y jorman (bodega). Ver «Registro de overrides por usuario» en el postmortem |
+> | Tarea 1 — dar de alta a alguien: solo el usuario | «Nuevo usuario» y «Editar usuario» llevan **«Marca asistencia»**: crea también la ficha del colaborador, su horario y el vínculo. «Desactivar» ofrece **«Baja del colaborador»** (PR #722, 9-oct-2026) |
 
 ---
 

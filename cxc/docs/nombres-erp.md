@@ -25,7 +25,7 @@ Cuando Daniel corrija un nombre («eso no se dice así»), para que quede atrapa
 |---|---|---|
 | Persona de la planilla | Colaborador | Empleado, Persona |
 | Lo que alguien adeuda | Saldo · Saldo a favor · Saldo final | Debe, Quiénes deben, Queda en caja, Por cobrar (en préstamos) |
-| Cartera de clientes | Cuentas por cobrar (sigla CxC solo si no cabe) | Cuentas por Cobrar, Por cobrar, CXC |
+| Cartera de clientes | Cuentas por cobrar (sigla CxC solo si no cabe) | Cuentas por Cobrar, Por cobrar (como nombre de la cartera; en Marketing sí es el término, ver abajo), CXC |
 | Cartera de proveedores | Cuentas por pagar | Por pagar (CXP) |
 | El grupo completo | Fashion Group · Intercompañía (ventas internas) | Grupo · 6 empresas, Del grupo, también en el grupo |
 | Razón social | Empresa | Compañía |
@@ -65,9 +65,9 @@ Cuando Daniel corrija un nombre («eso no se dice así»), para que quede atrapa
 | Agrupar mercancía para despacho | Bultos · Unidades por bulto | Poner en bulto, Embultar |
 | Pasos de un pedido en Despachos › Pedidos | Pendiente · En preparación · Preparado · Recibido (botón: «Iniciar preparación») | Armando, En proceso, Recibí la hoja, Listo |
 | Pedido detenido porque faltan piezas que se traen de otro lado | En espera de muestra (una marca sobre En preparación; botones «En espera de muestra» · «Quitar espera») | Esperando pieza, Falta muestra, Parado |
-| Módulo de envíos a clientes (pedidos + bultos + la guía) | Despachos (adentro: Pedidos · Bultos · Guías de despacho) | Envíos, Logística |
+| Módulo de envíos a clientes (pedidos + bultos + la guía) | Despachos (adentro: Pedidos · Guías de despacho · Etiquetas · Configuración; «Bultos» fue el nombre de Etiquetas unas horas del 7-oct-2026) | Envíos, Logística |
 | Poner una línea del pedido en un bulto | Asignar bulto · Quitar bulto · «N artículos asignados» | Poner en bulto, Poner en el bulto, Quitar del bulto, Marcar artículos |
-| A quién se le cobra un gasto (Marketing) | Se cobra a (las 5 marcas, o «No recuperable») · Se cobra (Completo · Mitad) | A quién se le pasa, mi costo, costo propio, inventario propio, porcentajes en pantalla |
+| A quién se le cobra un gasto (Marketing) | Se cobra a (las 5 marcas, o «No recuperable») · Se cobra (50 % · 100 % · No recuperable desde el 8-oct-2026; antes Completo · Mitad) | A quién se le pasa, mi costo, costo propio, inventario propio, porcentajes en pantalla |
 | Adjunto de un gasto | Comprobante · Adjuntar comprobante | Foto o factura, Subir foto o factura |
 | Gasto sin tienda | Sin tienda (en el formulario; el cajón del reporte y del ZIP sigue siendo «General») | De una tienda, General (como botón) |
 | Tiempo fuera durante la jornada que pasa del almuerzo permitido (Asistencia, columna de la planilla, Reporte, Excel, PDF, comprobante y ficha; 9-oct-2026) | Tiempo no laborado (en el Reporte el total de la fila pasa a llamarse «Total») | Salida temprana (es otra cosa: se fue y no volvió), Tiempo fuera, Exceso de salida |
@@ -75,6 +75,22 @@ Cuando Daniel corrija un nombre («eso no se dice así»), para que quede atrapa
 | Salida autorizada en la jornada que igual se descuenta (Asistencia, motivo de justificación con horas; 9-oct-2026) | Permiso personal (se lee «Permiso personal · 14:00–16:00 · se descuenta») | Permiso sin goce, Justificado sin pago |
 | Rótulos de formulario | Sustantivo («Pago por planilla», «Marcación en reloj») | Preguntas («¿Qué…?», «¿Quién…?», «¿A quién…?»), salvo «¿Es X (D-25)?», que Daniel aprobó textual |
 | Reponer la tardanza quedándose más tarde el mismo día (ficha del colaborador, Asistencia) | Compensación de tardanza (opciones: «No, la tardanza se descuenta» · «Sí, con tiempo después de la salida») | Repone tardanza, Recupera tardanza, Repone |
+| Lo que una marca debe de los gastos de Marketing (pestaña y estado del gasto; 8-oct-2026) | Por cobrar · Cobrado (pestañas del módulo: Por cobrar · Gastos · Impulsadoras) | Tiendas · Marcas (portada retirada el 8-oct-2026) |
+| Gasto de Marketing que no se le cobra a ninguna marca | No recuperable (con «Observaciones» opcional; sin campo «Motivo») | A cargo de la empresa, No se reporta, Sin marca |
+| Cerrar el cobro de una marca (Marketing) | Descargar ZIP · Cerrar (dos acciones separadas) · Cerrar cobro · Cobro cerrado · Cobros anteriores | Un solo botón que descarga y cierra |
+| Dejar un gasto fuera de un cierre (Marketing) | Excluir · Incluir · «Excluido de este cierre» | — |
+| Proveedor que el lector de facturas no reconoce (Marketing) | Proveedor nuevo | — |
+| Pestañas de Despachos › Pedidos | Pendientes · En preparación · Preparados · Recibidos (botones: «Recibir» · «Marcar recibido» · «Marcar en espera» · «Volver a Pendiente / En preparación / Preparado») | Verificado (estado retirado el 7-oct-2026) |
+| Grupos de fecha de Guías de despacho (7-oct-2026) | Hoy · Ayer · Esta semana · Semana pasada · Historial; distintivo «Pendiente» en la guía sin despachar | Este mes, Mes pasado |
+| Papel del pedido con o sin montos | Con precios · Sin precios | — |
+| Usuario que además marca asistencia (Usuarios, 9-oct-2026) | Marca asistencia (interruptor de «Nuevo usuario» y «Editar usuario») · Nuevo colaborador | — |
+| Dar de baja a quien marca (Usuarios › Desactivar) | Baja del colaborador · Fecha de salida · Motivo de salida | — |
+| Estado de un usuario que ya no entra | Inactivo (el activo no se rotula) | — |
+| Documento de la cartera de un cliente (botón único de CxC, 7-oct-2026) | Estado de cuenta (abre el del grupo si el cliente debe en más de una empresa) | Dos botones («Enviar estado de cuenta» aparte) |
+| Venta media por día (gráfica de Multifashion, 9-oct-2026) | Promedio diario | — |
+| Número grande de Multifashion › Clientes (9-oct-2026) | No vuelven | Frecuentes (como número grande) |
+| Módulo con el registro detenido a propósito | Gastos pausado · «Registro de gastos pausado.» | Falla, Error (no es una falla) |
+| Resumen de Préstamos (9-oct-2026) | Saldo total · Próximo descuento | — |
 
 ## Palabras prohibidas en textos visibles
 

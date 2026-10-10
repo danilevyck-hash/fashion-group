@@ -401,9 +401,9 @@ describe("6. las fotos cuelgan de la tienda y la lectura falla abierta", () => {
     );
   });
 
-  it("toda lectura del rediseño pasa por `columnas-opcionales` y falla ABIERTA", () => {
+  it("las columnas del rediseño existen (9-oct-2026): un error de lectura ya no se lee como «falta la migración»", () => {
     for (const r of [RUTA_DATOS, RUTA_FOTOS, "src/lib/search/marketing-server.ts"]) {
-      expect(codigo(r)).toMatch(/esColumnaAusente/);
+      expect(codigo(r)).not.toMatch(/esColumnaAusente/);
     }
     expect(codigo(RUTA_DATOS)).toMatch(/completarGasto\(/);
   });

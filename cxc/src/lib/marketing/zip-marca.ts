@@ -82,7 +82,7 @@ import {
 } from "./pdf-entrega-mueble";
 import { seReportaDe, TIENDA_GENERAL } from "./gasto";
 import { MARKETING_FOTOS_CON_PERIODO } from "./fotos-periodo";
-import { conRespaldoSinColumnas, type ResultadoPg } from "./columnas-opcionales";
+import type { ResultadoPg } from "./columnas-opcionales";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "./zip-e-impulsadoras";
 import {
   MKT_SOLO_COBRABLE_2026_10,
@@ -404,50 +404,25 @@ export function codigoDeNombreDeMarca(
 // 🔴 QUÉ ENTRA AL ZIP: solo lo que se reporta a la marca (Daniel, 22-sep-2026:
 // *«hay gastos o muebles que son para tienda pero no quiero reportar como
 // gastos pero saber que existen»*). La columna la agrega la migración
-// `20261216120000`; sin ella la lectura se repite SIN pedirla y todo se reporta
-// como hasta hoy — falla ABIERTO, nunca vacío (`columnas-opcionales.ts`).
+// `20261216120000`.
 
 const COLUMNAS_FACTURA =
   "id, proyecto_id, numero_factura, fecha_factura, proveedor, concepto, subtotal, total, impulsadora_id, impulsadora_mes, periodo_desde, periodo_hasta, anulado_en";
 const COLUMNAS_ENTREGA =
   "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, notas, created_at";
 
-function avisarSinColumna(mensaje: string): void {
-  console.warn(`zip-marca: ${mensaje}`);
-}
-
 async function leerFacturasConSeReporta(): Promise<ResultadoPg<FacturaFila[]>> {
-  const { resultado } = await conRespaldoSinColumnas<FacturaFila[]>(
-    () =>
-      supabaseServer
-        .from("mk_facturas")
-        .select(`${COLUMNAS_FACTURA}, se_reporta, tienda_codigo, nota, pct_a_la_marca`) as unknown as PromiseLike<
-        ResultadoPg<FacturaFila[]>
-      >,
-    () =>
-      supabaseServer.from("mk_facturas").select(COLUMNAS_FACTURA) as unknown as PromiseLike<
-        ResultadoPg<FacturaFila[]>
-      >,
-    avisarSinColumna,
-  );
-  return resultado;
+  return (await supabaseServer
+    .from("mk_facturas")
+    .select(`${COLUMNAS_FACTURA}, se_reporta, tienda_codigo, nota, pct_a_la_marca`)) as unknown as ResultadoPg<
+    FacturaFila[]
+  >;
 }
 
 async function leerEntregasConSeReporta(): Promise<ResultadoPg<EntregaFila[]>> {
-  const { resultado } = await conRespaldoSinColumnas<EntregaFila[]>(
-    () =>
-      supabaseServer
-        .from("mk_entregas_muebles")
-        .select(`${COLUMNAS_ENTREGA}, se_reporta, tienda_codigo`) as unknown as PromiseLike<
-        ResultadoPg<EntregaFila[]>
-      >,
-    () =>
-      supabaseServer
-        .from("mk_entregas_muebles")
-        .select(COLUMNAS_ENTREGA) as unknown as PromiseLike<ResultadoPg<EntregaFila[]>>,
-    avisarSinColumna,
-  );
-  return resultado;
+  return (await supabaseServer
+    .from("mk_entregas_muebles")
+    .select(`${COLUMNAS_ENTREGA}, se_reporta, tienda_codigo`)) as unknown as ResultadoPg<EntregaFila[]>;
 }
 
 /**
@@ -772,27 +747,16 @@ async function prepararDescarga(op: ZipMarcaOpciones): Promise<PrepDescarga> {
 
 /**
  * Los adjuntos que el ZIP necesita. Pide las columnas de la foto de TIENDA
- * (`tienda_codigo`, `periodo_id`); si la base todavía no las tiene, relee sin
- * ellas y el ZIP sale exactamente como antes — falla ABIERTA.
+ * (`tienda_codigo`, `periodo_id`).
  */
 async function leerAdjuntosDelZip(): Promise<{ data: AdjuntoFila[] | null; error: { message?: string | null; code?: string | null } | null }> {
   const tipos = ["pdf_factura", "foto_factura", "foto_proyecto", "foto_instalacion"];
   // `foto_instalacion` la habilita la migración 20260811180000. Pedirla antes
   // no rompe nada: si todavía no existe ninguna, no viene ninguna.
-  const { resultado } = await conRespaldoSinColumnas<AdjuntoFila[]>(
-    () =>
-      supabaseServer
-        .from("mk_adjuntos")
-        .select("id, tipo, factura_id, proyecto_id, url, nombre_original, tienda_codigo, periodo_id")
-        .in("tipo", tipos) as unknown as PromiseLike<{ data: AdjuntoFila[] | null; error: { message?: string | null; code?: string | null } | null }>,
-    () =>
-      supabaseServer
-        .from("mk_adjuntos")
-        .select("id, tipo, factura_id, proyecto_id, url, nombre_original")
-        .in("tipo", tipos) as unknown as PromiseLike<{ data: AdjuntoFila[] | null; error: { message?: string | null; code?: string | null } | null }>,
-    (m) => console.warn(`[marketing/zip] ${m}`),
-  );
-  return resultado;
+  return (await supabaseServer
+    .from("mk_adjuntos")
+    .select("id, tipo, factura_id, proyecto_id, url, nombre_original, tienda_codigo, periodo_id")
+    .in("tipo", tipos)) as unknown as { data: AdjuntoFila[] | null; error: { message?: string | null; code?: string | null } | null };
 }
 
 /**

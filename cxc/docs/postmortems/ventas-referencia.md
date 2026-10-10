@@ -1628,6 +1628,8 @@ sus meses.
 
 ## Consulta de artículos estilo Apple — propuesta APAGADA (9-oct-2026, `REFERENCIA_APPLE_2026_10`)
 
+> **Estado al 9-oct-2026**: `REFERENCIA_APPLE_2026_10 = false` (`lib/ventas/referencia-apple-2026-10.ts`, PR #703). En producción se ve la pantalla de antes; lo de abajo es la propuesta programada, no lo publicado. Se prende con el «sí» de Daniel.
+
 La pregunta de la pantalla: **«¿cuánto hay de este artículo y cómo se vende?»**. Medido 25-sep → 9-oct (`visitas_modulo`): **10 entradas, 9 desde el CELULAR**, de bodega (Bodega 3 · jorman 3 · angel 1) y un vendedor (rey 2); Daniel 1 desde la computadora.
 
 1. **Stock es EL número** de la tarjeta; Comprado · Vendido · % vendido en UNA línea debajo. Sale «Existencias».

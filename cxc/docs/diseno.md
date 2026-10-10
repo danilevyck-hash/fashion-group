@@ -105,6 +105,24 @@ Daniel, 2-oct-2026: *«cada vez que encontramos algo así de detalle, para que s
   - En el celular, sin encabezados, va «Ordenar ▾» en la barra con las mismas opciones, solo en las listas largas (Productos, Clientes, CxC).
   - Donde Daniel decidió que una lista NO se ordena o tiene un orden fijo, se respeta. Candado `orden-tabla.test.tsx`, con las dos listas.
 
+## Lo más simple que funcione (Daniel, 7 al 9-oct-2026)
+
+Antes de proponer un campo, una pestaña, una lista, un aviso o un estado nuevo, se pasa por las preguntas que hace él: *«¿vale la pena?»* · *«¿es necesario?»* · *«¿hace sentido tener todas esas pestañas?»* · *«¿no es lo mismo como notas, de modo opcional?»*.
+
+1. **Primero se busca si algo que ya existe lo cubre.** Si lo cubre, no se construye. Lo que descartó así:
+   - Proveedor con código: lo resuelve el lector de facturas, que reconoce al proveedor que ya existe.
+   - Un campo propio para el motivo del «No recuperable»: alcanza la observación opcional.
+   - Llevar el pago de la marca: *«solo mantenerlo ordenado para cerrar y se lo mando»*.
+   - Una lista de etiquetas pendientes: *«si no voy a etiquetar, no busco la factura»*.
+   - «Escanear» y «Subir PDF» por separado: es una sola entrada.
+   - El motivo obligatorio al corregir una hora en Asistencia.
+2. **Un paso o un dato nuevo entra cuando contesta una pregunta real de su gente.** «En espera de muestra» entró para que nadie pregunte por qué bodega no ha entregado un pedido.
+3. **Una sola puerta para cada cosa.** Crear a una persona, marque o no asistencia, se hace en un solo lugar: *«debe de ser en Usuarios»*.
+4. **Nombres de ERP profesional aunque él lo diga coloquial**: *«mi lenguaje es natural, en el sistema tiene que usar el de un ERP profesional»*. Su frase se traduce al término de [nombres-erp.md](nombres-erp.md) antes de escribirla en pantalla.
+5. **Una regla del personal no se afloja por comodidad de la pantalla.** El día con solo 2 marcas sigue saliendo «a revisar»: *«¿mal acostumbrarían al personal?»*.
+
+Cómo funciona por dentro (un solo número en todas las pantallas, quién cambia los datos) y cómo se le presenta: [asi-se-construye](../.claude/skills/asi-se-construye/SKILL.md) §§ 8, 16 y 17.
+
 ## Mockup: siempre, con capturas reales
 
 Daniel, 1-oct-2026: *«siempre mockup»* y *«dejamos fijo que las propuestas se muestran con capturas reales»*.
@@ -118,6 +136,7 @@ Daniel, 1-oct-2026: *«siempre mockup»* y *«dejamos fijo que las propuestas se
 
 ## Checklist antes de entregar
 
+- [ ] ¿Cada campo, pestaña, aviso o estado nuevo pasa el «¿es necesario?»? ¿Algo que ya existe lo cubre?
 - [ ] ¿Cuál es la pregunta de la pantalla? ¿Todo lo visible ayuda a responderla?
 - [ ] ¿Se lee de arriba abajo en el orden del trabajo?
 - [ ] ¿Hay una sola acción principal?

@@ -15,13 +15,13 @@
 // Se lee, se agrega al final (`anotarZip`) y se escribe.
 //
 // 🔴 FALLA ABIERTA, SIEMPRE. Anotar es un registro, no la descarga: si la
-// columna no existe todavía, si la fila cambió o si Storage se niega, el ZIP
+// fila cambió o si Storage se niega, el ZIP
 // igual sale. Nadie se queda sin su archivo porque la bitácora falle.
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { anotarZip, type RegistroZip } from "./periodo-estado";
-import { completarPeriodo, esColumnaAusente } from "./columnas-opcionales";
+import { completarPeriodo } from "./columnas-opcionales";
 import { guardarZipDelPeriodo } from "./storage";
 
 export interface ZipQueSeBajo {
@@ -61,10 +61,7 @@ export async function anotarZipBajado(z: ZipQueSeBajo): Promise<ResultadoAnotarZ
       .select("id, zips_bajados")
       .eq("id", periodoId)
       .maybeSingle();
-    if (error) {
-      if (!esColumnaAusente(error)) throw new Error(error.message);
-      return { guardado: archivoPath !== null, anotado: false, archivoPath };
-    }
+    if (error) throw new Error(error.message);
     if (!data) return { guardado: archivoPath !== null, anotado: false, archivoPath };
 
     const fila = completarPeriodo(data as Record<string, unknown>);
@@ -81,10 +78,7 @@ export async function anotarZipBajado(z: ZipQueSeBajo): Promise<ResultadoAnotarZ
       .from("mk_periodos")
       .update({ zips_bajados: lista })
       .eq("id", periodoId);
-    if (errEscribir) {
-      if (!esColumnaAusente(errEscribir)) throw new Error(errEscribir.message);
-      return { guardado: archivoPath !== null, anotado: false, archivoPath };
-    }
+    if (errEscribir) throw new Error(errEscribir.message);
     return { guardado: archivoPath !== null, anotado: true, archivoPath };
   } catch (err) {
     console.warn(

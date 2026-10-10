@@ -103,6 +103,8 @@ Si la pantalla y el Excel muestran el mismo total, **llaman a la misma función*
 
 🩸 El Excel de Comprobantes cobró **$1.516 de más** porque se arregló en la pantalla y quedó vivo en el Excel — y era la **segunda vez** que pasaba con el mismo cálculo.
 
+🔴 **Y vale entre pantallas: lo mismo da UN solo número en todas** (Daniel, Marketing, oct-2026: cuatro pantallas daban cuatro totales para lo mismo). Antes de publicar un total se compara con las otras pantallas, el Excel y el ZIP que lo muestran.
+
 ## 9. Se usa en iPad y en celular
 
 - **44 px mínimo** para todo lo que se toca. Sin excepción.
@@ -165,6 +167,8 @@ Cuando se afirma algo de una pantalla, **se mira la pantalla**, no solo el códi
 ## 16. Cómo se le habla a Daniel
 
 - **Resumido.** Es el dueño, no programador. Sin nombres de tabla ni jerga.
+- **Corto, ordenado por tema y un tema a la vez, siempre en español** (7 al 9-oct-2026), aunque el reporte del agente venga en inglés.
+- **Si dice «no entendí»**, no se repite lo mismo más largo: va un ejemplo concreto de su negocio (un cliente, una factura, una persona) y una tabla chica.
 - **Dónde estamos parados, cómo está hoy y cómo quedaría.**
 - **Mapear → definir juntos → ejecutar.** Nunca al revés.
 - Toda sugerencia **numerada**, con **ahora vs recomendación** lado a lado, y opciones **a·b·c SOLO si de verdad hace falta elegir**, con la recomendada marcada; si no, una sola recomendación (Daniel, 2-oct-2026: *«abc es solo de ser necesario»*). Él aprueba una por una.
@@ -173,4 +177,15 @@ Cuando se afirma algo de una pantalla, **se mira la pantalla**, no solo el códi
 - **Se dice el riesgo, no las horas.** Cuánto se toca y qué puede romperse, no cuánto tarda.
 - 🔴 **El trabajo lo hacen AGENTES en segundo plano, divididos por módulo o tarea; en la conversación, solo resúmenes. Nada de comandos a la vista** (Daniel, 1-oct-2026: *«acuérdate usar agentes… dividir el trabajo y no mandarme los textos como ⏺ Bash… nada de bash»*). Hasta los commits, las pruebas y el chequeo de GitHub y Vercel los corre un agente.
 
+- 🔴 **Toda recomendación pasa primero por «¿es necesario?»** y por si algo que ya existe lo cubre: la lista de lo que Daniel descartó y aceptó está en [docs/diseno.md](../../../docs/diseno.md) › «Lo más simple que funcione».
+
 🔴 **Aprobar un cambio NO es aprobar que se ejecute.** Son dos permisos distintos y hacen falta los dos, **módulo por módulo**. Daniel puede decir «sí» a las 16 cosas de una pantalla y todavía no querer que se toque el código hoy. Antes de lanzar un agente a construir se pregunta, con esas palabras: **«¿lo lanzo?»**. Es el tercer paso de *mapear → definir juntos → ejecutar*, y es suyo.
+
+## 17. Los datos los cambia Daniel
+
+Daniel: *«tú no muevas facturas, solo dime y yo veo y lo hago»*.
+
+- En producción **no se edita, mueve ni borra** una factura, un gasto, una marca del reloj ni una ficha. Se le dice qué registro es, qué tiene y qué habría que cambiar, y lo hace él desde la pantalla.
+- Las excepciones fueron **puntuales y explícitas**: cada una con su «sí» para ESE registro. Un «sí» no se extiende al siguiente caso parecido.
+- Leer y medir sigue siendo libre (`cxc/CLAUDE.md` › «El conector de Supabase»).
+- 🔴 **Una regla del personal no se afloja para que la pantalla salga limpia**: si el sistema marca algo «a revisar» (el día con solo 2 marcas), se queda así hasta que él diga otra cosa. Daniel: *«¿mal acostumbrarían al personal?»*.

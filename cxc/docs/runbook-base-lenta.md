@@ -11,8 +11,9 @@ Guía de 5 pasos. No hace falta saber programar. Empezá por el paso 1 y seguí 
 
 ## Paso 1 — Mirá el aviso de Telegram
 
-Desde el 27 de julio hay un vigía que revisa la base **cada 2 horas** y avisa al canal
-de Telegram ANTES de que se caiga. Buscá un mensaje que empiece con:
+Desde el 27 de julio hay un vigía que revisa la base **5 veces al día** (01:45, 07:25,
+12:25, 16:45 y 21:45 UTC; aquí decía «cada 2 horas» hasta el 9-oct-2026, y son 5 pasadas
+desde el 30-jul-2026) y avisa al chat de Alertas de Telegram ANTES de que se caiga. Buscá un mensaje que empiece con:
 
 - 🟡 **La base de datos se está apretando** — todavía funciona, pero hay que actuar.
 - 🔴 **La base de datos está al límite** — se va a caer o ya se cayó.
@@ -66,7 +67,8 @@ Ahí ves gráficos de los **últimos 7 días** (con el plan Free eran solo 24 ho
 - **Database connections** — cuántas conexiones abiertas hay.
 
 **Qué buscar:** el momento exacto en que la línea se disparó. Fijate qué hora fue y
-compará contra la tabla de crons del `CLAUDE.md` para ver qué estaba corriendo.
+compara contra la tabla de crons de `cxc/docs/crons.md` (horarios en UTC; Panamá es
+UTC−5) para ver qué estaba corriendo.
 
 ---
 
@@ -102,7 +104,7 @@ del proyecto. Sirve para saber QUÉ hay que arreglar, no solo que algo está mal
 | Lo que viste | Qué hacer |
 |---|---|
 | **Memoria llena** o **CPU al 100%** | Subir el compute. Panel de Supabase → **Project Settings** → **Compute and Disk** → subir de **Micro** al siguiente escalón. Cuesta plata pero es un botón y tarda unos minutos (la base se reinicia). |
-| **Se llenó por un cron pesado** | Correr menos seguido el cron culpable, o moverlo fuera del horario de oficina. La tabla de crons está en `cxc/CLAUDE.md`. |
+| **Se llenó por un cron pesado** | Correr menos seguido el cron culpable, o moverlo fuera del horario de oficina. La tabla de crons está en `cxc/docs/crons.md`. |
 | **Disco lleno** o **base cerca de 8 GB** | Hay que borrar o archivar datos viejos. Avisar para revisar qué tabla creció. |
 | **Consultas lentas** (Query Performance) | Falta un índice o una consulta está mal escrita. Es trabajo de código, no de configuración. |
 | **No encontrás nada y la app anda bien** | Puede haber sido un problema pasajero de Supabase. Mirá **https://status.supabase.com**. |
@@ -125,6 +127,13 @@ del proyecto. Sirve para saber QUÉ hay que arreglar, no solo que algo está mal
 - **Para ver qué backups hay:** desde la carpeta `cxc/`, correr
   `node scripts/restore.mjs --list --source r2`. Solo las fechas que dicen **OK** se
   pueden restaurar enteras.
+- **Si al respaldo le falta una columna o una tabla, avisa en el acto** (8-oct-2026,
+  #688). Ese error no se arregla solo, así que el aviso llega al chat de Alertas en esa
+  misma corrida, sin esperar a la siguiente. Cada tabla se copia ordenada por su llave
+  real, no por una columna `id` que puede no existir.
+- **Las funciones corren en Oregón (`pdx1`), junto a la base** (8-oct-2026, #683). Antes
+  corrían en Virginia y cada consulta a la base pagaba el viaje. Para volver atrás se
+  borra la línea `regions` de `vercel.json` y se despliega.
 - **El vigía de recursos no depende de la base.** Lee las métricas por HTTP y escribe a
   Telegram directo. Por eso sigue avisando cuando todo lo demás se queda mudo — el
   26 de julio la caída no dejó ni un solo registro de error, porque los errores se
@@ -136,6 +145,7 @@ del proyecto. Sirve para saber QUÉ hay que arreglar, no solo que algo está mal
 |---|---|
 | El vigía (ruta del cron) | `src/app/api/cron/db-salud/route.ts` |
 | Los umbrales que disparan el aviso | `src/lib/db-recursos.ts` |
-| Horarios del vigía (cada 2 h, al minuto :25) | `vercel.json` |
+| Horarios del vigía (5 pasadas al día) y región de las funciones (`pdx1`) | `vercel.json` |
+| Qué tablas entran al respaldo y por qué columna se ordena cada una | `src/lib/backup/tablas.ts` |
 | El backup a R2 | `src/app/api/cron/backup/route.ts` |
 | Restaurar desde un backup | `scripts/restore.mjs` |

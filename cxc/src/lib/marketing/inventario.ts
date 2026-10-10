@@ -51,10 +51,8 @@ import { normalizarBultos, normalizarPiezas, piezasParaStock } from "./piezas-bu
 import { exigirUnaMarca } from "./gasto";
 import {
   completarGasto,
-  conRespaldoSinColumnas,
-  sinColumnasDelRediseno,
 } from "./columnas-opcionales";
-import { columnasDelGasto, traeColumnasDelGasto } from "./puerta-gasto";
+import { columnasDelGasto } from "./puerta-gasto";
 import { exigirTiendaDelDirectorio } from "./puerta-gasto-server";
 import {
   borrarSellosDeDocumento,
@@ -894,16 +892,11 @@ export async function createEntrega(
     notas,
     ...cols,
   };
-  const insertar = (p: Record<string, unknown>) =>
-    supabaseServer.from("mk_entregas_muebles").insert(p).select("*").single();
-  const { resultado: resEntrega } = traeColumnasDelGasto(cols)
-    ? await conRespaldoSinColumnas(
-        () => insertar(payloadEntrega),
-        () => insertar(sinColumnasDelRediseno(payloadEntrega)),
-        (m) => console.error(m),
-      )
-    : { resultado: await insertar(payloadEntrega) };
-  const { data: entRow, error: entErr } = resEntrega;
+  const { data: entRow, error: entErr } = await supabaseServer
+    .from("mk_entregas_muebles")
+    .insert(payloadEntrega)
+    .select("*")
+    .single();
   if (entErr || !entRow) {
     // Pre-DDL: si la columna sigue NOT NULL (la migración 20260811180000 la
     // relaja), una entrega sin cliente rebota acá. Degradar limpio, no
@@ -1028,16 +1021,12 @@ export async function updateEntrega(
   const cols = columnasDelGasto(input);
   await exigirTiendaDelDirectorio(cols.tienda_codigo);
   Object.assign(updPayload, cols);
-  const actualizar = (p: Record<string, unknown>) =>
-    supabaseServer.from("mk_entregas_muebles").update(p).eq("id", id).select("id").maybeSingle();
-  const { resultado: resUpd } = traeColumnasDelGasto(cols)
-    ? await conRespaldoSinColumnas(
-        () => actualizar(updPayload),
-        () => actualizar(sinColumnasDelRediseno(updPayload)),
-        (m) => console.error(m),
-      )
-    : { resultado: await actualizar(updPayload) };
-  const updErr = resUpd.error;
+  const { error: updErr } = await supabaseServer
+    .from("mk_entregas_muebles")
+    .update(updPayload)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   if (updErr) throw new Error(`updateEntrega[entrega]: ${updErr.message}`);
 
   // 2) Reemplazar items (reparto = unidades bajo la marca primaria, empresa null).

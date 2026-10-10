@@ -9,12 +9,10 @@
 // 🔴 El filtro por lo escrito lo hace `marketing.ts › buscarTiendas` (por
 // palabra, medido). Acá solo se lee y se suma lo que SE REPORTA.
 //
-// 🔴 Falla ABIERTA: sin las columnas del rediseño, o ante cualquier tropiezo
-// de lectura, devuelve lista vacía — la búsqueda global no se cae por esto.
+// 🔴 Falla ABIERTA: ante cualquier tropiezo de lectura, lo dice en el log y devuelve lista vacía — la búsqueda global no se cae por esto.
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { esColumnaAusente } from "@/lib/marketing/columnas-opcionales";
 import { seReportaDe, TIENDA_GENERAL } from "@/lib/marketing/gasto";
 import { buscarTiendas, type TiendaDeMarketing } from "./marketing";
 
@@ -40,7 +38,6 @@ export async function buscarTiendasDeMarketing(
     ]);
     if (facturasRes.error || entregasRes.error) {
       const err = facturasRes.error ?? entregasRes.error;
-      if (err && esColumnaAusente(err)) return [];
       throw new Error(err?.message ?? "Error leyendo Marketing");
     }
 
