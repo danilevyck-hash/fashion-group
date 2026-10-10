@@ -71,9 +71,9 @@ afterEach(() => {
 });
 
 describe("Detalle de guía — interruptor APAGADO = la pantalla de hoy", () => {
-  it("el interruptor sigue apagado: lo prende Daniel", async () => {
+  it("el interruptor está prendido: Daniel lo aprobó el 9-oct-2026", async () => {
     const real = await vi.importActual<typeof import("@/lib/guias/guias-2026-10")>("@/lib/guias/guias-2026-10");
-    expect(real.GUIA_DETALLE_APPLE_2026_10).toBe(false);
+    expect(real.GUIA_DETALLE_APPLE_2026_10).toBe(true);
   });
   it("pendiente, bodega: HTML idéntico al de origin/main", async () => {
     expect((await montar(PENDIENTE)).innerHTML).toMatchSnapshot();
@@ -103,16 +103,27 @@ describe("Detalle de guía — interruptor PRENDIDO (9-oct-2026, propuesta)", ()
     expect(hecho.textContent).toContain("Despachado por");
     expect(hecho.textContent).toContain("Jorman");
   });
-  it("el N° del transportista, si es el MISMO en todos los envíos, se dice una sola vez", async () => {
+  it("🔴 el N° del transportista es POR ENVÍO: con el mismo número en todos, cada envío muestra el suyo", async () => {
+    // Daniel, 9-oct-2026: «El N.º del transportista es por envío, no por guía».
     flags.detalle = true;
     const c = await montar(COMPLETADA);
-    expect(c.querySelector("[data-numero-comun]")!.textContent).toBe("N° del transportista: TS-9");
-    expect(c.textContent!.split("TS-9")).toHaveLength(2);
+    const filas = [...c.querySelectorAll("[data-envio-fila]")];
+    expect(filas).toHaveLength(3);
+    for (const fila of filas) {
+      expect(fila.querySelector("[data-numero-transp-envio]")!.textContent).toBe("N° del transportista: TS-9");
+    }
+    expect(c.textContent!.split("TS-9")).toHaveLength(4);
+    expect(c.querySelector("[data-numero-comun]")).toBeNull();
+  });
+  it("pendiente con un número anotado al crear: no se presenta como dato «para toda la guía»", async () => {
+    flags.detalle = true;
+    const c = await montar({ ...PENDIENTE, numero_guia_transp: "TS-7" });
+    expect(c.textContent).toContain("Al crear la guía se anotó TS-7: lo lleva cada envío que no tenga el suyo.");
+    expect(c.textContent).not.toContain("para toda la guía");
   });
   it("con números distintos por envío, cada fila dice el suyo", async () => {
     flags.detalle = true;
     const c = await montar(COMPLETADA_VARIOS);
-    expect(c.querySelector("[data-numero-comun]")).toBeNull();
     expect(c.textContent).toContain("N° del transportista: TS-1");
     expect(c.textContent).toContain("N° del transportista: —");
   });

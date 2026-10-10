@@ -259,7 +259,8 @@ describe("🔴 en entrega directa la pantalla NO pide placa ni N° de transporti
     fireEvent.change(document.getElementById("despacho-chofer") as HTMLElement, { target: { value: "Julio" } });
     fireEvent.change(document.getElementById("despacho-receptor") as HTMLElement, { target: { value: "Ana" } });
     fireEvent.change(document.getElementById("despacho-cedula") as HTMLElement, { target: { value: "8-1-1" } });
-    // Faltan las firmas, no la placa.
+    // Faltan las firmas, no la placa. 9-oct-2026: «Despachar» no se apaga y lo dice al tocarlo.
+    fireEvent.click(screen.getByRole("button", { name: "Despachar" }));
     const falta = screen.getByText(/^Falta:/).textContent ?? "";
     expect(falta).toContain("firma");
     expect(falta).not.toContain("placa");
@@ -283,9 +284,11 @@ describe("🔴 el modo se MUESTRA, con un 'Cambiar' al lado", () => {
     expect(screen.getByRole("button", { name: "Cambiar" })).toBeTruthy();
   });
 
-  it("en entrega directa se explica por qué no se pide placa", () => {
+  it("en entrega directa el tipo se dice en una línea y no hay caja de placa", () => {
+    // 9-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`): se fue la frase «nuestro propio camión».
     render(<Despacho inicial="directo" />);
-    expect(screen.getByText(/nuestro propio camión/i)).toBeTruthy();
+    expect(document.querySelector("[data-tipo-despacho-linea]")!.textContent).toContain(ETIQUETA_TIPO_DESPACHO.directo);
+    expect(document.getElementById("despacho-placa")).toBeNull();
   });
 });
 

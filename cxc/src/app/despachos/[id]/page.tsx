@@ -62,7 +62,6 @@ import {
   ETIQUETA_TIPO_DESPACHO,
   esEntregaDirecta,
   guiaSinNumeroTransp,
-  numeroTranspImpreso,
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
@@ -222,19 +221,16 @@ export default function GuiaPage() {
   // así que el detalle toma el marco compacto del 2-oct y dice su estado.
   const apple = GUIA_DETALLE_APPLE_2026_10 || GUIAS_LISTA_APPLE_2026_10;
   /**
-   * 🔴 9-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`, apagado): la segunda pasada del
+   * 🔴 9-oct-2026 (`GUIA_DETALLE_APPLE_2026_10`, prendido el 9-oct con el sí de Daniel): la segunda pasada del
    * detalle, medida contra el uso real. La pantalla contesta «¿qué va en esta
    * guía y ya salió?»: el estado va junto al título también cuando ya salió, las
    * observaciones se leen ANTES de los envíos, y nada se dice dos veces.
    * `false` = la pantalla de hoy, byte por byte (`guias-detalle-apple-apagado`).
    */
   const v2 = GUIA_DETALLE_APPLE_2026_10;
-  /** El N° del transportista cuando TODOS los envíos llevan el mismo: se dice una vez. */
-  const numerosTransp = g ? items.map((i) => numeroTranspImpreso(i.numero_guia_transp, g.numero_guia_transp) || "") : [];
-  const numeroComun =
-    v2 && s.despachada && numerosTransp.length > 1 && numerosTransp[0] && numerosTransp.every((n) => n === numerosTransp[0])
-      ? numerosTransp[0]
-      : "";
+  // 🔴 El N° del transportista es POR ENVÍO, no por guía (corrección de Daniel al
+  // aprobar, 9-oct-2026): acá ya no se calcula un «número común»; cada fila de
+  // `ListaEnviosApple` muestra el suyo aunque se repita.
   /** Los tres botones caben en UNA fila del celular (ninguno queda solo abajo). */
   const BOTON_ACCION = `inline-flex items-center justify-center gap-1.5 min-h-[44px] ${v2 ? "flex-1 sm:flex-none px-2 sm:px-3.5" : "px-3.5"} rounded-md border border-gray-200 text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition`;
   /**
@@ -636,7 +632,6 @@ export default function GuiaPage() {
                 bultosPorLinea={s.bultosPorLinea}
                 setBultos={s.setBultos}
                 rol={role}
-                numeroComun={numeroComun}
               />)}
 
               {/* 🔴 LAS OBSERVACIONES, DONDE SE CARGA EL CAMIÓN.

@@ -2508,7 +2508,6 @@ Detalle entero (mediciones, citas, candados, mutaciones) en [postmortems/asisten
 
 **Del asistente:**
 
-- **Rediseño del detalle de la guía** — en curso, sin publicar (`GUIA_DETALLE_APPLE_2026_10 = false`).
 - **Consulta de artículos** — rediseño apagado; se prende al final.
 - **Limpieza de las ~20 guardas de «columna que falta»** — en curso. La de `tiempo_no_laborado` ya salió (#713).
 - **Recuperar las marcas del reloj de Boston del 5-oct** — en curso.

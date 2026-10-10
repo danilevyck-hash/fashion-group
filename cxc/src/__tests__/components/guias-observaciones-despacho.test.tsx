@@ -29,6 +29,12 @@ vi.mock("@/lib/guias/lista-apple-2026-10", async (orig) => ({
   ...(await orig<typeof import("@/lib/guias/lista-apple-2026-10")>()),
   GUIAS_LISTA_APPLE_2026_10: false,
 }));
+// 9-oct-2026: con `GUIA_DETALLE_APPLE_2026_10` prendido las observaciones van ANTES
+// de los envíos (lo fija `guias-detalle-apple-apagado.test.tsx`); acá, la de antes.
+vi.mock("@/lib/guias/guias-2026-10", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/guias-2026-10")>()),
+  GUIA_DETALLE_APPLE_2026_10: false,
+}));
 import { render, screen, cleanup, within } from "@testing-library/react";
 import type { Guia } from "@/app/despachos/components/types";
 

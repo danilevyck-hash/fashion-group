@@ -70,8 +70,9 @@ export const GUIA_APPLE_2026_10 = true;
  *  · «Despachada» junto al título (antes solo «Pendiente» tenía distintivo).
  *  · Observaciones ANTES de los envíos.
  *  · Ya despachada: sin el título «Ya despachada» ni «Tipo de despacho» (lo dice
- *    la línea de datos); entra «Despachado por»; el N° del transportista, si es
- *    el mismo en todos los envíos, se dice una sola vez.
+ *    la línea de datos); entra «Despachado por»; el N° del transportista se
+ *    muestra en CADA envío, siempre, aunque se repita (corrección de Daniel al
+ *    aprobar: *«El N.º del transportista es por envío, no por guía»*).
  *  · Pendiente: «N° del transportista» solo en la caja (se van la frase y el
  *    rótulo de columna); «Tipo de despacho» en una línea con «Cambiar»; los
  *    cuatro datos en una fila; «Despachar» negro que no se apaga y dice TODO lo
@@ -80,9 +81,12 @@ export const GUIA_APPLE_2026_10 = true;
  *  🔴 Solo pantalla: el PUT del despacho es idéntico y el servidor sigue
  *  exigiendo lo mismo. Imprimir y Compartir no dejan registro: no se midieron y
  *  por eso no se escondió ninguno.
- *  `false` = la pantalla de hoy, byte por byte (candado
+ *  🔴 PRENDIDO el 9-oct-2026 con el «sí» de Daniel al mockup, con esa corrección.
+ *  «Despachar» siempre prendido es un CAMBIO DE DECISIÓN suyo (antes: «el botón
+ *  se apaga y dice qué falta»); ver `DespachoForm.tsx` y `postmortems/guias.md`.
+ *  `false` = la pantalla de antes, byte por byte (candado
  *  `guias-detalle-apple-apagado.test.tsx`). */
-export const GUIA_DETALLE_APPLE_2026_10 = false;
+export const GUIA_DETALLE_APPLE_2026_10 = true;
 
 /** 🔴 ETIQUETAS · TRASLADO SIN FACTURA (2-oct-2026). Daniel aprobó el
  *  2-oct-2026 («sigue»); migración `20261226120000` aplicada el mismo día. Daniel: «¿y si
