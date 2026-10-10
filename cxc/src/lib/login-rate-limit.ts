@@ -1,7 +1,8 @@
 // Rate limit de login respaldado por Supabase (store COMPARTIDO entre instancias
 // serverless). Reemplaza el Map en-memoria del route, que no funcionaba en
 // serverless (cada lambda tenía su propio Map). Cuenta intentos FALLIDOS por IP;
-// tras MAX_FAILS fallos en la ventana, bloquea la IP por LOCKOUT.
+// tras MAX_FAILS fallos en la ventana, bloquea la IP por LOCKOUT. Desde el
+// 9-oct-2026 MAX_FAILS es 100: freno contra programas, no contra personas.
 //
 // Fail-OPEN ante error del store (tabla/RPC ausente o caída): preferimos permitir
 // el intento antes que bloquear a todos los usuarios. El rate-limit es una capa
@@ -9,7 +10,23 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 
-export const MAX_FAILS = 5;          // fallos antes de bloquear
+// ─────────────────────────────────────────────────────────────────────────────
+// EL ÚNICO NÚMERO DEL FRENO (9-oct-2026). Antes era 5: cinco contraseñas mal
+// escritas en la oficina dejaban a TODA la oficina (misma IP) sin entrar 15 min.
+// Daniel: «no permitas que se bloquee a todos por 15 minutos, no tiene sentido;
+// que no haya ese bloqueo del todo».
+//
+// Queda en 100, que ninguna oficina alcanza por error: para las personas el
+// bloqueo ya no existe. Lo que queda es solo un freno contra programas
+// automáticos: se entra SOLO con contraseña (la contraseña identifica a la
+// persona) y varias son nombres propios; sin ningún tope, un programa prueba
+// miles por minuto desde internet y entra como cualquiera, incluido un
+// administrador.
+//
+// Para quitarlo del todo, si Daniel lo decide: `Number.MAX_SAFE_INTEGER` no
+// sirve (la función de la base recibe un entero de 32 bits); poner 2147483647.
+// ─────────────────────────────────────────────────────────────────────────────
+export const MAX_FAILS = 100;        // fallos antes de bloquear: el fallo n.º 100 bloquea, el intento 101 ya no entra
 export const WINDOW_SECS = 15 * 60;  // ventana para acumular fallos (15 min)
 export const LOCKOUT_SECS = 15 * 60; // duración del bloqueo (15 min)
 

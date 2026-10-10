@@ -220,11 +220,11 @@ describe("Pantalla de login — sesión vigente no pide contraseña", () => {
     render(<LoginPage />);
 
     // Nunca aparece el campo de contraseña mientras se verifica…
-    expect(screen.queryByPlaceholderText("Contraseña")).toBeNull();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/home"));
     // …ni después de redirigir.
-    expect(screen.queryByPlaceholderText("Contraseña")).toBeNull();
+    expect(document.querySelector('input[type="password"]')).toBeNull();
     expect(sessionStorage.getItem("cxc_role")).toBe("bodega");
     expect(sessionStorage.getItem("fg_user_name")).toBe("rey");
     expect(JSON.parse(sessionStorage.getItem("fg_modules") || "[]")).toEqual([
@@ -246,7 +246,7 @@ describe("Pantalla de login — sesión vigente no pide contraseña", () => {
     mockFetchSesion({ status: 401 });
     render(<LoginPage />);
     await waitFor(() =>
-      expect(screen.queryByPlaceholderText("Contraseña")).not.toBeNull(),
+      expect(document.querySelector('input[type="password"]')).not.toBeNull(),
     );
     expect(replaceMock).not.toHaveBeenCalled();
     expect(sessionStorage.getItem("cxc_role")).toBeNull();
@@ -256,7 +256,7 @@ describe("Pantalla de login — sesión vigente no pide contraseña", () => {
     mockFetchSesion({ status: 200, body: { authenticated: true } });
     render(<LoginPage />);
     await waitFor(() =>
-      expect(screen.queryByPlaceholderText("Contraseña")).not.toBeNull(),
+      expect(document.querySelector('input[type="password"]')).not.toBeNull(),
     );
     expect(replaceMock).not.toHaveBeenCalled();
   });
@@ -266,9 +266,9 @@ describe("Pantalla de login — sesión vigente no pide contraseña", () => {
     const fetchMock = mockFetchSesion({ status: 200, body: { role: "bodega" } });
     render(<LoginPage />);
     await waitFor(() =>
-      expect(screen.queryByPlaceholderText("Contraseña")).not.toBeNull(),
+      expect(document.querySelector('input[type="password"]')).not.toBeNull(),
     );
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText("Tu sesión expiró. Inicia sesión de nuevo.")).toBeTruthy();
+    expect(screen.getByText(/sesión expiró/i)).toBeTruthy(); // el texto cambia con LOGIN_RETOQUES_2026_10
   });
 });
