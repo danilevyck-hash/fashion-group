@@ -27,7 +27,7 @@ vi.hoisted(() => {
 // ── Doble de PostgREST ──────────────────────────────────────────────────────
 type Fila = Record<string, unknown>;
 const tablas: Record<string, Fila[]> = {};
-/** Columnas que la base dice NO tener (para probar el falla-abierto). */
+/** Columnas cuya lectura la base contesta con error. */
 const columnasAusentes = new Set<string>();
 
 class Consulta implements PromiseLike<{ data: unknown; error: unknown }> {
@@ -431,11 +431,11 @@ describe("el Excel que va dentro del ZIP", () => {
     expect(excel.gastos).toBe(2);
   });
 
-  it("sin la columna `se_reporta` el archivo sale como antes — falla ABIERTO", async () => {
+  it("🔴 un error de la base al leer `se_reporta` NO se traga: el archivo no sale con todo «como antes»", async () => {
+    // Hasta el 9-oct-2026 se releía sin la columna y lo NO reportable entraba
+    // al ZIP de la marca. La columna existe: el error falla con su error.
     columnasAusentes.add("se_reporta");
-    const excel = await buildExcelDeMarca({ marcaCodigo: "TH" });
-    expect(excel.gastos).toBe(3); // entran las tres, como hoy
-    expect(excel.total).toBe(1149);
+    await expect(buildExcelDeMarca({ marcaCodigo: "TH" })).rejects.toThrow(/se_reporta/);
   });
 
   it("una marca al «50 %» cobra el total entero, no la mitad", async () => {

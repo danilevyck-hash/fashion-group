@@ -13,12 +13,8 @@ import {
 } from "./normalizar";
 import { esPathStorage } from "./storage";
 import { sellarDocumento, proveedoresDeMarcaIds } from "./periodos-io";
-import {
-  conRespaldoSinColumnas,
-  sinColumnasDelRediseno,
-} from "./columnas-opcionales";
-import { columnasDelGasto, traeColumnasDelGasto } from "./puerta-gasto";
-import { columnasDeProveedores, traeColumnasDeProveedores } from "./proveedores-2026-10";
+import { columnasDelGasto } from "./puerta-gasto";
+import { columnasDeProveedores } from "./proveedores-2026-10";
 import {
   exigirTiendaDelDirectorio,
   frenarFacturaDuplicada,
@@ -257,31 +253,6 @@ export async function restaurarProyecto(id: string): Promise<void> {
 export const MSG_SIN_CLIENTE_SIN_DDL =
   "Para registrar un gasto sin cliente falta correr la actualización de la base de datos. Mientras tanto, selecciona un cliente.";
 
-/**
- * El `insert` de la factura CON las columnas del rediseño y, si la base dijera
- * que no existen, el MISMO insert sin ellas (`columnas-opcionales.ts`, falla
- * abierta). Sin columnas nuevas en el payload no hay reintento que hacer.
- */
-async function insertarFacturaConRespaldo(payload: Record<string, unknown>) {
-  const insertar = (p: Record<string, unknown>) =>
-    supabaseServer.from("mk_facturas").insert(p).select("*").single();
-  const traeNuevas = [
-    "se_reporta",
-    "tienda_codigo",
-    "nota",
-    // PROVEEDORES (6-oct-2026): la columna nueva falla abierta igual.
-    "pct_a_la_marca",
-  ].some((c) => c in payload);
-  if (!traeNuevas) {
-    return { resultado: await insertar(payload), conLasColumnas: true };
-  }
-  return conRespaldoSinColumnas(
-    () => insertar(payload),
-    () => insertar(sinColumnasDelRediseno(payload)),
-    (m) => console.error(m),
-  );
-}
-
 export async function createFactura(
   input: CreateFacturaInput
 ): Promise<MkFactura> {
@@ -349,7 +320,7 @@ export async function createFactura(
     ...colsProveedores,
   };
 
-  const { resultado } = await insertarFacturaConRespaldo(payload);
+  const resultado = await supabaseServer.from("mk_facturas").insert(payload).select("*").single();
   const { data, error } = resultado;
   if (error || !data) {
     // Pre-DDL: el CHECK viejo rechaza proyecto e impulsadora los dos en NULL.
@@ -455,16 +426,12 @@ export async function updateFactura(
     await frenarSiEditarDejaDuplicado(id, payload);
   }
 
-  const actualizar = (p: Record<string, unknown>) =>
-    supabaseServer.from("mk_facturas").update(p).eq("id", id).select("*").single();
-  const { resultado } = traeColumnasDelGasto(cols) || traeColumnasDeProveedores(colsProveedores)
-    ? await conRespaldoSinColumnas(
-        () => actualizar(payload),
-        () => actualizar(sinColumnasDelRediseno(payload)),
-        (m) => console.error(m),
-      )
-    : { resultado: await actualizar(payload) };
-  const { data, error } = resultado;
+  const { data, error } = await supabaseServer
+    .from("mk_facturas")
+    .update(payload)
+    .eq("id", id)
+    .select("*")
+    .single();
   if (error || !data) {
     throw new Error(`updateFactura: ${error?.message ?? "sin datos"}`);
   }
@@ -476,16 +443,11 @@ async function frenarSiEditarDejaDuplicado(
   id: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  // `tienda_codigo` es del rediseño: sin la columna se relee sin ella y la
-  // fila cuenta como «General» — el freno queda más suelto, nunca más
-  // apretado. Falla ABIERTA.
-  const leer = (columnas: string) =>
-    supabaseServer.from("mk_facturas").select(columnas).eq("id", id).maybeSingle();
-  const { resultado } = await conRespaldoSinColumnas<unknown>(
-    () => leer("proveedor, total, fecha_factura, impulsadora_id, numero_factura, tienda_codigo"),
-    () => leer("proveedor, total, fecha_factura, impulsadora_id, numero_factura"),
-  );
-  const { data, error } = resultado;
+  const { data, error } = await supabaseServer
+    .from("mk_facturas")
+    .select("proveedor, total, fecha_factura, impulsadora_id, numero_factura, tienda_codigo")
+    .eq("id", id)
+    .maybeSingle();
   if (error || !data) return; // sin fila no hay con qué comparar; el update dirá lo suyo
   const fila = data as {
     proveedor: string | null;

@@ -665,7 +665,8 @@ describe("6 · 🔴 las tres columnas viajan en el MISMO guardado, y solo si la 
   it("candado estático: las tres puertas del servidor leen las columnas por `columnasDelGasto` y las rutas las pasan", () => {
     for (const rel of ["src/lib/marketing/mutations.ts", "src/lib/marketing/inventario.ts", "src/lib/marketing/impulsadoras.ts"]) {
       expect(sinComentarios(leer(rel)), rel).toMatch(/columnasDelGasto\(input\)/);
-      expect(sinComentarios(leer(rel)), rel).toMatch(/conRespaldoSinColumnas\(/);
+      // Las columnas ya existen (9-oct-2026): se escriben directo, sin reintento.
+      expect(sinComentarios(leer(rel)), rel).not.toMatch(/conRespaldoSinColumnas|sinColumnasDelRediseno/);
     }
     for (const rel of [
       "src/app/api/marketing/facturas/route.ts",

@@ -7,7 +7,7 @@ import {
   renombrarPeriodo,
 } from "@/lib/marketing/periodos-io";
 import { supabaseServer } from "@/lib/supabase-server";
-import { completarPeriodo, esColumnaAusente } from "@/lib/marketing/columnas-opcionales";
+import { completarPeriodo } from "@/lib/marketing/columnas-opcionales";
 import { zipsDelPeriodo } from "@/lib/marketing/zips-del-periodo";
 import { ZIP_E_IMPULSADORAS_NUEVO } from "@/lib/marketing/zip-e-impulsadoras";
 
@@ -27,8 +27,8 @@ const MSG_SIN_TABLAS =
 // desde el 22-sep-2026 con cada ZIP que se baja (`zips-bajados.ts`), y hasta
 // hoy NADIE lo mostraba. Esta puerta solo LEE esa columna — ni un `update`.
 //
-// 🔴 Falla ABIERTA: sin la columna (`columnas-opcionales.ts`) contesta lista
-// vacía y lo dice en `sinMigracion`; la pantalla entonces no dibuja nada.
+// `sinMigracion` se conserva en la respuesta (siempre `false` desde el
+// 9-oct-2026: la columna existe) porque la pantalla lo lee.
 // ────────────────────────────────────────────────────────────────────────────
 export async function GET(
   req: NextRequest,
@@ -48,12 +48,7 @@ export async function GET(
       .select("id, zips_bajados")
       .eq("id", params.id)
       .maybeSingle();
-    if (error) {
-      if (esColumnaAusente(error)) {
-        return NextResponse.json({ zips: [], sinMigracion: true });
-      }
-      throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
     const fila = completarPeriodo((data ?? {}) as Record<string, unknown>);
     return NextResponse.json({
       zips: zipsDelPeriodo(fila.zips_bajados),

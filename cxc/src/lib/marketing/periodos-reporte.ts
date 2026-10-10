@@ -21,7 +21,7 @@
 //
 // 🔴 «¿SE REPORTA A LA MARCA?» (rediseño, 22-sep-2026). Con el interruptor
 // `MARKETING_PORTADA_REDISENO` prendido, `cargarDatosPeriodos` trae
-// `se_reporta` (por `conRespaldoSinColumnas`: sin la columna, todo prendido)
+// `se_reporta`
 // y un gasto apagado NO entra en las líneas ni en los totales del reporte —
 // pero SÍ entra en `documentos`, porque el sello dice a qué período pertenece
 // y un gasto apagado también se registró en este período. Sellarlo evita que
@@ -30,7 +30,6 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { esMultifashion } from "@/lib/marketing/multifashion";
-import { conRespaldoSinColumnas } from "./columnas-opcionales";
 import { sumaEnElPeriodo } from "./periodo-estado";
 import { MARKETING_PORTADA_REDISENO } from "./portada-rediseno";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
@@ -218,36 +217,19 @@ const COLS_FACTURA =
 const COLS_ENTREGA =
   "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, notas, created_at";
 
-const avisarColumna = (m: string) => console.error(`[marketing/periodos-reporte] ${m}`);
 
 export async function cargarDatosPeriodos(): Promise<DatosPeriodos> {
   const excluir = MARKETING_PORTADA_REDISENO;
   const [factRes, fmRes, proyRes, marcasRes, entRes, adjRes, perRes, selloRes] =
     await Promise.all([
-      // `se_reporta` es del rediseño: se pide, y si la columna no está se
-      // relee sin ella (todo prendido, como hoy). Un timeout o un permiso no
-      // caen al respaldo: `esColumnaAusente` los deja pasar como error.
-      conRespaldoSinColumnas<FacturaFila[]>(
-        () =>
-          supabaseServer
-            .from("mk_facturas")
-            .select(`${COLS_FACTURA}, se_reporta`)
-            .is("anulado_en", null),
-        () => supabaseServer.from("mk_facturas").select(COLS_FACTURA).is("anulado_en", null),
-        avisarColumna,
-      ).then((r) => r.resultado),
+      supabaseServer.from("mk_facturas").select(`${COLS_FACTURA}, se_reporta`).is("anulado_en", null),
       supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id, porcentaje"),
       supabaseServer
         .from("mk_proyectos")
         .select("id, nombre, tienda, tienda_codigo")
         .is("anulado_en", null),
       supabaseServer.from("mk_marcas").select("id, nombre, codigo, empresa_codigo"),
-      conRespaldoSinColumnas<EntregaFila[]>(
-        () =>
-          supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA}, se_reporta`),
-        () => supabaseServer.from("mk_entregas_muebles").select(COLS_ENTREGA),
-        avisarColumna,
-      ).then((r) => r.resultado),
+      supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA}, se_reporta`),
       supabaseServer.from("mk_adjuntos").select("tipo, factura_id, proyecto_id"),
       supabaseServer
         .from("mk_periodos")

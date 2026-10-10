@@ -8,9 +8,8 @@
 // totales los hace el módulo PURO (`lib/marketing/proveedores-2026-10.ts`); acá
 // solo se leen las filas y se les pone el nombre de la marca y de la tienda.
 //
-// 🔴 Falla ABIERTA sin la migración `20270101120000_mkt_proveedores.sql`: se
-// relee sin `destino_sin_marca` y toda factura sin marca sale como «Costo
-// propio», que es lo que hay hoy (`columnas-opcionales.ts`).
+// `pct_a_la_marca` existe en producción (9-oct-2026): se lee directo y un
+// error de lectura falla con su error.
 //
 // 🔴 Apagado el interruptor contesta **404**: la pestaña no existe todavía.
 // ============================================================================
@@ -21,7 +20,6 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { TIENDA_GENERAL } from "@/lib/marketing/gasto";
-import { esColumnaAusente } from "@/lib/marketing/columnas-opcionales";
 import {
   MKT_PROVEEDORES_2026_10,
   fichaDeProveedor,
@@ -33,10 +31,8 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const COLUMNAS_CON =
+const COLUMNAS =
   "id, numero_factura, fecha_factura, proveedor, concepto, total, se_reporta, tienda_codigo, pct_a_la_marca, impulsadora_id";
-const COLUMNAS_SIN =
-  "id, numero_factura, fecha_factura, proveedor, concepto, total, se_reporta, tienda_codigo, impulsadora_id";
 
 interface FilaFactura {
   id: string;
@@ -60,10 +56,7 @@ export async function GET(req: NextRequest) {
   try {
     // 🔴 Solo las VIVAS: lo anulado no sale del servidor hacia ninguna pantalla
     // (23-sep-2026, «el período manda»).
-    const leer = (cols: string) =>
-      supabaseServer.from("mk_facturas").select(cols).is("anulado_en", null).limit(2000);
-    let res = await leer(COLUMNAS_CON);
-    if (res.error && esColumnaAusente(res.error)) res = await leer(COLUMNAS_SIN);
+    const res = await supabaseServer.from("mk_facturas").select(COLUMNAS).is("anulado_en", null).limit(2000);
     if (res.error) throw new Error(res.error.message);
     const filas = (res.data ?? []) as unknown as FilaFactura[];
 

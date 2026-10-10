@@ -412,10 +412,10 @@ describe("5. el ZIP lleva las fotos de la tienda del período, sin duplicar", ()
     expect(out.get("Nova Lux")).toBeUndefined();
   });
 
-  it("el armador recibe el período de la descarga y lee las columnas con respaldo", () => {
+  it("el armador recibe el período de la descarga y lee las columnas de la foto de tienda", () => {
     const src = leer("src/lib/marketing/zip-marca.ts");
     expect(src).toMatch(/periodoId: periodo\.id/);
-    expect(src).toMatch(/conRespaldoSinColumnas<AdjuntoFila\[\]>/);
+    expect(src).not.toMatch(/conRespaldoSinColumnas/);
     expect(src).toMatch(/tienda_codigo, periodo_id/);
   });
 });

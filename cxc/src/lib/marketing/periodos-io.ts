@@ -38,10 +38,6 @@
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
-import {
-  conRespaldoSinColumnas,
-  sinColumnasDelRediseno,
-} from "./columnas-opcionales";
 import type { PatchDeCierre, PeriodoSiguiente } from "./periodo-estado";
 import {
   SIN_BLOQUE,
@@ -445,21 +441,21 @@ export async function cerrarPeriodo(
 
 /**
  * Deshace `cerrarPeriodo` o `cerrarPeriodoConNombre`. Solo se usa si abrir el
- * siguiente falló. Borra también el nombre y la nota del rediseño; sin esas
- * columnas se reescribe sin ellas (`columnas-opcionales`).
+ * siguiente falló. Borra también el nombre y la nota del rediseño.
  */
 export async function reabrirPeriodo(id: string): Promise<void> {
-  const base = { estado: "abierto", cerrado_en: null, cerrado_por: null, reporte: null };
-  const { resultado } = await conRespaldoSinColumnas(
-    () =>
-      supabaseServer
-        .from("mk_periodos")
-        .update({ ...base, nombre_al_cerrar: null, nota_credito: null })
-        .eq("id", id),
-    () => supabaseServer.from("mk_periodos").update(base).eq("id", id),
-    (m) => avisar("reabrirPeriodo", m),
-  );
-  if (resultado.error) throw comoError(resultado.error, "reabrirPeriodo");
+  const { error } = await supabaseServer
+    .from("mk_periodos")
+    .update({
+      estado: "abierto",
+      cerrado_en: null,
+      cerrado_por: null,
+      reporte: null,
+      nombre_al_cerrar: null,
+      nota_credito: null,
+    })
+    .eq("id", id);
+  if (error) throw comoError(error, "reabrirPeriodo");
 }
 
 /**
@@ -468,9 +464,6 @@ export async function reabrirPeriodo(id: string): Promise<void> {
  * ya armado por `armarCierre` (periodo-estado.ts) y NO escribe `reporte`:
  * cerrar no genera nada — Daniel, *«cuando lo cierro es porque lo cobré»*.
  *
- * Sin las columnas nuevas (la migración sin correr) se cierra igual, sin
- * nombre ni nota, y queda rastro en el log (`columnas-opcionales`).
- *
  * No abre el siguiente: eso lo hace `abrirPeriodoSiguiente`, y el orden
  * importa (el índice único deja UN solo abierto por marca).
  */
@@ -478,22 +471,12 @@ export async function cerrarPeriodoConNombre(
   id: string,
   patch: PatchDeCierre,
 ): Promise<void> {
-  const { resultado } = await conRespaldoSinColumnas(
-    () =>
-      supabaseServer
-        .from("mk_periodos")
-        .update(patch)
-        .eq("id", id)
-        .eq("estado", "abierto"),
-    () =>
-      supabaseServer
-        .from("mk_periodos")
-        .update(sinColumnasDelRediseno(patch as unknown as Record<string, unknown>))
-        .eq("id", id)
-        .eq("estado", "abierto"),
-    (m) => avisar("cerrarPeriodoConNombre", m),
-  );
-  if (resultado.error) throw comoError(resultado.error, "cerrarPeriodoConNombre");
+  const { error } = await supabaseServer
+    .from("mk_periodos")
+    .update(patch)
+    .eq("id", id)
+    .eq("estado", "abierto");
+  if (error) throw comoError(error, "cerrarPeriodoConNombre");
 }
 
 /**

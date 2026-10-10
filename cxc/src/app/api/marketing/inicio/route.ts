@@ -14,7 +14,6 @@ import {
 } from "@/lib/marketing/resumen-bloques";
 import {
   completarPeriodo,
-  conRespaldoSinColumnas,
 } from "@/lib/marketing/columnas-opcionales";
 import {
   MARKETING_PORTADA_REDISENO,
@@ -53,7 +52,6 @@ export const fetchCache = "force-no-store";
 const COLS_FACTURA = "id, proyecto_id, total, grupo_legacy, impulsadora_id";
 const COLS_ENTREGA = "id, proyecto_id, total, total_por_marca, total_por_empresa_interna";
 const COLS_PERIODO = "id, proveedor_key, nombre, estado, cerrado_en";
-const avisarColumna = (m: string) => console.error(`[marketing/inicio] ${m}`);
 // 🔴 SOLO LO COBRABLE (apagado): también el porcentaje que se le cobra a la marca.
 const COLS_FACTURA_LEIDAS: string = MKT_SOLO_COBRABLE_2026_10
   ? `${COLS_FACTURA}, se_reporta, tienda_codigo, pct_a_la_marca`
@@ -82,38 +80,21 @@ export async function GET(req: NextRequest) {
       perRes,
       selloRes,
     ] = await Promise.all([
-        conRespaldoSinColumnas(
-          () =>
-            supabaseServer
-              .from("mk_facturas")
-              .select(COLS_FACTURA_LEIDAS)
-              .is("anulado_en", null) as never,
-          () => supabaseServer.from("mk_facturas").select(COLS_FACTURA).is("anulado_en", null),
-          avisarColumna,
-        ).then((r) => r.resultado),
+        supabaseServer.from("mk_facturas").select(COLS_FACTURA_LEIDAS).is("anulado_en", null),
         supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id, porcentaje"),
         supabaseServer
           .from("mk_proyectos")
           .select("id, tienda, tienda_codigo")
           .is("anulado_en", null),
         supabaseServer.from("mk_marcas").select("id, nombre, codigo, empresa_codigo"),
-        conRespaldoSinColumnas(
-          () => supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA}, se_reporta, tienda_codigo`),
-          () => supabaseServer.from("mk_entregas_muebles").select(COLS_ENTREGA),
-          avisarColumna,
-        ).then((r) => r.resultado),
+        supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA}, se_reporta, tienda_codigo`),
         supabaseServer.from("mk_impulsadoras").select("id, monto_mensual, activa"),
         // Comprobantes y fotos: alimentan los dos AVISOS del bloque. Si esta
         // lectura falla, los avisos salen en cero y la plata se dibuja igual.
         supabaseServer.from("mk_adjuntos").select("tipo, factura_id, proyecto_id"),
-        conRespaldoSinColumnas(
-          () =>
-            supabaseServer
-              .from("mk_periodos")
-              .select(`${COLS_PERIODO}, abierto_en, nombre_al_cerrar, nota_credito`),
-          () => supabaseServer.from("mk_periodos").select(`${COLS_PERIODO}, abierto_en`),
-          avisarColumna,
-        ).then((r) => r.resultado),
+        supabaseServer
+          .from("mk_periodos")
+          .select(`${COLS_PERIODO}, abierto_en, nombre_al_cerrar, nota_credito`),
         supabaseServer
           .from("mk_periodo_documentos")
           .select("periodo_id, proveedor_key, tipo, documento_id"),

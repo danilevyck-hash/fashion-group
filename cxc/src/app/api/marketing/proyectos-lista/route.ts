@@ -4,7 +4,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { esMultifashion, MULTIFASHION_CODIGOS } from "@/lib/marketing/multifashion";
 import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { MARKETING_TIENDAS_Y_MARCAS } from "@/lib/marketing/tiendas-y-marcas";
-import { conRespaldoSinColumnas } from "@/lib/marketing/columnas-opcionales";
 import { MARKETING_PORTADA_REDISENO } from "@/lib/marketing/portada-rediseno";
 import {
   marcasDeEntrega,
@@ -130,25 +129,14 @@ export async function GET(req: NextRequest) {
       // TODAS las facturas vivas — las de proyecto y las sueltas (proyecto_id
       // null) en UNA lectura: las dos alimentan al agregador, y las columnas
       // extra son las que la fila General necesita para describir el gasto.
-      // `se_reporta` es del rediseño (22-sep-2026): si la columna no está, se
-      // relee sin ella y todo cuenta como hoy (`columnas-opcionales`).
-      conRespaldoSinColumnas(
-        () =>
-          supabaseServer
-            .from("mk_facturas")
-            .select(`${COLS_FACTURA_LISTA}, se_reporta, tienda_codigo`)
-            .is("anulado_en", null),
-        () => supabaseServer.from("mk_facturas").select(COLS_FACTURA_LISTA).is("anulado_en", null),
-        (m) => console.error(`[marketing/proyectos-lista] ${m}`),
-      ).then((r) => r.resultado),
+      supabaseServer
+        .from("mk_facturas")
+        .select(`${COLS_FACTURA_LISTA}, se_reporta, tienda_codigo`)
+        .is("anulado_en", null),
       supabaseServer
         .from("mk_factura_marcas")
         .select("factura_id, marca_id, porcentaje"),
-      conRespaldoSinColumnas(
-        () => supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA_LISTA}, se_reporta, tienda_codigo`),
-        () => supabaseServer.from("mk_entregas_muebles").select(COLS_ENTREGA_LISTA),
-        (m) => console.error(`[marketing/proyectos-lista] ${m}`),
-      ).then((r) => r.resultado),
+      supabaseServer.from("mk_entregas_muebles").select(`${COLS_ENTREGA_LISTA}, se_reporta, tienda_codigo`),
       supabaseServer.from("mk_adjuntos").select("tipo, factura_id, proyecto_id"),
       supabaseServer
         .from("mk_periodos")
