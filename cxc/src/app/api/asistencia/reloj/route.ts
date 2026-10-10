@@ -24,8 +24,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
 import {
   DISPOSITIVO_FG,
-  avisoMigracionAgente,
-  esColumnaFaltante,
   estadoAgente,
   type FilaDispositivo,
 } from "@/lib/asistencia/agente";
@@ -73,10 +71,10 @@ export async function GET(req: NextRequest) {
       agenteVersion: f.agente_version ?? null,
       ...estadoAgente(f, ahora),
     })),
-    // `pedido_en` no está en la fila ⇒ la migración no corrió ⇒ el botón se
-    // muestra deshabilitado con el nombre del archivo que falta.
-    faltaMigracion: filas.length > 0 && !("pedido_en" in (filas[0] as object)),
-    avisoMigracion: avisoMigracionAgente(),
+    // Se conservan porque la pantalla los lee. Fijos desde el 9-oct-2026: las
+    // columnas del agente existen en `asistencia_dispositivos`.
+    faltaMigracion: false,
+    avisoMigracion: null,
   });
 }
 
@@ -109,12 +107,6 @@ export async function POST(req: NextRequest) {
   );
 
   if (error) {
-    if (esColumnaFaltante(error)) {
-      return NextResponse.json(
-        { error: avisoMigracionAgente(), faltaMigracion: true },
-        { status: 503 },
-      );
-    }
     console.error("[asistencia/reloj POST]", error.message);
     return NextResponse.json({ error: "No se pudo enviar el pedido." }, { status: 500 });
   }

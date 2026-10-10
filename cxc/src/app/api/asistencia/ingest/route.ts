@@ -26,7 +26,6 @@ import { normalizarEventos, ultimoInstante, type EventoCrudo } from "@/lib/asist
 import { guardarMarcaciones } from "@/lib/asistencia/guardar-marcaciones";
 import {
   decidirLeidoHasta,
-  esColumnaFaltante,
   nombreRelojEnPantalla,
   type FilaDispositivo,
 } from "@/lib/asistencia/agente";
@@ -58,13 +57,8 @@ async function guardarEstado(
   const { error } = await supabaseServer
     .from("asistencia_dispositivos")
     .upsert({ ...base, ...extra }, { onConflict: "dispositivo" });
-  if (!error) return { faltaMigracion: false };
-  if (!esColumnaFaltante(error)) {
-    console.error("[asistencia/ingest] no se pudo guardar el estado:", error.message);
-    return { faltaMigracion: false };
-  }
-  await supabaseServer.from("asistencia_dispositivos").upsert(base, { onConflict: "dispositivo" });
-  return { faltaMigracion: true };
+  if (error) console.error("[asistencia/ingest] no se pudo guardar el estado:", error.message);
+  return { faltaMigracion: false };
 }
 
 /** El renglón actual del reloj. `select("*")` a propósito: trae las columnas

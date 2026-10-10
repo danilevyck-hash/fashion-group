@@ -28,37 +28,7 @@ import { desdeDeLaVentana, motivosFrecuentes } from "./motivos-frecuentes";
 import { hoyPanama } from "@/lib/fecha-panama";
 
 /** Las columnas que se leen. Una sola lista, para que no se puedan separar. */
-const COLS_BASE =
-  "id, marcacion_id, empleado_codigo, fecha, hora, motivo, creada_por, creada_en";
-
-/**
- * 🩸 `quita` SE LEE APARTE, Y NO ES UN CAPRICHO (14-sep-2026). Si la migración
- * `20261128120000` no corrió, PostgREST contesta «column
- * asistencia_correcciones.quita does not exist» — un mensaje que NOMBRA LA
- * TABLA y dice «does not exist», o sea exactamente lo que `esTablaFaltante`
- * busca. Sin este apartado, faltar UNA COLUMNA se leería como «falta la tabla»
- * y el resultado sería CERO correcciones en silencio: la planilla se pagaría
- * con las horas del reloj, que es justo lo que alguien corrigió. Se memoriza
- * para no pagar dos consultas por lectura.
- */
-let hayColumnaQuita: boolean | null = null;
-
-function cols(): string {
-  return hayColumnaQuita === false ? COLS_BASE : `${COLS_BASE}, quita`;
-}
-
-/** ¿Este error es «esa COLUMNA no existe»? Se mira el nombre de la columna. */
-function esColumnaFaltante(err: unknown, columna: string): boolean {
-  if (!err) return false;
-  const e = err as { code?: string | null; message?: string | null };
-  const texto = String(e.message ?? "");
-  if (!texto.includes(columna)) return false;
-  return (
-    String(e.code ?? "") === "42703" ||
-    String(e.code ?? "") === "PGRST204" ||
-    /does not exist|no existe|could not find|schema cache/i.test(texto)
-  );
-}
+const COLS = "id, marcacion_id, empleado_codigo, fecha, hora, motivo, creada_por, creada_en, quita";
 
 interface FilaCorreccion {
   id: string;
@@ -115,7 +85,7 @@ export async function leerCorrecciones(
       (pedirCount, from, to) =>
         supabaseServer
           .from(TABLA_CORRECCIONES)
-          .select(cols(), pedirCount ? { count: "exact" } : {})
+          .select(COLS, pedirCount ? { count: "exact" } : {})
           .is("anulada_en", null)
           .gte("fecha", desde)
           .lte("fecha", hasta)
@@ -123,16 +93,9 @@ export async function leerCorrecciones(
           .order("id", { ascending: true })
           .range(from, to),
     );
-    hayColumnaQuita = hayColumnaQuita ?? true;
     return { correcciones: filas.map(aCorreccion), faltaMigracion: false };
   } catch (e) {
     const err = errorDeLectura(e);
-    // 🔴 PRIMERO la columna, DESPUÉS la tabla. Al revés, faltar `quita` se
-    // leería como faltar la tabla entera y se perderían TODAS las correcciones.
-    if (hayColumnaQuita !== false && esColumnaFaltante(err, "quita")) {
-      hayColumnaQuita = false;
-      return leerCorrecciones(desde, hasta);
-    }
     if (esTablaFaltante(err, TABLA_CORRECCIONES)) {
       return { correcciones: [], faltaMigracion: true };
     }
@@ -171,17 +134,12 @@ export async function leerHistorialDelDia(
 ): Promise<{ historial: CorreccionHistorial[]; faltaMigracion: boolean }> {
   const { data, error } = await supabaseServer
     .from(TABLA_CORRECCIONES)
-    .select(`${cols()}, anulada_en, anulada_por`)
+    .select(`${COLS}, anulada_en, anulada_por`)
     .eq("empleado_codigo", codigo)
     .eq("fecha", fecha)
     .order("creada_en", { ascending: false });
 
   if (error) {
-    // El mismo orden que arriba: la columna antes que la tabla.
-    if (hayColumnaQuita !== false && esColumnaFaltante(error, "quita")) {
-      hayColumnaQuita = false;
-      return leerHistorialDelDia(codigo, fecha);
-    }
     if (esTablaFaltante(error, TABLA_CORRECCIONES)) {
       return { historial: [], faltaMigracion: true };
     }

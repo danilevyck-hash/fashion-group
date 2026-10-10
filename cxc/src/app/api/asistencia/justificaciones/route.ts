@@ -16,9 +16,7 @@ import { esDiaLibreDeLaEmpresa, motivosParaElegir, motivoSeOfrece } from "@/lib/
 import { avisoMigracionDiaLibre } from "@/lib/asistencia/dia-libre-empresa";
 import { cargarDeudasDiaLibre } from "@/lib/asistencia/dia-libre-empresa-server";
 import {
-  avisoMigracionPermisoHoras,
   COLS_PERMISO_HORAS,
-  esColumnaPermisoHorasFaltante,
   motivoAdmiteHoras,
   motivoExigeHoras,
   ventanaDe,
@@ -60,15 +58,10 @@ export async function GET(req: NextRequest) {
   // lo que pase en la URL. Sin recorte, lo pedido tal cual.
   const alcance = alcanceDelRol(auth.role);
   const empresaFiltro = empresaForzada(alcance, empresaParaPedir(sp.get("empresa")));
-  let [{ data, error }, { personas, faltaMigracion, filas }] = await Promise.all([
+  const [{ data, error }, { personas, faltaMigracion, filas }] = await Promise.all([
     armar(`${COLS_BASE}, ${COLS_PERMISO_HORAS.join(", ")}`),
     leerPersonasDelModulo(),
   ]);
-  let faltaHoras = false;
-  if (error && esColumnaPermisoHorasFaltante(error)) {
-    faltaHoras = true;
-    ({ data, error } = await armar(COLS_BASE));
-  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   // 🔴 Filtro por empresa (10-sep-2026): las justificaciones de la gente de ESA empresa.
   const empresaDe = new Map(filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]));
@@ -82,10 +75,10 @@ export async function GET(req: NextRequest) {
     // justificación a alguien que no es de su empresa.
     personas: personas.filter((p) => empresaEnAlcance(alcance, empresaDe.get(String(p.codigo)) ?? null)),
     faltaMigracion,
-    // Sin las columnas, la pantalla no ofrece las horas y lo dice de entrada,
-    // no al fallar el guardado.
-    puedeCargarHoras: !faltaHoras,
-    avisoMigracionHoras: faltaHoras ? avisoMigracionPermisoHoras() : null,
+    // Se conservan porque la pantalla los lee. Fijos desde el 9-oct-2026: las
+    // columnas `hora_desde` / `hora_hasta` existen en producción.
+    puedeCargarHoras: true,
+    avisoMigracionHoras: null,
   });
 }
 
@@ -193,25 +186,9 @@ export async function POST(req: NextRequest) {
     nota: (b.nota ?? "").trim() || null,
     registrado_por: auth.userName ?? auth.role,
   };
-  let { error } = await supabaseServer.from("asistencia_justificaciones").insert(
+  const { error } = await supabaseServer.from("asistencia_justificaciones").insert(
     pidioHoras ? { ...base, hora_desde: horaDesde, hora_hasta: horaHasta } : base,
   );
-
-  // 🩸 FALTAN LAS COLUMNAS. Misma bifurcación que el resto del módulo:
-  //  · si NO se pidieron horas, se reintenta sin ellas y cargar una
-  //    justificación de día entero sigue funcionando igual que ayer;
-  //  · si SÍ se pidieron, NO se guarda a medias. Una justificación que se traga
-  //    las horas pasa a justificar el DÍA ENTERO —ocho horas de sueldo— y nadie
-  //    sabría por qué.
-  if (error && esColumnaPermisoHorasFaltante(error)) {
-    if (pidioHoras) {
-      return NextResponse.json(
-        { error: avisoMigracionPermisoHoras(), faltaMigracionHoras: true },
-        { status: 503 },
-      );
-    }
-    ({ error } = await supabaseServer.from("asistencia_justificaciones").insert(base));
-  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

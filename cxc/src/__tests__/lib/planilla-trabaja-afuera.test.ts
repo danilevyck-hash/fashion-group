@@ -367,11 +367,12 @@ describe("7. se dice en pantalla, y la columna se lee APARTE de las fichas", () 
       expect(src).toContain("trabajaAfuera: afuera");
     }
   });
-  it("🔴 la columna NO entra al `select` de las fichas (la migración está sin aplicar): se lee aparte y tolerante", () => {
+  it("la columna NO entra al `select` de las fichas: se lee aparte, y un error de lectura se propaga", () => {
     const src = puro("src/lib/asistencia/config-server.ts");
     expect(src).not.toMatch(/const COLS_[A-Z_]+ = `[^`]*TRABAJA_AFUERA/);
     expect(src).toContain("export async function leerTrabajaAfuera()");
-    expect(src).toContain("if (esColumnaTrabajaAfueraFaltante(error)) return new Set();");
+    expect(src).not.toContain("esColumnaTrabajaAfueraFaltante");
+    expect(src).not.toContain("esColumnaReponeTardanzaFaltante");
   });
   it("el PUT la escribe en un `update` propio, nunca dentro del upsert de la ficha", () => {
     const src = puro("src/app/api/asistencia/configuracion/route.ts");

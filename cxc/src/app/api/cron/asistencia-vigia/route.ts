@@ -56,7 +56,6 @@ import { borrarSelfiesVencidas } from "@/lib/marcacion/retencion";
 import {
   HORAS_PARA_VIGIA,
   DIAS_RECUPERACION_AGENTE,
-  esColumnaFaltante,
   nombreRelojEnPantalla,
   textoSilencio,
   textoHuecoViejo,
@@ -111,13 +110,8 @@ export async function GET(req: NextRequest) {
       .eq("dispositivo", f.dispositivo);
 
     if (errUpd) {
-      // Sin la migración corrida no hay `alertado_en`, o sea que no hay candado
-      // contra repetir. Se prefiere NO avisar: un aviso diario e idéntico se
-      // vuelve ruido en tres días y ahí se pierde la próxima alerta de verdad.
-      if (esColumnaFaltante(errUpd)) {
-        console.warn("[asistencia-vigia] falta la migración del agente; no se avisa");
-        continue;
-      }
+      // Sin poder marcar `alertado_en` no hay candado contra repetir: se
+      // prefiere NO avisar, y se dice en el log como el error que es.
       console.error("[asistencia-vigia] no se pudo marcar el aviso:", errUpd.message);
       continue;
     }
@@ -158,10 +152,6 @@ export async function GET(req: NextRequest) {
           .eq("dispositivo", f.dispositivo);
 
         if (errUpd) {
-          if (esColumnaFaltante(errUpd)) {
-            console.warn("[asistencia-vigia] falta la migración del hueco; no se avisa");
-            continue;
-          }
           console.error("[asistencia-vigia] no se pudo marcar el hueco:", errUpd.message);
           continue;
         }
