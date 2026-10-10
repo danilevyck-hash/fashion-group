@@ -27,10 +27,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-function esColumnaAusente(err: { message?: string | null } | null): boolean {
-  return /vendedor_switch_id|column/i.test(err?.message ?? "");
-}
-
 /** Nombre del vendedor, best-effort y SIN abrir sesión de Switch si se puede:
  *  primero el mapeo ya guardado (tabla local), después la lista cacheada. */
 async function nombreDeId(empresaKey: string, id: number): Promise<string | null> {
@@ -69,13 +65,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     .select("vendedor_switch_id")
     .eq("id", orderId)
     .single();
-  if (error) {
-    // Columna ausente (DDL pendiente) → sin vendedor asignado, modo legacy.
-    if (esColumnaAusente(error)) {
-      return NextResponse.json({ vendedorSwitchId: null, nombre: null, esFallback: false, ddlPendiente: true });
-    }
-    return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
-  }
+  if (error) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
 
   const vid = (data?.vendedor_switch_id as number | null) ?? null;
   if (vid != null) {
@@ -155,17 +145,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
     );
   }
 
-  let guardado: boolean;
   try {
-    guardado = await guardarVendedorSwitchEnPedido(db, cfg.ordersTable, orderId, parsed.id, nombre);
+    await guardarVendedorSwitchEnPedido(db, cfg.ordersTable, orderId, parsed.id, nombre);
   } catch {
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-  if (!guardado) {
-    return NextResponse.json(
-      { error: `Falta correr la migración de vendedor_switch_id en ${cfg.ordersTable}` },
-      { status: 503 },
-    );
   }
   return NextResponse.json({ ok: true, vendedorSwitchId: parsed.id, nombre });
 }

@@ -253,7 +253,6 @@ export async function urlDeVariante(
 /**
  * Guarda la foto elegida en el producto. `manual` = la eligió una persona →
  * foto_manual=true (candado contra la asignación automática del ZIP).
- * Tolerante a DDL pendiente: si `foto_manual` no existe, guarda solo image_url.
  */
 export async function guardarFotoElegida(
   cfg: MarcaConfig,
@@ -270,26 +269,12 @@ export async function guardarFotoElegida(
     .eq(idField, idValue)
     .select(idField)
     .maybeSingle();
-  if (!conFlag.error) {
-    if (!conFlag.data) throw new Error("Producto no encontrado");
-    // La foto es lo primero que ve el cliente: invalidar aquí cubre de un solo
-    // punto el selector de variantes Y la carga masiva por ZIP (manifiesto),
-    // que es el otro llamador. revalidateTag deduplica por request, así que un
-    // ZIP de 5000 SKUs invalida la tag UNA vez.
-    invalidarCatalogoPublico(cfg.marca);
-    return;
-  }
-  if (!conFlag.error.message.includes("foto_manual")) throw new Error(conFlag.error.message);
-
-  // Fallback pre-migración 20260725120000.
-  const sinFlag = await db
-    .from(cfg.productsTable)
-    .update({ image_url: imageUrl })
-    .eq(idField, idValue)
-    .select(idField)
-    .maybeSingle();
-  if (sinFlag.error) throw new Error(sinFlag.error.message);
-  if (!sinFlag.data) throw new Error("Producto no encontrado");
+  if (conFlag.error) throw new Error(conFlag.error.message);
+  if (!conFlag.data) throw new Error("Producto no encontrado");
+  // La foto es lo primero que ve el cliente: invalidar aquí cubre de un solo
+  // punto el selector de variantes Y la carga masiva por ZIP (manifiesto),
+  // que es el otro llamador. revalidateTag deduplica por request, así que un
+  // ZIP de 5000 SKUs invalida la tag UNA vez.
   invalidarCatalogoPublico(cfg.marca);
 }
 

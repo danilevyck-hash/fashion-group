@@ -285,12 +285,12 @@ describe("PATCH /vendedores-switch", () => {
     expect(envios).toEqual(["estado", "error"]);
   });
 
-  it("sin la columna (DDL pendiente) responde 503 con qué falta correr", async () => {
+  it("🔴 un error de escritura que nombra la columna NO se traga: 500, no «falta la migración»", async () => {
     calvinDb.queue("calvin_switch_envios", { data: null });
     calvinDb.queue("calvin_orders", { data: null, error: { message: 'column "vendedor_switch_id" does not exist' } });
     const res = await vendedoresPatch(patchReq({ orderId: OID, vendedorSwitchId: 9 }), { params: { marca: "calvin" } });
-    expect(res.status).toBe(503);
-    expect((await res.json()).error).toContain("calvin_orders");
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).not.toContain("migración");
   });
 
   it("bodega no puede cambiarlo", async () => {

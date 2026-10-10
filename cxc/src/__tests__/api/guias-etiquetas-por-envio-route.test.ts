@@ -260,33 +260,27 @@ describe("🔴 1. el POST de un envío: UN insert, todo o nada", () => {
 
 // ─── 2 · sin la migración ────────────────────────────────────────────────────
 
-describe("🔴 2. sin la migración de envíos, falla ABIERTA y lo dice", () => {
+describe("🔴 2. las columnas de envío existen: un error que las nombra NO se traga", () => {
+  // Hasta el 9-oct-2026 este error se leía como «falta la migración»: el GET
+  // releía sin las columnas (cada fila un envío suelto) y el POST de una sola
+  // factura se guardaba SIN `envio_id`. Ahora falla con su error.
   beforeEach(() => { sinColumnasDeEnvio = true; });
 
-  it("el GET lee con las columnas de siempre: cada fila es un envío de una (envio_id = id)", async () => {
-    tablas.guias_etiquetas = [etiqueta({ id: 4 }), etiqueta({ id: 10, switch_factura_id: 2 })];
+  it("el GET falla en vez de releer con las columnas de siempre", async () => {
+    tablas.guias_etiquetas = [etiqueta({ id: 4 })];
     const { GET } = await lista();
-    const json = (await (await GET(req())).json()) as { etiquetas: Array<{ id: number; envio_id: string; orden_en_envio: number; nota: null }> };
-    expect(json.etiquetas.map((e) => [e.id, e.envio_id, e.orden_en_envio, e.nota]).sort()).toEqual([
-      [10, "e-1", 1, null],
-      [4, "e-1", 1, null],
-    ].sort());
+    expect((await GET(req())).status).toBeGreaterThanOrEqual(500);
   });
 
-  it("varias facturas: 503 que nombra la migración, nada escrito de verdad", async () => {
+  it("el POST falla y no escribe nada — ni con varias facturas ni con una sola", async () => {
     const { POST } = await lista();
-    const res = await POST(req(envio()));
-    expect(res.status).toBe(503);
-    expect((await res.json()).error).toContain("20261224120000");
+    const varias = await POST(req(envio()));
+    const una = await POST(req(envio({ facturas: [{ switch_factura_id: 1, secuencial: "11-000000001", fecha_factura: "2026-10-01", cajas: 4 }] })));
+    for (const res of [varias, una]) {
+      expect(res.status).toBeGreaterThanOrEqual(500);
+      expect(JSON.stringify(await res.json())).not.toContain("20261224120000");
+    }
     expect(tablas.guias_etiquetas).toHaveLength(0);
-  });
-
-  it("una sola factura sin nota: se guarda como siempre", async () => {
-    const { POST } = await lista();
-    const res = await POST(req(envio({ facturas: [{ switch_factura_id: 1, secuencial: "11-000000001", fecha_factura: "2026-10-01", cajas: 4 }] })));
-    expect(res.status).toBe(201);
-    expect(tablas.guias_etiquetas).toHaveLength(1);
-    expect(tablas.guias_etiquetas[0]).not.toHaveProperty("envio_id");
   });
 });
 

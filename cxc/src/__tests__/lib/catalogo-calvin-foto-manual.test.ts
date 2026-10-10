@@ -93,8 +93,9 @@ describe("el código trata a las cuatro marcas igual, y tolera que la DDL no hay
     }
   });
 
-  it("sin la columna, guardar la foto REINTENTA sin ella en vez de reventar", () => {
-    expect(server).toContain('conFlag.error.message.includes("foto_manual")');
+  it("🔴 la columna existe en las cuatro (9-oct-2026): guardar la foto ya no reintenta sin el candado", () => {
+    expect(server).not.toContain('conFlag.error.message.includes("foto_manual")');
+    expect(server).not.toMatch(/update\(\{ image_url: imageUrl \}\)/);
   });
 
   it("sin la columna, `skusConFotoManual` devuelve vacío (no rompe el ZIP)", () => {

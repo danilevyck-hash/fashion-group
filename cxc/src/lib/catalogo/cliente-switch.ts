@@ -71,9 +71,8 @@ export function errorClienteNoExiste(cfg: MarcaConfig): string {
 }
 
 /**
- * Escribe `cliente_switch_id` en un pedido recién creado, tolerando la DDL
- * 20260705120000 pendiente (misma tolerancia que el checkout y el duplicar).
- * Devuelve `false` si la columna no existe — el pedido queda creado igual.
+ * Escribe `cliente_switch_id` en un pedido recién creado. Si la escritura
+ * falla, lanza.
  */
 export async function guardarClienteSwitchEnPedido(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,12 +80,10 @@ export async function guardarClienteSwitchEnPedido(
   ordersTable: string,
   orderId: string,
   clienteSwitchId: number | null,
-): Promise<boolean> {
+): Promise<void> {
   const { error } = await db
     .from(ordersTable)
     .update({ cliente_switch_id: clienteSwitchId })
     .eq("id", orderId);
-  if (!error) return true;
-  if (/cliente_switch_id|column/i.test(error.message ?? "")) return false;
-  throw new Error(error.message ?? "No se pudo guardar el cliente del pedido");
+  if (error) throw new Error(error.message ?? "No se pudo guardar el cliente del pedido");
 }

@@ -567,16 +567,15 @@ describe("🔴 la cotización sale por /apicotizacion/terminar y NADA MÁS cambi
     expect((db.filas[0] as unknown as Record<string, unknown>).documento).toBe("cotizacion");
   });
 
-  it("🔴 con el DDL pendiente (columna `documento` ausente) la cotización SALE IGUAL", async () => {
-    // Quedarse sin poder enviar por una etiqueta sería peor que no tener la
-    // etiqueta: la escritura reintenta sin la columna.
+  it("🔴 un error de escritura que nombra `documento` NO se traga: no se reintenta sin ella y NADA sale a Switch", async () => {
+    // La columna existe (9-oct-2026). Antes se reinsertaba sin ella y la
+    // cotización salía sin que quedara dicho QUÉ se mandó.
     sembrarArticulo("A", 1);
     const db = dbSinColumnaDocumento();
     const r = await enviar(["A"], { auto: true, documento: "cotizacion" }, db);
-    expect(r.kind).toBe("ok");
-    expect(switchState.cotizacionLlamado).toBe(1);
-    expect(db.registro.inserts).toBe(1);
-    expect((db.filas[0] as unknown as Record<string, unknown>).documento).toBeUndefined();
+    expect(r.kind).toBe("switch_caido");
+    expect(switchState.cotizacionLlamado).toBe(0);
+    expect(db.registro.inserts).toBe(0);
   });
 
   it("🔴 un id que Switch no devolvió NO se inventa: queda null y NO se verifica", async () => {

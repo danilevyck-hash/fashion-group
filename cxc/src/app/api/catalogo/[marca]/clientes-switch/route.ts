@@ -19,10 +19,6 @@ import { errorClienteNoExiste, parsearClienteSwitchId, resolverClienteSwitch } f
 import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
 import { correoDelDirectorio } from "@/lib/catalogo/correo-del-cliente";
 
-function esColumnaAusente(err: { message?: string | null } | null): boolean {
-  return /cliente_switch_id|column/i.test(err?.message ?? "");
-}
-
 // ─── GET: selector + cliente asignado a un pedido ────────────────────────────
 
 export async function GET(req: NextRequest, { params }: { params: { marca: string } }) {
@@ -43,13 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       .select("cliente_switch_id")
       .eq("id", orderId)
       .single();
-    if (error) {
-      // Columna ausente (DDL pendiente) → sin cliente asignado, modo legacy.
-      if (esColumnaAusente(error)) {
-        return NextResponse.json({ clienteSwitchId: null, ddlPendiente: true });
-      }
-      return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
-    }
+    if (error) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     const cid = (data?.cliente_switch_id as number | null) ?? null;
     if (cid == null) return NextResponse.json({ clienteSwitchId: null });
     const { data: cli } = await supabaseServer
@@ -173,15 +163,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
     .from(cfg.ordersTable)
     .update({ cliente_switch_id: clienteSwitchId, updated_at: new Date().toISOString() })
     .eq("id", orderId);
-  if (error) {
-    if (esColumnaAusente(error)) {
-      return NextResponse.json(
-        { error: `Falta correr la migración de cliente_switch_id en ${cfg.ordersTable}` },
-        { status: 503 },
-      );
-    }
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
   // El correo del cliente recién elegido, para que la pantalla lo escriba sola
   // en el campo de «Mandar por correo». No se manda nada: solo se ofrece.
   const supabaseServer = await cfg.mainDb();

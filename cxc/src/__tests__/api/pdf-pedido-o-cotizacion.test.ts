@@ -92,9 +92,8 @@ async function pedirPdf(
     error: null,
   });
   db.queue(m.productos, { data: [{ id: "p1", category: "CAMISETAS", bulto_pzas: 12 }], error: null });
-  // 🔴 El escalón tolerante: con `errorDocumento` la primera lectura (la que
-  // pide la columna `documento`) falla como si el DDL no estuviera corrido, y
-  // la ruta tiene que releer sin ella.
+  // Con `errorDocumento` la lectura del envío falla nombrando la columna. La
+  // segunda respuesta queda encolada para probar que NADIE la pide.
   if (opts.errorDocumento) {
     db.queue(m.envios, { data: null, error: { message: 'column "documento" does not exist' } }, { data: envio, error: null });
   } else {
@@ -140,11 +139,14 @@ describe("🔴 el PDF nombra lo que hay en Switch — las 4 marcas", () => {
       expect(r.disposition).toContain(`Pedido-${NUMERO}`);
     });
 
-    it(`${m.marca}: con el DDL 20260824160000 pendiente sale PEDIDO y no se cae`, async () => {
+    it(`${m.marca}: si la lectura del envío falla, el PDF sale SIN rotular y no se relee sin la columna`, async () => {
+      // La columna `documento` existe (9-oct-2026): un error que la nombre ya
+      // no dispara una segunda lectura. El PDF no se cae, pero no afirma nada.
       const r = await pedirPdf(m, { estado: "verificado" }, { errorDocumento: true });
       expect(r.res.status).toBe(200);
-      expect(r.label).toBe("Pedido");
+      expect(r.label).toBeUndefined();
       expect(r.disposition).toContain(`Pedido-${NUMERO}`);
+      expect(m.db().calls.filter((c) => c.table === m.envios)).toHaveLength(1);
     });
 
     it(`${m.marca}: la CONSULTA filtra por estado — no rotula cualquier envío`, async () => {
