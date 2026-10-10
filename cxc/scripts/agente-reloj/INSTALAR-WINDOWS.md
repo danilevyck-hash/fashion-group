@@ -154,14 +154,20 @@ sistema, pero **solo si el problema es de verdad**:
 
 Cada vuelta le pregunta a fashiongr hasta qué día tiene guardado. Si ve que le
 falta un pedazo —porque la PC estuvo apagada por vacaciones, o por un apagón
-largo— pide **15 días** de una sola vez en lugar de los 3 de siempre, rellena el
+largo— pide **30 días** de una sola vez en lugar de los 3 de siempre, rellena el
 hueco, y vuelve solo a los 3. En el log queda escrito cuando pasa.
+
+Si ese barrido largo falla (el reloj no contestó justo en ese momento), **el
+hueco sigue abierto**: fashiongr no lo da por cerrado hasta que las marcaciones
+entraron de verdad, y el agente lo vuelve a pedir solo —al prender la PC y cada
+6 horas— hasta que entra. Pasados los 30 días ya no se puede recuperar y deja de
+pedirse; queda anotado en el registro de fashiongr.
 
 Ese barrido largo tarda unos minutos y se hace **como mucho una vez cada 6
 horas**, para no tener al reloj de la entrada contestando preguntas todo el día.
 
-> **¿Por qué no pedir siempre 15 días y listo?** Porque el reloj entrega las
-> marcaciones de 10 en 10: 3 días son ~25 preguntas, pero 15 días son ~125. Cada
+> **¿Por qué no pedir siempre 30 días y listo?** Porque el reloj entrega las
+> marcaciones de 10 en 10: 3 días son ~85 preguntas, pero 30 días son ~900. Cada
 > 3 minutos, para siempre, eso es castigar al aparato sin necesidad.
 
 ### Traer historia todavía más vieja (un mes, dos meses)
@@ -175,6 +181,29 @@ Solo para casos raros, a mano:
 
 Traer lo mismo dos veces **no duplica nada** — las marcaciones repetidas se
 ignoran solas.
+
+---
+
+## Poner la versión nueva del programa (un doble clic)
+
+El programa **no se actualiza solo**: el código es privado y esa PC no lo puede
+bajar. Cuando hay versión nueva, viaja adentro de un solo archivo.
+
+**Versión 1.3.0 (9-oct-2026): recupera 30 días hacia atrás en vez de 15.** Se
+pone **una sola vez**:
+
+1. Copiar **`agregar-reloj-multifashion.bat`** a la PC de la oficina (OneDrive,
+   pendrive, como sea). Es un solo archivo; en el Escritorio está bien.
+2. **Doble clic.** Cuando Windows pida permiso (ventana azul), elegir **Sí**.
+3. Esperar a que termine. Tiene que decir *«ahora tiene la versión 1.3.0»*.
+
+El nombre del archivo dice «agregar reloj» porque nació para eso, pero además
+**deja puesto el programa nuevo**: si la PC ya tiene los dos relojes no agrega
+nada, solo cambia el programa y lo reinicia. Correrlo dos veces no rompe nada.
+
+Mientras nadie lo haga **todo sigue funcionando** con la versión anterior, que
+recupera 15 días. fashiongr sabe qué versión tiene la PC y cuenta con ese
+número, no con el nuevo.
 
 ---
 

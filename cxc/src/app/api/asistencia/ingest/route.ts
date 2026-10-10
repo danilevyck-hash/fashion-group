@@ -24,7 +24,13 @@ import { timingSafeEqual } from "crypto";
 import { supabaseServer } from "@/lib/supabase-server";
 import { normalizarEventos, ultimoInstante, type EventoCrudo } from "@/lib/asistencia/ingest";
 import { guardarMarcaciones } from "@/lib/asistencia/guardar-marcaciones";
-import { esColumnaFaltante, type FilaDispositivo } from "@/lib/asistencia/agente";
+import {
+  decidirLeidoHasta,
+  esColumnaFaltante,
+  nombreRelojEnPantalla,
+  type FilaDispositivo,
+} from "@/lib/asistencia/agente";
+import { logActivity } from "@/lib/log-activity";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -207,8 +213,27 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // `leido_hasta` solo avanza si TODO salió bien.
-  const hasta = ultimoInstante(filas);
+  // 🔴 `leido_hasta` solo avanza si TODO salió bien Y SIN SALTOS (9-oct-2026).
+  // Con un hueco abierto, un lote de la ventana normal ya no lo mueve: la regla
+  // entera está en `decidirLeidoHasta`.
+  const tiempos = eventos.map((e) => Date.parse(String(e?.time ?? ""))).filter(Number.isFinite);
+  const { leidoHasta: hasta, caducado } = decidirLeidoHasta({
+    previo: previa?.leido_hasta,
+    primeroMs: tiempos.length ? Math.min(...tiempos) : null,
+    ultimo: ultimoInstante(filas),
+    ahoraMs: Date.parse(ahora),
+    agenteVersion: body.agenteVersion ?? previa?.agente_version,
+  });
+  if (caducado) {
+    // 🚫 SIN AVISO, a propósito (Daniel, 9-oct-2026): queda en el registro y nada más.
+    console.warn(
+      `[asistencia/ingest] hueco caducado en ${dispositivo}: de ${caducado.desde} a ${caducado.hasta} ya no se puede recuperar del reloj`,
+    );
+    await logActivity("sistema", "hueco_caducado", "asistencia", {
+      reloj: nombreRelojEnPantalla(dispositivo),
+      ...caducado,
+    });
+  }
   // 🔴 ACÁ SE ESCRIBE `leido_ok_en`, Y SOLO ACÁ (15-sep-2026). Es el instante
   // en que el reloj se pudo LEER, que es lo que el vigía mide para decir «lleva
   // más de 24 horas sin poder leerse». No es `visto_en`: ese se mueve también

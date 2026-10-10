@@ -269,8 +269,8 @@ export function estadoAgente(fila: FilaDispositivo | null, ahoraMs: number): Est
  * un umbral de 24 horas, tranquilizar por un bajón corto no le sirve a nadie.
  *
  * ⚠️ NADA SE PIERDE POR AVISAR UN DÍA DESPUÉS: el reloj guarda las marcaciones
- * adentro y el agente recupera 15 días hacia atrás al volver
- * (`DIAS_RECUPERACION_AGENTE`). Medido el 15-sep-2026: la PC estuvo caída del
+ * adentro y el agente recupera `DIAS_RECUPERACION_AGENTE` días hacia atrás al
+ * volver. Medido el 15-sep-2026: la PC estuvo caída del
  * viernes 11 al martes 15 y al volver entraron solas las 141 marcaciones del
  * lunes y las 136 del martes.
  *
@@ -334,7 +334,7 @@ export function estadoAgente(fila: FilaDispositivo | null, ahoraMs: number): Est
  * entero sin poder leer el reloj sí.
  *
  * ⚠️ NADA SE PIERDE POR AVISAR UN DÍA DESPUÉS: el reloj guarda las marcaciones
- * adentro y el agente recupera `DIAS_RECUPERACION_AGENTE` (15) días hacia atrás
+ * adentro y el agente recupera `DIAS_RECUPERACION_AGENTE` días hacia atrás
  * al volver. Medido el 15-sep-2026: la PC estuvo caída del viernes 11 al martes
  * 15 y al volver entraron solas las 141 marcaciones del lunes y las 136 del
  * martes.
@@ -408,7 +408,7 @@ export function vigiaDebeAlertar(
  * política se haya aflojado. No agregar más sin su OK.
  *
  * EL CASO: el agente de la PC tiene ventana normal de 3 días y, al detectar un
- * hueco, barre `VENTANA_RECUPERACION_DIAS` (15) días automáticamente. Un hueco
+ * hueco, barre `VENTANA_RECUPERACION_DIAS` días automáticamente. Un hueco
  * MÁS VIEJO que eso ya no lo alcanza ninguna vuelta — no se arregla solo, y la
  * única salida es que alguien amplíe la ventana en el `.env` de la PC de la
  * oficina. Exactamente la regla de tres del canal SISTEMA: real, no se arregla
@@ -416,21 +416,121 @@ export function vigiaDebeAlertar(
  */
 
 /**
- * Hasta cuántos días hacia atrás recupera SOLO el agente de la PC.
+ * 🔴 EL PLAZO: hasta cuántos días hacia atrás recupera SOLO el programa de la PC.
+ * ESTE ES EL ÚNICO LUGAR DONDE VIVE (9-oct-2026: pasó de 15 a 30).
  *
- * 🔑 NO ES UN NÚMERO NUESTRO: es el espejo de `VENTANA_RECUPERACION_DIAS_DEFAULT`
- * en `scripts/agente-reloj/config.mjs` (v1.1.0, la que está instalada en la
- * oficina). Se repite acá porque el código de Next no puede importar los .mjs
- * del agente sin arrastrarlos al bundle; la igualdad la sostiene el test
- * `asistencia-vigia-hueco.test.ts`, que importa el archivo REAL del agente y
- * compara — si alguien mueve uno solo de los dos, el build se pone rojo.
+ * Daniel, 9-oct-2026: el plazo es **lo máximo que de verdad se puede recuperar
+ * del reloj**, no un número arbitrario; 30 días cubren una quincena completa con
+ * margen, por si la PC queda apagada dos semanas.
  *
- * ⚠️ Si algún día se amplía la ventana en el `.env` de la PC (VENTANA_
- * RECUPERACION_DIAS=30, p.ej.), este espejo NO se entera: refleja el DEFAULT
- * del programa, no el override local. Está bien así — el aviso peca de
- * temprano, nunca de tarde.
+ * Por qué 30 se puede: el reloj guarda mucho más que eso —el 6-ago-2026 se le
+ * pidió julio ENTERO (8.785 eventos, 36 días atrás) y lo entregó completo—. El
+ * límite nunca fue el aparato, era la ventana del programa.
+ *
+ * 🔑 Es el espejo de `VENTANA_RECUPERACION_DIAS_DEFAULT` en
+ * `scripts/agente-reloj/config.mjs` (el código de Next no puede importar los
+ * .mjs del agente sin arrastrarlos al bundle). La igualdad la sostiene
+ * `asistencia-vigia-hueco.test.ts`, que importa el archivo REAL del agente: si
+ * alguien mueve uno solo de los dos, el build se pone rojo.
+ *
+ * De acá salen las tres cosas que dependen del plazo: cuándo un hueco CADUCA
+ * (`decidirLeidoHasta`), cuándo el vigía avisa que quedó fuera de alcance, y
+ * el número que dice ese aviso.
  */
-export const DIAS_RECUPERACION_AGENTE = 15;
+export const DIAS_RECUPERACION_AGENTE = 30;
+
+/** Lo que alcanzan los programas anteriores al 1.3.0 (el instalado hasta el
+ *  9-oct-2026). Solo lo usa `diasQueAlcanza`. */
+const DIAS_RECUPERACION_AGENTE_ANTERIOR = 15;
+
+/** La ventana de SIEMPRE del programa: espejo de `VENTANA_DIAS_DEFAULT` (mismo
+ *  candado que el de arriba). */
+export const DIAS_VENTANA_NORMAL_AGENTE = 3;
+
+/**
+ * Cuántos días alcanza DE VERDAD el programa que está corriendo en la PC.
+ *
+ * El programa viaja a la PC a mano (un doble clic, ver INSTALAR-WINDOWS.md), así
+ * que entre el merge y ese doble clic la PC sigue pidiendo 15. El servidor lo
+ * sabe por la versión que el programa manda en cada envío: no se le atribuyen
+ * 30 días a un programa que pide 15.
+ */
+export function diasQueAlcanza(agenteVersion?: string | null): number {
+  const [mayor, menor] = String(agenteVersion ?? "").split(".").map(Number);
+  return mayor > 1 || (mayor === 1 && menor >= 3)
+    ? DIAS_RECUPERACION_AGENTE
+    : DIAS_RECUPERACION_AGENTE_ANTERIOR;
+}
+
+/** Dónde EMPIEZA a preguntar el programa cuando pide `dias`: las 00:00 de Panamá
+ *  de hace `dias - 1` días. La misma cuenta que `ventanaRodante` en
+ *  `vuelta.mjs` (hay candado que las compara). */
+export function arranqueVentana(ahoraMs: number, dias: number): number {
+  const CINCO_HORAS = 5 * 3_600_000;
+  const DIA = 86_400_000;
+  return (Math.floor((ahoraMs - CINCO_HORAS) / DIA) - (dias - 1)) * DIA + CINCO_HORAS;
+}
+
+/**
+ * 🔴 UN HUECO NO SE DA POR CERRADO HASTA QUE DE VERDAD SE CERRÓ (9-oct-2026).
+ *
+ * `leido_hasta` es «hasta acá llegó todo, sin saltos». Es lo ÚNICO que mira el
+ * programa de la PC para decidir si pide 3 días o barre largo: mientras quede
+ * antes de su ventana normal, vuelve a barrer largo en cada arranque de la PC y
+ * cada 6 horas. Por eso la regla vive acá, en el servidor, y no hay que tocar
+ * la PC para que valga.
+ *
+ * 🩸 EL CASO (5→8-oct-2026, reloj de Boston). La PC se apagó el lunes 5 a las
+ * 14:25 y volvió el jueves 8. El programa detectó el hueco y quiso barrer largo,
+ * pero ese primer intento no llegó a leer el reloj; 46 minutos después pidió su
+ * ventana normal (6, 7 y 8) y el servidor movió `leido_hasta` al 8. El hueco
+ * quedó «cerrado» con ~45 marcas de la tarde del 5 sin subir, y nadie volvió a
+ * pedirlas. Antes, CUALQUIER lote movía `leido_hasta` a su última marca.
+ *
+ * LA REGLA, con hueco abierto (lo leído termina antes de la ventana normal):
+ *   · un lote que solo trae lo de la ventana normal NO mueve nada: las marcas se
+ *     guardan igual, pero el hueco sigue abierto y se vuelve a pedir;
+ *   · un lote que trae eventos MÁS VIEJOS que la ventana normal solo puede venir
+ *     de un barrido largo, que arranca antes del hueco y llega en orden: ese sí
+ *     avanza;
+ *   · si el hueco es más viejo que lo que el programa alcanza, CADUCA: avanza
+ *     igual y se devuelve `caducado` para dejarlo en el registro. Sin aviso.
+ * Nunca retrocede.
+ *
+ * ⚠️ Por qué no se usa la numeración interna del reloj: cuenta también las
+ * huellas no reconocidas y las puertas (el 66% de los eventos), así que entre
+ * dos marcas seguidas salta 46 en una noche normal de Multifashion y 189 en un
+ * fin de semana largo — contra los 163 del hueco real. No hay umbral que separe.
+ *
+ * ponytail: un barrido normal que arranca antes de medianoche y llega después
+ * se confunde con uno largo (la ventana se corrió un día). La PC se apaga de
+ * noche; si algún día no, mandar `desde` en el envío del programa.
+ */
+export function decidirLeidoHasta(a: {
+  /** El `leido_hasta` guardado. */
+  previo?: string | null;
+  /** El instante del evento más viejo del lote, CRUDO (cuente o no). */
+  primeroMs: number | null;
+  /** La marca más nueva del lote que sí se guardó. */
+  ultimo: string | null;
+  ahoraMs: number;
+  agenteVersion?: string | null;
+}): { leidoHasta: string | null; caducado: { desde: string; hasta: string } | null } {
+  const quieto = { leidoHasta: null, caducado: null };
+  if (!a.ultimo) return quieto;
+  const leido = a.previo ? Date.parse(a.previo) : NaN;
+  if (!Number.isFinite(leido)) return { leidoHasta: a.ultimo, caducado: null };
+
+  const avanza = { leidoHasta: Date.parse(a.ultimo) > leido ? a.ultimo : null, caducado: null };
+  const normal = arranqueVentana(a.ahoraMs, DIAS_VENTANA_NORMAL_AGENTE);
+  if (leido >= normal) return avanza; // sin hueco: la ventana de siempre lo cubre
+
+  if (leido < arranqueVentana(a.ahoraMs, diasQueAlcanza(a.agenteVersion))) {
+    const hasta = new Date(a.primeroMs ?? Date.parse(a.ultimo)).toISOString();
+    return { ...avanza, caducado: { desde: a.previo as string, hasta } };
+  }
+  return a.primeroMs !== null && a.primeroMs < normal ? avanza : quieto;
+}
 
 const MINUTOS_POR_DIA = 24 * 60;
 
@@ -447,7 +547,7 @@ const MINUTOS_POR_DIA = 24 * 60;
 export function vigiaDebeAlertarHueco(
   fila: FilaDispositivo | null,
   ahoraMs: number,
-  dias: number = DIAS_RECUPERACION_AGENTE,
+  dias: number = diasQueAlcanza(fila?.agente_version),
 ): boolean {
   if (!fila?.leido_hasta) return false; // reloj recién puesto: no es hueco
   if (fila.hueco_alertado_en) return false; // ya se avisó de este episodio
@@ -466,7 +566,7 @@ export function vigiaDebeAlertarHueco(
 export function vigiaHuecoCerrado(
   fila: FilaDispositivo | null,
   ahoraMs: number,
-  dias: number = DIAS_RECUPERACION_AGENTE,
+  dias: number = diasQueAlcanza(fila?.agente_version),
 ): boolean {
   if (!fila?.hueco_alertado_en) return false; // no hubo episodio abierto
   const mins = minutosDesde(fila.leido_hasta, ahoraMs);

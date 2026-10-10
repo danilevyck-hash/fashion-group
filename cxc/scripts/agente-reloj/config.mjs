@@ -19,7 +19,7 @@ export const CARPETA = dirname(fileURLToPath(import.meta.url));
 /** Versión del programita. Viaja en cada envío y queda guardada en
  *  `asistencia_dispositivos.agente_version`, para saber desde acá si la oficina
  *  quedó con una versión vieja después de un cambio. */
-export const VERSION = "1.2.0";
+export const VERSION = "1.3.0";
 
 /** Cada cuánto da una vuelta. Corto a propósito: es lo que hace que el botón
  *  "Traer ahora" se sienta inmediato sin que el botón toque el reloj. */
@@ -31,16 +31,23 @@ export const VENTANA_DIAS_DEFAULT = 3;
 
 /**
  * Cuántos días se piden cuando se detecta un hueco de verdad (ver
- * `decidirVentana` en `vuelta.mjs`). Quince cubre unas vacaciones enteras con la
- * PC apagada.
+ * `decidirVentana` en `vuelta.mjs`).
+ *
+ * 🔴 30 DESDE EL 9-oct-2026 (v1.3.0; eran 15). Daniel: el plazo es lo máximo que
+ * de verdad se puede recuperar, y 30 cubre una quincena completa con margen por
+ * si la PC queda apagada dos semanas. El reloj guarda de sobra: el 6-ago-2026
+ * entregó julio entero (8.785 eventos) en un solo pedido.
  *
  * ⚠️ NO es la ventana de siempre, y no puede serlo: el firmware devuelve 10
- * eventos por página pida lo que pida, así que 15 días (~1.250 eventos) son
- * ~125 llamadas al reloj. A una vuelta cada 3 minutos eso serían ~60.000
- * llamadas por día contra el aparato de la entrada. La ventana larga se pide
- * SOLO cuando falta algo, y vuelve sola a la corta.
+ * eventos por página pida lo que pida, así que 30 días (~9.000 eventos) son
+ * ~900 llamadas al reloj y varios minutos. La ventana larga se pide SOLO cuando
+ * falta algo, y vuelve sola a la corta.
+ *
+ * 🔑 El servidor tiene el espejo (`DIAS_RECUPERACION_AGENTE` en
+ * `src/lib/asistencia/agente.ts`) y sabe por la VERSION cuál de los dos números
+ * vale en esta PC: si se cambia este, se sube la VERSION.
  */
-export const VENTANA_RECUPERACION_DIAS_DEFAULT = 15;
+export const VENTANA_RECUPERACION_DIAS_DEFAULT = 30;
 
 /**
  * Corrige la dirección de fashiongr antes de usarla.
@@ -245,7 +252,7 @@ export function leerConfig(ruta = join(CARPETA, ".env")) {
     ventanaDias: numero(env.VENTANA_DIAS, VENTANA_DIAS_DEFAULT),
     // 🔑 SIN TOCAR EL .env DE LA OFICINA. La PC ya tiene su `.env` escrito con
     // `VENTANA_DIAS=3`; esta es una variable NUEVA, así que al no estar en ese
-    // archivo toma el default de 15 y la recuperación queda activa sola.
+    // archivo toma el default y la recuperación queda activa sola.
     ventanaRecuperacionDias: numero(
       env.VENTANA_RECUPERACION_DIAS,
       VENTANA_RECUPERACION_DIAS_DEFAULT,
