@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
+import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users as UsersIcon, Megaphone, Activity } from "lucide-react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
@@ -156,6 +157,11 @@ function UsuariosPageInner() {
   const userModal = useFormModalDismiss(showUserModal, cerrarUserModal, !savingUser);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+  // 🔴 El error del formulario de usuario NO se va solo (Daniel, 9-oct-2026): a
+  // los 3 s no se alcanzaba a leer el del código de colaborador repetido. Se
+  // queda hasta que se cierra con la ✕, se corrige un campo o se sale del modal.
+  const [errorForm, setErrorForm] = useState<string | null>(null);
+  useEffect(() => { setErrorForm(null); }, [uName, uPassword, uRole, uCompany, customPerms, uModules, uMarca, showUserModal]);
 
   const loadSessions = useCallback(async () => {
     setLoadingSessions(true);
@@ -211,15 +217,16 @@ function UsuariosPageInner() {
     setUModules(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   }
   async function saveUser() {
-    if (!uName.trim()) { showToast("Nombre requerido"); return; }
-    if (!editUserId && !uPassword.trim()) { showToast("Contraseña requerida para nuevo usuario"); return; }
+    setErrorForm(null);
+    if (!uName.trim()) { setErrorForm("Nombre requerido"); return; }
+    if (!editUserId && !uPassword.trim()) { setErrorForm("Contraseña requerida para nuevo usuario"); return; }
     if (customPerms && uModules.length === 0) {
-      showToast("Selecciona al menos un módulo o desactiva los permisos personalizados.");
+      setErrorForm("Selecciona al menos un módulo o desactiva los permisos personalizados.");
       return;
     }
     // «Marca asistencia»: con ficha nueva, lo que falta se dice junto al guardar.
     const faltan = faltaEnMarca(uMarca);
-    if (faltan.length > 0) { showToast(`Falta ${faltan.join(", ")}.`); return; }
+    if (faltan.length > 0) { setErrorForm(`Falta ${faltan.join(", ")}.`); return; }
     // Marcar necesita el permiso de Marcación además del vínculo: si su rol no
     // lo trae, se suma a sus módulos; apagado, se quita.
     const base = customPerms ? uModules.filter((k) => moduloOfrecible(uRole, k)) : null;
@@ -249,8 +256,8 @@ function UsuariosPageInner() {
       const method = editUserId ? "PUT" : "POST";
       const res = await fetch("/api/admin/users", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (res.ok) { showToast(editUserId ? "Usuario actualizado" : "Usuario creado"); setShowUserModal(false); loadFgUsers(); }
-      else { const err = await res.json(); showToast(err.error || "Error"); }
-    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
+      else { const err = await res.json(); setErrorForm(err.error || "Error"); }
+    } catch { setErrorForm("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSavingUser(false);
   }
   // ¿Este usuario tiene una ficha ACTIVA? (la lista de colaboradores trae solo activas)
@@ -849,6 +856,11 @@ function UsuariosPageInner() {
       />
 
       <Toast message={toast} />
+      {errorForm && (
+        <EnLaPilaDeAvisos>
+          <CajaAviso message={errorForm} type="error" onDismiss={() => setErrorForm(null)} className={CLASE_AVISO_EN_PILA} />
+        </EnLaPilaDeAvisos>
+      )}
     </div>
   );
 }

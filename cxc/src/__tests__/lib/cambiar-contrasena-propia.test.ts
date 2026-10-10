@@ -35,14 +35,15 @@ const RUTA_ADMIN = "src/app/api/admin/users/route.ts";
 
 describe("🔴 la contraseña repetida se rechaza, y con las palabras de Daniel", () => {
   it("la frase es exactamente la suya", () => {
-    expect(AVISO_CONTRASENA_REPETIDA).toBe("Crea otra, esa no se puede");
+    // 9-oct-2026: pasó de «Crea otra, esa no se puede» a un texto de ERP.
+    expect(AVISO_CONTRASENA_REPETIDA).toBe("Esa contraseña ya está en uso. Se requiere una distinta.");
   });
 
   it("🔴 la dicen las DOS puertas —la propia y la del admin— y ninguna la escribe a mano", () => {
     for (const rel of [RUTA_PROPIA, RUTA_ADMIN]) {
       const src = sinComentarios(leer(rel));
       expect(src, rel).toContain("AVISO_CONTRASENA_REPETIDA");
-      expect(src, `${rel} tiene la frase escrita a mano`).not.toContain('"Crea otra');
+      expect(src, `${rel} tiene la frase escrita a mano`).not.toMatch(/"Crea otra|"Esa contraseña ya/);
     }
   });
 

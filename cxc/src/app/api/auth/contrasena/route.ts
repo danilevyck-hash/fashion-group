@@ -28,14 +28,14 @@ import { getLoginLock, registerLoginFailure } from "@/lib/login-rate-limit";
  *     o en minúsculas, por el autocapitalizar del iPhone).
  *   · `nueva`: mínimo 3 caracteres (`LARGO_MINIMO_CONTRASENA`) y NO puede ser la de otra persona —el login es solo
  *     contraseña, la contraseña ES la identidad—. Se comprueba con la MISMA
- *     función que usa el admin (`contrasenaEnUso`), y la respuesta es la frase
- *     de Daniel: «Crea otra, esa no se puede».
+ *     función que usa el admin (`contrasenaEnUso`), y la respuesta es
+ *     `AVISO_CONTRASENA_REPETIDA`.
  *
- * 🔴 EL RITMO SE FRENA COMO EN EL LOGIN. «Esa no se puede» dice, sin querer,
+ * 🔴 EL RITMO SE FRENA COMO EN EL LOGIN. «Ya está en uso» dice, sin querer,
  * que ESA contraseña es de alguien — y con login solo por contraseña, saberla
  * es entrar como esa persona. El login ya expone lo mismo (probar y ver quién
  * entra) y por eso tiene tope de 5 fallos en 15 min por IP; acá se usa el
- * MISMO contador: cada «actual» equivocada y cada «esa no se puede» suman un
+ * MISMO contador: cada «actual» equivocada y cada «ya está en uso» suman un
  * fallo, y con el tope puesto la ruta contesta 429 sin comparar nada.
  *
  * LAS SESIONES: al cambiarla se CIERRAN LAS DEMÁS sesiones de esa persona
