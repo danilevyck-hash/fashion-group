@@ -117,7 +117,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className={RETOQUES ? "flex items-center justify-center min-h-screen px-4" : "flex items-center justify-center min-h-screen"}>
       <form onSubmit={handleLogin} className="w-full max-w-sm space-y-6">
         <div className="flex justify-center mb-2">
           <FGLogo variant="full" theme="light" size={56} />

@@ -110,6 +110,10 @@ describe("Inicio de sesión — interruptor PRENDIDO = los 4 retoques", () => {
     const c = await montar();
     expect(c.querySelector('button[type="submit"]')!.textContent).toBe("Iniciar sesión");
   });
+  it("5 · en el celular, el margen lateral normal del sistema (px-4)", async () => {
+    const c = await montar();
+    expect(c.querySelector("form")!.parentElement!.className).toContain("px-4");
+  });
 });
 
 describe("Inicio de sesión — lo que NO cambia, prendido o apagado", () => {
