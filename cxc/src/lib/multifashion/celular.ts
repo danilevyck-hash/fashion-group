@@ -89,14 +89,17 @@ export function subtituloHoyAyer(args: {
  *    sección con su lista (Resumen · Año · Vendedoras · Productos · Clientes) y
  *    el renglón 2 lleva el período con el calendario a su derecha;
  *  · la venta de hoy tiene su línea («Hoy $1,866 · ayer $1,795») y la frescura
- *    queda sola, en su línea gris.
- * Los cuatro renglones del Resumen siguen. 🔴 Ningún número cambia.
+ *    queda sola, en su línea gris;
+ *  · UNA sola forma de ir a cada sección, el título: los cuatro renglones salen
+ *    del Resumen (Daniel: «¿por qué el menú arriba y en la pantalla?») y también
+ *    la línea gris de hábitos bajo la gráfica. El Resumen termina en la gráfica.
+ * 🔴 Ningún número cambia.
  * `false` = el encabezado de antes («‹ Septiembre» y el mes como título).
  * Candado `multifashion-barra-celular.test.ts`.
  */
 export const MULTIFASHION_BARRA_2026_10 = true;
 
-/** Las secciones del título: Resumen y los cuatro renglones, con sus nombres. */
+/** Las secciones del título: Resumen y las cuatro que eran renglones, con sus nombres. */
 export function seccionesDeLaBarra(
   pestanas: readonly { id: TabMultifashion; label: string }[],
   anio: number,

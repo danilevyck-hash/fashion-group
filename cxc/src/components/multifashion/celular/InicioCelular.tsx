@@ -78,9 +78,15 @@ interface Props {
   onAbrir: (clave: ClaveRenglon) => void;
   /** Lo que requiere atención (`MULTIFASHION_APPLE_2026_10`), ARRIBA. */
   atencion?: ReactNode;
+  /**
+   * 🔴 `MULTIFASHION_BARRA_2026_10`: con el título como lista de secciones, la
+   * pantalla termina en la gráfica — sin la línea de hábitos ni los cuatro
+   * renglones (y sin pedir sus tres datos).
+   */
+  soloElMes?: boolean;
 }
 
-export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencion = null }: Props) {
+export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencion = null, soloElMes = false }: Props) {
   const { totales } = data;
   const year = periodo.tipo === "mes" ? periodo.anio : corte.anio;
   const mes = periodo.tipo === "mes" ? periodo.mes : corte.mes;
@@ -114,7 +120,7 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
   // ── Los hábitos: la MISMA línea del Resumen de computadora ────────────────
   const patrones = data.patrones;
   const hayVentana = patrones != null && patrones.mesesUsados > 0;
-  const habitos = totales.n_tickets > 0
+  const habitos = !soloElMes && totales.n_tickets > 0
     ? lineaHabitos({
         mejorDow: hayVentana ? patrones!.mejorDow : null,
         horaPico: hayVentana && patrones!.horaPico != null ? horaPicoLabel(patrones!.horaPico) : null,
@@ -124,17 +130,17 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
 
   // ── Los cuatro renglones. MISMAS claves de SWR que cada pestaña ───────────
   const { data: vend } = useSWR<VendedorasResumen>(
-    `/api/multifashion/vendedoras?year=${year}&periodo=mes&mes=${mes}`,
+    soloElMes ? null : `/api/multifashion/vendedoras?year=${year}&periodo=mes&mes=${mes}`,
     json,
     { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
   );
   const { data: prod } = useSWR<ProductosResumen>(
-    `/api/multifashion/productos?year=${year}&mes=${mes}&periodo=mes`,
+    soloElMes ? null : `/api/multifashion/productos?year=${year}&mes=${mes}&periodo=mes`,
     json,
     { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
   );
   const { data: fidel } = useSWR<FidelizacionResumen>(
-    "multifashion-fidelizacion",
+    soloElMes ? null : "multifashion-fidelizacion",
     () => json("/api/multifashion/fidelizacion"),
     { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
   );
@@ -226,11 +232,13 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
       )}
 
       {/* Los cuatro renglones. */}
+      {!soloElMes && (
       <ul data-celular="renglones" className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
         {renglones.map((r) => (
           <RenglonFila key={r.clave} renglon={r} onAbrir={() => onAbrir(r.clave)} />
         ))}
       </ul>
+      )}
     </section>
   );
 }

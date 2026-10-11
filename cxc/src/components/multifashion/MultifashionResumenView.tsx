@@ -189,6 +189,8 @@ interface MultifashionResumenViewProps {
     pantalla: PantallaCelular;
     onAbrir: (clave: ClaveRenglon) => void;
     onAbrirMes?: (anio: number, mes: number) => void;
+    /** `MULTIFASHION_BARRA_2026_10`: sin hábitos ni renglones. */
+    soloElMes?: boolean;
   };
 }
 
@@ -452,6 +454,7 @@ export function MultifashionResumenView({
               corte={celular.corte}
               onAbrir={celular.onAbrir}
               atencion={atencion}
+              soloElMes={celular.soloElMes}
             />
           )}
         </div>

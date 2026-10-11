@@ -2,6 +2,9 @@
  * 🔴 CANDADO — MULTIFASHION EN EL CELULAR CON EL ENCABEZADO COMPARTIDO
  * (`MULTIFASHION_BARRA_2026_10`, 11-oct-2026).
  *
+ * La regla: en el Resumen del celular el título es la ÚNICA navegación (sin los
+ * cuatro renglones) y no hay línea gris de hábitos; su dibujo se prueba en
+ * `multifashion-celular.test.tsx` (`soloElMes`).
  * Lo que no debe cambiar: los nombres de las secciones son los de las pestañas,
  * la línea de hoy lleva los MISMOS dos montos que la línea gris de antes, la
  * frescura sigue siendo `LineaDeFrescura`, y apagado queda el encabezado de antes.
@@ -15,7 +18,15 @@ import { PESTANAS_MULTIFASHION } from "@/lib/multifashion/pestanas";
 const shell = fs.readFileSync(path.join(process.cwd(), "src/app/multifashion/MultifashionShell.tsx"), "utf8");
 
 describe("Multifashion › celular › encabezado compartido", () => {
-  it("el título ofrece Resumen y los cuatro renglones, con los nombres de las pestañas", () => {
+  it("el Resumen sin renglones ni hábitos cuelga del MISMO interruptor (apagado = como antes)", () => {
+    expect(shell).toContain("soloElMes: barra");
+    const inicio = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/celular/InicioCelular.tsx"), "utf8");
+    expect(inicio).toContain("soloElMes = false");
+    expect(inicio).toMatch(/\{!soloElMes && \(\s*<ul data-celular="renglones"/);
+    expect(inicio).toContain("const habitos = !soloElMes &&");
+  });
+
+  it("el título ofrece Resumen y las cuatro secciones, con los nombres de las pestañas", () => {
     expect(seccionesDeLaBarra(PESTANAS_MULTIFASHION, 2026).map((s) => s.label))
       .toEqual(["Resumen", "Año 2026", "Vendedoras", "Productos", "Clientes"]);
     expect(seccionesDeLaBarra(PESTANAS_MULTIFASHION, 2026).filter((s) => s.value !== "anio").map((s) => s.value))

@@ -47,8 +47,6 @@ await pg.route("**/*", (r) => {
 });
 await pg.goto(BASE + "/multifashion", { waitUntil: "networkidle", timeout: 180000 }).catch((e) => console.log("goto:", e.message));
 await pg.waitForSelector('[data-celular="numero-del-mes"]', { timeout: 90000 }).catch(() => console.log("SIN número del mes"));
-await pg.waitForFunction(() => document.querySelectorAll('[data-celular="renglones"] li').length === 4
-  && !!document.querySelector('[data-renglon="clientes"]')?.textContent?.includes("frecuentes"), null, { timeout: 60000 }).catch(() => console.log("renglones sin dato"));
 await pg.waitForTimeout(1500);
 
 const medir = () => pg.evaluate(() => {
@@ -73,9 +71,15 @@ const medir = () => pg.evaluate(() => {
 console.log("ARRIBA", JSON.stringify(await medir(), null, 1));
 console.log("TEXTO", JSON.stringify(await pg.evaluate(() => document.body.innerText.slice(0, 700))));
 await pg.screenshot({ path: `${OUT}/${PREFIJO}-arriba.png` });
-await pg.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-await pg.waitForTimeout(800);
-await pg.screenshot({ path: `${OUT}/${PREFIJO}-abajo.png` });
+// «abajo» solo si la página todavía se desliza.
+const fin = await pg.evaluate(() => { const r = (s) => document.querySelector(s)?.getBoundingClientRect(); return { alto: document.documentElement.scrollHeight, vista: innerHeight, grafica: Math.round(r('[data-celular="inicio"]')?.bottom ?? 0), tabBar: Math.round(r("[data-tab-bar]")?.top ?? 0) }; });
+console.log("FIN", JSON.stringify(fin));
+if (fin.alto > fin.vista + 4) {
+  await pg.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await pg.waitForTimeout(800);
+  await pg.screenshot({ path: `${OUT}/${PREFIJO}-abajo.png` });
+}
+if (process.env.SIN_LISTA) { console.log(`escrituras bloqueadas por el navegador: ${bloqueadas}`); await br.close(); process.exit(0); }
 
 // La lista del título, abierta. Es la lista NATIVA del teléfono (`<select>`).
 await pg.evaluate(() => window.scrollTo(0, 0));

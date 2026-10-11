@@ -72,6 +72,8 @@ interface MultifashionViewProps {
     onAbrir: (clave: ClaveRenglon) => void;
     /** `MULTIFASHION_APPLE_2026_10`: un mes tocado en «Año». */
     onAbrirMes?: (anio: number, mes: number) => void;
+    /** `MULTIFASHION_BARRA_2026_10`: el Resumen sin hábitos ni renglones. */
+    soloElMes?: boolean;
   };
 }
 

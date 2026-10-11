@@ -367,7 +367,7 @@ const RUTAS = {
   "/api/multifashion/bonos": { mes_evaluado: { year: 2026, mes: 9 }, es_elegible: false, gerente: { nombre: "JENNIFER MIRANDA", bono: 0 }, vendedoras: [] },
 };
 
-async function pintarInicio(pantalla: "inicio" | "anio" = "inicio", periodo: Periodo = SEPTIEMBRE) {
+async function pintarInicio(pantalla: "inicio" | "anio" = "inicio", periodo: Periodo = SEPTIEMBRE, soloElMes = false) {
   vi.stubGlobal("fetch", fetchPorUrl(RUTAS));
   const r = montar(
     <MultifashionResumenView
@@ -375,7 +375,7 @@ async function pintarInicio(pantalla: "inicio" | "anio" = "inicio", periodo: Per
       selectedYear={2026}
       isClosedYear={false}
       mes={periodo.tipo === "mes" ? periodo.mes : 9}
-      celular={{ periodo, corte: CORTE, pantalla, onAbrir: vi.fn() }}
+      celular={{ periodo, corte: CORTE, pantalla, onAbrir: vi.fn(), soloElMes }}
     />,
   );
   await screen.findByText("Ventas del mes");
@@ -401,6 +401,16 @@ describe("2 · al abrir: el mes es el número", () => {
     expect([...barras.children].filter((b) => b.className.includes("opacity-20"))).toHaveLength(7);
     expect(container.querySelector('[data-celular="habitos"]')!.textContent)
       .toContain("mejor día del mes: 19 sep, $4,064");
+  });
+
+  it("🔴 `soloElMes` (MULTIFASHION_BARRA_2026_10): el título es la única navegación; sin renglones ni hábitos, y el número no cambia", async () => {
+    const r = await pintarInicio("inicio", SEPTIEMBRE, true);
+    const inicio = r.container.querySelector('[data-celular="inicio"]') as HTMLElement;
+    expect(inicio.querySelector('[data-celular="numero-del-mes"]')!.textContent).toBe("$32,946");
+    expect(inicio.querySelector('[data-celular="linea-del-mes"]')!.textContent).toContain("▲ 29 %");
+    expect(inicio.querySelector('[data-celular="renglones"]')).toBeNull();
+    expect(inicio.querySelector("[data-renglon]")).toBeNull();
+    expect(inicio.querySelector('[data-celular="habitos"]')).toBeNull();
   });
 
   it("🔴 CUATRO renglones, con su texto y su número", async () => {

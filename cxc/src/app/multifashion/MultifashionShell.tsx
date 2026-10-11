@@ -519,7 +519,7 @@ export function MultifashionShell({
           corte={corte}
           isClosedYear={isClosedYear}
           syncTick={syncTick}
-          celular={MULTIFASHION_CELULAR ? { pantalla: pantallaCel, onAbrir: abrirRenglon, onAbrirMes: abrirMes } : undefined}
+          celular={MULTIFASHION_CELULAR ? { pantalla: pantallaCel, onAbrir: abrirRenglon, onAbrirMes: abrirMes, soloElMes: barra } : undefined}
         />
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
