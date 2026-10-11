@@ -18,8 +18,11 @@ const BARRA: Record<EstadoDia, string> = {
   futuro: "bg-gray-100",
 };
 
+/** Hoy, con venta: oscuro como el destacado y rayado, porque el día no cerró. */
+const BARRA_HOY_EN_CURSO = "bg-[repeating-linear-gradient(135deg,#111827_0_3px,#6b7280_3px_6px)]";
+
 export function GraficaDelMes({
-  dias, year, mes, esMesActual, diaActual, feriados,
+  dias, year, mes, esMesActual, diaActual, feriados, alta = false, ventaHoy = null,
 }: {
   dias: readonly { dia: number; ventas: number; n_tickets: number }[];
   year: number;
@@ -27,13 +30,25 @@ export function GraficaDelMes({
   esMesActual: boolean;
   diaActual: number;
   feriados?: readonly string[] | null;
+  /** `MULTIFASHION_BARRA_2026_10`, celular: el doble de alto (240 px) y la línea de arriba dice «Venta promedio diaria … · 1–10 oct». */
+  alta?: boolean;
+  /**
+   * `MULTIFASHION_BARRA_2026_10`: lo vendido HOY hasta ahora. La barra de «Hoy»
+   * es la destacada (oscura, rayada: el día va en curso) y el último día
+   * completo vuelve al gris de los demás. Misma escala (el mejor día cerrado).
+   * No entra al promedio ni responde al toque.
+   * ponytail: si hoy ya pasó al mejor día del mes, la barra topa en el 100 %.
+   */
+  ventaHoy?: number | null;
 }) {
   const g = useMemo(
     () => graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados }),
     [dias, year, mes, esMesActual, diaActual, feriados],
   );
+  const maxCerrado = Math.max(0, ...g.dias.filter((d) => d.alto > 0).map((d) => d.ventas / d.alto));
+  const altoHoy = ventaHoy != null && ventaHoy > 0 && maxCerrado > 0 ? Math.min(1, ventaHoy / maxCerrado) : null;
   const [tocado, setTocado] = useState<number | null>(null);
-  const linea = lineaDeLaGrafica(g, year, mes, tocado);
+  const linea = lineaDeLaGrafica(g, year, mes, tocado, alta);
 
   // El dedo o el mouse eligen por la posición: cada barra mide ~10 px en el celular.
   const diaEn = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -51,7 +66,7 @@ export function GraficaDelMes({
       <div
         role="group"
         aria-label="Ventas diarias del mes · toca un día"
-        className="relative mt-3 flex h-[120px] cursor-pointer touch-pan-y items-end gap-[2px] sm:h-[180px] sm:gap-1"
+        className={cn("relative mt-3 flex cursor-pointer touch-pan-y items-end gap-[2px] sm:h-[180px] sm:gap-1", alta ? "h-[240px]" : "h-[120px]")}
         onPointerMove={(e) => { if (e.pointerType === "mouse") setTocado(diaEn(e)); }}
         onPointerLeave={(e) => { if (e.pointerType === "mouse") setTocado(null); }}
         onPointerUp={(e) => {
@@ -75,12 +90,14 @@ export function GraficaDelMes({
             data-estado={d.estado}
             className={cn(
               "flex-1 rounded-t-[3px] transition-opacity",
-              BARRA[d.estado],
+              d.estado === "hoy" && altoHoy != null ? BARRA_HOY_EN_CURSO
+                : d.estado === "ultimo" && altoHoy != null ? BARRA.venta : BARRA[d.estado],
               tocado != null && d.dia !== tocado && "opacity-30",
               tocado === d.dia && d.estado === "venta" && "bg-gray-900",
             )}
             style={{
-              height: d.estado === "hoy" || d.estado === "futuro" || d.alto === 0
+              height: d.estado === "hoy" && altoHoy != null ? `${Math.max(3, altoHoy * 100)}%`
+                : d.estado === "hoy" || d.estado === "futuro" || d.alto === 0
                 ? (d.estado === "futuro" ? "2px" : "4px")
                 : `${Math.max(3, d.alto * 100)}%`,
             }}

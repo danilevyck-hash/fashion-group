@@ -678,6 +678,55 @@ El trabajo del 4-oct nunca se publicó y partía de un `main` 141 cambios atrás
 - ✅ Resuelto el 9-oct-2026 (PR #698): el número grande de Clientes es «No vuelven» (la propuesta traía «Frecuentes»).
 - ✅ Resuelto el 9-oct-2026 (PR #698): el Resumen ya no lleva «Ver meta»; el enlace queda solo en Vendedoras.
 
+## El Resumen del celular, con el encabezado de todo el sistema (11-oct-2026)
+
+> Daniel, 11-oct-2026, desde su iPhone: *«¿Por qué los otros tabs no están como en los otros módulos en el celular?»* y *«¿la venta del día cómo debería de estar?»*. Después, sobre las capturas: *«¿por qué el menú arriba y en la pantalla?»*, *«Actualizado debería de estar a nivel de las ventas hoy y ayer, y lo de últimos 12 meses en una línea, sin tanto protagonismo»*, *«que la comparación sea hasta lo más actualizado»*, *«¿por qué muestra mejores horas solo rango de una hora?»*, *«¿promedio diario qué?»*. Aprobó con *«dale aprobado, tíralo»*.
+
+Interruptor `MULTIFASHION_BARRA_2026_10` (`lib/multifashion/celular.ts`), **prendido**. `false` = el celular del 24-sep («‹ Septiembre», el mes como título, los cuatro renglones y la línea de hábitos). **Solo el celular**: la computadora no cambió.
+
+### Por qué era distinto
+
+El celular de Multifashion («un número y cuatro renglones», 24-sep) nació ocho días antes que la barra compartida (`BarraDeControles`, 2-oct). Nunca se pasó a ella: era el único módulo con pestañas que no usaba el título como lista.
+
+### La pantalla, de arriba abajo
+
+1. **«Resumen ▾»**: el título es la lista de secciones (Resumen · Año 2026 · Vendedoras · Productos · Clientes). Es la ÚNICA forma de ir a cada una: los cuatro renglones salieron del Resumen. «Año» entra en la lista porque sin el «‹ Octubre» de antes no tenía vuelta.
+2. **«‹ Octubre 2026 ▾» y el calendario** en el renglón 2. El mes va entero, como en Ventas.
+3. **«Hoy $2,140 · ayer $1,795»** a la izquierda y **«Actualizado 6:00 pm ↻»** al final del mismo renglón (la misma `LineaDeFrescura`). Si no cabe —solo pasa con «Hoy sin ventas todavía»—, la frescura baja; nunca se corta.
+4. **El número del mes, con la venta de hoy.**
+5. **«▲ 85 % contra octubre 2025 · proyección $86,648».**
+6. **«Venta promedio diaria $2,662 · 1–10 oct»** y la gráfica, al doble de alto (240 px). La barra destacada es la de HOY, rayada porque el día va en curso.
+7. **Dos líneas grises**: «Últimos 12 meses · día de mayor venta: sábado (25 %)» y «Horario de mayor venta: 3–6 pm (40 %)».
+
+### Las definiciones
+
+- **Número grande = días completos + la venta de hoy.** El detalle del mes corta en el último día COMPLETO (regla del 31-jul-2026); arriba decía «Hoy $2,140» y cualquiera suponía que el número ya lo traía. Lo de hoy es la MISMA cifra del renglón «Hoy» (`venta-hoy`, misma vista, retail, las notas de crédito restan). Sin esa cifra, sin ventas todavía, o si el día de «hoy» no es el que sigue al corte del detalle, queda el número de siempre: nunca se suma dos veces (`ventaDeHoyParaElMes`).
+- **El % va hasta el mismo día y la misma hora del año pasado.** Días completos de siempre + ese día del año pasado solo hasta la hora del último sync de hoy (`/api/multifashion/comparativo-hoy`, `instanteUnAnioAntes`, `baseDeHoyAnioPasado`). Un día a medias contra un día entero se leería como caída cada mañana. Medido el 11-oct-2026 a las 6:00 pm: $26,616.22 + $2,140.40 = $28,756.62 contra $14,262.00 + $1,268.49 = $15,530.49 → ▲ 85 % (sobre días completos daba 87 %). Si las dos lecturas no se cortaron en el MISMO instante, queda el % de días completos. El 29-feb no suma nada del año pasado.
+- **La proyección y el promedio diario siguen sobre días completos**: un día a medias no entra en una tasa. Por eso la línea dice de qué días es («1–10 oct»).
+- **«Últimos 12 meses» = los 365 días que terminan AYER** (`lib/multifashion/historico.ts`). Hoy nunca entra.
+  - **Día de mayor venta: por TOTAL vendido**, con su parte de la venta. 🩸 Por promedio de los días con venta ganaba «domingo»: $5,412 de promedio sobre **6 domingos** en todo el año (la tienda casi no abre los domingos). Por total, medido: sábado $178,728 (24.8 %, 52 días) · viernes 16.0 % · miércoles 15.8 % · martes 14.0 % · jueves 13.3 % · lunes 11.6 % · domingo 4.5 % (6 días).
+  - **Horario de mayor venta: las 3 horas SEGUIDAS que más vendieron**, con su parte de la venta. Medido: 3–6 pm, 40.2 %. Las mejores 2 son 4–6 pm (27.7 %) y las mejores 4, 2–6 pm (51.1 %). La tienda vende de 10 am a 7 pm.
+  - Lo que no se puede calcular no se dibuja: nunca un $0 ni un 0 % como dato.
+- 🔴 **Sin SQL nuevo ni migración.** Los días salen del detalle del mes (uno por mes de la ventana); las horas, del procedimiento de horas en los once meses enteros y de las facturas de esos días en los dos meses del borde. Son ~28 lecturas y se hacen **una vez al día**: la respuesta se guarda por el día de Panamá (`unstable_cache`, el patrón del catálogo público). El permiso se revisa en CADA pedido, antes de leer lo guardado, y no hay caché pública.
+
+### Qué se fue del celular
+
+- Los **cuatro renglones** (Año · Vendedoras · Productos · Clientes). Sus números se ven al abrir cada sección.
+- La **línea gris de hábitos** («Dom es el día fuerte ($4,565) · hora pico 3–4 pm · mejor día del mes…»). Dos de sus tres datos ya eran de los últimos 3 meses y la línea no lo decía. En la computadora sigue.
+
+### Candados
+
+- `src/__tests__/lib/multifashion-barra-celular.test.ts` — las secciones del título, la línea de hoy, el número con hoy y sus caídas al número de siempre, el % hasta la misma hora, la ventana de 365 días, el día por total, el bloque de 3 horas, la línea de la gráfica, lo guardado del día con el permiso antes.
+- `src/__tests__/components/multifashion-celular.test.tsx` — con `soloElMes`, sin renglones ni hábitos y el mismo número; sin ella, la pantalla del 24-sep.
+- `multifashion-acceso` y `multifashion-cerrado-y-espejo` — las rutas son 15: nacieron `historico` y `comparativo-hoy` (solo leen, `ROLES_MULTIFASHION`).
+
+### Pendientes y dudas para Daniel
+
+- ⚠️ **La computadora, Productos y «Año 2026» siguen mostrando el mes SIN la venta de hoy**, y la computadora conserva la línea gris de 3 meses. El celular y la computadora dicen números distintos del mismo mes (la diferencia es la venta de hoy) hasta que Daniel decida alinearlos.
+- ⚠️ **Las lecturas de «Últimos 12 meses» deberían ser UN procedimiento en la base.** Pide el «sí» de Daniel al SQL.
+- ⚠️ Con «miércoles» la primera línea gris mediría 378 px de 370 y bajaría a una tercera línea. Hoy gana sábado con distancia.
+- ⚠️ Una corrección de Switch sobre un día viejo se ve en «Últimos 12 meses» al día siguiente.
+
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 
 > El 14-sep-2026 CLAUDE.md pasaba de 333 mil caracteres (el tope del harness es 150 mil) y las instrucciones se cortaban a la mitad. Se dejó ahí un resumen de las reglas vigentes y el texto completo —mediciones, citas de Daniel, candados y mutaciones— se movió acá sin cambiar una palabra.

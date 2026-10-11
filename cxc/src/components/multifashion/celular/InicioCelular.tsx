@@ -35,6 +35,7 @@ import { filasDelAnio } from "@/lib/multifashion/apple";
 import { MULTIFASHION_GRAFICA_2026_10 } from "@/lib/multifashion/grafica-mes";
 import { GraficaDelMes } from "../GraficaDelMes";
 import { lineaMayoreo } from "@/lib/multifashion/retail-al-frente";
+import { lineasDelHistorico, type HistoricoVentas } from "@/lib/multifashion/historico";
 
 export const TONO_CLASE: Record<TonoCelular, string> = {
   sube: "text-emerald-700",
@@ -78,15 +79,29 @@ interface Props {
   onAbrir: (clave: ClaveRenglon) => void;
   /** Lo que requiere atención (`MULTIFASHION_APPLE_2026_10`), ARRIBA. */
   atencion?: ReactNode;
+  /**
+   * 🔴 `MULTIFASHION_BARRA_2026_10`: con el título como lista de secciones, la
+   * pantalla termina en la gráfica — sin la línea de hábitos ni los cuatro
+   * renglones (y sin pedir sus tres datos).
+   */
+  soloElMes?: boolean;
+  /** Lo que se suma al número grande: la venta de HOY (`ventaDeHoyParaElMes`), o `null`. */
+  ventaHoy?: number | null;
+  /** Lo que se suma a la base del año pasado: ese día hasta la misma hora (`baseDeHoyAnioPasado`), o `null`. */
+  prevHoy?: number | null;
 }
 
-export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencion = null }: Props) {
+export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencion = null, soloElMes = false, ventaHoy = null, prevHoy = null }: Props) {
   const { totales } = data;
   const year = periodo.tipo === "mes" ? periodo.anio : corte.anio;
   const mes = periodo.tipo === "mes" ? periodo.mes : corte.mes;
 
   // ── El número grande y su línea ───────────────────────────────────────────
-  const deltaYoy = data.yoy.tiene_data ? variacionPct(totales.ventas, data.yoy.ventas) : null;
+  // 🔴 El % cubre lo mismo que el número: con hoy de los DOS lados, o de ninguno.
+  const hastaAhora = ventaHoy != null && prevHoy != null;
+  const deltaYoy = data.yoy.tiene_data
+    ? variacionPct(totales.ventas + (hastaAhora ? ventaHoy : 0), data.yoy.ventas + (hastaAhora ? prevHoy : 0))
+    : null;
   const cierra = data.is_mes_actual ? totales.proyeccion_cierre : null;
   const linea = lineaDelMes({ periodo, deltaAnioPasado: deltaYoy, cierraEn: cierra });
 
@@ -114,7 +129,7 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
   // ── Los hábitos: la MISMA línea del Resumen de computadora ────────────────
   const patrones = data.patrones;
   const hayVentana = patrones != null && patrones.mesesUsados > 0;
-  const habitos = totales.n_tickets > 0
+  const habitos = !soloElMes && totales.n_tickets > 0
     ? lineaHabitos({
         mejorDow: hayVentana ? patrones!.mejorDow : null,
         horaPico: hayVentana && patrones!.horaPico != null ? horaPicoLabel(patrones!.horaPico) : null,
@@ -124,17 +139,17 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
 
   // ── Los cuatro renglones. MISMAS claves de SWR que cada pestaña ───────────
   const { data: vend } = useSWR<VendedorasResumen>(
-    `/api/multifashion/vendedoras?year=${year}&periodo=mes&mes=${mes}`,
+    soloElMes ? null : `/api/multifashion/vendedoras?year=${year}&periodo=mes&mes=${mes}`,
     json,
     { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
   );
   const { data: prod } = useSWR<ProductosResumen>(
-    `/api/multifashion/productos?year=${year}&mes=${mes}&periodo=mes`,
+    soloElMes ? null : `/api/multifashion/productos?year=${year}&mes=${mes}&periodo=mes`,
     json,
     { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
   );
   const { data: fidel } = useSWR<FidelizacionResumen>(
-    "multifashion-fidelizacion",
+    soloElMes ? null : "multifashion-fidelizacion",
     () => json("/api/multifashion/fidelizacion"),
     { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
   );
@@ -168,7 +183,7 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
       {atencion && <div className="mb-4">{atencion}</div>}
       {/* El mes, como número. */}
       <p data-celular="numero-del-mes" className="text-center text-[52px] font-light leading-none tracking-tight tabular-nums text-gray-950">
-        {montoCorto(totales.ventas)}
+        {montoCorto(totales.ventas + (ventaHoy ?? 0))}
       </p>
       {filaTocada ? (
         <p data-celular="linea-del-dia" className="mt-2 text-center text-sm font-medium text-gray-950 tabular-nums">
@@ -197,6 +212,8 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
             esMesActual={data.is_mes_actual}
             diaActual={data.dia_actual}
             feriados={data.feriados ?? null}
+            alta={soloElMes}
+            ventaHoy={ventaHoy}
           />
         </div>
       ) : (
@@ -225,13 +242,35 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
         <p data-celular="habitos" className="mt-2 text-sm text-gray-500">{habitos}</p>
       )}
 
+      {soloElMes && <HistoricoCelular />}
+
       {/* Los cuatro renglones. */}
+      {!soloElMes && (
       <ul data-celular="renglones" className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
         {renglones.map((r) => (
           <RenglonFila key={r.clave} renglon={r} onAbrir={() => onAbrir(r.clave)} />
         ))}
       </ul>
+      )}
     </section>
+  );
+}
+
+/**
+ * 🔴 `MULTIFASHION_BARRA_2026_10` — «Últimos 12 meses», en lugar de la línea
+ * gris de hábitos y con su mismo peso: dos líneas chicas, sin caja. Se pide
+ * aparte y una vez por hora; mientras no llega, o si falla, no se dibuja nada.
+ */
+function HistoricoCelular() {
+  const { data } = useSWR<HistoricoVentas>("/api/multifashion/historico", json, {
+    dedupingInterval: 60 * 60_000, revalidateOnFocus: false,
+  });
+  const lineas = data?.semana && data.horas ? lineasDelHistorico(data) : [];
+  if (lineas.length === 0) return null;
+  return (
+    <p data-celular="historico" className="mt-2 text-sm text-gray-500 tabular-nums">
+      {lineas.map((l) => <span key={l} className="block">{l}</span>)}
+    </p>
   );
 }
 

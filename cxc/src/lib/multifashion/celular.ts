@@ -35,6 +35,7 @@
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import type { TabMultifashion } from "@/lib/multifashion/pestanas";
 import { etiquetaPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifashion/periodo";
+import { unAnioAntes } from "@/lib/ventas/clientes-corte-comparativo";
 
 /**
  * El interruptor. `false` = la pantalla de celular de antes, intacta (título,
@@ -79,6 +80,110 @@ export function subtituloHoyAyer(args: {
   if (hoy === undefined || hoy === null) return subtituloDelMes({ dias: args.dias, hoy });
   const deHoy = hoy.hayVentas ? `hoy ${montoCorto(hoy.ventas)}` : "hoy sin ventas todavía";
   return `${deHoy} · ayer ${montoCorto(hoy.ayer)}`;
+}
+
+/**
+ * 🔴 EL ENCABEZADO COMPARTIDO (11-oct-2026, propuesta). Daniel, desde su iPhone:
+ * «¿Por qué los otros tabs no están como en los otros módulos en el celular?» y
+ * «¿la venta del día cómo debería de estar?». Prendido, en el celular:
+ *  · el encabezado es `BarraDeControles`, el mismo de Ventas: el título es la
+ *    sección con su lista (Resumen · Año · Vendedoras · Productos · Clientes) y
+ *    el renglón 2 lleva el período con el calendario a su derecha;
+ *  · la venta de hoy tiene su línea («Hoy $1,866 · ayer $1,795») y la frescura
+ *    queda sola, en su línea gris;
+ *  · UNA sola forma de ir a cada sección, el título: los cuatro renglones salen
+ *    del Resumen (Daniel: «¿por qué el menú arriba y en la pantalla?») y también
+ *    la línea gris de hábitos bajo la gráfica. El Resumen termina en la gráfica.
+ * 🔴 Ningún número cambia.
+ * `false` = el encabezado de antes («‹ Septiembre» y el mes como título).
+ * Candado `multifashion-barra-celular.test.ts`.
+ */
+export const MULTIFASHION_BARRA_2026_10 = true;
+
+/** Las secciones del título: Resumen y las cuatro que eran renglones, con sus nombres. */
+export function seccionesDeLaBarra(
+  pestanas: readonly { id: TabMultifashion; label: string }[],
+  anio: number,
+): { value: string; label: string }[] {
+  return pestanas.flatMap((p) =>
+    p.id === "resumen"
+      ? [{ value: p.id, label: p.label }, { value: "anio", label: `Año ${anio}` }]
+      : [{ value: p.id, label: p.label }],
+  );
+}
+
+/**
+ * La línea de hoy, en piezas: «$1,866» (o «sin ventas todavía») y «ayer $1,795».
+ * Los MISMOS dos montos de `subtituloHoyAyer`; `null` si el mes no es el de hoy
+ * o el dato no llegó.
+ */
+export function lineaDeHoy(
+  hoy?: { hayVentas: boolean; ventas: number; ayer: number } | null,
+): { hoy: string; ayer: string } | null {
+  if (!hoy) return null;
+  return { hoy: hoy.hayVentas ? montoCorto(hoy.ventas) : "sin ventas todavía", ayer: `ayer ${montoCorto(hoy.ayer)}` };
+}
+
+/**
+ * 🔴 EL NÚMERO DEL MES CON LA VENTA DE HOY (`MULTIFASHION_BARRA_2026_10`, Daniel,
+ * 11-oct-2026). El detalle del mes corta en el último día COMPLETO; arriba dice
+ * «Hoy $2,140» y cualquiera supone que el número grande ya lo trae. En el
+ * celular: número grande = días completos + la venta de hoy, la MISMA del
+ * renglón «Hoy» (`venta-hoy`). La proyección y el promedio NO se tocan: siguen
+ * sobre días completos. El % va hasta la misma hora (`baseDeHoyAnioPasado`).
+ * Devuelve lo que se suma, o `null` (= el número de siempre) si el mes no es el
+ * de hoy, si hoy todavía no vendió, o si el día de «hoy» no es el que sigue al
+ * corte del detalle (medianoche, dato viejo): nunca se suma dos veces ni se adivina.
+ */
+export function ventaDeHoyParaElMes(e: {
+  esMesActual: boolean;
+  anio: number;
+  mes: number;
+  /** El último día completo del detalle (`dia_actual`). */
+  diaActual: number;
+  hoy?: { fecha: string; hayVentas: boolean; ventas: number } | null;
+}): number | null {
+  if (!e.esMesActual || !e.hoy || !e.hoy.hayVentas) return null;
+  const sigue = `${e.anio}-${String(e.mes).padStart(2, "0")}-${String(e.diaActual + 1).padStart(2, "0")}`;
+  return e.hoy.fecha === sigue && Number.isFinite(e.hoy.ventas) ? e.hoy.ventas : null;
+}
+
+/**
+ * 🔴 EL % HASTA LO MÁS ACTUALIZADO (Daniel, 11-oct-2026: «que la comparación sea
+ * hasta lo más actualizado»). El número grande ya trae hoy; el % compara contra
+ * el año pasado hasta el MISMO día y la MISMA hora: los días completos de
+ * siempre + ese día del año pasado solo hasta la hora del último sync de hoy.
+ * Un día a medias contra un día entero se leería como caída cada mañana.
+ *
+ * El instante del año pasado: la misma fecha un año antes (`unAnioAntes`, 29-feb
+ * → 28-feb) a la misma hora de Panamá del sync. `null` si el sync no es de hoy.
+ * `mismoDia: false` = el año pasado no tuvo ese día (29-feb): no se suma nada.
+ */
+export function instanteUnAnioAntes(
+  fechaHoy: string,
+  corteIso: string,
+): { fecha: string; instante: string; mismoDia: boolean } | null {
+  const t = Date.parse(corteIso);
+  if (!Number.isFinite(t)) return null;
+  const enPanama = new Date(t - 5 * 3_600_000).toISOString(); // UTC−5 fijo
+  if (enPanama.slice(0, 10) !== fechaHoy) return null;
+  const fecha = unAnioAntes(fechaHoy);
+  return { fecha, instante: `${fecha}T${enPanama.slice(11, 19)}-05:00`, mismoDia: fecha.slice(5) === fechaHoy.slice(5) };
+}
+
+/**
+ * Lo que se suma a la base del año pasado, o `null` (= el % de días completos,
+ * como siempre): solo si las dos lecturas se cortaron en el MISMO instante.
+ */
+export function baseDeHoyAnioPasado(e: {
+  /** La hora del último sync que trae la venta de hoy (`sync.ultimo`). */
+  corteDeHoy: string | null | undefined;
+  fechaDeHoy: string | null | undefined;
+  comparativo?: { fecha?: string; corte?: string | null; ventasPrev?: number | null } | null;
+}): number | null {
+  const c = e.comparativo;
+  if (!c || !e.corteDeHoy || c.corte !== e.corteDeHoy || c.fecha !== e.fechaDeHoy) return null;
+  return typeof c.ventasPrev === "number" && Number.isFinite(c.ventasPrev) ? c.ventasPrev : null;
 }
 
 /** Las dos pantallas que el celular agrega adentro de «Resumen». */

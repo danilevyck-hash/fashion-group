@@ -26,11 +26,13 @@ interface PeriodoSelectProps {
   siguiente?: string | null;
   /** CALENDARIO_SIMPLE_2026_10: más angosto en el celular, para que «Rango» entre al lado. */
   compacto?: boolean;
+  /** `MULTIFASHION_BARRA_2026_10`: en la barra del celular el mes va entero, «Octubre 2026», como en Ventas. */
+  mesCompleto?: boolean;
 }
 
 const FLECHA = "inline-flex h-11 w-9 shrink-0 items-center justify-center rounded-md text-lg text-gray-600 transition hover:bg-gray-100 active:scale-[0.97] disabled:pointer-events-none disabled:text-gray-300";
 
-export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, siguiente, compacto = false }: PeriodoSelectProps) {
+export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, siguiente, compacto = false, mesCompleto = false }: PeriodoSelectProps) {
   // Los grupos se dibujan en el orden en que aparecen (rangos primero, después
   // los años del más nuevo al más viejo) — el mismo orden que arma `opcionesPeriodo`.
   const grupos: { nombre: string; items: OpcionPeriodo[] }[] = [];
@@ -82,7 +84,7 @@ export function PeriodoSelect({ valor, opciones, onChange, disabled, anterior, s
     {compacto ? (
       <PanelPeriodo
         rotulo={rotulo ?? PLACEHOLDER_PERIODO}
-        rotuloCorto={corto}
+        rotuloCorto={mesCompleto ? undefined : corto}
         anios={panel.anios}
         mesesDe={(a) => panel.meses.get(a) ?? []}
         seleccion={panel.seleccion}

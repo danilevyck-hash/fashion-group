@@ -42,7 +42,7 @@ import SyncNowButton from "@/components/shared/SyncNowButton";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
-import { resolverTabMultifashion, type TabMultifashion } from "@/lib/multifashion/pestanas";
+import { PESTANAS_MULTIFASHION, resolverTabMultifashion, type TabMultifashion } from "@/lib/multifashion/pestanas";
 import {
   ajustarPeriodo, anioDelPeriodo, etiquetaPeriodo, mesVecino, opcionesPeriodo, periodoAUrl,
   periodoDesdeUrl, periodoPorDefecto, rangoInicial, VALOR_RANGO, type CortePeriodo, type Periodo,
@@ -51,6 +51,7 @@ import {
 import {
   MULTIFASHION_CELULAR, diasDelMesMirado, encabezadoCelular, esElMesDeHoy, etiquetaMesCorto,
   esPantallaCelular, mesAnterior, mesSiguiente, subtituloDelMes, subtituloHoyAyer, MF_DIA_2026_10, type ClaveRenglon,
+  MULTIFASHION_BARRA_2026_10, lineaDeHoy, seccionesDeLaBarra,
 } from "@/lib/multifashion/celular";
 import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
 import type { Multifashion } from "@/components/ventas/types";
@@ -61,6 +62,7 @@ import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
 import { Aviso } from "@/components/ui/Aviso";
+import { BarraDeControles, useBarraCelular } from "@/components/celular/BarraDeControles";
 
 // Fetcher puro del overview por año. SWR lo cachea por año → volver a un año ya
 // visto pinta al instante y revalida en background.
@@ -86,6 +88,8 @@ export function MultifashionShell({
   // 🔴 La lista se LEE de `acceso.ts` (derivada de `modules.ts`), nunca se
   // escribe acá: era la única copia a mano que quedaba (11-sep-2026).
   const { authChecked } = useAuth({ moduleKey: "multifashion", allowedRoles: ROLES_MULTIFASHION });
+  // 🔴 `MULTIFASHION_BARRA_2026_10`: en el celular, el encabezado compartido.
+  const barra = useBarraCelular(MULTIFASHION_BARRA_2026_10);
 
   // 🔴 El corte es el mes de PANAMÁ (UTC−5 fijo), no el del navegador: es la
   // misma regla de borde de mes de todo el módulo.
@@ -187,6 +191,18 @@ export function MultifashionShell({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }, [router, pathname, searchParams]);
 
+  // 🔴 `MULTIFASHION_BARRA_2026_10`: la sección elegida en el título. Los dos
+  // parámetros en UNA escritura, y como pantalla: el gesto de volver regresa.
+  const seccion = tab === "resumen" && pantallaCel === "anio" ? "anio" : tab;
+  const irASeccion = useCallback((v: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("mfCel");
+    params.delete("subtab");
+    if (v === "anio") params.set("mfCel", "anio");
+    else if (v !== "resumen") params.set("subtab", v);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [router, pathname, searchParams]);
+
   const encabezadoBase = encabezadoCelular({ tab, pantalla: pantallaCel, periodo, corte });
   // CALENDARIO_SIMPLE_2026_10: con un rango, «‹» dice el MES al que vuelve (el
   // Resumen del mes del rango), no «‹ Rango de fechas».
@@ -223,6 +239,10 @@ export function MultifashionShell({
             ? (ventaHoy ? { hayVentas: ventaHoy.hayVentas, ventas: ventaHoy.ventas } : undefined)
             : null,
         })
+    : null;
+
+  const hoyCel = barra && subtituloCel != null
+    ? lineaDeHoy(esHoy && ventaHoy ? { hayVentas: ventaHoy.hayVentas, ventas: ventaHoy.ventas, ayer: ventaHoy.ayer.ventas } : null)
     : null;
 
   // Las dos acciones de sync: en el teléfono viven en el menú ☰; desde `md`
@@ -292,7 +312,8 @@ export function MultifashionShell({
     />
   );
   const selectorPeriodoSimple = (
-    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2" data-selector-periodo>
+    // `barra`: el mes ocupa el renglón y el calendario queda a su derecha, como en Ventas.
+    <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 ${barra ? "w-full flex-nowrap [&>div:first-child]:min-w-0 [&>div:first-child]:flex-1 [&>div>[aria-expanded]]:flex-1" : ""}`} data-selector-periodo>
       {mesDelRango ? botonRango : (
         <>
           <PeriodoSelect
@@ -303,6 +324,7 @@ export function MultifashionShell({
             anterior={mesVecino(periodo, -1, opciones)}
             siguiente={mesVecino(periodo, 1, opciones)}
             compacto
+            mesCompleto={barra}
           />
           {TIPOS_POR_TAB[tab].rango && botonRango}
         </>
@@ -345,7 +367,19 @@ export function MultifashionShell({
         layout no agrega otro título arriba: volvería a empujar el número. */}
     <AppHeader module="Multifashion" acciones={conFrescura ? undefined : accionesSync} tituloEnLaPantalla={MULTIFASHION_CELULAR} />
     <PullToRefresh onRefresh={async () => { await mutate(); }}>
-    <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
+    {/* 🔴 `MULTIFASHION_BARRA_2026_10`: el encabezado del celular es el de
+        Ventas. Título = la sección, con su lista; renglón 2 = el período y el
+        calendario. «Año» no lleva período: lo dice su título. */}
+    {barra && (
+      <BarraDeControles
+        titulo="Multifashion"
+        pestanas={seccionesDeLaBarra(PESTANAS_MULTIFASHION, selectedYear)}
+        activa={seccion}
+        onPestana={irASeccion}
+        periodo={seccion === "anio" ? null : selectorPeriodo}
+      />
+    )}
+    <main className={`mx-auto w-full max-w-[1280px] px-4 md:px-7 md:py-6 ${barra ? "pb-5 pt-0" : "py-5"}`}>
       {/* Bloque 1 de 3: título + período. */}
       <header className={`relative z-20 mb-4 flex-wrap items-center justify-between gap-3 ${
         MULTIFASHION_CELULAR ? "hidden sm:flex" : "flex"
@@ -394,7 +428,23 @@ export function MultifashionShell({
       {/* 🔴 EL ENCABEZADO DEL CELULAR (24-sep-2026): el mes es el título, «‹
           Agosto» cambia de mes y «Octubre ›» solo si el mes no es el actual —
           NUNCA hacia el futuro. Reemplaza al desplegable de 57 meses. */}
-      {MULTIFASHION_CELULAR && (
+      {barra && (hoyCel || subtituloCel || frescuraCel) && (
+        // Hoy · ayer a la izquierda y la frescura al final del MISMO renglón
+        // (Daniel, 11-oct-2026). Si no cabe, la frescura baja sola: nunca se corta.
+        // `-my-2.5`: el ↻ se sigue tocando en 44 px sin darle ese alto al renglón.
+        <div data-celular="hoy-y-frescura" className="mb-3 mt-2 flex flex-wrap items-center justify-between gap-x-3 tabular-nums">
+          {hoyCel ? (
+            <p data-celular="hoy" className="whitespace-nowrap text-[15px] text-gray-950">
+              Hoy <span className="font-medium">{hoyCel.hoy}</span>
+              <span className="text-gray-500"> · {hoyCel.ayer}</span>
+            </p>
+          ) : subtituloCel && <p className="text-sm text-gray-500">{subtituloCel}</p>}
+          {frescuraCel && (
+            <span data-celular="subtitulo" className="-my-2.5 whitespace-nowrap text-sm text-gray-500">{frescuraCel}</span>
+          )}
+        </div>
+      )}
+      {MULTIFASHION_CELULAR && !barra && (
         <header data-celular="encabezado" className="mb-3 sm:hidden">
           <div data-fila-del-avatar className="flex min-h-[44px] items-center justify-between">
             {encabezado.atras ? (
@@ -471,7 +521,7 @@ export function MultifashionShell({
           corte={corte}
           isClosedYear={isClosedYear}
           syncTick={syncTick}
-          celular={MULTIFASHION_CELULAR ? { pantalla: pantallaCel, onAbrir: abrirRenglon, onAbrirMes: abrirMes } : undefined}
+          celular={MULTIFASHION_CELULAR ? { pantalla: pantallaCel, onAbrir: abrirRenglon, onAbrirMes: abrirMes, soloElMes: barra } : undefined}
         />
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">

@@ -104,10 +104,21 @@ export function etiquetaEnCelular(d: DiaGrafica, g: Grafica): boolean {
 }
 
 /** La línea de arriba de la gráfica: el día tocado o, sin tocar, el promedio. */
-export function lineaDeLaGrafica(g: Grafica, year: number, mes: number, tocado: number | null): string | null {
+const MES_CORTO_GRAFICA = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/**
+ * `conRango` (`MULTIFASHION_BARRA_2026_10`, celular): «Venta promedio diaria
+ * $2,662 · 1–10 oct». Daniel, 11-oct-2026: «¿promedio diario qué?». Dice qué se
+ * promedia y de qué días; el número es el MISMO.
+ */
+export function lineaDeLaGrafica(g: Grafica, year: number, mes: number, tocado: number | null, conRango = false): string | null {
   const d = tocado == null ? null : g.dias.find((x) => x.dia === tocado) ?? null;
   if (!d || d.estado === "hoy" || d.estado === "futuro") {
     if (g.promedio == null) return null;
+    if (conRango) {
+      const dias = g.diasCerrados === 1 ? "1" : `1–${g.diasCerrados}`;
+      return `Venta promedio diaria ${montoCorto(g.promedio)} · ${dias} ${MES_CORTO_GRAFICA[mes - 1]}`;
+    }
     return `Promedio diario ${montoCorto(g.promedio)} · ${g.diasCerrados} ${g.diasCerrados === 1 ? "día" : "días"}`;
   }
   const linea = lineaDelDia({ anio: year, mes, dia: d.dia, ventas: d.ventas, tickets: d.tickets });
