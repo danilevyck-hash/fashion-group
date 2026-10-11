@@ -75,5 +75,29 @@ await pg.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight
 await pg.waitForTimeout(800);
 console.log("ABAJO", JSON.stringify(await medir(), null, 1));
 await pg.screenshot({ path: `${OUT}/${process.env.PREFIJO}-abajo.png` });
+// ── El selector abierto y un mes elegido (sin recargar la página) ──
+if (process.env.MES) {
+  await pg.evaluate(() => window.scrollTo(0, 0));
+  await pg.waitForTimeout(400);
+  await pg.locator('button[aria-label^="Período"]:visible, button[aria-haspopup]:visible').filter({ hasText: /20\d\d/ }).first().click();
+  await pg.waitForTimeout(900);
+  const menu = await pg.evaluate(() => {
+    const r = (el) => { const b = el.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), right: Math.round(b.right), bottom: Math.round(b.bottom) }; };
+    const d = [...document.querySelectorAll('[role="dialog"]')].filter((e) => e.getBoundingClientRect().width > 0);
+    return d.map((e) => ({ label: e.getAttribute("aria-label"), caja: r(e), texto: e.innerText,
+      botones: [...e.querySelectorAll("button")].map((b) => ({ t: (b.innerText || b.getAttribute("aria-label") || "").trim(), aria: b.getAttribute("aria-label"), off: b.disabled, ...r(b) })) }));
+  });
+  console.log("MENU", JSON.stringify(menu));
+  await pg.screenshot({ path: `${OUT}/${process.env.PREFIJO}-selector-abierto.png` });
+  await pg.locator('[role="dialog"] button:visible').filter({ hasText: new RegExp(`^${process.env.MES}`, "i") }).first().click();
+  await pg.waitForTimeout(2500);
+  console.log("MES-ARRIBA", JSON.stringify(await medir()));
+  console.log("MES-TEXTO", JSON.stringify(await pg.evaluate(() => document.body.innerText.slice(0, 900))));
+  await pg.screenshot({ path: `${OUT}/${process.env.PREFIJO}-mes.png` });
+  await pg.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await pg.waitForTimeout(600);
+  console.log("MES-ABAJO", JSON.stringify(await medir()));
+  await pg.screenshot({ path: `${OUT}/${process.env.PREFIJO}-mes-abajo.png` });
+}
 console.log(`escrituras bloqueadas por el navegador: ${bloqueadas}`);
 await br.close();
