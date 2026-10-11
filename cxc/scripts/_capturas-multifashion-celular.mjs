@@ -90,6 +90,23 @@ if (process.env.MEDIR_HOY) {
 console.log("ARRIBA", JSON.stringify(await medir(), null, 1));
 console.log("TEXTO", JSON.stringify(await pg.evaluate(() => document.body.innerText.slice(0, 700))));
 await pg.screenshot({ path: `${OUT}/${PREFIJO}-arriba.png` });
+// La gráfica: su alto, el promedio y, con TOCAR=1, un día tocado (captura aparte).
+console.log("GRAFICA", JSON.stringify(await pg.evaluate(() => {
+  const g = document.querySelector('[data-celular="inicio"] [data-elemento="grafica-dias"] [role="group"]'); if (!g) return null;
+  const c = g.getBoundingClientRect(), barras = [...g.querySelectorAll("[data-dia]")].map((b) => Math.round(b.getBoundingClientRect().height));
+  const p = g.querySelector('[data-elemento="grafica-promedio"]')?.getBoundingClientRect();
+  const l = document.querySelector('[data-celular="inicio"] [data-elemento="grafica-linea"]').getBoundingClientRect();
+  return { alto: Math.round(c.height), arriba: Math.round(c.top), abajo: Math.round(c.bottom), barraMasAlta: Math.max(...barras), promedioDesdeAbajo: p ? Math.round(c.bottom - p.top) : null, lineaDeArribaTermina: Math.round(l.bottom) };
+})));
+if (process.env.TOCAR) {
+  const b = pg.locator('[data-celular="inicio"] [data-dia="3"]');
+  await b.tap();
+  await pg.waitForTimeout(500);
+  console.log("TOCADO", JSON.stringify(await pg.evaluate(() => document.querySelector('[data-celular="inicio"] [data-elemento="grafica-linea"]').textContent)));
+  await pg.screenshot({ path: `${OUT}/_extra-${PREFIJO}-dia-tocado.png` });
+  await b.tap();
+  await pg.waitForTimeout(300);
+}
 // «abajo» solo si la página todavía se desliza.
 const fin = await pg.evaluate(() => { const r = (s) => document.querySelector(s)?.getBoundingClientRect(); return { alto: document.documentElement.scrollHeight, vista: innerHeight, grafica: Math.round(r('[data-celular="inicio"]')?.bottom ?? 0), tabBar: Math.round(r("[data-tab-bar]")?.top ?? 0) }; });
 console.log("FIN", JSON.stringify(fin));

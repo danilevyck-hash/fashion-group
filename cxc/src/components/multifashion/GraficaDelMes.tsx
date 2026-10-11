@@ -19,7 +19,7 @@ const BARRA: Record<EstadoDia, string> = {
 };
 
 export function GraficaDelMes({
-  dias, year, mes, esMesActual, diaActual, feriados,
+  dias, year, mes, esMesActual, diaActual, feriados, alta = false,
 }: {
   dias: readonly { dia: number; ventas: number; n_tickets: number }[];
   year: number;
@@ -27,6 +27,8 @@ export function GraficaDelMes({
   esMesActual: boolean;
   diaActual: number;
   feriados?: readonly string[] | null;
+  /** `MULTIFASHION_BARRA_2026_10`: en el celular, el doble de alto (240 px). Solo cambia el alto. */
+  alta?: boolean;
 }) {
   const g = useMemo(
     () => graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados }),
@@ -51,7 +53,7 @@ export function GraficaDelMes({
       <div
         role="group"
         aria-label="Ventas diarias del mes · toca un día"
-        className="relative mt-3 flex h-[120px] cursor-pointer touch-pan-y items-end gap-[2px] sm:h-[180px] sm:gap-1"
+        className={cn("relative mt-3 flex cursor-pointer touch-pan-y items-end gap-[2px] sm:h-[180px] sm:gap-1", alta ? "h-[240px]" : "h-[120px]")}
         onPointerMove={(e) => { if (e.pointerType === "mouse") setTocado(diaEn(e)); }}
         onPointerLeave={(e) => { if (e.pointerType === "mouse") setTocado(null); }}
         onPointerUp={(e) => {

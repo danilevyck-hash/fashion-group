@@ -27,6 +27,12 @@ describe("Multifashion › celular › encabezado compartido", () => {
     expect(inicio).toContain("soloElMes = false");
     expect(inicio).toMatch(/\{!soloElMes && \(\s*<ul data-celular="renglones"/);
     expect(inicio).toContain("const habitos = !soloElMes &&");
+    // La gráfica alta (240 px) solo la pide el celular con el interruptor; sin la prop mide lo de siempre.
+    expect(inicio).toContain("alta={soloElMes}");
+    const grafica = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/GraficaDelMes.tsx"), "utf8");
+    expect(grafica).toContain('alta = false');
+    expect(grafica).toContain('alta ? "h-[240px]" : "h-[120px]"');
+    expect(grafica).toContain("sm:h-[180px]");
     // En su lugar, «Últimos 12 meses»: solo con el interruptor.
     expect(inicio).toContain("{soloElMes && <HistoricoCelular />}");
   });

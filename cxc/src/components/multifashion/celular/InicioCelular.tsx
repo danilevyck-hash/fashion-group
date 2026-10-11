@@ -204,6 +204,7 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
             esMesActual={data.is_mes_actual}
             diaActual={data.dia_actual}
             feriados={data.feriados ?? null}
+            alta={soloElMes}
           />
         </div>
       ) : (
