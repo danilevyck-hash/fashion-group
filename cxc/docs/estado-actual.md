@@ -2523,3 +2523,15 @@ Detalle entero (mediciones, citas, candados, mutaciones) en [postmortems/asisten
 - Prender «Compensación de tardanza» a quien apruebe (hoy nadie la tiene).
 - La marca doble de Ángel (305) del 7-oct.
 - Hablar con quienes no marcan el almuerzo y con Jorman, que marca 7-8 veces.
+
+## 11-oct-2026 — Multifashion en el celular: el Resumen con el encabezado de todo el sistema
+
+Publicado y prendido (`MULTIFASHION_BARRA_2026_10`). Daniel: *«dale aprobado, tíralo»*. 📄 [postmortems/multifashion.md](postmortems/multifashion.md) › «El Resumen del celular, con el encabezado de todo el sistema (11-oct-2026)».
+
+**Qué cambió, solo en el celular:** el título es la lista de secciones y el período va en su renglón, como en Ventas · «Hoy · ayer» con «Actualizado … ↻» en el mismo renglón · el número del mes trae la venta de hoy y el % compara hasta el mismo día y la misma hora del año pasado · la gráfica al doble de alto, con la barra de hoy destacada · «Últimos 12 meses»: día de mayor venta y horario de mayor venta, con su parte de la venta.
+
+**Pendiente de Daniel:**
+
+- La computadora, Productos y «Año 2026» siguen mostrando el mes **sin** la venta de hoy, y la computadora conserva la línea gris de 3 meses. Falta decidir si se alinean con el celular.
+- Las lecturas de «Últimos 12 meses» deberían pasar a un procedimiento en la base. Hoy se leen una vez al día. Pide su «sí» al SQL.
+

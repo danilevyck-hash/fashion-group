@@ -228,3 +228,22 @@ describe("Multifashion › celular › la línea de la gráfica dice qué promed
   });
 });
 
+describe("Multifashion › «Últimos 12 meses» se lee una vez al día, y el permiso en cada pedido", () => {
+  const ruta = fs.readFileSync(path.join(process.cwd(), "src/app/api/multifashion/historico/route.ts"), "utf8");
+
+  it("lo guardado va por el día de Panamá, sin nada de quien lo pide", () => {
+    expect(ruta).toContain('unstable_cache(leerHistorico, ["multifashion-historico"], { revalidate: 86_400 })');
+    expect(ruta).toContain("historicoDelDia(hoyPanama())");
+    // Lo que se guarda no recibe la petición ni la sesión: solo la fecha.
+    expect(ruta).toMatch(/async function leerHistorico\(hoy: string\)/);
+  });
+
+  it("🔴 el permiso se revisa ANTES de leer lo guardado, y no hay caché pública", () => {
+    const get = ruta.slice(ruta.indexOf("export async function GET"));
+    expect(get.indexOf("requireRole(req, ROLES_MULTIFASHION)")).toBeGreaterThan(-1);
+    expect(get.indexOf("requireRole(req, ROLES_MULTIFASHION)")).toBeLessThan(get.indexOf("historicoDelDia("));
+    expect(get.indexOf("if (auth instanceof NextResponse) return auth;")).toBeLessThan(get.indexOf("historicoDelDia("));
+    expect(ruta).not.toMatch(/Cache-Control|s-maxage|public,/);
+  });
+});
+

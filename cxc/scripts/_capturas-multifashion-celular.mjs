@@ -116,6 +116,14 @@ console.log("LINEA-GRAFICA", JSON.stringify(await pg.evaluate(() => {
   const out = { texto: l.textContent, ancho: Math.round(l.getBoundingClientRect().width), real: w(l.textContent), peor: w("Venta promedio diaria $12,345 · 1–30 sep"), lineas: Math.round(l.getBoundingClientRect().height / parseFloat(getComputedStyle(l).lineHeight)) };
   s.remove(); return out;
 })));
+// CACHE=1: la ruta de 12 meses tres veces DESDE NODE (el navegador interceptado manda
+// `Cache-Control: no-cache` y en desarrollo eso salta lo guardado). La 2.ª y la 3.ª no deben leer la base.
+if (process.env.CACHE) {
+  const cabeceras = { cookie: `cxc_session=${cookie}; cxc_ultimo_toque=${Date.now()}` };
+  const una = async () => { const t = Date.now(); const r = await fetch(`${BASE}/api/multifashion/historico`, { headers: cabeceras }); const j = await r.json(); return { ms: Date.now() - t, status: r.status, cc: r.headers.get("cache-control"), sabado: j.semana?.[6]?.total }; };
+  console.log("CACHE", JSON.stringify([await una(), await una(), await una()]));
+  console.log("CACHE-SIN-SESION", (await fetch(`${BASE}/api/multifashion/historico`)).status);
+}
 if (process.env.VER_HISTORICO) console.log("HISTORICO-JSON", JSON.stringify(await pg.evaluate(() => fetch("/api/multifashion/historico").then((r) => r.json()))));
 // VER_COMPARATIVO=1: las dos sumas detrás del % (solo lecturas).
 if (process.env.VER_COMPARATIVO) console.log("COMPARATIVO-JSON", JSON.stringify(await pg.evaluate(async () => {
