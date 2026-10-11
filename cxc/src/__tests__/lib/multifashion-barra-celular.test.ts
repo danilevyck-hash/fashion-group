@@ -16,6 +16,7 @@ import {
   baseDeHoyAnioPasado, instanteUnAnioAntes, lineaDeHoy, montoCorto, seccionesDeLaBarra, subtituloHoyAyer, ventaDeHoyParaElMes,
 } from "@/lib/multifashion/celular";
 import { PESTANAS_MULTIFASHION } from "@/lib/multifashion/pestanas";
+import { graficaDelMes, lineaDeLaGrafica } from "@/lib/multifashion/grafica-mes";
 import {
   TITULO_HISTORICO, bloqueDeHoras, diaDeMayorVenta, etiquetaHoras, historicoDeVentas, horasDeFacturas,
   lineasDelHistorico, mesesDelHistorico, ventanaDelHistorico,
@@ -200,6 +201,30 @@ describe("Multifashion › celular › el número del mes con la venta de hoy", 
     expect(sel).toContain("mesCompleto = false");
     expect(sel).toContain("rotuloCorto={mesCompleto ? undefined : corto}");
     expect(shell).toContain("mesCompleto={barra}");
+  });
+});
+
+describe("Multifashion › celular › la línea de la gráfica dice qué promedia y de qué días", () => {
+  const dias = (n: number) => Array.from({ length: n }, (_, i) => ({ dia: i + 1, ventas: i < 10 ? 2662 : 500, n_tickets: 5 }));
+  const octubre = (diaActual: number) => graficaDelMes({ dias: dias(31), year: 2026, mes: 10, esMesActual: true, diaActual, feriados: [] });
+
+  it("«Venta promedio diaria $X · 1–10 oct», con el MISMO número; apagado y en la computadora, el texto de siempre", () => {
+    const g = octubre(10);
+    expect(lineaDeLaGrafica(g, 2026, 10, null, true)).toBe("Venta promedio diaria $2,662 · 1–10 oct");
+    expect(lineaDeLaGrafica(g, 2026, 10, null)).toBe("Promedio diario $2,662 · 10 días");
+    // Un solo día completo, y un mes cerrado entero.
+    expect(lineaDeLaGrafica(octubre(1), 2026, 10, null, true)).toBe("Venta promedio diaria $2,662 · 1 oct");
+    const sep = graficaDelMes({ dias: dias(30), year: 2026, mes: 9, esMesActual: false, diaActual: 30, feriados: [] });
+    expect(lineaDeLaGrafica(sep, 2026, 9, null, true)).toMatch(/^Venta promedio diaria \$[\d,]+ · 1–30 sep$/);
+  });
+
+  it("sin ningún día completo no dice nada (como hoy), y el día tocado no cambia", () => {
+    expect(lineaDeLaGrafica(octubre(0), 2026, 10, null, true)).toBeNull();
+    expect(lineaDeLaGrafica(octubre(0), 2026, 10, null)).toBeNull();
+    const g = octubre(10);
+    expect(lineaDeLaGrafica(g, 2026, 10, 3, true)).toBe(lineaDeLaGrafica(g, 2026, 10, 3));
+    const grafica = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/GraficaDelMes.tsx"), "utf8");
+    expect(grafica).toContain("lineaDeLaGrafica(g, year, mes, tocado, alta)");
   });
 });
 

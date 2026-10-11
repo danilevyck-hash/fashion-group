@@ -30,7 +30,7 @@ export function GraficaDelMes({
   esMesActual: boolean;
   diaActual: number;
   feriados?: readonly string[] | null;
-  /** `MULTIFASHION_BARRA_2026_10`: en el celular, el doble de alto (240 px). Solo cambia el alto. */
+  /** `MULTIFASHION_BARRA_2026_10`, celular: el doble de alto (240 px) y la línea de arriba dice «Venta promedio diaria … · 1–10 oct». */
   alta?: boolean;
   /**
    * `MULTIFASHION_BARRA_2026_10`: lo vendido HOY hasta ahora. La barra de «Hoy»
@@ -48,7 +48,7 @@ export function GraficaDelMes({
   const maxCerrado = Math.max(0, ...g.dias.filter((d) => d.alto > 0).map((d) => d.ventas / d.alto));
   const altoHoy = ventaHoy != null && ventaHoy > 0 && maxCerrado > 0 ? Math.min(1, ventaHoy / maxCerrado) : null;
   const [tocado, setTocado] = useState<number | null>(null);
-  const linea = lineaDeLaGrafica(g, year, mes, tocado);
+  const linea = lineaDeLaGrafica(g, year, mes, tocado, alta);
 
   // El dedo o el mouse eligen por la posición: cada barra mide ~10 px en el celular.
   const diaEn = (e: React.PointerEvent<HTMLDivElement>) => {

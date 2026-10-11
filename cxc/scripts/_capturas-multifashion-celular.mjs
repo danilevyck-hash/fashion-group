@@ -109,6 +109,13 @@ if (process.env.TOCAR) {
   await b.tap();
   await pg.waitForTimeout(300);
 }
+console.log("LINEA-GRAFICA", JSON.stringify(await pg.evaluate(() => {
+  const l = document.querySelector('[data-celular="inicio"] [data-elemento="grafica-linea"]'); if (!l) return null;
+  const s = document.createElement("span"); s.className = l.className; s.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;min-height:0"; l.parentElement.appendChild(s);
+  const w = (t) => { s.textContent = t; return Math.round(s.getBoundingClientRect().width); };
+  const out = { texto: l.textContent, ancho: Math.round(l.getBoundingClientRect().width), real: w(l.textContent), peor: w("Venta promedio diaria $12,345 · 1–30 sep"), lineas: Math.round(l.getBoundingClientRect().height / parseFloat(getComputedStyle(l).lineHeight)) };
+  s.remove(); return out;
+})));
 if (process.env.VER_HISTORICO) console.log("HISTORICO-JSON", JSON.stringify(await pg.evaluate(() => fetch("/api/multifashion/historico").then((r) => r.json()))));
 // VER_COMPARATIVO=1: las dos sumas detrás del % (solo lecturas).
 if (process.env.VER_COMPARATIVO) console.log("COMPARATIVO-JSON", JSON.stringify(await pg.evaluate(async () => {
