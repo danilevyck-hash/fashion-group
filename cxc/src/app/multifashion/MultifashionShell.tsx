@@ -428,17 +428,18 @@ export function MultifashionShell({
           Agosto» cambia de mes y «Octubre ›» solo si el mes no es el actual —
           NUNCA hacia el futuro. Reemplaza al desplegable de 57 meses. */}
       {barra && (hoyCel || subtituloCel || frescuraCel) && (
-        <div data-celular="hoy-y-frescura" className="mb-3 mt-2 tabular-nums">
-          {hoyCel && (
-            <p data-celular="hoy" className="text-base text-gray-950">
+        // Hoy · ayer a la izquierda y la frescura al final del MISMO renglón
+        // (Daniel, 11-oct-2026). Si no cabe, la frescura baja sola: nunca se corta.
+        // `-my-2.5`: el ↻ se sigue tocando en 44 px sin darle ese alto al renglón.
+        <div data-celular="hoy-y-frescura" className="mb-3 mt-2 flex flex-wrap items-center justify-between gap-x-3 tabular-nums">
+          {hoyCel ? (
+            <p data-celular="hoy" className="whitespace-nowrap text-[15px] text-gray-950">
               Hoy <span className="font-medium">{hoyCel.hoy}</span>
               <span className="text-gray-500"> · {hoyCel.ayer}</span>
             </p>
-          )}
-          {(frescuraCel || !hoyCel) && (
-            <p data-celular="subtitulo" className="text-sm text-gray-500">
-              {!hoyCel && subtituloCel}{!hoyCel && subtituloCel && frescuraCel && " · "}{frescuraCel}
-            </p>
+          ) : subtituloCel && <p className="text-sm text-gray-500">{subtituloCel}</p>}
+          {frescuraCel && (
+            <span data-celular="subtitulo" className="-my-2.5 whitespace-nowrap text-sm text-gray-500">{frescuraCel}</span>
           )}
         </div>
       )}

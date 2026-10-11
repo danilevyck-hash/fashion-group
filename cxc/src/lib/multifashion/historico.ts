@@ -9,10 +9,10 @@
 // detalle del mes (`multifashion_detalle_mensual_v3` y `multifashion_horas_pico_v1`,
 // retail, `is_wholesale = false`), uno por mes de la ventana.
 //
-//   · Día de mayor venta    → el día de la semana con el promedio más alto; el
+//   · mayor venta (día)     → el día de la semana con el promedio más alto; el
 //     promedio es por día CON venta (> 0), la misma definición del detalle del mes.
-//   · Hora de mayor venta   → la hora con más venta neta sumada (`agregarPatrones`).
-//   · Venta diaria más alta → el día con más venta neta.
+//   · mayor venta (hora)    → la hora con más venta neta sumada (`agregarPatrones`).
+//   · máximo diario         → el día con más venta neta.
 // 🔴 HOY no entra en los dos primeros de día (se filtra por fecha).
 // ponytail: la hora suma los meses enteros que da el procedimiento, así que lo
 // vendido HOY entra en esa suma (1 día de ~345); sacarlo pide SQL nuevo.
@@ -24,9 +24,6 @@ import { agregarPatrones, mesesDeLaVentana, type HoraMes } from "./patrones";
 
 export const MESES_DEL_HISTORICO = 12;
 export const TITULO_HISTORICO = `Últimos ${MESES_DEL_HISTORICO} meses`;
-export const ROTULO_DIA_SEMANA = "Día de mayor venta";
-export const ROTULO_HORA = "Hora de mayor venta";
-export const ROTULO_MEJOR_DIA = "Venta diaria más alta";
 
 const DIA_LARGO = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -86,23 +83,24 @@ export function historicoDeVentas(meses: readonly MesHistorico[], hoyIso: string
   };
 }
 
-/** «nov 2025 – 10 oct 2026»: la ventana de verdad, al lado del título. */
-export function rangoDelHistorico(h: Pick<HistoricoVentas, "desde" | "hasta">): string {
-  const [ad, md] = h.desde.split("-").map(Number);
-  const [ah, mh, dh] = h.hasta.split("-").map(Number);
-  return `${MES_CORTO[md - 1]} ${ad} – ${dh} ${MES_CORTO[mh - 1]} ${ah}`;
-}
-
-/** Las filas que SÍ se pueden decir, en orden. `hora` llega ya escrita («3–4 pm»). */
-export function filasDelHistorico(h: HistoricoVentas, hora: string | null): { rotulo: string; valor: string }[] {
-  const filas: { rotulo: string; valor: string }[] = [];
+/**
+ * UNA línea gris bajo la gráfica (Daniel, 11-oct-2026: «en una línea, sin tanto
+ * protagonismo»): «Últimos 12 meses · mayor venta: domingo (promedio $5,412) y
+ * 5–6 pm · máximo diario $21,428 (24 dic)». El día va sin año: la ventana no
+ * llega a 12 meses, así que un día y un mes no se repiten. Lo que no se puede
+ * calcular se omite; sin ninguno, `null`. `hora` llega ya escrita («5–6 pm»).
+ */
+export function lineaDelHistorico(h: HistoricoVentas, hora: string | null): string | null {
+  const mayor: string[] = [];
   if (h.diaSemana && h.diaSemana.promedio > 0) {
-    filas.push({ rotulo: ROTULO_DIA_SEMANA, valor: `${DIA_LARGO[h.diaSemana.dow]} · promedio ${fmtMoneyCompact(h.diaSemana.promedio)}` });
+    mayor.push(`${DIA_LARGO[h.diaSemana.dow].toLowerCase()} (promedio ${fmtMoneyCompact(h.diaSemana.promedio)})`);
   }
-  if (hora) filas.push({ rotulo: ROTULO_HORA, valor: hora });
+  if (hora) mayor.push(hora);
+  const partes: string[] = [];
+  if (mayor.length) partes.push(`mayor venta: ${mayor.join(" y ")}`);
   if (h.mejorDia && h.mejorDia.ventas > 0) {
-    const [a, m, d] = h.mejorDia.fecha.split("-").map(Number);
-    filas.push({ rotulo: ROTULO_MEJOR_DIA, valor: `${fmtMoneyCompact(h.mejorDia.ventas)} · ${d} ${MES_CORTO[m - 1]} ${a}` });
+    const [, m, d] = h.mejorDia.fecha.split("-").map(Number);
+    partes.push(`máximo diario ${fmtMoneyCompact(h.mejorDia.ventas)} (${d} ${MES_CORTO[m - 1]})`);
   }
-  return filas;
+  return partes.length ? [TITULO_HISTORICO, ...partes].join(" · ") : null;
 }

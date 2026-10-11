@@ -15,7 +15,7 @@ import path from "path";
 import { lineaDeHoy, montoCorto, seccionesDeLaBarra, subtituloHoyAyer } from "@/lib/multifashion/celular";
 import { PESTANAS_MULTIFASHION } from "@/lib/multifashion/pestanas";
 import {
-  TITULO_HISTORICO, filasDelHistorico, historicoDeVentas, mesesDelHistorico, rangoDelHistorico, type MesHistorico,
+  TITULO_HISTORICO, historicoDeVentas, lineaDelHistorico, mesesDelHistorico, type MesHistorico,
 } from "@/lib/multifashion/historico";
 
 const shell = fs.readFileSync(path.join(process.cwd(), "src/app/multifashion/MultifashionShell.tsx"), "utf8");
@@ -81,7 +81,6 @@ describe("Multifashion › celular › «Últimos 12 meses»", () => {
     expect(v[11]).toEqual({ anio: 2026, mes: 10 });
     const h = historicoDeVentas(MESES, HOY);
     expect([h.desde, h.hasta]).toEqual(["2025-11-01", "2026-10-10"]);
-    expect(rangoDelHistorico(h)).toBe("nov 2025 – 10 oct 2026");
   });
 
   it("🔴 HOY no entra, y el promedio es por día CON venta", () => {
@@ -92,14 +91,28 @@ describe("Multifashion › celular › «Últimos 12 meses»", () => {
     expect(h.horaPico).toBe(15); // 900 + 300 contra 500 + 600
   });
 
-  it("los tres rótulos, con su valor; lo que no se puede calcular no se dibuja", () => {
-    expect(filasDelHistorico(historicoDeVentas(MESES, HOY), "3–4 pm")).toEqual([
-      { rotulo: "Día de mayor venta", valor: "Domingo · promedio $4,500" },
-      { rotulo: "Hora de mayor venta", valor: "3–4 pm" },
-      { rotulo: "Venta diaria más alta", valor: "$7,104 · 3 oct 2026" },
-    ]);
-    expect(filasDelHistorico(historicoDeVentas([], HOY), null)).toEqual([]);
-    expect(filasDelHistorico(historicoDeVentas([mes(2026, 10, [[11, 500]])], HOY), null)).toEqual([]);
+  it("UNA línea que nombra la ventana, con los tres datos; lo que no se puede calcular se omite", () => {
+    const h = historicoDeVentas(MESES, HOY);
+    expect(lineaDelHistorico(h, "3–4 pm"))
+      .toBe("Últimos 12 meses · mayor venta: domingo (promedio $4,500) y 3–4 pm · máximo diario $7,104 (3 oct)");
+    expect(lineaDelHistorico(h, null))
+      .toBe("Últimos 12 meses · mayor venta: domingo (promedio $4,500) · máximo diario $7,104 (3 oct)");
+    expect(lineaDelHistorico(historicoDeVentas([], HOY), "3–4 pm")).toBe("Últimos 12 meses · mayor venta: 3–4 pm");
+    // Sin ningún dato no hay línea (ni con solo la venta de HOY).
+    expect(lineaDelHistorico(historicoDeVentas([], HOY), null)).toBeNull();
+    expect(lineaDelHistorico(historicoDeVentas([mes(2026, 10, [[11, 500]])], HOY), null)).toBeNull();
+  });
+
+  it("es una línea gris sin caja, y la frescura va en el renglón de hoy con el componente común", () => {
+    const inicio = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/celular/InicioCelular.tsx"), "utf8");
+    const pieza = inicio.slice(inicio.indexOf("function HistoricoCelular"), inicio.indexOf("function RenglonFila"));
+    expect(pieza).toMatch(/<p data-celular="historico" className="[^"]*text-sm text-gray-500/);
+    expect(pieza).not.toMatch(/border|rounded|uppercase|<ul|<li/);
+    const renglon = shell.slice(shell.indexOf('data-celular="hoy-y-frescura"'), shell.indexOf("{MULTIFASHION_CELULAR && !barra && ("));
+    expect(renglon).toContain("flex flex-wrap"); // si no cabe, baja: nunca se corta
+    expect(renglon).toContain('data-celular="hoy"');
+    expect(renglon).toContain("{frescuraCel}");
+    expect(renglon).not.toMatch(/truncate|overflow-hidden/);
   });
 });
 

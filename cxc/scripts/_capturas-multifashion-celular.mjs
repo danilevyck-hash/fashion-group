@@ -70,6 +70,23 @@ const medir = () => pg.evaluate(() => {
   };
 });
 
+// Anchos del renglón de hoy con otros montos (solo se mide; el texto vuelve a su lugar).
+if (process.env.MEDIR_HOY) {
+  console.log("RENGLON-HOY", JSON.stringify(await pg.evaluate(() => {
+    const p = document.querySelector('[data-celular="hoy"]'), f = document.querySelector('[data-celular="subtitulo"]'), h = document.querySelector('[data-celular="historico"]');
+    if (!p || !f) return null;
+    const original = p.innerHTML, out = {};
+    const caso = (n, html) => { if (html) p.innerHTML = html; const a = p.getBoundingClientRect(), b = f.getBoundingClientRect(), c = p.parentElement.getBoundingClientRect(); out[n] = { hoy: Math.round(a.width), frescura: Math.round(b.width), fila: Math.round(c.width), altoFila: Math.round(c.height), mismaFila: Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) < 6, toque: Math.round(f.querySelector("button, [role=button]")?.getBoundingClientRect().height ?? b.height) }; };
+    caso("real");
+    caso("4 dígitos", 'Hoy <span class="font-medium">$9,888</span><span class="text-gray-500"> · ayer $8,888</span>');
+    caso("5 dígitos", 'Hoy <span class="font-medium">$12,340</span><span class="text-gray-500"> · ayer $11,795</span>');
+    caso("sin ventas", 'Hoy <span class="font-medium">sin ventas todavía</span><span class="text-gray-500"> · ayer $1,795</span>');
+    p.innerHTML = original;
+    const lh = h ? parseFloat(getComputedStyle(h).lineHeight) : 0;
+    out.historico = h ? { texto: h.textContent, lineas: Math.round(h.getBoundingClientRect().height / lh) } : null;
+    return out;
+  }), null, 1));
+}
 console.log("ARRIBA", JSON.stringify(await medir(), null, 1));
 console.log("TEXTO", JSON.stringify(await pg.evaluate(() => document.body.innerText.slice(0, 700))));
 await pg.screenshot({ path: `${OUT}/${PREFIJO}-arriba.png` });
