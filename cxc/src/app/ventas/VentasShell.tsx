@@ -403,7 +403,7 @@ export function VentasShell({
           enRango ? botonRango :
           RESUMEN_MES_2026_10 && tab === "resumen" ? (
             <div className="flex w-full items-center gap-1.5">
-            // El selector de Comisiones: ‹ 2026 › · Todo el año · 12 meses.
+            {/* El selector de Comisiones: ‹ 2026 › · Todo el año · 12 meses. */}
             <ComisionesPeriodo
               className="w-full [&>button]:h-9 [&>button]:min-h-0 [&>button]:w-full [&>button]:text-[13px]"
               year={selectedYear}
