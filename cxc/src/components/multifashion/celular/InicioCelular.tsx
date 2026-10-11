@@ -26,7 +26,7 @@ import { conteoPorChip } from "@/lib/multifashion/clientes-seguimiento";
 import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 import { lineaHabitos, mayoreoDelAnio } from "@/lib/multifashion/resumen-minimo";
 import {
-  MF_DIA_2026_10, barrasDelMes, contraAlCorte, deltaCorto, lineaDelDia, lineaDelMes, montoCorto, renglonesDelInicio,
+  MF_DIA_2026_10, barrasDelMes, deltaCorto, lineaDelDia, lineaDelMes, montoCorto, renglonesDelInicio,
   type ClaveRenglon, type RenglonCelular, type TonoCelular,
 } from "@/lib/multifashion/celular";
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
@@ -35,7 +35,7 @@ import { filasDelAnio } from "@/lib/multifashion/apple";
 import { MULTIFASHION_GRAFICA_2026_10 } from "@/lib/multifashion/grafica-mes";
 import { GraficaDelMes } from "../GraficaDelMes";
 import { lineaMayoreo } from "@/lib/multifashion/retail-al-frente";
-import { lineaDelHistorico, type HistoricoVentas } from "@/lib/multifashion/historico";
+import { lineasDelHistorico, type HistoricoVentas } from "@/lib/multifashion/historico";
 
 export const TONO_CLASE: Record<TonoCelular, string> = {
   sube: "text-emerald-700",
@@ -87,21 +87,23 @@ interface Props {
   soloElMes?: boolean;
   /** Lo que se suma al número grande: la venta de HOY (`ventaDeHoyParaElMes`), o `null`. */
   ventaHoy?: number | null;
+  /** Lo que se suma a la base del año pasado: ese día hasta la misma hora (`baseDeHoyAnioPasado`), o `null`. */
+  prevHoy?: number | null;
 }
 
-export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencion = null, soloElMes = false, ventaHoy = null }: Props) {
+export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencion = null, soloElMes = false, ventaHoy = null, prevHoy = null }: Props) {
   const { totales } = data;
   const year = periodo.tipo === "mes" ? periodo.anio : corte.anio;
   const mes = periodo.tipo === "mes" ? periodo.mes : corte.mes;
 
   // ── El número grande y su línea ───────────────────────────────────────────
-  const deltaYoy = data.yoy.tiene_data ? variacionPct(totales.ventas, data.yoy.ventas) : null;
+  // 🔴 El % cubre lo mismo que el número: con hoy de los DOS lados, o de ninguno.
+  const hastaAhora = ventaHoy != null && prevHoy != null;
+  const deltaYoy = data.yoy.tiene_data
+    ? variacionPct(totales.ventas + (hastaAhora ? ventaHoy : 0), data.yoy.ventas + (hastaAhora ? prevHoy : 0))
+    : null;
   const cierra = data.is_mes_actual ? totales.proyeccion_cierre : null;
-  const lineaBase = lineaDelMes({ periodo, deltaAnioPasado: deltaYoy, cierraEn: cierra });
-  // 🔴 Con la venta de hoy en el número, el % (de días completos) dice hasta cuándo.
-  const linea = ventaHoy != null && lineaBase.contra
-    ? { ...lineaBase, contra: contraAlCorte(year, mes, data.dia_actual) }
-    : lineaBase;
+  const linea = lineaDelMes({ periodo, deltaAnioPasado: deltaYoy, cierraEn: cierra });
 
   // ── Las barras del día por día ────────────────────────────────────────────
   const barras = useMemo(
@@ -256,16 +258,20 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
 
 /**
  * 🔴 `MULTIFASHION_BARRA_2026_10` — «Últimos 12 meses», en lugar de la línea
- * gris de hábitos y con su mismo peso: UNA línea chica, sin caja. Se pide
+ * gris de hábitos y con su mismo peso: dos líneas chicas, sin caja. Se pide
  * aparte y una vez por hora; mientras no llega, o si falla, no se dibuja nada.
  */
 function HistoricoCelular() {
   const { data } = useSWR<HistoricoVentas>("/api/multifashion/historico", json, {
     dedupingInterval: 60 * 60_000, revalidateOnFocus: false,
   });
-  const linea = data ? lineaDelHistorico(data, data.horaPico != null ? horaPicoLabel(data.horaPico) : null) : null;
-  if (!linea) return null;
-  return <p data-celular="historico" className="mt-2 text-sm text-gray-500 tabular-nums [text-wrap:balance]">{linea}</p>;
+  const lineas = data?.semana && data.horas ? lineasDelHistorico(data) : [];
+  if (lineas.length === 0) return null;
+  return (
+    <p data-celular="historico" className="mt-2 text-sm text-gray-500 tabular-nums">
+      {lineas.map((l) => <span key={l} className="block">{l}</span>)}
+    </p>
+  );
 }
 
 function RenglonFila({ renglon, onAbrir }: { renglon: RenglonCelular; onAbrir: () => void }) {

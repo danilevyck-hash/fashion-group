@@ -13,11 +13,12 @@ import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
 import {
-  contraAlCorte, lineaDeHoy, montoCorto, seccionesDeLaBarra, subtituloHoyAyer, ventaDeHoyParaElMes,
+  baseDeHoyAnioPasado, instanteUnAnioAntes, lineaDeHoy, montoCorto, seccionesDeLaBarra, subtituloHoyAyer, ventaDeHoyParaElMes,
 } from "@/lib/multifashion/celular";
 import { PESTANAS_MULTIFASHION } from "@/lib/multifashion/pestanas";
 import {
-  TITULO_HISTORICO, historicoDeVentas, lineaDelHistorico, mesesDelHistorico, type MesHistorico,
+  TITULO_HISTORICO, bloqueDeHoras, diaDeMayorVenta, etiquetaHoras, historicoDeVentas, horasDeFacturas,
+  lineasDelHistorico, mesesDelHistorico, ventanaDelHistorico,
 } from "@/lib/multifashion/historico";
 
 const shell = fs.readFileSync(path.join(process.cwd(), "src/app/multifashion/MultifashionShell.tsx"), "utf8");
@@ -71,48 +72,64 @@ describe("Multifashion › celular › encabezado compartido", () => {
 
 describe("Multifashion › celular › «Últimos 12 meses»", () => {
   const HOY = "2026-10-11"; // domingo
-  const mes = (anio: number, m: number, dias: [number, number][], horas: [number, number][] = []): MesHistorico => ({
-    anio, mes: m, dias: dias.map(([dia, ventas]) => ({ dia, ventas })), horas: horas.map(([hora, ventas]) => ({ hora, ventas })),
-  });
-  const MESES = [
-    // sáb 5 y sáb 12 sep; dom 6 sep (uno en $0 no es divisor: dom 13)
-    mes(2026, 9, [[5, 3000], [12, 2000], [6, 4000], [13, 0]], [[15, 900], [17, 500]]),
-    // sáb 3 oct (récord), dom 4 oct, y HOY dom 11 con una venta enorme que no debe entrar
-    mes(2026, 10, [[3, 7104], [4, 5000], [11, 99999]], [[15, 300], [17, 600]]),
+  const DIAS = [
+    { fecha: "2025-10-10", ventas: 90000 }, // un día ANTES de la ventana: no entra
+    { fecha: "2025-10-11", ventas: 1000 },  // sábado, primer día de la ventana
+    { fecha: "2026-09-05", ventas: 3000 },  // sábado
+    { fecha: "2026-09-06", ventas: 4500 },  // domingo: UNO solo, el día más alto
+    { fecha: "2026-09-13", ventas: 0 },     // domingo sin venta
+    { fecha: "2026-10-10", ventas: 2000 },  // sábado, AYER: último día
+    { fecha: "2026-10-11", ventas: 99999 }, // HOY: no entra
   ];
+  const HORAS = [[10, 100], [15, 300], [16, 900], [17, 800], [18, 700], [19, 200]].map(([hora, ventas]) => ({ hora, ventas }));
 
-  it("la ventana se nombra, son 12 meses y termina AYER", () => {
+  it("la ventana se nombra y son los 365 días que terminan AYER", () => {
     expect(TITULO_HISTORICO).toBe("Últimos 12 meses");
-    const v = mesesDelHistorico(HOY);
-    expect(v).toHaveLength(12);
-    expect(v[0]).toEqual({ anio: 2025, mes: 11 });
-    expect(v[11]).toEqual({ anio: 2026, mes: 10 });
-    const h = historicoDeVentas(MESES, HOY);
-    expect([h.desde, h.hasta]).toEqual(["2025-11-01", "2026-10-10"]);
+    expect(ventanaDelHistorico(HOY)).toEqual({ desde: "2025-10-11", hasta: "2026-10-10" });
+    const meses = mesesDelHistorico(HOY);
+    expect(meses).toHaveLength(13);
+    // Los dos meses del borde entran en parte; los once del medio, enteros.
+    expect(meses[0]).toEqual({ anio: 2025, mes: 10, desde: "2025-10-11", hasta: "2025-10-31", entero: false });
+    expect(meses[12]).toEqual({ anio: 2026, mes: 10, desde: "2026-10-01", hasta: "2026-10-10", entero: false });
+    expect(meses.slice(1, 12).every((m) => m.entero)).toBe(true);
   });
 
-  it("🔴 HOY no entra, y el promedio es por día CON venta", () => {
-    const h = historicoDeVentas(MESES, HOY);
-    // Domingo: (4000 + 5000) / 2 — sin el $0 del 13 ni los $99,999 de hoy.
-    expect(h.diaSemana).toEqual({ dow: 0, promedio: 4500, dias: 2 });
-    expect(h.mejorDia).toEqual({ fecha: "2026-10-03", ventas: 7104 });
-    expect(h.horaPico).toBe(15); // 900 + 300 contra 500 + 600
+  it("🔴 HOY no entra, y el día de mayor venta es por TOTAL, no por promedio de los días con venta", () => {
+    const h = historicoDeVentas(DIAS, HORAS, HOY);
+    // Sábado: 1000 + 3000 + 2000 en 3 días. Domingo: 4500 en 1 día (el promedio más alto, y no gana).
+    expect(h.semana[6]).toEqual({ dow: 6, total: 6000, dias: 3 });
+    expect(h.semana[0]).toEqual({ dow: 0, total: 4500, dias: 1 });
+    expect(diaDeMayorVenta(h)).toEqual({ dow: 6, pct: 57 }); // 6000 de 10500
   });
 
-  it("UNA línea que nombra la ventana: día y hora de mayor venta; lo que no se puede calcular se omite", () => {
-    const h = historicoDeVentas(MESES, HOY);
-    expect(lineaDelHistorico(h, "3–4 pm")).toBe("Últimos 12 meses · mayor venta: domingo y 3–4 pm");
-    expect(lineaDelHistorico(h, null)).toBe("Últimos 12 meses · mayor venta: domingo");
-    expect(lineaDelHistorico(historicoDeVentas([], HOY), "3–4 pm")).toBe("Últimos 12 meses · mayor venta: 3–4 pm");
+  it("el horario son las 3 horas SEGUIDAS que más venden, con su parte de la venta", () => {
+    const h = historicoDeVentas(DIAS, HORAS, HOY);
+    expect(bloqueDeHoras(h)).toEqual({ desde: 16, hasta: 19, pct: 80 }); // 2400 de 3000
+    expect(etiquetaHoras(16, 19)).toBe("4–7 pm");
+    expect(etiquetaHoras(11, 14)).toBe("11 am–2 pm");
+    // Las facturas de los meses del borde se cuentan por hora de Panamá (UTC−5).
+    expect(horasDeFacturas([{ fecha_ts: "2026-10-10T21:30:00+00:00", subtotal: "10.5" }, { fecha_ts: "2026-10-10T21:59:00Z", subtotal: -0.5 }]))
+      .toEqual([{ hora: 16, ventas: 10 }]);
+  });
+
+  it("dos líneas que nombran la ventana; lo que no se puede calcular se omite", () => {
+    const h = historicoDeVentas(DIAS, HORAS, HOY);
+    expect(lineasDelHistorico(h)).toEqual([
+      "Últimos 12 meses · día de mayor venta: sábado (57 %)",
+      "Horario de mayor venta: 4–7 pm (80 %)",
+    ]);
+    expect(lineasDelHistorico(historicoDeVentas(DIAS, [], HOY))).toEqual(["Últimos 12 meses · día de mayor venta: sábado (57 %)"]);
+    expect(lineasDelHistorico(historicoDeVentas([], HORAS, HOY))).toEqual(["Últimos 12 meses · horario de mayor venta: 4–7 pm (80 %)"]);
     // Sin ningún dato no hay línea (ni con solo la venta de HOY).
-    expect(lineaDelHistorico(historicoDeVentas([], HOY), null)).toBeNull();
-    expect(lineaDelHistorico(historicoDeVentas([mes(2026, 10, [[11, 500]])], HOY), null)).toBeNull();
+    expect(lineasDelHistorico(historicoDeVentas([], [], HOY))).toEqual([]);
+    expect(lineasDelHistorico(historicoDeVentas([{ fecha: HOY, ventas: 500 }], [], HOY))).toEqual([]);
   });
 
   it("es una línea gris sin caja, y la frescura va en el renglón de hoy con el componente común", () => {
     const inicio = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/celular/InicioCelular.tsx"), "utf8");
     const pieza = inicio.slice(inicio.indexOf("function HistoricoCelular"), inicio.indexOf("function RenglonFila"));
     expect(pieza).toMatch(/<p data-celular="historico" className="[^"]*text-sm text-gray-500/);
+    expect(pieza).toContain('className="block"'); // una línea por dato, sin caja
     expect(pieza).not.toMatch(/border|rounded|uppercase|<ul|<li/);
     const renglon = shell.slice(shell.indexOf('data-celular="hoy-y-frescura"'), shell.indexOf("{MULTIFASHION_CELULAR && !barra && ("));
     expect(renglon).toContain("flex flex-wrap"); // si no cabe, baja: nunca se corta
@@ -140,19 +157,41 @@ describe("Multifashion › celular › el número del mes con la venta de hoy", 
     expect(ventaDeHoyParaElMes({ ...base, hoy: { ...hoy, fecha: "2026-10-12" } })).toBeNull();
   });
 
-  it("el %, la proyección y el promedio no se recalculan; el % dice hasta cuándo", () => {
-    expect(contraAlCorte(2026, 10, 10)).toBe("al 10 oct, contra 2025");
+  it("🔴 el % llega hasta la misma hora del año pasado; sin las dos lecturas del MISMO instante, queda el de días completos", () => {
+    const corte = "2026-10-11T23:00:12.000Z"; // 6:00:12 pm de Panamá
+    expect(instanteUnAnioAntes("2026-10-11", corte)).toEqual({ fecha: "2025-10-11", instante: "2025-10-11T18:00:12-05:00", mismoDia: true });
+    // 29-feb: el año pasado no tuvo ese día; el 28 ya está entero en la base.
+    expect(instanteUnAnioAntes("2028-02-29", "2028-02-29T20:00:00Z")).toEqual({ fecha: "2027-02-28", instante: "2027-02-28T15:00:00-05:00", mismoDia: false });
+    // Un sync que no es de hoy no sirve para cortar.
+    expect(instanteUnAnioAntes("2026-10-11", "2026-10-11T03:00:00Z")).toBeNull();
+
+    const comp = { fecha: "2026-10-11", corte, ventasPrev: 1234.5 };
+    expect(baseDeHoyAnioPasado({ corteDeHoy: corte, fechaDeHoy: "2026-10-11", comparativo: comp })).toBe(1234.5);
+    expect(baseDeHoyAnioPasado({ corteDeHoy: corte, fechaDeHoy: "2026-10-11", comparativo: { ...comp, ventasPrev: 0 } })).toBe(0);
+    // Otro sync, otro día, sin dato o sin hora: nada que sumar.
+    expect(baseDeHoyAnioPasado({ corteDeHoy: "2026-10-11T23:30:00.000Z", fechaDeHoy: "2026-10-11", comparativo: comp })).toBeNull();
+    expect(baseDeHoyAnioPasado({ corteDeHoy: corte, fechaDeHoy: "2026-10-12", comparativo: comp })).toBeNull();
+    expect(baseDeHoyAnioPasado({ corteDeHoy: corte, fechaDeHoy: "2026-10-11", comparativo: { ...comp, ventasPrev: null } })).toBeNull();
+    expect(baseDeHoyAnioPasado({ corteDeHoy: null, fechaDeHoy: "2026-10-11", comparativo: comp })).toBeNull();
+    expect(baseDeHoyAnioPasado({ corteDeHoy: corte, fechaDeHoy: "2026-10-11", comparativo: undefined })).toBeNull();
+  });
+
+  it("hoy entra de los DOS lados del % o de ninguno; la proyección y el promedio siguen en días completos", () => {
     const inicio = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/celular/InicioCelular.tsx"), "utf8");
-    // Las tres cuentas siguen saliendo de `totales` (días completos), sin `ventaHoy`.
-    expect(inicio).toContain("variacionPct(totales.ventas, data.yoy.ventas)");
+    expect(inicio).toContain("const hastaAhora = ventaHoy != null && prevHoy != null;");
+    expect(inicio).toContain("variacionPct(totales.ventas + (hastaAhora ? ventaHoy : 0), data.yoy.ventas + (hastaAhora ? prevHoy : 0))");
     expect(inicio).toContain("data.is_mes_actual ? totales.proyeccion_cierre : null");
     expect(inicio).toContain("{montoCorto(totales.ventas + (ventaHoy ?? 0))}");
     const grafica = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/GraficaDelMes.tsx"), "utf8");
     // La gráfica recibe los MISMOS días: el promedio no ve la venta de hoy.
     expect(grafica).toContain("graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados })");
+    // Con la venta de hoy, la barra destacada es la de HOY y el último día completo vuelve al gris.
+    expect(grafica).toContain('d.estado === "hoy" && altoHoy != null ? BARRA_HOY_EN_CURSO');
+    expect(grafica).toContain('d.estado === "ultimo" && altoHoy != null ? BARRA.venta : BARRA[d.estado]');
     // Apagado (sin `soloElMes`) no se pide ni se suma nada.
     const vista = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/MultifashionResumenView.tsx"), "utf8");
     expect(vista).toContain("useVentaHoy(syncTick, celular?.soloElMes === true)");
+    expect(vista).toContain("const corteDeHoy = celular?.soloElMes ? ventaHoy?.sync.ultimo ?? null : null;");
     expect(vista).toContain("ventaHoy={celular.soloElMes ? ventaDeHoyParaElMes(");
   });
 

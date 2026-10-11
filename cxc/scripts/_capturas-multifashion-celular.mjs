@@ -110,6 +110,19 @@ if (process.env.TOCAR) {
   await pg.waitForTimeout(300);
 }
 if (process.env.VER_HISTORICO) console.log("HISTORICO-JSON", JSON.stringify(await pg.evaluate(() => fetch("/api/multifashion/historico").then((r) => r.json()))));
+// VER_COMPARATIVO=1: las dos sumas detrás del % (solo lecturas).
+if (process.env.VER_COMPARATIVO) console.log("COMPARATIVO-JSON", JSON.stringify(await pg.evaluate(async () => {
+  const j = (u) => fetch(u).then((r) => r.json());
+  const [hoy, comp, det] = await Promise.all([j("/api/multifashion/venta-hoy"), j("/api/multifashion/comparativo-hoy"), j(`/api/multifashion/detalle-mensual?year=${new Date().getFullYear()}&mes=${new Date().getMonth() + 1}`)]);
+  return { hoy: { fecha: hoy.fecha, ventas: hoy.ventas, documentos: hoy.documentos, sync: hoy.sync }, comp, mes: { ventas: det.totales?.ventas, dia_actual: det.dia_actual, yoy: det.yoy } };
+})));
+if (process.env.MEDIR_LINEAS) console.log("LINEAS-12M", JSON.stringify(await pg.evaluate(() => {
+  const h = document.querySelector('[data-celular="historico"]'); if (!h) return null;
+  const s = document.createElement("span"); s.className = h.className; s.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap"; h.parentElement.appendChild(s);
+  const out = { ancho: Math.round(h.getBoundingClientRect().width), real: [...h.querySelectorAll("span")].map((x) => ({ t: x.textContent, w: Math.round((() => { s.textContent = x.textContent; return s.getBoundingClientRect().width; })()) })), altoReal: Math.round(h.getBoundingClientRect().height) };
+  for (const t of ["Últimos 12 meses · día de mayor venta: miércoles (22 %)", "12 meses · día de mayor venta: miércoles (22 %)", "Últimos 12 meses · día de mayor venta: sábado (22 %)", "Horario de mayor venta: 11 am–2 pm (38 %)", "Últimos 12 meses · horario de mayor venta: 11 am–2 pm (38 %)"]) { s.textContent = t; out[t] = Math.round(s.getBoundingClientRect().width); }
+  s.remove(); return out;
+})));
 // MEDIR_LINEA=1: cuánto miden, en una línea, las redacciones candidatas de «12 meses» (ancho útil 370).
 if (process.env.MEDIR_LINEA) {
   console.log("LINEA-12M", JSON.stringify(await pg.evaluate(() => {

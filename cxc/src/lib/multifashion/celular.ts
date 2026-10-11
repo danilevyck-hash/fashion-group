@@ -35,6 +35,7 @@
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import type { TabMultifashion } from "@/lib/multifashion/pestanas";
 import { etiquetaPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifashion/periodo";
+import { unAnioAntes } from "@/lib/ventas/clientes-corte-comparativo";
 
 /**
  * El interruptor. `false` = la pantalla de celular de antes, intacta (título,
@@ -128,8 +129,8 @@ export function lineaDeHoy(
  * 11-oct-2026). El detalle del mes corta en el último día COMPLETO; arriba dice
  * «Hoy $2,140» y cualquiera supone que el número grande ya lo trae. En el
  * celular: número grande = días completos + la venta de hoy, la MISMA del
- * renglón «Hoy» (`venta-hoy`). El %, la proyección y el promedio NO se tocan:
- * siguen sobre días completos.
+ * renglón «Hoy» (`venta-hoy`). La proyección y el promedio NO se tocan: siguen
+ * sobre días completos. El % va hasta la misma hora (`baseDeHoyAnioPasado`).
  * Devuelve lo que se suma, o `null` (= el número de siempre) si el mes no es el
  * de hoy, si hoy todavía no vendió, o si el día de «hoy» no es el que sigue al
  * corte del detalle (medianoche, dato viejo): nunca se suma dos veces ni se adivina.
@@ -147,11 +148,42 @@ export function ventaDeHoyParaElMes(e: {
   return e.hoy.fecha === sigue && Number.isFinite(e.hoy.ventas) ? e.hoy.ventas : null;
 }
 
-const MES_CORTO_CEL = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+/**
+ * 🔴 EL % HASTA LO MÁS ACTUALIZADO (Daniel, 11-oct-2026: «que la comparación sea
+ * hasta lo más actualizado»). El número grande ya trae hoy; el % compara contra
+ * el año pasado hasta el MISMO día y la MISMA hora: los días completos de
+ * siempre + ese día del año pasado solo hasta la hora del último sync de hoy.
+ * Un día a medias contra un día entero se leería como caída cada mañana.
+ *
+ * El instante del año pasado: la misma fecha un año antes (`unAnioAntes`, 29-feb
+ * → 28-feb) a la misma hora de Panamá del sync. `null` si el sync no es de hoy.
+ * `mismoDia: false` = el año pasado no tuvo ese día (29-feb): no se suma nada.
+ */
+export function instanteUnAnioAntes(
+  fechaHoy: string,
+  corteIso: string,
+): { fecha: string; instante: string; mismoDia: boolean } | null {
+  const t = Date.parse(corteIso);
+  if (!Number.isFinite(t)) return null;
+  const enPanama = new Date(t - 5 * 3_600_000).toISOString(); // UTC−5 fijo
+  if (enPanama.slice(0, 10) !== fechaHoy) return null;
+  const fecha = unAnioAntes(fechaHoy);
+  return { fecha, instante: `${fecha}T${enPanama.slice(11, 19)}-05:00`, mismoDia: fecha.slice(5) === fechaHoy.slice(5) };
+}
 
-/** «al 10 oct, contra 2025»: el % es de días completos y el número ya trae hoy; se dice hasta cuándo. */
-export function contraAlCorte(anio: number, mes: number, diaActual: number): string {
-  return `al ${diaActual} ${MES_CORTO_CEL[mes - 1]}, contra ${anio - 1}`;
+/**
+ * Lo que se suma a la base del año pasado, o `null` (= el % de días completos,
+ * como siempre): solo si las dos lecturas se cortaron en el MISMO instante.
+ */
+export function baseDeHoyAnioPasado(e: {
+  /** La hora del último sync que trae la venta de hoy (`sync.ultimo`). */
+  corteDeHoy: string | null | undefined;
+  fechaDeHoy: string | null | undefined;
+  comparativo?: { fecha?: string; corte?: string | null; ventasPrev?: number | null } | null;
+}): number | null {
+  const c = e.comparativo;
+  if (!c || !e.corteDeHoy || c.corte !== e.corteDeHoy || c.fecha !== e.fechaDeHoy) return null;
+  return typeof c.ventasPrev === "number" && Number.isFinite(c.ventasPrev) ? c.ventasPrev : null;
 }
 
 /** Las dos pantallas que el celular agrega adentro de «Resumen». */

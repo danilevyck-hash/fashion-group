@@ -18,6 +18,9 @@ const BARRA: Record<EstadoDia, string> = {
   futuro: "bg-gray-100",
 };
 
+/** Hoy, con venta: oscuro como el destacado y rayado, porque el día no cerró. */
+const BARRA_HOY_EN_CURSO = "bg-[repeating-linear-gradient(135deg,#111827_0_3px,#6b7280_3px_6px)]";
+
 export function GraficaDelMes({
   dias, year, mes, esMesActual, diaActual, feriados, alta = false, ventaHoy = null,
 }: {
@@ -30,8 +33,9 @@ export function GraficaDelMes({
   /** `MULTIFASHION_BARRA_2026_10`: en el celular, el doble de alto (240 px). Solo cambia el alto. */
   alta?: boolean;
   /**
-   * `MULTIFASHION_BARRA_2026_10`: lo vendido HOY hasta ahora. La casilla «Hoy»
-   * lo dibuja con su contorno punteado, a la misma escala (el mejor día cerrado).
+   * `MULTIFASHION_BARRA_2026_10`: lo vendido HOY hasta ahora. La barra de «Hoy»
+   * es la destacada (oscura, rayada: el día va en curso) y el último día
+   * completo vuelve al gris de los demás. Misma escala (el mejor día cerrado).
    * No entra al promedio ni responde al toque.
    * ponytail: si hoy ya pasó al mejor día del mes, la barra topa en el 100 %.
    */
@@ -86,7 +90,8 @@ export function GraficaDelMes({
             data-estado={d.estado}
             className={cn(
               "flex-1 rounded-t-[3px] transition-opacity",
-              BARRA[d.estado],
+              d.estado === "hoy" && altoHoy != null ? BARRA_HOY_EN_CURSO
+                : d.estado === "ultimo" && altoHoy != null ? BARRA.venta : BARRA[d.estado],
               tocado != null && d.dia !== tocado && "opacity-30",
               tocado === d.dia && d.estado === "venta" && "bg-gray-900",
             )}
