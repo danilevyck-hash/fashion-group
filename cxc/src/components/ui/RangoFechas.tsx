@@ -273,17 +273,20 @@ export default function RangoFechas({
         type="button"
         onClick={() => setAbierto((v) => !v)}
         aria-haspopup="dialog"
-        className={`inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap px-2.5 text-sm sm:px-3 transition active:scale-[0.97] ${
+        aria-label={vacio ? ROTULO_BOTON_RANGO : undefined}
+        title={vacio ? ROTULO_BOTON_RANGO : undefined}
+        className={`inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap text-sm sm:px-3 transition active:scale-[0.97] ${
           vacio
-            ? "rounded-md border border-gray-300 bg-white text-gray-700 hover:border-black hover:text-black"
-            : `${onQuitar ? "rounded-l-md" : "rounded-md"} bg-gray-900 font-medium text-white`
+            ? "w-11 justify-center rounded-md border border-gray-300 bg-white text-gray-700 hover:border-black hover:text-black sm:w-auto"
+            : `${onQuitar ? "rounded-l-md" : "rounded-md"} bg-gray-900 px-2.5 font-medium text-white`
         }`}
       >
-        {/* En el celular: «Rango», sin ícono — así entra en la misma línea que
-            la empresa y ‹ Oct 2026 ›. */}
-        <CalendarDays aria-hidden className={`hidden h-4 w-4 shrink-0 sm:block ${vacio ? "text-gray-500" : "text-white"}`} />
+        {/* En el celular, vacío: SOLO el ícono del calendario, cuadrado de 44 px
+            (Daniel, 11-oct-2026) — así entra en la misma línea que el selector.
+            Con un rango dice las fechas, sin ícono. La computadora no cambia. */}
+        <CalendarDays aria-hidden className={`shrink-0 ${vacio ? "h-5 w-5 text-gray-500 sm:h-4 sm:w-4" : "hidden h-4 w-4 text-white sm:block"}`} />
         {vacio ? (
-          <><span className="sm:hidden">Rango</span><span className="hidden sm:inline">{ROTULO_BOTON_RANGO}</span></>
+          <span className="hidden sm:inline">{ROTULO_BOTON_RANGO}</span>
         ) : etiquetaRangoCorta(desde, hasta)}
       </button>
       {!vacio && onQuitar && (

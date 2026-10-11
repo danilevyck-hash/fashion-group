@@ -102,5 +102,29 @@ if (process.env.MES) {
   console.log("MES-ABAJO", JSON.stringify(await medir()));
   await pg.screenshot({ path: `${OUT}/${process.env.PREFIJO}-mes-abajo.png` });
 }
+// ── RANGO=1: el botón del calendario, y el encabezado con un rango elegido ──
+if (process.env.RANGO) {
+  try {
+    await pg.evaluate(() => window.scrollTo(0, 0));
+    await pg.waitForTimeout(300);
+    const cuadro = await pg.evaluate(() => {
+      const b = [...document.querySelectorAll('[data-boton-rango] button')].find((x) => x.getBoundingClientRect().width > 0);
+      const r = b.getBoundingClientRect();
+      return { aria: b.getAttribute("aria-label"), title: b.title, texto: b.innerText, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), svg: !!b.querySelector("svg") && b.querySelector("svg").getBoundingClientRect().width };
+    });
+    console.log("BOTON-RANGO", JSON.stringify(cuadro));
+    await pg.locator('[data-boton-rango] button:visible').first().click();
+    await pg.waitForTimeout(1500);
+    await pg.screenshot({ path: `${OUT}/${process.env.PREFIJO}-calendario-abierto.png` });
+    const dia = (n) => pg.locator('[role="dialog"] button:visible, [role="grid"] button:visible').filter({ hasText: new RegExp(`^${n}$`) }).first();
+    await dia(1).click(); await pg.waitForTimeout(500);
+    await dia(10).click(); await pg.waitForTimeout(3000);
+    console.log("RANGO-URL", await pg.evaluate(() => location.search));
+    console.log("RANGO-BOTONES", JSON.stringify(await pg.evaluate(() => [...document.querySelectorAll('[data-boton-rango] button')].filter((x) => x.getBoundingClientRect().width > 0).map((b) => { const r = b.getBoundingClientRect(); return { t: b.innerText, aria: b.getAttribute("aria-label"), x: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height), right: Math.round(r.right) }; }))));
+    console.log("RANGO-TEXTO", JSON.stringify(await pg.evaluate(() => document.body.innerText.slice(0, 900))));
+    console.log("RANGO-ANCHO", await pg.evaluate(() => document.documentElement.scrollWidth));
+    await pg.screenshot({ path: `${OUT}/${process.env.PREFIJO}-rango-activo.png` });
+  } catch (e) { console.log("RANGO-FALLO", e.message.slice(0, 400)); }
+}
 console.log(`escrituras bloqueadas por el navegador: ${bloqueadas}`);
 await br.close();
