@@ -81,6 +81,45 @@ export function subtituloHoyAyer(args: {
   return `${deHoy} · ayer ${montoCorto(hoy.ayer)}`;
 }
 
+/**
+ * 🔴 EL ENCABEZADO COMPARTIDO (11-oct-2026, propuesta). Daniel, desde su iPhone:
+ * «¿Por qué los otros tabs no están como en los otros módulos en el celular?» y
+ * «¿la venta del día cómo debería de estar?». Prendido, en el celular:
+ *  · el encabezado es `BarraDeControles`, el mismo de Ventas: el título es la
+ *    sección con su lista (Resumen · Año · Vendedoras · Productos · Clientes) y
+ *    el renglón 2 lleva el período con el calendario a su derecha;
+ *  · la venta de hoy tiene su línea («Hoy $1,866 · ayer $1,795») y la frescura
+ *    queda sola, en su línea gris.
+ * Los cuatro renglones del Resumen siguen. 🔴 Ningún número cambia.
+ * `false` = el encabezado de antes («‹ Septiembre» y el mes como título).
+ * Candado `multifashion-barra-celular.test.ts`.
+ */
+export const MULTIFASHION_BARRA_2026_10 = true;
+
+/** Las secciones del título: Resumen y los cuatro renglones, con sus nombres. */
+export function seccionesDeLaBarra(
+  pestanas: readonly { id: TabMultifashion; label: string }[],
+  anio: number,
+): { value: string; label: string }[] {
+  return pestanas.flatMap((p) =>
+    p.id === "resumen"
+      ? [{ value: p.id, label: p.label }, { value: "anio", label: `Año ${anio}` }]
+      : [{ value: p.id, label: p.label }],
+  );
+}
+
+/**
+ * La línea de hoy, en piezas: «$1,866» (o «sin ventas todavía») y «ayer $1,795».
+ * Los MISMOS dos montos de `subtituloHoyAyer`; `null` si el mes no es el de hoy
+ * o el dato no llegó.
+ */
+export function lineaDeHoy(
+  hoy?: { hayVentas: boolean; ventas: number; ayer: number } | null,
+): { hoy: string; ayer: string } | null {
+  if (!hoy) return null;
+  return { hoy: hoy.hayVentas ? montoCorto(hoy.ventas) : "sin ventas todavía", ayer: `ayer ${montoCorto(hoy.ayer)}` };
+}
+
 /** Las dos pantallas que el celular agrega adentro de «Resumen». */
 export type PantallaCelular = "inicio" | "anio";
 
