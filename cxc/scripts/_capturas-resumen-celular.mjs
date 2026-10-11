@@ -33,6 +33,8 @@ await ctx.addCookies([{ name: "cxc_session", value: cookie, domain: "127.0.0.1",
 // Lo que el login deja en el navegador (el encabezado y la barra de pestañas
 // lo leen de ahí). El orden de pestañas es el del teléfono de Daniel.
 const modulosAdmin = perms.find((p) => p.role === "admin").modulos;
+// MEMORIA=2025 simula un período recordado de otra visita (`fg_last_ventas_periodo`).
+if (process.env.MEMORIA) await ctx.addInitScript((m) => localStorage.setItem("fg_last_ventas_periodo", m), process.env.MEMORIA);
 await ctx.addInitScript(([mods]) => {
   sessionStorage.setItem("cxc_role", "admin");
   sessionStorage.setItem("fg_user_id", "cap");
@@ -70,6 +72,7 @@ const medir = () => pg.evaluate(() => {
 });
 
 console.log("ARRIBA", JSON.stringify(await medir(), null, 1));
+console.log("ARRIBA-TEXTO", JSON.stringify(await pg.evaluate(() => document.body.innerText.slice(0, 900))));
 await pg.screenshot({ path: `${OUT}/${process.env.PREFIJO}-arriba.png` });
 await pg.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
 await pg.waitForTimeout(800);

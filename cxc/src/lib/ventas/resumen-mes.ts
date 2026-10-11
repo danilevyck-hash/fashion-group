@@ -47,6 +47,28 @@ export function mesValido(raw: string | null | undefined, mesActual: number, esA
   return m;
 }
 
+/**
+ * 🔴 CON QUÉ MES ABRE EL RESUMEN (Daniel, 11-oct-2026: «se debe de abrir
+ * siempre en el mes en curso»). El `?mes=` de la URL manda —«0» es «Todo el
+ * año», a un toque en el selector—. Sin él: el mes en curso de PANAMÁ
+ * (`hoy` = `hoyPanama()`) si se mira el año en curso, y «todo el año» en un
+ * año cerrado, que no tiene mes en curso.
+ */
+export function mesAlAbrir(mesUrl: string, anio: number, hoy: string): string {
+  if (mesUrl) return mesUrl;
+  return anio === Number(hoy.slice(0, 4)) ? String(Number(hoy.slice(5, 7))) : "0";
+}
+
+/**
+ * 🔴 «Siempre»: al ABRIR el Resumen (sin `?periodo=` ni `?mes=` en la URL) no
+ * se mira el año recordado (`fg_last_ventas_periodo`): se abre en el año en
+ * curso. Con algo elegido en la URL, la memoria vale como siempre. Las otras
+ * pestañas no pasan por aquí.
+ */
+export function memoriaAlAbrir(tab: string, periodoUrl: string, mesUrl: string, memoria: string): string {
+  return tab === "resumen" && !periodoUrl && !mesUrl ? "" : memoria;
+}
+
 /** La cifra de un período: el mes `m`, o la suma de los doce si `m` es 0. */
 export function delPeriodo(serie: (number | null)[], m: MesDelResumen): number {
   if (m > 0) return serie[m - 1] ?? 0;

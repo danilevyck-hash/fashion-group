@@ -26,7 +26,8 @@ import { PRODUCTOS_FILTROS_2026_10 } from "@/lib/productos/filtros";
 import { usePeriodoProductos } from "@/components/ventas/usePeriodoProductos";
 import { ComisionesPeriodo } from "@/components/comisiones/ComisionesPeriodo";
 import RangoFechas from "@/components/ui/RangoFechas";
-import { RESUMEN_MES_2026_10, rotuloDelPeriodo } from "@/lib/ventas/resumen-mes";
+import { RESUMEN_MES_2026_10, memoriaAlAbrir, mesAlAbrir, rotuloDelPeriodo } from "@/lib/ventas/resumen-mes";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { VENTAS_APPLE_2026_10 } from "@/lib/ventas/ventas-apple";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
@@ -207,10 +208,13 @@ export function VentasShell({
   // curso. Lo que la pestaña no sepa servir cae al año en curso — ver
   // `src/lib/ventas/periodo.ts`, donde está el porqué de cada regla.
   const [periodoUrl, setPeriodoUrl] = useUrlState(PARAM_PERIODO_VENTAS, "");
-  const [periodoMemoria, setPeriodoMemoria] = useLastUsed(MEMORIA_PERIODO_VENTAS, "");
-  // 🔴 RESUMEN_MES_2026_10: el MES del Resumen en el celular («0» = todo el
-  // año). Solo lo mira el Resumen; las otras pestañas siguen con su período.
-  const [mesResumen, setMesResumen] = useUrlState("mes", "0");
+  const [periodoRecordado, setPeriodoMemoria] = useLastUsed(MEMORIA_PERIODO_VENTAS, "");
+  // 🔴 RESUMEN_MES_2026_10: el MES del Resumen («0» = todo el año). Solo lo
+  // mira el Resumen; las otras pestañas siguen con su período.
+  // 🔴 Sin `?mes=` abre en el MES EN CURSO de Panamá (`mesAlAbrir`), y al abrir
+  // no mira el año recordado (`memoriaAlAbrir`). Daniel, 11-oct-2026.
+  const [mesUrl, setMesResumen] = useUrlState("mes", "");
+  const periodoMemoria = memoriaAlAbrir(tab, periodoUrl, mesUrl, periodoRecordado);
 
   // Lo que se pidió (URL o memoria), ANTES de ajustarlo a la pestaña: la
   // llave de la caché. Así «Últimos 12 meses» no se pierde por pasar un
@@ -300,6 +304,7 @@ export function VentasShell({
   const periodo = resolverPeriodo({ url: periodoUrl, memoria: periodoMemoria, tab, anioEnCurso, cap });
   const selectedYear = anioDelPeriodo(periodo, anioEnCurso);
   const isClosedYear = selectedYear < anioEnCurso;
+  const mesResumen = mesAlAbrir(mesUrl, selectedYear, hoyPanama());
 
   const opciones = useMemo(
     () => opcionesPeriodo({ tab, anios: availableYears, anioEnCurso, cap }),
