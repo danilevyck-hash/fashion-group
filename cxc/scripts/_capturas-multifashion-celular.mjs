@@ -47,7 +47,9 @@ await pg.route("**/*", (r) => {
 });
 await pg.goto(BASE + "/multifashion", { waitUntil: "networkidle", timeout: 180000 }).catch((e) => console.log("goto:", e.message));
 await pg.waitForSelector('[data-celular="numero-del-mes"]', { timeout: 90000 }).catch(() => console.log("SIN número del mes"));
+await pg.waitForSelector('[data-celular="historico"], [data-celular="renglones"]', { timeout: 60000 }).catch(() => console.log("SIN tarjeta bajo la gráfica"));
 await pg.waitForTimeout(1500);
+console.log("HISTORICO", JSON.stringify(await pg.evaluate(() => document.querySelector('[data-celular="historico"]')?.innerText ?? null)));
 
 const medir = () => pg.evaluate(() => {
   const r = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height), right: Math.round(b.right) }; };

@@ -197,6 +197,11 @@ describe("candado estructural — /api/multifashion/**", () => {
       "contactos",
       "detalle-mensual",
       "fidelizacion",
+      // 11-oct-2026 · NOTA FECHADA — `historico`: «Últimos 12 meses» del Resumen
+      // del celular (propuesta, `MULTIFASHION_BARRA_2026_10`).
+      // `requireRole(req, ROLES_MULTIFASHION)`, solo lee, sin parámetros ni
+      // empresa de la URL.
+      "historico",
       // `metas` NO acepta fechas del navegador: su período sale de la fila de la
       // base. Nunca necesitó clamp, y con la ventana levantada nadie lo necesita.
       "metas",

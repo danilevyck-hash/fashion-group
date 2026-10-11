@@ -35,6 +35,7 @@ import { filasDelAnio } from "@/lib/multifashion/apple";
 import { MULTIFASHION_GRAFICA_2026_10 } from "@/lib/multifashion/grafica-mes";
 import { GraficaDelMes } from "../GraficaDelMes";
 import { lineaMayoreo } from "@/lib/multifashion/retail-al-frente";
+import { TITULO_HISTORICO, filasDelHistorico, rangoDelHistorico, type HistoricoVentas } from "@/lib/multifashion/historico";
 
 export const TONO_CLASE: Record<TonoCelular, string> = {
   sube: "text-emerald-700",
@@ -231,6 +232,8 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
         <p data-celular="habitos" className="mt-2 text-sm text-gray-500">{habitos}</p>
       )}
 
+      {soloElMes && <HistoricoCelular />}
+
       {/* Los cuatro renglones. */}
       {!soloElMes && (
       <ul data-celular="renglones" className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -240,6 +243,36 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
       </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * 🔴 `MULTIFASHION_BARRA_2026_10` — «Últimos 12 meses», en lugar de la línea
+ * gris de hábitos: tres datos de la tienda con su rótulo. Se pide aparte y una
+ * vez por hora; mientras no llega, o si falla, no se dibuja nada.
+ */
+function HistoricoCelular() {
+  const { data } = useSWR<HistoricoVentas>("/api/multifashion/historico", json, {
+    dedupingInterval: 60 * 60_000, revalidateOnFocus: false,
+  });
+  if (!data) return null;
+  const filas = filasDelHistorico(data, data.horaPico != null ? horaPicoLabel(data.horaPico) : null);
+  if (filas.length === 0) return null;
+  return (
+    <div data-celular="historico" className="mt-6">
+      <p className="flex items-baseline justify-between gap-3 px-1 text-sm text-gray-500">
+        <span className="uppercase tracking-wide text-gray-400">{TITULO_HISTORICO}</span>
+        <span className="tabular-nums">{rangoDelHistorico(data)}</span>
+      </p>
+      <ul className="mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white">
+        {filas.map((f) => (
+          <li key={f.rotulo} className="flex min-h-[52px] items-center justify-between gap-3 border-t border-gray-200 px-4 py-2.5 first:border-t-0">
+            <span className="whitespace-nowrap text-[15px] text-gray-950">{f.rotulo}</span>
+            <span className="shrink-0 text-right text-sm tabular-nums text-gray-600">{f.valor}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
