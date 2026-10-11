@@ -429,17 +429,14 @@ function ResumenCelularPorPeriodo({
             </tr>
           </tbody>
         </table>
-      </GrupoVentas>
-
-      {/* La nota de mayoreo es del AÑO (no hay dato por mes): con un mes elegido no sale. */}
-      {mes === 0 && multiMayoreoNota && (
-        <>
-          <RotuloVentas>Multifashion</RotuloVentas>
-          <p className="px-6 text-[13px] text-gray-600" style={ESTILO_COLCHON_DERECHA}>
-            {multiMayoreoNota}
+        {/* La nota de mayoreo es del AÑO (no hay dato por mes): con un mes elegido no sale.
+            Va como nota al pie DENTRO de la tarjeta, no suelta debajo. */}
+        {mes === 0 && multiMayoreoNota && (
+          <p data-nota-mayoreo className="text-balance border-t border-gray-100 px-3 py-2 text-[12px] text-gray-500">
+            Multifashion {multiMayoreoNota}
           </p>
-        </>
-      )}
+        )}
+      </GrupoVentas>
     </PantallaVentas>
   );
 }
