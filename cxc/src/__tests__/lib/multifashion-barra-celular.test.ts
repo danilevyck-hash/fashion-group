@@ -12,7 +12,9 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
-import { lineaDeHoy, montoCorto, seccionesDeLaBarra, subtituloHoyAyer } from "@/lib/multifashion/celular";
+import {
+  contraAlCorte, lineaDeHoy, montoCorto, seccionesDeLaBarra, subtituloHoyAyer, ventaDeHoyParaElMes,
+} from "@/lib/multifashion/celular";
 import { PESTANAS_MULTIFASHION } from "@/lib/multifashion/pestanas";
 import {
   TITULO_HISTORICO, historicoDeVentas, lineaDelHistorico, mesesDelHistorico, type MesHistorico,
@@ -97,12 +99,10 @@ describe("Multifashion › celular › «Últimos 12 meses»", () => {
     expect(h.horaPico).toBe(15); // 900 + 300 contra 500 + 600
   });
 
-  it("UNA línea que nombra la ventana, con los tres datos; lo que no se puede calcular se omite", () => {
+  it("UNA línea que nombra la ventana: día y hora de mayor venta; lo que no se puede calcular se omite", () => {
     const h = historicoDeVentas(MESES, HOY);
-    expect(lineaDelHistorico(h, "3–4 pm"))
-      .toBe("Últimos 12 meses · mayor venta: domingo (promedio $4,500) y 3–4 pm · máximo diario $7,104 (3 oct)");
-    expect(lineaDelHistorico(h, null))
-      .toBe("Últimos 12 meses · mayor venta: domingo (promedio $4,500) · máximo diario $7,104 (3 oct)");
+    expect(lineaDelHistorico(h, "3–4 pm")).toBe("Últimos 12 meses · mayor venta: domingo y 3–4 pm");
+    expect(lineaDelHistorico(h, null)).toBe("Últimos 12 meses · mayor venta: domingo");
     expect(lineaDelHistorico(historicoDeVentas([], HOY), "3–4 pm")).toBe("Últimos 12 meses · mayor venta: 3–4 pm");
     // Sin ningún dato no hay línea (ni con solo la venta de HOY).
     expect(lineaDelHistorico(historicoDeVentas([], HOY), null)).toBeNull();
@@ -119,6 +119,48 @@ describe("Multifashion › celular › «Últimos 12 meses»", () => {
     expect(renglon).toContain('data-celular="hoy"');
     expect(renglon).toContain("{frescuraCel}");
     expect(renglon).not.toMatch(/truncate|overflow-hidden/);
+  });
+});
+
+describe("Multifashion › celular › el número del mes con la venta de hoy", () => {
+  const base = { esMesActual: true, anio: 2026, mes: 10, diaActual: 10 };
+  const hoy = { fecha: "2026-10-11", hayVentas: true, ventas: 2140.25 };
+
+  it("🔴 número grande = días completos + la venta de hoy, cuando hoy existe y es el día que sigue al corte", () => {
+    expect(ventaDeHoyParaElMes({ ...base, hoy })).toBe(2140.25);
+    expect(montoCorto(26616.37 + ventaDeHoyParaElMes({ ...base, hoy })!)).toBe("$28,757");
+  });
+
+  it("sin dato, sin ventas, en otro mes o con el día corrido, queda el número de siempre: nunca se adivina", () => {
+    expect(ventaDeHoyParaElMes({ ...base, hoy: undefined })).toBeNull();
+    expect(ventaDeHoyParaElMes({ ...base, hoy: { ...hoy, hayVentas: false, ventas: 0 } })).toBeNull();
+    expect(ventaDeHoyParaElMes({ ...base, esMesActual: false, hoy })).toBeNull();
+    // El detalle ya cortó en el 11 (pasó la medianoche) y «hoy» sigue siendo el 11: no se suma dos veces.
+    expect(ventaDeHoyParaElMes({ ...base, diaActual: 11, hoy })).toBeNull();
+    expect(ventaDeHoyParaElMes({ ...base, hoy: { ...hoy, fecha: "2026-10-12" } })).toBeNull();
+  });
+
+  it("el %, la proyección y el promedio no se recalculan; el % dice hasta cuándo", () => {
+    expect(contraAlCorte(2026, 10, 10)).toBe("al 10 oct, contra 2025");
+    const inicio = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/celular/InicioCelular.tsx"), "utf8");
+    // Las tres cuentas siguen saliendo de `totales` (días completos), sin `ventaHoy`.
+    expect(inicio).toContain("variacionPct(totales.ventas, data.yoy.ventas)");
+    expect(inicio).toContain("data.is_mes_actual ? totales.proyeccion_cierre : null");
+    expect(inicio).toContain("{montoCorto(totales.ventas + (ventaHoy ?? 0))}");
+    const grafica = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/GraficaDelMes.tsx"), "utf8");
+    // La gráfica recibe los MISMOS días: el promedio no ve la venta de hoy.
+    expect(grafica).toContain("graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados })");
+    // Apagado (sin `soloElMes`) no se pide ni se suma nada.
+    const vista = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/MultifashionResumenView.tsx"), "utf8");
+    expect(vista).toContain("useVentaHoy(syncTick, celular?.soloElMes === true)");
+    expect(vista).toContain("ventaHoy={celular.soloElMes ? ventaDeHoyParaElMes(");
+  });
+
+  it("en la barra el mes va entero, como en Ventas; fuera de la barra sigue corto", () => {
+    const sel = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/PeriodoSelect.tsx"), "utf8");
+    expect(sel).toContain("mesCompleto = false");
+    expect(sel).toContain("rotuloCorto={mesCompleto ? undefined : corto}");
+    expect(shell).toContain("mesCompleto={barra}");
   });
 });
 

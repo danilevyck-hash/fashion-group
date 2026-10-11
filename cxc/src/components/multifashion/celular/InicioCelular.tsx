@@ -26,7 +26,7 @@ import { conteoPorChip } from "@/lib/multifashion/clientes-seguimiento";
 import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 import { lineaHabitos, mayoreoDelAnio } from "@/lib/multifashion/resumen-minimo";
 import {
-  MF_DIA_2026_10, barrasDelMes, deltaCorto, lineaDelDia, lineaDelMes, montoCorto, renglonesDelInicio,
+  MF_DIA_2026_10, barrasDelMes, contraAlCorte, deltaCorto, lineaDelDia, lineaDelMes, montoCorto, renglonesDelInicio,
   type ClaveRenglon, type RenglonCelular, type TonoCelular,
 } from "@/lib/multifashion/celular";
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
@@ -85,9 +85,11 @@ interface Props {
    * renglones (y sin pedir sus tres datos).
    */
   soloElMes?: boolean;
+  /** Lo que se suma al número grande: la venta de HOY (`ventaDeHoyParaElMes`), o `null`. */
+  ventaHoy?: number | null;
 }
 
-export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencion = null, soloElMes = false }: Props) {
+export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencion = null, soloElMes = false, ventaHoy = null }: Props) {
   const { totales } = data;
   const year = periodo.tipo === "mes" ? periodo.anio : corte.anio;
   const mes = periodo.tipo === "mes" ? periodo.mes : corte.mes;
@@ -95,7 +97,11 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
   // ── El número grande y su línea ───────────────────────────────────────────
   const deltaYoy = data.yoy.tiene_data ? variacionPct(totales.ventas, data.yoy.ventas) : null;
   const cierra = data.is_mes_actual ? totales.proyeccion_cierre : null;
-  const linea = lineaDelMes({ periodo, deltaAnioPasado: deltaYoy, cierraEn: cierra });
+  const lineaBase = lineaDelMes({ periodo, deltaAnioPasado: deltaYoy, cierraEn: cierra });
+  // 🔴 Con la venta de hoy en el número, el % (de días completos) dice hasta cuándo.
+  const linea = ventaHoy != null && lineaBase.contra
+    ? { ...lineaBase, contra: contraAlCorte(year, mes, data.dia_actual) }
+    : lineaBase;
 
   // ── Las barras del día por día ────────────────────────────────────────────
   const barras = useMemo(
@@ -175,7 +181,7 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
       {atencion && <div className="mb-4">{atencion}</div>}
       {/* El mes, como número. */}
       <p data-celular="numero-del-mes" className="text-center text-[52px] font-light leading-none tracking-tight tabular-nums text-gray-950">
-        {montoCorto(totales.ventas)}
+        {montoCorto(totales.ventas + (ventaHoy ?? 0))}
       </p>
       {filaTocada ? (
         <p data-celular="linea-del-dia" className="mt-2 text-center text-sm font-medium text-gray-950 tabular-nums">
@@ -205,6 +211,7 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
             diaActual={data.dia_actual}
             feriados={data.feriados ?? null}
             alta={soloElMes}
+            ventaHoy={ventaHoy}
           />
         </div>
       ) : (

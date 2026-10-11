@@ -324,6 +324,7 @@ export function MultifashionShell({
             anterior={mesVecino(periodo, -1, opciones)}
             siguiente={mesVecino(periodo, 1, opciones)}
             compacto
+            mesCompleto={barra}
           />
           {TIPOS_POR_TAB[tab].rango && botonRango}
         </>

@@ -54,7 +54,8 @@ import { ROTULO_ESTE_MES, ROTULO_VENTANA } from "@/lib/multifashion/patrones";
 import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
 import { diasSinVenta } from "@/lib/multifashion/resumen-minimo";
 import { ResumenMinimo, TarjetaAnio } from "./ResumenMinimo";
-import { MULTIFASHION_CELULAR, type ClaveRenglon, type PantallaCelular } from "@/lib/multifashion/celular";
+import { MULTIFASHION_CELULAR, ventaDeHoyParaElMes, type ClaveRenglon, type PantallaCelular } from "@/lib/multifashion/celular";
+import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
 import { AnioCelular, AnioGrande, InicioCelular, MesesDelAnio } from "./celular/InicioCelular";
 import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
@@ -393,6 +394,9 @@ export function MultifashionResumenView({
       }).texto
     : null;
   const metaAtrasada = useMetaQueNoLlega(MULTIFASHION_APPLE_2026_10);
+  // 🔴 `MULTIFASHION_BARRA_2026_10`: la venta de hoy, la MISMA petición del
+  // renglón «Hoy» del shell (misma clave de SWR). Solo el celular con el interruptor.
+  const { data: ventaHoy } = useVentaHoy(syncTick, celular?.soloElMes === true);
   const atencion = MULTIFASHION_APPLE_2026_10 ? (
     <AtencionMultifashion
       tiendaAbrio={tiendaAbrio}
@@ -455,6 +459,9 @@ export function MultifashionResumenView({
               onAbrir={celular.onAbrir}
               atencion={atencion}
               soloElMes={celular.soloElMes}
+              ventaHoy={celular.soloElMes ? ventaDeHoyParaElMes({
+                esMesActual: data.is_mes_actual, anio: year, mes, diaActual: data.dia_actual, hoy: ventaHoy,
+              }) : null}
             />
           )}
         </div>

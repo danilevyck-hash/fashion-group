@@ -123,6 +123,37 @@ export function lineaDeHoy(
   return { hoy: hoy.hayVentas ? montoCorto(hoy.ventas) : "sin ventas todavía", ayer: `ayer ${montoCorto(hoy.ayer)}` };
 }
 
+/**
+ * 🔴 EL NÚMERO DEL MES CON LA VENTA DE HOY (`MULTIFASHION_BARRA_2026_10`, Daniel,
+ * 11-oct-2026). El detalle del mes corta en el último día COMPLETO; arriba dice
+ * «Hoy $2,140» y cualquiera supone que el número grande ya lo trae. En el
+ * celular: número grande = días completos + la venta de hoy, la MISMA del
+ * renglón «Hoy» (`venta-hoy`). El %, la proyección y el promedio NO se tocan:
+ * siguen sobre días completos.
+ * Devuelve lo que se suma, o `null` (= el número de siempre) si el mes no es el
+ * de hoy, si hoy todavía no vendió, o si el día de «hoy» no es el que sigue al
+ * corte del detalle (medianoche, dato viejo): nunca se suma dos veces ni se adivina.
+ */
+export function ventaDeHoyParaElMes(e: {
+  esMesActual: boolean;
+  anio: number;
+  mes: number;
+  /** El último día completo del detalle (`dia_actual`). */
+  diaActual: number;
+  hoy?: { fecha: string; hayVentas: boolean; ventas: number } | null;
+}): number | null {
+  if (!e.esMesActual || !e.hoy || !e.hoy.hayVentas) return null;
+  const sigue = `${e.anio}-${String(e.mes).padStart(2, "0")}-${String(e.diaActual + 1).padStart(2, "0")}`;
+  return e.hoy.fecha === sigue && Number.isFinite(e.hoy.ventas) ? e.hoy.ventas : null;
+}
+
+const MES_CORTO_CEL = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** «al 10 oct, contra 2025»: el % es de días completos y el número ya trae hoy; se dice hasta cuándo. */
+export function contraAlCorte(anio: number, mes: number, diaActual: number): string {
+  return `al ${diaActual} ${MES_CORTO_CEL[mes - 1]}, contra ${anio - 1}`;
+}
+
 /** Las dos pantallas que el celular agrega adentro de «Resumen». */
 export type PantallaCelular = "inicio" | "anio";
 

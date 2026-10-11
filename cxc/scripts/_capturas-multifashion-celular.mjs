@@ -39,6 +39,8 @@ await ctx.addInitScript(([rol, mods]) => {
   sessionStorage.setItem("fg_orden_pestanas", JSON.stringify(["asistencia", "multifashion", "comisiones"]));
 }, [ROL, modulos]);
 const pg = await ctx.newPage();
+pg.on("pageerror", (e) => console.log("PAGEERROR", String(e).slice(0, 600)));
+pg.on("console", (m) => { if (m.type() === "error") console.log("CONSOLE", m.text().slice(0, 400)); });
 let bloqueadas = 0;
 await pg.route("**/*", (r) => {
   const m = r.request().method();
@@ -106,6 +108,41 @@ if (process.env.TOCAR) {
   await pg.screenshot({ path: `${OUT}/_extra-${PREFIJO}-dia-tocado.png` });
   await b.tap();
   await pg.waitForTimeout(300);
+}
+if (process.env.VER_HISTORICO) console.log("HISTORICO-JSON", JSON.stringify(await pg.evaluate(() => fetch("/api/multifashion/historico").then((r) => r.json()))));
+// MEDIR_LINEA=1: cuánto miden, en una línea, las redacciones candidatas de «12 meses» (ancho útil 370).
+if (process.env.MEDIR_LINEA) {
+  console.log("LINEA-12M", JSON.stringify(await pg.evaluate(() => {
+    const h = document.querySelector('[data-celular="historico"]'); if (!h) return null;
+    const s = document.createElement("span"); s.className = h.className; s.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap";
+    h.parentElement.appendChild(s);
+    const casos = { normal: ["domingo", "$5,412", "5–6 pm"], peor: ["miércoles", "$12,345", "5–6 pm"], peorHora: ["miércoles", "$12,345", "11 am–12 pm"] };
+    const formas = {
+      "Últimos 12 meses · mayor venta: D (promedio M) y H": (d, m, x) => `Últimos 12 meses · mayor venta: ${d} (promedio ${m}) y ${x}`,
+      "12 meses · mayor venta: D (promedio M) y H": (d, m, x) => `12 meses · mayor venta: ${d} (promedio ${m}) y ${x}`,
+      "Últimos 12 meses · mayor venta: D (M) y H": (d, m, x) => `Últimos 12 meses · mayor venta: ${d} (${m}) y ${x}`,
+      "12 meses · mayor venta: D (M) y H": (d, m, x) => `12 meses · mayor venta: ${d} (${m}) y ${x}`,
+      "Últimos 12 meses · mayor venta: D y H": (d, m, x) => `Últimos 12 meses · mayor venta: ${d} y ${x}`,
+    };
+    const out = { ancho: Math.round(h.getBoundingClientRect().width), real: h.textContent, lineasReal: Math.round(h.getBoundingClientRect().height / parseFloat(getComputedStyle(h).lineHeight)) };
+    for (const [n, f] of Object.entries(formas)) { out[n] = {}; for (const [c, v] of Object.entries(casos)) { s.textContent = f(...v); out[n][c] = Math.round(s.getBoundingClientRect().width); } }
+    s.remove();
+    return out;
+  }), null, 1));
+}
+// MES_ANTERIOR=1: un toque en ‹ para medir «Septiembre 2026» con ‹ y › a la vista.
+if (process.env.MES_ANTERIOR) {
+  await pg.locator('[data-renglon="periodo"] [data-flecha="anterior"]').tap();
+  await pg.waitForTimeout(3500);
+  await pg.waitForSelector('[data-renglon="periodo"] [aria-expanded]', { timeout: 15000 }).catch(() => console.log("SIN período tras ‹", pg.url()));
+  await pg.screenshot({ path: `${OUT}/_extra-${PREFIJO}-mes-anterior.png` });
+  console.log("TRAS-TOQUE", JSON.stringify(await pg.evaluate(() => ({ barra: !!document.querySelector("[data-barra-celular]"), fila: document.querySelector('[data-renglon="periodo"]')?.innerHTML.slice(0, 700) ?? null, texto: document.body.innerText.slice(0, 300) }))));
+  console.log("MES-ANTERIOR", JSON.stringify(await pg.evaluate(() => {
+    const fila = document.querySelector('[data-renglon="periodo"]'); const b = fila.querySelector("[aria-expanded]"); const t = b.querySelector("span");
+    const r = (e) => { const x = e.getBoundingClientRect(); return { x: Math.round(x.left), w: Math.round(x.width), right: Math.round(x.right) }; };
+    return { texto: b.innerText, boton: r(b), textoPx: r(t), desborda: b.scrollWidth > b.clientWidth, controles: [...fila.querySelectorAll("button")].filter((e) => e.getBoundingClientRect().width > 0).map((e) => ({ t: (e.innerText || e.getAttribute("aria-label")).trim(), ...r(e) })), scrollWidth: document.documentElement.scrollWidth, numero: document.querySelector('[data-celular="numero-del-mes"]')?.textContent, linea: document.querySelector('[data-celular="linea-del-mes"]')?.textContent, sub: document.querySelector('[data-celular="hoy-y-frescura"]')?.innerText };
+  })));
+  await pg.screenshot({ path: `${OUT}/_extra-${PREFIJO}-mes-anterior.png` });
 }
 // «abajo» solo si la página todavía se desliza.
 const fin = await pg.evaluate(() => { const r = (s) => document.querySelector(s)?.getBoundingClientRect(); return { alto: document.documentElement.scrollHeight, vista: innerHeight, grafica: Math.round(r('[data-celular="inicio"]')?.bottom ?? 0), tabBar: Math.round(r("[data-tab-bar]")?.top ?? 0) }; });

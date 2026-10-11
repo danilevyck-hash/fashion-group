@@ -19,7 +19,7 @@ const BARRA: Record<EstadoDia, string> = {
 };
 
 export function GraficaDelMes({
-  dias, year, mes, esMesActual, diaActual, feriados, alta = false,
+  dias, year, mes, esMesActual, diaActual, feriados, alta = false, ventaHoy = null,
 }: {
   dias: readonly { dia: number; ventas: number; n_tickets: number }[];
   year: number;
@@ -29,11 +29,20 @@ export function GraficaDelMes({
   feriados?: readonly string[] | null;
   /** `MULTIFASHION_BARRA_2026_10`: en el celular, el doble de alto (240 px). Solo cambia el alto. */
   alta?: boolean;
+  /**
+   * `MULTIFASHION_BARRA_2026_10`: lo vendido HOY hasta ahora. La casilla «Hoy»
+   * lo dibuja con su contorno punteado, a la misma escala (el mejor día cerrado).
+   * No entra al promedio ni responde al toque.
+   * ponytail: si hoy ya pasó al mejor día del mes, la barra topa en el 100 %.
+   */
+  ventaHoy?: number | null;
 }) {
   const g = useMemo(
     () => graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados }),
     [dias, year, mes, esMesActual, diaActual, feriados],
   );
+  const maxCerrado = Math.max(0, ...g.dias.filter((d) => d.alto > 0).map((d) => d.ventas / d.alto));
+  const altoHoy = ventaHoy != null && ventaHoy > 0 && maxCerrado > 0 ? Math.min(1, ventaHoy / maxCerrado) : null;
   const [tocado, setTocado] = useState<number | null>(null);
   const linea = lineaDeLaGrafica(g, year, mes, tocado);
 
@@ -82,7 +91,8 @@ export function GraficaDelMes({
               tocado === d.dia && d.estado === "venta" && "bg-gray-900",
             )}
             style={{
-              height: d.estado === "hoy" || d.estado === "futuro" || d.alto === 0
+              height: d.estado === "hoy" && altoHoy != null ? `${Math.max(3, altoHoy * 100)}%`
+                : d.estado === "hoy" || d.estado === "futuro" || d.alto === 0
                 ? (d.estado === "futuro" ? "2px" : "4px")
                 : `${Math.max(3, d.alto * 100)}%`,
             }}

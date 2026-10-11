@@ -19,14 +19,12 @@
 // Lo que no se puede calcular no se dibuja: nunca un $0 como dato.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { fmtMoneyCompact } from "@/lib/ventas/format";
 import { agregarPatrones, mesesDeLaVentana, type HoraMes } from "./patrones";
 
 export const MESES_DEL_HISTORICO = 12;
 export const TITULO_HISTORICO = `Últimos ${MESES_DEL_HISTORICO} meses`;
 
 const DIA_LARGO = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const p2 = (n: number) => String(n).padStart(2, "0");
 
 export interface MesHistorico {
@@ -85,22 +83,15 @@ export function historicoDeVentas(meses: readonly MesHistorico[], hoyIso: string
 
 /**
  * UNA línea gris bajo la gráfica (Daniel, 11-oct-2026: «en una línea, sin tanto
- * protagonismo»): «Últimos 12 meses · mayor venta: domingo (promedio $5,412) y
- * 5–6 pm · máximo diario $21,428 (24 dic)». El día va sin año: la ventana no
- * llega a 12 meses, así que un día y un mes no se repiten. Lo que no se puede
- * calcular se omite; sin ninguno, `null`. `hora` llega ya escrita («5–6 pm»).
+ * protagonismo»): «Últimos 12 meses · mayor venta: domingo y 5–6 pm». Medido a
+ * 402 px (370 útiles, 14 px): 343 px, y 349 con «miércoles». Con el promedio
+ * («domingo (promedio $5,412)») mide 473 y no cabe en una línea.
+ * Lo que no se puede calcular se omite; sin ninguno, `null`. `hora` llega ya
+ * escrita («5–6 pm»). `mejorDia` y el promedio se siguen calculando, sin uso aquí.
  */
 export function lineaDelHistorico(h: HistoricoVentas, hora: string | null): string | null {
   const mayor: string[] = [];
-  if (h.diaSemana && h.diaSemana.promedio > 0) {
-    mayor.push(`${DIA_LARGO[h.diaSemana.dow].toLowerCase()} (promedio ${fmtMoneyCompact(h.diaSemana.promedio)})`);
-  }
+  if (h.diaSemana && h.diaSemana.promedio > 0) mayor.push(DIA_LARGO[h.diaSemana.dow].toLowerCase());
   if (hora) mayor.push(hora);
-  const partes: string[] = [];
-  if (mayor.length) partes.push(`mayor venta: ${mayor.join(" y ")}`);
-  if (h.mejorDia && h.mejorDia.ventas > 0) {
-    const [, m, d] = h.mejorDia.fecha.split("-").map(Number);
-    partes.push(`máximo diario ${fmtMoneyCompact(h.mejorDia.ventas)} (${d} ${MES_CORTO[m - 1]})`);
-  }
-  return partes.length ? [TITULO_HISTORICO, ...partes].join(" · ") : null;
+  return mayor.length ? `${TITULO_HISTORICO} · mayor venta: ${mayor.join(" y ")}` : null;
 }
