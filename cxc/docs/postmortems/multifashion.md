@@ -414,7 +414,7 @@
 
 1. **El número grande es RETAIL** (`is_wholesale = false`): año, mes, día, mes a mes, meta, bono y Telegram. Como siempre.
 2. **Todo % es retail contra retail.** 🩸 Cuatro RPC (`_multifashion_retail_blend_sum`, `multifashion_overview_serie_v1`, `multifashion_detalle_mensual_v2`, `multifashion_bonos_v4`) leían enero–abril de 2025 de `ventas_raw`, donde el mayoreo NO está marcado (0 de 25.727 filas): las cuatro facturas de LA FRONTERA del 30-abr-2025 ($23.917) entraban como venta de tienda del año pasado. `switch_facturas` tiene 2024 y 2025 completos (2025: 12.948 documentos en las dos tablas; $686.044,05 vs $686.043,69). El pegado sobraba.
-3. **La línea chiquita** «+ $X de mayoreo (N facturas) · entró $Y» debajo del número grande, SOLO cuando el mayoreo del período ≠ 0 (marzo 2026 tiene factura + NC de Joystep, neto $0: sin línea). En el año, el mes y el Telegram diario. **En Productos no se marca nada.**
+3. **La línea chiquita** «+ $X de mayoreo (N facturas) · entró $Y» debajo del número grande, SOLO cuando el mayoreo del período ≠ 0 (marzo 2026 tiene factura + NC de Joystep, neto $0: sin línea). En el año, el mes y el Telegram diario (🩸 del Telegram se quitó el 11-oct-2026, ver «11-oct-2026» abajo). **En Productos no se marca nada.**
 
 ### Lo medido (23-sep-2026, RPC de producción vs la misma fórmula sobre la vista sin `ventas_raw`)
 
@@ -867,6 +867,37 @@ Interruptor `MULTIFASHION_SUMA_HOY_2026_10` (`lib/multifashion/celular.ts`), **p
 - **Secretaria y contabilidad VEN el módulo** (Daniel: «que pueda VER Multifashion»): `modules.ts`, migración `20261228120000` (role_permissions + los overrides de Angela y andrea; revierte `20261118120000`). Escribe solo `ROLES_MULTIFASHION_ESCRITURA` (admin · `gerente_acs`); metas, solo admin. Multifashion va fija en la barra de la secretaria (`FIJAS_POR_ROL`).
 - **Comisiones ya no ofrece Multifashion** («para no enredar»): total por persona, bonos y la barra «TOTAL A PAGAR · Multifashion» viven en Multifashion › Vendedoras (`conTotalAPagar`); la Δ sigue contra el mes anterior (`vsAnioPasado` apagado). Septiembre 2026: $213,51 + $150 de bonos = $363,51.
 - **El selector «Octubre 2026» se abría fuera de la pantalla** en la computadora: ver `docs/diseno.md` › «Detalles aprendidos».
+
+## 11-oct-2026 — El Telegram diario: «sin venta año pasado» y sin la línea de mayoreo
+
+> Daniel, textual: *«telegram no quiero que me muevas cosas que no quisiera, sí me gusta comparar día por día porque un domingo no es lo mismo que un martes, pero que los números hagan sentido»* y *«quita + $28,366 de mayoreo (5 facturas) · entró $459,946»*.
+
+**Lo que NO cambió:** «Día» contra el mismo día de la semana del año pasado (−364 días), «Mes» y «Año» por fecha, el orden, la alineación, los emojis, el chat y la línea de la meta. Ninguna cuenta se tocó.
+
+**1 · El día equivalente que no vendió.** 🩸 El domingo 11-oct-2026 se compara con el domingo 12-oct-2025, que no tuvo venta: arriba decía `s/d año pasado` y abajo no salía la fila «Día», mientras el «Mes» del año pasado sí subía con la venta del sábado 11-oct-2025 ($1.283, por FECHA). Se leía como contradicción. Ahora, solo en ese caso:
+
+```
+Día    $2,305    sin venta año pasado
+…
+Año pasado
+Día    $0        domingo 12 oct 2025
+```
+
+Lo que cubría «s/d año pasado» (la regla única `variacionPct`, base < $100) y cómo queda:
+
+| Caso del día equivalente | Arriba | Fila «Día» abajo |
+|---|---|---|
+| Sumó exactamente $0 y el año pasado tiene venta cargada | **`sin venta año pasado`** (nuevo) | **`$0` + la fecha** (nuevo) |
+| Vendió entre $0,01 y $99,99 | `s/d año pasado` | el monto + la fecha (como antes) |
+| Neto negativo (solo devoluciones) | `s/d año pasado` | no sale (como antes) |
+| $0 y el año pasado ENTERO en $0 (historia que no está en la base) | `s/d año pasado` | no sale: **nunca un cero inventado** |
+| La lectura falla | no hay mensaje: `sumRetail` lanza y el cron lo registra como error | — |
+
+`diaEquivalenteSinVenta` en `src/lib/acs-resumen-diario.ts`. «Mes» y «Año» sin base siguen diciendo `s/d año pasado`. ⚠️ El 1 y 2 de enero, si el año pasado todavía suma $0 a esa fecha, el día cae a `s/d` (conservador a propósito).
+
+**2 · La línea del mayoreo se fue del Telegram.** La había pedido Daniel el 23-sep-2026 («abajo chiquitito me pones tanto por el mayoreo…», arriba en «Retail al frente»); el 11-oct pidió quitarla. Salen las dos (debajo de «Mes» y debajo de «Año»). **«Año» y «Mes» ya eran retail y no cambian**: el mayoreo solo deja de mencionarse. 🔴 **En la pantalla de Multifashion la línea sigue.** La lectura (`leerMayoreoRango`) y `lineaMayoreoTelegram` se conservan sin lector en el mensaje: quitarlas era un cambio más grande y un candado de «Retail al frente» nombra esa lectura.
+
+Los dos envíos (el cron y la recuperación de `switch-reconciliacion`) usan el mismo `buildMensajeHtml`. Candados: `acs-resumen-diario.test.ts` › «sin venta el día equivalente y sin mayoreo» (el texto entero del 10 y del 11-oct-2026, ancho ≤ 40 columnas) y `multifashion-retail-al-frente.test.tsx` › «la línea del mayoreo YA NO sale».
 
 ## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
 

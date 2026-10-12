@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Resumen diario ACS para Telegram (cron acs-resumen-diario, 00:30 UTC =
-// 20:00 Panamá = 8pm, tras el sync ACS de cierre de 00:15 UTC = 19:15 Panamá).
+// 19:30 Panamá = 7:30pm, tras el sync ACS de cierre de 00:15 UTC = 19:15 Panamá).
 //
 // SEMÁNTICA = la del módulo Multifashion (validada al centavo contra
 // multifashion_overview_serie_v1 el 4-jul-2026):
@@ -36,7 +36,7 @@
 // $0 · -100% falso y el mes compara 1..D-1 contra 1..D (asimétrico). Antes de
 // calcular se verifica en switch_sync_log que hubo un sync de facturas ACS
 // exitoso DESPUÉS del cierre de tienda (fecha+1 00:00 UTC = 19:00 Panamá =
-// cierre 7pm; el sync de 00:15 UTC lo satisface con ~45 min de margen antes del
+// cierre 7pm; el sync de 00:15 UTC lo satisface con ~15 min de margen antes del
 // resumen de 00:30). Si no lo hubo, el
 // mensaje omite la línea de "Hoy" y reporta el mes al último día completo
 // (1..D-1 vs 1..D-1, simétrico). Un $0 real con sync fresco (tienda cerrada,
@@ -49,9 +49,7 @@ import { variacionPct } from "@/lib/variacion";
 import { leerMayoreoRango, sumRetail } from "@/lib/multifashion/retail-dia";
 import { leerRitmoMeta } from "@/lib/multifashion/meta-ritmo-lectura";
 import type { RitmoMeta } from "@/lib/multifashion/meta-ritmo";
-import {
-  RETAIL_AL_FRENTE, lineaMayoreoTelegram, type MayoreoDelPeriodo,
-} from "@/lib/multifashion/retail-al-frente";
+import { RETAIL_AL_FRENTE, type MayoreoDelPeriodo } from "@/lib/multifashion/retail-al-frente";
 
 export { hoyPanama };
 
@@ -71,9 +69,10 @@ export interface AcsResumenDiario {
    *  cubra el día, sin comparable, o la lectura falló → la línea no sale.
    *  Cuenta en `@/lib/multifashion/meta-ritmo`, lectura en `meta-ritmo-lectura`. */
   meta?: RitmoMeta | null;
-  /** La línea chiquita del mayoreo (23-sep-2026): cuánto entró por mayoreo en
-   *  el MES y en el AÑO hasta el `corte`. NO entra a Mes/Año ni a sus %.
-   *  `null`/ausente = no se leyó (o el interruptor está apagado) → no sale. */
+  /** El mayoreo del MES y del AÑO hasta el `corte` (23-sep-2026). NO entra a
+   *  Mes/Año ni a sus %. 🔴 Desde el 11-oct-2026 el Telegram YA NO lo escribe
+   *  (Daniel: «quita + $28,366 de mayoreo (5 facturas) · entró $459,946»); el
+   *  dato se sigue leyendo y viaja aquí, sin lector en el mensaje. */
   mayoreoMes?: MayoreoDelPeriodo | null;
   mayoreoAnio?: MayoreoDelPeriodo | null;
 }
@@ -208,8 +207,19 @@ export async function calcularResumenDiario(
 //   …
 //
 //   Sin base comparable del año pasado (menos de $100): esa fila muestra
-//   "s/d año pasado" en vez de la flecha y NO aparece en el bloque de abajo.
+//   "s/d año pasado" en vez de la flecha. Abajo aparece solo si el monto es
+//   mayor que cero (una base de $50 se ve; una negativa o en cero, no).
 //   Si ninguna métrica tiene comparable, el bloque "Año pasado" se omite entero.
+//
+//   🔴 El DÍA equivalente sin venta (11-oct-2026, Daniel: «que los números
+//   hagan sentido»): el domingo 11-oct-2026 se compara con el domingo
+//   12-oct-2025, que no vendió. Decía "s/d año pasado" y no mostraba la fila,
+//   mientras el Mes del año pasado sí crecía por FECHA: se contradecía. Ahora,
+//   SOLO en ese caso (ver `diaEquivalenteSinVenta`):
+//   Día    $2,305    sin venta año pasado
+//   …
+//   Año pasado
+//   Día    $0        domingo 12 oct 2025
 //
 //   Con una meta grupal de Multifashion vigente (3-sep-2026, mockup aprobado
 //   por Daniel), UNA línea más al final y nada más cambia:
@@ -218,12 +228,11 @@ export async function calcularResumenDiario(
 //   Sin meta que cubra el día, o sin comparable, la línea y su separador no
 //   salen. Ver fmtLineaMeta y src/lib/multifashion/meta-ritmo.ts.
 //
-//   Con mayoreo en el mes o en el año (23-sep-2026, Daniel: «abajo chiquitito
-//   me pones tanto por el mayoreo»), UNA línea debajo de la fila que le toca,
-//   SOLO si el mayoreo de ese período no es cero; Mes y Año siguen siendo
-//   retail y sus % retail contra retail:
-//   Año    $390,121    ▲ +15.7%
-//     + $28,366 de mayoreo (5 facturas) · entró $418,487
+//   🩸 La línea del mayoreo («+ $28,366 de mayoreo (5 facturas) · entró
+//   $418,487», debajo de Mes y de Año desde el 23-sep-2026) SE QUITÓ del
+//   Telegram el 11-oct-2026, a pedido de Daniel. Mes y Año ya eran retail y
+//   siguen siéndolo: ningún número cambia, el mayoreo solo deja de mencionarse
+//   aquí. En la pantalla de Multifashion la línea sigue.
 
 export function fmtMonto(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
@@ -318,6 +327,17 @@ export function fmtDiaTitulo(fecha: string): string {
   return `${wd} ${d.getUTCDate()} ${mes}`;
 }
 
+/** ¿El día equivalente del año pasado (−364 d) de verdad NO vendió?
+ *
+ *  Exige las dos cosas: el día sumó exactamente $0 Y el año pasado tiene venta
+ *  cargada hasta la víspera (`anioPrev > 0`). Sin lo segundo, el cero puede ser
+ *  historia que no está en la base, y ahí se sigue diciendo "s/d año pasado":
+ *  nunca un cero inventado. Una lectura que FALLA no llega aquí — `sumRetail`
+ *  lanza y el resumen de ese día no se manda. */
+export function diaEquivalenteSinVenta(r: AcsResumenDiario): boolean {
+  return r.syncFresco && r.hoyPrev === 0 && r.anioPrev > 0;
+}
+
 const SEPARADOR = "━".repeat(18);
 const ANCHO_LABEL = 7; // "Día"/"Mes"/"Año" + relleno hasta la columna del monto
 
@@ -340,15 +360,18 @@ export function buildMensaje(r: AcsResumenDiario, prefijo = ""): string {
   // Sin sync fresco el día `fecha` está incompleto: se cae la fila "Día" entera
   // (mostrar $0 · -100% sería un falso negativo — es la guardia anti-ruido).
   if (r.syncFresco) {
-    actual.push({ label: "Día", monto: r.hoy, resto: fmtVariacion(r.hoy, r.hoyPrev, 0) });
-    if (r.hoyPrev > 0) {
+    const sinVenta = diaEquivalenteSinVenta(r);
+    actual.push({
+      label: "Día",
+      monto: r.hoy,
+      resto: sinVenta ? "sin venta año pasado" : fmtVariacion(r.hoy, r.hoyPrev, 0),
+    });
+    if (r.hoyPrev > 0 || sinVenta) {
       pasado.push({ label: "Día", monto: r.hoyPrev, resto: fmtDiaPrevLargo(r.fechaComparable) });
     }
   }
   actual.push({ label: "Mes", monto: r.mes, resto: fmtVariacion(r.mes, r.mesPrev, 1) });
-  const notaMes = lineaMayoreoTelegram(r.mayoreoMes);
   actual.push({ label: "Año", monto: r.anio, resto: fmtVariacion(r.anio, r.anioPrev, 1) });
-  const notaAnio = lineaMayoreoTelegram(r.mayoreoAnio);
   if (r.mesPrev > 0) {
     pasado.push({ label: "Mes", monto: r.mesPrev, resto: fmtRangoMesPrevLargo(r.corte) });
   }
@@ -367,12 +390,7 @@ export function buildMensaje(r: AcsResumenDiario, prefijo = ""): string {
     // hasta qué día llegan los acumulados cuando el corte se recorta a D-1.
     lineas.push(`⏳ Ventas del día aún sincronizando (al ${fmtDiaCorto(r.corte)})`);
   }
-  for (const f of actual) {
-    lineas.push(fila(f));
-    // La línea chiquita del mayoreo va DEBAJO de su fila, sangrada, y solo si hubo.
-    if (f.label === "Mes" && notaMes) lineas.push(`  ${notaMes}`);
-    if (f.label === "Año" && notaAnio) lineas.push(`  ${notaAnio}`);
-  }
+  lineas.push(...actual.map(fila));
   // Sin ninguna métrica comparable el bloque de abajo sobra, y con él su cierre.
   if (pasado.length > 0) lineas.push(SEPARADOR, "Año pasado", ...pasado.map(fila));
   // La meta va AL FINAL, con su propio separador, y solo si hay algo que decir.

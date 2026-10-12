@@ -202,6 +202,111 @@ describe("buildMensaje — formato tabla aprobado 25-jul-2026", () => {
   });
 });
 
+// ── 11-oct-2026: «sin venta año pasado» y el Telegram sin la línea de mayoreo ──
+// Daniel: «sí me gusta comparar día por día porque un domingo no es lo mismo
+// que un martes, pero que los números hagan sentido» · «quita + $28,366 de
+// mayoreo (5 facturas) · entró $459,946».
+//
+// Cifras del mensaje REAL del domingo 11-oct-2026. Las del sábado 10 salen de
+// restarle a esas el domingo ($2,305) y el sábado 11-oct-2025 ($1,283); la
+// venta del propio sábado 10 ($2,100) y su meta son de ejemplo, no medidas.
+const meta14 = { vendido: 114, factor: 1, ritmo: 100, pct: 0.14 };
+const mayoreo = (retail: number) => ({ monto: 28365.9, facturas: 5, retail });
+const DOM_11: AcsResumenDiario = {
+  fecha: "2026-10-11", corte: "2026-10-11", syncFresco: true,
+  hoy: 2305, hoyPrev: 0, fechaComparable: "2025-10-12",
+  mes: 28921, mesPrev: 15545, anio: 431580, anioPrev: 363698,
+  meta: meta14,
+  mayoreoMes: { monto: 0, facturas: 0, retail: 28921 },
+  mayoreoAnio: mayoreo(431580),
+};
+const SAB_10: AcsResumenDiario = {
+  fecha: "2026-10-10", corte: "2026-10-10", syncFresco: true,
+  hoy: 2100, hoyPrev: 1283, fechaComparable: "2025-10-11",
+  mes: 26616, mesPrev: 14262, anio: 429275, anioPrev: 362415,
+  meta: meta14,
+};
+
+describe("buildMensaje — sin venta el día equivalente y sin mayoreo (11-oct-2026)", () => {
+  const TEXTO_SAB_10 = [
+    "🏪 ACS · sábado 10 oct",
+    SEP,
+    "Día    $2,100    ▲ +64%",
+    "Mes    $26,616   ▲ +86.6%",
+    "Año    $429,275  ▲ +18.4%",
+    SEP,
+    "Año pasado",
+    "Día    $1,283    sábado 11 oct 2025",
+    "Mes    $14,262   1 al 10 de octubre 2025",
+    "Año    $362,415  1 ene al 10 oct 2025",
+    SEP,
+    "🎯 Meta  ▲ +14% arriba del ritmo",
+  ].join("\n");
+
+  it("sábado 10-oct (CON comparación): el mensaje de siempre, letra por letra", () => {
+    // Sin mayoreo en el dato, este texto es el que ya salía ANTES del cambio.
+    expect(buildMensaje(SAB_10)).toBe(TEXTO_SAB_10);
+  });
+
+  it("…y con mayoreo en el dato sale IDÉNTICO: la línea ya no se escribe", () => {
+    const conMayoreo = buildMensaje({
+      ...SAB_10, mayoreoMes: mayoreo(SAB_10.mes), mayoreoAnio: mayoreo(SAB_10.anio),
+    });
+    expect(conMayoreo).toBe(TEXTO_SAB_10);
+    expect(conMayoreo).not.toContain("mayoreo");
+  });
+
+  it("domingo 11-oct (el día equivalente no vendió): «sin venta año pasado» y su fila en $0", () => {
+    expect(buildMensaje(DOM_11)).toBe(
+      [
+        "🏪 ACS · domingo 11 oct",
+        SEP,
+        "Día    $2,305    sin venta año pasado",
+        "Mes    $28,921   ▲ +86.0%",
+        "Año    $431,580  ▲ +18.7%",
+        SEP,
+        "Año pasado",
+        "Día    $0        domingo 12 oct 2025",
+        "Mes    $15,545   1 al 11 de octubre 2025",
+        "Año    $363,698  1 ene al 11 oct 2025",
+        SEP,
+        "🎯 Meta  ▲ +14% arriba del ritmo",
+      ].join("\n"),
+    );
+  });
+
+  it("un cero INVENTADO nunca: base chica, negativa o año pasado sin datos siguen en «s/d»", () => {
+    // Vendió, pero menos de $100: no hay % honesto; la fila de abajo dice cuánto.
+    const chica = buildMensaje({ ...DOM_11, hoyPrev: 50 });
+    expect(chica).toContain("Día    $2,305    s/d año pasado");
+    expect(chica).toContain("Día    $50       domingo 12 oct 2025");
+    // Neto negativo (solo devoluciones): ni «sin venta» ni fila.
+    const negativa = buildMensaje({ ...DOM_11, hoyPrev: -40 });
+    expect(negativa).toContain("Día    $2,305    s/d año pasado");
+    expect(negativa).not.toContain("domingo 12 oct 2025");
+    // El año pasado entero en cero = no hay historia cargada: no se afirma «sin venta».
+    const sinHistoria = buildMensaje({ ...DOM_11, mesPrev: 0, anioPrev: 0 });
+    expect(sinHistoria).not.toContain("sin venta");
+    expect(sinHistoria).not.toContain("$0");
+    expect(sinHistoria).not.toContain("Año pasado");
+  });
+
+  it("sin sync fresco no hay fila Día, así que tampoco «sin venta»", () => {
+    const msg = buildMensaje({ ...DOM_11, syncFresco: false, corte: "2026-10-10" });
+    expect(msg).not.toContain("sin venta");
+    expect(msg).not.toContain("Día");
+  });
+
+  it("no ensancha el mensaje: ninguna fila pasa de la más larga que ya existía", () => {
+    for (const r of [SAB_10, DOM_11]) {
+      const lineas = buildMensaje(r, "(recuperado) ").split("\n");
+      // La fila «Mes … 1 al 11 de octubre 2025» mide 40; la de mayoreo medía 52.
+      expect(Math.max(...lineas.slice(1).map((l) => l.length))).toBeLessThanOrEqual(40);
+      expect(buildMensajeHtml(r, "(recuperado) ").length).toBeLessThan(4096);
+    }
+  });
+});
+
 describe("buildMensajeHtml", () => {
   it("envuelve la tabla en <pre> — es lo que hace que Telegram la pinte monoespaciada", () => {
     const html = buildMensajeHtml(BASE);
