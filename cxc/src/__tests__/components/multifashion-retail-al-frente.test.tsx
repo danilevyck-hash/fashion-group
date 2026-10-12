@@ -214,7 +214,10 @@ describe("2 · la línea chiquita del mayoreo", () => {
     expect(mayoreoDelAnio({ ytdVentas: 28365.9, ytdTickets: 5 }, 390120.61)).toEqual({ monto: 28365.9, facturas: 5, retail: 390120.61 });
   });
 
-  it("Telegram: la línea corta va debajo de Mes y de Año, solo si hubo", () => {
+  // 🔴 11-oct-2026, Daniel: «quita + $28,366 de mayoreo (5 facturas) · entró
+  // $459,946». Este candado exigía la línea debajo de Año; ahora exige que NO
+  // salga. `lineaMayoreoTelegram` y la lectura del mayoreo se conservan.
+  it("Telegram: la línea del mayoreo YA NO sale, ni debajo de Mes ni de Año", () => {
     const base = {
       fecha: "2026-09-23", corte: "2026-09-22", syncFresco: true,
       hoy: 1000, hoyPrev: 900, fechaComparable: "2025-09-23",
@@ -227,12 +230,14 @@ describe("2 · la línea chiquita del mayoreo", () => {
     });
     expect(lineaMayoreoTelegram({ monto: 28365.9, facturas: 5, retail: 390120.61 }))
       .toBe("+ $28,366 de mayoreo (5 facturas) · entró $418,487");
+    expect(conMayoreo).not.toContain("mayoreo");
+    // Con y sin mayoreo en el dato, el mensaje es el MISMO: Mes y Año son retail.
+    expect(conMayoreo).toBe(buildMensaje(base));
     const lineas = conMayoreo.split("\n");
-    const iAnio = lineas.findIndex((l) => l.startsWith("Año"));
-    expect(lineas[iAnio + 1]).toBe("  + $28,366 de mayoreo (5 facturas) · entró $418,487");
-    // Septiembre sin mayoreo: nada debajo de Mes.
     const iMes = lineas.findIndex((l) => l.startsWith("Mes"));
-    expect(lineas[iMes + 1]).toMatch(/^Año/);
+    const iAnio = lineas.findIndex((l) => l.startsWith("Año"));
+    expect(iAnio).toBe(iMes + 1);
+    expect(lineas[iAnio + 1]).toBe("━".repeat(18));
     // Y los números grandes no se mueven.
     expect(lineas[iMes]).toContain("$31,834");
     expect(lineas[iAnio]).toContain("$390,121");

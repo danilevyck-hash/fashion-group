@@ -604,6 +604,9 @@ Año    $263,407    1 ene al 24 jul 2025
   **mismo día de calendario** del año anterior (29-feb → 28-feb).
 - Sin sync fresco del día se cae la fila «Día» entera y aparece
   `⏳ Ventas del día aún sincronizando (al 23-jul)`.
+- **Día equivalente sin venta (11-oct-2026):** si ese día del año pasado sumó $0, arriba dice
+  `sin venta año pasado` y abajo sale `Día    $0        domingo 12 oct 2025`.
+- La línea de mayoreo ya no sale en este mensaje (11-oct-2026); Mes y Año son retail, como siempre.
 - Sin base comparable (< $100): esa fila dice `s/d año pasado` y no aparece abajo. Si ninguna
   métrica tiene comparable, el bloque «Año pasado» se omite entero.
 - La línea **🎯 Meta** sale solo si hay una meta grupal activa que cubra el corte.
