@@ -36,6 +36,8 @@ import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import type { TabMultifashion } from "@/lib/multifashion/pestanas";
 import { etiquetaPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifashion/periodo";
 import { unAnioAntes } from "@/lib/ventas/clientes-corte-comparativo";
+import { baseDesdeRatio } from "@/lib/variacion";
+import type { RetailMonthly } from "@/components/ventas/types";
 
 /**
  * El interruptor. `false` = la pantalla de celular de antes, intacta (título,
@@ -184,6 +186,71 @@ export function baseDeHoyAnioPasado(e: {
   const c = e.comparativo;
   if (!c || !e.corteDeHoy || c.corte !== e.corteDeHoy || c.fecha !== e.fechaDeHoy) return null;
   return typeof c.ventasPrev === "number" && Number.isFinite(c.ventasPrev) ? c.ventasPrev : null;
+}
+
+/**
+ * 🔴 LA COMPUTADORA Y «AÑO» TAMBIÉN SUMAN HOY (Daniel, 11-oct-2026: «sí, que la
+ * computadora también sume hoy»). El celular ya lo hacía (`MULTIFASHION_BARRA_2026_10`)
+ * y el mismo mes decía dos números: $28,757 en el celular y $26,616 en la computadora.
+ * Regla viva, las dos pantallas: el NÚMERO trae hoy · las TASAS (proyección,
+ * promedio diario, tickets) siguen sobre días completos y lo dicen · el % contra
+ * el año pasado va hasta el mismo día y la misma hora.
+ * `false` = la computadora y «Año» sobre días completos, como hasta el 11-oct.
+ * El Resumen del celular no depende de este interruptor.
+ * Candado `multifashion-corte-dia-completo.test.ts`.
+ */
+export const MULTIFASHION_SUMA_HOY_2026_10 = true;
+
+/**
+ * El mes con hoy: UNA cuenta para el celular y la computadora. El número suma
+ * hoy si se pudo leer; el % lleva hoy de los DOS lados o de ninguno.
+ */
+export function mesConHoy(e: {
+  /** Días completos del mes y la base del año pasado a los mismos días. */
+  ventas: number;
+  prev: number;
+  ventaHoy: number | null | undefined;
+  prevHoy: number | null | undefined;
+}): { numero: number; ventasPct: number; prevPct: number; conHoy: boolean; hastaAhora: boolean } {
+  const conHoy = e.ventaHoy != null;
+  const hastaAhora = conHoy && e.prevHoy != null;
+  return {
+    numero: e.ventas + (e.ventaHoy ?? 0),
+    ventasPct: e.ventas + (hastaAhora ? e.ventaHoy! : 0),
+    prevPct: e.prev + (hastaAhora ? e.prevHoy! : 0),
+    conHoy,
+    hastaAhora,
+  };
+}
+
+/**
+ * El AÑO con hoy: el renglón del mes en curso (el que la base marca parcial)
+ * suma la venta de hoy y su % queda hasta la misma hora, igual que el Resumen.
+ * 🩸 EL TOTAL DEL AÑO NO SE TOCA: `ytdVentas` YA trae hoy (`multifashion_mensual_v7`
+ * suma `mes <= p_mes`, sin corte de día). Medido el 11-oct-2026: el año decía
+ * $431,580.06 y sus meses sumaban $429,274.82; la diferencia, $2,305.24, era la
+ * venta de hoy. Sumarla otra vez la contaba dos veces. Con el renglón al día,
+ * los meses vuelven a sumar el año. Solo con los DOS lados leídos; si no, el
+ * renglón de siempre (días completos). La proyección del año tampoco se toca.
+ */
+export function anioConHoy<T extends { retail: { ytdVentas: number; meses: RetailMonthly[] } }>(
+  overview: T,
+  anio: number,
+  hoy: { fecha: string; hayVentas: boolean; ventas: number } | null | undefined,
+  prevHoy: number | null | undefined,
+): T {
+  const i = overview.retail.meses.findIndex((m) => m.es_periodo_parcial);
+  if (i < 0 || prevHoy == null) return overview;
+  const m = overview.retail.meses[i];
+  const ventaHoy = ventaDeHoyParaElMes({
+    esMesActual: true, anio, mes: i + 1, hoy,
+    diaActual: m.fecha_corte ? Number(m.fecha_corte.slice(8, 10)) : 0,
+  });
+  if (ventaHoy == null) return overview;
+  const base = (baseDesdeRatio(m.ventas, m.vs2025) ?? 0) + prevHoy;
+  const meses = overview.retail.meses.slice();
+  meses[i] = { ...m, ventas: m.ventas + ventaHoy, vs2025: base > 0 ? (m.ventas + ventaHoy) / base - 1 : null };
+  return { ...overview, retail: { ...overview.retail, meses } };
 }
 
 /** Las dos pantallas que el celular agrega adentro de «Resumen». */

@@ -26,7 +26,7 @@ import { conteoPorChip } from "@/lib/multifashion/clientes-seguimiento";
 import type { ClienteUniverso } from "@/lib/multifashion/clientes-universo";
 import { lineaHabitos, mayoreoDelAnio } from "@/lib/multifashion/resumen-minimo";
 import {
-  MF_DIA_2026_10, barrasDelMes, deltaCorto, lineaDelDia, lineaDelMes, montoCorto, renglonesDelInicio,
+  MF_DIA_2026_10, barrasDelMes, deltaCorto, lineaDelDia, lineaDelMes, mesConHoy, montoCorto, renglonesDelInicio,
   type ClaveRenglon, type RenglonCelular, type TonoCelular,
 } from "@/lib/multifashion/celular";
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
@@ -98,10 +98,8 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
 
   // ── El número grande y su línea ───────────────────────────────────────────
   // 🔴 El % cubre lo mismo que el número: con hoy de los DOS lados, o de ninguno.
-  const hastaAhora = ventaHoy != null && prevHoy != null;
-  const deltaYoy = data.yoy.tiene_data
-    ? variacionPct(totales.ventas + (hastaAhora ? ventaHoy : 0), data.yoy.ventas + (hastaAhora ? prevHoy : 0))
-    : null;
+  const conHoy = mesConHoy({ ventas: totales.ventas, prev: data.yoy.ventas, ventaHoy, prevHoy });
+  const deltaYoy = data.yoy.tiene_data ? variacionPct(conHoy.ventasPct, conHoy.prevPct) : null;
   const cierra = data.is_mes_actual ? totales.proyeccion_cierre : null;
   const linea = lineaDelMes({ periodo, deltaAnioPasado: deltaYoy, cierraEn: cierra });
 
@@ -183,7 +181,7 @@ export function InicioCelular({ data, overview, periodo, corte, onAbrir, atencio
       {atencion && <div className="mb-4">{atencion}</div>}
       {/* El mes, como número. */}
       <p data-celular="numero-del-mes" className="text-center text-[52px] font-light leading-none tracking-tight tabular-nums text-gray-950">
-        {montoCorto(totales.ventas + (ventaHoy ?? 0))}
+        {montoCorto(conHoy.numero)}
       </p>
       {filaTocada ? (
         <p data-celular="linea-del-dia" className="mt-2 text-center text-sm font-medium text-gray-950 tabular-nums">

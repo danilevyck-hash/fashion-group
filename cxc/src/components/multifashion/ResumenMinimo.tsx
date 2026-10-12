@@ -35,8 +35,9 @@ import { variacionPct } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import { fmtDeltaRetail, lineaMayoreo, tonoDeltaRetail } from "@/lib/multifashion/retail-al-frente";
 import {
-  comparativosDelMes, lineaHabitos, mayoreoDelAnio, mayoreoDelMes,
+  alDiaCompleto, comparativosDelMes, lineaHabitos, mayoreoDelAnio, mayoreoDelMes,
 } from "@/lib/multifashion/resumen-minimo";
+import { mesConHoy } from "@/lib/multifashion/celular";
 import type { DetalleMensualResp } from "./MultifashionResumenView";
 import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
 
@@ -79,19 +80,26 @@ interface Props {
   mesAMes: ReactNode;
   /** Lo que requiere atención, ARRIBA (`MULTIFASHION_APPLE_2026_10`). */
   atencion?: ReactNode;
+  /** `MULTIFASHION_SUMA_HOY_2026_10`: la venta de HOY y su base del año pasado, las MISMAS del celular. */
+  ventaHoy?: number | null;
+  prevHoy?: number | null;
 }
 
-export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico, mesAMes, atencion = null }: Props) {
+export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico, mesAMes, atencion = null, ventaHoy = null, prevHoy = null }: Props) {
   const [mesAMesAbierto, setMesAMesAbierto] = useState(false);
   const { totales, is_mes_actual } = data;
 
   // ── Tarjeta 1: el mes ──────────────────────────────────────────────────────
+  // 🔴 El número trae hoy (la MISMA cuenta del celular, `mesConHoy`); lo que
+  // sigue sobre días completos —tickets, promedio, el % contra el mes anterior—
+  // lo dice («al día 10»). Sin la venta de hoy, la tarjeta de siempre.
+  const conHoy = mesConHoy({ ventas: totales.ventas, prev: data.yoy.ventas, ventaHoy, prevHoy });
   const comparativos = comparativosDelMes({
     ventas: totales.ventas, yoy: data.yoy, mesAnterior: data.mes_anterior, year, mes,
+    conHoy: conHoy.conHoy ? { ...conHoy, diaCorte: data.dia_actual } : null,
   });
-  const dYoy = data.yoy.tiene_data ? variacionPct(totales.ventas, data.yoy.ventas) : null;
-  const dMom = data.mes_anterior.tiene_data ? variacionPct(totales.ventas, data.mes_anterior.ventas) : null;
-  const notaMes = lineaMayoreo(mayoreoDelMes(overview.wholesale.meses, mes, totales.ventas));
+  const { dYoy, dMom } = comparativos;
+  const notaMes = lineaMayoreo(mayoreoDelMes(overview.wholesale.meses, mes, conHoy.numero));
 
   // ── Tarjeta 2: cierra en (mes en curso) · margen tienda (mes cerrado) ──────
   const hayProyeccion = is_mes_actual && totales.proyeccion_cierre != null;
@@ -117,11 +125,12 @@ export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico
         <Card data-elemento="ventas-del-mes" className="p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Ventas del mes</p>
           <p className={NUM_MES}>
-            {fmtMoney(totales.ventas)}
+            {fmtMoney(conHoy.numero)}
           </p>
           <p className="mt-0.5 text-xs text-gray-500">
             <span className="tabular-nums">{totales.n_tickets.toLocaleString()}</span> tickets ·{" "}
             <span className="tabular-nums">${totales.ticket_promedio.toFixed(2)}</span> promedio
+            {conHoy.conHoy && ` · ${alDiaCompleto(data.dia_actual)}`}
           </p>
           <p className="mt-2 border-t border-gray-100 pt-2 text-xs">
             <span className={cn(" font-medium tabular-nums", TONO[tonoDeltaRetail(dYoy)])}>{comparativos.yoy}</span>
