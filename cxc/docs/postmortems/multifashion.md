@@ -682,7 +682,7 @@ El trabajo del 4-oct nunca se publicó y partía de un `main` 141 cambios atrás
 
 > Daniel, 11-oct-2026, desde su iPhone: *«¿Por qué los otros tabs no están como en los otros módulos en el celular?»* y *«¿la venta del día cómo debería de estar?»*. Después, sobre las capturas: *«¿por qué el menú arriba y en la pantalla?»*, *«Actualizado debería de estar a nivel de las ventas hoy y ayer, y lo de últimos 12 meses en una línea, sin tanto protagonismo»*, *«que la comparación sea hasta lo más actualizado»*, *«¿por qué muestra mejores horas solo rango de una hora?»*, *«¿promedio diario qué?»*. Aprobó con *«dale aprobado, tíralo»*.
 
-Interruptor `MULTIFASHION_BARRA_2026_10` (`lib/multifashion/celular.ts`), **prendido**. `false` = el celular del 24-sep («‹ Septiembre», el mes como título, los cuatro renglones y la línea de hábitos). **Solo el celular**: la computadora no cambió.
+Interruptor `MULTIFASHION_BARRA_2026_10` (`lib/multifashion/celular.ts`), **prendido**. `false` = el celular del 24-sep («‹ Septiembre», el mes como título, los cuatro renglones y la línea de hábitos). **Solo el celular**; la computadora y «Año» se alinearon el mismo día con su propio interruptor (ver «La computadora también suma hoy», abajo).
 
 ### Por qué era distinto
 
@@ -722,10 +722,52 @@ El celular de Multifashion («un número y cuatro renglones», 24-sep) nació oc
 
 ### Pendientes y dudas para Daniel
 
-- ⚠️ **La computadora, Productos y «Año 2026» siguen mostrando el mes SIN la venta de hoy**, y la computadora conserva la línea gris de 3 meses. El celular y la computadora dicen números distintos del mismo mes (la diferencia es la venta de hoy) hasta que Daniel decida alinearlos.
+- ✅ **La computadora y «Año 2026» ya suman hoy** (mismo día, sección de abajo). ⚠️ Siguen pendientes de decisión: **Productos** (su venta llega hasta ayer) y la **línea gris de 3 meses** de la computadora.
 - ⚠️ **Las lecturas de «Últimos 12 meses» deberían ser UN procedimiento en la base.** Pide el «sí» de Daniel al SQL.
 - ⚠️ Con «miércoles» la primera línea gris mediría 378 px de 370 y bajaría a una tercera línea. Hoy gana sábado con distancia.
 - ⚠️ Una corrección de Switch sobre un día viejo se ve en «Últimos 12 meses» al día siguiente.
+
+## La computadora también suma hoy (11-oct-2026)
+
+> Daniel, 11-oct-2026, al ver que el mismo mes decía $28,757 en el celular y $26,616 en la computadora: *«sí, que la computadora también sume hoy»*.
+
+Interruptor `MULTIFASHION_SUMA_HOY_2026_10` (`lib/multifashion/celular.ts`), **prendido**. `false` = la computadora y «Año» sobre días completos, como hasta ese día. El Resumen del celular no depende de él.
+
+### La regla, para las dos pantallas
+
+- **El NÚMERO trae hoy**: días completos + la venta de hoy (la del renglón «Hoy»).
+- **Las TASAS no**: proyección, promedio diario, tickets y el % contra el mes anterior siguen sobre días completos **y lo dicen** («al día 10», «con 10 días», «10 días»).
+- **El % contra el año pasado va hasta el mismo día y la misma hora.**
+- Es **una sola cuenta**: `mesConHoy` (el mes) y `anioConHoy` (el renglón del mes dentro del año). La vista lee la venta de hoy y su base una vez (`ventaDeHoyParaElMes`, `baseDeHoyAnioPasado`, la ruta `comparativo-hoy`) y se la pasa al celular y a la computadora. Mismas caídas: sin la venta de hoy, sin ventas todavía, otro mes, o si «hoy» no es el día que sigue al corte, queda el número de días completos.
+- La regla del 31-jul-2026 («el mes en curso corta en el último día COMPLETO») sigue viva **en la base**: el detalle y la tabla cortan igual. Lo que cambió es lo que se escribe. Lo prohibido sigue prohibido: dos cifras de la misma pantalla sobre cortes distintos sin decirlo.
+
+### La computadora, medido el 11-oct-2026 a las 7:15 pm
+
+- «Ventas del mes **$28,921.45**» = $26,616.22 (días 1–10) + $2,305.23 (hoy).
+- «473 tickets · $56.27 promedio · al día 10».
+- «▲ +86.0% vs oct 2025 · ▲ +61.2% vs septiembre, al día 10». El 86.0 % = $28,921.45 contra $14,262.00 + $1,283.44 = $15,545.44. El 61.2 % = $26,616.22 contra $16,506.95 (septiembre al día 10): sigue sobre días completos y por eso lo dice. Si la base de hoy del año pasado no se pudo leer, el primero también dice «, al día 10».
+- «Proyección de cierre $86,648.49 · por temporada, con 10 días»: sin cambio.
+- La gráfica dibuja la barra de «Hoy» rayada, como en el celular. El promedio sigue en «10 días».
+- «Mes a mes»: el renglón «Oct hoy» dice $28,921.45 contra $15,545.44 (+86.0 %) y el subtítulo lo aclara: «el mes en curso incluye la venta de hoy, contra 2025 hasta la misma hora».
+
+### 🩸 El año YA traía hoy; lo que no cuadraba era su renglón de octubre
+
+`ytdVentas` sale de `multifashion_mensual_v7`, que suma `mes <= p_mes` **sin corte de día**. Medido: el año decía **$431,580.06** y sus meses sumaban **$429,274.82**; la diferencia, $2,305.24, era la venta de hoy. El primer intento sumó hoy también al total y lo contó dos veces ($433,885.29): lo delató la resta contra los renglones. Por eso `anioConHoy` **solo toca el renglón del mes en curso**. Con eso los meses suman el año, en «Año 2026» del celular y en «Mes a mes».
+
+**El % del año** («▲ +18.7% vs 2025»): es la proyección de cierre contra el cierre real del año pasado. La proyección (`multifashion_proyeccion_cierre_v2`) = cierre 2025 × (vendido 2026 hasta hoy ÷ vendido 2025 hasta el mismo día). O sea: ya incluye hoy, pero del año pasado toma ese día **entero**, no hasta la misma hora. Medido: $431,580.06 ÷ $363,697.50 − 1 = 18.66 %. No se tocó: es SQL. A media mañana lee algo más bajo (un día a medias contra uno entero sobre una base de $360 mil: menos de un punto) y se empareja al cierre.
+
+### Lo que sigue con otro corte
+
+- **Productos**: su «Venta» sale de `switch_articulo_diario`, que llega hasta ayer y trae unidades y costo. Sumarle la venta de hoy rompería unidades y margen. Se queda así.
+- **Vendedoras**, el **Telegram** y la **línea gris de 3 meses**: sin cambio.
+- **La gráfica «Año» (acumulado)** de la computadora y del celular: su serie es por día cerrado.
+- ⚠️ En el celular, si la base de hoy del año pasado no se pudo leer, el número trae hoy y el % queda en días completos **sin decirlo** (así salió el #739). En la computadora sí lo dice.
+- ⚠️ El año se lee al abrir la pantalla y la venta de hoy al volver a ella: entre un sync y otro, el renglón de octubre puede ir unos dólares adelante del total del año hasta recargar.
+
+### Candados
+
+- `multifashion-corte-dia-completo.test.ts` — la regla del 31-jul y, al final, la del 11-oct: una sola cuenta para las dos pantallas, el número y el % medidos, lo que dice su corte, el año sin sumar dos veces y sus caídas.
+- `multifashion-barra-celular.test.ts` — el celular usa `mesConHoy`.
 
 ## Lo que decía CLAUDE.md hasta el 14-sep-2026 (movido acá, verbatim)
 

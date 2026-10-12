@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
 import {
-  baseDeHoyAnioPasado, instanteUnAnioAntes, lineaDeHoy, montoCorto, seccionesDeLaBarra, subtituloHoyAyer, ventaDeHoyParaElMes,
+  baseDeHoyAnioPasado, instanteUnAnioAntes, lineaDeHoy, mesConHoy, montoCorto, seccionesDeLaBarra, subtituloHoyAyer, ventaDeHoyParaElMes,
 } from "@/lib/multifashion/celular";
 import { PESTANAS_MULTIFASHION } from "@/lib/multifashion/pestanas";
 import { graficaDelMes, lineaDeLaGrafica } from "@/lib/multifashion/grafica-mes";
@@ -179,21 +179,31 @@ describe("Multifashion › celular › el número del mes con la venta de hoy", 
 
   it("hoy entra de los DOS lados del % o de ninguno; la proyección y el promedio siguen en días completos", () => {
     const inicio = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/celular/InicioCelular.tsx"), "utf8");
-    expect(inicio).toContain("const hastaAhora = ventaHoy != null && prevHoy != null;");
-    expect(inicio).toContain("variacionPct(totales.ventas + (hastaAhora ? ventaHoy : 0), data.yoy.ventas + (hastaAhora ? prevHoy : 0))");
+    // La cuenta es UNA para el celular y la computadora (`mesConHoy`, 11-oct-2026).
+    expect(inicio).toContain("const conHoy = mesConHoy({ ventas: totales.ventas, prev: data.yoy.ventas, ventaHoy, prevHoy });");
+    expect(inicio).toContain("variacionPct(conHoy.ventasPct, conHoy.prevPct)");
+    expect(mesConHoy({ ventas: 26616.22, prev: 14262, ventaHoy: 2140.4, prevHoy: 1268.49 }))
+      .toEqual({ numero: 26616.22 + 2140.4, ventasPct: 26616.22 + 2140.4, prevPct: 14262 + 1268.49, conHoy: true, hastaAhora: true });
+    // Sin la base de hoy del año pasado: el número trae hoy, el % queda en días completos.
+    expect(mesConHoy({ ventas: 26616.22, prev: 14262, ventaHoy: 2140.4, prevHoy: null }))
+      .toEqual({ numero: 26616.22 + 2140.4, ventasPct: 26616.22, prevPct: 14262, conHoy: true, hastaAhora: false });
+    // Sin la venta de hoy: nada cambia, aunque llegue la base.
+    expect(mesConHoy({ ventas: 26616.22, prev: 14262, ventaHoy: null, prevHoy: 1268.49 }))
+      .toEqual({ numero: 26616.22, ventasPct: 26616.22, prevPct: 14262, conHoy: false, hastaAhora: false });
     expect(inicio).toContain("data.is_mes_actual ? totales.proyeccion_cierre : null");
-    expect(inicio).toContain("{montoCorto(totales.ventas + (ventaHoy ?? 0))}");
+    expect(inicio).toContain("{montoCorto(conHoy.numero)}");
     const grafica = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/GraficaDelMes.tsx"), "utf8");
     // La gráfica recibe los MISMOS días: el promedio no ve la venta de hoy.
     expect(grafica).toContain("graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados })");
     // Con la venta de hoy, la barra destacada es la de HOY y el último día completo vuelve al gris.
     expect(grafica).toContain('d.estado === "hoy" && altoHoy != null ? BARRA_HOY_EN_CURSO');
     expect(grafica).toContain('d.estado === "ultimo" && altoHoy != null ? BARRA.venta : BARRA[d.estado]');
-    // Apagado (sin `soloElMes`) no se pide ni se suma nada.
+    // Con los dos interruptores apagados no se pide ni se suma nada; el celular solo depende del suyo.
     const vista = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/MultifashionResumenView.tsx"), "utf8");
-    expect(vista).toContain("useVentaHoy(syncTick, celular?.soloElMes === true)");
-    expect(vista).toContain("const corteDeHoy = celular?.soloElMes ? ventaHoy?.sync.ultimo ?? null : null;");
-    expect(vista).toContain("ventaHoy={celular.soloElMes ? ventaDeHoyParaElMes(");
+    expect(vista).toContain("const sumaHoy = MULTIFASHION_SUMA_HOY_2026_10 || celular?.soloElMes === true;");
+    expect(vista).toContain("useVentaHoy(syncTick, sumaHoy)");
+    expect(vista).toContain("const corteDeHoy = sumaHoy ? ventaHoy?.sync?.ultimo ?? null : null;");
+    expect(vista).toContain("ventaHoy={celular.soloElMes ? hoyDelMes : null}");
   });
 
   it("en la barra el mes va entero, como en Ventas; fuera de la barra sigue corto", () => {

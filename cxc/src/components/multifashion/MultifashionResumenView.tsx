@@ -54,7 +54,7 @@ import { ROTULO_ESTE_MES, ROTULO_VENTANA } from "@/lib/multifashion/patrones";
 import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
 import { diasSinVenta } from "@/lib/multifashion/resumen-minimo";
 import { ResumenMinimo, TarjetaAnio } from "./ResumenMinimo";
-import { MULTIFASHION_CELULAR, baseDeHoyAnioPasado, ventaDeHoyParaElMes, type ClaveRenglon, type PantallaCelular } from "@/lib/multifashion/celular";
+import { MULTIFASHION_CELULAR, MULTIFASHION_SUMA_HOY_2026_10, anioConHoy, baseDeHoyAnioPasado, ventaDeHoyParaElMes, type ClaveRenglon, type PantallaCelular } from "@/lib/multifashion/celular";
 import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
 import useSWR from "swr";
 import type { CortePeriodo, Periodo } from "@/lib/multifashion/periodo";
@@ -396,11 +396,14 @@ export function MultifashionResumenView({
     : null;
   const metaAtrasada = useMetaQueNoLlega(MULTIFASHION_APPLE_2026_10);
   // 🔴 `MULTIFASHION_BARRA_2026_10`: la venta de hoy, la MISMA petición del
-  // renglón «Hoy» del shell (misma clave de SWR). Solo el celular con el interruptor.
-  const { data: ventaHoy } = useVentaHoy(syncTick, celular?.soloElMes === true);
+  // renglón «Hoy» del shell (misma clave de SWR).
+  // 🔴 `MULTIFASHION_SUMA_HOY_2026_10`: la computadora y «Año» suman hoy con
+  // ESTAS mismas lecturas y las mismas caídas al número de días completos.
+  const sumaHoy = MULTIFASHION_SUMA_HOY_2026_10 || celular?.soloElMes === true;
+  const { data: ventaHoy } = useVentaHoy(syncTick, sumaHoy);
   // El mismo día del año pasado hasta la hora de ESE sync: la clave lleva la hora,
   // así un sync nuevo vuelve a pedirlo y los dos lados nunca quedan desfasados.
-  const corteDeHoy = celular?.soloElMes ? ventaHoy?.sync.ultimo ?? null : null;
+  const corteDeHoy = sumaHoy ? ventaHoy?.sync?.ultimo ?? null : null;
   const { data: comparativoHoy } = useSWR<{ fecha?: string; corte?: string | null; ventasPrev?: number | null }>(
     corteDeHoy ? ["multifashion-comparativo-hoy", corteDeHoy] : null,
     async () => {
@@ -410,6 +413,17 @@ export function MultifashionResumenView({
     },
     { revalidateOnFocus: false, dedupingInterval: 60_000 },
   );
+  const prevHoy = baseDeHoyAnioPasado({ corteDeHoy, fechaDeHoy: ventaHoy?.fecha, comparativo: comparativoHoy });
+  const hoyDelMes = data ? ventaDeHoyParaElMes({
+    esMesActual: data.is_mes_actual, anio: year, mes, diaActual: data.dia_actual, hoy: ventaHoy,
+  }) : null;
+  // El mes en curso con hoy dentro del año: lo leen «Año» del celular y «Mes a mes».
+  // El total del año no cambia: ya traía hoy (ver `anioConHoy`).
+  const overviewHoy = useMemo(
+    () => (MULTIFASHION_SUMA_HOY_2026_10 ? anioConHoy(overview, year, ventaHoy, prevHoy) : overview),
+    [overview, year, ventaHoy, prevHoy],
+  );
+  const anioTraeHoy = overviewHoy !== overview;
   const atencion = MULTIFASHION_APPLE_2026_10 ? (
     <AtencionMultifashion
       tiendaAbrio={tiendaAbrio}
@@ -449,10 +463,10 @@ export function MultifashionResumenView({
             <AnioCelular
               tarjeta={MULTIFASHION_APPLE_2026_10 ? (
                 <>
-                  <AnioGrande overview={overview} year={year} />
-                  <MesesDelAnio overview={overview} year={year} onAbrirMes={celular.onAbrirMes} />
+                  <AnioGrande overview={overviewHoy} year={year} />
+                  <MesesDelAnio overview={overviewHoy} year={year} onAbrirMes={celular.onAbrirMes} />
                 </>
-              ) : <TarjetaAnio overview={overview} year={year} isClosedYear={isClosedYear} />}
+              ) : <TarjetaAnio overview={overviewHoy} year={year} isClosedYear={isClosedYear} />}
               acumulado={
                 <CumulativeChartCard
                   chart={cumChart}
@@ -472,10 +486,8 @@ export function MultifashionResumenView({
               onAbrir={celular.onAbrir}
               atencion={atencion}
               soloElMes={celular.soloElMes}
-              ventaHoy={celular.soloElMes ? ventaDeHoyParaElMes({
-                esMesActual: data.is_mes_actual, anio: year, mes, diaActual: data.dia_actual, hoy: ventaHoy,
-              }) : null}
-              prevHoy={baseDeHoyAnioPasado({ corteDeHoy, fechaDeHoy: ventaHoy?.fecha, comparativo: comparativoHoy })}
+              ventaHoy={celular.soloElMes ? hoyDelMes : null}
+              prevHoy={prevHoy}
             />
           )}
         </div>
@@ -485,10 +497,12 @@ export function MultifashionResumenView({
         <div className={MULTIFASHION_CELULAR && celular ? "hidden sm:block" : undefined}>
         <ResumenMinimo
           data={data}
-          overview={overview}
+          overview={overviewHoy}
           year={year}
           mes={mes}
           isClosedYear={isClosedYear}
+          ventaHoy={MULTIFASHION_SUMA_HOY_2026_10 ? hoyDelMes : null}
+          prevHoy={prevHoy}
           grafico={
             <ChartMesAnioMount
               chartView={chartView}
@@ -501,15 +515,17 @@ export function MultifashionResumenView({
               prevYear={prevYear}
               data={data}
               avisoTiendaAbrio={MULTIFASHION_APPLE_2026_10 ? null : tiendaAbrio}
+              ventaHoy={MULTIFASHION_SUMA_HOY_2026_10 ? hoyDelMes : null}
             />
           }
           atencion={atencion}
           mesAMes={
             <ComparativoInteranualCard
-              meses={overview.retail.meses}
+              meses={overviewHoy.retail.meses}
               year={year}
               diaActual={data.dia_actual}
-              totalAnio={overview.retail.ytdVentas}
+              totalAnio={overviewHoy.retail.ytdVentas}
+              conHoy={anioTraeHoy}
             />
           }
         />
@@ -714,13 +730,15 @@ function TarjetasDelMes({
 // midiéndose sobre los meses comparables — con una línea que dice sobre
 // cuántos, cuando no son todos. Regla en `lib/multifashion/fila-anio.ts`.
 function ComparativoInteranualCard({
-  meses, year, diaActual, totalAnio,
+  meses, year, diaActual, totalAnio, conHoy = false,
 }: {
   meses: RetailMonthly[];
   year: number;
   diaActual: number;
   /** El MISMO número de la tarjeta «Año» (`overview.retail.ytdVentas`). */
   totalAnio: number;
+  /** `MULTIFASHION_SUMA_HOY_2026_10`: el renglón del mes en curso trae la venta de hoy (`anioConHoy`). */
+  conHoy?: boolean;
 }) {
   const prevYear = year - 1;
   const filas = meses
@@ -798,6 +816,7 @@ function ComparativoInteranualCard({
         <h4 className="font-display text-sm font-semibold text-gray-950">Mes a mes vs {prevYear}</h4>
         <p className="mt-0.5 text-xs text-gray-400">
           Retail (sin mayoreo) · mismo corte
+          {conHoy && ` · el mes en curso incluye la venta de hoy, contra ${prevYear} hasta la misma hora`}
         </p>
       </div>
       <div className={cn(GRID, "border-b border-gray-200 bg-gray-50 py-2 text-xs font-medium uppercase tracking-[0.04em] text-gray-500")}>
@@ -813,7 +832,7 @@ function ComparativoInteranualCard({
         <div key={f.label} data-fila="mes" className={cn(GRID, "border-t border-gray-100 py-2 text-sm")}>
           <span data-col="mes" className="capitalize text-gray-700">
             {f.label}
-            {f.parcial ? <span className="ml-1 text-xs text-gray-400">d{diaActual}</span> : null}
+            {f.parcial ? <span className="ml-1 text-xs text-gray-400">{conHoy ? "hoy" : `d${diaActual}`}</span> : null}
           </span>
           <span data-col="actual" className="text-right tabular-nums text-gray-950">{fmtMoney(f.v)}</span>
           <span data-col="previo" className="text-right tabular-nums text-gray-500">
@@ -987,8 +1006,10 @@ function LineaPatron({
 // vivía en Overview). Un solo gráfico con switch.
 function ChartMesAnioMount({
   chartView, setChartView, cumChart, mesMapAct, mesMapPrev, year, mes, prevYear, data,
-  avisoTiendaAbrio = null,
+  avisoTiendaAbrio = null, ventaHoy = null,
 }: {
+  /** `MULTIFASHION_SUMA_HOY_2026_10`: la barra de «Hoy», como en el celular. */
+  ventaHoy?: number | null;
   mes: number;
   chartView: "mes" | "anio";
   setChartView: (v: "mes" | "anio") => void;
@@ -1039,6 +1060,7 @@ function ChartMesAnioMount({
                 esMesActual={is_mes_actual}
                 diaActual={data.dia_actual}
                 feriados={data.feriados ?? null}
+                ventaHoy={ventaHoy}
               />
               {avisoTiendaAbrio && (
                 <p data-aviso="tienda-abrio" className="mt-2 text-xs font-medium text-amber-700">{avisoTiendaAbrio}</p>

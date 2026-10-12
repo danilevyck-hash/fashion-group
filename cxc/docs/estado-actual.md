@@ -2532,6 +2532,8 @@ Publicado y prendido (`MULTIFASHION_BARRA_2026_10`). Daniel: *«dale aprobado, t
 
 **Pendiente de Daniel:**
 
-- La computadora, Productos y «Año 2026» siguen mostrando el mes **sin** la venta de hoy, y la computadora conserva la línea gris de 3 meses. Falta decidir si se alinean con el celular.
+- ✅ **La computadora y «Año 2026» ya suman hoy** (Daniel, 11-oct-2026: *«sí, que la computadora también sume hoy»*; `MULTIFASHION_SUMA_HOY_2026_10`, prendido). El número trae hoy, las tasas siguen sobre días completos y lo dicen, y el % va hasta la misma hora. El total del año ya traía hoy; lo que se alineó fue su renglón de octubre. 📄 Postmortem › «La computadora también suma hoy (11-oct-2026)».
+- Productos sigue hasta ayer **a propósito** (su tabla trae unidades y costo, y llega hasta ayer). La computadora conserva la línea gris de 3 meses: falta decidir.
+- El % del año compara contra el mismo día del año pasado **entero**, no hasta la misma hora. Cambiarlo es SQL: pide su «sí».
 - Las lecturas de «Últimos 12 meses» deberían pasar a un procedimiento en la base. Hoy se leen una vez al día. Pide su «sí» al SQL.
 

@@ -67,16 +67,29 @@ export interface EntradaComparativos {
   mesAnterior: { ventas: number; tiene_data: boolean };
   year: number;
   mes: number;
+  /**
+   * `MULTIFASHION_SUMA_HOY_2026_10`: el número de al lado trae la venta de hoy
+   * (`mesConHoy`). El % contra el año pasado va con hoy de los dos lados
+   * (`hastaAhora`); lo que sigue sobre días completos lo DICE: «, al día 10».
+   */
+  conHoy?: { ventasPct: number; prevPct: number; hastaAhora: boolean; diaCorte: number } | null;
+}
+
+/** «al día 10»: el corte de lo que NO trae la venta de hoy. El día 1 no hay días completos. */
+export function alDiaCompleto(diaCorte: number): string {
+  return diaCorte > 0 ? `al día ${diaCorte}` : "sin contar hoy";
 }
 
 /** «▲ +25.0% vs sep 2025 · ▼ −22.0% vs agosto». Sin base, «n/a vs …». */
-export function comparativosDelMes(e: EntradaComparativos): { yoy: string; mom: string; texto: string } {
-  const dYoy = e.yoy.tiene_data ? variacionPct(e.ventas, e.yoy.ventas) : null;
+export function comparativosDelMes(e: EntradaComparativos): { yoy: string; mom: string; texto: string; dYoy: number | null; dMom: number | null } {
+  const h = e.conHoy ?? null;
+  const dYoy = e.yoy.tiene_data ? variacionPct(h ? h.ventasPct : e.ventas, h ? h.prevPct : e.yoy.ventas) : null;
   const dMom = e.mesAnterior.tiene_data ? variacionPct(e.ventas, e.mesAnterior.ventas) : null;
   const mesPrev = e.mes === 1 ? 12 : e.mes - 1;
-  const yoy = `${fmtDeltaRetail(dYoy)} vs ${MES_CORTO[e.mes - 1]} ${e.year - 1}`;
-  const mom = `${fmtDeltaRetail(dMom)} vs ${MES_LARGO[mesPrev - 1]}`;
-  return { yoy, mom, texto: `${yoy} · ${mom}` };
+  const corte = h ? `, ${alDiaCompleto(h.diaCorte)}` : "";
+  const yoy = `${fmtDeltaRetail(dYoy)} vs ${MES_CORTO[e.mes - 1]} ${e.year - 1}${h && !h.hastaAhora ? corte : ""}`;
+  const mom = `${fmtDeltaRetail(dMom)} vs ${MES_LARGO[mesPrev - 1]}${corte}`;
+  return { yoy, mom, texto: `${yoy} · ${mom}`, dYoy, dMom };
 }
 
 // ─── «Cierra en», por temporada ─────────────────────────────────────────────
