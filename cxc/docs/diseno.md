@@ -42,6 +42,9 @@
 Daniel, 2-oct-2026: *«cada vez que encontramos algo así de detalle, para que siga esa línea»*. Cuando aparece un detalle en un módulo, se escribe aquí y **se revisa en qué otros módulos pasa lo mismo**.
 
 - **El logo o título va en la misma línea que «← Volver/Inicio»**. No se le dedica una franja propia. Lo primero que se ve tiene que ser el contenido: fotos, lista o tabla.
+- **Liquid glass donde Apple lo usa** (Daniel, 2-oct-2026): los menús desplegables, las hojas que suben, el botón ☰ y la barra fija de abajo llevan fondo translúcido con desenfoque, borde fino y sombra suave. Se hace con una sola clase compartida y, si el navegador no lo soporta, el fondo pasa a blanco sólido.
+- **Nada se desliza de lado en el celular**: ninguna pantalla puede ser más ancha que 390 px. Las tablas pasan a fichas y los textos largos bajan de línea.
+- **Cada pantalla se revisa renglón por renglón**: controles segmentados del mismo alto, nada solo en una fila si cabe al lado de otra cosa, nada cortado y el «···» solo con lo ocasional.
 - **Nunca dos veces la misma marca o logo en pantalla.** Pasó en Reebok, con un logo arriba y otro en el encabezado.
 - **Nunca dos veces la misma palabra seguida.** Por ejemplo, el rótulo «Marca» encima de un desplegable que dice «Seleccionar marca»: o el rótulo, o el texto del desplegable.
 - **Nombres de personas como se escriben: «Daniel Levy»**, nunca «DANIEL LEVY». La capitalización se hace en pantalla, sin tocar el dato.

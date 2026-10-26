@@ -24,7 +24,7 @@
 //     cliente_switch_id ni vendedor_switch_id: escribir ahí el mostrador
 //     volvería a poner el default silencioso que este cambio vino a sacar,
 //   · ni siquiera consulta el mostrador ni el vendedor DEFAULT,
-//   · el aviso a Telegram PIDE el paso que falta,
+//   · no manda Telegram (26-oct-2026, Daniel: el aviso del link se retiró),
 //   · sigue cerrando la sesión de Switch en el finally (hoy no abre ninguna,
 //     pero la higiene se conserva por si mañana vuelve a haber un camino).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -209,12 +209,10 @@ describe("confirmar del link — NO sale solo a Switch (las 3 marcas)", () => {
       expect(mainDb.chainsFor("fg_catalogo_publico_switch")).toHaveLength(0);
     });
 
-    it(`${m.marca}: el aviso a Telegram PIDE el paso que falta`, async () => {
+    it(`${m.marca}: confirmar sin piezas cortas no manda Telegram (26-oct-2026)`, async () => {
       seed(m);
       await confirmar(m.marca);
-      const avisos = mockTelegram.mock.calls.map((c) => String(c[0]));
-      expect(avisos.some((a) => a.includes("Falta asignar el cliente y enviarlo a Switch"))).toBe(true);
-      expect(avisos.some((a) => a.includes("Entra a Switch como Contado"))).toBe(false);
+      expect(mockTelegram).not.toHaveBeenCalled();
     });
 
     it(`${m.marca}: si el post-conversión falla, la confirmación igual responde 200`, async () => {

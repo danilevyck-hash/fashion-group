@@ -197,7 +197,6 @@ export interface MarcaConfig {
   upload: { roles: string[]; storage: "marca" | "main"; pathPrefix: string };
 
   // ── Presentación / mensajes ──
-  telegramEmoji: string;
   /** Nombre del directorio Switch en mensajes de error (clientes-switch). */
   switchDirectorioLabel: string;
   sendOrder: {
@@ -309,7 +308,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     // suma su 'cliente' legacy (quirk heredado, no es un rol del sistema).
     createRoles: [...pedidoRoles(), ROL_LEGACY_CLIENTE],
     upload: { roles: catalogoAdminRoles(), storage: "marca", pathPrefix: STORAGE_PREFIX.reebok },
-    telegramEmoji: "🛒",
     switchDirectorioLabel: "Active Shoes",
     sendOrder: {
       from: "Reebok Panama <pedidos@fashiongr.com>",
@@ -410,7 +408,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     exportCols: "origen, cliente, vendor, items, created_at",
     createRoles: pedidoRoles(),
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.joybees },
-    telegramEmoji: "🐝",
     switchDirectorioLabel: "Joystep",
     sendOrder: {
       from: "Joybees Panama <pedidos@fashiongr.com>",
@@ -494,7 +491,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     exportCols: "origen, cliente, vendor, items, created_at",
     createRoles: pedidoRoles(),
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.tommy },
-    telegramEmoji: "🔵",
     switchDirectorioLabel: "Fashion Shoes",
     sendOrder: {
       from: "Tommy Hilfiger Panama <pedidos@fashiongr.com>",
@@ -580,7 +576,6 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     exportCols: "origen, cliente, vendor, items, created_at",
     createRoles: pedidoRoles(),
     upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.calvin },
-    telegramEmoji: "⚫",
     switchDirectorioLabel: "Vistana International",
     sendOrder: {
       from: "Calvin Klein Panama <pedidos@fashiongr.com>",

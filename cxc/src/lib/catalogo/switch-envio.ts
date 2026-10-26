@@ -42,10 +42,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { resolverLineas, resumirPedido } from "./lineas-pedido";
-import { avisoPedidoEnviado } from "./telegram-pedido";
+import { resolverLineas } from "./lineas-pedido";
 import { shortError } from "@/lib/telegram";
-import { enviarNegocioPrivado, enviarSistema } from "@/lib/alertas/canal";
+import { enviarSistema } from "@/lib/alertas/canal";
 import {
   createSwitchClient,
   SwitchApiError,
@@ -482,22 +481,8 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
     }
   }
 
-  // Mismo cuerpo que el aviso de creación (armador único en telegram-pedido.ts):
-  // referencias · bultos · piezas · monto salen de las MISMAS líneas resueltas
-  // que se acaban de enviar — no se recalcula nada.
-  const resumen = resumirPedido([...lineasResueltas.values()]);
-  await enviarNegocioPrivado(
-    avisoPedidoEnviado({
-      label: p.marcaLabel,
-      numero: p.orderNumber,
-      cliente: p.clienteNombre || `cliente ${p.clienteId}`,
-      total: resumen.total,
-      piezas: resumen.piezas,
-      numeroSwitch: numeroInterno,
-      verificado,
-      documento,
-    }),
-  );
+  // 🔴 Sin aviso de Telegram por envío exitoso (26-oct-2026, Daniel). Los de
+  // falla y ambiguo, arriba, siguen yendo a SISTEMA.
 
   return { kind: "ok", numeroInterno, pedidoSwitchId, verificado, warnings: textosDeAvisos(avisos), documento };
 }
