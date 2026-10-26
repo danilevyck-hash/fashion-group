@@ -127,10 +127,7 @@ describe("🔴 LA ADVERTENCIA — lo único que no se puede dejar de decir", () 
     expect(NOTA_COTIZACION).toBe("no aparta mercancía");
     const cot = OPCIONES_DOCUMENTO.find((o) => o.clave === "cotizacion")!;
     expect(cot.nota).toBe(NOTA_COTIZACION);
-    // Y el aviso de Telegram NO la repite: dos líneas, y punto.
-    const tg = SRC("src/lib/catalogo/telegram-pedido.ts");
-    expect(tg).not.toMatch(/extras: \[\s*"No aparta mercancía/);
-    expect(tg).toMatch(/etiquetaDocumento/);
+    // 26-oct-2026: el aviso de Telegram del envío ya no existe (Daniel).
   });
 });
 
@@ -151,8 +148,8 @@ describe("cómo se nombra cada salida en pantalla y en Telegram", () => {
   // 🔴 `etapaTelegram` SE BORRÓ el 25-ago-2026 junto con la etapa deletreada del
   // aviso ("— COTIZACIÓN enviada a Switch"). Lo que el canal necesita para
   // leerse de un vistazo lo da `etiquetaDocumento` («Cotización»/«Pedido») como
-  // PRIMERA palabra del mensaje, más el emoji 📝/📦. El candado de eso vive en
-  // telegram-pedido-origen.test.ts, que compara el mensaje entero.
+  // PRIMERA palabra del mensaje, más el emoji 📝/📦. 26-oct-2026: ese aviso
+  // tampoco se manda ya (Daniel); la etiqueta sigue en pantalla.
   it("la palabra que grita cuál de las dos es sigue existiendo", () => {
     expect(etiquetaDocumento("cotizacion")).toBe("Cotización");
     expect(etiquetaDocumento("pedido")).toBe("Pedido");

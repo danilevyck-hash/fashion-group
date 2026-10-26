@@ -251,7 +251,7 @@ describe("POST /orders — crear con numeración RPC e idempotencia", () => {
     }
   });
 
-  it("reebok: RPC reebok_create_order con p_total por categoría + is_preorder; Telegram al crear", async () => {
+  it("reebok: RPC reebok_create_order con p_total por categoría + is_preorder; sin Telegram (26-oct-2026)", async () => {
     categoryMap = new Map([
       [P1, "footwear"],
       [P2, "apparel"],
@@ -284,8 +284,8 @@ describe("POST /orders — crear con numeración RPC e idempotencia", () => {
     expect(pItems[0].is_preorder).toBe(true);
     expect(pItems[1].is_preorder).toBe(false);
 
-    expect(mockTelegram).toHaveBeenCalledTimes(1);
-    expect(String(mockTelegram.mock.calls[0][0])).toContain("PED-101");
+    // 26-oct-2026 (Daniel): el pedido nuevo ya no avisa por Telegram.
+    expect(mockTelegram).not.toHaveBeenCalled();
   });
 
   it("reebok: retry idempotente (already_created=true) NO re-alerta a Telegram", async () => {
@@ -321,7 +321,7 @@ describe("POST /orders — crear con numeración RPC e idempotencia", () => {
     expect(args.p_total).toBe(300); // 2×12×10 + 1×12×5
     const pItems = args.p_items as Array<Record<string, unknown>>;
     expect(pItems.every((i) => !("is_preorder" in i))).toBe(true);
-    expect(String(mockTelegram.mock.calls[0][0])).toContain("Joybees");
+    expect(mockTelegram).not.toHaveBeenCalled();
   });
 
   it("RPC con error responde 500 'Error interno' — ambas marcas", async () => {

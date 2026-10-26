@@ -53,8 +53,6 @@ import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import { comprobantesRoles, puedeVerPrecioDePedido } from "@/lib/catalogo/roles";
 import { esPedidoDelLink } from "@/lib/catalogo/cliente-elegido";
-import { avisoPedidoDeVendedor } from "@/lib/catalogo/telegram-pedido";
-import { enviarNegocioPrivado } from "@/lib/alertas/canal";
 import {
   errorClienteNoExiste,
   guardarClienteSwitchEnPedido,
@@ -465,22 +463,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     }
   }
 
-  // Telegram solo en creación real (un retry idempotente NO reenvía la alerta).
-  // Este endpoint es SIEMPRE el camino del vendedor: la RPC de creación deja
-  // origen_original en su default 'mio' (el 'link' solo lo escribe la RPC de
-  // conversión del pedido público). Por eso el origen no se lee de la fila.
-  if (!already_created) {
-    await enviarNegocioPrivado(
-      avisoPedidoDeVendedor({
-        emoji: cfg.telegramEmoji,
-        label: cfg.label,
-        cliente: client_name,
-        total,
-        numero: order_number,
-        piezas: resumenPed.piezas,
-      }),
-    );
-  }
+  // 🔴 Sin aviso de Telegram por pedido nuevo (26-oct-2026, Daniel).
 
   // Respuesta compatible con el front (espera order.id para navegar al detalle).
   const { data: order } = await db.from(cfg.ordersTable).select("id, order_number").eq("id", order_id).single();

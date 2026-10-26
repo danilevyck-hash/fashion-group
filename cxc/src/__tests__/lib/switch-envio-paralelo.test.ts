@@ -35,12 +35,13 @@ import { WARNING_SEVERIDAD } from "@/lib/catalogo/switch-prevalidacion";
 import { _resetCachePermisoPrecio } from "@/lib/catalogo/permiso-precio";
 
 vi.mock("@/lib/alertas/canal", () => ({
+  enviarNegocio: vi.fn(async () => true),
   enviarNegocioPrivado: vi.fn(async () => true),
   enviarSistema: vi.fn(async () => true),
 }));
-// Se importa DESPUÉS del mock (vitest iza los `vi.mock`): es el doble, y sirve
-// para leer el texto exacto del aviso que sale al canal.
-import { enviarNegocioPrivado } from "@/lib/alertas/canal";
+// Se importa DESPUÉS del mock (vitest iza los `vi.mock`): son los dobles, y
+// sirven para comprobar que un envío exitoso no manda nada.
+import { enviarNegocio, enviarNegocioPrivado, enviarSistema } from "@/lib/alertas/canal";
 
 // ── Doble de Switch ──────────────────────────────────────────────────────────
 
@@ -593,30 +594,16 @@ describe("🔴 la cotización sale por /apicotizacion/terminar y NADA MÁS cambi
     expect(r.verificado).toBe(false);
   });
 
-  // 🔴 25-ago-2026 — ESTE CANDADO CAMBIÓ DE DIRECCIÓN. Exigía la etapa
-  // deletreada ("COTIZACIÓN enviada a Switch") y la línea de que no aparta
-  // mercancía, o sea que FIJABA justo lo que Daniel podó: *"lo quiero más
-  // simple… solo quiero lo útil"*. Lo que siempre quiso decir —y sigue
-  // exigiendo— es que el aviso DIGA CUÁL DE LAS DOS FUE: hoy lo dicen el emoji
-  // (📝 vs 📦) y la primera palabra, que es lo primero que se ve en el canal.
-  it("🔴 el aviso de Telegram DICE cuál de las dos salió, en dos líneas", async () => {
+  // 🔴 26-oct-2026 (Daniel): un envío EXITOSO ya no manda Telegram, sea
+  // pedido o cotización. Los de falla y ambiguo siguen yendo a SISTEMA.
+  it("🔴 un envío exitoso no manda ningún aviso de Telegram", async () => {
     sembrarArticulo("A", 1);
-    await enviar(["A"], { auto: true, documento: "cotizacion" });
-    const texto = String(vi.mocked(enviarNegocioPrivado).mock.calls.at(-1)![0]);
-    expect(texto.startsWith("📝 Cotización TOM-015 · ")).toBe(true);
-    expect(texto).toContain("16-000000555");
-    expect(texto.split("\n").length).toBe(2);
-    // Lo podado no puede volver por este camino.
-    expect(texto).not.toContain("COTIZACIÓN enviada a Switch");
-    expect(texto).not.toContain("No aparta mercancía");
-    expect(texto).not.toContain("Vendedor:");
-
-    vi.mocked(enviarNegocioPrivado).mockClear();
-    await enviar(["A"], { auto: true }, dbFalso());
-    const otro = String(vi.mocked(enviarNegocioPrivado).mock.calls.at(-1)![0]);
-    expect(otro.startsWith("📦 Pedido TOM-015 · ")).toBe(true);
-    expect(otro).not.toContain("Cotización");
-    expect(otro).not.toContain("No aparta mercancía");
+    const canales = [enviarNegocio, enviarNegocioPrivado, enviarSistema].map((f) => vi.mocked(f));
+    canales.forEach((f) => f.mockClear());
+    const r1 = await enviar(["A"], { auto: true, documento: "cotizacion" });
+    const r2 = await enviar(["A"], { auto: true }, dbFalso());
+    expect([r1.kind, r2.kind]).toEqual(["ok", "ok"]);
+    canales.forEach((f) => expect(f).not.toHaveBeenCalled());
   });
 });
 

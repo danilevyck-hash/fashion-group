@@ -14,8 +14,7 @@ import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
 import { shortError } from "@/lib/telegram";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
-import { avisoPedidoDelLink } from "@/lib/catalogo/telegram-pedido";
-import { enviarNegocio, enviarNegocioPrivado, enviarSistema } from "@/lib/alertas/canal";
+import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -285,23 +284,7 @@ async function handleConfirmar(
         const numero = (data as { order_number?: string })?.order_number;
         if (!numero) throw new Error("RPC sin order_number");
         const ya = !!(data as { already_converted?: boolean })?.already_converted;
-        // Este endpoint es SIEMPRE el camino del LINK: la RPC de conversión
-        // deja origen_original='link' en la fila del pedido. El aviso lo dice
-        // con todas las letras, y además cómo entra a Switch (contado + vendedor
-        // DEFAULT, ver publico-switch-actor) — es lo que lo diferencia del
-        // pedido que mete un vendedor, que sí lleva cliente y vendedor reales.
-        if (!ya) {
-          await enviarNegocioPrivado(
-            avisoPedidoDelLink({
-              emoji: cfg.telegramEmoji,
-              label: cfg.label,
-              cliente: pedido.cliente_nombre,
-              total,
-              numero,
-              piezas: resumenLink.piezas,
-            }),
-          );
-        }
+        // 🔴 Sin aviso de Telegram por pedido del link confirmado (26-oct-2026, Daniel).
         return { numero, yaConvertida: ya };
       },
     };

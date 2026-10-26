@@ -225,7 +225,7 @@ describe("RUTEO REAL — a dónde cae cada uno", () => {
 describe("BARRIDO GLOBAL — nadie llama sendTelegramAlert directo", () => {
   /**
    * Hasta hoy esta regla sólo tenía candados POR ARCHIVO
-   * (asistencia-vigia-hueco, telegram-pedido-origen, monto-guard-candado): tres
+   * (asistencia-vigia-hueco, telegram-pedido-origen —retirado el 26-oct-2026—, monto-guard-candado): tres
    * puntos vigilados de un sistema con más de cien rutas. Y encima seis
    * archivos importaban `sendTelegramAlert` sin usarlo —importación muerta— así
    * que cualquier barrido los habría marcado como falsos positivos. Borradas

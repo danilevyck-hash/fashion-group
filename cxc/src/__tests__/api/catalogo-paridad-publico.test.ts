@@ -12,7 +12,7 @@
 //   · GET 404 si no existe o está soft-deleted; nunca expone `deleted`
 //   · confirmar: idempotente; SIN 409 de stock (25-jul-2026: se quitó el modal
 //     y el aceptar_stock) — confirma directo y devuelve la FOTO del stock
-//     (`stock`) con la cantidad REAL; Telegram SOLO en conversión real
+//     (`stock`) con la cantidad REAL; Telegram solo por piezas cortas
 //
 // Topología de DB ACTUAL (fijada a propósito): las tablas *_pedidos_publicos
 // viven en el proyecto PRINCIPAL (client creado con createClient en el route);
@@ -379,10 +379,10 @@ describe("POST /pedido-publico/[id]/confirmar — auto-conversión del cliente",
     expect(rpcName).toBe("convert_reebok_pedido_publico");
     expect(args.p_short_id).toBe("abc12345");
     expect(args.p_total).toBe(240); // 2×12×10 server-side
-    // 2 avisos: la confirmación + el aviso de piezas faltantes al equipo.
-    expect(mockTelegram).toHaveBeenCalledTimes(2);
-    expect(String(mockTelegram.mock.calls[0][0])).toContain("PED-050");
-    expect(String(mockTelegram.mock.calls[1][0])).toContain("pidió 2 bultos, hay 8 u");
+    // 1 aviso: el de piezas faltantes al equipo. La confirmación ya no avisa
+    // (26-oct-2026, Daniel).
+    expect(mockTelegram).toHaveBeenCalledTimes(1);
+    expect(String(mockTelegram.mock.calls[0][0])).toContain("pidió 2 bultos, hay 8 u");
   });
 
   it("reebok: con stock suficiente confirma directo", async () => {
@@ -447,7 +447,8 @@ describe("POST /pedido-publico/[id]/confirmar — auto-conversión del cliente",
     const [rpcName, args] = joybeesDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
     expect(rpcName).toBe("convert_joybees_pedido_publico");
     expect(args.p_total).toBe(240); // 2×12×10
-    expect(String(mockTelegram.mock.calls[0][0])).toContain("JBP-050");
+    // 26-oct-2026: la confirmación ya no avisa «Pedido JBP-050» por Telegram.
+    expect(mockTelegram.mock.calls.some((c) => String(c[0]).includes("Pedido JBP-050"))).toBe(false);
   });
 
   it("joybees: stock corto confirma igual y devuelve la cantidad REAL (espejo de Reebok)", async () => {
