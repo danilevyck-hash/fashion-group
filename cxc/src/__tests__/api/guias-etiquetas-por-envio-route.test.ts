@@ -31,7 +31,7 @@ vi.mock("@/lib/requireRole", () => ({
 }));
 vi.mock("@/lib/require-auth", () => ({ getSession: () => ({ role: "bodega", userName: "Jorman" }) }));
 vi.mock("@/lib/log-activity", () => ({ logActivity: async () => {} }));
-vi.mock("@/lib/alertas/canal", () => ({ enviarNegocio: async () => {} }));
+vi.mock("@/lib/alertas/canal", () => ({ enviarNegocio: async () => {}, enviarNegocioPrivado: async () => {} }));
 
 // ── La base doblada ─────────────────────────────────────────────────────────
 type Fila = Record<string, unknown>;

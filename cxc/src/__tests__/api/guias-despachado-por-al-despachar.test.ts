@@ -19,7 +19,7 @@ vi.mock("@/lib/requireRole", () => ({
   requireRole: () => ({ role: "bodega", userName: "Bodega" }),
 }));
 vi.mock("@/lib/log-activity", () => ({ logActivity: async () => {} }));
-vi.mock("@/lib/alertas/canal", () => ({ enviarNegocio: async () => {} }));
+vi.mock("@/lib/alertas/canal", () => ({ enviarNegocio: async () => {}, enviarNegocioPrivado: async () => {} }));
 
 const GUIA_ID = "11111111-1111-4111-8111-111111111111";
 

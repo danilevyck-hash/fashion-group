@@ -50,7 +50,7 @@ vi.mock("@/lib/reebok-category-lookup", () => ({
   fetchReebokCategoryMap: vi.fn(async () => new Map<string, string>()),
 }));
 // Telegram: el POST de orders avisa. Nunca debe salir a la red desde el arnés.
-vi.mock("@/lib/alertas/canal", () => ({ enviarNegocio: vi.fn(async () => true) }));
+vi.mock("@/lib/alertas/canal", () => ({ enviarNegocio: vi.fn(async () => true), enviarNegocioPrivado: vi.fn(async () => true) }));
 
 import type { NextRequest, NextResponse } from "next/server";
 import { GET as ordersGet, POST as ordersPost } from "@/app/api/catalogo/[marca]/orders/route";

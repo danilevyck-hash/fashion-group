@@ -35,8 +35,8 @@ const COBROS = ["src/app/api/cron/cobros-del-dia/route.ts"];
 
 /** Todos los demás, con su canal de hoy. */
 const MAPA: Record<string, string[]> = {
-  "src/app/api/catalogo/[marca]/orders/route.ts": [N],
-  "src/app/api/catalogo/[marca]/pedido-publico/[id]/confirmar/route.ts": [N, S],
+  "src/app/api/catalogo/[marca]/orders/route.ts": [A], // 25-oct-2026: pedido nuevo → privado
+  "src/app/api/catalogo/[marca]/pedido-publico/[id]/confirmar/route.ts": [N, A, S], // 25-oct-2026: el link confirmado → privado; «menos piezas» sigue en N
   "src/app/api/cron/acs-resumen-diario/route.ts": [A],
   "src/app/api/cron/asistencia-vigia/route.ts": [S],
   "src/app/api/cron/backup/route.ts": [S],
@@ -47,7 +47,7 @@ const MAPA: Record<string, string[]> = {
   "src/app/api/cron/guias-pendientes/route.ts": [N],
   "src/app/api/cron/reclamos-viejos/route.ts": [N],
   "src/app/api/cron/switch-reconciliacion/route.ts": [N, A, S],
-  "src/app/api/guias/[id]/route.ts": [N],
+  "src/app/api/guias/[id]/route.ts": [A], // 25-oct-2026: guía despachada → privado
   "src/app/api/prestamos/movimientos/route.ts": [A],
   "src/lib/alertas/crons-que-avisan-io.ts": [S],
   "src/lib/alertas/cuadre-costo-io.ts": [S],
@@ -55,7 +55,7 @@ const MAPA: Record<string, string[]> = {
   "src/lib/alertas/silencio-de-datos-io.ts": [S],
   "src/lib/asistencia/mismo-aparato-io.ts": [A],
   "src/lib/campos-obligatorios.ts": [S],
-  "src/lib/catalogo/switch-envio.ts": [N, S],
+  "src/lib/catalogo/switch-envio.ts": [A, S], // 25-oct-2026: enviado a Switch → privado
   "src/lib/catalogos/clasificacion-aviso.ts": [S],
   "src/lib/catalogos/fotos-nuevos.ts": [N],
   "src/lib/cheques-alert.ts": [N, A],

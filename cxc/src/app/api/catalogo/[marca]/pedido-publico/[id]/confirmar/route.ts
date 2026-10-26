@@ -15,7 +15,7 @@ import { disponibleVendible } from "@/lib/catalogos/disponible";
 import { shortError } from "@/lib/telegram";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { avisoPedidoDelLink } from "@/lib/catalogo/telegram-pedido";
-import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
+import { enviarNegocio, enviarNegocioPrivado, enviarSistema } from "@/lib/alertas/canal";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -291,7 +291,7 @@ async function handleConfirmar(
         // DEFAULT, ver publico-switch-actor) — es lo que lo diferencia del
         // pedido que mete un vendedor, que sí lleva cliente y vendedor reales.
         if (!ya) {
-          await enviarNegocio(
+          await enviarNegocioPrivado(
             avisoPedidoDelLink({
               emoji: cfg.telegramEmoji,
               label: cfg.label,

@@ -122,14 +122,14 @@ describe("a. 🔴 EL TIPO: la ruta de Feriados y la pantalla", () => {
   };
 
   it("guarda el tipo con el MISMO upsert; sin tipo es feriado; un tipo raro es 400", async () => {
-    expect((await post({ fecha: "2026-10-20", nombre: "Cierre", tipo: "dia_libre" })).status).toBe(200);
-    expect((await post({ fecha: "2026-10-21", nombre: "Cierre" })).status).toBe(200);
-    expect((await post({ fecha: "2026-10-22", nombre: "Cierre", tipo: "otro" })).status).toBe(400);
+    expect((await post({ fecha: "2099-10-20", nombre: "Cierre", tipo: "dia_libre" })).status).toBe(200);
+    expect((await post({ fecha: "2099-10-21", nombre: "Cierre" })).status).toBe(200);
+    expect((await post({ fecha: "2099-10-22", nombre: "Cierre", tipo: "otro" })).status).toBe(400);
     expect(db.upserts).toEqual([
-      { fecha: "2026-10-20", nombre: "Cierre", tipo: "dia_libre" },
-      { fecha: "2026-10-21", nombre: "Cierre", tipo: "feriado" },
+      { fecha: "2099-10-20", nombre: "Cierre", tipo: "dia_libre" },
+      { fecha: "2099-10-21", nombre: "Cierre", tipo: "feriado" },
     ]);
-    // Una fecha FUTURA no crea deuda al guardarse.
+    // Una fecha FUTURA no crea deuda al guardarse. (2099: con «2026-10-20» la prueba se venció sola el 20-oct-2026.)
     expect(db.insertados).toEqual([]);
   });
 

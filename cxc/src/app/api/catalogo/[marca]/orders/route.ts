@@ -54,7 +54,7 @@ import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import { comprobantesRoles, puedeVerPrecioDePedido } from "@/lib/catalogo/roles";
 import { esPedidoDelLink } from "@/lib/catalogo/cliente-elegido";
 import { avisoPedidoDeVendedor } from "@/lib/catalogo/telegram-pedido";
-import { enviarNegocio } from "@/lib/alertas/canal";
+import { enviarNegocioPrivado } from "@/lib/alertas/canal";
 import {
   errorClienteNoExiste,
   guardarClienteSwitchEnPedido,
@@ -470,7 +470,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   // origen_original en su default 'mio' (el 'link' solo lo escribe la RPC de
   // conversión del pedido público). Por eso el origen no se lee de la fila.
   if (!already_created) {
-    await enviarNegocio(
+    await enviarNegocioPrivado(
       avisoPedidoDeVendedor({
         emoji: cfg.telegramEmoji,
         label: cfg.label,

@@ -45,7 +45,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolverLineas, resumirPedido } from "./lineas-pedido";
 import { avisoPedidoEnviado } from "./telegram-pedido";
 import { shortError } from "@/lib/telegram";
-import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
+import { enviarNegocioPrivado, enviarSistema } from "@/lib/alertas/canal";
 import {
   createSwitchClient,
   SwitchApiError,
@@ -486,7 +486,7 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
   // referencias · bultos · piezas · monto salen de las MISMAS líneas resueltas
   // que se acaban de enviar — no se recalcula nada.
   const resumen = resumirPedido([...lineasResueltas.values()]);
-  await enviarNegocio(
+  await enviarNegocioPrivado(
     avisoPedidoEnviado({
       label: p.marcaLabel,
       numero: p.orderNumber,

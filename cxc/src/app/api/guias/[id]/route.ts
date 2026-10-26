@@ -4,7 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { transportistaLabel } from "@/lib/transportistaLabel";
-import { enviarNegocio } from "@/lib/alertas/canal";
+import { enviarNegocioPrivado } from "@/lib/alertas/canal";
 import { validarEmpresasItems } from "@/lib/guias/validar-items";
 import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
 import {
@@ -35,7 +35,7 @@ interface GuiaForNotify {
   guia_items?: Array<{ cliente?: string | null; empresa?: string | null; bultos?: number | null; deleted?: boolean }> | null;
 }
 
-/** Aviso Telegram al despachar una guía (interno, solo chat de Daniel). No lanza. */
+/** Aviso Telegram al despachar una guía: va al chat PRIVADO de Daniel con trato de negocio (`enviarNegocioPrivado`, 25-oct-2026). No lanza. */
 async function notifyGuiaDespachada(guia: GuiaForNotify): Promise<void> {
   const numero = `GT-${String(guia.numero).padStart(3, "0")}`;
   const transp = transportistaLabel(guia) || "—";
@@ -66,7 +66,7 @@ async function notifyGuiaDespachada(guia: GuiaForNotify): Promise<void> {
   lineas.push("", `Total: ${total} bultos`);
 
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  await enviarNegocio(`<pre>${esc(lineas.join("\n"))}</pre>`, "HTML");
+  await enviarNegocioPrivado(`<pre>${esc(lineas.join("\n"))}</pre>`, "HTML");
 }
 
 // ── GET ──
