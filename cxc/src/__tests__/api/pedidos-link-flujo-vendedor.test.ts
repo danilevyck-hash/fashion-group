@@ -55,6 +55,7 @@ vi.mock("@/lib/switch-api/client", () => ({
 }));
 vi.mock("@/lib/alertas/canal", () => ({
   enviarNegocio: vi.fn(async () => {}),
+  enviarNegocioPrivado: vi.fn(async () => {}),
   enviarSistema: vi.fn(async () => {}),
 }));
 

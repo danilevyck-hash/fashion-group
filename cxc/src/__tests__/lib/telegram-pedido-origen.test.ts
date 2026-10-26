@@ -271,17 +271,17 @@ describe("barrido estático: los emisores usan los builders y el canal de negoci
     expect(s).not.toContain("enviado a Switch →");
   });
 
-  it("la creación del vendedor usa avisoPedidoDeVendedor por enviarNegocio", () => {
+  it("la creación del vendedor usa avisoPedidoDeVendedor por enviarNegocioPrivado", () => {
     const s = src("app/api/catalogo/[marca]/orders/route.ts");
     expect(s).toContain("avisoPedidoDeVendedor(");
-    expect(s).toContain("enviarNegocio(");
+    expect(s).toContain("enviarNegocioPrivado(");
     expect(s).not.toContain("sendTelegramAlert");
   });
 
-  it("la confirmación del link usa avisoPedidoDelLink por enviarNegocio", () => {
+  it("la confirmación del link usa avisoPedidoDelLink por enviarNegocioPrivado", () => {
     const s = src("app/api/catalogo/[marca]/pedido-publico/[id]/confirmar/route.ts");
     expect(s).toContain("avisoPedidoDelLink(");
-    expect(s).toContain("enviarNegocio(");
+    expect(s).toContain("enviarNegocioPrivado(");
     expect(s).not.toContain("sendTelegramAlert");
   });
 

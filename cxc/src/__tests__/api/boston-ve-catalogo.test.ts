@@ -79,7 +79,7 @@ vi.mock("@/lib/switch-api/client", async (orig) => ({
 vi.mock("@/lib/reebok-category-lookup", () => ({
   fetchReebokCategoryMap: vi.fn(async () => new Map<string, string>()),
 }));
-vi.mock("@/lib/alertas/canal", () => ({ enviarNegocio: vi.fn(async () => true), enviarSistema: vi.fn(async () => true) }));
+vi.mock("@/lib/alertas/canal", () => ({ enviarNegocio: vi.fn(async () => true), enviarNegocioPrivado: vi.fn(async () => true), enviarSistema: vi.fn(async () => true) }));
 vi.mock("@/lib/rechazos-de-switch", () => ({ lineaDeRechazos: async () => null }));
 
 import type { NextRequest, NextResponse } from "next/server";

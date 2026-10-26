@@ -35,12 +35,12 @@ import { WARNING_SEVERIDAD } from "@/lib/catalogo/switch-prevalidacion";
 import { _resetCachePermisoPrecio } from "@/lib/catalogo/permiso-precio";
 
 vi.mock("@/lib/alertas/canal", () => ({
-  enviarNegocio: vi.fn(async () => true),
+  enviarNegocioPrivado: vi.fn(async () => true),
   enviarSistema: vi.fn(async () => true),
 }));
 // Se importa DESPUÉS del mock (vitest iza los `vi.mock`): es el doble, y sirve
 // para leer el texto exacto del aviso que sale al canal.
-import { enviarNegocio } from "@/lib/alertas/canal";
+import { enviarNegocioPrivado } from "@/lib/alertas/canal";
 
 // ── Doble de Switch ──────────────────────────────────────────────────────────
 
@@ -602,7 +602,7 @@ describe("🔴 la cotización sale por /apicotizacion/terminar y NADA MÁS cambi
   it("🔴 el aviso de Telegram DICE cuál de las dos salió, en dos líneas", async () => {
     sembrarArticulo("A", 1);
     await enviar(["A"], { auto: true, documento: "cotizacion" });
-    const texto = String(vi.mocked(enviarNegocio).mock.calls.at(-1)![0]);
+    const texto = String(vi.mocked(enviarNegocioPrivado).mock.calls.at(-1)![0]);
     expect(texto.startsWith("📝 Cotización TOM-015 · ")).toBe(true);
     expect(texto).toContain("16-000000555");
     expect(texto.split("\n").length).toBe(2);
@@ -611,9 +611,9 @@ describe("🔴 la cotización sale por /apicotizacion/terminar y NADA MÁS cambi
     expect(texto).not.toContain("No aparta mercancía");
     expect(texto).not.toContain("Vendedor:");
 
-    vi.mocked(enviarNegocio).mockClear();
+    vi.mocked(enviarNegocioPrivado).mockClear();
     await enviar(["A"], { auto: true }, dbFalso());
-    const otro = String(vi.mocked(enviarNegocio).mock.calls.at(-1)![0]);
+    const otro = String(vi.mocked(enviarNegocioPrivado).mock.calls.at(-1)![0]);
     expect(otro.startsWith("📦 Pedido TOM-015 · ")).toBe(true);
     expect(otro).not.toContain("Cotización");
     expect(otro).not.toContain("No aparta mercancía");
