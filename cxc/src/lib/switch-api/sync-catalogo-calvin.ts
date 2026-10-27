@@ -32,6 +32,7 @@ import { normalizarBultoPzas } from "@/lib/calvin-bulto";
 import { calvinServer } from "@/lib/calvin-supabase-server";
 import { buildCalvinDerivedFields } from "@/lib/calvin-nombres";
 import type { SwitchArticulo } from "./client";
+import { filtroDeMarca } from "./catalogo-marca-por-nombre";
 
 /**
  * Piezas por bulto SEGÚN SWITCH (`cantidadPorCaja`).
@@ -123,6 +124,9 @@ export async function syncCatalogoCalvin(
       productsTable: "calvin_products",
       empresas: EMPRESAS,
       articuloFilter: isCalvinArticulo, // solo marcaId 8 (CK FOOTWEAR en vistana)
+      // 27-oct-2026: la marca se reconoce por su NOMBRE («CK FOOTWEAR»), porque Switch
+      // repite la marca en cada importación. Falla abierta al id CALVIN_MARCA_ID.
+      filtroDeLaCorrida: (arts, client) => filtroDeMarca(arts, client, "CK FOOTWEAR", CALVIN_MARCA_ID),
       // sin inventoryTable: el stock vive en el producto (patrón Joybees/Tommy)
       stockFields: (existencia, disponibilidad) => ({ existencia, disponibilidad, stock: existencia }),
       // Las columnas que el UPDATE escribe además de price/name/active, para
