@@ -31,6 +31,7 @@ import { normalizarBultoPzas } from "@/lib/tommy-bulto";
 import { tommyServer } from "@/lib/tommy-supabase-server";
 import { buildTommyDerivedFields } from "@/lib/tommy-nombres";
 import type { SwitchArticulo } from "./client";
+import { filtroDeMarca } from "./catalogo-marca-por-nombre";
 
 /**
  * Piezas por bulto SEGÚN SWITCH (`cantidadPorCaja`).
@@ -125,6 +126,9 @@ export async function syncCatalogoTommy(
       productsTable: "tommy_products",
       empresas: EMPRESAS,
       articuloFilter: isTommyArticulo, // solo marcaId 3 (excluye basura marketing/ajustes)
+      // 27-oct-2026: la marca se reconoce por su NOMBRE («TH FOOTWEAR»), porque Switch
+      // repite la marca en cada importación. Falla abierta al id TOMMY_MARCA_ID.
+      filtroDeLaCorrida: (arts, client) => filtroDeMarca(arts, client, "TH FOOTWEAR", TOMMY_MARCA_ID),
       // sin inventoryTable: el stock vive en el producto (patrón Joybees)
       stockFields: (existencia, disponibilidad) => ({ existencia, disponibilidad, stock: existencia }),
       // Las columnas que el UPDATE escribe además de price/name/active, para

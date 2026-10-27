@@ -352,6 +352,13 @@ export interface CatalogoSyncConfig {
   /** Un artículo entra al catálogo solo si pasa este filtro (Reebok: proveedor;
    *  Joybees: todo). */
   articuloFilter: (a: SwitchArticulo) => boolean;
+  /** Si está, reemplaza a `articuloFilter` en la corrida: se arma con la lista
+   *  ya bajada y el MISMO cliente (misma sesión). Tommy y Calvin lo usan para
+   *  reconocer la marca por su nombre (`catalogo-marca-por-nombre.ts`). */
+  filtroDeLaCorrida?: (
+    arts: readonly SwitchArticulo[],
+    client: ReturnType<typeof createSwitchClient>,
+  ) => Promise<(a: SwitchArticulo) => boolean>;
   /** Tabla de inventario aparte (Reebok). Omitir si el stock vive en el producto
    *  (Joybees usa la columna `stock`). */
   inventoryTable?: string;
@@ -628,7 +635,10 @@ export async function syncCatalogo(
       // Fail-safe sobre la respuesta CRUDA: 0 artículos = Switch falló → no tocar.
       if (artsAll.length === 0) throw new Error("Switch /lista devolvió 0 artículos — no se toca el catálogo");
 
-      const arts = artsAll.filter(config.articuloFilter);
+      const filtro = config.filtroDeLaCorrida
+        ? await config.filtroDeLaCorrida(artsAll, client)
+        : config.articuloFilter;
+      const arts = artsAll.filter(filtro);
 
       // Productos existentes (por categoría, o TODA la tabla si categories=[]).
       // `oculto_manual` (toggle admin, DDL 20260723120000) puede no existir aún:
