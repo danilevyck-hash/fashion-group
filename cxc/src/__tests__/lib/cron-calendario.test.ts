@@ -221,18 +221,31 @@ describe("ventas intradía — cobertura de empresas", () => {
     expect(b2b).toContain("joystep");
   });
 
-  it("ACS (american_classic): las de cada hora + el cierre de las 00:15, nada más", () => {
+  it("ACS (american_classic): las de cada hora + el cierre de las 00:15 + la carga de las 03:00, nada más", () => {
     const acs = ventas
       .filter((e) => e.empresas.includes("american_classic"))
       .map((e) => e.hhmmUtc)
       .sort();
-    expect(acs).toEqual(["0015", ...FACTURAS_CADA_HORA_UTC]);
+    expect(acs).toEqual(["0015", "0300", ...FACTURAS_CADA_HORA_UTC]);
   });
 
-  it("el sync de CIERRE de ACS (00:15) sigue en pie — el resumen de las 00:30 depende de él", () => {
+  it("el sync de CIERRE de ACS (00:15) sigue en pie", () => {
     expect(ventas.some((e) => e.hhmmUtc === "0015" && e.empresas.includes("american_classic"))).toBe(
       true,
     );
+  });
+
+  // 1-nov-2026: la tienda factura después de las 7 p. m. (90 días: última venta
+  // p99 = máx = 21:56 de Panamá). El resumen sale a las 22:15 (03:15 UTC) y la
+  // carga de las 22:00 (03:00 UTC) va justo antes — de ella depende.
+  it("la carga de la noche de ACS (03:00) va justo antes del resumen (03:15)", () => {
+    expect(ventas.filter((e) => e.hhmmUtc === "0300").map((e) => e.empresas)).toEqual([
+      ["american_classic"],
+    ]);
+    const crons = (JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../../vercel.json"), "utf8")) as {
+      crons: { path: string; schedule: string }[];
+    }).crons;
+    expect(crons.find((c) => c.path === "/api/cron/acs-resumen-diario")?.schedule).toBe("15 3 * * *");
   });
 
   it("los saldos de CXC (estadocuenta) NO se tocaron: siguen 16:0x y 21:1x", () => {
@@ -283,8 +296,9 @@ describe("frescura — hueco MÁS LARGO entre dos refrescos consecutivos", () =>
     expect(distanciaCircularMin("1200", "1210")).toBeLessThan(SEPARACION_MINIMA_MIN);
   });
 
-  it("ventas ACS: peor hueco 6h15, de noche (00:15 → 06:30 UTC)", () => {
-    expect(peorHueco("american_classic", VENTAS)).toBeCloseTo(6.25, 5);
+  it("ventas ACS: peor hueco 5h20, de madrugada (06:30 → 11:50 UTC)", () => {
+    // Era 6h15 (00:15 → 06:30) hasta que entró la carga de las 03:00 (1-nov-2026).
+    expect(peorHueco("american_classic", VENTAS)).toBeCloseTo(5 + 20 / 60, 5);
   });
 
   it("pagos (recibos): de 12h20 a 8h35", () => {

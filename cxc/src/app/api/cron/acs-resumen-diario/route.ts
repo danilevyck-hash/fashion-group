@@ -1,10 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/cron/acs-resumen-diario — Resumen de ventas ACS del día a Telegram.
-// Corre 00:30 UTC (19:30 Panamá = 7:30pm), después del sync de cierre de
-// facturas ACS de 00:15 UTC (la tienda cierra 7pm sin más movimiento) → el
-// número de "hoy" ya incluye el día completo de la tienda.
+// Corre 03:15 UTC (22:15 Panamá), después de la carga de facturas ACS de
+// 03:00 UTC (22:00 Panamá) → el número de "hoy" ya incluye el día completo.
 //
-// 🔴 7:30 Y NO 7:00 (Daniel, 6-oct-2026). A las 7:00 p.m. el sync de cierre
+// 🔴 22:15 Y NO 7:30 p.m. (1-nov-2026). La tienda sigue facturando después de
+// las 7: el 31-oct hubo ventas a las 7:16 y 7:27 que el mensaje de las 7:30 no
+// contó. Medido en 90 días (80 días con venta): la última factura del día cae
+// p50 18:35 · p90 19:00 · p99 = máx 21:56 de Panamá. 22:15 queda después de la
+// última venta en todos esos días y antes de la medianoche de Panamá, así que
+// `hoyPanama()` sigue siendo el día que se reporta.
+//
+// Historia: 7:30 Y NO 7:00 (Daniel, 6-oct-2026). A las 7:00 p.m. el sync de cierre
 // todavía no arrancó —corre 15 min después— y la guardia de frescura
 // (`ventasAcsSyncFresco`, que exige un sync arrancado DESPUÉS del cierre de
 // tienda) daría "no fresco": el mensaje saldría SIN la línea de "Hoy". El

@@ -172,7 +172,9 @@ describe("🔴 la medición no se tocó", () => {
     // ⚠️ 8-oct-2026: suben a 93 — las facturas del día corren CADA HORA de 7 a. m.
     // a 6 p. m. de Panamá (9 entradas nuevas) y se retiraron las 3 de solo
     // american_classic de la jornada. Ver `cron-calendario.test.ts`.
-    expect(vercel.crons).toHaveLength(93);
+    // ⚠️ 1-nov-2026: suben a 94 — la carga de facturas de Multifashion de las
+    // 22:00 de Panamá, antes del resumen de la noche (ahora 22:15).
+    expect(vercel.crons).toHaveLength(94);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el
