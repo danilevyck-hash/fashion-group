@@ -65,8 +65,8 @@ export const CRONS_CUYO_TRABAJO_ES_UN_MENSAJE: Readonly<Record<string, string>> 
   "cheques-alert": "el aviso de las 9 de la mañana con los cheques y los recordatorios",
   // 14:30 UTC. Las guías que quedaron sin despachar.
   "guias-pendientes": "el aviso de guías que quedaron sin despachar",
-  // 00:30 UTC = 7:30 p.m. de Panamá, después de que la tienda cierra (7pm) y
-  // del sync de cierre de las 00:15 UTC.
+  // 03:15 UTC = 10:15 p.m. de Panamá (1-nov-2026; era 00:30), después de la
+  // carga de facturas de Multifashion de las 03:00 UTC.
   "acs-resumen-diario": "el resumen de ventas de Multifashion de la noche",
   // Día 1 de cada mes, 13:00 UTC.
   "grupo-resumen-mensual": "el resumen del mes de las 8 empresas",

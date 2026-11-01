@@ -899,6 +899,26 @@ Lo que cubría «s/d año pasado» (la regla única `variacionPct`, base < $100)
 
 Los dos envíos (el cron y la recuperación de `switch-reconciliacion`) usan el mismo `buildMensajeHtml`. Candados: `acs-resumen-diario.test.ts` › «sin venta el día equivalente y sin mayoreo» (el texto entero del 10 y del 11-oct-2026, ancho ≤ 40 columnas) y `multifashion-retail-al-frente.test.tsx` › «la línea del mayoreo YA NO sale».
 
+## 1-nov-2026 — El resumen de la noche sale a las 10:15 p.m., con la carga de las 10:00
+
+**Qué pasaba.** El Telegram de las 7:30 p.m. leía la última carga de facturas, la de las 7:15 p.m. (00:15 UTC), y la tienda sigue facturando después de las 7. El 31-oct quedaron afuera dos ventas, de las 7:16 ($38.40) y las 7:27 ($30.88): el mensaje dijo menos que el resumen mensual del grupo ($66,957 contra $67,026).
+
+**Medido contra producción (1-nov-2026, `switch_facturas`, american_classic, hora de Panamá).**
+
+| Ventana | Días con venta | Última factura p50 | p90 | p99 | Máx | Días con venta después de 7:15 p.m. |
+|---|---|---|---|---|---|---|
+| 90 días | 80 | 18:35 | 19:00 | 21:56 (= máx) | 21:56 (3-oct) | 3 (3-oct, 4-oct, 31-oct) |
+| 365 días (solo retail) | 308 | 18:36 | 19:04 | 20:03 | 21:58 (18-abr) | 22 |
+
+- La factura llega a Switch al instante (una de las 7:14:33 entró en la carga de las 7:15:18). Lo que demora es esperar la próxima carga: cada carga de ACS tarda 7–34 s (30 días, cero fallos).
+- Con 80 días, «después de la última venta en ≥99 % de los días» exige cubrir el máximo (21:56).
+
+**Qué se hizo.**
+- Carga nueva de facturas de solo american_classic a las **22:00 de Panamá** (03:00 UTC, slot `facturas-0300`). Vecinos de american_classic: la de 00:15 UTC (2h45 antes) y `sync-articulo-info` de las 04:00 UTC (60 min después). La de las 7:15 p.m. se queda (refresca la pantalla de la noche).
+- `acs-resumen-diario` pasa a las **22:15 de Panamá** (03:15 UTC): antes de la medianoche, así que `hoyPanama()` sigue siendo el día reportado.
+- La guardia de frescura no cambió (pide una carga posterior a las 7 p.m.). La recuperación de `switch-reconciliacion` sigue en `enviarNegocioPrivado`, con `earlyUtcRun` (ventana desde las 00:00 UTC, que contiene las 03:15). Sin avisos nuevos.
+- 94 entradas de cron (tope de Vercel Pro: 100).
+
 ## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
 
 > Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.

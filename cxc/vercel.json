@@ -322,8 +322,12 @@
       "schedule": "15 0 * * *"
     },
     {
+      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-0300",
+      "schedule": "0 3 * * *"
+    },
+    {
       "path": "/api/cron/acs-resumen-diario",
-      "schedule": "30 0 * * *"
+      "schedule": "15 3 * * *"
     },
     {
       "path": "/api/cron/grupo-resumen-mensual",

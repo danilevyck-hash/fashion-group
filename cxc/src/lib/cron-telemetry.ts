@@ -848,6 +848,11 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync facturas", hhmmUtc: "2300", empresas: CRON_EMPRESAS_VENTAS },
   { cron: "sync-recibos", hhmmUtc: "2315", empresas: CRON_EMPRESAS_RECIBOS },
   { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"] },
+  // Carga de facturas de la NOCHE de Multifashion (1-nov-2026): 22:00 Panamá,
+  // justo antes del resumen de las 22:15. La tienda factura después de las 7
+  // (90 días: última venta p99 = máx = 21:56). A 2h45 de la de 00:15 y a 60 min
+  // de sync-articulo-info (04:00), las dos únicas de american_classic cerca.
+  { cron: "switch-sync facturas", hhmmUtc: "0300", empresas: ["american_classic"] },
   // Guías › Pedidos, CUATRO pasadas de día (6-oct-2026, Daniel): 8:10, 10:40,
   // 1:20 y 3:45 de Panamá, todas dentro de la jornada de bodega, y la pasada de
   // la madrugada (06:10 UTC = 01:10 de Panamá) se apagó: nadie mira el dato a

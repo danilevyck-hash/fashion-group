@@ -249,9 +249,10 @@ describe("2) la regla 2 — un aviso por avería, no uno por día", () => {
     // entrada, estos números cambian solos — y este candado lo dice.
     expect(corridasPorDiaDelPar("vistana", "recibos")).toBe(4);
     // 8-oct-2026: facturas cada hora de 7 a 18 de Panamá → 13 de día + el `all`
-    // de madrugada (+ el cierre de las 00:15 en ACS).
+    // de madrugada (+ el cierre de las 00:15 y la carga de las 03:00 en ACS,
+    // 1-nov-2026, antes del resumen de las 03:15).
     expect(corridasPorDiaDelPar("vistana", "facturas")).toBe(14);
-    expect(corridasPorDiaDelPar("american_classic", "facturas")).toBe(15);
+    expect(corridasPorDiaDelPar("american_classic", "facturas")).toBe(16);
     expect(corridasPorDiaDelPar("vistana", "estadocuenta")).toBe(3);
     expect(corridasPorDiaDelPar("vistana", "utilidad")).toBe(1);
     expect(corridasPorDiaDelPar("fashion_shoes", "catalogo_tommy")).toBe(4);

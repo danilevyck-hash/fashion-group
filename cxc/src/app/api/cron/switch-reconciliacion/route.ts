@@ -456,11 +456,12 @@ const COLATERAL_CRONS: ColateralCron[] = [
     // (10:00/14:00/18:00 UTC = madrugada/mañana Panamá) caen en el día Panamá
     // SIGUIENTE al que quedó sin reportar — ayer es ese día, ya completo en DB
     // (syncFresco=true por ser pasado). Prefijo "(recuperado)" para distinguirlo
-    // del run normal de las 00:30. Solo lee la DB, no toca Switch. Su cron corre
-    // 00:30 UTC, muy antes de la primera pasada (10:00) → sin guard de hora.
+    // del run normal. Solo lee la DB, no toca Switch. Su cron corre 03:15 UTC
+    // (era 00:30 hasta el 1-nov-2026), antes de la primera pasada (10:00) → sin
+    // guard de hora.
     cronName: "acs-resumen-diario",
     label: "acs-resumen",
-    earlyUtcRun: true, // corre 00:30 UTC, antes de la medianoche Panamá
+    earlyUtcRun: true, // corre 03:15 UTC (22:15 Panamá), antes de la medianoche Panamá
     recover: async () => {
       const ayer = panamaDate(-1);
       const resumen = await calcularResumenDiario(ayer, true);
