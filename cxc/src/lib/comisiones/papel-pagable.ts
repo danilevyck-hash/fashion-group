@@ -71,7 +71,7 @@ export function renglonesDelPapel(
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 LO QUE NO SE PAGA NO SALE EN EL PAPEL (6-oct-2026). Con tasa 0 % o la
 // persona en «No pagable», la sección (Ventas o Cobros) no sale en el PDF, el
-// Excel ni el detalle de pantalla, ni su línea del resumen; con las dos fuera,
+// Excel (la pantalla: ver `seccionesDePantalla`), ni su línea del resumen; con las dos fuera,
 // la persona no sale en el papel. 🩸 El PDF de Rodrigo (Vistana, sep) decía
 // «Cobros $8,134 × 0.00% = $0» con la sección entera. Ningún número cambia.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -88,6 +88,26 @@ export function seccionesDelPapel(
 ): SeccionesDelPapel {
   const paga = sePagaComision(vendedor);
   return { ventas: paga && Number(d.tasa_venta) > 0, cobros: paga && Number(d.tasa_cobro) > 0 };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EN PANTALLA, EL NO PAGABLE SE VE COMPLETO (3-nov-2026). Oficina (DEFAULT)
+// y Daniel Levy abrían el detalle VACÍO: la regla de arriba era para el PAPEL.
+// En pantalla manda SOLO la tasa: con 0 % la sección sigue escondida (Rodrigo,
+// cobros). El PDF y el Excel siguen con `seccionesDelPapel`. Ningún número cambia.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Interruptor: `false` = la pantalla usa `seccionesDelPapel`, como antes. */
+export const DETALLE_NO_PAGABLES_EN_PANTALLA = true;
+
+/** Qué secciones dibuja el detalle de PANTALLA de una persona. */
+export function seccionesDePantalla(
+  d: { tasa_venta: number; tasa_cobro: number },
+  vendedor: string,
+  prendido: boolean = DETALLE_NO_PAGABLES_EN_PANTALLA,
+): SeccionesDelPapel {
+  if (!prendido) return seccionesDelPapel(d, vendedor);
+  return { ventas: Number(d.tasa_venta) > 0, cobros: Number(d.tasa_cobro) > 0 };
 }
 
 /** ¿La persona sale en el papel? Con las dos secciones fuera, no. */
