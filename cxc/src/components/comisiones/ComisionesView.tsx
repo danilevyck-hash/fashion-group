@@ -84,6 +84,8 @@ import dynamic from "next/dynamic";
 import { VENDEDORES_RANGO_2026_10, type RangoConsulta } from "@/lib/comisiones/vendedores-rango";
 import { COMISIONES_APPLE_V2_2026_10, type ResumenDelTotal } from "@/lib/comisiones/apple-v2";
 import { ComisionesComputadoraV2, PieComisionesV2 } from "./ComisionesComputadoraV2";
+import { BuscarClienteComisiones } from "./BuscarClienteComisiones";
+import { COMISIONES_BUSCAR_CLIENTE } from "@/lib/comisiones/buscar-cliente";
 
 // Vistas LAZY: solo la que se está mirando descarga su JS, en su propio chunk →
 // fuera del bundle inicial de /comisiones. Skeleton mientras carga.
@@ -282,7 +284,7 @@ export function ComisionesView({
   const pie = v2 && !enCelular ? (
     <PieComisionesV2 mes={mes} empresas={EMPRESAS} syncStale={syncStale} onStale={setSyncStale} />
   ) : undefined;
-  const cuerpo = enConfig && hayConfig ? (
+  const cuerpoLista = enConfig && hayConfig ? (
     <ComisionesConfiguracionView v2={v2} />
   ) : enRango ? (
     <ComisionesVendedoresRango vista={vista} rango={rango!} />
@@ -328,6 +330,10 @@ export function ComisionesView({
       pie={pie}
     />
   );
+  /** «Buscar cliente» (mockup): arriba de la lista, con el período elegido y las 6 empresas. */
+  const cuerpo = COMISIONES_BUSCAR_CLIENTE && conPapel && !enRango && !(enConfig && hayConfig) ? (
+    <BuscarClienteComisiones year={year} mes={mes} empresa={esVistaDeEmpresa(vista) ? vista : null}>{cuerpoLista}</BuscarClienteComisiones>
+  ) : cuerpoLista;
   /** v2: el número grande solo cuando se mira lo que se paga. */
   const resumenVisible = v2 && conPapel && !(enConfig && hayConfig) ? resumen : null;
 

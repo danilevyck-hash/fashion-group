@@ -187,6 +187,8 @@ const PERMITIDOS: Record<string, string> = {
   // así que si alguien le devuelve su lista propia el build se pone ROJO.
 
   // ── Filtros de reporte: no atan a nadie a ningún registro ──
+  "components/comisiones/BuscarClienteComisiones.tsx":
+    "Comisiones › «Buscar cliente» (3-nov-2026): solo LEE las facturas y cobros del cliente en el período; no guarda ni ata a ningún cliente.",
   // 22-sep-2026 · NOTA FECHADA — `ReportePorProyectoView.tsx` salió de esta
   // lista porque el ARCHIVO se retiró (pieza C del rediseño de Marketing:
   // Daniel, «"Por proyecto" se va»). Candado: `marketing-portada-y-cierre`.
