@@ -22,6 +22,10 @@ export interface VentaDoc {
   tipo: string;
   subtotal: number;
   pct_utilidad: number | null;
+  /** Desde la DDL 20261111130000 (v10): identidad estable de la factura, para cambiarle el vendedor. */
+  switch_factura_id?: number | null;
+  /** El vendedor de Switch, SOLO si la factura está cambiada a otro vendedor; null si no. */
+  vendedor_switch?: string | null;
 }
 export interface CobroDoc {
   fecha: string;

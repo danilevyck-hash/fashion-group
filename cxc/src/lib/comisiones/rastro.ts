@@ -45,6 +45,8 @@ export const ACCION_CONFIG_TASA = "config_tasa";
 export const ACCION_CONFIG_CLIENTE_SIN_COMISION = "config_cliente_sin_comision";
 export const ACCION_CONFIG_DESCUENTO = "config_descuento";
 export const ACCION_CONFIG_DESCUENTO_MES = "config_descuento_mes";
+/** 11-nov-2026: la comisión de UNA factura pasa a otro vendedor (o vuelve al de Switch). */
+export const ACCION_CONFIG_VENDEDOR_FACTURA = "config_vendedor_factura";
 
 export type FormatoDescarga = "pdf" | "excel";
 

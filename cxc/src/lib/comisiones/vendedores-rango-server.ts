@@ -8,6 +8,8 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { leerComision } from "./rpc";
 import { EMPRESAS_COMISIONAN } from "./empresas";
 import { aplicarAlias, claveAlias, type AliasVendedor } from "./alias";
+import { COMISIONES_CAMBIAR_VENDEDOR_FACTURA, vendedorConCambio } from "./cambiar-vendedor";
+import { leerCambiosActivosOVacio } from "./cambiar-vendedor-server";
 import { signoVenta } from "@/lib/ventas/tipos-comprobante";
 import {
   comisionDeDetalle,
@@ -62,16 +64,20 @@ async function comisionGrupo(desde: string, hasta: string, m: Map<string, FilaRa
   );
 }
 
-/** Ventas del grupo por (empresa, vendedor): lo facturado, las notas de crédito restan. */
+/** Ventas del grupo por (empresa, vendedor): lo facturado, las notas de crédito restan.
+ *  🔴 El vendedor de una factura cambiada a mano (`comision_factura_vendedor`) manda
+ *  aquí igual que en la RPC v10 (`vendedorConCambio`); con el interruptor apagado se
+ *  lee el de Switch, como siempre. */
 async function ventasGrupo(desde: string, hasta: string, m: Map<string, FilaRango>) {
-  const [alias, facturas] = await Promise.all([
+  const [alias, cambios, facturas] = await Promise.all([
     supabaseServer.from("comision_vendedor_alias").select("nombre_switch, vendedor_canonico"),
-    leerTodoPaginado<{ empresa_key: string; vendedor_nombre: string | null; tipo_comprobante: string; subtotal_descuento: number }>(
+    COMISIONES_CAMBIAR_VENDEDOR_FACTURA ? leerCambiosActivosOVacio(EMPRESAS_COMISIONAN) : new Map<string, string>(),
+    leerTodoPaginado<{ empresa_key: string; switch_factura_id: number | null; vendedor_nombre: string | null; tipo_comprobante: string; subtotal_descuento: number }>(
       "switch_facturas (vendedores por rango)",
       (pedirCount, a, b) =>
         supabaseServer
           .from("switch_facturas")
-          .select("empresa_key, vendedor_nombre, tipo_comprobante, subtotal_descuento", pedirCount ? { count: "exact" } : {})
+          .select("empresa_key, switch_factura_id, vendedor_nombre, tipo_comprobante, subtotal_descuento", pedirCount ? { count: "exact" } : {})
           .in("empresa_key", EMPRESAS_COMISIONAN as unknown as string[])
           .gte("fecha", inicioPanama(desde))
           .lt("fecha", inicioPanama(sumarDias(hasta, 1)))
@@ -82,7 +88,10 @@ async function ventasGrupo(desde: string, hasta: string, m: Map<string, FilaRang
   if (alias.error) throw new Error(`alias de vendedor: ${alias.error.message}`);
   const lista = (alias.data ?? []) as AliasVendedor[];
   for (const f of facturas) {
-    const vendedor = aplicarAlias(f.vendedor_nombre, lista);
+    const vendedor = vendedorConCambio(
+      { empresa_key: f.empresa_key, switch_factura_id: f.switch_factura_id, vendedor: aplicarAlias(f.vendedor_nombre, lista) },
+      cambios,
+    );
     if (!vendedor) continue;
     sumarEn(m, f.empresa_key, vendedor, signoVenta(f.tipo_comprobante) * Number(f.subtotal_descuento ?? 0), 0);
   }

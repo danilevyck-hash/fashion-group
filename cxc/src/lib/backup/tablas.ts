@@ -124,6 +124,8 @@ export const TABLAS_PERSONAS = [
 
   // ── Comisiones (la configuración que decide a quién se le paga)
   "comision_exclusion",
+  // 11-nov-2026: la comisión de UNA factura pasada a otro vendedor, a mano.
+  "comision_factura_vendedor",
   "comision_vendedor_alias",
   "comision_vendedor_tasa",
   "comision_descuentos_fijos",

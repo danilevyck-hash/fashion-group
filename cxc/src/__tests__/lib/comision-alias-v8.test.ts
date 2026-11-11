@@ -495,7 +495,7 @@ describe("🔴 leerComision: v8 después de la v9, y dice si el alias ya está a
     expect(r.data?.version).toBe("v8");
     expect(r.data?.alias_aplicado).toBe(true);
     expect(r.data?.exclusiones_aplicadas).toBe(true);
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v9", "comision_b2b_v8"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v10", "comision_b2b_v9", "comision_b2b_v8"]);
   });
 
   it("sin la DDL: cae a la v7 y lo confiesa (version = v7, alias_aplicado = false)", async () => {
@@ -506,7 +506,7 @@ describe("🔴 leerComision: v8 después de la v9, y dice si el alias ya está a
     expect(r.data?.version).toBe("v7");
     expect(r.data?.alias_aplicado).toBe(false);
     expect(r.data?.exclusiones_aplicadas).toBe(true);
-    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7"]);
+    expect(rpcCalls.map((c) => c.fn)).toEqual(["comision_b2b_v10", "comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7"]);
   });
 });
 

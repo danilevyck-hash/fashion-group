@@ -290,6 +290,8 @@ const DATASETS: Dataset[] = [
   // Configuración de comisiones: quién no comisiona, qué grafías son la misma
   // persona, los descuentos fijos. `comision_exclusion` es soft delete = HISTORIAL.
   { table: "comision_exclusion" },
+  // 11-nov-2026: la comisión de UNA factura pasada a otro vendedor; soft delete = HISTORIAL.
+  { table: "comision_factura_vendedor" },
   { table: "comision_vendedor_alias" },
   { table: "comision_descuentos_fijos" },
   { table: "comision_descuento_excepciones" },
