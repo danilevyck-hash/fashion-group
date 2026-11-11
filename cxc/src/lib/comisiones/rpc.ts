@@ -32,8 +32,12 @@ import { supabaseServer } from "@/lib/supabase-server";
 import type { SupabaseLikeResult } from "@/lib/supabase-retry";
 import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
 
-/** La regla vigente: v8 + el cliente de intercompañía excluido por CÓDIGO, no por nombre. */
-export const RPC_COMISION = "comision_b2b_v9";
+/** La regla vigente: la v9 + el vendedor de UNA factura cambiado a mano
+ *  (`comision_factura_vendedor`, Daniel 11-nov-2026). Red: la v9 mientras la
+ *  DDL 20261111120000 no corra (mismos números: la tabla no existe). */
+export const RPC_COMISION = "comision_b2b_v10";
+/** La anterior: v8 + el cliente de intercompañía excluido por CÓDIGO, no por nombre. */
+export const RPC_COMISION_V9 = "comision_b2b_v9";
 /** La anterior (D-108 filtrado por nombre dentro del SQL). Red mientras la DDL de v9 no corra. */
 export const RPC_COMISION_V8 = "comision_b2b_v8";
 /** Exclusiones sin casillas, sin alias. Red mientras la DDL de v8 no corra. */
@@ -46,7 +50,8 @@ export const RPC_COMISION_V5 = "comision_b2b_v5";
 /** De la más nueva a la más vieja: se pide la primera y se cae a la siguiente
  *  SOLO si la función no existe (o falla por algo no transitorio). */
 export const CADENA_RPC_COMISION = [
-  { fn: RPC_COMISION, version: "v9" },
+  { fn: RPC_COMISION, version: "v10" },
+  { fn: RPC_COMISION_V9, version: "v9" },
   { fn: RPC_COMISION_V8, version: "v8" },
   { fn: RPC_COMISION_ANTERIOR, version: "v7" },
   { fn: RPC_COMISION_V6, version: "v6" },
@@ -79,8 +84,10 @@ export interface ComisionRespuesta {
   exclusiones_aplicadas: boolean;
   /** true desde la v8: las grafías de Switch ya están colapsadas en una persona. */
   alias_aplicado: boolean;
-  /** true solo con la v9: ningún cliente se excluye por su NOMBRE dentro del SQL. */
+  /** true desde la v9: ningún cliente se excluye por su NOMBRE dentro del SQL. */
   cliente_por_codigo: boolean;
+  /** true solo con la v10: el vendedor cambiado a mano de una factura YA está aplicado. */
+  vendedor_por_factura: boolean;
   vendedores: ComisionVendedor[];
 }
 
@@ -130,9 +137,10 @@ export async function leerComision(
       mes: d.mes ?? mes,
       version,
       regla_cobro: version === "v5" ? "cartera" : "quien_registro",
-      exclusiones_aplicadas: version === "v9" || version === "v8" || version === "v7",
-      alias_aplicado: version === "v9" || version === "v8",
-      cliente_por_codigo: version === "v9",
+      exclusiones_aplicadas: version === "v10" || version === "v9" || version === "v8" || version === "v7",
+      alias_aplicado: version === "v10" || version === "v9" || version === "v8",
+      cliente_por_codigo: version === "v10" || version === "v9",
+      vendedor_por_factura: version === "v10",
       vendedores: (d.vendedores ?? []) as ComisionVendedor[],
     },
     error: null,

@@ -1638,3 +1638,19 @@ La pregunta de la pantalla: **«¿cuánto hay de este artículo y cómo se vende
 4. Sale **«1 modelo · 26 colores»** de arriba: el título de la tarjeta ya lo dice. Con varios códigos pegados se queda.
 
 🔴 Ningún número cambia: todo sale de `armarTarjetaModelo`. `false` = la pantalla de hoy: candado `src/__tests__/ventas/referencia-apple-apagado.test.tsx` (NB2570 y NB2570001, celular y computadora, HTML de `origin/main` antes del cambio; prendido, rojo).
+
+## 🔴 Comisiones: la comisión de UNA factura pasa a otro vendedor (11-nov-2026)
+
+**Decisión de Daniel:** en Comisiones, desde el detalle de la factura, SOLO el administrador puede cambiar el vendedor de UNA factura para que su comisión pase a otro. Pidió que pasaran las DOS (venta y cobro).
+
+**Lo que se hizo** (interruptor `COMISIONES_CAMBIAR_VENDEDOR_FACTURA`, `lib/comisiones/cambiar-vendedor.ts`, **APAGADO** hasta aplicar la migración `20261111120000_comision_factura_vendedor_v10.sql`):
+
+1. **Tabla `comision_factura_vendedor`** (empresa_key, `switch_factura_id`, secuencial, vendedor canónico en mayúsculas, activa, creado_por/en, desactivado_por/en). Una sola ACTIVA por factura (índice único parcial), soft delete FIRMADO, nunca DELETE, RLS service_role, trigger que canonicaliza el vendedor por el alias. 🔴 **La factura se identifica por `switch_factura_id`, no por el secuencial**: hay 40 secuenciales repetidos entre eras dentro de la misma empresa (migración `20260723120000`). `switch_facturas` **no se toca**: el sync la pisa en cada corrida.
+2. **`comision_b2b_v10`** = la v9 byte a byte salvo el CTE `doc_vendedor`: `COALESCE(cfv.vendedor, comision_vendedor_canonico(sf.vendedor_nombre))`. Las exclusiones se aplican DESPUÉS, sobre el vendedor ya cambiado (medido con pglite: F-1 de EDWIN pasada a REYNALDO sale en REYNALDO y no en EDWIN; con D-84 excluido para REYNALDO, no comisiona para nadie). `comision_b2b_detalle` cambia igual y saca por documento `switch_factura_id` y `vendedor_switch` (solo si la factura está cambiada). `rpc.ts` pide la v10 y cae a la v9. Las notas de crédito tienen su propio id: siguen con su vendedor salvo que también se cambien. No hay cierre de comisiones: cualquier mes se puede cambiar.
+3. **Ruta `/api/ventas/comisiones/factura-vendedor`** (POST cambia · DELETE devuelve), solo admin (`requireRole`), rastro en `activity_logs` (`comisiones`, `config_vendedor_factura`), quién lo hizo lo pone el servidor.
+4. **Pantalla**: en el detalle v3, cada factura lleva «···» → «Cambiar vendedor» (selector con los mismos vendedores de Exclusiones de comisión) y, si está cambiada, «Devolver al de Switch» y la línea «Vendedor en Switch: X». Deshacer 5 s (`useUndoAction` + `UndoToast`): el renglón sale en el acto y la escritura va después; luego se vuelve a leer el detalle.
+5. **El rango de Vendedores** (`vendedores-rango-server.ts › ventasGrupo`) aplica el mismo cambio al sumar ventas (`vendedorConCambio`), fallando abierto.
+
+⚠️ **PASA SOLO LA VENTA. El cobro NO se pudo ligar a la factura, y no se inventó**: `/apireporte/recibos` manda 14 campos (medido 22-sep-2026) y ninguno dice qué factura pagó el recibo —ni número de recibo ni documento aplicado—; `switch_recibos` no tiene llave natural (se reemplaza el mes entero) y el estado de cuenta muestra débito/crédito por documento pero no el cruce. Ligar por cliente + monto + fecha sería adivinar plata. El cobro sigue siendo de quien REGISTRÓ el recibo (v6). Si Switch algún día manda el documento aplicado, se agrega.
+
+Candado: `src/__tests__/lib/comision-factura-vendedor-v10.test.ts` (interruptor apagado · DDL · v10 = v9 salvo el cambio · conducta real con pglite · ruta solo admin y soft delete · barrido sin DELETE).

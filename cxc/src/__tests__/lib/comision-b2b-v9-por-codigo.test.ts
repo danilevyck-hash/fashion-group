@@ -209,15 +209,18 @@ describe("🔴 la migración carga D-108 en las SEIS empresas, por código", () 
 });
 
 // ═══ 4. La cadena de RPC ═════════════════════════════════════════════════════
-describe("🔴 la v9 encabeza la cadena, y la v8 queda de red", () => {
-  it("v9 → v8 → v7 → v6 → v5, y la respuesta dice si el cliente ya va por código", async () => {
-    const { RPC_COMISION, CADENA_RPC_COMISION } = await import("@/lib/comisiones/rpc");
-    expect(RPC_COMISION).toBe("comision_b2b_v9");
+// CAMBIÓ DE DIRECCIÓN el 11-nov-2026: la vigente es la v10 (el vendedor de UNA
+// factura cambiado a mano) y la v9 pasó a ser «la anterior». Solo se agrega un
+// eslabón adelante; lo que este caso exige —el orden y la confesión— no cambia.
+describe("🔴 la v9 sigue en la cadena, justo detrás de la v10, y la v8 queda de red", () => {
+  it("v10 → v9 → v8 → v7 → v6 → v5, y la respuesta dice si el cliente ya va por código", async () => {
+    const { RPC_COMISION_V9, CADENA_RPC_COMISION } = await import("@/lib/comisiones/rpc");
+    expect(RPC_COMISION_V9).toBe("comision_b2b_v9");
     expect(CADENA_RPC_COMISION.map((c) => c.fn)).toEqual([
-      "comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5",
+      "comision_b2b_v10", "comision_b2b_v9", "comision_b2b_v8", "comision_b2b_v7", "comision_b2b_v6", "comision_b2b_v5",
     ]);
     const src = leer("src/lib/comisiones/rpc.ts");
-    expect(src).toContain('cliente_por_codigo: version === "v9"');
+    expect(src).toContain('cliente_por_codigo: version === "v10" || version === "v9"');
   });
 });
 

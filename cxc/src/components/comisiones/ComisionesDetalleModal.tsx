@@ -44,9 +44,23 @@
 
 import { useEffect, useState } from "react";
 import { X, Download, FileText, Send } from "lucide-react";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import UndoToast from "@/components/UndoToast";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
+// 🔴 11-nov-2026: SOLO admin pasa la comisión de UNA factura a otro vendedor,
+// desde este detalle («···» del renglón). Interruptor en `cambiar-vendedor.ts`.
+import {
+  AVISO_CAMBIO_PROGRAMADO,
+  AVISO_DEVOLUCION_PROGRAMADA,
+  COMISIONES_CAMBIAR_VENDEDOR_FACTURA,
+  ROTULO_CAMBIAR_VENDEDOR,
+  ROTULO_CANCELAR,
+  ROTULO_DEVOLVER_VENDEDOR,
+  ROTULO_VENDEDOR_EN_SWITCH,
+} from "@/lib/comisiones/cambiar-vendedor";
 import { fmtMoney } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
-import { exportComisionDetalle, comisionLinea, type ComisionDetalle, type ComisionDescuento } from "@/lib/ventas/comisionExcel";
+import { exportComisionDetalle, comisionLinea, type ComisionDetalle, type ComisionDescuento, type VentaDoc } from "@/lib/ventas/comisionExcel";
 import { ModalOverlay } from "@/components/ui";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -160,10 +174,25 @@ interface Props {
   v2?: boolean;
   /** 🔴 `COMISIONES_DETALLE_V3_2026_10` (apagado): el detalle en renglones. Las pruebas lo fuerzan. */
   v3?: boolean;
+  /** 🔴 `COMISIONES_CAMBIAR_VENDEDOR_FACTURA` (apagado): «···» → «Cambiar vendedor» en cada factura, solo admin. Las pruebas lo fuerzan. */
+  cambiarVendedor?: boolean;
 }
 
-export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vendedor, onClose, inline = false, v2 = false, v3 = COMISIONES_DETALLE_V3_2026_10 }: Props) {
+export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vendedor, onClose, inline = false, v2 = false, v3 = COMISIONES_DETALLE_V3_2026_10, cambiarVendedor = COMISIONES_CAMBIAR_VENDEDOR_FACTURA }: Props) {
   const [data, setData] = useState<ComisionDetalle | null>(null);
+  // 🔴 Cambiar el vendedor de una factura: espejo del `requireRole(["admin"])`
+  // de `/api/ventas/comisiones/factura-vendedor`. Un botón que el servidor
+  // rechaza es peor que ningún botón.
+  const [esAdmin, setEsAdmin] = useState(false);
+  useEffect(() => { setEsAdmin((sessionStorage.getItem("cxc_role") || "") === "admin"); }, []);
+  const puedeCambiarVendedor = cambiarVendedor && esAdmin;
+  /** Los vendedores que se pueden elegir (los mismos de Exclusiones de comisión); null = sin cargar. */
+  const [vendedoresDisponibles, setVendedoresDisponibles] = useState<string[] | null>(null);
+  /** Índice del renglón con el selector de vendedor abierto. */
+  const [cambiandoIdx, setCambiandoIdx] = useState<number | null>(null);
+  /** Se suma para volver a leer el detalle después de un cambio. */
+  const [recarga, setRecarga] = useState(0);
+  const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
   const [descuentos, setDescuentos] = useState<ComisionDescuento[]>([]);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   // 🔴 ESPEJO DE `POST /api/ventas/comisiones/descuentos`, que es
@@ -219,7 +248,54 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
       }
     })();
     return () => { alive = false; };
-  }, [empresa, year, mes, vendedor]);
+  }, [empresa, year, mes, vendedor, recarga]);
+
+  /** Abre el selector de vendedor en ese renglón; la lista se trae UNA vez (la de Exclusiones de comisión). */
+  async function abrirCambioDeVendedor(i: number) {
+    setCambiandoIdx(i);
+    if (vendedoresDisponibles) return;
+    try {
+      const res = await fetch("/api/ventas/comisiones/exclusiones", { cache: "no-store" });
+      const j = res.ok ? ((await res.json()) as { vendedores?: Record<string, string[]> }) : {};
+      setVendedoresDisponibles(j.vendedores?.[empresa] ?? []);
+    } catch {
+      setVendedoresDisponibles([]);
+    }
+  }
+
+  /**
+   * 🔴 Pasa la factura a otro vendedor (o la devuelve al de Switch) con 5 s para
+   * deshacer: el renglón sale de la lista en el acto y la escritura va después.
+   * Al confirmarse se vuelve a leer el detalle (los totales salen de la RPC).
+   */
+  function programarCambioDeVendedor(v: VentaDoc, nuevoVendedor: string | null) {
+    if (!data || v.switch_factura_id == null) return;
+    const antes = data;
+    const id = v.switch_factura_id;
+    setCambiandoIdx(null);
+    scheduleAction({
+      id: `vendedor-factura-${id}`,
+      message: nuevoVendedor ? AVISO_CAMBIO_PROGRAMADO : AVISO_DEVOLUCION_PROGRAMADA,
+      onOptimistic: () => setData({ ...antes, ventas: antes.ventas.filter((x) => x !== v) }),
+      onRevert: () => setData(antes),
+      execute: async () => {
+        const res = nuevoVendedor
+          ? await fetch("/api/ventas/comisiones/factura-vendedor", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ empresa_key: empresa, switch_factura_id: id, secuencial: v.secuencial, vendedor: nuevoVendedor }),
+            })
+          : await fetch(`/api/ventas/comisiones/factura-vendedor?empresa=${empresa}&id=${id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const b = await res.json().catch(() => ({}));
+          setAviso((b as { error?: string }).error ?? "No se pudo cambiar el vendedor.");
+          setTimeout(() => setAviso(null), 8000);
+          throw new Error("no se guardó");
+        }
+        setRecarga((n) => n + 1);
+      },
+    });
+  }
 
   async function toggleDescuento(id: string, activo: boolean) {
     if (togglingId) return;
@@ -758,20 +834,60 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                     {data.ventas.map((v, i) => {
                       const nc = v.tipo === "Nota de Crédito";
                       const enCero = v.subtotal === 0 && v.tipo === "Factura";
+                      // 🔴 El «···» solo con el interruptor, solo admin y solo si la RPC trae el id (DDL v10).
+                      const conMenu = puedeCambiarVendedor && v.switch_factura_id != null;
+                      const cambiada = !!v.vendedor_switch;
                       return (
-                        <li key={i} data-renglon-venta className={`flex items-start justify-between gap-3 py-2 ${enCero ? "text-gray-400" : ""}`}>
-                          <div className="min-w-0">
-                            <p className={`truncate text-sm ${enCero ? "" : "text-gray-900"}`}>{v.cliente}</p>
-                            <p className="mt-0.5 text-xs tabular-nums text-gray-500">
-                              {fmtDate(v.fecha)}
-                              {rotuloFactura(facturaParaMostrar(v.secuencial), nc) && ` · ${rotuloFactura(facturaParaMostrar(v.secuencial), nc)}`}
-                              {nc && <span className="ml-1.5 inline-block whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">{CHIP_NOTA_DE_CREDITO}</span>}
-                            </p>
+                        <li key={i} data-renglon-venta className={`py-2 ${enCero ? "text-gray-400" : ""}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className={`truncate text-sm ${enCero ? "" : "text-gray-900"}`}>{v.cliente}</p>
+                              <p className="mt-0.5 text-xs tabular-nums text-gray-500">
+                                {fmtDate(v.fecha)}
+                                {rotuloFactura(facturaParaMostrar(v.secuencial), nc) && ` · ${rotuloFactura(facturaParaMostrar(v.secuencial), nc)}`}
+                                {nc && <span className="ml-1.5 inline-block whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">{CHIP_NOTA_DE_CREDITO}</span>}
+                              </p>
+                              {cambiada && (
+                                <p data-vendedor-en-switch className="mt-0.5 text-xs text-gray-500">
+                                  {ROTULO_VENDEDOR_EN_SWITCH}: {nombreVendedorEnPantalla(v.vendedor_switch!)}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 items-start gap-1">
+                              <div className="text-right tabular-nums">
+                                <p className={`text-sm ${enCero ? "" : rojo(v.subtotal)}`}>{fmtMoney(v.subtotal)}</p>
+                                <p className={`mt-0.5 text-xs ${v.subtotal < 0 ? "text-red-600" : "text-gray-500"}`}>Comisión {fmtMoney(comisionLinea(v.subtotal, data.tasa_venta))}</p>
+                              </div>
+                              {conMenu && (
+                                <OverflowMenu
+                                  ariaLabel={`Más opciones de la factura ${facturaParaMostrar(v.secuencial)}`}
+                                  items={[
+                                    { label: ROTULO_CAMBIAR_VENDEDOR, onClick: () => void abrirCambioDeVendedor(i) },
+                                    ...(cambiada ? [{ label: ROTULO_DEVOLVER_VENDEDOR, onClick: () => programarCambioDeVendedor(v, null) }] : []),
+                                  ]}
+                                />
+                              )}
+                            </div>
                           </div>
-                          <div className="shrink-0 text-right tabular-nums">
-                            <p className={`text-sm ${enCero ? "" : rojo(v.subtotal)}`}>{fmtMoney(v.subtotal)}</p>
-                            <p className={`mt-0.5 text-xs ${v.subtotal < 0 ? "text-red-600" : "text-gray-500"}`}>Comisión {fmtMoney(comisionLinea(v.subtotal, data.tasa_venta))}</p>
-                          </div>
+                          {conMenu && cambiandoIdx === i && (
+                            <div data-selector-vendedor className="mt-2 flex items-center gap-2">
+                              <select
+                                aria-label="Vendedor"
+                                defaultValue=""
+                                disabled={vendedoresDisponibles === null}
+                                onChange={(e) => { if (e.target.value) programarCambioDeVendedor(v, e.target.value); }}
+                                className="min-h-[44px] flex-1 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900"
+                              >
+                                <option value="" disabled>{vendedoresDisponibles === null ? "Cargando…" : "Vendedor"}</option>
+                                {(vendedoresDisponibles ?? []).filter((n) => n !== vendedor).map((n) => (
+                                  <option key={n} value={n}>{nombreVendedorEnPantalla(n)}</option>
+                                ))}
+                              </select>
+                              <button type="button" onClick={() => setCambiandoIdx(null)} className="min-h-[44px] rounded-md px-3 text-sm text-gray-600 hover:bg-gray-100">
+                                {ROTULO_CANCELAR}
+                              </button>
+                            </div>
+                          )}
                         </li>
                       );
                     })}
@@ -850,6 +966,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           <ModalOverlay align="start" backdropClassName="bg-black/40" className="overflow-y-auto p-4 print:hidden">{hoja}</ModalOverlay>
         )}
         {laHojaDeMandar}
+        {pendingUndo && <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />}
       </>
     );
   }

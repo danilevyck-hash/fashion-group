@@ -214,13 +214,13 @@ describe("🔴 UNA llamada, no diez (12-ago-2026)", () => {
   // CAMBIÓ DE DIRECCIÓN el 6-sep-2026: la vigente es la v9 (D-108 excluido por
   // CÓDIGO y no por su nombre dentro del SQL). Lo que este caso exige —que las
   // DOS pestañas pidan la MISMA RPC— no cambió.
-  it("las RPC siguen siendo la MISMA para las dos pestañas (leerComision → comision_b2b_v9)", () => {
+  it("las RPC siguen siendo la MISMA para las dos pestañas (leerComision → comision_b2b_v10)", () => {
     // 🔄 6-sep-2026: el mes es `m` (uno de los del período: «Todo el año» pide
     // varios). Que las DOS pestañas pidan la MISMA función no cambió.
     expect(consolidado).toContain("leerComision(empresa, year, m)");
     expect(consolidado).not.toMatch(/rpc\("comision_b2b_v5"/);
     const rpc = leer("src/lib/comisiones/rpc.ts");
-    expect(rpc).toContain('RPC_COMISION = "comision_b2b_v9"');
+    expect(rpc).toContain('RPC_COMISION = "comision_b2b_v10"');
     expect(rpc).toContain('RPC_COMISION_ANTERIOR = "comision_b2b_v7"');
     expect(rpc).toContain("p_empresa_key: empresa");
   });
