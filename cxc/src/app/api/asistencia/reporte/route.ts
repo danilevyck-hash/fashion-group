@@ -28,6 +28,8 @@ import {
   type MarcacionConId,
 } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
+import { conCodigoPorReloj } from "@/lib/asistencia/codigo-por-reloj";
+import { leerMapaDeReloj } from "@/lib/asistencia/codigo-por-reloj-server";
 import { sinIgnorados } from "@/lib/asistencia/codigos-ignorados";
 import { leerIgnorados } from "@/lib/asistencia/codigos-ignorados-server";
 import {
@@ -115,7 +117,7 @@ export async function GET(req: NextRequest) {
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
     // marcas diarias pasa de 1.000 filas, y PostgREST corta ahí EN SILENCIO.
     // Un reporte de horas recortado sin avisar es peor que uno que falla.
-    const [marcaciones, { reglas }, { directorio }, correcciones, personasDb, afuera, horariosLeidos, jRes, vRes, fRes, telefono, aprRes, entradasRes, compensan] = await Promise.all([
+    const [marcacionesCrudas, { reglas }, { directorio }, correcciones, personasDb, afuera, horariosLeidos, jRes, vRes, fRes, telefono, aprRes, entradasRes, compensan, mapaReloj] = await Promise.all([
       leerTodoPaginado<MarcacionConId>(
         "asistencia_marcaciones (reporte)",
         (pedirCount, from, to) => {
@@ -179,7 +181,13 @@ export async function GET(req: NextRequest) {
       leerEntradasAutorizadas(desde, hasta),
       // 🔴 Quién tiene «Compensación de tardanza» (9-oct-2026). Vacío = hoy.
       leerReponeTardanza(),
+      // 🔴 El mapeo (reloj, número) → colaborador (11-nov-2026). Con el
+      // interruptor apagado viene vacío y no se consulta nada.
+      leerMapaDeReloj(),
     ]);
+    // 🔴 EL MISMO NÚMERO EN DOS RELOJES ES DOS PERSONAS: se resuelve ANTES de
+    // las correcciones y de agrupar. Con el mapa vacío es la misma lista.
+    const marcaciones = conCodigoPorReloj(marcacionesCrudas, mapaReloj);
     const nombres = new Map<string, string>(
       directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
     );

@@ -25,6 +25,8 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { salidaSugerida, minutosDelDia, diaPanama } from "@/lib/asistencia/reporte";
 import { ALMUERZO_FIJO_MIN, almuerzoDeEmpresa } from "@/lib/asistencia/config";
 import { leerDirectorio } from "@/lib/asistencia/config-server";
+import { conCodigoPorReloj } from "@/lib/asistencia/codigo-por-reloj";
+import { leerMapaDeReloj } from "@/lib/asistencia/codigo-por-reloj-server";
 import { compararPersonas } from "@/lib/asistencia/directorio";
 import { leerHorarios, TABLA_HORARIOS } from "@/lib/asistencia/horarios-server";
 import {
@@ -43,7 +45,7 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-interface FilaMarca { empleado_codigo: string | null; empleado_nombre: string | null; ocurrio_en: string }
+interface FilaMarca { empleado_codigo: string | null; empleado_nombre: string | null; ocurrio_en: string; dispositivo: string | null }
 
 export async function GET(req: NextRequest) {
   const auth = requireAsistencia(req, asistenciaRoles());
@@ -53,12 +55,12 @@ export async function GET(req: NextRequest) {
     // Universo = quien tenga marcaciones. Se leen las de los últimos 90 días:
     // alcanza para sugerir un horario y evita traer la tabla entera.
     const hace90 = new Date(Date.now() - 90 * 86_400_000).toISOString();
-    const marcas = await leerTodoPaginado<FilaMarca>(
+    const marcasCrudas = await leerTodoPaginado<FilaMarca>(
       "asistencia_marcaciones (horarios)",
       (pedirCount, from, to) =>
         supabaseServer
           .from("asistencia_marcaciones")
-          .select("empleado_codigo, empleado_nombre, ocurrio_en", pedirCount ? { count: "exact" } : {})
+          .select("empleado_codigo, empleado_nombre, ocurrio_en, dispositivo", pedirCount ? { count: "exact" } : {})
           .gte("ocurrio_en", hace90)
           .order("ocurrio_en", { ascending: true })
           .order("id", { ascending: true })
@@ -68,10 +70,13 @@ export async function GET(req: NextRequest) {
     // El traductor código → nombre. Es el MISMO que usan Justificaciones, el
     // Reporte y los exports: acá no se vuelve a consultar `asistencia_personas`.
     // 🔴 Y los horarios por la fuente ÚNICA, la misma del Reporte y la Planilla.
-    const [horariosLeidos, { directorio, filas }] = await Promise.all([
+    const [horariosLeidos, { directorio, filas }, mapaReloj] = await Promise.all([
       leerHorarios(),
       leerDirectorio(),
+      leerMapaDeReloj(),
     ]);
+    // 🔴 El mismo número en dos relojes es dos personas (11-nov-2026).
+    const marcas = conCodigoPorReloj(marcasCrudas, mapaReloj);
     const porCodigo = new Map(horariosLeidos.horarios.map((h) => [h.empleado_codigo, h]));
     const empresaDe = new Map(filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]));
 

@@ -36,6 +36,8 @@ import {
   type MarcaSimple,
 } from "./marcacion";
 import { queSePuedeDeshacer, type Deshacible, type MarcaGuardada } from "./deshacer";
+import { codigosQueCaenEn, conCodigoPorReloj } from "@/lib/asistencia/codigo-por-reloj";
+import { leerMapaDeReloj } from "@/lib/asistencia/codigo-por-reloj-server";
 
 const PANAMA = "-05:00";
 
@@ -104,21 +106,32 @@ export async function leerMarcasDeLaQuincena(
   deshacer: (Deshacible & { id: string; indice: number }) | null;
 }> {
   const quincena = quincenaDeHoy(hoy);
-  const { data, error } = await supabaseServer
+  // 🔴 El mismo número en dos relojes es dos personas (11-nov-2026): se piden
+  // su código y los números de reloj que le pertenecen, y se filtra DESPUÉS de
+  // resolver. Con el mapa vacío es la consulta de siempre.
+  const mapaReloj = await leerMapaDeReloj();
+  const codigos = codigosQueCaenEn(codigo, mapaReloj);
+  const base = supabaseServer
     .from("asistencia_marcaciones")
-    .select("id, ocurrio_en, dispositivo")
-    .eq("empleado_codigo", codigo)
+    .select("id, empleado_codigo, ocurrio_en, dispositivo");
+  const { data, error } = await (codigos.length === 1 ? base.eq("empleado_codigo", codigos[0]) : base.in("empleado_codigo", codigos))
     .gte("ocurrio_en", limiteDelDia(quincena.desde, false))
     .lte("ocurrio_en", limiteDelDia(quincena.hasta, true))
     .order("ocurrio_en", { ascending: true })
     .limit(500);
   if (error) throw new Error(error.message);
+  const resueltas = conCodigoPorReloj(
+    (data ?? []) as unknown as { id: string; empleado_codigo: string | null; ocurrio_en: string; dispositivo: string | null }[],
+    mapaReloj,
+  // Se descarta solo lo que RESOLVIÓ a otra persona; una fila sin código (una
+  // lectura vieja) se queda, como siempre.
+  ).filter((m) => m.empleado_codigo == null || String(m.empleado_codigo).trim() === codigo);
   // 🔴 SI NO SE PUEDE LEER LAS QUITADAS, NO SE OFRECE «DESHACER». Sin la
   // migración `20261128120000` la columna no existe: dibujar el botón sería
   // ofrecer algo que el servidor va a rechazar, y la persona no puede hacer
   // nada con ese mensaje. Un control que no ofrece nada no se dibuja.
   const quitadas = await leerMarcasQuitadas(codigo, quincena.desde, quincena.hasta);
-  const marcas = (data ?? [])
+  const marcas = resueltas
     .map((m) => ({
       id: String((m as { id: string }).id ?? ""),
       ocurrioEn: String((m as { ocurrio_en: string }).ocurrio_en),

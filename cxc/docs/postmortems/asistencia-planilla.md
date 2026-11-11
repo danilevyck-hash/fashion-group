@@ -3634,3 +3634,26 @@ Daniel, textual, ante las opciones de qué hacer con el sábado trabajado por qu
 ### Candados
 
 `src/__tests__/lib/asistencia-sabado-trabajado.test.ts` (14 pruebas): el sábado a `domingoMin` e idéntico al domingo · Aprobaciones lo ofrece como «sabado», sin aprobar $0 con aviso, aprobado × 1.50 = el mismo dinero que un domingo igual · el Reporte muestra el día no laborable con marcas sin tardanza ni extra, esconde el sin nada, y la planilla sigue pidiendo todos · Multifashion no se mueve · con el interruptor en `false` vuelve `sabadoMin` y el Reporte lo esconde · el rótulo sale de UN lugar y `domingos`/`domingo_min` no cambian. Tres candados viejos **cambiaron de dirección con nota fechada** (`asistencia-planilla.test.ts` «el sábado trabajado se MIDE aparte», `horario-configurable.test.ts` § 1 y § 7) y el vocabulario del comprobante suma «DÍA» y «DESCANSO».
+
+## El mismo número en dos relojes es dos personas (11-nov-2026)
+
+### Lo que pasó (medido contra producción el 11-nov-2026)
+
+- El motor agrupa las marcas **solo por `empleado_codigo`** (`reporte.ts` › `armarReporte`, `porPersona.get(cod)`), y el número del reloj **no es único entre aparatos**. El 5 del `reloj cboston` es **Jorman Hernandez** (ficha 5, Vistana); el 5 del `reloj acs` es **Silenys**, colaboradora nueva de Multifashion **sin ficha**.
+- **114 marcas de Silenys** (del 1-oct al 2-nov-2026, 344 de Jorman en el mismo lapso) cayeron en los días de Jorman: días de 7 u 8 marcas «a revisar», los domingos de ella (4, 11, 18 y 25-oct: 410–533 min «vistos») como horas extra de él, y su salida de las 19:00 como la de él.
+- La contadora los arregló a mano: **78 correcciones** sobre el código 5 (74 vivas); **57 QUITAN una marca del `reloj acs`** desde el 1-oct (grupo A: solo existían por la mezcla), 8 quitan una marca de Boston (dudosas, se quedan), 2 cambian la hora de una marca de Silenys (6-oct 16:35 y 9-oct 12:55: con el mapeo viajan al día de ELLA) y 7 son anteriores a octubre.
+- Yeisibeth Muñoz (ficha 306) marcó un día (2-oct) en el `reloj acs` con el número **4**: 4 marcas sueltas sin ficha. El **65** del reloj de Boston sigue desconocido y se deja como está.
+- **Ninguna quincena de octubre está cerrada** para Vistana: la mezcla no movió plata de un cierre.
+
+### Lo que se hizo (`codigo-por-reloj.ts`, interruptor `MARCAS_POR_RELOJ_Y_NUMERO`, hoy `false`)
+
+- **Un mapeo escrito a mano**, `asistencia_codigo_por_reloj` (`20270111120000`, **SIN aplicar**): `(dispositivo, codigo_reloj) → empleado_codigo`, con `activo` y firma; nunca un DELETE; único por par solo entre activos (un número puede cambiar de dueño: las impulsadoras rotan). RLS prendido, sin políticas, como el resto del módulo.
+- **La regla**: si el par está en el mapeo, la marca es de ese colaborador; si no, es del número tal cual, como siempre. Se aplica **al LEER, en una copia** (`conCodigoPorReloj`), ANTES de `aplicarCorrecciones` y de agrupar: la fila de `asistencia_marcaciones` no se edita ni se borra, y las correcciones siguen atadas por `id`, así que viajan con la marca a su dueño.
+- **Un solo lugar, todos los lectores**: Reporte, Planilla, «quién marcó» (día libre), Horarios, Configuración (códigos con marcas), la ficha de una persona (`leerMarcasDeLaVentana`: pide su código más los números de reloj que le pertenecen, `codigosQueCaenEn`, y filtra después), la quincena del teléfono (`leerMarcasDeLaQuincena`) y la validación de una corrección (`leerMarcacion` firma con el dueño resuelto). Candado estático en `codigo-por-reloj.test.ts`.
+- **El interruptor vive en el lector del servidor** (`leerMapaDeReloj`): apagado no consulta la base y devuelve el mapa vacío, y `conCodigoPorReloj` con el mapa vacío devuelve **la misma lista** que recibió. Prendido, un error es un error (sin la tabla, lanza): no se vuelve a mezclar personas en silencio.
+- **`false` = exactamente lo de hoy.** Se prende en una solicitud aparte **después** de aplicar la migración y cargar las filas (reloj acs · 5 → Silenys; reloj acs · 4 → 306) y la ficha de Silenys.
+- Impacto medido sobre las extras de Jorman en octubre (motor corrido hoy vs separado, con las 57 del grupo A anuladas): **los 11 días aprobados no cambian ni un minuto**; cambian los pendientes 28, 29 y 30-oct (−118, −117 y −161 min) y el 16-oct, decidido «no» (−156). ⚠️ Doce días de octubre pasan a «a revisar» con 3 marcas: 8 por las quitas dudosas sobre marcas de Boston que se quedan y 4 porque Jorman marcó tres veces y la cuarta era de Silenys.
+
+### Candados
+
+`src/__tests__/asistencia/codigo-por-reloj.test.ts` (13 pruebas): el día de Jorman con las marcas de Silenys mezcladas (8 marcas, a revisar, salida 19:00) → separadas (4 y 4, cada una con su salida, extra de él en 0) · mapa vacío devuelve la MISMA lista · una marca agregada a mano nunca se mueve · la corrección viaja con su marca · apagado no consulta la base · prendido lee solo activos y un error lanza · todo lector resuelve por el mismo lugar y antes de las correcciones · nadie escribe en el mapeo desde la app.
