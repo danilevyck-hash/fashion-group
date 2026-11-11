@@ -274,6 +274,8 @@ const DATASETS: Dataset[] = [
   // Los códigos escondidos: lo decide una persona y no se re-deriva de nada.
   // ⚠️ Su PK es `empleado_codigo`, no `id`.
   { table: "asistencia_codigos_ignorados" },
+  // (reloj, número) → colaborador: lo decide una persona y no se re-deriva.
+  { table: "asistencia_codigo_por_reloj" },
   { table: "asistencia_dispositivos" },
   // Gastos y banco. bancos_saldos lo escribe contabilidad A MANO; egresos_varios
   // lo baja un sync pero se REEMPLAZA mes a mes (`egresos_reemplazar_mes`), así

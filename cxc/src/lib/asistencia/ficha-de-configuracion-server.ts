@@ -32,6 +32,8 @@ import { diaPanama } from "./reporte";
 import { crearDirectorio } from "./directorio";
 import { agruparPorCodigo, TABLA_REPARTO, type FilaReparto } from "./reparto";
 import { TABLA_CODIGOS_IGNORADOS } from "./codigos-ignorados";
+import { codigosQueCaenEn, conCodigoPorReloj } from "./codigo-por-reloj";
+import { leerMapaDeReloj } from "./codigo-por-reloj-server";
 import {
   leerReglas,
   leerPersonas,
@@ -61,8 +63,14 @@ export function arranqueDeLaVentana(ahora = Date.now()): string {
  * página alcanza, pero el que se quede sin paginar es el que un día pierde
  * días enteros sin avisar.
  */
-export function leerMarcasDeLaVentana(desde: string, codigo?: string): Promise<FilaMarca[]> {
-  return leerTodoPaginado<FilaMarca>(
+export async function leerMarcasDeLaVentana(desde: string, codigo?: string): Promise<FilaMarca[]> {
+  // 🔴 El mismo número en dos relojes es dos personas (11-nov-2026): para UNA
+  // persona se piden su código y los números de reloj que le pertenecen, y
+  // después se resuelve y se filtra, porque el mismo número crudo puede ser de
+  // otro en otro reloj. Con el mapa vacío es la consulta de siempre.
+  const mapaReloj = await leerMapaDeReloj();
+  const codigos = codigo ? codigosQueCaenEn(codigo, mapaReloj) : null;
+  const crudas = await leerTodoPaginado<FilaMarca>(
     codigo ? "asistencia_marcaciones (una persona)" : "asistencia_marcaciones (configuración)",
     (pedirCount, from, to) => {
       const q = supabaseServer
@@ -72,12 +80,15 @@ export function leerMarcasDeLaVentana(desde: string, codigo?: string): Promise<F
           pedirCount ? { count: "exact" } : {},
         )
         .gte("ocurrio_en", desde);
-      return (codigo ? q.eq("empleado_codigo", codigo) : q)
+      const porCodigo = !codigos ? q : codigos.length === 1 ? q.eq("empleado_codigo", codigos[0]) : q.in("empleado_codigo", codigos);
+      return porCodigo
         .order("ocurrio_en", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to);
     },
   );
+  const resueltas = conCodigoPorReloj(crudas, mapaReloj);
+  return codigo ? resueltas.filter((m) => String(m.empleado_codigo ?? "").trim() === codigo) : resueltas;
 }
 
 /** Los códigos con fila en `asistencia_horarios`. `null` si no se pudo leer. */

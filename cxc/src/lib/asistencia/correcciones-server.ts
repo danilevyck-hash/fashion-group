@@ -19,6 +19,8 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { esTablaFaltante } from "./config";
+import { conCodigoPorReloj } from "./codigo-por-reloj";
+import { leerMapaDeReloj } from "./codigo-por-reloj-server";
 import {
   TABLA_CORRECCIONES,
   motivoLeido,
@@ -296,14 +298,23 @@ export interface MarcacionParaCorregir {
  * apunta a la persona y al día que dice.
  */
 export async function leerMarcacion(id: string): Promise<MarcacionParaCorregir | null> {
-  const { data, error } = await supabaseServer
-    .from("asistencia_marcaciones")
-    .select("id, empleado_codigo, ocurrio_en")
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data, error }, mapaReloj] = await Promise.all([
+    supabaseServer
+      .from("asistencia_marcaciones")
+      .select("id, empleado_codigo, ocurrio_en, dispositivo")
+      .eq("id", id)
+      .maybeSingle(),
+    leerMapaDeReloj(),
+  ]);
   if (error) throw new Error(error.message);
   if (!data) return null;
-  const f = data as { id: string; empleado_codigo: string | null; ocurrio_en: string };
+  // 🔴 El mismo número en dos relojes es dos personas (11-nov-2026): la
+  // corrección se firma con el dueño RESUELTO de la marca, el mismo que ve el
+  // Reporte. Con el mapa vacío es el código tal cual.
+  const [f] = conCodigoPorReloj(
+    [data as { id: string; empleado_codigo: string | null; ocurrio_en: string; dispositivo?: string | null }],
+    mapaReloj,
+  );
   return {
     id: String(f.id),
     empleadoCodigo: String(f.empleado_codigo ?? "").trim(),

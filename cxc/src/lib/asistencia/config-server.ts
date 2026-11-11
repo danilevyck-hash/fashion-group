@@ -43,6 +43,8 @@ import { COLUMNA_TRABAJA_AFUERA, trabajaAfuera } from "./trabaja-afuera";
 import { COLUMNA_REPONE_TARDANZA, reponeTardanza } from "./repone-tardanza";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { conCodigoPorReloj } from "./codigo-por-reloj";
+import { leerMapaDeReloj } from "./codigo-por-reloj-server";
 import {
   reglasDesdeFila,
   TABLA_PERSONAS,
@@ -434,17 +436,22 @@ export async function leerCodigosConMarcaciones(
   dias = DIAS_VENTANA_PERSONAS,
 ): Promise<Set<string>> {
   const desde = new Date(Date.now() - dias * 86_400_000).toISOString();
-  const filas = await leerTodoPaginado<{ empleado_codigo: string | null }>(
-    "asistencia_marcaciones (directorio)",
-    (pedirCount, from, to) =>
-      supabaseServer
-        .from("asistencia_marcaciones")
-        .select("empleado_codigo", pedirCount ? { count: "exact" } : {})
-        .gte("ocurrio_en", desde)
-        .order("ocurrio_en", { ascending: true })
-        .order("id", { ascending: true })
-        .range(from, to),
-  );
+  const [crudas, mapaReloj] = await Promise.all([
+    leerTodoPaginado<{ empleado_codigo: string | null; dispositivo: string | null }>(
+      "asistencia_marcaciones (directorio)",
+      (pedirCount, from, to) =>
+        supabaseServer
+          .from("asistencia_marcaciones")
+          .select("empleado_codigo, dispositivo", pedirCount ? { count: "exact" } : {})
+          .gte("ocurrio_en", desde)
+          .order("ocurrio_en", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+    ),
+    leerMapaDeReloj(),
+  ]);
+  // 🔴 El mismo número en dos relojes es dos personas (11-nov-2026).
+  const filas = conCodigoPorReloj(crudas, mapaReloj);
   const out = new Set<string>();
   for (const f of filas) {
     const c = (f.empleado_codigo ?? "").trim();

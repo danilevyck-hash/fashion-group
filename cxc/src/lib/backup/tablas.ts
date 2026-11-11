@@ -104,6 +104,10 @@ export const TABLAS_PERSONAS = [
   // persona nueva. Si se pierde, la basura (39, 55, 9999) vuelve a contarse
   // como trabajo pendiente y hay que decidirlo todo otra vez.
   "asistencia_codigos_ignorados",
+  // 🔴 QUÉ NÚMERO DE QUÉ RELOJ ES DE QUIÉN (11-nov-2026). Lo decide una persona
+  // y no se deriva de nada: el 5 de Boston es Jorman y el 5 de Multifashion es
+  // Silenys. Sin esto, las marcas de una vuelven a caer en los días del otro.
+  "asistencia_codigo_por_reloj",
   "asistencia_dispositivos",
 
   // ── Gastos y banco

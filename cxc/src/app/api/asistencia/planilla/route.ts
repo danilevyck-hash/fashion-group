@@ -48,6 +48,8 @@ import {
   type MarcacionConId,
 } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
+import { conCodigoPorReloj } from "@/lib/asistencia/codigo-por-reloj";
+import { leerMapaDeReloj } from "@/lib/asistencia/codigo-por-reloj-server";
 // 🔴 LAS ENTRADAS AUTORIZADAS (24-sep-2026): la MISMA lectura que el Reporte.
 import { indexarEntradasAutorizadas } from "@/lib/asistencia/entrada-autorizada";
 import { leerEntradasAutorizadas } from "@/lib/asistencia/entrada-autorizada-server";
@@ -373,7 +375,7 @@ export async function GET(req: NextRequest) {
     // Paginado y verificado contra el COUNT: PostgREST corta en 1.000 filas EN
     // SILENCIO y una quincena de 37 personas con 4 marcas diarias pasa de ahí.
     // Una planilla con las marcaciones recortadas sin avisar se paga igual.
-    const marcaciones = await leerTodoPaginado<MarcacionConId>(
+    const marcacionesCrudas = await leerTodoPaginado<MarcacionConId>(
       "asistencia_marcaciones (planilla)",
       (pedirCount, from, to) =>
         supabaseServer
@@ -392,7 +394,7 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas }, personasDb, afuera, correcciones, manualesLeidos, aprRes, repRes, horariosLeidos, jRes, vRes, fRes, entradasRes, compensan] = await Promise.all([
+    const [{ reglas }, personasDb, afuera, correcciones, manualesLeidos, aprRes, repRes, horariosLeidos, jRes, vRes, fRes, entradasRes, compensan, mapaReloj] = await Promise.all([
       leerReglas(),
       leerPersonas(),
       // 🔴 QUIÉN TRABAJA AFUERA (14-sep-2026). Lectura APARTE y tolerante: con
@@ -432,7 +434,14 @@ export async function GET(req: NextRequest) {
       leerEntradasAutorizadas(q.desde, hastaReloj),
       // 🔴 Quién tiene «Compensación de tardanza» (9-oct-2026). Vacío = hoy.
       leerReponeTardanza(),
+      // 🔴 El mapeo (reloj, número) → colaborador (11-nov-2026), la MISMA
+      // lectura que el Reporte. Interruptor apagado = mapa vacío, sin consulta.
+      leerMapaDeReloj(),
     ]);
+    // 🔴 EL MISMO NÚMERO EN DOS RELOJES ES DOS PERSONAS: se resuelve ANTES de
+    // las correcciones y de todo lo que agrupa por código. Con el mapa vacío
+    // es la misma lista que leyó la base.
+    const marcaciones = conCodigoPorReloj(marcacionesCrudas, mapaReloj);
 
     const horarios = horariosLeidos.horarios;
 

@@ -9,10 +9,12 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { aplicarCorrecciones, type MarcacionConId } from "./correcciones";
 import { leerCorrecciones } from "./correcciones-server";
+import { conCodigoPorReloj } from "./codigo-por-reloj";
+import { leerMapaDeReloj } from "./codigo-por-reloj-server";
 import { diaPanama } from "./reporte";
 
 export async function leerQuienMarco(desde: string, hasta: string): Promise<Set<string>> {
-  const [marcaciones, correcciones] = await Promise.all([
+  const [marcacionesCrudas, correcciones, mapaReloj] = await Promise.all([
     leerTodoPaginado<MarcacionConId>(
       "asistencia_marcaciones (quién marcó)",
       (pedirCount, from, to) =>
@@ -26,7 +28,11 @@ export async function leerQuienMarco(desde: string, hasta: string): Promise<Set<
           .range(from, to),
     ),
     leerCorrecciones(desde, hasta),
+    leerMapaDeReloj(),
   ]);
+  // 🔴 El mismo número en dos relojes es dos personas (11-nov-2026): se
+  // resuelve igual que en el motor, antes de las correcciones.
+  const marcaciones = conCodigoPorReloj(marcacionesCrudas, mapaReloj);
   const out = new Set<string>();
   for (const m of aplicarCorrecciones(marcaciones, correcciones.correcciones).marcaciones) {
     const cod = String(m.empleado_codigo ?? "").trim();
