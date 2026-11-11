@@ -34,7 +34,7 @@ import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
 
 /** La regla vigente: la v9 + el vendedor de UNA factura cambiado a mano
  *  (`comision_factura_vendedor`, Daniel 11-nov-2026). Red: la v9 mientras la
- *  DDL 20261111120000 no corra (mismos números: la tabla no existe). */
+ *  DDL 20261111130000 no corra (mismos números: la tabla no existe). */
 export const RPC_COMISION = "comision_b2b_v10";
 /** La anterior: v8 + el cliente de intercompañía excluido por CÓDIGO, no por nombre. */
 export const RPC_COMISION_V9 = "comision_b2b_v9";

@@ -30,7 +30,7 @@ import {
 } from "@/lib/comisiones/cambiar-vendedor";
 
 const RAIZ = process.cwd();
-const MIG_V10 = "supabase/migrations/20261111120000_comision_factura_vendedor_v10.sql";
+const MIG_V10 = "supabase/migrations/20261111130000_comision_factura_vendedor_v10.sql";
 const MIG_V9 = "supabase/migrations/20261008120000_comision_b2b_v9_cliente_por_codigo.sql";
 const MIG_V8 = "supabase/migrations/20260913120000_comision_vendedor_alias_v8.sql";
 
@@ -58,7 +58,7 @@ function comoLaV9(body: string): string {
 
 // ═══ 1. El interruptor y el módulo puro ══════════════════════════════════════
 describe("🔴 el interruptor nace APAGADO y el módulo puro valida", () => {
-  it("COMISIONES_CAMBIAR_VENDEDOR_FACTURA = false hasta que la DDL 20261111120000 esté aplicada", () => {
+  it("COMISIONES_CAMBIAR_VENDEDOR_FACTURA = false hasta que la DDL 20261111130000 esté aplicada", () => {
     expect(COMISIONES_CAMBIAR_VENDEDOR_FACTURA).toBe(false);
   });
   it("nombres de ERP en los rótulos", () => {

@@ -9,7 +9,7 @@
 // pasa la comisión de VENTA; el cobro sigue siendo de quien registró el recibo.
 //
 // Dónde vive la decisión: tabla `comision_factura_vendedor` (migración
-// 20261111120000), una sola ACTIVA por (empresa, switch_factura_id); quien
+// 20261111130000), una sola ACTIVA por (empresa, switch_factura_id); quien
 // suma es la RPC `comision_b2b_v10` con COALESCE(cambio, vendedor de Switch) y
 // las exclusiones se aplican sobre el vendedor ya cambiado. `switch_facturas`
 // NO se toca: el sync la pisa.
@@ -24,7 +24,7 @@ import { normalizarVendedor } from "./exclusiones";
 /**
  * El interruptor. `false` = todo como hoy: la pantalla no ofrece «Cambiar
  * vendedor» y el rango de Vendedores lee el vendedor de Switch. Se prende
- * SOLO después de aplicar la migración 20261111120000 (sin ella, la RPC v10 no
+ * SOLO después de aplicar la migración 20261111130000 (sin ella, la RPC v10 no
  * existe y rpc.ts cae a la v9, que no mira la tabla).
  */
 export const COMISIONES_CAMBIAR_VENDEDOR_FACTURA = false;
