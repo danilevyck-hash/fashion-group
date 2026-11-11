@@ -74,8 +74,8 @@ function reporte(marcaciones: readonly Marcacion[]) {
 const persona = (ps: ReturnType<typeof reporte>, codigo: string) => ps.find((p) => p.codigo === codigo);
 
 describe("1. la regla pura", () => {
-  it("🔴 el interruptor está APAGADO en main: se prende después de aplicar la migración", () => {
-    expect(MARCAS_POR_RELOJ_Y_NUMERO).toBe(false);
+  it("🔴 el interruptor está PRENDIDO desde el 11-nov-2026 (migración aplicada y mapeo cargado)", () => {
+    expect(MARCAS_POR_RELOJ_Y_NUMERO).toBe(true);
   });
 
   it("con el mapa vacío devuelve LA MISMA lista (ni copia ni toca nada)", () => {

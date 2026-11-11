@@ -23,9 +23,11 @@
 // el mapa viene vacío y esta función devuelve la MISMA lista que recibió.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** 🔴 `false` = exactamente lo de hoy: nadie consulta la tabla y nada se mueve.
- *  Se prende DESPUÉS de aplicar la migración y cargar las filas del mapeo. */
-export const MARCAS_POR_RELOJ_Y_NUMERO = false;
+/** 🔴 `false` = lo de antes: nadie consulta la tabla y nada se mueve.
+ *  PRENDIDO el 11-nov-2026, después de aplicar la migración, cargar el mapeo
+ *  (reloj acs · 5 → 308 Silenys · 4 → 306 Yeisibeth) y anular las 59
+ *  correcciones que solo existían por la mezcla. */
+export const MARCAS_POR_RELOJ_Y_NUMERO = true;
 
 export const TABLA_CODIGO_POR_RELOJ = "asistencia_codigo_por_reloj";
 export const MIGRACION_CODIGO_POR_RELOJ = "20270111120000_asistencia_codigo_por_reloj.sql";
