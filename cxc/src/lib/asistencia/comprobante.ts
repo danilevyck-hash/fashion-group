@@ -38,6 +38,7 @@ import { centavos, minutosTardanzaMostrados } from "./planilla";
 import { tiempoDelDia } from "./formato-tiempo";
 import { notaAjuste } from "./corte-quincena";
 import { notaOtrosServicios } from "./otros-servicios";
+import { ROTULO_DOMINGO_COMPROBANTE } from "./sabado-trabajado";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { fichaFiscal } from "@/lib/cxc/empresa-fiscal";
 
@@ -316,7 +317,7 @@ export function armarComprobante(
     R("extra125", "HORAS EXTRAS 1.25", v(d?.extraDiurno), "dato", false),
     R("extra150", "HORAS EXTRAS 1.50", v(d?.extraNocturno), "dato", false),
     R("excedente", "EXCEDENTE DE HORAS EXTRAS SEMANAL", v(d?.excedente), "dato", false),
-    R("domingo", "DOMINGO", v(d?.domingos), "dato", false),
+    R("domingo", ROTULO_DOMINGO_COMPROBANTE, v(d?.domingos), "dato", false),
     R("feriado", "FERIADO", v(d?.feriados), "dato", false),
     R("ausencia", "AUSENCIA", v(d?.ausencias), "dato", false),
     R("tardanzas", "TARDANZAS", v(d?.tardanzas), "dato", false,

@@ -272,6 +272,8 @@ describe("C. 🔴 NINGÚN TEXTO SIN SU ACENTO", () => {
     "COLABORADOR", "POSICIÓN", "DESEMPEÑADA", "RATA", "POR", "HORA",
     // Los renglones
     "SALARIO", "HORAS", "EXTRAS", "EXCEDENTE", "SEMANAL", "DOMINGO", "FERIADO",
+    // 11-nov-2026: «DÍA DE DESCANSO» reemplaza a «DOMINGO» con el sábado adentro.
+    "DÍA", "DESCANSO",
     "AUSENCIA", "TARDANZAS", "SALIDA", "TEMPRANA", "TOTAL", "DEVENGADO",
     "DEDUCCIONES", "SEGURO", "SOCIAL", "EDUCATIVO", "IMPUESTO", "SOBRE", "LA",
     "RENTA", "DESCUENTOS", "PRÉSTAMO", "DESCUENTO", "A", "TERCEROS", "DAÑO",
@@ -296,10 +298,10 @@ describe("C. 🔴 NINGÚN TEXTO SIN SU ACENTO", () => {
   it("y ninguna de esas palabras perdió su tilde por el camino", () => {
     const sinTilde = (s: string) => s.normalize("NFD").replace(/[̀-́̃̈]/g, "");
     const conTilde = [...VOCABULARIO].filter((w) => sinTilde(w) !== w);
-    // Las cinco con tilde o ñ del papel: POSICIÓN · PRÉSTAMO · MERCANCÍA ·
-    // RECIBÍ · CÉDULA · DESEMPEÑADA · DAÑO.
+    // Las ocho con tilde o ñ del papel: POSICIÓN · PRÉSTAMO · MERCANCÍA ·
+    // RECIBÍ · CÉDULA · DESEMPEÑADA · DAÑO · DÍA (11-nov-2026, «DÍA DE DESCANSO»).
     expect(conTilde.sort()).toEqual([
-      "CÉDULA", "DAÑO", "DESEMPEÑADA", "MERCANCÍA", "POSICIÓN", "PRÉSTAMO", "RECIBÍ",
+      "CÉDULA", "DAÑO", "DESEMPEÑADA", "DÍA", "MERCANCÍA", "POSICIÓN", "PRÉSTAMO", "RECIBÍ",
     ]);
     for (const w of conTilde) expect(TODO.some((t) => t.includes(w))).toBe(true);
   });

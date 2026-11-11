@@ -3608,3 +3608,29 @@ Daniel aprobó «Repone tardanza»: algunos colaboradores reponen la tardanza qu
 - Ejemplos (9:00–18:00, prendida): 9:15→18:15 tardanza $0 extra $0 · 9:15→18:20 $0 / $0 (sobran 5 < 10) · 9:15→18:30 $0 / 15 min al 1,50 con aprobación · 9:15→18:05 se descuentan 10 · 9:15→18:00 se descuentan 15.
 - **Medido contra producción, septiembre de 2026** (`scripts/_medir-repone-tardanza.ts`, solo lectura): apagada, el motor nuevo da **IDÉNTICO** al de `origin/main` (47 colaboradores, 3.320 marcas). Prendida a TODOS (informativo): **107 días** de 28 colaboradores cambiarían; desaparecen **$58,98** de descuentos por tardanza y dejan de pagarse **$61,88** de extras medidas (de esas, **$28,68** ya aprobadas); 2.135 min de tardanza y 1.940 min de extra. Los que no tienen sueldo cargado (Yulissa, Daniel, 39) cuentan en días pero no en plata.
 - Candados: `asistencia-repone-tardanza.test.ts` (los ejemplos con plata; 5 fallan con el código de antes) y `asistencia-repone-tardanza-mes-real.test.ts` (septiembre real, apagada = hoy, minutos y plata).
+
+## El sábado trabajado se aprueba y se paga como el domingo (11-nov-2026)
+
+Daniel, textual, ante las opciones de qué hacer con el sábado trabajado por quien no trabaja los sábados: *«1. A»* — exactamente como el domingo. Y sobre el Reporte: *«a veces mando a Rodrigo a trabajar los sábados, él debería poder marcar y editar»*.
+
+### Lo que estaba roto (auditado contra el código, archivo:línea)
+
+| Dónde | Qué pasaba |
+|---|---|
+| `reporte.ts` › `armarReporte` (filtro `esDiaLaborable`) | El Reporte escondía los días no laborables; solo la planilla pedía `incluirNoHabiles: true`. Sin fila, una marca mal puesta un sábado **no se podía corregir**. |
+| `planilla.ts` › `clasificarDia` | El sábado no laborable caía en `sabadoMin`: **sin columna, sin plata**; la tarjeta solo avisaba «no se pagan aquí». |
+| `aprobaciones.ts` › `diasConExtra` | Sumaba `domingoMin + feriadoMin + extra`: el sábado **nunca llegaba a Aprobaciones**. |
+| El domingo | SÍ funcionaba: Aprobaciones tipo «domingo», aprobado → trabajado × `recargoDomingoFeriado` × rata; no aprobado → $0 visible con aviso ámbar y freno del cierre. |
+
+### Lo que se hizo (`src/lib/asistencia/sabado-trabajado.ts`, interruptor `SABADO_TRABAJADO_COMO_DOMINGO = true`)
+
+- **El motor** (`clasificarDia`): un día no laborable (`d.habil === false`) va a `domingoMin` si es domingo **o sábado** (`noLaborableVaComoDomingo`). Es la MISMA columna, así que `medirHoras`, el aviso ámbar, el freno del cierre, `armarLinea` (× 1.50 × rata), el Excel, el PDF, el comprobante, el cierre (`planilla-guardada`: `domingos` / `domingo_min`) y el corte (`corte-quincena`: concepto `domingos`) la reciben **sin tocarse**. Un sábado y un domingo idénticos pagan el mismo número (candado). Seguros sobre el bruto, `paga_seguros` y `cobra_horas_extra`: igual que el domingo, porque es el mismo camino.
+- **Aprobaciones**: `diasConExtra` ya lo ofrece (vive en `domingoMin`); el `tipo` gana el valor `"sabado"` (`TipoDiaAprobable`) para que el chip diga «sábado» y no «domingo» sobre un sábado. Sin aprobar: $0 y aviso; «No»: decidido, no frena.
+- **El Reporte**: un día no laborable **con marcas** se recorre como fila (`esDiaLaborable(f) || p.dias.has(f)`); el que no tiene nada sigue escondido. Ese día **no tiene horario que cumplir** (`esDescansoTrabajado`): tardanza, salida temprana, tiempo fuera y hora extra salen en 0 —igual que lo que la planilla ya hacía con el domingo— y lo trabajado va entero al recargo. Las marcas y «a revisar» (4 marcas) no se tocan. Al lado de la fecha va el MISMO chip de Aprobaciones («sábado» / «domingo»).
+- **El rótulo**: la columna decía «Domingos», y con el sábado adentro engaña. Se rotula **«Descanso»** (Código de Trabajo: día de descanso semanal trabajado) desde UN lugar: tabla del cuadro («Des-/canso»), Excel («Descanso» y «Descanso (h)»), PDF, corte (`ROTULO_DEL_RELOJ.domingos`), detalle de la tarjeta («Descanso (domingos y sábados)») y comprobante («DÍA DE DESCANSO»). **Solo cambia el texto**: el campo `domingos` y la columna `domingo_min` siguen igual, y ningún número se mueve. Alternativa que se descartó: «Domingos y sábados» (no cabe en el encabezado de dos líneas y para Multifashion sugiere que su sábado va ahí, cuando ese es un día normal pagado por el quincenal).
+- **No cambia**: Multifashion (lunes a sábado: su sábado es `habil` y nunca pasa por acá), feriados y día libre de la empresa (van antes en `clasificarDia`), la marcación por teléfono (ya aceptaba el sábado), `sabadoMin` (queda en 0 con el interruptor prendido; la hoja «Horas» del Excel conserva «Sábado (h) sin pagar» para las quincenas viejas).
+- **`false`** = exactamente lo de antes: `sabadoMin`, sin fila en el Reporte, rótulos «Domingos».
+
+### Candados
+
+`src/__tests__/lib/asistencia-sabado-trabajado.test.ts` (14 pruebas): el sábado a `domingoMin` e idéntico al domingo · Aprobaciones lo ofrece como «sabado», sin aprobar $0 con aviso, aprobado × 1.50 = el mismo dinero que un domingo igual · el Reporte muestra el día no laborable con marcas sin tardanza ni extra, esconde el sin nada, y la planilla sigue pidiendo todos · Multifashion no se mueve · con el interruptor en `false` vuelve `sabadoMin` y el Reporte lo esconde · el rótulo sale de UN lugar y `domingos`/`domingo_min` no cambian. Tres candados viejos **cambiaron de dirección con nota fechada** (`asistencia-planilla.test.ts` «el sábado trabajado se MIDE aparte», `horario-configurable.test.ts` § 1 y § 7) y el vocabulario del comprobante suma «DÍA» y «DESCANSO».

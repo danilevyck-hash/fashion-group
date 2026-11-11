@@ -234,7 +234,8 @@ describe("C · si el servidor dice que no, la pantalla vuelve", () => {
 describe("D · control", () => {
   it("🔴 el Reporte usa el MISMO componente de botones que Aprobaciones", () => {
     const reporte = fs.readFileSync(path.join(RAIZ, "src/app/asistencia/ReporteTab.tsx"), "utf8");
-    expect(reporte).toContain('import { BotonesSiNo } from "./aprobaciones/BotonesSiNo"');
+    // 11-nov-2026: el mismo archivo también presta `ChipTipo` para el día de descanso.
+    expect(reporte).toMatch(/import \{ BotonesSiNo(, ChipTipo)? \} from "\.\/aprobaciones\/BotonesSiNo"/);
   });
 
   it("🔴 el Reporte NO rehace la cuenta de qué se aprueba: no importa `diasConExtra`", () => {

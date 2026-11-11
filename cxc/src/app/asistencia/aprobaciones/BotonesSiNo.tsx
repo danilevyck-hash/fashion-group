@@ -13,6 +13,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import type { Decision } from "@/lib/asistencia/aprobaciones";
+import { textoTipoDia, type TipoDiaAprobable } from "@/lib/asistencia/sabado-trabajado";
 
 export function BotonesSiNo({
   decision,
@@ -59,15 +60,15 @@ export function BotonesSiNo({
   );
 }
 
-/** «domingo» / «feriado» al lado de un día que no es hábil. Nada para la extra. */
-export function ChipTipo({ tipo }: { tipo: "extra" | "domingo" | "feriado" }) {
+/** «domingo» / «sábado» / «feriado» al lado de un día que no es hábil. Nada para la extra. */
+export function ChipTipo({ tipo }: { tipo: TipoDiaAprobable }) {
   if (tipo === "extra") return null;
   return (
     <span
       className="shrink-0 rounded bg-amber-50 px-1.5 text-[11px] text-amber-800"
       title="Trabajado en un día que no es hábil: se paga con el recargo de domingo y feriado."
     >
-      {tipo}
+      {textoTipoDia(tipo)}
     </span>
   );
 }

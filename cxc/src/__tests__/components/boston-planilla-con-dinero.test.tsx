@@ -18,6 +18,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import PlanillaBoston from "@/app/boston/tabs/PlanillaBoston";
+import { ROTULO_DOMINGOS_CORTO } from "@/lib/asistencia/sabado-trabajado";
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,7 +52,9 @@ vi.mock("@/components/ui/RangoFechas", () => ({
  *  que Boston dibuja sea EXACTAMENTE esa lista (con la columna nueva adentro). */
 const COLUMNAS = [
   "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas", "Salida\ntemprana", "Tiempo no\nlaborado",
-  "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
+  // 11-nov-2026: la columna «Domingos» se rotula «Descanso» cuando el sábado
+  // trabajado va adentro (`sabado-trabajado.ts`); el dinero no se movió.
+  "Extra\n1.50", "Exce-\ndente", ROTULO_DOMINGOS_CORTO, "Feria-\ndos", "Total\nbruto",
   "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
   "Mercan-\ncía", "Total\ndeducc.", "Otros\nservicios (+)", "Neto a\npagar",
 ];

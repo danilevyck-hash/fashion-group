@@ -37,6 +37,7 @@ import {
 import { HORAS_CERO, TOTALES_CERO, quincena, totalizar } from "@/lib/asistencia/planilla";
 import { centavos, type DineroLinea, type LineaPlanilla } from "@/lib/asistencia/planilla";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
+import { ROTULO_DOMINGOS } from "@/lib/asistencia/sabado-trabajado";
 import { CLAVES_RENGLON, armarComprobante } from "@/lib/asistencia/comprobante";
 import { construirExcelPlanilla, construirPdfPlanilla, type DatosPlanillaExport } from "@/lib/asistencia/planilla-exportar";
 import { totalesDe } from "@/lib/asistencia/planilla-guardada";
@@ -337,15 +338,16 @@ describe("D. LA NOTA — se dice de dónde salió, sin cajas ni chips", () => {
     const a = aplicarAjusteEnLinea(LINEA(), DIAS_DE_ANA, DIAS);
     const b = aplicarAjusteEnLinea(LINEA({ codigo: "2", etiqueta: "BETO" }), DINERO({ domingos: 20 }), DIAS);
     const c = LINEA({ codigo: "3", etiqueta: "CARLA" });
+    // 11-nov-2026: la columna «Domingos» se rotula desde `sabado-trabajado.ts` («Descanso»).
     expect(notaAjuste([a, b, c])).toBe(
-      "Horas extra 1.25, Tardanzas y Domingos incluyen los días 14–15 sep, que la quincena anterior pagó sin medir (2 colaboradores).",
+      `Horas extra 1.25, Tardanzas y ${ROTULO_DOMINGOS} incluyen los días 14–15 sep, que la quincena anterior pagó sin medir (2 colaboradores).`,
     );
     expect(columnasConAjuste({ domingos: 20, extraDiurno: 1 })).toEqual(["extraDiurno", "domingos"]);
   });
 
   it("con una sola columna, el verbo va en singular", () => {
     const b = aplicarAjusteEnLinea(LINEA(), DINERO({ domingos: 20 }), DIAS);
-    expect(notaAjuste([b])).toMatch(/^Domingos incluye los días/);
+    expect(notaAjuste([b]).startsWith(`${ROTULO_DOMINGOS} incluye los días`)).toBe(true);
   });
 });
 

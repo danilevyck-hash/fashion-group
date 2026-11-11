@@ -42,8 +42,9 @@ import {
 } from "@/lib/asistencia/extras-decididas";
 // 🔴 LOS DOS BOTONES SON LOS MISMOS DE APROBACIONES, no unos nuevos: mismo
 // componente, mismo endpoint, mismas reglas del servidor (19-sep-2026).
-import { BotonesSiNo } from "./aprobaciones/BotonesSiNo";
+import { BotonesSiNo, ChipTipo } from "./aprobaciones/BotonesSiNo";
 import { claveDia } from "@/lib/asistencia/aprobaciones";
+import { tipoDeDiaNoLaborable } from "@/lib/asistencia/sabado-trabajado";
 import { aprobacionesRoles } from "@/lib/asistencia/roles";
 // 🔴 LAS MARCAS DEL DÍA SE VEN TODAS (18-sep-2026). La contadora: *«y como veo
 // quien marco de mas? en el excel solo salen max 4 marcaciones»*. La cuenta de
@@ -2116,7 +2117,15 @@ function FilaDia({ d, codigo, persona, empresa, conExtra, sinMarcas, puedeCorreg
           teclado las siga alcanzando: esconderlas del tabulador sería sacarlas
           de verdad. */}
       <tr className={`group border-b border-gray-100 ${d.revisar ? "bg-amber-50/60" : ""} ${d.correcciones.length ? "bg-blue-50/40" : ""}`}>
-        <td className="whitespace-nowrap px-2 py-1.5 text-gray-700">{fechaCorta(d.fecha)}</td>
+        <td className="whitespace-nowrap px-2 py-1.5 text-gray-700">
+          {fechaCorta(d.fecha)}
+          {/* 🔴 El día de descanso trabajado (11-nov-2026) se dice con el MISMO
+              chip de Aprobaciones: «sábado» o «domingo». Solo cuando hay marcas;
+              un feriado ya tiene su renglón. */}
+          {!d.habil && !d.feriado && d.marcas.length > 0 && (
+            <span className="ml-1.5 inline-flex align-middle"><ChipTipo tipo={tipoDeDiaNoLaborable(d.fecha)} /></span>
+          )}
+        </td>
         {/* 🔴 CON EL EDITOR ABIERTO SIEMPRE VAN LAS CUATRO COLUMNAS, aunque el
             día no tenga ni una marca: el caso más común es justamente ése —quien
             olvidó marcar no tiene nada que corregir— y sin las celdas no habría

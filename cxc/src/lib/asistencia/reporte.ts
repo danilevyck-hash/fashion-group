@@ -127,6 +127,7 @@ import { compensarTardanza } from "./repone-tardanza";
 // `horario-configurable.ts`; acá solo se le pregunta. Sin nada configurado,
 // lunes a viernes y un horario: lo de siempre.
 import { esDiaLaborable, horarioDelDia } from "./horario-configurable";
+import { SABADO_TRABAJADO_COMO_DOMINGO, esDescansoTrabajado } from "./sabado-trabajado";
 // 🔑 SOLO EL TIPO. `correcciones.ts` importa `diaPanama` de acá (un valor), así
 // que un import normal armaría un ciclo en tiempo de ejecución; `import type`
 // se borra al compilar y no queda ninguno.
@@ -938,9 +939,15 @@ export function armarReporte(opts: {
     const extraMinimoSeg = extraMinimoMin * 60;
     // 🔴 SUS días laborables. Sin lista, lunes a viernes: lo de siempre.
     const diasDeEsta = opts.diasLaborables?.get(codigo);
+    // 🔴 UN DÍA NO LABORABLE CON MARCAS SALE COMO FILA (11-nov-2026, Daniel:
+    // «a veces mando a Rodrigo a trabajar los sábados, él debería poder marcar
+    // y editar»): sin la fila, una marca mal puesta un sábado no se podía
+    // arreglar. El que no tiene nada sigue escondido, como siempre. Con
+    // `SABADO_TRABAJADO_COMO_DOMINGO` apagado, la lista de antes.
     const habiles = opts.incluirNoHabiles === true
       ? todosLosDias
-      : todosLosDias.filter((f) => esDiaLaborable(f, diasDeEsta));
+      : todosLosDias.filter((f) =>
+        esDiaLaborable(f, diasDeEsta) || (SABADO_TRABAJADO_COMO_DOMINGO && p.dias.has(f)));
 
     const dias: DiaReporte[] = [];
     for (const fecha of habiles) {
@@ -1339,6 +1346,12 @@ export function armarReporte(opts: {
         marcas: buenas, salidaTempranaMin, habil, enCurso, fueraDeVigencia: false, vacacion: null,
       });
 
+      // 🔴 EL DÍA DE DESCANSO TRABAJADO NO TIENE HORARIO QUE CUMPLIR (11-nov-2026):
+      // igual que el domingo de siempre, sin tardanza, salida temprana, tiempo
+      // fuera ni hora extra — lo trabajado va ENTERO al recargo (`clasificarDia`).
+      // Acá solo se ponen en cero para que el Reporte no le pinte una tardanza
+      // a quien vino un sábado a las 10. Las marcas y «a revisar» no se tocan.
+      const descanso = esDescansoTrabajado(habil, feriado);
       dias.push({
         fecha,
         marcas: buenas.map(fmt),
@@ -1348,18 +1361,22 @@ export function armarReporte(opts: {
         entrada: fmt(ent),
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
-        tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin: extraTotalMin, trabajadoMin,
+        tardeMin: descanso ? 0 : tardeMin,
+        excesoAlmuerzoMin: descanso ? 0 : excesoAlmuerzoMin,
+        salidaTempranaMin: descanso ? 0 : salidaTempranaMin,
+        extraMin: descanso ? 0 : extraTotalMin,
+        trabajadoMin,
         // 🔴 Los tres de la entrada autorizada (24-sep-2026). Solo viajan
         // cuando hay algo que decir: un día de siempre sale como siempre.
-        ...(extraEntradaMin > 0 ? { extraEntradaMin } : {}),
+        ...(extraEntradaMin > 0 && !descanso ? { extraEntradaMin } : {}),
         ...(entradaAutorizada ? { entradaAutorizada } : {}),
-        ...(entradaTempranaMin !== null ? { entradaTempranaMin } : {}),
+        ...(entradaTempranaMin !== null && !descanso ? { entradaTempranaMin } : {}),
         revisar, salidaSospechosa: sospechosa,
         enCurso, fueraDeVigencia: false, ausente: false, vacacion: null, justificado, permiso, permisoRango,
         permisoPerdonaMin, permisoPerdonaSalidaMin, permisoPerdonaAlmuerzoMin, feriado, habil,
         ...seDescuenta,
         // 🔴 Solo con el interruptor prendido: apagado, el día sale como siempre.
-        ...(descuentaFuera ? { descuentaFueraMin: fueraNuevo ? excesoAlmuerzoMin : 0 } : {}),
+        ...(descuentaFuera ? { descuentaFueraMin: fueraNuevo && !descanso ? excesoAlmuerzoMin : 0 } : {}),
         // Solo para decirlo: los minutos de arriba ya salieron con ese horario.
         horarioDeAfuera: horarioHoy.deAfuera,
         correcciones,

@@ -23,6 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { DineroLinea } from "./planilla";
+import { ROTULO_DOMINGOS_CORTO } from "./sabado-trabajado";
 
 /** Los 20 campos que la tabla dibuja, en su orden (+ «Tiempo no laborado», 9-oct-2026). */
 export const CAMPOS_DINERO_PLANILLA = [
@@ -59,7 +60,7 @@ export const COLUMNAS_DINERO_PLANILLA: readonly ColumnaDineroPlanilla[] = [
   { campo: "tiempoNoLaborado", rotulo: "Tiempo no\nlaborado" },
   { campo: "extraNocturno", rotulo: "Extra\n1.50" },
   { campo: "excedente", rotulo: "Exce-\ndente" },
-  { campo: "domingos", rotulo: "Domin-\ngos" },
+  { campo: "domingos", rotulo: ROTULO_DOMINGOS_CORTO },
   { campo: "feriados", rotulo: "Feria-\ndos" },
   { campo: "totalBruto", rotulo: "Total\nbruto" },
   { campo: "seguroSocial", rotulo: "Seguro\nsocial" },
