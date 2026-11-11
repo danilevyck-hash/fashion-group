@@ -21,6 +21,8 @@
  * que se puede testear desde afuera de la oficina.
  * ────────────────────────────────────────────────────────────────────────── */
 
+import { fechaPanamaDe } from "@/lib/fecha-panama";
+
 /**
  * 🔑 EL NOMBRE DEL RELOJ ES ESTE Y NO OTRO.
  *
@@ -389,13 +391,62 @@ export function vigiaDebeAlertar(
   if (!ultima) return false;
   const mins = minutosDesde(ultima, ahoraMs);
   if (mins === null || mins <= horas * 60) return false;
-  if (fila.alertado_en) {
-    // Ya se avisó: solo se repite si pasó el respiro. Una fecha ilegible se
-    // trata como «recién avisado» — ante la duda, callar.
-    const desdeAviso = minutosDesde(fila.alertado_en, ahoraMs);
-    if (desdeAviso === null || desdeAviso <= horasEntreAvisos * 60) return false;
+  // Ya se avisó: solo se repite si pasó el respiro. Una fecha ilegible se
+  // trata como «recién avisado» — ante la duda, callar.
+  return respiroCumplido(fila, ahoraMs, horasEntreAvisos);
+}
+
+/* ── 🔴 SOLO DÍAS HÁBILES (11-nov-2026) ────────────────────────────────────
+ *
+ * Daniel: *«esos días [feriados] el aviso no me debería de llegar, que hace
+ * ruido»* → «3. A». Con el interruptor prendido, las 24 horas seguidas se
+ * reemplazan por: HOY es día hábil del reloj Y entre la última lectura buena y
+ * hoy (los dos excluidos) hubo al menos UN día hábil COMPLETO sin leer.
+ * Día hábil = de la empresa del reloj (Boston lunes a viernes, Multifashion
+ * lunes a sábado), menos domingo y menos todo `asistencia_feriados`.
+ * Un silencio antes de un feriado no se pierde: avisa el siguiente hábil.
+ * `false` = las 24 horas de antes. El anti-repetición es el mismo.
+ */
+export const VIGIA_SOLO_DIAS_HABILES = true;
+
+export interface CalendarioDelReloj {
+  /** 1 = lunes … 6 = sábado. El domingo nunca cuenta. */
+  dias: readonly number[];
+  /** Fechas YYYY-MM-DD de `asistencia_feriados`, de cualquier tipo. */
+  feriados: ReadonlySet<string>;
+}
+
+function esDiaHabilDelReloj(fecha: string, cal: CalendarioDelReloj): boolean {
+  const dow = new Date(`${fecha}T12:00:00Z`).getUTCDay();
+  return dow !== 0 && cal.dias.includes(dow) && !cal.feriados.has(fecha);
+}
+
+function diaSiguiente(fecha: string): string {
+  return new Date(Date.parse(`${fecha}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}
+
+function respiroCumplido(fila: FilaDispositivo, ahoraMs: number, horasEntreAvisos: number): boolean {
+  if (!fila.alertado_en) return true;
+  const desdeAviso = minutosDesde(fila.alertado_en, ahoraMs);
+  return desdeAviso !== null && desdeAviso > horasEntreAvisos * 60;
+}
+
+export function vigiaDebeAlertarEnDiasHabiles(
+  fila: FilaDispositivo | null,
+  ahoraMs: number,
+  cal: CalendarioDelReloj,
+  horasEntreAvisos: number = HORAS_ENTRE_AVISOS_VIGIA,
+): boolean {
+  if (!fila) return false;
+  const ultima = ultimaLecturaBuena(fila);
+  if (!ultima || !Number.isFinite(Date.parse(ultima))) return false;
+  const hoy = fechaPanamaDe(new Date(ahoraMs).toISOString());
+  if (!esDiaHabilDelReloj(hoy, cal)) return false;
+  let huboDiaCompleto = false;
+  for (let d = diaSiguiente(fechaPanamaDe(ultima)); d < hoy; d = diaSiguiente(d)) {
+    if (esDiaHabilDelReloj(d, cal)) { huboDiaCompleto = true; break; }
   }
-  return true;
+  return huboDiaCompleto && respiroCumplido(fila, ahoraMs, horasEntreAvisos);
 }
 
 /* ── El hueco que el programa ya no alcanza ─────────────────────────────────

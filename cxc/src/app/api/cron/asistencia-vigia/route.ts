@@ -53,6 +53,9 @@ import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { enviarSistema } from "@/lib/alertas/canal";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { borrarSelfiesVencidas } from "@/lib/marcacion/retencion";
+import { leerFeriados } from "@/lib/asistencia/feriados-server";
+import { diasLaborablesDeEmpresa } from "@/lib/asistencia/horario-configurable";
+import { RELOJ_DE_EMPRESAS } from "@/lib/asistencia/relojes-en-la-fila";
 import {
   HORAS_PARA_VIGIA,
   DIAS_RECUPERACION_AGENTE,
@@ -61,7 +64,10 @@ import {
   textoHuecoViejo,
   textoHuecoCerrado,
   vigiaDebeAlertar,
+  vigiaDebeAlertarEnDiasHabiles,
   vigiaDebeAlertarHueco,
+  VIGIA_SOLO_DIAS_HABILES,
+  type CalendarioDelReloj,
   vigiaHuecoCerrado,
   type FilaDispositivo,
 } from "@/lib/asistencia/agente";
@@ -97,8 +103,26 @@ export async function GET(req: NextRequest) {
   const filas = (data ?? []) as FilaDispositivo[];
   const avisados: string[] = [];
 
+  // 🔴 Solo días hábiles (11-nov-2026). Sin poder leer los feriados se cae a
+  // las 24 horas de antes: falla ABIERTA, nunca callar de más.
+  let calendarioDe: ((dispositivo: string) => CalendarioDelReloj) | null = null;
+  if (VIGIA_SOLO_DIAS_HABILES) {
+    try {
+      const hoy = hoyPanama();
+      const desde = new Date(Date.parse(`${hoy}T12:00:00Z`) - 90 * 86_400_000).toISOString().slice(0, 10);
+      const { feriados, diasLibres } = await leerFeriados(desde, hoy);
+      const fechas = new Set([...feriados.keys(), ...diasLibres.keys()]);
+      calendarioDe = (d) => ({ dias: diasLaborablesDeEmpresa(RELOJ_DE_EMPRESAS[d]?.[0]), feriados: fechas });
+    } catch (e) {
+      console.error("[asistencia-vigia] no se pudieron leer los feriados:", (e as Error).message);
+    }
+  }
+
   for (const f of filas) {
-    if (!vigiaDebeAlertar(f, ahora, HORAS_PARA_VIGIA)) continue;
+    const debe = calendarioDe
+      ? vigiaDebeAlertarEnDiasHabiles(f, ahora, calendarioDe(f.dispositivo))
+      : vigiaDebeAlertar(f, ahora, HORAS_PARA_VIGIA);
+    if (!debe) continue;
 
     const minutos = (ahora - Date.parse(f.visto_en as string)) / 60_000;
     // Se marca ANTES de mandar: si el envío a Telegram falla, es preferible

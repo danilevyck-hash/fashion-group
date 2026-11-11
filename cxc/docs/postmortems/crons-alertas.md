@@ -1483,3 +1483,13 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 - Se publica por solicitud de cambio: rama → `gh pr create --base main` → `gh pr merge <n> --auto --squash`. Detalle en [`../seguridad/publicar-por-solicitud-de-cambio.md`](../seguridad/publicar-por-solicitud-de-cambio.md).
 - Apagar `enforce_admins` no es salida de emergencia; tampoco `--force` ni `gh pr merge --admin`. Ver [`../seguridad/github-enforce-admins.md`](../seguridad/github-enforce-admins.md).
 - El chequeo de tipos salió del build de Vercel (`typescript.ignoreBuildErrors: true` en `next.config.js`) y pasó al workflow «pruebas» (paso «Chequeo de tipos», `npm run typecheck`, antes de las pruebas). El build se colgaba en ese paso hasta el límite de 45 min y frenaba la cola de vistas previas.
+
+## El reloj y los feriados (11-nov-2026)
+
+Daniel: *«esos días [feriados] el aviso no me debería de llegar, que hace ruido»* → «3. A».
+
+- **Antes**: el vigía (`asistencia-vigia`, 10:00 · 15:00 · 17:15 de Panamá, lunes a viernes) avisaba por 🔧 SISTEMA si el reloj llevaba **más de 24 h** sin leerse, sin mirar feriados: un feriado o el lunes después de uno sonaba.
+- **Ahora** (`VIGIA_SOLO_DIAS_HABILES = true`, `vigiaDebeAlertarEnDiasHabiles` en `lib/asistencia/agente.ts`): suena solo si **hoy es día hábil del reloj** y entre la última lectura buena y hoy (los dos excluidos) hubo **al menos un día hábil COMPLETO** sin leer. Día hábil = días de la empresa del reloj (`RELOJ_DE_EMPRESAS` → `diasLaborablesDeEmpresa`: Boston lunes a viernes, Multifashion lunes a sábado), nunca domingo, y nunca una fecha de `asistencia_feriados` (feriado o día libre).
+- Un silencio antes de un feriado **no se pierde**: avisa el siguiente hábil. Ejemplo medido en el candado: mudo desde el 2-nov 16:35 con 3, 5 y 10-nov feriados → el 4 cuenta pero aún no termina, el 5 es feriado, **avisa el 6**.
+- 🔴 Si no se pueden leer los feriados, cae a las **24 h de antes** (falla ABIERTA, nunca callar de más). Anti-repetición (2 h), texto del aviso, `vercel.json` y la alerta del hueco de 30 días: **sin cambios**.
+- Candado: `src/__tests__/lib/vigia-solo-dias-habiles.test.ts`. `false` = la conducta de antes.
