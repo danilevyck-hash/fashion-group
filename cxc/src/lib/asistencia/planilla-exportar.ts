@@ -34,6 +34,7 @@ import {
 } from "@/lib/excel-export";
 import { MINUTOS_TARDE_QUE_SON_AUSENCIA } from "./config";
 import type { ReglasAsistencia } from "./config";
+import { ROTULO_DOMINGOS, ROTULO_DOMINGOS_CORTO, ROTULO_DOMINGO_HORAS } from "./sabado-trabajado";
 import {
   EXPLICACION_SERVICIO_PROFESIONAL,
   MOTIVO_FUERA_DE_PLANILLA,
@@ -190,7 +191,7 @@ const COLUMNAS: ReportColumn[] = [
   { header: "Tiempo no laborado", wch: 15, align: "right", fmt: MONEY_FMT },
   { header: "Horas extra 1.50", wch: 14, align: "right", fmt: MONEY_FMT },
   { header: "Excedente", wch: 14, align: "right", fmt: MONEY_FMT },
-  { header: "Domingos", wch: 12, align: "right", fmt: MONEY_FMT },
+  { header: ROTULO_DOMINGOS, wch: 12, align: "right", fmt: MONEY_FMT },
   { header: "Feriados", wch: 12, align: "right", fmt: MONEY_FMT },
   { header: "Total bruto", wch: 13, align: "right", fmt: MONEY_FMT },
   { header: "Seguro social", wch: 13, align: "right", fmt: MONEY_FMT },
@@ -304,7 +305,7 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
     { header: "Extra 1.25 (h)", wch: 12, align: "right" },
     { header: "Extra 1.50 (h)", wch: 12, align: "right" },
     { header: "Excedente (h)", wch: 12, align: "right" },
-    { header: "Domingo (h)", wch: 11, align: "right" },
+    { header: ROTULO_DOMINGO_HORAS, wch: 11, align: "right" },
     { header: "Feriado (h)", wch: 11, align: "right" },
     { header: "Tardanza (min)", wch: 13, align: "right" },
     // 🔴 Los minutos de más de 30 tarde van APARTE. Sumados a la tardanza, la
@@ -589,7 +590,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
     startY: ESTILO_UNICO ? Y_CONTENIDO : 24,
     head: [[
       "Colaborador", "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas", "Salida\ntemprana", "Tiempo no\nlaborado",
-      "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
+      "Extra\n1.50", "Exce-\ndente", ROTULO_DOMINGOS_CORTO, "Feria-\ndos", "Total\nbruto",
       "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
       "Mercan-\ncía", "Total\ndeducc.", "Otros\nserv. (+)", "Neto a\npagar",
     ]],

@@ -98,6 +98,7 @@ import {
   type DiaLibreEnLinea,
 } from "@/lib/asistencia/dia-libre-empresa";
 import { ROTULOS_DINERO_PLANILLA, montosDePlanilla } from "@/lib/asistencia/columnas-dinero-planilla";
+import { ROTULO_DOMINGOS_DETALLE } from "@/lib/asistencia/sabado-trabajado";
 import { antesDeCerrarDelCuadro } from "@/lib/asistencia/antes-de-cerrar-del-cuadro";
 // 🔴 CON «TODAS», EL TABLERO DE CIERRE (19-sep-2026): una línea por empresa,
 // con personas · neto · qué falta · Cerrar. Nunca un total del grupo.
@@ -2534,7 +2535,7 @@ function Tarjeta({
           {linea(`Horas extra 1.25 (${aHoras(h.extraDiurnoMin)} h)`, d.extraDiurno)}
           {linea(`Horas extra 1.50 (${aHoras(h.extraNocturnoMin)} h)`, d.extraNocturno)}
           {linea(`Excedente (${aHoras(h.excedenteMin)} h — no se usa, va al 1.50)`, d.excedente)}
-          {linea(`Domingos (${aHoras(h.domingoMin)} h)`, d.domingos)}
+          {linea(`${ROTULO_DOMINGOS_DETALLE} (${aHoras(h.domingoMin)} h)`, d.domingos)}
           {linea(`Feriados (${aHoras(h.feriadoMin)} h)`, d.feriados)}
           {/* 🔴 LAS DOS ETIQUETAS SALEN DE `planilla.ts`, y no se arman acá.
               Desde el 25-ago-2026 estas dos columnas SE REPARTEN los mismos

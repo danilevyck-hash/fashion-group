@@ -84,6 +84,7 @@
 
 import type { DineroLinea, Quincena } from "./planilla";
 import { centavos } from "./planilla";
+import { ROTULO_DOMINGOS } from "./sabado-trabajado";
 import { finDeLaMedicion, ultimoDiaQueSePaga } from "./dia-31";
 
 /**
@@ -345,7 +346,7 @@ export const ROTULO_DEL_RELOJ: Readonly<Record<CampoDelReloj, string>> = {
   extraDiurno: "Horas extra 1.25",
   extraNocturno: "Horas extra 1.50",
   excedente: "Excedente",
-  domingos: "Domingos",
+  domingos: ROTULO_DOMINGOS,
   feriados: "Feriados",
   ausencias: "Ausencias",
   tardanzas: "Tardanzas",

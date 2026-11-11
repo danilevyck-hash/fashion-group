@@ -51,6 +51,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { clasificarDia, fechaCorta, type LineaPlanilla } from "./planilla";
+import { tipoDeDiaNoLaborable, type TipoDiaAprobable } from "./sabado-trabajado";
 import type { ReglasAsistencia } from "./config";
 import type { PersonaReporte } from "./reporte";
 
@@ -192,7 +193,8 @@ export interface DiaExtra {
   nocturnoMin: number;
   /** 🔴 Lo trabajado en domingo o feriado (10-sep-2026): se aprueba igual que la extra, con SU recargo. */
   domFerMin: number;
-  tipo: "extra" | "domingo" | "feriado";
+  /** «sabado» (11-nov-2026) = el sábado trabajado por quien no lo trabaja: va como el domingo. */
+  tipo: TipoDiaAprobable;
   /**
    * 🔴 «Entró 06:00 (autorizado)» (24-sep-2026): la hora autorizada del día,
    * "HH:MM", cuando parte de estos minutos viene de la ENTRADA. Ausente = el
@@ -232,7 +234,9 @@ export function diasConExtra(
       diurnoMin: c.extraDiurnoMin,
       nocturnoMin: c.extraNocturnoMin,
       domFerMin,
-      tipo: c.feriadoMin > 0 ? "feriado" : c.domingoMin > 0 ? "domingo" : "extra",
+      // 🔴 El sábado trabajado (11-nov-2026) viaja en `domingoMin` y se dice
+      // con su nombre para que el chip no diga «domingo» sobre un sábado.
+      tipo: c.feriadoMin > 0 ? "feriado" : c.domingoMin > 0 ? tipoDeDiaNoLaborable(d.fecha) : "extra",
       // Solo cuando la entrada autorizada aportó minutos: así la pantalla
       // dice de dónde sale una extra que no se ve en la hora de salida.
       ...((d.extraEntradaMin ?? 0) > 0 && d.entradaAutorizada
@@ -313,7 +317,7 @@ export interface PersonaEnDia {
   nocturnoMin: number;
   /** Lo trabajado en domingo o feriado, y de qué tipo es el día (10-sep-2026). */
   domFerMin: number;
-  tipo: "extra" | "domingo" | "feriado";
+  tipo: TipoDiaAprobable;
   /** `true` ⇔ `decision === 'si'`. Lo que se PAGA. */
   aprobado: boolean;
   /** Sí · No · pendiente (10-sep-2026). Ausente = se deriva de `aprobado`. */

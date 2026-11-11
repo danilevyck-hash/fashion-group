@@ -119,11 +119,15 @@ describe("1. 🔴 SIN LA MIGRACIÓN TODO SE COMPORTA COMO HOY", () => {
     expect(r.size).toBe(0);
   });
 
-  it("sin mapa, el motor mide lunes a viernes: el sábado 5 sin marca NO es ausencia, y con marca va a `sabadoMin`", () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 11-NOV-2026: con marca, el sábado no laborable va
+  // a `domingoMin` (se aprueba y se paga como el domingo), no a `sabadoMin`.
+  // El control al revés vive en `asistencia-sabado-trabajado.test.ts` § 5.
+  it("sin mapa, el motor mide lunes a viernes: el sábado 5 sin marca NO es ausencia, y con marca va como el domingo", () => {
     const p = reporte({ marcaciones: [...diaNormal(MF, LUN_7), ...diaNormal(MF, SAB_5)], desde: SAB_5, hasta: LUN_7 });
     const sab = diaDe(p, SAB_5);
     expect(sab.habil).toBe(false);
-    expect(clasificarDia(sab, R).sabadoMin).toBeGreaterThan(0);
+    expect(clasificarDia(sab, R).domingoMin).toBeGreaterThan(0);
+    expect(clasificarDia(sab, R).sabadoMin).toBe(0);
     expect(clasificarDia(sab, R).ausenciaMin).toBe(0);
     const sinMarca = reporte({ marcaciones: diaNormal(MF, LUN_7), desde: SAB_5, hasta: LUN_7 });
     expect(diaDe(sinMarca, SAB_5).ausente).toBe(false);
@@ -397,7 +401,8 @@ describe("7. 🔴 las rutas y la pantalla van por la fuente ÚNICA", () => {
   it("el motor: los días se recorren por persona, `habil` sale de `esDiaLaborable` y el horario del día de `horarioDelDia`", () => {
     const motor = puro("src/lib/asistencia/reporte.ts");
     expect(motor).toMatch(/const habil = esDiaLaborable\(fecha, diasDeEsta\);/);
-    expect(motor).toMatch(/todosLosDias\.filter\(\(f\) => esDiaLaborable\(f, diasDeEsta\)\)/);
+    // 11-nov-2026: el día no laborable CON marcas también se recorre (`sabado-trabajado.ts`).
+    expect(motor).toMatch(/todosLosDias\.filter\(\(f\) =>\s*esDiaLaborable\(f, diasDeEsta\) \|\| \(SABADO_TRABAJADO_COMO_DOMINGO && p\.dias\.has\(f\)\)\)/);
     expect(motor).toMatch(/p\.primera\.get\(fecha\)\?\.dispositivo/);
     expect(motor).toMatch(/if \(!prim \|\| seg < prim\.seg\)/);
     // La planilla pregunta por `d.habil`, no por el calendario.

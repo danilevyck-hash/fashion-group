@@ -92,6 +92,7 @@ import { etiquetaPersona } from "./directorio";
 // preguntarle al calendario por un día que sí lo trae haría que el Reporte y
 // la Planilla dijeran cosas distintas del mismo sábado.
 import { esHabil, type DiaReporte, type PersonaReporte } from "./reporte";
+import { noLaborableVaComoDomingo } from "./sabado-trabajado";
 import { tiempoDelDia } from "./formato-tiempo";
 import { minutosExtraAutomaticos } from "./extra-automatico";
 import { ultimoDiaQueSePaga } from "./dia-31";
@@ -684,11 +685,6 @@ export function jornadaDiariaMin(h: HorarioDia | null | undefined): number {
   return Number.isFinite(min) && min > 0 ? min : JORNADA_DIARIA_DEFAULT_MIN;
 }
 
-/** El día de la semana de una fecha, 0 = domingo. */
-function dow(fecha: string): number {
-  return new Date(`${fecha}T12:00:00Z`).getUTCDay();
-}
-
 /**
  * Clasifica UN día en las columnas del cuadro.
  *
@@ -792,9 +788,12 @@ export function clasificarDia(
   // abajo, con tardanza, extra y ausencia como cualquier otro; para el resto
   // sigue siendo el sábado de siempre (`sabadoMin`, sin columna). El domingo
   // nunca es laborable y sigue con su recargo.
+  // 🔴 EL SÁBADO TRABAJADO POR QUIEN NO TRABAJA LOS SÁBADOS VA COMO EL DOMINGO
+  // (11-nov-2026, Daniel: «1. A»): a `domingoMin`, que es la MISMA columna, el
+  // mismo recargo y la misma aprobación. Con `SABADO_TRABAJADO_COMO_DOMINGO`
+  // apagado vuelve a `sabadoMin`, sin plata. Ver `sabado-trabajado.ts`.
   if (!habil) {
-    const esDomingo = dow(d.fecha) === 0;
-    return esDomingo
+    return noLaborableVaComoDomingo(d.fecha)
       ? { ...cero, domingoMin: d.trabajadoMin }
       : { ...cero, sabadoMin: d.trabajadoMin };
   }

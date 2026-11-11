@@ -493,11 +493,16 @@ describe("🔴 Tolerancia, domingos, feriados y ausencias", () => {
     expect(calcularDinero(523.47, 40, h, manuales(), R)!.ausencias).toBe(24.16);
   });
 
-  it("el sábado trabajado se MIDE aparte y no se cuela en ninguna columna pagada", () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 11-NOV-2026 (Daniel: «1. A»): el sábado trabajado
+  // por quien no trabaja los sábados va a la columna del DOMINGO —se aprueba y
+  // se paga × 1.50— y `sabadoMin` queda en 0. Hasta ese día se medía aparte y
+  // no se pagaba. El control al revés (interruptor apagado → `sabadoMin`) vive
+  // en `asistencia-sabado-trabajado.test.ts` § 5.
+  it("el sábado trabajado va a la columna del domingo y no se cuela en la extra ni en la ausencia", () => {
     const p = correr([["2026-07-25", "08:00"], ["2026-07-25", "12:00"]], "2026-07-25", "2026-07-25");
     const h = medirHoras(p, R, 8 * 60);
-    expect(h.sabadoMin).toBe(240);
-    expect(h.domingoMin).toBe(0);
+    expect(h.domingoMin).toBe(240);
+    expect(h.sabadoMin).toBe(0);
     expect(h.extraDiurnoMin).toBe(0);
     expect(h.ausenciaMin).toBe(0);
   });

@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { PESTANA_FICHAS, dondeSeCargaLaFicha } from "@/lib/asistencia/persona-en-el-centro";
 import { textoAlmuerzo, REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
 import { MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
+import { SABADO_TRABAJADO_COMO_DOMINGO } from "@/lib/asistencia/sabado-trabajado";
 
 /** Los motivos salen de la MISMA lista que ofrece el desplegable.
  *  🩸 Este cartel nombraba «vacaciones» y «permiso»: las vacaciones se mudaron a
@@ -113,7 +114,7 @@ export default function ComoFuncionaTab() {
           <li>· La quincena va del <b>1 al 15</b> y del <b>16 al fin de mes</b>. El día 31 no paga sueldo de más, pero si se falta ese día sí se descuenta.</li>
           <li>· La <b>rata por hora</b> es el salario del mes dividido entre {reglas.divisor40} para quien trabaja 40 horas por semana, y entre {reglas.divisor48} para quien trabaja 48.</li>
           <li>· Las <b>horas extra</b> hasta las {reglas.horaCorteNocturno} se pagan × {reglas.recargoExtraDiurno}; desde el minuto siguiente × {reglas.recargoExtraNocturno}. <b>No hay un tercer escalón</b>: el «excedente de 9 horas» también va × {reglas.recargoExtraNocturno} y su columna queda en $0.00.</li>
-          <li>· Los <b>domingos y feriados</b> trabajados se pagan × {reglas.recargoDomingoFeriado}.</li>
+          <li>· Los <b>domingos y feriados</b> trabajados se pagan × {reglas.recargoDomingoFeriado}.{SABADO_TRABAJADO_COMO_DOMINGO && <> El <b>sábado</b> de quien no trabaja los sábados va igual que el domingo: se aprueba en Aprobaciones y se paga × {reglas.recargoDomingoFeriado}, en la columna «Descanso».</>}</li>
           <li>· Se descuentan las <b>tardanzas</b> (minutos × el valor del minuto), las <b>ausencias</b> (8 horas × la rata por cada día completo), el seguro social ({reglas.seguroSocialPct} %) y el educativo ({reglas.seguroEducativoPct} %).</li>
           {/* 🩸 Este renglón nombraba la casilla «ya se le pagó», y esa casilla
               se renombró el 1-sep-2026 porque enredaba. Un cartel que
