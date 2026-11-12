@@ -2637,3 +2637,16 @@ Aprobado por Daniel con el mockup «HOY vs RECOMENDACIÓN» (`~/Desktop/etiqueta
 - 🔴 **Falla ABIERTA sin la columna:** la lista y la etiqueta suelta se vuelven a leer sin `pedido`; un envío sin pedido se guarda como siempre; uno con pedido contesta 503 y lo dice.
 - **El papel** (`pdf-etiquetas.ts`): «Pedido 16-000002926» en una línea normal, gris (68) y del tamaño de la fecha del encabezado, sin rótulo, en el aire que ya había entre la factura y «Cliente». Si la nota obliga a apretar (carta), lo que no cabe arriba se le quita al aire de cliente → destino. Un traslado no lo imprime. 🔴 **Sin pedido el PDF es idéntico byte por byte** al del generador anterior (ocho casos, carta y 4×6, con huellas fijas).
 - **Candados:** `guias-etiqueta-pedido` (papel) y el bloque 7 de `guias-etiquetas-por-envio-route` (la ruta).
+
+## 12-nov-2026 — Etiquetas: el N.° de pedido se trae de Switch
+
+Aprobado por Daniel. El campo pasó de «N.° de pedido (opcional)» a **«N.° de pedido»** y sigue sin frenar: se puede imprimir sin él.
+
+- **De dónde sale:** el API de Switch no trae el pedido; la vista de la factura en el PANEL (`/reportes/facturamostrar/<switch_factura_id>`) sí: «Referencia Pedido: 16-000002889». El id es el `switch_factura_id` que la lista de facturas del envío ya trae.
+- **Medido el 12-nov-2026 en las seis del grupo:** Fashion Wear (16-000002894, 16-000002841), Vistana (16-000002388) y Active Wear (16-000000241) contestan **HTML**; Fashion Shoes (16-000002205), Active Shoes (16-000000554) y Joystep (16-000000073) contestan **un PDF de DOMPDF** con el mismo texto. La factura sin pedido no trae la línea (Active Wear 11-000000355, Joystep 11-000000103) → vacío.
+- **Cómo:** `GET /api/guias/etiquetas/pedido?empresa=&ids=` (los roles de Etiquetas) → `buscarPedidosDeFacturas` (`lib/guias/pedido-de-factura.ts`): UN login al panel por empresa y por búsqueda, las facturas una tras otra (máx. 10), y cierra la sesión. Si hay una corrida de Switch de esa empresa en curso (`switch_sync_log` running < 30 min) no entra. Tope **12 s**; **nunca falla hacia la pantalla**: lo que no se lea viaja `null`.
+- **Medido:** de 3 a 12 s por búsqueda (el login del panel va de 2 a 12 s; cada factura, 0,5 a 3,5 s). Un login lento llega al tope y el campo queda para escribirlo.
+- **La lectura** (`extraerReferenciaPedido`): regex estricta —solo espacios entre «Pedido:» y un `NN-NNNNNN…`— y pasa por `normalizarPedido`. El PDF se lee inflando sus streams y juntando las cadenas `Tj`/`TJ`.
+- **En pantalla:** al marcar facturas, «Buscando pedido…» junto al rótulo y el campo se llena; varias facturas con pedidos distintos se juntan «16-000002889 / 16-000002898» si caben en 30; si no, el campo queda vacío y lo dice. Lo escrito a mano no se pisa; lo ya leído no se vuelve a pedir.
+- ⚠️ **Saca a Daniel del panel de esa empresa** (`changesession=SI`); él lo acepta. No es un cron: no tiene horario. Va declarado en `cron-login-web-oficina.test.ts` (bloque C y `PUERTAS_LOGIN_WEB`).
+- **Candado:** `guias-etiquetas-pedido-switch` (lector HTML/PDF, la unión, roles y el `null` cuando Switch falla).

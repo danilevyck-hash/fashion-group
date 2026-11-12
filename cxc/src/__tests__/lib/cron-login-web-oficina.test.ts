@@ -100,6 +100,7 @@ const PUERTAS_LOGIN_WEB = [
   "syncAllEgresos",
   "syncEmpresaIngresos",
   "syncAllIngresos",
+  "buscarPedidosDeFacturas",
 ];
 
 /** Crons cuyo route LLAMA a una puerta del login web. Sin listas escritas a
@@ -225,6 +226,11 @@ describe("C. quién importa web-client", () => {
       // es responsable de hacerlo en la madrugada de Panamá y de mirar el
       // calendario, porque no hay ningún cron que se lo haga cumplir.
       path.join("app", "api", "diag", "egresos-varios", "route.ts"),
+      // 🔴 NO es un cron (12-nov-2026): Despachos › Etiquetas › Nuevo envío
+      // busca el N.° de pedido de las facturas marcadas EN EL MOMENTO, con un
+      // login por empresa y por búsqueda. Daniel aceptó que lo saque del panel.
+      // No tiene horario ni es colateral: no entra en COLATERALES_LOGIN_WEB.
+      path.join("lib", "guias", "pedido-de-factura.ts"),
       // COMPRAS (ingreso de mercancía) de las 6 de Fashion Group: corre 09:05
       // UTC = 04:05 a.m. Panamá (madrugada, igual que los otros). Es la franja
       // que dejó libre `sync-mayor` al retirarse, y era de un cron de login web.

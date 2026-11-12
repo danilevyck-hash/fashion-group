@@ -339,6 +339,7 @@ Todas las rutas que `web-client.ts` toca en producción. `baseUrl` = la misma `S
 | `/reportes/stockingresomercanciadetalle` | POST | **llegadas, una fila por artículo** (13 columnas; 12 en fashion_shoes) | CSV con `;` | `switch_ingresos_mercancia` | `:788` |
 | `/reportes/stockingresomercancia` | POST | lo mismo resumido por documento, **solo para cuadrar** | CSV con `;` | — (se compara, no se guarda) | `:790` |
 | `/log/<file>` | GET | el archivo que arman los acumuladores cuando responden `response:false` | CSV | — | `:665` |
+| `/reportes/facturamostrar/<switch_factura_id>` | GET | la vista de UNA factura: de ahí sale **«Referencia Pedido»** (el API no la trae). HTML en Fashion Wear, Vistana y Active Wear; **PDF** en Fashion Shoes, Active Shoes y Joystep (medido 12-nov-2026) | HTML o PDF | — (en el momento, a Despachos › Etiquetas) | `leerFacturaMostrar` → `lib/guias/pedido-de-factura.ts` |
 
 🔑 **El `uuid` no es fijo ni configurable: Switch lo emite en cada pedido de reporte** y solo vale para esa corrida. Buscar «el uuid de Boston» en el repo no encuentra nada porque no existe.
 

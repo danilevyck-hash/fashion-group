@@ -72,6 +72,7 @@ import {
   normalizarNota,
   normalizarPedido,
   notasMasUsadas,
+  pedidoPropuesto,
   rangosDelEnvio,
   textoRango,
   type Envio,
@@ -454,6 +455,11 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   const [destino, setDestino] = useState("");
   const [destinoTocado, setDestinoTocado] = useState(false);
   const [pedido, setPedido] = useState("");
+  const [pedidoTocado, setPedidoTocado] = useState(false);
+  const [buscandoPedido, setBuscandoPedido] = useState(false);
+  const [avisoPedido, setAvisoPedido] = useState<string | null>(null);
+  /** Lo que Switch ya contestó, por `empresa|switch_factura_id` (null = sin pedido). */
+  const pedidosHallados = useRef(new Map<string, string | null>());
   const [guardando, setGuardando] = useState(false);
   const [formato, setFormato] = useFormatoEtiquetas();
   const [error, setError] = useState<string | null>(null);
@@ -543,6 +549,40 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   const enElEnvio = marcadas.filter((m) => porClave.has(m.clave));
   const atajos = useMemo(() => notasMasUsadas(etiquetas), [etiquetas]);
 
+  // 🔴 EL N.° DE PEDIDO SE TRAE DE SWITCH (12-nov-2026): al marcar facturas se
+  // busca su «Referencia Pedido» en el panel y se propone en el campo, que se
+  // sigue pudiendo editar. Lo escrito a mano NO se pisa. Un login por búsqueda:
+  // se espera a que dejen de marcar y lo ya buscado no se vuelve a pedir.
+  const idsDelEnvio = enElEnvio
+    .map((m) => (porClave.get(m.clave) as Factura).switch_factura_id)
+    .filter((id): id is number => id != null);
+  const llaveIds = `${empresaElegida ?? ""}|${idsDelEnvio.join(",")}`;
+  useEffect(() => {
+    if (pedidoTocado || !empresaElegida) return;
+    if (idsDelEnvio.length === 0) { setPedido(""); setAvisoPedido(null); return; }
+    let vigente = true;
+    const proponer = () => {
+      const { valor, noCabe } = pedidoPropuesto(idsDelEnvio.map((id) => pedidosHallados.current.get(`${empresaElegida}|${id}`) ?? null));
+      setPedido(valor);
+      setAvisoPedido(noCabe ? "Las facturas son de pedidos distintos y no caben juntos. Escríbelo a mano." : null);
+    };
+    const faltan = idsDelEnvio.filter((id) => !pedidosHallados.current.has(`${empresaElegida}|${id}`));
+    if (faltan.length === 0) { proponer(); return; }
+    const t = setTimeout(async () => {
+      setBuscandoPedido(true);
+      try {
+        const r = await fetch(`/api/guias/etiquetas/pedido?empresa=${encodeURIComponent(empresaElegida)}&ids=${faltan.join(",")}`, { cache: "no-store" });
+        const d = (await r.json().catch(() => null)) as { pedidos?: Record<string, string | null>; motivo?: string } | null;
+        // Solo se recuerda lo que se pudo leer: un error o el tope se vuelven a intentar.
+        if (!d?.motivo) for (const id of faltan) pedidosHallados.current.set(`${empresaElegida}|${id}`, d?.pedidos?.[String(id)] ?? null);
+        else for (const [id, p] of Object.entries(d.pedidos ?? {})) if (p) pedidosHallados.current.set(`${empresaElegida}|${id}`, p);
+      } catch { /* sin conexión: el campo queda para escribirlo */ }
+      if (vigente) { setBuscandoPedido(false); proponer(); }
+    }, 700);
+    return () => { vigente = false; clearTimeout(t); setBuscandoPedido(false); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [llaveIds, pedidoTocado]);
+
   // La vista previa de los rangos: lo mismo que va a salir en el papel.
   const previa = useMemo(() => {
     const filas = enElEnvio.map((m, i) => ({
@@ -573,6 +613,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
     setFacturas(null);
     setMarcadas([]);
     setEmpresaKey(null);
+    setPedidoTocado(false);
     setError(null);
     setDiasVisibles(DIAS_CON_FACTURA_VISIBLES);
     setDiasAlternados(new Set());
@@ -1058,17 +1099,21 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
         {!ETIQUETAS_TRASLADO_2026_10 && !destinoTocado && destino && (
           <p className="mt-1.5 text-xs text-gray-500">Se llenó solo con el destino de siempre de este cliente.</p>
         )}
-        {/* 12-nov-2026: el N.° de pedido, opcional y del envío entero. Sale chico bajo la factura. */}
-        <label htmlFor="envio-pedido" className="mb-1 mt-3 block text-xs text-gray-500">N.° de pedido (opcional)</label>
+        {/* 12-nov-2026: el N.° de pedido del envío entero, traído de Switch y editable; no frena. Sale chico bajo la factura. */}
+        <label htmlFor="envio-pedido" className="mb-1 mt-3 block text-xs text-gray-500">
+          N.° de pedido
+          {buscandoPedido && <span className="ml-2 text-gray-400" aria-live="polite">Buscando pedido…</span>}
+        </label>
         <input
           type="text"
           value={pedido}
-          onChange={(e) => setPedido(e.target.value)}
+          onChange={(e) => { setPedidoTocado(true); setAvisoPedido(null); setPedido(e.target.value); }}
           id="envio-pedido"
           maxLength={MAX_PEDIDO}
           autoComplete="off"
           className="w-full max-w-sm rounded-md border border-gray-200 px-3 text-base sm:text-sm outline-none transition focus:border-black min-h-[44px]"
         />
+        {avisoPedido && <p className="mt-1.5 text-xs text-gray-500">{avisoPedido}</p>}
     </>
   );
   const resumenEnvio = enElEnvio.length + (traslado ? 1 : 0) > 0 && (
