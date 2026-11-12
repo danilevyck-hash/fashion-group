@@ -22,12 +22,13 @@ import { EMPRESAS_COMISIONAN } from "./empresas";
 import { normalizarVendedor } from "./exclusiones";
 
 /**
- * El interruptor. `false` = todo como hoy: la pantalla no ofrece «Cambiar
- * vendedor» y el rango de Vendedores lee el vendedor de Switch. Se prende
- * SOLO después de aplicar la migración 20261111130000 (sin ella, la RPC v10 no
- * existe y rpc.ts cae a la v9, que no mira la tabla).
+ * El interruptor. 🔴 PRENDIDO el 11-nov-2026 con el «sí» de Daniel, después de
+ * aplicar la migración 20261111130000 y medir que octubre 2026 da lo MISMO en
+ * v9 y v10 con la tabla vacía (13 pares empresa-vendedor, al centavo).
+ * `false` = la pantalla no ofrece «Cambiar vendedor» y el rango de Vendedores
+ * lee el vendedor de Switch.
  */
-export const COMISIONES_CAMBIAR_VENDEDOR_FACTURA = false;
+export const COMISIONES_CAMBIAR_VENDEDOR_FACTURA = true;
 
 /** Rótulos de la pantalla (nombres de ERP, docs/nombres-erp.md). */
 export const ROTULO_CAMBIAR_VENDEDOR = "Cambiar vendedor";
