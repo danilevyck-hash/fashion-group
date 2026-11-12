@@ -112,8 +112,8 @@ function cookieHeader(jar: Map<string, string>): string {
 async function webFetch(
   url: string,
   jar: Map<string, string>,
-  init: RequestInit & { followRedirects?: number } = {},
-): Promise<{ res: Response; text: string }> {
+  init: RequestInit & { followRedirects?: number; binario?: boolean } = {},
+): Promise<{ res: Response; text: string; bytes: Uint8Array }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -142,8 +142,10 @@ async function webFetch(
       storeCookies(jar, res);
       hops--;
     }
+    // `binario`: los bytes crudos (la vista de una factura puede ser un PDF).
+    if (init.binario) return { res, text: "", bytes: new Uint8Array(await res.arrayBuffer()) };
     const text = await res.text();
-    return { res, text };
+    return { res, text, bytes: new Uint8Array() };
   } finally {
     clearTimeout(timer);
   }
@@ -955,4 +957,22 @@ export async function cerrarSesionWeb(session: WebSession): Promise<void> {
   } catch {
     /* best-effort */
   }
+}
+
+/**
+ * La vista de UNA factura en el panel (`/reportes/facturamostrar/<id>`), en
+ * HTML. El `id` es el `switch_factura_id` de `switch_facturas` (el id interno
+ * de Switch). Es la única fuente de la «Referencia Pedido»: el API no la trae
+ * (12-nov-2026, Despachos › Etiquetas). Solo lee.
+ */
+export async function leerFacturaMostrar(session: WebSession, facturaId: number): Promise<Uint8Array> {
+  const { res, bytes } = await webFetch(
+    `${session.baseUrl}/reportes/facturamostrar/${encodeURIComponent(String(facturaId))}`,
+    session.cookies,
+    { headers: { Accept: "text/html" }, binario: true },
+  );
+  if (res.status !== 200) {
+    throw new SwitchWebError(session.empresaKey, "facturamostrar", `status ${res.status}`);
+  }
+  return bytes;
 }

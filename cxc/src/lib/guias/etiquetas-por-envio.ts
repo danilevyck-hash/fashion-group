@@ -75,6 +75,17 @@ export function normalizarPedido(v: unknown): Validacion<string | null> {
   return { ok: true, valor: t };
 }
 
+/**
+ * 🔴 EL PEDIDO QUE SE PROPONE (12-nov-2026), de los pedidos que Switch dio para
+ * las facturas marcadas, en su orden: sin repetidos, unidos con « / » si caben
+ * en `MAX_PEDIDO`. Si no caben, `valor` vacío y `noCabe` (se escribe a mano).
+ */
+export function pedidoPropuesto(pedidos: readonly (string | null)[]): { valor: string; noCabe: boolean } {
+  const unicos = [...new Set(pedidos.filter((p): p is string => !!p))];
+  const unido = unicos.join(" / ");
+  return unido.length > MAX_PEDIDO ? { valor: "", noCabe: true } : { valor: unido, noCabe: false };
+}
+
 // ─── Lo que viaja en el POST de un envío ─────────────────────────────────────
 
 export interface FacturaDelEnvio {
