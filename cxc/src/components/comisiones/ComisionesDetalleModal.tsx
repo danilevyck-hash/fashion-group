@@ -879,7 +879,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                                 className="min-h-[44px] flex-1 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900"
                               >
                                 <option value="" disabled>{vendedoresDisponibles === null ? "Cargando…" : "Vendedor"}</option>
-                                {(vendedoresDisponibles ?? []).filter((n) => n !== vendedor).map((n) => (
+                                {(vendedoresDisponibles ?? []).filter((n) => n.toUpperCase() !== vendedor.trim().toUpperCase()).map((n) => (
                                   <option key={n} value={n}>{nombreVendedorEnPantalla(n)}</option>
                                 ))}
                               </select>
