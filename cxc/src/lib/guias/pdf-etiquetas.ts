@@ -136,6 +136,13 @@ const MAY_ROTULO = 2.1702;
 const MAY_BULTO_ROTULO = 2.4802;
 /** Se compara contra un papel, de cerca: 4 mm. */
 const MAY_FACTURA = 4.0;
+/** De la base de la factura a la base de la línea chica del pedido. */
+const BAJO_LA_FACTURA = 4.4;
+/**
+ * Con pedido, lo MÍNIMO de la base de la factura a la base del rótulo «Cliente»:
+ * la línea del pedido, su descolgado (0,9), un milímetro y el rótulo.
+ */
+const FACTURA_A_CLIENTE_CON_PEDIDO = BAJO_LA_FACTURA + 0.9 + 1.0 + MAY_ROTULO;
 /** Se lee al entregar, de cerca: 5,5 mm. */
 const MAY_CLIENTE = 5.5;
 /** 🔴 Se lee ordenando el camión, de lejos: 7,5 mm y en negrita. */
@@ -220,6 +227,8 @@ export interface DatosEtiqueta {
   rotuloNota?: string;
   /** 🔴 TRASLADO (2-oct-2026): el rótulo sobre «TRASLADO» dice «Documento». Sin esto, «Factura». */
   rotuloSecuencial?: string;
+  /** El pedido de Switch del que salió la factura, o nada. Es interno: va chico, debajo de la factura. */
+  pedido?: string | null;
 }
 
 /** El encabezado de un traslado sin empresa: el mismo nombre que el papel de la guía. */
@@ -240,6 +249,8 @@ export function datosDeEtiqueta(e: EtiquetaFila): DatosEtiqueta {
     destino: e.destino,
     cajas: e.cajas,
     nota: e.nota ?? null,
+    // 12-nov-2026: el N.° de pedido, solo bajo una factura (un traslado no tiene).
+    ...(!traslado && e.pedido ? { pedido: e.pedido } : {}),
   };
 }
 
@@ -520,15 +531,31 @@ function dibujarEtiqueta(
     mayuscula: MAY_FACTURA,
     maxLineas: 1,
   });
+  // ── EL PEDIDO, debajo de la factura: chico, normal y gris, como la fecha. Es
+  // un dato INTERNO. Cae en el aire que ya había antes de «Cliente», así que
+  // no se mueve nada más; sin pedido el papel es idéntico al de antes.
+  const pedido = String(d.pedido ?? "").trim();
+  if (pedido) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(F_FECHA);
+    doc.setTextColor(68);
+    doc.text(`Pedido ${pedido}`, izq, y + BAJO_LA_FACTURA, { maxWidth: ancho });
+    doc.setTextColor(17);
+  }
+  // Con pedido, el aire de factura → cliente no se aprieta por debajo de su
+  // línea: lo que falte se le quita al de cliente → destino.
+  const apretarArriba = pedido
+    ? Math.min(apretar / 2, Math.max(0, ENTRE_BLOQUES - FACTURA_A_CLIENTE_CON_PEDIDO))
+    : apretar / 2;
   y = bloqueDeCampo(doc, "Cliente", String(d.cliente_nombre ?? "").toUpperCase(), {
     ...campo,
-    y: y + ENTRE_BLOQUES - apretar / 2,
+    y: y + ENTRE_BLOQUES - apretarArriba,
     mayuscula: MAY_CLIENTE,
     maxLineas: 2,
   });
   const yDestino = bloqueDeCampo(doc, "Destino", String(d.destino ?? "").toUpperCase(), {
     ...campo,
-    y: y + ENTRE_BLOQUES - apretar / 2,
+    y: y + ENTRE_BLOQUES - Math.min(apretar - apretarArriba, APRETAR_MAXIMO / 2),
     mayuscula: MAY_DESTINO,
     maxLineas: 2,
     hastaY: yRaya - AIRE_SOBRE_LA_RAYA,

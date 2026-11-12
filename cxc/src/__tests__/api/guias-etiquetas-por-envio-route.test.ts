@@ -42,6 +42,8 @@ let escrituras: Escritura[];
 /** Simula que la migración `20261224120000` todavía no corrió. */
 let sinColumnasDeEnvio = false;
 let proximoErrorInsert: { code: string; message: string } | null = null;
+/** Simula que la migración del N.° de pedido (`20270112120000`) todavía no corrió. */
+let sinColumnaPedido = false;
 let siguienteId = 100;
 
 const COLUMNA_AUSENTE = { code: "42703", message: "column guias_etiquetas.envio_id does not exist" };
@@ -103,6 +105,9 @@ function cadena(tabla: string) {
         for (const e of tablas.guias_etiquetas ?? []) if (ids.has(e.guia_item_id)) e.guia_item_id = null;
       }
       return { data: null, error: null, count: null };
+    }
+    if (tabla === "guias_etiquetas" && sinColumnaPedido && /\bpedido\b/.test(columnas)) {
+      return { data: null, error: { code: "42703", message: "column guias_etiquetas.pedido does not exist" }, count: null };
     }
     if (tabla === "guias_etiquetas" && sinColumnasDeEnvio && pideEnvio()) {
       return { data: null, error: COLUMNA_AUSENTE, count: null };
@@ -173,6 +178,7 @@ function etiqueta(over: Fila = {}): Fila {
 beforeEach(() => {
   escrituras = [];
   sinColumnasDeEnvio = false;
+  sinColumnaPedido = false;
   proximoErrorInsert = null;
   siguienteId = 100;
   tablas = {
@@ -428,5 +434,48 @@ describe("6. importar ata por cliente + empresa + DESTINO", () => {
     const res = await POST(req({ guia_id: GUIA, ids: [1, 2] }));
     expect((await res.json()).atadas).toBe(2);
     expect(tablas.guias_etiquetas.map((e) => e.guia_item_id)).toEqual([R1, R2]);
+  });
+});
+
+// ─── 7 · el N.° de pedido (12-nov-2026) ──────────────────────────────────────
+
+describe("🔴 7. el N.° de pedido: opcional, recortado y del envío entero", () => {
+  const filasEscritas = () => escrituras.filter((e) => e.op === "insert")[0].datos as Fila[];
+
+  it("se recorta y va a CADA fila del envío; la respuesta lo trae", async () => {
+    const { POST } = await lista();
+    const res = await POST(req(envio({ pedido: "  16-000002926 " })));
+    expect(res.status).toBe(201);
+    expect(filasEscritas().map((f) => f.pedido)).toEqual(["16-000002926", "16-000002926", "16-000002926"]);
+    const json = (await res.json()) as { etiquetas: Array<{ pedido: string | null }> };
+    expect(json.etiquetas.every((e) => e.pedido === "16-000002926")).toBe(true);
+  });
+
+  it("vacío o ausente: se guarda como siempre, SIN la llave `pedido`", async () => {
+    const { POST } = await lista();
+    expect((await POST(req(envio({ pedido: "   " })))).status).toBe(201);
+    expect(filasEscritas().some((f) => "pedido" in f)).toBe(false);
+    escrituras = [];
+    tablas.guias_etiquetas = [];
+    expect((await POST(req(envio()))).status).toBe(201);
+    expect(filasEscritas().some((f) => "pedido" in f)).toBe(false);
+  });
+
+  it("más de 30 caracteres o un número suelto: 400 y nada escrito", async () => {
+    const { POST } = await lista();
+    expect((await POST(req(envio({ pedido: "1".repeat(31) })))).status).toBe(400);
+    expect((await POST(req(envio({ pedido: 16 })))).status).toBe(400);
+    expect(escrituras).toHaveLength(0);
+  });
+
+  it("⚠️ falla ABIERTA sin la columna: la lista se lee igual y un envío sin pedido se guarda", async () => {
+    sinColumnaPedido = true;
+    tablas.guias_etiquetas = [etiqueta({ id: 7, switch_factura_id: 70, secuencial: "11-000000070" })];
+    const { GET, POST } = await lista();
+    const g = await GET(req());
+    expect(g.status).toBe(200);
+    const json = (await g.json()) as { etiquetas: Array<{ id: number; pedido: string | null }> };
+    expect(json.etiquetas.map((e) => [e.id, e.pedido])).toEqual([[7, null]]);
+    expect((await POST(req(envio()))).status).toBe(201);
   });
 });

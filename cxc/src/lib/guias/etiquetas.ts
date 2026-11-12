@@ -100,6 +100,8 @@ export interface EtiquetaFila {
   orden_en_envio?: number;
   /** La nota de esta factura (≤ 15, mayúsculas), o `null`. */
   nota?: string | null;
+  /** El N.° de pedido del envío (12-nov-2026), o `null`. Sin la columna no llega. */
+  pedido?: string | null;
 }
 
 // ─── El estado, DERIVADO ─────────────────────────────────────────────────────

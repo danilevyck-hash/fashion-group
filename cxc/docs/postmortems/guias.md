@@ -2625,3 +2625,15 @@ Aprobado por Daniel, los tres en una solicitud de cambio:
 - **Etiquetas › Nuevo envío: «o N.° de factura».** Se escribe la factura (`2534` o `11-000002534`) y el sistema encuentra al cliente por CÓDIGO y la deja marcada. Busca en las 6 del grupo, solo `Factura`, último año (`GET /api/guias/facturas-cliente?factura=`); compara por los dígitos del final (`facturasPorNumero` en `etiquetas-por-envio.ts`, que usa `claveDeFactura`) y de cada empresa toma la más reciente. **En dos empresas, se elige** con un chip por empresa. Si la factura ya está etiquetada o ya salió en una guía, se dice. El buscador de la lista no cambió.
 - **Pestañas:** Pedidos · Etiquetas · Guías de despacho · Configuración. Cada rol sigue viendo las suyas y el módulo sigue abriendo en Pedidos. Esto revierte lo de «Guías sigue primero» (`guias-etiqueta-rediseno`).
 - **Candados:** `pedidos-flujo-simple` · `pedidos-en-preparacion` · `etiquetas-por-numero-factura` · `guias-etiqueta-rediseno`.
+
+
+## 12-nov-2026 — Etiquetas: el N.° de pedido, opcional
+
+Aprobado por Daniel con el mockup «HOY vs RECOMENDACIÓN» (`~/Desktop/etiqueta-pedido-mockup/`):
+
+- **Dónde se escribe:** Etiquetas › Nuevo envío, debajo del destino: «N.° de pedido (opcional)». Es UNO por envío. No hay pantalla para editar una etiqueta ya impresa (lo impreso no se cambia: se anula el envío), así que tampoco se edita después.
+- **Dónde se guarda:** `guias_etiquetas.pedido` (text, NULL = sin pedido, nunca cadena vacía; CHECK recortado y ≤ 30). La tabla es una fila por factura y no hay tabla de envío, así que el pedido se copia a cada fila del envío, igual que `destino`. Migración `20270112120000_guias_etiquetas_pedido.sql`, aditiva, **aplicada el 12-nov-2026** con `npm run migrar`.
+- **El servidor** recorta y junta espacios (`normalizarPedido` en `etiquetas-por-envio.ts`); vacío = sin pedido y la fila viaja SIN la llave (igual que antes); más de 30 o algo que no sea texto = 400.
+- 🔴 **Falla ABIERTA sin la columna:** la lista y la etiqueta suelta se vuelven a leer sin `pedido`; un envío sin pedido se guarda como siempre; uno con pedido contesta 503 y lo dice.
+- **El papel** (`pdf-etiquetas.ts`): «Pedido 16-000002926» en una línea normal, gris (68) y del tamaño de la fecha del encabezado, sin rótulo, en el aire que ya había entre la factura y «Cliente». Si la nota obliga a apretar (carta), lo que no cabe arriba se le quita al aire de cliente → destino. Un traslado no lo imprime. 🔴 **Sin pedido el PDF es idéntico byte por byte** al del generador anterior (ocho casos, carta y 4×6, con huellas fijas).
+- **Candados:** `guias-etiqueta-pedido` (papel) y el bloque 7 de `guias-etiquetas-por-envio-route` (la ruta).
