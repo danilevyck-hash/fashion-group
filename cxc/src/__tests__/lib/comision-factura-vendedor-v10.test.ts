@@ -57,9 +57,11 @@ function comoLaV9(body: string): string {
 }
 
 // ═══ 1. El interruptor y el módulo puro ══════════════════════════════════════
-describe("🔴 el interruptor nace APAGADO y el módulo puro valida", () => {
-  it("COMISIONES_CAMBIAR_VENDEDOR_FACTURA = false hasta que la DDL 20261111130000 esté aplicada", () => {
-    expect(COMISIONES_CAMBIAR_VENDEDOR_FACTURA).toBe(false);
+describe("🔴 el interruptor está PRENDIDO y el módulo puro valida", () => {
+  // 11-nov-2026: la DDL 20261111130000 se aplicó con el «sí» de Daniel y octubre
+  // 2026 dio lo mismo en v9 y v10 con la tabla vacía (13 pares, al centavo).
+  it("COMISIONES_CAMBIAR_VENDEDOR_FACTURA = true (Daniel, 11-nov-2026)", () => {
+    expect(COMISIONES_CAMBIAR_VENDEDOR_FACTURA).toBe(true);
   });
   it("nombres de ERP en los rótulos", () => {
     expect(ROTULO_CAMBIAR_VENDEDOR).toBe("Cambiar vendedor");
