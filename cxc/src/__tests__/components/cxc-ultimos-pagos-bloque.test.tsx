@@ -106,18 +106,19 @@ describe("el bloque dibujado", () => {
 });
 
 describe("🔄 dónde vive el bloque hoy, y cada cartera con SU hook", () => {
-  it("CXC del grupo: POR FECHA, dentro del panel expandido, y se pide al abrirlo", () => {
+  it("CXC del grupo: POR FECHA, en la página del cliente (ya no en la fila expandida)", () => {
     const bloque = leer("src/app/cxc/components/UltimosPagosPorFecha.tsx");
     expect(bloque).toContain('from "@/lib/cxc/pagos-por-fecha"');
     expect(bloque).toContain("TITULO_ULTIMOS_PAGOS");
     expect(bloque).toContain("SIN_PAGOS");
     expect(bloque).not.toContain("useUltimosPagosBoston");
 
+    // 🩸 12-nov-2026: la fila expandida de la computadora ya NO lo dibuja
+    // (Daniel aprobó quitarlo); vive en la página del cliente.
     const panel = leer("src/app/cxc/components/ContactPanel.tsx");
-    expect(panel).toContain("<UltimosPagosPorFecha");
-    // Se pide recién con el panel ABIERTO: en escritorio el panel de los 100
-    // clientes vive montado aunque esté cerrado.
-    expect(panel).toContain("useUltimosPagosGrupo(codigo, abierto)");
+    expect(panel).not.toContain("<UltimosPagosPorFecha");
+    expect(panel).not.toContain("useUltimosPagosGrupo(");
+    expect(leer("src/app/cxc/cliente/[codigo]/ClienteCxc.tsx")).toContain("<UltimosPagosPorFecha");
   });
 
   it("🩸 el corte por empresa y su botón ya no existen en el grupo", () => {

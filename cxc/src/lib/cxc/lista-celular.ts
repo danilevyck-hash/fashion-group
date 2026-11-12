@@ -357,6 +357,8 @@ export interface RenglonEmpresaCliente {
   documentos: number;
   masViejo: number | null;
   ultimoPago: { fecha: string; monto: number } | null;
+  /** La última factura en ESA empresa (las notas de crédito no son compras). */
+  ultimaCompra: { fecha: string; monto: number } | null;
 }
 
 /**
@@ -388,6 +390,9 @@ export function empresasDelCliente(
       documentos: docs?.documentos ?? 0,
       masViejo: docs?.masViejo ?? null,
       ultimoPago: fecha ? { fecha, monto: Number(d.ultimoPagoMonto) || 0 } : null,
+      ultimaCompra: (d.ultimaCompraFecha ?? "").slice(0, 10)
+        ? { fecha: (d.ultimaCompraFecha ?? "").slice(0, 10), monto: Number(d.ultimaCompraMonto) || 0 }
+        : null,
     });
   }
   return filas.sort((a, b) => b.total - a.total);

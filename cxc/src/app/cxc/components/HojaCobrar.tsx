@@ -40,6 +40,9 @@ import { Aviso } from "@/components/ui/Aviso";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
+import { montoExacto, type RenglonEmpresaCliente } from "@/lib/cxc/lista-celular";
+import { montoDeTabla, nombreCortoEmpresa, totalDelDesglose } from "@/lib/cxc/desglose-celular-2026-11";
+import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 
 /** El código Switch (D-XXX) es el mismo en todas las empresas del cliente. */
 function codigoDe(client: ConsolidatedClient): string | null {
@@ -104,6 +107,14 @@ interface Props {
    * reconocer. Interruptor `ESTADO_CUENTA_UN_BOTON_2026_10`.
    */
   companyFilter?: string;
+  /**
+   * 🔴 EL DESGLOSE POR EMPRESA DEL CELULAR (12-nov-2026,
+   * `CXC_DESGLOSE_CELULAR_2026_11`). Con filas, la hoja abre con el nombre de
+   * título, el total grande, la tabla por empresa y «Enviar estado de cuenta»,
+   * que despliega las MISMAS cuatro salidas. `null` = la hoja de siempre (lo
+   * que ve la computadora).
+   */
+  desglose?: RenglonEmpresaCliente[] | null;
 }
 
 export default function HojaCobrar({
@@ -118,6 +129,7 @@ export default function HojaCobrar({
   ultimoPagoTexto = null,
   hrefDocumentos = null,
   companyFilter,
+  desglose = null,
 }: Props) {
   const abierto = !!client;
   const codigo = client ? codigoDe(client) : null;
@@ -128,6 +140,8 @@ export default function HojaCobrar({
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [salidasAbiertas, setSalidasAbiertas] = useState(false);
+  useEffect(() => { setSalidasAbiertas(false); }, [client]);
 
   useEffect(() => {
     if (!abierto || !codigo) return;
@@ -230,20 +244,8 @@ export default function HojaCobrar({
     onClose();
   }
 
-  const cuerpo = (
-    <div className="space-y-3">
-      <div>
-        <p className="text-base font-semibold text-gray-900">
-          {datos?.clienteNombre || nombre}
-          {totalDeLaFila != null && (
-            <span className="tabular-nums font-normal text-gray-600"> · ${fmt(totalDeLaFila)}</span>
-          )}
-        </p>
-        {ultimoPagoTexto && <p className="text-xs text-gray-500 mt-0.5">{ultimoPagoTexto}</p>}
-        <p className="text-xs text-gray-500 mt-0.5">{encabezado}</p>
-        {marcaEnvio && <p className="text-xs text-gray-400 mt-0.5">{marcaEnvio}</p>}
-      </div>
-
+  const avisos = (
+    <>
       {cuadre && !cuadre.cuadra && cuadre.aviso && (
         <Aviso
         >
@@ -260,6 +262,10 @@ export default function HojaCobrar({
 
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
 
+    </>
+  );
+
+  const salidas = (
       <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 overflow-hidden">
         <FilaAccion
           titulo="Correo"
@@ -288,6 +294,25 @@ export default function HojaCobrar({
           onClick={entregarPdf}
         />
       </ul>
+  );
+
+  const cuerpo = (
+    <div className="space-y-3">
+      <div>
+        <p className="text-base font-semibold text-gray-900">
+          {datos?.clienteNombre || nombre}
+          {totalDeLaFila != null && (
+            <span className="tabular-nums font-normal text-gray-600"> · ${fmt(totalDeLaFila)}</span>
+          )}
+        </p>
+        {ultimoPagoTexto && <p className="text-xs text-gray-500 mt-0.5">{ultimoPagoTexto}</p>}
+        <p className="text-xs text-gray-500 mt-0.5">{encabezado}</p>
+        {marcaEnvio && <p className="text-xs text-gray-400 mt-0.5">{marcaEnvio}</p>}
+      </div>
+
+      {avisos}
+
+      {salidas}
 
       <div className="flex flex-wrap items-center gap-4">
       <button
@@ -312,6 +337,88 @@ export default function HojaCobrar({
     </div>
   );
 
+  // 🔴 EL CELULAR CON DESGLOSE (12-nov-2026, `CXC_DESGLOSE_CELULAR_2026_11`).
+  // Lo que se MANDA no cambia: las cuatro salidas son las de arriba, y el
+  // estado de cuenta se sigue preparando AL ABRIR la hoja (el `useEffect` del
+  // principio), así el PDF ya está listo cuando el dedo toca «Descargar PDF»
+  // —iOS no abre la hoja de compartir si en el medio hay una espera de red—.
+  const total = desglose ? totalDelDesglose(desglose) : null;
+  const cuerpoDesglose = desglose && total && (
+    <div className="space-y-3">
+      <div>
+        <p className="text-[28px] leading-tight font-semibold tabular-nums text-gray-900">
+          ${fmt(totalDeLaFila ?? total.total)}
+        </p>
+        {marcaEnvio && <p className="text-xs text-gray-400 mt-0.5">{marcaEnvio}</p>}
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Desglose por empresa ({desglose.length})
+        </p>
+        <table className="w-full text-[12.5px] tabular-nums tracking-tight">
+          <thead>
+            <tr className="text-[11px] font-medium uppercase text-gray-400">
+              <th className="text-left font-medium pb-1.5">Empresa</th>
+              <th className="text-right font-medium pb-1.5 pl-1.5 text-emerald-600">0-90</th>
+              <th className="text-right font-medium pb-1.5 pl-1.5 text-amber-600">91-120</th>
+              <th className="text-right font-medium pb-1.5 pl-1.5 text-red-500">+120</th>
+              <th className="text-right font-medium pb-1.5 pl-1.5">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {desglose.map((f) => (
+              <FilaDesglose key={f.key} fila={f} />
+            ))}
+            <tr className="border-t border-gray-300 font-semibold">
+              <td className="pt-2 text-left">Total</td>
+              <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-emerald-700">{montoDeTabla(total.current)}</td>
+              <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-amber-600">{montoDeTabla(total.watch)}</td>
+              <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-red-600">{montoDeTabla(total.overdue)}</td>
+              <td className="pt-2 pl-1.5 text-right whitespace-nowrap">{montoDeTabla(total.total)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {avisos}
+
+      {!salidasAbiertas ? (
+        <button
+          type="button"
+          onClick={() => setSalidasAbiertas(true)}
+          className="block w-full rounded-md bg-black px-4 py-3.5 text-base font-semibold text-white transition active:scale-[0.97]"
+        >
+          Enviar estado de cuenta
+        </button>
+      ) : (
+        <div className="space-y-1">
+          <p className="text-xs text-gray-500">{encabezado}</p>
+          {salidas}
+          <button
+            type="button"
+            onClick={() => { onEscribirloYo(client); onClose(); }}
+            className="inline-flex items-center min-h-[44px] text-sm font-medium text-blue-600 hover:text-blue-800 transition"
+          >
+            Editar mensaje ›
+          </button>
+        </div>
+      )}
+
+      {hrefDocumentos && (
+        <div className="flex justify-center">
+          <Link
+            href={hrefDocumentos}
+            onClick={onClose}
+            className="inline-flex items-center min-h-[44px] text-sm font-medium text-blue-600 hover:text-blue-800 transition"
+          >
+            Ver ficha completa ›
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+
   // 🔴 EN CELULAR LA HOJA SUBE DESDE ABAJO. No hace falta un segundo
   // componente: `ModalOverlay` con `align="center"` ES el patrón de
   // hoja-desde-abajo del sistema (`items-end sm:items-center`) — pegada al
@@ -321,7 +428,7 @@ export default function HojaCobrar({
     <ModalOverlay onBackdropClick={onClose} align="center">
       <div className="bg-white rounded-t-2xl sm:rounded-lg w-full sm:max-w-md mx-0 sm:mx-4 mb-0 sm:my-16 border border-gray-200 max-h-[92vh] overflow-y-auto">
         <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">Enviar estado de cuenta</h2>
+          <h2 className="text-base font-semibold text-gray-900">{cuerpoDesglose ? (datos?.clienteNombre || nombre) : "Enviar estado de cuenta"}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -331,7 +438,7 @@ export default function HojaCobrar({
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <div className="px-5 py-4">{cuerpo}</div>
+        <div className="px-5 py-4">{cuerpoDesglose || cuerpo}</div>
       </div>
     </ModalOverlay>
   );
@@ -360,5 +467,51 @@ function FilaAccion({
         {detalle && <span className="block text-xs text-gray-500 mt-0.5 truncate">{detalle}</span>}
       </button>
     </li>
+  );
+}
+
+/**
+ * Una empresa del desglose del celular: sus tres tramos y el total, y debajo
+ * «Últ. pago $X · N d · Últ. compra $Y · N d». Los días del pago con el MISMO
+ * color de la computadora (`daysAgingColor`); los de la compra en gris, como
+ * allá: una compra vieja no es plata en riesgo.
+ */
+function FilaDesglose({ fila }: { fila: RenglonEmpresaCliente }) {
+  const diasPago = daysSince(fila.ultimoPago?.fecha);
+  const diasCompra = daysSince(fila.ultimaCompra?.fecha);
+  return (
+    <>
+      <tr className="border-t border-gray-100">
+        <td className="pt-2 text-left text-[13.5px] font-semibold text-gray-900 whitespace-nowrap">
+          {nombreCortoEmpresa(fila.key, fila.nombre)}
+        </td>
+        <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-emerald-700">{montoDeTabla(fila.current)}</td>
+        <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-amber-600">{montoDeTabla(fila.watch)}</td>
+        <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-red-600">{montoDeTabla(fila.overdue)}</td>
+        <td className="pt-2 pl-1.5 text-right whitespace-nowrap font-semibold">{montoDeTabla(fila.total)}</td>
+      </tr>
+      <tr>
+        <td colSpan={5} className="pb-2 text-left text-[11px] text-gray-500 whitespace-nowrap">
+          Últ. pago{" "}
+          {fila.ultimoPago ? (
+            <>
+              {montoExacto(fila.ultimoPago.monto)} ·{" "}
+              <span className={daysAgingColor(diasPago)}>{diasPago != null ? `${diasPago} d` : ""}</span>
+            </>
+          ) : (
+            <span className="text-gray-300">—</span>
+          )}
+          {" · "}Últ. compra{" "}
+          {fila.ultimaCompra ? (
+            <>
+              {montoExacto(fila.ultimaCompra.monto)} ·{" "}
+              <span className="text-gray-500">{diasCompra != null ? `${diasCompra} d` : ""}</span>
+            </>
+          ) : (
+            <span className="text-gray-300">—</span>
+          )}
+        </td>
+      </tr>
+    </>
   );
 }

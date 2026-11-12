@@ -196,24 +196,16 @@ describe("🔴 con la lista pintada NO se pide nada", () => {
 });
 
 describe("🔴 abrir el cliente trae los pagos — UN clic, y en UN solo lugar", () => {
-  it("escritorio: al expandir salen las TRES FECHAS con su total y sus empresas", async () => {
+  // 🩸 12-nov-2026: Daniel aprobó quitar «Últimos pagos» de la fila
+  // expandida de la computadora (repetía las columnas «Último pago» y «Última
+  // compra» del desglose). Expandir ya no pide nada; el bloque sigue en la
+  // página del cliente (`ClienteCxc.tsx`) y en la tarjeta de `PanelCxcMobile`.
+  it("escritorio: al expandir ya NO se pide ni se dibuja «Últimos pagos»", async () => {
     pintarEscritorio();
     fireEvent.click(screen.getByTitle("City Mall Paso Canoa"));
-    await waitFor(() => expect(pedidosDePagos()).toHaveLength(1));
-    await screen.findByText(/20 ago/);
-    const bloque = screen.getByText("Últimos pagos").parentElement!;
-    const lineas = within(bloque).getAllByRole("listitem").map((li) => li.textContent);
-    expect(lineas).toHaveLength(3);
-    expect(lineas[0]).toContain("$234,189.21");
-    expect(lineas[0]).toContain("Fashion Wear");
-    expect(lineas[0]).toContain("Fashion Shoes");
-  });
-
-  it("🔴 el bloque se dibuja UNA sola vez, no dos", async () => {
-    pintarEscritorio();
-    fireEvent.click(screen.getByTitle("City Mall Paso Canoa"));
-    await screen.findByText(/20 ago/);
-    expect(screen.getAllByText("Últimos pagos")).toHaveLength(1);
+    await screen.findAllByText(/Desglose por empresa/);
+    expect(pedidosDePagos()).toHaveLength(0);
+    expect(screen.queryByText("Últimos pagos")).toBeNull();
   });
 
   it("celular: al abrir la tarjeta pasa lo mismo, con UNA sola lectura", async () => {
@@ -224,16 +216,6 @@ describe("🔴 abrir el cliente trae los pagos — UN clic, y en UN solo lugar",
     expect(screen.getAllByText("Últimos pagos")).toHaveLength(1);
   });
 
-  it("cerrar y volver a abrir no vuelve a pedir", async () => {
-    pintarEscritorio();
-    const fila = screen.getByTitle("City Mall Paso Canoa");
-    fireEvent.click(fila);
-    await waitFor(() => expect(pedidosDePagos()).toHaveLength(1));
-    fireEvent.click(fila);
-    fireEvent.click(fila);
-    await waitFor(() => expect(screen.getAllByText("Últimos pagos").length).toBe(1));
-    expect(pedidosDePagos()).toHaveLength(1);
-  });
 });
 
 describe("🔴 Boston lee por SU camino, sin cruzarse con el del grupo", () => {
@@ -242,7 +224,7 @@ describe("🔴 Boston lee por SU camino, sin cruzarse con el del grupo", () => {
     expect(cajonBoston).toContain("useUltimosPagosBoston");
     expect(cajonBoston).not.toContain("useUltimosPagosGrupo");
 
-    const panelGrupo = leer("src/app/cxc/components/ContactPanel.tsx");
+    const panelGrupo = leer("src/app/cxc/components/PanelCxcMobile.tsx");
     expect(panelGrupo).toContain("useUltimosPagosGrupo");
     expect(panelGrupo).not.toContain("useUltimosPagosBoston");
 

@@ -1486,6 +1486,16 @@ Cartera del grupo leída de `switch_estadocuenta_aging_mv` acotada a las 6: **21
 
 ---
 
+## 🔴 EL CLIENTE EN EL CELULAR: DESGLOSE POR EMPRESA (12-nov-2026, PRENDIDO)
+
+Daniel aprobó la «Variante B» de `~/Desktop/cxc-detalle-mockup/celular-variantes.html` y la parte de computadora de `hoy-vs-recomendacion-v2.html`.
+
+- **Celular** (`HojaCobrar` con la prop `desglose`, interruptor `CXC_DESGLOSE_CELULAR_2026_11` en `lib/cxc/desglose-celular-2026-11.ts`): el título es el nombre del cliente; el total grande con centavos; «Desglose por empresa (N)» con Empresa · 0-90 · 91-120 · +120 · Total, encabezados verde/ámbar/rojo como la computadora, montos **sin centavos** y el cero escrito «0»; debajo de cada empresa «Últ. pago $X · N d · Últ. compra $Y · N d» (los días del pago con `daysAgingColor`, los de la compra en gris, «—» si no hay); la fila de Total. «Enviar estado de cuenta» despliega las cuatro salidas de siempre y «Editar mensaje ›»; «Ver ficha completa ›» va a `/cxc/cliente/<código>` (donde iba «Estado de cuenta ›»). Se quitó la línea «Último pago …» de arriba.
+- 🔴 **Sin lectura nueva**: sale de `empresasDelCliente` (que ahora también trae `ultimaCompra`). El estado de cuenta se sigue preparando al ABRIR la hoja, así el PDF está listo antes del toque (iOS).
+- Solo «Vistana International» se acorta a «Vistana». City Mall Paso Canoa (el más grande) cabe en 375 px sin deslizar.
+- **Computadora** (`ContactPanel`): sale el bloque «Últimos pagos» por fecha y su lectura `useUltimosPagosGrupo` de la fila expandida — repetía las columnas «Último pago» y «Última compra». Sigue en la página del cliente (`ClienteCxc.tsx`) y en `PanelCxcMobile`.
+- `false` = la hoja de antes. Candado `cxc-desglose-celular-2026-11.test.tsx`.
+
 ## 🔴 UN SOLO BOTÓN «ESTADO DE CUENTA», Y EL DEL GRUPO POR OMISIÓN (7-oct-2026, PRENDIDO)
 
 Interruptor `ESTADO_CUENTA_UN_BOTON_2026_10 = true` (`lib/cxc/estado-cuenta-un-boton-2026-10.ts`). Nació apagado (PR #666) y se prendió el 7-oct-2026 (PR #669): Daniel escribió «Aprobado» sobre el mockup HOY vs RECOMENDACIÓN. `false` = todo como antes.

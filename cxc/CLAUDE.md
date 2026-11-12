@@ -97,6 +97,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - 🔴 **Su DIRECTORIO se refresca SEMANAL sin tocar al grupo**: `sync-clientes-boston` (domingos 07:10 UTC) escribe **SOLO `switch_clientes` de Boston**. Para marcar ausente: lista completa y sin encoger bajo el **70%**; vacía = error. Alerta B, **165 h**.
 - 🔴 **La secretaria cobra y ve el módulo** (`ROLES_CXC`). ⚠️ **Boston sigue afuera**: otra lista.
 - 🔴 **UN solo botón «Estado de cuenta» (7-oct-2026, `ESTADO_CUENTA_UN_BOTON_2026_10`, prendido)**: abre el documento del GRUPO si el cliente debe en más de una empresa; el PDF se llama por el cliente y en la computadora siempre se descarga; toda fecha del papel y del correo sale de `hoyPanama()`. 📄 Postmortem › 7-oct-2026.
+- 🔴 **El cliente en el celular (12-nov-2026, `CXC_DESGLOSE_CELULAR_2026_11`, prendido)**: la hoja abre con el nombre, el total y «Desglose por empresa» (0-90 · 91-120 · +120 · Total sin centavos, «Últ. pago · Últ. compra» bajo cada una), sin lectura nueva; «Enviar estado de cuenta» despliega las cuatro salidas. La fila expandida de la computadora ya no lleva «Últimos pagos» (sigue en la página del cliente). 📄 Postmortem › 12-nov-2026.
 
 **La planilla de David = la de Yulissa** (hoy abre `PlanillaTab` en Asistencia; `PlanillaBoston` queda para el interruptor apagado): columnas de dinero de UN lugar (`columnas-dinero-planilla.ts`, 19) · mismo corte que la contadora (`corteParaBoston`; `planilla-guardada` le fuerza Boston, `?id=` ajeno → 404) · Préstamos suma las tres cuentas (`calcularSaldoPrestamo`).
 
