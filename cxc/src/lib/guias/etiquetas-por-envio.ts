@@ -59,6 +59,22 @@ export function normalizarNota(v: unknown): Validacion<string | null> {
   return { ok: true, valor: t };
 }
 
+/** El N.° de pedido cabe en una línea chica: 30 caracteres como mucho. */
+export const MAX_PEDIDO = 30;
+
+/**
+ * 🔴 EL N.° DE PEDIDO (12-nov-2026), opcional y del ENVÍO entero: se recortan
+ * los bordes y se juntan los espacios; NO se pasa a mayúsculas (es un número).
+ * Vacío = sin pedido (`null`, nunca cadena vacía: así lo exige el CHECK).
+ */
+export function normalizarPedido(v: unknown): Validacion<string | null> {
+  if (v != null && typeof v !== "string") return { ok: false, error: "El N.° de pedido no es válido" };
+  const t = (v ?? "").trim().replace(/\s+/g, " ");
+  if (!t) return { ok: true, valor: null };
+  if (t.length > MAX_PEDIDO) return { ok: false, error: `El N.° de pedido es de ${MAX_PEDIDO} caracteres como mucho` };
+  return { ok: true, valor: t };
+}
+
 // ─── Lo que viaja en el POST de un envío ─────────────────────────────────────
 
 export interface FacturaDelEnvio {
@@ -77,6 +93,8 @@ export interface EnvioNuevo {
   cliente_nombre: string;
   destino: string;
   facturas: FacturaDelEnvio[];
+  /** El N.° de pedido del envío, o `null` (12-nov-2026). Va a cada fila. */
+  pedido?: string | null;
 }
 
 /**
@@ -93,11 +111,16 @@ export function validarEnvioNuevo(
   const b = (body ?? {}) as Record<string, unknown>;
   const lista = Array.isArray(b.facturas) ? (b.facturas as unknown[]) : [];
   if (lista.length === 0) return { ok: false, error: "Marca al menos una factura" };
+  const pedido = normalizarPedido(b.pedido);
+  if (!pedido.ok) return pedido;
   // 🔴 Un envío puede llevar facturas Y un traslado (Daniel, 2-oct-2026: van en
   // el mismo camión). Uno solo por envío; solo traslado = empresa opcional.
   const traslados = conTraslado ? lista.filter(esFilaDeTraslado) : [];
   if (traslados.length > 1) return { ok: false, error: "Un envío lleva un solo traslado" };
-  if (traslados.length === 1 && lista.length === 1) return validarTraslado(b, lista[0]);
+  if (traslados.length === 1 && lista.length === 1) {
+    const t = validarTraslado(b, lista[0]);
+    return t.ok ? { ok: true, valor: { ...t.valor, pedido: pedido.valor } } : t;
+  }
 
   const facturas: FacturaDelEnvio[] = [];
   let cabecera: Omit<EnvioNuevo, "facturas"> | null = null;
@@ -135,7 +158,7 @@ export function validarEnvioNuevo(
     if (!t.ok) return t;
     facturas.splice(lista.indexOf(traslados[0]), 0, t.valor.facturas[0]);
   }
-  return { ok: true, valor: { ...cab, facturas } };
+  return { ok: true, valor: { ...cab, facturas, pedido: pedido.valor } };
 }
 
 // ─── TRASLADO SIN FACTURA (2-oct-2026, `ETIQUETAS_TRASLADO_2026_10`) ─────────

@@ -64,11 +64,13 @@ import {
 } from "@/lib/guias/etiquetas";
 import {
   MAX_NOTA,
+  MAX_PEDIDO,
   agruparEnEnvios,
   facturaDelBulto,
   filtrarEnvios,
   moverEnElEnvio,
   normalizarNota,
+  normalizarPedido,
   notasMasUsadas,
   rangosDelEnvio,
   textoRango,
@@ -451,6 +453,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   const [marcadas, setMarcadas] = useState<Marcada[]>([]);
   const [destino, setDestino] = useState("");
   const [destinoTocado, setDestinoTocado] = useState(false);
+  const [pedido, setPedido] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [formato, setFormato] = useFormatoEtiquetas();
   const [error, setError] = useState<string | null>(null);
@@ -672,6 +675,8 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
       if (f.switch_factura_id == null) return `${f.secuencial} todavía no tiene su número interno. Toca «Actualizar».`;
     }
     if (!destino.trim()) return "Escribe el destino del envío";
+    const p = normalizarPedido(pedido);
+    if (!p.ok) return p.error;
     return null;
   }
 
@@ -688,6 +693,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
       cliente_codigo: cliente.codigo,
       cliente_nombre: cliente.nombre,
       destino: destino.trim(),
+      pedido: pedido.trim(),
       facturas: [...enElEnvio.map((m) => {
         const f = porClave.get(m.clave) as Factura;
         return {
@@ -1052,6 +1058,17 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
         {!ETIQUETAS_TRASLADO_2026_10 && !destinoTocado && destino && (
           <p className="mt-1.5 text-xs text-gray-500">Se llenó solo con el destino de siempre de este cliente.</p>
         )}
+        {/* 12-nov-2026: el N.° de pedido, opcional y del envío entero. Sale chico bajo la factura. */}
+        <label htmlFor="envio-pedido" className="mb-1 mt-3 block text-xs text-gray-500">N.° de pedido (opcional)</label>
+        <input
+          type="text"
+          value={pedido}
+          onChange={(e) => setPedido(e.target.value)}
+          id="envio-pedido"
+          maxLength={MAX_PEDIDO}
+          autoComplete="off"
+          className="w-full max-w-sm rounded-md border border-gray-200 px-3 text-base sm:text-sm outline-none transition focus:border-black min-h-[44px]"
+        />
     </>
   );
   const resumenEnvio = enElEnvio.length + (traslado ? 1 : 0) > 0 && (

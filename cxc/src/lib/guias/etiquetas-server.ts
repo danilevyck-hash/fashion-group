@@ -77,6 +77,8 @@ interface FilaCruda {
   envio_id?: string | null;
   orden_en_envio?: number | null;
   nota?: string | null;
+  // 12-nov-2026 (migración `20270112120000`). Sin ella no llega.
+  pedido?: string | null;
 }
 
 const COLUMNAS =
@@ -88,6 +90,22 @@ const COLUMNAS_ATADAS = "id, guia_item_id, cajas";
 
 /** Las de siempre MÁS las del envío (1-oct-2026). */
 const COLUMNAS_ENVIO = COLUMNAS + ", envio_id, orden_en_envio, nota";
+
+/** Las del envío MÁS el N.° de pedido (12-nov-2026). */
+const COLUMNAS_PEDIDO = COLUMNAS_ENVIO + ", pedido";
+
+/**
+ * 🔴 FALLA ABIERTA SIN LA COLUMNA `pedido`: «la columna no existe» (42703 de
+ * Postgres o PGRST204/«schema cache» de PostgREST) se lee otra vez sin ella.
+ */
+export function esColumnaPedidoAusente(code: string | undefined, message: string | undefined): boolean {
+  if (code === "42703" || code === "PGRST204") return true;
+  const m = message ?? "";
+  return /pedido/i.test(m) && /does not exist|could not find/i.test(m);
+}
+
+export const AVISO_MIGRACION_PEDIDO =
+  "Falta correr la migración del N.° de pedido (20270112120000). Guarda el envío sin pedido.";
 
 export const AVISO_MIGRACION_TRASLADO =
   "Falta correr la migración de traslados sin factura (20261226120000 y 20261227120000)";
@@ -112,6 +130,7 @@ function aEtiqueta(f: FilaCruda, guiaNumero: number | null): EtiquetaFila {
     envio_id: f.envio_id ? String(f.envio_id) : String(f.id),
     orden_en_envio: Number(f.orden_en_envio ?? 1) || 1,
     nota: f.nota ? String(f.nota) : null,
+    pedido: f.pedido ? String(f.pedido) : null,
   };
 }
 
@@ -134,7 +153,12 @@ export async function leerEtiquetas(): Promise<EtiquetaFila[]> {
           .order("id", { ascending: true })
           .range(desde, hasta),
     );
-  const filas = await leer(COLUMNAS_ENVIO)
+  const filas = await leer(COLUMNAS_PEDIDO)
+    .catch((e: unknown) => {
+      const err = e as { code?: string; message?: string };
+      if (esColumnaPedidoAusente(err?.code, err?.message ?? String(e))) return leer(COLUMNAS_ENVIO);
+      throw e;
+    })
     .catch((e: unknown) => {
       const err = e as { code?: string; message?: string };
       throw errorDeTabla(err?.code, err?.message ?? String(e));
@@ -202,7 +226,8 @@ export async function leerEtiqueta(id: number): Promise<EtiquetaFila | null> {
     .eq("id", id)
     .eq("deleted", false)
     .maybeSingle();
-  const { data, error } = await leer(COLUMNAS_ENVIO);
+  let { data, error } = await leer(COLUMNAS_PEDIDO);
+  if (error && esColumnaPedidoAusente(error.code, error.message)) ({ data, error } = await leer(COLUMNAS_ENVIO));
   if (error) throw errorDeTabla(error.code, error.message);
   if (!data) return null;
   const f = data as unknown as FilaCruda;
@@ -552,10 +577,18 @@ export async function crearEnvio(
     envio_id: envioId,
     orden_en_envio: i + 1,
     nota: f.nota,
+    // Sin pedido la fila viaja igual que antes: así se guarda aunque falte la columna.
+    ...(envio.pedido ? { pedido: envio.pedido } : {}),
   }));
 
-  const { data, error } = await supabaseServer.from(TABLA_ETIQUETAS).insert(filas).select(COLUMNAS_ENVIO);
+  const { data, error } = await supabaseServer
+    .from(TABLA_ETIQUETAS)
+    .insert(filas)
+    .select(envio.pedido ? COLUMNAS_PEDIDO : COLUMNAS_ENVIO);
   if (error) {
+    if (envio.pedido && esColumnaPedidoAusente(error.code, error.message)) {
+      return { ok: false, status: 503, error: AVISO_MIGRACION_PEDIDO };
+    }
     // 🔴 Sin la migración `20261226120000` la columna sigue NOT NULL: el traslado
     // no se guarda y se DICE (falla abierta: lo demás funciona igual).
     if (error.code === "23502" && envio.facturas.some((f) => f.switch_factura_id == null)) {
