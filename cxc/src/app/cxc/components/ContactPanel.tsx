@@ -6,8 +6,6 @@ import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
-import UltimosPagosPorFecha from "./UltimosPagosPorFecha";
-import { useUltimosPagosGrupo } from "../hooks/useUltimosPagosGrupo";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
@@ -33,8 +31,6 @@ interface Props {
   onOpenEstado?: (client: ConsolidatedClient) => void;
   /** «Le enviaste el estado de cuenta hace 3 días», o `null`. */
   marcaEnvio?: string | null;
-  /** El panel está abierto: recién ahí se piden los últimos pagos. */
-  abierto?: boolean;
 }
 
 export default function ContactPanel({
@@ -44,7 +40,6 @@ export default function ContactPanel({
   onCobrar,
   onOpenEstado,
   marcaEnvio,
-  abierto = true,
 }: Props) {
   const [desgloseOpen, setDesgloseOpen] = useState(true);
 
@@ -57,11 +52,10 @@ export default function ContactPanel({
 
   // 🔴 EL DESGLOSE POR EMPRESA SE QUEDA EXACTAMENTE COMO ESTABA — Daniel lo
   // eligió así el 5-sep-2026, con sus columnas «Último pago» y «Última compra».
-  // Lo que se agrega debajo es el bloque «Últimos pagos» POR FECHA, que
-  // reemplaza al de por-empresa (y al botón «Últimos pagos ›» de la fila
-  // cerrada): un cliente que le paga a las seis el mismo día llenaba 18 líneas
-  // para decir lo que dicen 3.
-  const pagos = useUltimosPagosGrupo(codigo, abierto);
+  // 🩸 El bloque «Últimos pagos» POR FECHA que vivía debajo se RETIRÓ de esta
+  // fila el 12-nov-2026 (Daniel aprobó «hoy vs recomendación»): repetía lo que
+  // ya dicen las columnas de la tabla. Sigue en la página del cliente
+  // (`ClienteCxc.tsx`) y en la ficha de Clientes.
 
   return (
     <div className="bg-gray-50/80 px-6 py-4 border-b border-gray-200 space-y-3">
@@ -147,9 +141,6 @@ export default function ContactPanel({
           )}
         </div>
       )}
-
-      {/* ── Últimos pagos, POR FECHA ──────────────────────────── */}
-      <UltimosPagosPorFecha pagos={pagos} />
 
       {/* ── Acciones: estado de cuenta · ficha ──────────────────── */}
       <div className="flex items-center gap-3 flex-wrap">

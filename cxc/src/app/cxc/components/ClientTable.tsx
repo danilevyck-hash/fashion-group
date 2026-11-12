@@ -114,7 +114,6 @@ export default function ClientTable({
               onOpenEstado={onOpenEstado}
               onCobrar={onCobrar}
               marcaEnvio={marcaEnvioDe(client)}
-              abierto={isExpanded}
             />
           )}
         </AccordionContent>

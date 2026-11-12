@@ -47,7 +47,8 @@ import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import UndoToast from "@/components/UndoToast";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
-import { ultimoPagoDelCliente } from "@/lib/cxc/lista-celular";
+import { ultimoPagoDelCliente, empresasDelCliente } from "@/lib/cxc/lista-celular";
+import { CXC_DESGLOSE_CELULAR_2026_11 } from "@/lib/cxc/desglose-celular-2026-11";
 import { fechaCortaPago } from "@/lib/cxc/pagos-por-fecha";
 import {
   diasSinPagar,
@@ -158,6 +159,9 @@ function textoUltimoPagoDe(client: ConsolidatedClient, hoy: string): string {
   if (!pago) return "Sin pagos"; // 1-oct-2026, Daniel: nombres normales de ERP
   return `Último pago ${fechaCortaPago(pago.fecha, hoy)} · $${fmt(pago.monto)}`;
 }
+
+/** Nombre de cada empresa para el desglose de la hoja del celular. */
+const nombrePorKeyCelular: Record<string, string> = Object.fromEntries(COMPANIES.map((c) => [c.key, c.name]));
 
 // ── Main Component ───────────────────────────────────────
 
@@ -987,7 +991,12 @@ function AdminDashboardInner() {
         onEscribirloYo={openEmail}
         marcaEnvio={cobrarClient ? marcaEnvioDe(cobrarClient) : null}
         totalDeLaFila={cobrarDesdeCelular && cobrarClient ? cobrarClient.total : null}
-        ultimoPagoTexto={cobrarDesdeCelular && cobrarClient ? textoUltimoPagoDe(cobrarClient, hoy) : null}
+        ultimoPagoTexto={cobrarDesdeCelular && cobrarClient && !CXC_DESGLOSE_CELULAR_2026_11 ? textoUltimoPagoDe(cobrarClient, hoy) : null}
+        desglose={
+          cobrarDesdeCelular && cobrarClient && CXC_DESGLOSE_CELULAR_2026_11
+            ? empresasDelCliente(cobrarClient, nombrePorKeyCelular, {})
+            : null
+        }
         hrefDocumentos={
           cobrarDesdeCelular && cobrarClient
             ? `/cxc/cliente/${encodeURIComponent(codigoDe(cobrarClient))}`
