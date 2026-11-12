@@ -9,7 +9,7 @@
  * Lo que este candado exige:
  *   1. 🔴 SIN PEDIDO EL PAPEL ES IDÉNTICO AL DE ANTES. Las huellas de abajo se
  *      sacaron del generador ANTERIOR al cambio (commit 142b0fae), con fecha y
- *      id de archivo fijos, y el nuevo dio las mismas en los ocho casos. Si
+ *      id de archivo fijos y sin la fecha de creación (lleva el huso horario de la máquina), y el nuevo dio las mismas en los ocho casos. Si
  *      cambian sin que nadie haya tocado el papel a propósito, algo se movió.
  *   2. Con pedido, la línea sale debajo de la factura y ARRIBA del rótulo
  *      «Cliente», sin pisarlo, también en el caso apretado de carta.
@@ -44,18 +44,20 @@ function pdfDe(e: EtiquetaFila, f: Formato) {
   doc.setFileId("0".repeat(32));
   return doc;
 }
-const huella = (e: EtiquetaFila, f: Formato) => createHash("sha256").update(pdfDe(e, f).output()).digest("hex");
+/** La fecha de creación lleva el huso horario de la máquina: se saca de la huella. */
+const huella = (e: EtiquetaFila, f: Formato) =>
+  createHash("sha256").update(pdfDe(e, f).output().replace(/\/CreationDate \([^)]*\)/, "")).digest("hex");
 
 /** Las huellas del generador de ANTES del pedido (medidas el 12-nov-2026). */
 const ANTES: Array<[string, EtiquetaFila, Formato, string]> = [
-  ["normal", ETQ, "carta", "b5f44887a28742c465f99a18ed9b732109cc4cda9f0941d8581f551922043754"],
-  ["normal", ETQ, "4x6", "aff234d886bfaa8aab1d3ab4c456ea2f6be7a3bc7ee560f05e3585aa0d81f904"],
-  ["nota", { ...ETQ, nota: "FRÁGIL" }, "carta", "b31cda7d87f8891d925a2d2f172e0bc4f3a5e2b353a694dc4f6ea2545df9f98f"],
-  ["nota", { ...ETQ, nota: "FRÁGIL" }, "4x6", "dd557d2702f92f40122556e157fc1f8d43624aff21915fd5ef0ba03ecd0b0493"],
-  ["largo", LARGO, "carta", "a3caa174819aacb614ca4c2ce65f3718ed1c371d337951d3f69fa8e8a479184d"],
-  ["largo", LARGO, "4x6", "5ab6e76239d95d52ba985eeb39dd202bb8f0143c7f28ee3f5fb8fda1aedb7184"],
-  ["traslado", TRASLADO, "carta", "8671c6dc1fb8b55cf3bd5927bc03b02a7e985f6cf8c3f99bcffc3757ab00e17b"],
-  ["traslado", TRASLADO, "4x6", "262c9a4eff12483d862d53c9b9e5a820047cc87495c829e5690324142f78ca0b"],
+  ["normal", ETQ, "carta", "2b5ab62e3f8d244d96405e808064c00fb820f1d70f18855076f18078fd09ae50"],
+  ["normal", ETQ, "4x6", "3dfe3df7af33cb4fe233155e6e499dcaa09566774fd176576f65f1f339f9f53b"],
+  ["nota", { ...ETQ, nota: "FRÁGIL" }, "carta", "451a5a4dd391ccb245565aaf04360edc541ada14873a8a9f0695b3bc8f52f5b6"],
+  ["nota", { ...ETQ, nota: "FRÁGIL" }, "4x6", "88371b52973da25301568bfba1de87cc2dce2908b8faad5a856f0855424411f3"],
+  ["largo", LARGO, "carta", "225acc4ea4d216e47919c4b16b7946b8d1604b6631213cb59e777755fb5e239b"],
+  ["largo", LARGO, "4x6", "a78d8524e5fbcd0ad003d796b74405ded52b3bbf77183f9502d54096f9e6a00f"],
+  ["traslado", TRASLADO, "carta", "fef188773b4bc84d6aadaee186cab1912929e36fc522ea844b4d4b32ae8d6496"],
+  ["traslado", TRASLADO, "4x6", "498f68620aaa121a7b31200e83a02b941e557c57da190f6c19683871b2abd6eb"],
 ];
 
 interface Pieza { texto: string; pt: number; gris: string; negrita: boolean; y: number }
