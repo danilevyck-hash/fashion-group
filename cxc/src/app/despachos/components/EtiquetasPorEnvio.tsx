@@ -33,6 +33,7 @@ import ClientePicker from "@/components/ClientePicker";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { ModalOverlay, Toast } from "@/components/ui";
 import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
+import { facturaParaMostrar } from "@/lib/guias/numero-factura";
 import {
   DIAS_CON_FACTURA_VISIBLES,
   DIAS_POR_VER_MAS,
@@ -425,6 +426,16 @@ interface PanelProps {
   onRecargar: () => Promise<void> | void;
 }
 
+/** Lo que contesta `facturas-cliente?factura=`: una por empresa. */
+interface FacturaHallada {
+  empresa_key: string;
+  empresa: string;
+  secuencial: string;
+  fecha: string;
+  cliente_codigo: string;
+  cliente_nombre: string;
+}
+
 function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }: PanelProps) {
   const [cliente, setCliente] = useState<{ nombre: string; codigo: string } | null>(null);
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
@@ -456,6 +467,12 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   const [trasladoBultos, setTrasladoBultos] = useState("");
   const barra = useRef<HTMLDivElement | null>(null);
   usePublicarAltoBarraFija(barra, ETIQUETAS_TRASLADO_2026_10);
+  // 🔴 POR N.° DE FACTURA (12-nov-2026): se escribe la factura, el sistema
+  // encuentra al cliente y la deja marcada. En dos empresas, se elige.
+  const [numeroFactura, setNumeroFactura] = useState("");
+  const [coincidencias, setCoincidencias] = useState<FacturaHallada[]>([]);
+  const [buscandoNumero, setBuscandoNumero] = useState(false);
+  const [preElegida, setPreElegida] = useState<string | null>(null);
 
   const [historicos, setHistoricos] = useState<Record<string, string[]>>({});
   const [definidos, setDefinidos] = useState<DefinidosPorCliente>({});
@@ -544,6 +561,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   const botones = cliente?.codigo ? botonesDeDestino(cliente.codigo, historicos[cliente.codigo] ?? [], definidos) : [];
 
   function elegirCliente(nombre: string, codigo: string) {
+    setPreElegida(null);
     // Con el traslado se acepta un cliente fuera del directorio («Ingresar manualmente»).
     const aMano = ETIQUETAS_TRASLADO_2026_10 && nombre.trim() !== "";
     setCliente(codigo || aMano ? { nombre: nombre.trim(), codigo } : null);
@@ -557,6 +575,40 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
     setDiasAlternados(new Set());
     setDestinoTocado(false);
     setDestino(codigo ? (destinoParaAutollenar(codigo, historicos[codigo] ?? [], definidos) ?? "") : "");
+  }
+
+  async function buscarFactura() {
+    const n = numeroFactura.trim();
+    if (!n || buscandoNumero) return;
+    setBuscandoNumero(true);
+    setCoincidencias([]);
+    setError(null);
+    try {
+      const r = await fetch(`/api/guias/facturas-cliente?factura=${encodeURIComponent(n)}`, { cache: "no-store" });
+      const d = (await r.json().catch(() => null)) as { coincidencias?: FacturaHallada[]; error?: string } | null;
+      if (!r.ok) { setError(d?.error ?? "No se pudo buscar la factura"); return; }
+      const hs = d?.coincidencias ?? [];
+      if (hs.length === 0) setError(`No se encontró la factura ${n} en el último año`);
+      else if (hs.length === 1) elegirFacturaHallada(hs[0]);
+      else setCoincidencias(hs);
+    } catch {
+      setError("Sin conexión. Revisa el internet y vuelve a intentar.");
+    } finally {
+      setBuscandoNumero(false);
+    }
+  }
+
+  /** Elige el cliente de la factura y la deja marcada en su empresa. */
+  function elegirFacturaHallada(h: FacturaHallada) {
+    elegirCliente(h.cliente_nombre, h.cliente_codigo);
+    // Mismo cliente: el efecto no vuelve a correr y la lista quedaría vacía.
+    if (h.cliente_codigo === cliente?.codigo) void cargarFacturas(h.cliente_codigo);
+    const clave = claveFactura(h);
+    setEmpresaKey(h.empresa_key);
+    setMarcadas([{ clave, bultos: "", nota: "" }]);
+    setPreElegida(clave);
+    setCoincidencias([]);
+    setNumeroFactura("");
   }
 
   function elegirEmpresa(key: string) {
@@ -702,6 +754,43 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
             permitirOtro={ETIQUETAS_TRASLADO_2026_10}
             onChange={elegirCliente}
           />
+          <form
+            className="mt-2 flex items-center gap-2"
+            onSubmit={(e) => { e.preventDefault(); void buscarFactura(); }}
+          >
+            <input
+              type="text"
+              inputMode="numeric"
+              value={numeroFactura}
+              onChange={(e) => setNumeroFactura(e.target.value)}
+              placeholder="o N.° de factura"
+              aria-label="Buscar por número de factura"
+              className="min-h-[44px] w-40 rounded-md border border-gray-300 px-3 text-base outline-none transition focus:border-black sm:text-sm"
+            />
+            <button type="submit" disabled={!numeroFactura.trim() || buscandoNumero} className={BOTON_BLANCO}>
+              {buscandoNumero ? "Buscando…" : "Buscar factura"}
+            </button>
+          </form>
+          {coincidencias.length > 1 && (
+            <div className="mt-2" role="group" aria-label="La factura está en varias empresas">
+              <p className="mb-1 text-xs text-gray-500">Esa factura está en {coincidencias.length} empresas. Selecciona cuál:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {coincidencias.map((h) => (
+                  <button
+                    key={claveFactura(h)}
+                    type="button"
+                    onClick={() => elegirFacturaHallada(h)}
+                    className={`${CHIP} border-gray-200 text-gray-700 hover:bg-gray-50`}
+                  >
+                    {h.empresa} · {facturaParaMostrar(h.secuencial)} · {h.cliente_nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {preElegida && facturas && !porClave.has(preElegida) && (
+            <p className="mt-2 text-xs text-amber-700">Esa factura ya está etiquetada o ya salió en una guía.</p>
+          )}
         </div>
   );
   const bloqueTraslado = cliente && traslado && (

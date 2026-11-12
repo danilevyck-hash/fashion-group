@@ -65,8 +65,8 @@ describe("🔴 1 · cuatro pasos, y quién marca cada uno", () => {
     expect(mover("en_preparacion", "pendiente", secretaria).ok).toBe(false);
   });
 
-  it("el PATCH pide los bultos al pasar de En preparación a Preparado", () => {
-    expect(ruta()).toContain('if (estado === "preparado" && desde === "en_preparacion") {');
+  it("el PATCH ya no pide bultos al pasar de En preparación a Preparado (12-nov-2026)", () => {
+    expect(ruta()).not.toContain('if (estado === "preparado" && desde === "en_preparacion") {');
   });
 
   it("la migración SOLO agrega: ningún UPDATE ni DELETE sobre filas", () => {
@@ -93,7 +93,7 @@ describe("🔴 2 · «En espera de muestra»", () => {
   });
 
   it("marcar Preparado la quita sola", () => {
-    const c = columnasDelPaso("en_preparacion", "preparado", "julio", "2026-10-09T15:00:00.000Z", 4);
+    const c = columnasDelPaso("en_preparacion", "preparado", "julio", "2026-10-09T15:00:00.000Z");
     expect(c).toMatchObject({ espera_muestra_desde: null, espera_muestra_por: null, espera_muestra_nota: null });
   });
 

@@ -37,7 +37,6 @@ import {
   esEstadoFlujoSimple,
   estadoFlujoSimpleLeido,
   puedeMoverFlujoSimple,
-  validarCantidadBultos,
   columnasDelPaso,
   esDeshacerFlujoSimple,
   puedeMarcarEsperaMuestra,
@@ -259,7 +258,6 @@ async function patchFlujoSimple(
   empresa: string,
   id: number,
   estado: EstadoFlujoSimple,
-  body: Record<string, unknown> | null,
 ): Promise<NextResponse> {
   const quienFirma = auth.userName || auth.userId;
   if (!quienFirma) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
@@ -279,19 +277,11 @@ async function patchFlujoSimple(
   const v = puedeMoverFlujoSimple({ desde, hasta: estado, empresa_key: empresa }, { role: auth.role, userName: auth.userName });
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 403 });
 
-  // El número de bultos SOLO se pide (y se exige) al preparar DESDE En
-  // preparación: volver a «Preparado» desde «Recibido» conserva el que había.
-  let bultosNuevos: number | null = null;
-  if (estado === "preparado" && desde === "en_preparacion") {
-    const val = validarCantidadBultos(body?.bultos);
-    if (!val.ok) return NextResponse.json({ error: val.error }, { status: 400 });
-    bultosNuevos = val.valor!;
-  }
-
+  // 🔴 12-nov-2026 (Daniel): «Preparado» es un toque, sin número de bultos.
   const ahora = new Date().toISOString();
   // 🩸 8-oct-2026: volver a «Pendiente» caía en la rama de Recibido y FIRMABA
   // «recibido_por». Ahora avanzar y deshacer salen de una sola función.
-  const cols = columnasDelPaso(desde, estado, quienFirma, ahora, bultosNuevos);
+  const cols = columnasDelPaso(desde, estado, quienFirma, ahora);
   const fila = { empresa_key: empresa, pedido_switch_id: id, cambiado_por: quienFirma, cambiado_en: ahora, ...cols };
   const { error } = await supabaseServer.from("pedidos_bodega_estado").upsert(fila, { onConflict: "empresa_key,pedido_switch_id" });
   if (error) return NextResponse.json({ error: "No se pudo guardar el estado" }, { status: 500 });
@@ -407,7 +397,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (PEDIDOS_FLUJO_SIMPLE_2026_10) {
-    return patchFlujoSimple(auth, empresa, id, estado as EstadoFlujoSimple, body);
+    return patchFlujoSimple(auth, empresa, id, estado as EstadoFlujoSimple);
   }
 
   let envio: { envio_id: string; bultos: number } | null = null;

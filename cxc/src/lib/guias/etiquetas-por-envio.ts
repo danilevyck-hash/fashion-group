@@ -585,3 +585,28 @@ export function moverEnElEnvio<T>(lista: readonly T[], i: number, paso: -1 | 1):
   [copia[i], copia[j]] = [copia[j], copia[i]];
   return copia;
 }
+
+// ─── Crear por N.° de factura (12-nov-2026) ──────────────────────────────────
+
+/**
+ * 🔴 CREAR UNA ETIQUETA ESCRIBIENDO LA FACTURA (Daniel, 12-nov-2026): de las
+ * facturas leídas, las que terminan en los dígitos tecleados (`2534` o el largo
+ * `11-000002534`; un número sin clave de `claveDeFactura` —sin dígitos o todo
+ * ceros— no busca nada), y de cada empresa SOLO la más reciente: los
+ * secuenciales de Switch se repiten entre empresas, y si queda más de una se
+ * elige en pantalla.
+ */
+export function facturasPorNumero<T extends { empresa_key: string; secuencial: string | null; fecha: string | null }>(
+  filas: readonly T[],
+  tecleado: string,
+): T[] {
+  const buscado = String(tecleado ?? "").replace(/\D/g, "");
+  if (claveDeFactura(buscado) === "") return [];
+  const porEmpresa = new Map<string, T>();
+  for (const f of filas) {
+    if (!String(f.secuencial ?? "").replace(/\D/g, "").endsWith(buscado)) continue;
+    const ya = porEmpresa.get(f.empresa_key);
+    if (!ya || String(f.fecha ?? "") > String(ya.fecha ?? "")) porEmpresa.set(f.empresa_key, f);
+  }
+  return [...porEmpresa.values()].sort((a, b) => String(b.fecha ?? "").localeCompare(String(a.fecha ?? "")));
+}

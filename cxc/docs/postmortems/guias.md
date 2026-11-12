@@ -2615,3 +2615,13 @@ Interruptor `GUIA_DETALLE_APPLE_2026_10` (`src/lib/guias/guias-2026-10.ts`), **p
 - **Lo que no cambia:** el PUT del despacho, las reglas del servidor, las cajas (mismos `id`), el papel.
 - **Candados:** `guias-detalle-apple-apagado.test.tsx` (apagado = HTML de antes, byte por byte, en cinco estados; y la pantalla prendida, con cada envío mostrando su N° del transportista aunque sea el mismo) y `guias-detalle-apple.test.tsx` (PUT idéntico).
 
+
+
+## 12-nov-2026 — Preparado sin bultos, Etiquetas por N.° de factura y el orden de las pestañas
+
+Aprobado por Daniel, los tres en una solicitud de cambio:
+
+- **Pedidos: «Preparado» es un toque.** Se fue la casilla «N.° de bultos» de la fila En preparación y el servidor ya no lo exige (`validarCantidadBultos` se retiró; `columnasDelPaso` no escribe `bultos` al preparar). «N bultos» dejó de mostrarse en Preparados y Recibidos: la fila dice solo las unidades. 🔴 **La columna `pedidos_bodega_estado.bultos` y lo ya anotado NO se tocan** (sin migración); ni la guía, ni la etiqueta, ni Telegram la leían. Volver un paso atrás sigue dejándola en NULL, como antes.
+- **Etiquetas › Nuevo envío: «o N.° de factura».** Se escribe la factura (`2534` o `11-000002534`) y el sistema encuentra al cliente por CÓDIGO y la deja marcada. Busca en las 6 del grupo, solo `Factura`, último año (`GET /api/guias/facturas-cliente?factura=`); compara por los dígitos del final (`facturasPorNumero` en `etiquetas-por-envio.ts`, que usa `claveDeFactura`) y de cada empresa toma la más reciente. **En dos empresas, se elige** con un chip por empresa. Si la factura ya está etiquetada o ya salió en una guía, se dice. El buscador de la lista no cambió.
+- **Pestañas:** Pedidos · Etiquetas · Guías de despacho · Configuración. Cada rol sigue viendo las suyas y el módulo sigue abriendo en Pedidos. Esto revierte lo de «Guías sigue primero» (`guias-etiqueta-rediseno`).
+- **Candados:** `pedidos-flujo-simple` · `pedidos-en-preparacion` · `etiquetas-por-numero-factura` · `guias-etiqueta-rediseno`.

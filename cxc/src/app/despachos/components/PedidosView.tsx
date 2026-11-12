@@ -41,7 +41,6 @@ import {
   MAX_NOTA_MUESTRA,
   lineaEsperaMuestra,
   estadoFlujoSimpleLeido,
-  validarCantidadBultos,
   ultimaFirmaFlujoSimple,
   diasEnPreparado,
   preparadoViejo,
@@ -238,23 +237,17 @@ export default function PedidosView({
   }
 
   // ── FLUJO SIMPLIFICADO (7-oct-2026) ─────────────────────────────────────
-  // Lo que anota bodega en la fila, mientras no se envía: la verdad sigue en
-  // `pedidos` hasta que se confirma.
-  const [bultoEnFila, setBultoEnFila] = useState<Record<string, string>>({});
   // «Facturado» y «Despachado» SÍ piden confirmar (son el trabajo de la
   // secretaria, con el mismo riesgo de marcar la fila de al lado); «Preparado»
-  // no: escribir el número y tocar el botón YA es la confirmación, y Daniel
-  // pidió menos pasos, no más.
+  // no: es UN toque (12-nov-2026, Daniel: sin número de bultos).
   const [porConfirmarSimple, setPorConfirmarSimple] = useState<{ pedido: PedidoBodega; destino: EstadoFlujoSimple } | null>(null);
 
-  /** Mueve el pedido, con los bultos si los hay. Optimista, revierte si falla. */
-  async function moverSimple(p: PedidoBodega, destino: EstadoFlujoSimple, bultos?: number) {
-    const antes = { estado: p.estado, bultos: p.bultos, espera_muestra_desde: p.espera_muestra_desde, espera_muestra_nota: p.espera_muestra_nota };
-    // Volver a Pendiente o a En preparación borra los bultos anotados (el
-    // servidor hace lo mismo); marcar Preparado quita la espera de muestra.
-    const bultosDespues = destino === "pendiente" || destino === "en_preparacion" ? null : bultos ?? p.bultos;
+  /** Mueve el pedido. Optimista, revierte si falla. */
+  async function moverSimple(p: PedidoBodega, destino: EstadoFlujoSimple) {
+    const antes = { estado: p.estado, espera_muestra_desde: p.espera_muestra_desde, espera_muestra_nota: p.espera_muestra_nota };
+    // Marcar Preparado (o volver a Pendiente) quita la espera de muestra.
     const sinEspera = destino === "en_preparacion" ? {} : { espera_muestra_desde: null, espera_muestra_nota: null };
-    setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado: destino, bultos: bultosDespues, ...sinEspera } : x)));
+    setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado: destino, ...sinEspera } : x)));
     try {
       const r = await fetch("/api/guias/pedidos", {
         method: "PATCH",
@@ -263,25 +256,16 @@ export default function PedidosView({
           empresa_key: p.empresa_key,
           pedido_switch_id: p.pedido_switch_id,
           estado: destino,
-          ...(bultos != null ? { bultos } : {}),
         }),
       });
       const d = (await r.json().catch(() => null)) as Record<string, unknown> | null;
       if (!r.ok) throw new Error(typeof d?.error === "string" ? d.error : String(r.status));
       setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, ...d } : x)));
-      setBultoEnFila((m) => { const n = { ...m }; delete n[clave(p)]; return n; });
     } catch (e) {
       setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, ...antes } : x)));
       const msg = e instanceof Error && e.message.length < 90 ? e.message : "No se pudo guardar el estado. Intenta de nuevo.";
       toast(msg, "error");
     }
-  }
-
-  /** Bodega marca «Preparado»: valida el número de bultos y lo manda de una vez. */
-  function marcarPreparadoSimple(p: PedidoBodega) {
-    const v = validarCantidadBultos(bultoEnFila[clave(p)] ?? "");
-    if (!v.ok) return toast(v.error, "warning");
-    void moverSimple(p, "preparado", v.valor);
   }
 
   // ── «En espera de muestra» (9-oct-2026) ─────────────────────────────────
@@ -331,7 +315,7 @@ export default function PedidosView({
       destino === "pendiente"
         ? "Vuelve a Pendiente: bodega todavía no tiene la hoja del pedido."
         : destino === "en_preparacion"
-          ? "Vuelve a En preparación: se quitan los bultos anotados."
+          ? "Vuelve a En preparación: se quita la firma de Preparado."
           : "Vuelve a Preparado: se quita la recepción. La firma de bodega se conserva.";
     return { titulo, mensaje, boton: `Volver a ${ROTULO_ESTADO_FLUJO_SIMPLE[destino]}` };
   }
@@ -552,9 +536,8 @@ export default function PedidosView({
 
   // ── El control de la fila, flujo simplificado ───────────────────────────
   // UN control por fila, que dice lo que hace (docs/diseno.md, regla 6):
-  //   · Pendiente → la casilla del número de bultos + «Preparado», apagado
-  //     hasta que el número sea válido (bodega o la secretaria).
-  //   · Preparado → los bultos que anotó bodega, quietos, + «Recibir» (solo
+  //   · En preparación → «Preparado», un toque (12-nov-2026: sin bultos).
+  //   · Preparado → las unidades, quietas, + «Recibir» (solo
   //     la secretaria o admin; bodega solo lee el chip). Termina AQUÍ:
   //     facturar en Switch y Etiquetas quedan afuera de Pedidos.
   //   · Recibido → el pedido ya se cerró: un chip quieto y nada más.
@@ -600,31 +583,17 @@ export default function PedidosView({
     }
     if (e === "en_preparacion") {
       if (!puedeMarcar) return chipUnidades || <span className="text-gray-400">—</span>;
-      const valor = bultoEnFila[clave(p)] ?? "";
       const enEspera = !!p.espera_muestra_desde;
-      // Lo principal (bultos + Preparado) en una línea; lo secundario, debajo:
+      // Lo principal (Preparado) en una línea; lo secundario, debajo:
       // en la computadora los cinco controles de corrido se salían de la tabla.
       return (
         <div className="flex flex-col items-end gap-1">
         <div className={fila}>
           {chipUnidades}
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={9999}
-            value={valor}
-            placeholder="N.°"
-            aria-label={`Bultos del pedido ${p.secuencial}`}
-            onChange={(ev) => setBultoEnFila((m) => ({ ...m, [clave(p)]: ev.target.value }))}
-            // 44 px de alto en el celular (regla 10 de docs/diseno.md).
-            className="h-11 w-16 rounded-md border border-gray-300 px-1.5 text-right tabular-nums focus:border-gray-900 focus:outline-none sm:h-9"
-          />
           <button
             type="button"
-            onClick={() => marcarPreparadoSimple(p)}
-            disabled={!valor.trim()}
-            className="h-9 whitespace-nowrap rounded-md bg-black px-3 text-xs font-medium text-white transition active:scale-[0.97] disabled:opacity-40"
+            onClick={() => void moverSimple(p, "preparado")}
+            className="h-9 whitespace-nowrap rounded-md bg-black px-3 text-xs font-medium text-white transition active:scale-[0.97]"
           >
             Preparado
           </button>
@@ -643,14 +612,12 @@ export default function PedidosView({
         </div>
       );
     }
-    // 🔴 LAS PIEZAS, JUNTO A LOS BULTOS (7-oct-2026, Daniel: «¿puedes poner la
-    // cantidad de pieza?»): «5 bultos · 620 unidades». `p.piezas == null` =
-    // nadie abrió el detalle de este pedido todavía: se calla, no se inventa.
+    // 🔴 LAS UNIDADES (7-oct-2026, Daniel: «¿puedes poner la cantidad de
+    // pieza?»). 🔴 12-nov-2026: los bultos ya no se anotan ni se muestran.
+    // `p.piezas == null` = sin líneas todavía: se calla, no se inventa.
     const chipBultos = (
       <span className={`${base} border-gray-300 bg-white text-gray-700`}>
-        {[p.bultos ? `${p.bultos} ${p.bultos === 1 ? "bulto" : "bultos"}` : null, p.piezas != null ? textoUnidades(p.piezas) : null]
-          .filter(Boolean)
-          .join(" · ") || "—"}
+        {p.piezas != null ? textoUnidades(p.piezas) : "—"}
       </span>
     );
     if (e === "preparado") {

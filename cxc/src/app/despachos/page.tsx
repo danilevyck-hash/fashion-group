@@ -195,8 +195,8 @@ export default function GuiasPage() {
   const enPedidos = hayPedidos && vista === "pedidos";
   /** Las pestañas que de verdad existen para este rol. Con una sola, no se dibuja la fila. */
   const pestanas: Array<[Vista, string]> = [
+    // 🔴 Orden (12-nov-2026, Daniel): Pedidos · Etiquetas · Guías de despacho · Configuración.
     ...(hayPedidos ? ([["pedidos", "Pedidos"]] as Array<[Vista, string]>) : []),
-    ["guias", "Guías de despacho"],
     // 🔴 «Bultos» (era «Etiquetas», 7-oct-2026): es el nombre del glosario de
     // `docs/nombres-erp.md` para esta pantalla (se escriben los bultos y
     // salen las hojas); la `key` de la pestaña («etiquetas») no cambia.
@@ -206,6 +206,7 @@ export default function GuiasPage() {
     // de hoy no cambia. Pendiente actualizar `docs/nombres-erp.md` el día que
     // esto se prenda.
     ...(hayEtiquetas ? ([["etiquetas", PEDIDOS_FLUJO_SIMPLE_2026_10 ? "Etiquetas" : "Bultos"]] as Array<[Vista, string]>) : []),
+    ["guias", "Guías de despacho"],
     ...(hayConfig ? ([["config", "Configuración"]] as Array<[Vista, string]>) : []),
   ];
 
