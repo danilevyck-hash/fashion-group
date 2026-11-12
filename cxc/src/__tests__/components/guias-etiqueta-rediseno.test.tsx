@@ -421,15 +421,17 @@ describe("🔴 5. las dos pestañas se sienten familia", () => {
   /**
    * ⚠️ Daniel preguntó si Etiquetas debía ir de primero y quedamos en que NO: el
    * orden sigue lo que más se abre, y hoy son 257 guías contra una etiqueta.
+   * 🔴 12-nov-2026: Daniel lo cambió — Pedidos · Etiquetas · Guías de despacho ·
+   * Configuración (candado en `guias/etiquetas-por-numero-factura.test.ts`).
    */
-  it("⚠️ el ORDEN de las pestañas NO cambió: Guías sigue primero", () => {
+  it("el orden de las pestañas: Etiquetas antes que Guías (12-nov-2026)", () => {
     const pagina = leer("src/app/despachos/page.tsx");
     const lista = pagina.slice(
       pagina.indexOf("const pestanas: Array<[Vista, string]> = ["),
       pagina.indexOf("// Al TOCAR Guías"),
     );
     expect(lista).toContain('["guias", "Guías de despacho"]');
-    expect(lista.indexOf('"Guías de despacho"')).toBeLessThan(lista.indexOf('"Bultos"'));
-    expect(lista.indexOf('"Bultos"')).toBeLessThan(lista.indexOf('"Configuración"'));
+    expect(lista.indexOf('"Bultos"')).toBeLessThan(lista.indexOf('"Guías de despacho"'));
+    expect(lista.indexOf('"Guías de despacho"')).toBeLessThan(lista.indexOf('"Configuración"'));
   });
 });

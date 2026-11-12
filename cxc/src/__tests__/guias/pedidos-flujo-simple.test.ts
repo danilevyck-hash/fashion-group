@@ -50,7 +50,6 @@ import {
   ROLES_FLUJO_SIMPLE_TODAS,
   rolesDelEstadoFlujoSimple,
   puedeMoverFlujoSimple,
-  validarCantidadBultos,
   firmaEnColumnaFlujoSimple,
   ultimaFirmaFlujoSimple,
   PREPARADO_VIEJO_DIAS,
@@ -125,14 +124,23 @@ describe("🔴 3 · un solo número de bultos por pedido", () => {
     expect(detalle()).toContain("ocultarBulto");
   });
 
-  it("validarCantidadBultos acepta enteros de 1 a 9999, nada más", () => {
-    expect(validarCantidadBultos("6")).toEqual({ ok: true, valor: 6 });
-    expect(validarCantidadBultos(6)).toEqual({ ok: true, valor: 6 });
-    expect(validarCantidadBultos("0").ok).toBe(false);
-    expect(validarCantidadBultos("10000").ok).toBe(false);
-    expect(validarCantidadBultos("3.5").ok).toBe(false);
-    expect(validarCantidadBultos("").ok).toBe(false);
-    expect(validarCantidadBultos(undefined).ok).toBe(false);
+  // 🔴 12-nov-2026 (Daniel): «Preparado» es UN toque, sin número de bultos.
+  it("el servidor ya NO exige bultos para marcar Preparado", () => {
+    const r = rutaLista();
+    expect(r).not.toContain("validarCantidadBultos");
+    expect(r).not.toContain("body?.bultos");
+    expect(columnasDelPaso("en_preparacion", "preparado", "jorman", "x")).not.toHaveProperty("bultos");
+  });
+
+  it("la fila de En preparación no tiene casilla de bultos: «Preparado» va directo", () => {
+    const v = vista();
+    expect(v).not.toContain("bultoEnFila");
+    expect(v).not.toContain("Bultos del pedido");
+    expect(v).toContain('onClick={() => void moverSimple(p, "preparado")}');
+  });
+
+  it("ninguna fila muestra «N bultos»", () => {
+    expect(vista()).not.toMatch(/p\.bultos === 1 \? "bulto"/);
   });
 });
 
@@ -300,8 +308,8 @@ describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
 
   it("avanzar firma su columna", () => {
     expect(columnasDelPaso("pendiente", "en_preparacion", "jorman", ahora)).toEqual({ estado: "en_preparacion", en_preparacion_por: "jorman", en_preparacion_en: ahora });
-    expect(columnasDelPaso("en_preparacion", "preparado", "jorman", ahora, 3)).toEqual({
-      estado: "preparado", bultos: 3, preparado_por: "jorman", preparado_en: ahora,
+    expect(columnasDelPaso("en_preparacion", "preparado", "jorman", ahora)).toEqual({
+      estado: "preparado", preparado_por: "jorman", preparado_en: ahora,
       espera_muestra_desde: null, espera_muestra_por: null, espera_muestra_nota: null,
     });
     expect(columnasDelPaso("preparado", "recibido", "Angela", ahora)).toEqual({ estado: "recibido", recibido_por: "Angela", recibido_en: ahora });
@@ -316,7 +324,7 @@ describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
 
   it("el PATCH escribe con columnasDelPaso y deja rastro en el registro de actividad", () => {
     const r = rutaLista();
-    expect(r).toContain("columnasDelPaso(desde, estado, quienFirma, ahora, bultosNuevos)");
+    expect(r).toContain("columnasDelPaso(desde, estado, quienFirma, ahora)");
     expect(r).toContain('"deshacer_paso"');
     expect(r).toContain("antes: previo");
   });
@@ -338,9 +346,9 @@ describe("🔴 10 · las unidades también en Pendientes (Daniel, 8-oct-2026)", 
     expect(v).toMatch(/<div className=\{fila\}>\s*\{chipUnidades\}/);
   });
 
-  it("Preparados y Recibidos también dicen las unidades, tengan o no bultos", () => {
+  it("Preparados y Recibidos también dicen las unidades", () => {
     const v = vista();
-    expect(v).toContain('p.piezas != null ? textoUnidades(p.piezas) : null]');
+    expect(v).toContain('{p.piezas != null ? textoUnidades(p.piezas) : "—"}');
     expect(v.match(/\{chipBultos\}\s*\{chipRecibido\}/g)?.length).toBe(2);
   });
 

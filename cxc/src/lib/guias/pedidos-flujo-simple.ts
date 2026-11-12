@@ -64,7 +64,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
-import { empresasQueVe, horaPanama, MAX_BULTO, MIN_BULTO, veLaEmpresa, type Veredicto } from "./pedidos-bultos";
+import { empresasQueVe, horaPanama, veLaEmpresa, type Veredicto } from "./pedidos-bultos";
 
 /**
  * 🔴 PRENDIDO el 7-oct-2026 con el «sí» de Daniel, después de ver el mockup
@@ -223,7 +223,8 @@ export interface ColumnasDelPaso {
  * paso a otro por error?»). Una sola función para avanzar y retroceder; la
  * usan el PATCH de la pantalla y cualquier corrección hecha a mano, para que
  * las dos escriban exactamente lo mismo.
- *   · Avanzar firma SU columna (y Preparado guarda los bultos).
+ *   · Avanzar firma SU columna. 🔴 12-nov-2026: Preparado ya NO pide bultos
+ *     (un toque); la columna `bultos` se queda en la base con lo ya anotado.
  *   · Volver a Preparado borra SOLO la firma de Recibido: la de bodega queda.
  *   · Volver a Pendiente deja la fila como nueva —sin bultos ni firmas—, porque
  *     al prepararlo de nuevo se anota otra vez el número. La firma de quien lo
@@ -235,7 +236,6 @@ export function columnasDelPaso(
   hasta: EstadoFlujoSimple,
   quien: string,
   ahora: string,
-  bultos?: number | null,
 ): ColumnasDelPaso {
   if (hasta === "pendiente") {
     return {
@@ -254,7 +254,7 @@ export function columnasDelPaso(
     // 🔴 Marcar Preparado QUITA SOLA la espera de muestra (Daniel, 9-oct-2026).
     return desde === "recibido"
       ? { estado: hasta, recibido_por: null, recibido_en: null }
-      : { estado: hasta, bultos: bultos ?? null, preparado_por: quien, preparado_en: ahora, ...SIN_ESPERA_MUESTRA };
+      : { estado: hasta, preparado_por: quien, preparado_en: ahora, ...SIN_ESPERA_MUESTRA };
   }
   return { estado: hasta, recibido_por: quien, recibido_en: ahora };
 }
@@ -315,17 +315,6 @@ export function lineaEsperaMuestra(dias: number, por?: string | null, en?: strin
 /** ¿Este cambio es deshacer un paso (ir hacia atrás)? */
 export function esDeshacerFlujoSimple(desde: EstadoFlujoSimple, hasta: EstadoFlujoSimple): boolean {
   return estadoAnteriorFlujoSimple(desde) === hasta;
-}
-
-// ─── Cuántos bultos: UN número por pedido ───────────────────────────────────
-
-/** El número que anota bodega al preparar el pedido. Entero de 1 a 9999. */
-export function validarCantidadBultos(v: unknown): Veredicto & { valor?: number } {
-  const n = typeof v === "number" ? v : Number(String(v ?? "").trim());
-  if (!Number.isInteger(n) || n < MIN_BULTO || n > MAX_BULTO) {
-    return { ok: false, error: `Escribe cuántos bultos son, de ${MIN_BULTO} a ${MAX_BULTO}` };
-  }
-  return { ok: true, valor: n };
 }
 
 // ─── Un «Preparado» que nadie recibe tiene que verse ────────────────────────

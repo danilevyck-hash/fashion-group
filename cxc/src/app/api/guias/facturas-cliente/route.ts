@@ -33,6 +33,10 @@ import { B2B_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
 import { esCodigoDeCliente } from "@/lib/clientes/mundos";
 import { TIPO_FACTURA, yaSalioEn } from "@/lib/guias/atajos-facturas";
 import { leerIndiceYaSalio } from "@/lib/guias/ya-salio-server";
+import { facturasPorNumero } from "@/lib/guias/etiquetas-por-envio";
+import { claveDeFactura } from "@/lib/guias/numero-factura";
+import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
+import { nombreParaMostrar } from "@/lib/clientes/nombre-display";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +70,10 @@ export async function GET(req: NextRequest) {
   // para armar una guía; el `total` de cada factura se recorta ACÁ, nunca
   // escondido en la pantalla — la fila lo pintaba igual que a cualquiera.
   const verPrecio = getSession(req)?.role !== "bodega";
+
+  // 🔴 12-nov-2026: Etiquetas › Nuevo envío también arranca por el N.° de factura.
+  const numero = req.nextUrl.searchParams.get("factura");
+  if (numero != null) return buscarPorNumero(numero.trim());
 
   const codigo = (req.nextUrl.searchParams.get("codigo") ?? "").trim();
   // Solo códigos del grupo (D-XXX). Un código numérico de Boston/Multifashion
@@ -166,4 +174,65 @@ async function frescuraFacturas(): Promise<string | null> {
   }
   if (ultimoPorEmpresa.size === 0) return null;
   return [...ultimoPorEmpresa.values()].sort()[0];
+}
+
+/** Solo se busca en el último año: lo que se etiqueta es reciente. */
+const DIAS_BUSQUEDA_POR_NUMERO = 365;
+
+/**
+ * `?factura=2534` → el cliente (por CÓDIGO, el mismo puente de arriba) de la
+ * factura que termina en esos dígitos, una por empresa de las 6 del grupo
+ * (`facturasPorNumero`). Más de una = la pantalla pregunta cuál.
+ */
+async function buscarPorNumero(numero: string): Promise<NextResponse> {
+  const clave = claveDeFactura(numero);
+  if (clave === "" || numero.replace(/\D/g, "").length > 15) {
+    return NextResponse.json({ error: "Escribe el número de la factura" }, { status: 400 });
+  }
+  const desde = new Date(Date.now() - DIAS_BUSQUEDA_POR_NUMERO * 86_400_000).toISOString().slice(0, 10);
+  const { data: facs, error } = await supabaseServer
+    .from("switch_facturas")
+    .select("empresa_key, secuencial, fecha, cliente_switch_id")
+    .eq("tipo_comprobante", TIPO_FACTURA)
+    .in("empresa_key", [...B2B_EMPRESA_KEYS])
+    .gte("fecha", desde)
+    .like("secuencial", `%${clave}`)
+    .order("fecha", { ascending: false })
+    .limit(500);
+  if (error) {
+    console.error("[guias/facturas-cliente] por número:", error.message);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+  const halladas = facturasPorNumero(
+    (facs ?? []) as Array<{ empresa_key: string; secuencial: string | null; fecha: string | null; cliente_switch_id: number | null }>,
+    numero,
+  ).filter((f) => typeof f.cliente_switch_id === "number");
+  if (halladas.length === 0) return NextResponse.json({ coincidencias: [] });
+
+  const orFiltro = halladas
+    .map((f) => `and(empresa_key.eq.${f.empresa_key},cliente_switch_id.eq.${f.cliente_switch_id})`)
+    .join(",");
+  const { data: clientes, error: cErr } = await supabaseServer
+    .from("switch_clientes")
+    .select("empresa_key, cliente_switch_id, codigo, nombre")
+    .or(orFiltro);
+  if (cErr) {
+    console.error("[guias/facturas-cliente] por número, clientes:", cErr.message);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+  const filas = (clientes ?? []) as Array<{ empresa_key: string; cliente_switch_id: number; codigo: string | null; nombre: string | null }>;
+  const coincidencias = halladas.flatMap((f) => {
+    const c = filas.find((x) => x.empresa_key === f.empresa_key && x.cliente_switch_id === f.cliente_switch_id);
+    const codigo = (c?.codigo ?? "").trim();
+    if (!esCodigoDeCliente(codigo) || CODIGOS_RETIRADOS_DE_GUIAS.includes(codigo)) return [];
+    return [{
+      empresa_key: f.empresa_key,
+      empresa: mapEmpresaName(f.empresa_key),
+      secuencial: String(f.secuencial),
+      fecha: String(f.fecha),
+      cliente_codigo: codigo,
+      cliente_nombre: nombreParaMostrar(codigo, c?.nombre) || codigo,
+    }];
+  });
+  return NextResponse.json({ coincidencias });
 }
