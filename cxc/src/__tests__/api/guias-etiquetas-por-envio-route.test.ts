@@ -18,6 +18,9 @@
  *   5. 🔴 Bodega no corrige los bultos de un envío etiquetado (el servidor los
  *      ignora), y el GET marca esos renglones con `con_etiquetas`.
  *   6. Importar ata por cliente + empresa + DESTINO.
+ *   7-8. 🔴 CADA ETIQUETA LLEVA EL PEDIDO DE SU FACTURA (13-nov-2026) y lo pone
+ *      el SERVIDOR: la pantalla no lo manda (se ignora); lo no leído se lee de
+ *      Switch y, si Switch no contesta, se guarda igual sin pedido.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -32,6 +35,15 @@ vi.mock("@/lib/requireRole", () => ({
 vi.mock("@/lib/require-auth", () => ({ getSession: () => ({ role: "bodega", userName: "Jorman" }) }));
 vi.mock("@/lib/log-activity", () => ({ logActivity: async () => {} }));
 vi.mock("@/lib/alertas/canal", () => ({ enviarNegocio: async () => {}, enviarNegocioPrivado: async () => {} }));
+/** El panel de Switch: `null` = no contesta (el login falla). */
+let panelSwitch: Record<number, string> | null = null;
+let loginsSwitch = 0;
+vi.mock("@/lib/switch-api/web-client", () => ({
+  loginSwitchWeb: async () => { loginsSwitch++; if (!panelSwitch) throw new Error("Switch caído"); return {}; },
+  cerrarSesionWeb: async () => {},
+  leerFacturaMostrar: async (_s: unknown, id: number) =>
+    `<p>CUFE: FE01</p><label>Referencia Pedido:</label><label>${panelSwitch?.[id] ?? ""}</label>`,
+}));
 
 // ── La base doblada ─────────────────────────────────────────────────────────
 type Fila = Record<string, unknown>;
@@ -177,6 +189,8 @@ function etiqueta(over: Fila = {}): Fila {
 
 beforeEach(() => {
   escrituras = [];
+  panelSwitch = null;
+  loginsSwitch = 0;
   sinColumnasDeEnvio = false;
   sinColumnaPedido = false;
   proximoErrorInsert = null;
@@ -439,33 +453,17 @@ describe("6. importar ata por cliente + empresa + DESTINO", () => {
 
 // ─── 7 · el N.° de pedido (12-nov-2026) ──────────────────────────────────────
 
-describe("🔴 7. el N.° de pedido: opcional, recortado y del envío entero", () => {
+describe("🔴 7. el N.° de pedido NO se manda desde la pantalla (13-nov-2026)", () => {
   const filasEscritas = () => escrituras.filter((e) => e.op === "insert")[0].datos as Fila[];
 
-  it("se recorta y va a CADA fila del envío; la respuesta lo trae", async () => {
+  it("un `pedido` en el cuerpo se IGNORA: ni se guarda ni da 400", async () => {
     const { POST } = await lista();
-    const res = await POST(req(envio({ pedido: "  16-000002926 " })));
-    expect(res.status).toBe(201);
-    expect(filasEscritas().map((f) => f.pedido)).toEqual(["16-000002926", "16-000002926", "16-000002926"]);
-    const json = (await res.json()) as { etiquetas: Array<{ pedido: string | null }> };
-    expect(json.etiquetas.every((e) => e.pedido === "16-000002926")).toBe(true);
-  });
-
-  it("vacío o ausente: se guarda como siempre, SIN la llave `pedido`", async () => {
-    const { POST } = await lista();
-    expect((await POST(req(envio({ pedido: "   " })))).status).toBe(201);
-    expect(filasEscritas().some((f) => "pedido" in f)).toBe(false);
-    escrituras = [];
-    tablas.guias_etiquetas = [];
-    expect((await POST(req(envio()))).status).toBe(201);
-    expect(filasEscritas().some((f) => "pedido" in f)).toBe(false);
-  });
-
-  it("más de 30 caracteres o un número suelto: 400 y nada escrito", async () => {
-    const { POST } = await lista();
-    expect((await POST(req(envio({ pedido: "1".repeat(31) })))).status).toBe(400);
-    expect((await POST(req(envio({ pedido: 16 })))).status).toBe(400);
-    expect(escrituras).toHaveLength(0);
+    for (const pedido of ["16-000002926", "1".repeat(31), 16]) {
+      escrituras = [];
+      tablas.guias_etiquetas = [];
+      expect((await POST(req(envio({ pedido })))).status).toBe(201);
+      expect(filasEscritas().some((f) => "pedido" in f)).toBe(false);
+    }
   });
 
   it("⚠️ falla ABIERTA sin la columna: la lista se lee igual y un envío sin pedido se guarda", async () => {
@@ -477,5 +475,67 @@ describe("🔴 7. el N.° de pedido: opcional, recortado y del envío entero", (
     const json = (await g.json()) as { etiquetas: Array<{ id: number; pedido: string | null }> };
     expect(json.etiquetas.map((e) => [e.id, e.pedido])).toEqual([[7, null]]);
     expect((await POST(req(envio()))).status).toBe(201);
+  });
+});
+
+// ─── 8 · el pedido de CADA factura (13-nov-2026) ─────────────────────────────
+
+describe("🔴 8. cada etiqueta lleva el pedido de SU factura", () => {
+  const filasEscritas = () => escrituras.filter((e) => e.op === "insert" && e.tabla === "guias_etiquetas")[0].datos as Fila[];
+  const factura = (id: number, pedido: string | null, leido = true): Fila => ({
+    empresa_key: "fashion_shoes", switch_factura_id: id, pedido_referencia: pedido,
+    pedido_leido_en: leido ? "2026-11-13T10:00:00Z" : null,
+  });
+
+  it("🩸 3 facturas de 3 pedidos (Amani): cada etiqueta con el suyo, sin entrar a Switch", async () => {
+    tablas.switch_facturas = [factura(1, "16-000002314"), factura(2, "16-000001925"), factura(3, "16-000002472")];
+    const { POST } = await lista();
+    expect((await POST(req(envio()))).status).toBe(201);
+    expect(filasEscritas().map((f) => f.pedido)).toEqual(["16-000002314", "16-000001925", "16-000002472"]);
+    expect(loginsSwitch).toBe(0);
+  });
+
+  it("lo que mande la pantalla no pisa el de la factura", async () => {
+    tablas.switch_facturas = [factura(1, "16-000002314"), factura(2, "16-000001925"), factura(3, "16-000002472")];
+    const { POST } = await lista();
+    expect((await POST(req(envio({ pedido: "16-000009999" })))).status).toBe(201);
+    expect(filasEscritas().map((f) => f.pedido)).toEqual(["16-000002314", "16-000001925", "16-000002472"]);
+  });
+
+  it("un traslado no lleva pedido", async () => {
+    tablas.switch_facturas = [factura(1, "16-000002314")];
+    const { POST } = await lista();
+    const facturas = [
+      { switch_factura_id: 1, secuencial: "11-000000001", fecha_factura: "2026-10-01", cajas: 2 },
+      { switch_factura_id: null, secuencial: "Traslado", fecha_factura: "2026-10-01", cajas: 1, nota: "MUEBLES" },
+    ];
+    expect((await POST(req(envio({ facturas })))).status).toBe(201);
+    expect(filasEscritas().map((f) => f.pedido ?? null)).toEqual(["16-000002314", null]);
+  });
+
+  it("una factura sin pedido va sin la llave; las otras con el suyo", async () => {
+    tablas.switch_facturas = [factura(1, "16-000002314"), factura(2, null), factura(3, "16-000002472")];
+    const { POST } = await lista();
+    expect((await POST(req(envio()))).status).toBe(201);
+    const filas = filasEscritas();
+    expect(filas.map((f) => f.pedido ?? null)).toEqual(["16-000002314", null, "16-000002472"]);
+    expect("pedido" in filas[1]).toBe(false);
+  });
+
+  it("sin leer: se lee de Switch antes de guardar (y se guarda con la factura)", async () => {
+    tablas.switch_facturas = [factura(1, "16-000002314"), factura(2, null, false), factura(3, null, false)];
+    panelSwitch = { 2: "16-000001925", 3: "16-000002472" };
+    const { POST } = await lista();
+    expect((await POST(req(envio()))).status).toBe(201);
+    expect(filasEscritas().map((f) => f.pedido)).toEqual(["16-000002314", "16-000001925", "16-000002472"]);
+    expect(loginsSwitch).toBe(1);
+    expect(tablas.switch_facturas.map((f) => f.pedido_referencia)).toEqual(["16-000002314", "16-000001925", "16-000002472"]);
+  });
+
+  it("Switch no contesta: se guarda igual, sin pedido en las que faltaban", async () => {
+    tablas.switch_facturas = [factura(1, "16-000002314"), factura(2, null, false), factura(3, null, false)];
+    const { POST } = await lista();
+    expect((await POST(req(envio()))).status).toBe(201);
+    expect(filasEscritas().map((f) => f.pedido ?? null)).toEqual(["16-000002314", null, null]);
   });
 });

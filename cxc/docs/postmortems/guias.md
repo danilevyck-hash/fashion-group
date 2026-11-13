@@ -2686,3 +2686,10 @@ Daniel, textual: *«que se pueda eliminar también las despachadas y que lo pued
 - ⚠️ El detalle `/despachos/<id>` no tiene «···»; eliminar sigue en la fila de la lista.
 - Candados: `src/__tests__/api/guias-eliminar-route.test.ts` (roles, Completada, orden, falla sin dejar la guía borrada) y `guias-eliminar-en-la-fila.test.tsx` (bodega ve «Eliminar guía», vendedor no).
 - Primera aplicada a mano: GT-306 (guía de prueba de Julio, 3 etiquetas 152·153·154 sueltas).
+
+## 13-nov-2026 — Cada etiqueta lleva el pedido de SU factura, y no se escribe a mano
+
+- 🩸 **Antes:** el envío tenía UN solo «N.° de pedido» editable, la unión de los pedidos con « / » si cabía en 30; si no, quedaba vacío con «no caben juntos, escríbelo a mano». Amani, 13-nov-2026: 3 facturas de 3 pedidos → las 3 etiquetas (152–154) salieron sin pedido, aunque `switch_facturas.pedido_referencia` los tenía. Se rellenaron a mano (aprobado).
+- 🔴 **Ahora:** el pedido lo pone el SERVIDOR al guardar, factura por factura (`pedidosParaEtiquetar` en `pedido-de-factura.ts`, llamado desde `crearEnvio`): lo leído sale de `switch_facturas`; lo no leído (`pedido_leido_en` NULL) se lee del panel en ese momento; si Switch no contesta, se guarda igual sin pedido. Traslado o factura sin pedido = vacío.
+- 🔴 **No hay campo editable** (Daniel: «¿por qué el número de pedido se puede editar? No tiene sentido»). La pantalla muestra en solo lectura «Pedido 16-…» junto a cada factura del resumen, y un `pedido` que llegue en el POST se ignora. `pedidoPropuesto` se retiró.
+- **Candado:** `guias-etiquetas-por-envio-route` › 7 y 8.

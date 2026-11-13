@@ -27,6 +27,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { mapEmpresaName } from "@/lib/empresa-mapping";
 import { yaSalioEn } from "@/lib/guias/atajos-facturas";
 import { leerYaSalio } from "@/lib/guias/ya-salio-server";
+import { pedidosParaEtiquetar } from "@/lib/guias/pedido-de-factura";
 import { ETIQUETAS_2026_10 } from "@/lib/guias/guias-2026-10";
 import {
   guiaQueSeLlevo,
@@ -560,6 +561,11 @@ export async function crearEnvio(
   const ya = vivas.filter((e) => e.empresa_key === envio.empresa_key && e.switch_factura_id != null && pedidas.has(e.switch_factura_id));
   if (ya.length > 0) return { ok: false, status: 409, error: textoYaEtiquetadas(ya), yaEtiquetadas: ya };
 
+  // 🔴 13-nov-2026: cada etiqueta lleva el pedido de SU factura, y lo decide
+  // el SERVIDOR (no se escribe a mano). Switch caído = esa etiqueta sin pedido.
+  const porFactura = await pedidosParaEtiquetar(envio.empresa_key, [...pedidas]);
+  const pedidoDe = (id: number | null): string | null => (id == null ? null : porFactura.get(id) ?? null);
+
   const envioId = crypto.randomUUID();
   const base = {
     empresa_key: envio.empresa_key || null, // traslado sin empresa → NULL
@@ -569,25 +575,29 @@ export async function crearEnvio(
     destino: envio.destino,
     creado_por: creadoPor,
   };
-  const filas = envio.facturas.map((f, i) => ({
-    ...base,
-    switch_factura_id: f.switch_factura_id,
-    secuencial: f.secuencial,
-    fecha_factura: f.fecha_factura,
-    cajas: f.cajas,
-    envio_id: envioId,
-    orden_en_envio: i + 1,
-    nota: f.nota,
-    // Sin pedido la fila viaja igual que antes: así se guarda aunque falte la columna.
-    ...(envio.pedido ? { pedido: envio.pedido } : {}),
-  }));
+  const filas = envio.facturas.map((f, i) => {
+    const pedido = pedidoDe(f.switch_factura_id);
+    return {
+      ...base,
+      switch_factura_id: f.switch_factura_id,
+      secuencial: f.secuencial,
+      fecha_factura: f.fecha_factura,
+      cajas: f.cajas,
+      envio_id: envioId,
+      orden_en_envio: i + 1,
+      nota: f.nota,
+      // Sin pedido la fila viaja igual que antes: así se guarda aunque falte la columna.
+      ...(pedido ? { pedido } : {}),
+    };
+  });
+  const conPedido = filas.some((f) => "pedido" in f);
 
   const { data, error } = await supabaseServer
     .from(TABLA_ETIQUETAS)
     .insert(filas)
-    .select(envio.pedido ? COLUMNAS_PEDIDO : COLUMNAS_ENVIO);
+    .select(conPedido ? COLUMNAS_PEDIDO : COLUMNAS_ENVIO);
   if (error) {
-    if (envio.pedido && esColumnaPedidoAusente(error.code, error.message)) {
+    if (conPedido && esColumnaPedidoAusente(error.code, error.message)) {
       return { ok: false, status: 503, error: AVISO_MIGRACION_PEDIDO };
     }
     // 🔴 Sin la migración `20261226120000` la columna sigue NOT NULL: el traslado

@@ -157,6 +157,41 @@ export async function buscarPedidosDeFacturas(
   return { pedidos: { ...pedidos }, leidas, ...(motivo ? { motivo } : {}) };
 }
 
+/**
+ * 🔴 EL PEDIDO DE CADA ETIQUETA ES EL DE SU FACTURA (13-nov-2026). 🩸 El envío
+ * llevaba UN pedido para todas: con 3 facturas de 3 pedidos no cabían juntos y
+ * las etiquetas salieron sin pedido. Al guardar un envío: lo ya leído sale de
+ * `switch_facturas.pedido_referencia`; lo que nadie leyó (`pedido_leido_en`
+ * NULL) se lee del panel con `buscarPedidosDeFacturas` (que lo guarda). NUNCA
+ * lanza: si la base o Switch no contestan, esa factura va sin pedido.
+ */
+export async function pedidosParaEtiquetar(empresaKey: string, ids: readonly number[]): Promise<Map<number, string | null>> {
+  const out = new Map<number, string | null>();
+  if (!empresaKey || ids.length === 0) return out;
+  try {
+    const { data, error } = await supabaseServer
+      .from("switch_facturas")
+      .select("switch_factura_id, pedido_referencia, pedido_leido_en")
+      .eq("empresa_key", empresaKey)
+      .in("switch_factura_id", [...ids]);
+    if (error) throw new Error(error.message);
+    const sinLeer: number[] = [];
+    for (const r of (data ?? []) as Array<{ switch_factura_id: number | string; pedido_referencia: string | null; pedido_leido_en: string | null }>) {
+      const id = Number(r.switch_factura_id);
+      if (!r.pedido_leido_en) { sinLeer.push(id); continue; }
+      const n = normalizarPedido(r.pedido_referencia);
+      out.set(id, n.ok ? n.valor : null);
+    }
+    if (sinLeer.length > 0) {
+      const { pedidos } = await buscarPedidosDeFacturas(empresaKey, sinLeer);
+      for (const id of sinLeer) out.set(id, pedidos[String(id)] ?? null);
+    }
+  } catch (e) {
+    console.error(`[guias/pedido] etiquetar ${empresaKey}:`, e instanceof Error ? e.message : String(e));
+  }
+  return out;
+}
+
 /** Lo que el sync de facturas mira en cada corrida: los últimos 7 días… */
 export const DIAS_LLENAR_PEDIDO = 7;
 /** …como mucho 20 facturas por empresa… */

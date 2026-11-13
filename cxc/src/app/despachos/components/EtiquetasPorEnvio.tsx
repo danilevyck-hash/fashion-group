@@ -65,17 +65,14 @@ import {
 } from "@/lib/guias/etiquetas";
 import {
   MAX_NOTA,
-  MAX_PEDIDO,
   agruparEnEnvios,
   facturaDelBulto,
   facturasAtenuadas,
   filtrarEnvios,
   moverEnElEnvio,
   normalizarNota,
-  normalizarPedido,
   notasMasUsadas,
   idsSinPedidoLeido,
-  pedidoPropuesto,
   rangosDelEnvio,
   textoRango,
   type Envio,
@@ -478,10 +475,9 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
   const [marcadas, setMarcadas] = useState<Marcada[]>([]);
   const [destino, setDestino] = useState("");
   const [destinoTocado, setDestinoTocado] = useState(false);
-  const [pedido, setPedido] = useState("");
-  const [pedidoTocado, setPedidoTocado] = useState(false);
   const [buscandoPedido, setBuscandoPedido] = useState(false);
-  const [avisoPedido, setAvisoPedido] = useState<string | null>(null);
+  /** Sube cuando Switch contesta un pedido: vuelve a dibujar el de cada factura. */
+  const [, setPedidosVistos] = useState(0);
   /** Lo que Switch ya contestó, por `empresa|switch_factura_id` (null = sin pedido). */
   const pedidosHallados = useRef(new Map<string, string | null>());
   const cola = useRef<Promise<void>>(Promise.resolve());
@@ -622,35 +618,32 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
   const enElEnvio = marcadas.filter((m) => porClave.has(m.clave));
   const atajos = useMemo(() => notasMasUsadas(etiquetas), [etiquetas]);
 
-  // 🔴 EL N.° DE PEDIDO SE TRAE DE SWITCH (12-nov-2026): al marcar facturas se
-  // busca su «Referencia Pedido» en el panel y se propone en el campo, que se
-  // sigue pudiendo editar. Lo escrito a mano NO se pisa. Un login por búsqueda:
-  // se espera a que dejen de marcar y lo ya buscado no se vuelve a pedir.
+  // 🔴 EL N.° DE PEDIDO ES EL DE CADA FACTURA (13-nov-2026): se ve, en solo
+  // lectura, al lado de cada una y cada etiqueta imprime el suyo (lo pone el
+  // SERVIDOR). No se escribe a mano (Daniel: «no tiene sentido»). Lo que no
+  // vino con la lista se busca en el panel; lo ya buscado no se repite.
   const idsDelEnvio = enElEnvio
     .map((m) => (porClave.get(m.clave) as Factura).switch_factura_id)
     .filter((id): id is number => id != null);
   const llaveIds = `${empresaElegida ?? ""}|${idsDelEnvio.join(",")}`;
   useEffect(() => {
-    if (pedidoTocado || !empresaElegida) return;
-    if (idsDelEnvio.length === 0) { setPedido(""); setAvisoPedido(null); return; }
-    let vigente = true;
-    const proponer = () => {
-      const { valor, noCabe } = pedidoPropuesto(idsDelEnvio.map((id) => pedidosHallados.current.get(`${empresaElegida}|${id}`) ?? null));
-      setPedido(valor);
-      setAvisoPedido(noCabe ? "Las facturas son de pedidos distintos y no caben juntos. Escríbelo a mano." : null);
-    };
+    if (!empresaElegida) return;
     const faltan = () => idsDelEnvio.filter((id) => !pedidosHallados.current.has(`${empresaElegida}|${id}`));
-    if (faltan().length === 0) { proponer(); return; }
+    if (faltan().length === 0) return;
+    let vigente = true;
     // Respaldo: lo que no vino con la lista. Primero se espera lo que ya se está
     // pidiendo en segundo plano —dos logins seguidos se botan uno al otro—.
     const t = setTimeout(async () => {
       setBuscandoPedido(true);
       await enCola(() => pedirPedidos(pedidosHallados.current, empresaElegida, faltan()));
-      if (vigente) { setBuscandoPedido(false); proponer(); }
+      if (vigente) { setBuscandoPedido(false); setPedidosVistos((n) => n + 1); }
     }, 700);
     return () => { vigente = false; clearTimeout(t); setBuscandoPedido(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [llaveIds, pedidoTocado, ronda]);
+  }, [llaveIds, ronda]);
+  /** El pedido que imprime esa factura (el de Switch), o `null`. */
+  const pedidoDeLaFactura = (f: Factura): string | null =>
+    f.switch_factura_id == null ? null : pedidosHallados.current.get(`${empresaElegida}|${f.switch_factura_id}`) ?? null;
 
   // La vista previa de los rangos: lo mismo que va a salir en el papel.
   const previa = useMemo(() => {
@@ -682,7 +675,6 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
     setFacturas(null);
     setMarcadas([]);
     setEmpresaKey(null);
-    setPedidoTocado(false);
     setError(null);
     setDiasVisibles(DIAS_CON_FACTURA_VISIBLES);
     setDiasAlternados(new Set());
@@ -713,7 +705,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
 
   /** Elige el cliente de la factura y la deja marcada en su empresa. */
   function elegirFacturaHallada(h: FacturaHallada | DocumentoHallado) {
-    // Buscador único: el pedido viene con la factura y se propone al instante.
+    // Buscador único: el pedido viene con la factura y se ve al instante.
     if ("pedidoLeido" in h && h.pedidoLeido && h.switch_factura_id != null) {
       pedidosHallados.current.set(`${h.empresa_key}|${h.switch_factura_id}`, h.pedido);
     }
@@ -789,8 +781,6 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
       if (f.switch_factura_id == null) return `${f.secuencial} todavía no tiene su número interno. Toca «Actualizar».`;
     }
     if (!destino.trim()) return "Escribe el destino del envío";
-    const p = normalizarPedido(pedido);
-    if (!p.ok) return p.error;
     return null;
   }
 
@@ -807,7 +797,6 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
       cliente_codigo: cliente.codigo,
       cliente_nombre: cliente.nombre,
       destino: destino.trim(),
-      pedido: pedido.trim(),
       facturas: [...enElEnvio.map((m) => {
         const f = porClave.get(m.clave) as Factura;
         return {
@@ -1208,25 +1197,11 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
         {!ETIQUETAS_TRASLADO_2026_10 && !destinoTocado && destino && (
           <p className="mt-1.5 text-xs text-gray-500">Se llenó solo con el destino de siempre de este cliente.</p>
         )}
-        {/* 12-nov-2026: el N.° de pedido del envío entero, traído de Switch y editable; no frena. Sale chico bajo la factura. */}
-        <label htmlFor="envio-pedido" className="mb-1 mt-3 block text-xs text-gray-500">
-          N.° de pedido
-          {buscandoPedido && <span className="ml-2 text-gray-400" aria-live="polite">Buscando pedido…</span>}
-        </label>
-        <input
-          type="text"
-          value={pedido}
-          onChange={(e) => { setPedidoTocado(true); setAvisoPedido(null); setPedido(e.target.value); }}
-          id="envio-pedido"
-          maxLength={MAX_PEDIDO}
-          autoComplete="off"
-          className="w-full max-w-sm rounded-md border border-gray-200 px-3 text-base sm:text-sm outline-none transition focus:border-black min-h-[44px]"
-        />
-        {avisoPedido && <p className="mt-1.5 text-xs text-gray-500">{avisoPedido}</p>}
     </>
   );
   const resumenEnvio = enElEnvio.length + (traslado ? 1 : 0) > 0 && (
           <ul data-testid="resumen-envio" className="mb-3 text-sm">
+            {buscandoPedido && <li className="text-xs text-gray-400" aria-live="polite">Buscando pedido…</li>}
             {previa.rangos.map((r, i) => {
               const esElTraslado = traslado && r.fila.clave === TEXTO_TRASLADO;
               const f = (porClave.get(r.fila.clave) ?? { secuencial: TEXTO_TRASLADO }) as Factura;
@@ -1260,6 +1235,9 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
                     </>
                   )}
                   <span className="tabular-nums">{f.secuencial}</span>
+                  {!esElTraslado && pedidoDeLaFactura(f) && (
+                    <span className="tabular-nums text-xs text-gray-500">Pedido {pedidoDeLaFactura(f)}</span>
+                  )}
                   <span className="tabular-nums text-gray-500">
                     {r.fila.cajas > 0 ? `bultos ${textoRango(r)} de ${previa.total}` : "faltan los bultos"}
                   </span>
