@@ -174,7 +174,9 @@ describe("🔴 la medición no se tocó", () => {
     // american_classic de la jornada. Ver `cron-calendario.test.ts`.
     // ⚠️ 1-nov-2026: suben a 94 — la carga de facturas de Multifashion de las
     // 22:00 de Panamá, antes del resumen de la noche (ahora 22:15).
-    expect(vercel.crons).toHaveLength(94);
+    // ⚠️ 13-nov-2026: suben a 95 — `despachos-correo` (tallas de los despachos
+    // de ASW desde el correo), nacido apagado.
+    expect(vercel.crons).toHaveLength(95);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

@@ -43,6 +43,7 @@ const MAPA: Record<string, string[]> = {
   "src/app/api/cron/catalogos-fotos-resumen/route.ts": [N],
   "src/app/api/cron/cheques-alert/route.ts": [N],
   "src/app/api/cron/db-salud/route.ts": [S],
+  "src/app/api/cron/despachos-correo/route.ts": [S], // 13-nov-2026: llave de Microsoft o formato raro
   "src/app/api/cron/grupo-resumen-mensual/route.ts": [A],
   "src/app/api/cron/guias-pendientes/route.ts": [N],
   "src/app/api/cron/reclamos-viejos/route.ts": [N],

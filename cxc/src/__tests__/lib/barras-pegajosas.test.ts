@@ -77,6 +77,7 @@ const NO_SON_BARRAS_DE_PAGINA: { archivo: string; motivo: string }[] = [
   { archivo: "app/despachos/components/GuiasList.tsx", motivo: "thead del detalle de la guía" },
   { archivo: "app/reclamos/components/EmpresaList.tsx", motivo: "thead de la lista de reclamos" },
   { archivo: "app/reclamos/components/ReclamoDetail.tsx", motivo: "thead de artículos y de liquidaciones" },
+  { archivo: "app/productos/cargar/TallasDePedido.tsx", motivo: "thead de la vista previa de tallas (su caja tiene scroll propio)" },
   // 22-sep-2026 · NOTA FECHADA — `ReportePorProyectoView.tsx` salió de esta
   // lista porque el archivo se retiró (pieza C del rediseño de Marketing).
   { archivo: "app/productos/cargar/ReebokClient.tsx", motivo: "thead de la vista previa" },

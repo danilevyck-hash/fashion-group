@@ -347,6 +347,9 @@ const DATASETS: Dataset[] = [
   // líneas, pero no sabe nada de bultos: si esto se pierde, hay que volver a
   // armar el pedido a mano.
   { table: "pedidos_linea_bulto" },
+  // Tallas y curva de caja de los despachos del proveedor (13-nov-2026): salen de
+  // correos que el buzón no guarda para siempre.
+  { table: "despacho_tallas" },
   // Catálogo Reebok: a qué cajón va cada rubro de Switch (17-sep-2026). Lo
   // escribe Daniel a mano; Switch manda el rubro, no dice a qué categoría va.
   { table: "reebok_rubro_categoria" },

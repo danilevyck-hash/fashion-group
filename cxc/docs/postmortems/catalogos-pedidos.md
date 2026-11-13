@@ -3525,3 +3525,33 @@ Daniel aprobó las capturas «hoy vs recomendación» el 6-oct-2026. Administrar
 - **Llamadas extra**: una por marcaId distinto de la lista, menos el de siempre — ≈10 en Fashion Shoes y ≈42 en Vistana por corrida, de a 4 en paralelo (el `/stock` ya hace cientos por corrida, de a 8). Sin tabla ni caché: no hizo falta DDL.
 - **Sin aviso nuevo** (Daniel): Telegram solo para lo que falla; las alertas del sync quedan como estaban.
 - Dónde: `src/lib/switch-api/catalogo-marca-por-nombre.ts` (puro + cliente inyectado), enganchado en el motor por `filtroDeLaCorrida` (`sync-catalogo.ts`). `false` = el filtro por un solo id. Candado `src/__tests__/lib/catalogo-marca-por-nombre.test.ts` (3/26/31 entran y 5 «TH KIDS» no · ficha caída = solo el 3 · Calvin 8/69 · apagado no llama a Switch).
+
+## El Excel de tallas por pedido (13-nov-2026, `TALLAS_POR_PEDIDO_2026_11`)
+
+**Qué es.** Plantilla Switch › Tallas por bulto (`/productos/cargar?tab=tallas`): se elige la empresa y se escribe el N.° de pedido (p. ej. `16-000002182`); el servidor lee el pedido de Switch (el id del pedido = el correlativo del secuencial, medido 94 de 94) y cruza cada referencia con las tallas de los despachos del proveedor. Arriba sale «N referencias · X con tallas · Y a llenar a mano» y la acción principal «Descargar Excel de tallas». La caja de subir un Excel quedó abajo, igual que antes. Solo admin y secretaria (`ROLES_TALLAS_PEDIDO`; el servidor contesta 403 al resto). `false` = la pantalla de antes.
+
+**De dónde sale cada talla.** Tabla `despacho_tallas` (migración `20270114120000`, aplicada; aditiva, RLS solo service_role, en el respaldo como PERSONAS porque el buzón no guarda para siempre). Una fila por correo + factura + referencia + caja + talla, con el código de barra y la curva de la caja (`CANTIDAD_ORD_X_PP`). **No se guardan correos ni archivos.** Sale de los adjuntos de despacho del proveedor (tabla de formatos abajo); el destinatario de la mercancía dice la empresa (lista escrita a mano en `despacho-archivo.ts`, incluida la razón social de Multifashion). Las filas sin caja (ropa, medias, bolsos) no tienen curva y no se guardan.
+
+**Las reglas del Excel** (`lib/tallas-pedido/armar.ts`, puro; `excel.ts`):
+- Una fila por talla: Referencia · Descripción · Talla · Código de barra (texto) · Pares · Opción, y una fila «Total <referencia>» en negrita que da los pares del pedido. Fila 1, filtro desde A1, encabezado fijo (`workbookBytes`). Archivo `Tallas-<pedido>-<AAAA-MM-DD>.xlsx`.
+- Pares = pares del pedido ÷ pares por caja × curva. **Nunca un decimal.**
+- Curvas distintas de la misma referencia → «Opción 1, 2…», ordenadas por talla. 🔑 **La MISMA curva en dos cajas o dos despachos es UNA opción** (THS10474T: las opciones 4 y 5 repetían las tallas 8 y 9 de la 1 y la 2). El código de barra sale del despacho más reciente.
+- Niños: Switch escribe `TH101074T000` y ASW `TH101074T`: se busca también sin el «000» final.
+- Sin datos del proveedor → una fila **AMARILLA** con los pares del pedido, sin talla ni código (como el Excel de referencia que hizo Daniel). Si los pares del pedido no llenan cajas enteras → la opción entera **NARANJA**, con Pares **vacío**.
+- Una caja que no cuadra (una talla que no divide exacto, o la suma distinta de los pares por caja) no se ofrece.
+- 🔑 **Las curvas salen del despacho MÁS RECIENTE de la referencia** (`delUltimoDespacho`), como hizo Daniel a mano («la entrada más reciente que tenga correo»): las curvas viejas no se mezclan. Se casa por REFERENCIA, nunca por fecha: el aviso de ASW puede llegar 2+ semanas antes del ingreso en Switch.
+- Tallas conocidas pero sin caja (Reebok «Detalle despacho») → las tallas con su código de barra en NARANJA y Pares vacío.
+
+**La carga.** Historial desde el 9-mar-2026 (lo que guarda el buzón), cargado a mano el 13-nov-2026. Lo nuevo: cron `despachos-correo` (23:45 UTC, Microsoft Graph, Mail.Read de aplicación), **APAGADO** (`DESPACHOS_CORREO_AUTOMATICO = false`) y sin credenciales hasta que Daniel autorice la app en Microsoft Entra (variables `GRAPH_TENANT_ID` · `GRAPH_CLIENT_ID` · `GRAPH_CLIENT_SECRET`). Avisa por 🔧 SISTEMA solo si Microsoft rechaza la llave o llega un «_TXT» con columnas desconocidas.
+
+**Los formatos, por empresa** (abiertos uno por uno el 13-nov-2026; el lector se elige por el ENCABEZADO, `leerAdjuntoDeDespacho`, y uno desconocido avisa):
+
+| Empresa | Remitente / adjunto | Referencia | Talla | Código de barra | Cantidad | Caja | Factura |
+|---|---|---|---|---|---|---|---|
+| Fashion Shoes (TH), Fashion Wear (TH), Vistana (CK), Active Wear (KL), Multifashion (KL) | @aswgr.com · `<factura>_TXT.txt/.xlsx/.xls` (78–79 columnas, `;`) | REFERENCIA | TALLA | EAN | CANTIDAD | CODIGO_PREPACK · CANTIDAD_PREPACK (cajas) · CANTIDAD_ORD_X_PP (pares por caja) | FACT |
+| Active Shoes (Reebok) | @fashionfitnessgroup.com · «Packing List Ordenes <pedido>.xlsx» | Articulo (fila de talla) | Talla | Barcode | Cant Empaque | Nro Carton (fila del cartón; sus tallas debajo) | «PL <Nro Pedido>» |
+| Active Shoes (Reebok) | @fashionfitnessgroup.com · «Detalle despacho Active.xlsx» | SKU Father | Talla | EAN (si no, UPC) | Quantity | — (no trae; «SIN CAJA») | Document Number |
+
+Las columnas de ASW son las mismas en las cinco empresas (Vistana agrega una 79.ª, «CANTIDAD PRELIMINAR»); lo que cambia es el CONTENIDO: la ropa (CK, TH de Fashion Wear) casi nunca trae caja. Cruce contra `switch_ingresos_mercancia` por referencia (13-nov-2026): Fashion Shoes 404 de 414 (las 10 que no, exhibidores TWSPF…), Vistana 83/83, Active Wear 5/5, Active Shoes 146/146; Multifashion no tiene ingresos en esa tabla.
+
+Candado: `tallas-por-pedido.test.ts` (pedido 2182 real como fixture + cada regla + los dos formatos de Reebok; 6 mutaciones cazadas y un control).
