@@ -32,6 +32,7 @@ import {
   costoDeArticulos,
   facturasDelArchivo,
   contarContraSwitch,
+  separarContraSwitch,
   normalizarCodigo,
   plural,
 } from "@/lib/depurador/resumen-del-archivo";
@@ -488,5 +489,14 @@ describe("el costo sale de las mismas filas que el Excel", () => {
     const faltan = categoriasQueFaltan(valoresInesperados(items));
     expect(faltan?.categorias).toContain("T-SHIRTS");
     expect(faltan?.categorias).toContain("JACKETS");
+  });
+});
+
+describe("separarContraSwitch — cuáles son, por código", () => {
+  it("parte los códigos sin repetir en nuevos y ya están", () => {
+    expect(separarContraSwitch(["a1", "A1", "B2", " c3 "], new Set(["A1"]))).toEqual({
+      codigosNuevos: ["B2", "C3"],
+      codigosYaEstan: ["A1"],
+    });
   });
 });

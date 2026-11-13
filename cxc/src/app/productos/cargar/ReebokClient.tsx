@@ -61,6 +61,7 @@ import {
   costoDelArchivo,
   costoDeArticulos,
   facturasDelArchivo,
+  normalizarCodigo,
   plural,
 } from "@/lib/depurador/resumen-del-archivo";
 import { categoriasQueFaltan, inesperadosQueSeRevisan, listaConY } from "@/lib/depurador/reebok-categorias";
@@ -486,6 +487,10 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
     [salida, catalogo, switchRows],
   );
   const nuevosEnSwitch = useNuevosEnSwitch(REEBOK_EMPRESA_KEY, codigosDelArchivo);
+  const descripcionPorCodigo = useMemo(
+    () => Object.fromEntries(switchRows.map((r) => [normalizarCodigo(r.cols["Código *"]), String(r.cols["Descripción *"] ?? "")])),
+    [switchRows],
+  );
 
   // Se filtró y no quedó nada: entregar un Excel vacío en silencio sería lo peor.
   const quedoVacio = filtrarSinPiezas && vista.articulos === 0;
@@ -1302,7 +1307,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
 
           {/* Qué va a pasar al subir el archivo: lo nuevo se crea, lo que ya
               está se pisa. Falla ABIERTA: sin dato, no se dibuja nada. */}
-          <NuevosEnSwitch contra={nuevosEnSwitch} />
+          <NuevosEnSwitch contra={nuevosEnSwitch} descripciones={descripcionPorCodigo} />
 
           {/* Aviso discreto: no se perdió nada, simplemente no se pidieron esas piezas */}
           {vista.omitidos > 0 && (

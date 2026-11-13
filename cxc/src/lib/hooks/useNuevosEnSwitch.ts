@@ -36,7 +36,13 @@ export function useNuevosEnSwitch(empresa: string, codigos: readonly (string | n
         });
         if (!res.ok) return;
         const json = await res.json();
-        if (vivo && json?.ok) setResultado({ nuevos: Number(json.nuevos) || 0, yaEstan: Number(json.yaEstan) || 0 });
+        if (vivo && json?.ok) setResultado({
+          nuevos: Number(json.nuevos) || 0,
+          yaEstan: Number(json.yaEstan) || 0,
+          codigosNuevos: Array.isArray(json.codigosNuevos) ? json.codigosNuevos : undefined,
+          codigosYaEstan: Array.isArray(json.codigosYaEstan) ? json.codigosYaEstan : undefined,
+          descripcionEnSwitch: json.descripcionEnSwitch ?? undefined,
+        });
       } catch {
         // Falla abierta: sin línea en pantalla, sin ruido.
       }

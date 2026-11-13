@@ -42,7 +42,7 @@ import { useRegistrarQuePasan } from "./useRegistrarQuePasan";
 import type { ParMarcaDesc } from "./descripciones-que-pasan";
 import { workbookBlob, filtroDesdeA1 } from "@/lib/excel-export";
 import { ROTULO_DESCARGAR_PLANTILLA, ROTULO_SUBIR_OTRO_ARCHIVO } from "@/lib/depurador/rotulos";
-import { costoDelArchivo, facturasDelArchivo, plural } from "@/lib/depurador/resumen-del-archivo";
+import { costoDelArchivo, facturasDelArchivo, normalizarCodigo, plural } from "@/lib/depurador/resumen-del-archivo";
 import { FILTRO_AMBAR, filaVisible, rotuloFiltro } from "@/lib/depurador/filtro-ambar";
 import { filasDeAvisos, nombreArchivoAvisos, ROTULO_BAJAR_AVISOS } from "@/lib/depurador/avisos-excel";
 import { TRES_DETALLES } from "@/lib/depurador/tres-detalles";
@@ -742,6 +742,10 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
     [processed],
   );
   const nuevosEnSwitch = useNuevosEnSwitch(empresa, codigosDelArchivo);
+  const descripcionPorCodigo = useMemo(
+    () => Object.fromEntries((processed ?? []).map((d) => [normalizarCodigo(d.cols["Código *"]), String(d.cols["Descripción *"] ?? "")])),
+    [processed],
+  );
 
   // Descripciones huérfanas: bajo una marca CK/TH conocida pero NO en su catálogo,
   // tras aplicar normalización (Tarea 8). Las de marca "Otros"/desconocida NO cuentan
@@ -1036,7 +1040,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
 
           {/* Qué va a pasar al subir el archivo: lo nuevo se crea, lo que ya
               está se pisa. Falla ABIERTA: sin dato, no se dibuja nada. */}
-          <NuevosEnSwitch contra={nuevosEnSwitch} />
+          <NuevosEnSwitch contra={nuevosEnSwitch} descripciones={descripcionPorCodigo} />
 
           {/* Aviso discreto: no se perdió nada, el proveedor no pidió esos artículos */}
           {omitidosSinCantidad > 0 && (
