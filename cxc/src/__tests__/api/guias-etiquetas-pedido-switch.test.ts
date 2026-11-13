@@ -9,7 +9,6 @@ import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { deflateSync } from "zlib";
 import { NextRequest } from "next/server";
 import { signSession } from "@/lib/session-cookie";
-import { pedidoPropuesto } from "@/lib/guias/etiquetas-por-envio";
 
 vi.mock("@/lib/supabase-server", () => ({
   HAS_SERVICE_ROLE: true,
@@ -69,17 +68,6 @@ describe("1. extraerReferenciaPedido", () => {
     expect(extraerReferenciaPedido(con)).toBe("16-000002205");
     const sin = pdf("BT 311.560 470.968 Td /F2 9.0 Tf  [(Vencimiento a: )] TJ ET");
     expect(extraerReferenciaPedido(sin)).toBeNull();
-  });
-});
-
-describe("2. pedidoPropuesto", () => {
-  it("uno, repetidos y vacíos", () => {
-    expect(pedidoPropuesto(["16-000002889", null, "16-000002889"])).toEqual({ valor: "16-000002889", noCabe: false });
-    expect(pedidoPropuesto([null, null])).toEqual({ valor: "", noCabe: false });
-  });
-  it("dos distintos caben; tres no", () => {
-    expect(pedidoPropuesto(["16-000002889", "16-000002898"]).valor).toBe("16-000002889 / 16-000002898");
-    expect(pedidoPropuesto(["16-000002889", "16-000002898", "16-000002900"])).toEqual({ valor: "", noCabe: true });
   });
 });
 

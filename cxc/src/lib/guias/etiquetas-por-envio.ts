@@ -63,7 +63,9 @@ export function normalizarNota(v: unknown): Validacion<string | null> {
 export const MAX_PEDIDO = 30;
 
 /**
- * 🔴 EL N.° DE PEDIDO (12-nov-2026), opcional y del ENVÍO entero: se recortan
+ * 🔴 EL N.° DE PEDIDO (12-nov-2026; 13-nov-2026): cada etiqueta lleva el de SU
+ * factura (`pedidosParaEtiquetar`, en el servidor); NO se escribe a mano.
+ * Aquí solo se limpia lo leído de Switch. Se recortan
  * los bordes y se juntan los espacios; NO se pasa a mayúsculas (es un número).
  * Vacío = sin pedido (`null`, nunca cadena vacía: así lo exige el CHECK).
  */
@@ -73,17 +75,6 @@ export function normalizarPedido(v: unknown): Validacion<string | null> {
   if (!t) return { ok: true, valor: null };
   if (t.length > MAX_PEDIDO) return { ok: false, error: `El N.° de pedido es de ${MAX_PEDIDO} caracteres como mucho` };
   return { ok: true, valor: t };
-}
-
-/**
- * 🔴 EL PEDIDO QUE SE PROPONE (12-nov-2026), de los pedidos que Switch dio para
- * las facturas marcadas, en su orden: sin repetidos, unidos con « / » si caben
- * en `MAX_PEDIDO`. Si no caben, `valor` vacío y `noCabe` (se escribe a mano).
- */
-export function pedidoPropuesto(pedidos: readonly (string | null)[]): { valor: string; noCabe: boolean } {
-  const unicos = [...new Set(pedidos.filter((p): p is string => !!p))];
-  const unido = unicos.join(" / ");
-  return unido.length > MAX_PEDIDO ? { valor: "", noCabe: true } : { valor: unido, noCabe: false };
 }
 
 /** Cuántas facturas se leen del panel por pedido de la pantalla, como mucho. */
@@ -129,8 +120,6 @@ export interface EnvioNuevo {
   cliente_nombre: string;
   destino: string;
   facturas: FacturaDelEnvio[];
-  /** El N.° de pedido del envío, o `null` (12-nov-2026). Va a cada fila. */
-  pedido?: string | null;
 }
 
 /**
@@ -147,15 +136,12 @@ export function validarEnvioNuevo(
   const b = (body ?? {}) as Record<string, unknown>;
   const lista = Array.isArray(b.facturas) ? (b.facturas as unknown[]) : [];
   if (lista.length === 0) return { ok: false, error: "Marca al menos una factura" };
-  const pedido = normalizarPedido(b.pedido);
-  if (!pedido.ok) return pedido;
   // 🔴 Un envío puede llevar facturas Y un traslado (Daniel, 2-oct-2026: van en
   // el mismo camión). Uno solo por envío; solo traslado = empresa opcional.
   const traslados = conTraslado ? lista.filter(esFilaDeTraslado) : [];
   if (traslados.length > 1) return { ok: false, error: "Un envío lleva un solo traslado" };
   if (traslados.length === 1 && lista.length === 1) {
-    const t = validarTraslado(b, lista[0]);
-    return t.ok ? { ok: true, valor: { ...t.valor, pedido: pedido.valor } } : t;
+    return validarTraslado(b, lista[0]);
   }
 
   const facturas: FacturaDelEnvio[] = [];
@@ -194,7 +180,7 @@ export function validarEnvioNuevo(
     if (!t.ok) return t;
     facturas.splice(lista.indexOf(traslados[0]), 0, t.valor.facturas[0]);
   }
-  return { ok: true, valor: { ...cab, facturas, pedido: pedido.valor } };
+  return { ok: true, valor: { ...cab, facturas } };
 }
 
 // ─── TRASLADO SIN FACTURA (2-oct-2026, `ETIQUETAS_TRASLADO_2026_10`) ─────────
