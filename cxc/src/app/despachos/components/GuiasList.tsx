@@ -35,6 +35,7 @@ import { Aviso } from "@/components/ui/Aviso";
 import { GUIAS_LISTA_APPLE_2026_10, enElPeriodo, resumenDeGuias, type PeriodoGuias } from "@/lib/guias/lista-apple-2026-10";
 import { GUIAS_GRUPOS_FECHA_2026_10 } from "@/lib/guias/grupos-fecha-2026-10";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
 
 /**
  * 🔴 LOS AVISOS DE LA FILA, CALLADOS Y SIN MOVER NADA (19-sep-2026).
@@ -193,7 +194,8 @@ const DESPACHO_ROLES = ["admin", "secretaria", "bodega"];
 // Exportada: la página de la lista la usa para decidir a quién le dispara el
 // refresco de facturas de hoy (quien no puede crear guías no lo necesita).
 export const CREATE_ROLES = ["admin", "secretaria", "bodega"];
-const DELETE_ROLES = ["admin", "secretaria"];
+// 13-nov-2026: elimina quien escribe guías (admin · secretaria · bodega), la misma lista del servidor.
+const DELETE_ROLES = GUIAS_WRITE_ROLES;
 
 export default function GuiasList({
   guias, loading, error, search, setSearch,
@@ -812,8 +814,8 @@ export default function GuiasList({
                               ventana que exige escribir ELIMINAR.
 
                               ⚠️ Solo se dibuja para quien puede borrar
-                              (`canDelete` = admin · secretaria, y nunca en
-                              `readOnly`): a bodega y a vendedor no les aparece
+                              (`canDelete` = admin · secretaria · bodega desde el 13-nov-2026, y nunca en
+                              `readOnly`): al vendedor no le aparece
                               ni el «···». Y no aparece en modo selección, que
                               tiene su propia barra de acciones. */}
                           <div className="flex items-stretch">

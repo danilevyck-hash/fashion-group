@@ -122,7 +122,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 
 > 📄 Mediciones, citas de Daniel, candados, mutaciones y las reglas de PANTALLA: el postmortem › «Lo que decía CLAUDE.md hasta el 22-sep-2026». Léelo antes de tocar una pantalla suya.
 
-- **Completada = bloqueada**: el PUT la rechaza. **DOS excepciones que NO miran el estado**, una columna de una línea con `.eq("guia_id", id)`: `PATCH /api/guias/[id]/cliente` y `.../numero-transp`.
+- **Completada = bloqueada**: el PUT la rechaza. **DOS excepciones que NO miran el estado**, una columna de una línea con `.eq("guia_id", id)`: `PATCH /api/guias/[id]/cliente` y `.../numero-transp`. 🔴 **Y «Eliminar guía» (13-nov-2026)**: admin · secretaria · bodega, en cualquier estado; suelta sus etiquetas y marca guía y renglones `deleted` (postmortem › «Eliminar guía»).
 - Despachada se corrigen **TRES campos**: transportista · cliente · facturas; **los bultos NO** (`campos-editables.ts`).
 - **El cliente vive en `guia_items.cliente_codigo`, uno por renglón**; `receptor_nombre` es quien FIRMA; elegirlo **no es obligatorio**. Las sugerencias **NUNCA atan solas**: pareo **exacto, nunca por parecido**.
 - N° del transportista **POR LÍNEA** y **NO bloquea**; placa, «recibido por», cédula y **las dos firmas SÍ**. **Entrega directa**: sin placa ni transportista, `"0"` pelado se imprime vacío (`sinCeroPelado`).
