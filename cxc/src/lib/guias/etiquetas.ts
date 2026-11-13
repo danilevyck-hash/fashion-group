@@ -567,7 +567,8 @@ export function facturasParaEtiquetar(
   // regla NO se reescribe acá: es `yaSalioEn`, el MISMO dato que pinta el chip
   // «Ya salió en GT-xxx» en Nueva guía (lo calcula el servidor con
   // `indiceYaSalio` sobre `guia_items.facturas` de guías vivas).
-  const yaSalio = (f: FacturaDelCliente) => sinLasYaDespachadas && f.yaSalioEn != null;
+  // 🔴 13-nov-2026 (Daniel): la guía «Pendiente Bodega» NO bloquea; solo la despachada.
+  const yaSalio = (f: FacturaDelCliente) => sinLasYaDespachadas && f.yaSalioEn != null && !f.yaSalioPendiente;
   const etiquetada = (f: FacturaDelCliente) =>
     f.switch_factura_id != null &&
     etiquetaDeLaFactura(etiquetas, f.empresa_key, f.switch_factura_id) !== null;

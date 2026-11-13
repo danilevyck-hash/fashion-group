@@ -26,7 +26,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { mapEmpresaName } from "@/lib/empresa-mapping";
 import { yaSalioEn } from "@/lib/guias/atajos-facturas";
-import { leerIndiceYaSalio } from "@/lib/guias/ya-salio-server";
+import { leerYaSalio } from "@/lib/guias/ya-salio-server";
 import { ETIQUETAS_2026_10 } from "@/lib/guias/guias-2026-10";
 import {
   guiaQueSeLlevo,
@@ -527,7 +527,8 @@ export async function crearEnvio(
   if (sinLasYaDespachadas) {
     let indice: Map<string, number> | null = null;
     try {
-      indice = await leerIndiceYaSalio();
+      // 13-nov-2026: solo bloquea la guía DESPACHADA; la «Pendiente Bodega» deja etiquetar.
+      indice = (await leerYaSalio()).despachadas;
     } catch {
       indice = null;
     }

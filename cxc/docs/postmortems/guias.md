@@ -2662,3 +2662,14 @@ Daniel: «¿Por qué demoraría más? Que lo haga en la misma llamada que lo otr
 - **Carga inicial (30 días):** 162 facturas de las 6 → **162 leídas (100 %)**, **153 con pedido (94,4 %)**; las otras 9 no tienen pedido en Switch. Active Wear y Joystep no facturaron en esos 30 días.
 - ⚠️ **Login del panel en el día:** `switch-sync` entra al panel cada hora si hay facturas nuevas sin leer (saca a Daniel de esa empresa; él lo aceptó). Está declarado en `cron-login-web-oficina.test.ts` (`AUTORIZADOS_EN_OFICINA`).
 - **Candado:** `guias-pedido-guardado` (la lista trae el pedido, el paso acotado y sin lanzar, el respaldo, y el sync que no lo cuenta como error).
+
+## 13-nov-2026 — Etiquetas › Nuevo envío: un solo buscador
+
+Daniel: «… al entrar a nuevo envío ahí de una se debe ir actualizando».
+
+- **Interruptor:** `ETIQUETAS_BUSCADOR_UNICO_2026_11` (`lib/guias/guias-2026-10.ts`), **prendido**. `false` = el panel de antes (cliente + «Buscar factura» aparte).
+- **Un campo** acepta cliente, N.° de factura o N.° de pedido (`/api/guias/facturas-cliente?buscar=`, busca por `secuencial` y por `pedido_referencia`). Elegir una factura o un pedido pone cliente, empresa, la factura marcada y el pedido.
+- 🔴 **Excepción a «entrar a Despachos NO llama a Switch»** (decisión de Daniel, 13-nov-2026): abrir Nuevo envío dispara `POST /api/guias/facturas-hoy` en segundo plano, sin bloquear la pantalla. El freno es el del servidor: **10 min por empresa** (`SYNC_NOW_COOLDOWN_MIN`). La lista de Despachos sigue sin llamar a Switch.
+- 🔴 **La factura ya etiquetada o ya en una guía se VE atenuada y no se puede marcar** (`facturasAtenuadas`), con «Ya etiquetada el … · Ver». El pie cuenta por la empresa elegida.
+- 🔴 **Guía «Pendiente Bodega» no bloquea** (Daniel, 13-nov-2026): la factura que está en una guía todavía pendiente SÍ se marca y se etiqueta, con la línea «En la guía GT-xxx · pendiente». En una guía despachada (o en cualquier otro estado) sigue atenuada y el servidor contesta 409. `leerYaSalio` (`ya-salio-server.ts`) devuelve dos índices (`indicesYaSalio`): `indice` (todas, el chip de Nueva guía no cambia) y `despachadas` (lo que bloquea). Si está en una pendiente y en una despachada, bloquea. La ya etiquetada sigue bloqueada igual.
+- **Candados:** `etiquetas-buscador-unico` · `etiquetas-guia-pendiente`.

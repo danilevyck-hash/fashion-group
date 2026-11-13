@@ -167,6 +167,13 @@ interface ClientePickerProps {
   hasError?: boolean;
   inputClassName?: string;
   id?: string;
+  /**
+   * Resultados extra ARRIBA de los clientes (13-nov-2026, Etiquetas › Nuevo
+   * envío: factura o pedido). Recibe lo tecleado y cómo cerrar la lista. Con
+   * algo tecleado que es solo un número, el pie «No está en el directorio» y
+   * «Ingresar manualmente» se callan: ese número no es un nombre de cliente.
+   */
+  arriba?: (consulta: string, cerrar: () => void) => React.ReactNode;
 }
 
 /** Fila del desplegable. 44 px de alto: se toca desde el iPhone. */
@@ -233,6 +240,7 @@ export default function ClientePicker({
   hasError = false,
   inputClassName = "",
   id,
+  arriba,
 }: ClientePickerProps) {
   const [abierto, setAbierto] = useState(false);
   const [query, setQuery] = useState("");
@@ -282,6 +290,7 @@ export default function ClientePicker({
   // al mismo cliente y sin esto quedaría abierta.
   const directorio = ocultar(directorioCrudo);
   const listaTop = q.length < 2 ? ocultar(topClientes ?? []) : [];
+  const esNumero = Boolean(arriba) && /^[\d\s-]+$/.test(q);
 
   return (
     <div ref={wrapRef} className="relative">
@@ -361,11 +370,12 @@ export default function ClientePicker({
         className="bg-white border border-gray-200 rounded-md shadow-lg"
       >
         <>
-          {q.length >= 2 && cargando && (
+          {arriba && q && arriba(q, () => { setQuery(""); setAbierto(false); })}
+          {q.length >= 2 && cargando && !esNumero && (
             <div className="px-3 py-2 text-xs text-gray-400">Buscando…</div>
           )}
 
-          {q.length >= 2 && !cargando && hitsVisibles.length === 0 && (
+          {q.length >= 2 && !cargando && hitsVisibles.length === 0 && !esNumero && (
             <div className="px-3 py-2 text-xs text-gray-500">
               {permitirOtro
                 ? "No está en el directorio."
@@ -393,7 +403,7 @@ export default function ClientePicker({
           {/* La salida de emergencia, SIEMPRE visible y siempre explícita —
               salvo donde el cliente amarra sí o sí (`permitirOtro=false`):
               ahí no hay salida a mano y el pie dice el camino. */}
-          <div className="border-t border-gray-100">
+          {!esNumero && <div className="border-t border-gray-100">
             {!permitirOtro ? (
               <div className="px-3 py-2 text-xs text-gray-400">
                 {/* 1-oct-2026, Daniel: nombres normales de ERP. */}
@@ -414,7 +424,7 @@ export default function ClientePicker({
                 manualmente&rdquo;.
               </div>
             )}
-          </div>
+          </div>}
         </>
       </DesplegableFlotante>
 

@@ -37,7 +37,7 @@ vi.mock("@/lib/supabase-server", () => ({
   HAS_SERVICE_ROLE: true,
   supabaseServer: { from: (t: string) => cadena(t) },
 }));
-vi.mock("@/lib/guias/ya-salio-server", () => ({ leerIndiceYaSalio: async () => new Map() }));
+vi.mock("@/lib/guias/ya-salio-server", () => ({ leerIndiceYaSalio: async () => new Map(), leerYaSalio: async () => ({ indice: new Map(), despachadas: new Map() }) }));
 const login = vi.fn();
 const leer = vi.fn();
 vi.mock("@/lib/switch-api/web-client", () => ({
