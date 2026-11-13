@@ -28,6 +28,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { pedidoDeReferencia } from "@/lib/guias/pedidos-flujo-simple";
 import { requireAuth, getSession } from "@/lib/require-auth";
 import { B2B_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
 import { esCodigoDeCliente } from "@/lib/clientes/mundos";
@@ -139,6 +140,7 @@ export async function GET(req: NextRequest) {
     despachadas = new Map();
   }
 
+  const delPedido = await bultosDelPedido((facs ?? []) as FacturaFila[]);
   const facturas = ((facs ?? []) as FacturaFila[])
     .filter((f) => f.secuencial && f.fecha)
     .map((f) => {
@@ -158,6 +160,7 @@ export async function GET(req: NextRequest) {
         // sync de facturas). `pedidoLeido: false` = todavía nadie lo leyó.
         pedido: f.pedido_referencia ?? null,
         pedidoLeido: f.pedido_leido_en != null,
+        ...delPedido(f),
       };
     });
 
@@ -247,6 +250,7 @@ async function buscarPorNumero(numero: string, conPedido = false): Promise<NextR
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
   const filas = (clientes ?? []) as Array<{ empresa_key: string; cliente_switch_id: number; codigo: string | null; nombre: string | null }>;
+  const delPedido = await bultosDelPedido(halladas.map(({ f }) => f));
   const coincidencias = halladas.flatMap(({ f, tipo }) => {
     const c = filas.find((x) => x.empresa_key === f.empresa_key && x.cliente_switch_id === f.cliente_switch_id);
     const codigo = (c?.codigo ?? "").trim();
@@ -264,8 +268,39 @@ async function buscarPorNumero(numero: string, conPedido = false): Promise<NextR
         switch_factura_id: f.switch_factura_id == null ? null : Number(f.switch_factura_id),
         pedido: f.pedido_referencia ?? null,
         pedidoLeido: f.pedido_leido_en != null,
+        ...delPedido(f),
       } : {}),
     }];
   });
   return NextResponse.json({ coincidencias });
+}
+
+/**
+ * 🔴 13-nov-2026 (propuesta): los bultos que bodega anotó al marcar Preparado,
+ * amarrados por el N.° de pedido de la factura (`pedido_referencia`
+ * «16-000002463» = pedido 2463 de esa MISMA empresa). Solo Preparado o
+ * Recibido con bultos. Falla ABIERTA: sin lectura, la factura viaja sin ellos.
+ */
+async function bultosDelPedido(
+  filas: ReadonlyArray<{ empresa_key: string; pedido_referencia?: string | null }>,
+): Promise<(f: { empresa_key: string; pedido_referencia?: string | null }) => { pedidoBultos?: number; pedidoPreparadoPor?: string | null }> {
+  const idDe = pedidoDeReferencia;
+  const ids = [...new Set(filas.map((f) => idDe(f.pedido_referencia)).filter((n): n is number => n != null))];
+  const porClave = new Map<string, { bultos: number; preparado_por: string | null }>();
+  if (ids.length > 0) {
+    const { data, error } = await supabaseServer
+      .from("pedidos_bodega_estado")
+      .select("empresa_key, pedido_switch_id, bultos, preparado_por")
+      .in("empresa_key", [...new Set(filas.map((f) => f.empresa_key))])
+      .in("pedido_switch_id", ids)
+      .in("estado", ["preparado", "recibido"]);
+    if (error) console.error("[guias/facturas-cliente] bultos del pedido:", error.message);
+    for (const r of (data ?? []) as Array<{ empresa_key: string; pedido_switch_id: number; bultos: number; preparado_por: string | null }>) {
+      if (r.bultos != null) porClave.set(`${r.empresa_key}|${r.pedido_switch_id}`, r);
+    }
+  }
+  return (f) => {
+    const r = porClave.get(`${f.empresa_key}|${idDe(f.pedido_referencia)}`);
+    return r ? { pedidoBultos: r.bultos, pedidoPreparadoPor: r.preparado_por } : {};
+  };
 }

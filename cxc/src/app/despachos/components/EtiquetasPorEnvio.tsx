@@ -714,7 +714,8 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
     if (h.cliente_codigo === cliente?.codigo) void cargarFacturas(h.cliente_codigo);
     const clave = claveFactura(h);
     setEmpresaKey(h.empresa_key);
-    setMarcadas([{ clave, bultos: "", nota: "" }]);
+    // 🔴 13-nov-2026 (propuesta): los bultos del pedido Preparado vienen puestos.
+    setMarcadas([{ clave, bultos: "pedidoBultos" in h && h.pedidoBultos ? String(h.pedidoBultos) : "", nota: "" }]);
     setPreElegida(clave);
     setCoincidencias([]);
     setNumeroFactura("");
@@ -737,7 +738,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
 
   function alternarFactura(clave: string) {
     setError(null);
-    setMarcadas((m) => (m.some((x) => x.clave === clave) ? m.filter((x) => x.clave !== clave) : [...m, { clave, bultos: "", nota: "" }]));
+    setMarcadas((m) => (m.some((x) => x.clave === clave) ? m.filter((x) => x.clave !== clave) : [...m, { clave, bultos: porClave.get(clave)?.pedidoBultos ? String(porClave.get(clave)!.pedidoBultos) : "", nota: "" }]));
   }
 
   /**
@@ -820,6 +821,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
     // una ventana que nace después de un `await`). Si el servidor dice que no,
     // la pestaña vacía se cierra sola.
     let creadas: EtiquetaFila[] | null = null;
+    let recibidos: string[] = [];
     try {
       await abrirPdfEnPestana(async () => {
         const r = await fetch("/api/guias/etiquetas", {
@@ -827,7 +829,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(cuerpo),
         });
-        const d = (await r.json().catch(() => ({}))) as { etiquetas?: EtiquetaFila[]; error?: string };
+        const d = (await r.json().catch(() => ({}))) as { etiquetas?: EtiquetaFila[]; error?: string; pedidosRecibidos?: string[] };
         if (!r.ok || !Array.isArray(d.etiquetas) || d.etiquetas.length === 0) {
           setError(d.error || "No se pudo guardar");
           // 🔴 409: otra persona etiquetó alguna de estas facturas. Se relee la
@@ -836,12 +838,15 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
           return null;
         }
         creadas = d.etiquetas;
+        recibidos = d.pedidosRecibidos ?? [];
         return pdfDelEnvio(d.etiquetas, formato)();
       });
       const guardadas = creadas as EtiquetaFila[] | null;
       if (guardadas) {
         const total = guardadas.reduce((s, e) => s + e.cajas, 0);
-        await onListo(`Listo · ${total} etiquetas — se abrieron en otra pestaña`);
+        // 🔴 13-nov-2026: se DICE qué pedido quedó Recibido.
+        const conPedido = recibidos.length > 0 ? ` · pedido ${recibidos.join(", ")} recibido` : "";
+        await onListo(`Listo · ${total} etiquetas — se abrieron en otra pestaña${conPedido}`);
         onCerrar();
       }
     } catch {
@@ -1097,6 +1102,11 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
                                       />
                                       {rango && rango.hasta >= rango.desde && (
                                         <div className="mt-1 text-xs tabular-nums text-gray-500">Bultos {textoRango(rango)}</div>
+                                      )}
+                                      {f.pedidoBultos != null && (
+                                        <div data-bultos-del-pedido className="mt-1 max-w-[220px] text-xs text-gray-500">
+                                          Preparado por {(f.pedidoPreparadoPor ?? "bodega").replace(/^./, (c) => c.toUpperCase())} · {f.pedidoBultos} {f.pedidoBultos === 1 ? "bulto" : "bultos"}
+                                        </div>
                                       )}
                                     </div>
                                     <div className="min-w-[180px] flex-1">

@@ -65,8 +65,8 @@ describe("🔴 1 · cuatro pasos, y quién marca cada uno", () => {
     expect(mover("en_preparacion", "pendiente", secretaria).ok).toBe(false);
   });
 
-  it("el PATCH ya no pide bultos al pasar de En preparación a Preparado (12-nov-2026)", () => {
-    expect(ruta()).not.toContain('if (estado === "preparado" && desde === "en_preparacion") {');
+  it("el PATCH EXIGE los bultos al pasar de En preparación a Preparado (13-nov-2026, revierte el 12-nov)", () => {
+    expect(ruta()).toContain('if (estado === "preparado" && desde === "en_preparacion") {');
   });
 
   it("la migración SOLO agrega: ningún UPDATE ni DELETE sobre filas", () => {

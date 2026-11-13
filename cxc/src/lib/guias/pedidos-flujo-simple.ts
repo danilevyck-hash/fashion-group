@@ -64,7 +64,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
-import { empresasQueVe, horaPanama, veLaEmpresa, type Veredicto } from "./pedidos-bultos";
+import { empresasQueVe, horaPanama, MAX_BULTO, MIN_BULTO, veLaEmpresa, type Veredicto } from "./pedidos-bultos";
 
 /**
  * 🔴 PRENDIDO el 7-oct-2026 con el «sí» de Daniel, después de ver el mockup
@@ -236,6 +236,7 @@ export function columnasDelPaso(
   hasta: EstadoFlujoSimple,
   quien: string,
   ahora: string,
+  bultos?: number | null,
 ): ColumnasDelPaso {
   if (hasta === "pendiente") {
     return {
@@ -254,7 +255,7 @@ export function columnasDelPaso(
     // 🔴 Marcar Preparado QUITA SOLA la espera de muestra (Daniel, 9-oct-2026).
     return desde === "recibido"
       ? { estado: hasta, recibido_por: null, recibido_en: null }
-      : { estado: hasta, preparado_por: quien, preparado_en: ahora, ...SIN_ESPERA_MUESTRA };
+      : { estado: hasta, bultos: bultos ?? null, preparado_por: quien, preparado_en: ahora, ...SIN_ESPERA_MUESTRA };
   }
   return { estado: hasta, recibido_por: quien, recibido_en: ahora };
 }
@@ -377,3 +378,24 @@ export function ultimaFirmaFlujoSimple(f: FirmasFlujoSimple): string | null {
 
 /** Que no se nos olviden las 6 del grupo en ningún camino de respaldo. */
 export const EMPRESAS_PEDIDOS_FLUJO_SIMPLE = B2B_EMPRESA_KEYS;
+
+/**
+ * 🔴 13-nov-2026 (propuesta): al marcar Preparado bodega escribe cuántos
+ * bultos son — obligatorio — y Etiquetas los trae puestos con la factura.
+ */
+/**
+ * El N.° de pedido de la factura («16-000002463») → el id del pedido (2463).
+ * Igualdad exacta del formato de Switch; cualquier otra cosa = null.
+ */
+export function pedidoDeReferencia(ref: string | null | undefined): number | null {
+  const m = /^16-(\d{1,12})$/.exec(String(ref ?? "").trim());
+  return m ? Number(m[1]) : null;
+}
+
+export function validarCantidadBultos(v: unknown): Veredicto & { valor?: number } {
+  const n = typeof v === "number" ? v : Number(String(v ?? "").trim());
+  if (!Number.isInteger(n) || n < MIN_BULTO || n > MAX_BULTO) {
+    return { ok: false, error: `Escribe cuántos bultos son, de ${MIN_BULTO} a ${MAX_BULTO}` };
+  }
+  return { ok: true, valor: n };
+}
