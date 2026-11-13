@@ -32,8 +32,8 @@ import { requireAuth, getSession } from "@/lib/require-auth";
 import { B2B_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
 import { esCodigoDeCliente } from "@/lib/clientes/mundos";
 import { TIPO_FACTURA, yaSalioEn } from "@/lib/guias/atajos-facturas";
-import { leerIndiceYaSalio } from "@/lib/guias/ya-salio-server";
-import { facturasPorNumero } from "@/lib/guias/etiquetas-por-envio";
+import { leerYaSalio } from "@/lib/guias/ya-salio-server";
+import { facturasPorNumero, facturasPorPedido } from "@/lib/guias/etiquetas-por-envio";
 import { claveDeFactura } from "@/lib/guias/numero-factura";
 import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import { nombreParaMostrar } from "@/lib/clientes/nombre-display";
@@ -76,6 +76,9 @@ export async function GET(req: NextRequest) {
   // 🔴 12-nov-2026: Etiquetas › Nuevo envío también arranca por el N.° de factura.
   const numero = req.nextUrl.searchParams.get("factura");
   if (numero != null) return buscarPorNumero(numero.trim());
+  // 🔴 13-nov-2026: el buscador único también encuentra por N.° de PEDIDO.
+  const documento = req.nextUrl.searchParams.get("buscar");
+  if (documento != null) return buscarPorNumero(documento.trim(), true);
 
   const codigo = (req.nextUrl.searchParams.get("codigo") ?? "").trim();
   // Solo códigos del grupo (D-XXX). Un código numérico de Boston/Multifashion
@@ -125,13 +128,15 @@ export async function GET(req: NextRequest) {
   // 3 · El índice «ya salió»: renglones vivos de guías vivas. Paginado con
   //     orden estable — db-max-rows corta en 1000 EN SILENCIO.
   let indice: ReadonlyMap<string, number>;
+  let despachadas: ReadonlyMap<string, number>;
   try {
     // La lectura vive en `ya-salio-server.ts`: Etiquetas lee la MISMA (1-oct-2026).
-    indice = await leerIndiceYaSalio();
+    ({ indice, despachadas } = await leerYaSalio());
   } catch (e) {
     // Fail-open: sin índice no hay aviso, pero la lista de facturas sale igual.
     console.error("[guias/facturas-cliente] ya-salió:", e instanceof Error ? e.message : String(e));
     indice = new Map();
+    despachadas = new Map();
   }
 
   const facturas = ((facs ?? []) as FacturaFila[])
@@ -146,6 +151,9 @@ export async function GET(req: NextRequest) {
         fecha: String(f.fecha),
         total: verPrecio ? Number(f.total ?? 0) : null,
         yaSalioEn: yaSalioEn(indice, empresa, String(f.secuencial)),
+        yaSalioPendiente:
+          yaSalioEn(indice, empresa, String(f.secuencial)) != null &&
+          yaSalioEn(despachadas, empresa, String(f.secuencial)) == null,
         // 🔴 12-nov-2026: el N.° de pedido viaja CON la factura (lo guarda el
         // sync de facturas). `pedidoLeido: false` = todavía nadie lo leyó.
         pedido: f.pedido_referencia ?? null,
@@ -190,33 +198,45 @@ const DIAS_BUSQUEDA_POR_NUMERO = 365;
  * factura que termina en esos dígitos, una por empresa de las 6 del grupo
  * (`facturasPorNumero`). Más de una = la pantalla pregunta cuál.
  */
-async function buscarPorNumero(numero: string): Promise<NextResponse> {
+async function buscarPorNumero(numero: string, conPedido = false): Promise<NextResponse> {
   const clave = claveDeFactura(numero);
   if (clave === "" || numero.replace(/\D/g, "").length > 15) {
     return NextResponse.json({ error: "Escribe el número de la factura" }, { status: 400 });
   }
   const desde = new Date(Date.now() - DIAS_BUSQUEDA_POR_NUMERO * 86_400_000).toISOString().slice(0, 10);
-  const { data: facs, error } = await supabaseServer
-    .from("switch_facturas")
-    .select("empresa_key, secuencial, fecha, cliente_switch_id")
-    .eq("tipo_comprobante", TIPO_FACTURA)
-    .in("empresa_key", [...B2B_EMPRESA_KEYS])
-    .gte("fecha", desde)
-    .like("secuencial", `%${clave}`)
-    .order("fecha", { ascending: false })
-    .limit(500);
+  const consulta = (columna: "secuencial" | "pedido_referencia") =>
+    supabaseServer
+      .from("switch_facturas")
+      .select("empresa_key, switch_factura_id, secuencial, fecha, cliente_switch_id, pedido_referencia, pedido_leido_en")
+      .eq("tipo_comprobante", TIPO_FACTURA)
+      .in("empresa_key", [...B2B_EMPRESA_KEYS])
+      .gte("fecha", desde)
+      .like(columna, `%${clave}`)
+      .order("fecha", { ascending: false })
+      .limit(500);
+  const [porFactura, porPedido] = await Promise.all([
+    consulta("secuencial"),
+    conPedido ? consulta("pedido_referencia") : Promise.resolve({ data: [], error: null }),
+  ]);
+  const error = porFactura.error ?? porPedido.error;
   if (error) {
     console.error("[guias/facturas-cliente] por número:", error.message);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
-  const halladas = facturasPorNumero(
-    (facs ?? []) as Array<{ empresa_key: string; secuencial: string | null; fecha: string | null; cliente_switch_id: number | null }>,
-    numero,
-  ).filter((f) => typeof f.cliente_switch_id === "number");
+  type Fila = {
+    empresa_key: string; switch_factura_id: number | null; secuencial: string | null; fecha: string | null;
+    cliente_switch_id: number | null; pedido_referencia?: string | null; pedido_leido_en?: string | null;
+  };
+  const halladas = [
+    ...facturasPorNumero((porFactura.data ?? []) as Fila[], numero).map((f) => ({ f, tipo: "factura" as const })),
+    ...facturasPorPedido((porPedido.data ?? []) as Fila[], numero).map((f) => ({ f, tipo: "pedido" as const })),
+  ]
+    .filter(({ f }) => typeof f.cliente_switch_id === "number")
+    // Lo más reciente arriba, sea factura o pedido: lo que se etiqueta es de hoy.
+    .sort((a, b) => String(b.f.fecha ?? "").localeCompare(String(a.f.fecha ?? "")));
   if (halladas.length === 0) return NextResponse.json({ coincidencias: [] });
 
-  const orFiltro = halladas
-    .map((f) => `and(empresa_key.eq.${f.empresa_key},cliente_switch_id.eq.${f.cliente_switch_id})`)
+  const orFiltro = [...new Set(halladas.map(({ f }) => `and(empresa_key.eq.${f.empresa_key},cliente_switch_id.eq.${f.cliente_switch_id})`))]
     .join(",");
   const { data: clientes, error: cErr } = await supabaseServer
     .from("switch_clientes")
@@ -227,7 +247,7 @@ async function buscarPorNumero(numero: string): Promise<NextResponse> {
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
   const filas = (clientes ?? []) as Array<{ empresa_key: string; cliente_switch_id: number; codigo: string | null; nombre: string | null }>;
-  const coincidencias = halladas.flatMap((f) => {
+  const coincidencias = halladas.flatMap(({ f, tipo }) => {
     const c = filas.find((x) => x.empresa_key === f.empresa_key && x.cliente_switch_id === f.cliente_switch_id);
     const codigo = (c?.codigo ?? "").trim();
     if (!esCodigoDeCliente(codigo) || CODIGOS_RETIRADOS_DE_GUIAS.includes(codigo)) return [];
@@ -238,6 +258,13 @@ async function buscarPorNumero(numero: string): Promise<NextResponse> {
       fecha: String(f.fecha),
       cliente_codigo: codigo,
       cliente_nombre: nombreParaMostrar(codigo, c?.nombre) || codigo,
+      // Aditivo (13-nov-2026): lo que el buscador único necesita para llenar el pedido.
+      ...(conPedido ? {
+        tipo,
+        switch_factura_id: f.switch_factura_id == null ? null : Number(f.switch_factura_id),
+        pedido: f.pedido_referencia ?? null,
+        pedidoLeido: f.pedido_leido_en != null,
+      } : {}),
     }];
   });
   return NextResponse.json({ coincidencias });

@@ -669,3 +669,44 @@ export function facturasPorNumero<T extends { empresa_key: string; secuencial: s
   }
   return [...porEmpresa.values()].sort((a, b) => String(b.fecha ?? "").localeCompare(String(a.fecha ?? "")));
 }
+
+/**
+ * 🔴 BUSCAR POR N.° DE PEDIDO (13-nov-2026): las facturas cuyo
+ * `pedido_referencia` termina en lo tecleado (mismos dígitos finales que la
+ * factura: `2448` encuentra `16-000002448`). Medido el 13-nov-2026: 163
+ * pedidos leídos, ninguno repetido dentro de una empresa ni entre empresas, así
+ * que cada pedido da una factura; si algún día un pedido trae varias, salen
+ * todas. Solo ve lo que el sync ya leyó (`pedido_referencia` no nulo).
+ */
+export function facturasPorPedido<T extends { pedido_referencia?: string | null; fecha: string | null }>(
+  filas: readonly T[],
+  tecleado: string,
+): T[] {
+  const buscado = String(tecleado ?? "").replace(/\D/g, "");
+  if (claveDeFactura(buscado) === "") return [];
+  return filas
+    .filter((f) => String(f.pedido_referencia ?? "").replace(/\D/g, "").endsWith(buscado))
+    .sort((a, b) => String(b.fecha ?? "").localeCompare(String(a.fecha ?? "")));
+}
+
+/** Días hacia atrás en que la factura ya etiquetada o ya en guía se ve atenuada. */
+export const DIAS_ATENUADAS = 7;
+
+/**
+ * Las facturas que NO se pueden marcar (ya etiquetadas o ya en una guía) y que
+ * igual se MUESTRAN atenuadas: las de los últimos `DIAS_ATENUADAS` días y la
+ * que se buscó por número. Las más viejas siguen fuera, contadas al pie.
+ * ponytail: corte fijo de 7 días; si estorba, que dependa de los días abiertos.
+ */
+export function facturasAtenuadas<T extends { empresa_key: string; secuencial: string; fecha: string }>(
+  todas: readonly T[],
+  visibles: readonly T[],
+  hoy: string,
+  buscada: string | null,
+): T[] {
+  const libres = new Set(visibles);
+  const corte = new Date(Date.parse(`${hoy}T12:00:00Z`) - DIAS_ATENUADAS * 86_400_000).toISOString().slice(0, 10);
+  return todas.filter(
+    (f) => !libres.has(f) && (String(f.fecha).slice(0, 10) >= corte || `${f.empresa_key}-${f.secuencial}` === buscada),
+  );
+}

@@ -14,20 +14,24 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { indiceYaSalio, type RenglonVivo } from "@/lib/guias/atajos-facturas";
+import { indicesYaSalio, type RenglonVivo } from "@/lib/guias/atajos-facturas";
+
+/** El único estado en que la factura de la guía todavía se puede etiquetar. */
+export const ESTADO_PENDIENTE_BODEGA = "Pendiente Bodega";
 
 interface GuiaVivaFila {
   numero: number;
+  estado: string | null;
   guia_items: Array<{ empresa: string | null; facturas: string | null; deleted: boolean | null }> | null;
 }
 
-export async function leerIndiceYaSalio(): Promise<Map<string, number>> {
+export async function leerYaSalio(): Promise<ReturnType<typeof indicesYaSalio>> {
   const guias = await leerTodoPaginado<GuiaVivaFila>(
     "guia_transporte (ya salió en otra guía)",
     (pedirCount, desde, hasta) =>
       supabaseServer
         .from("guia_transporte")
-        .select("numero, guia_items(empresa, facturas, deleted)", pedirCount ? { count: "exact" } : {})
+        .select("numero, estado, guia_items(empresa, facturas, deleted)", pedirCount ? { count: "exact" } : {})
         .eq("deleted", false)
         .order("id", { ascending: true })
         .range(desde, hasta),
@@ -38,8 +42,12 @@ export async function leerIndiceYaSalio(): Promise<Map<string, number>> {
       // ⚠️ guia_items tiene su PROPIO `deleted`, independiente del de la
       // cabecera: filtrar solo la guía deja pasar renglones borrados.
       if (it.deleted) continue;
-      renglones.push({ empresa: it.empresa, facturas: it.facturas, guiaNumero: g.numero });
+      renglones.push({ empresa: it.empresa, facturas: it.facturas, guiaNumero: g.numero, pendiente: g.estado === ESTADO_PENDIENTE_BODEGA });
     }
   }
-  return indiceYaSalio(renglones);
+  return indicesYaSalio(renglones);
+}
+
+export async function leerIndiceYaSalio(): Promise<Map<string, number>> {
+  return (await leerYaSalio()).indice;
 }

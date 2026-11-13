@@ -107,3 +107,13 @@ export const ETIQUETAS_TRASLADO_2026_10 = true;
  *  antes: `Traslado` en facturas y «Traslado <cliente>: <contenido>» en
  *  Observaciones. `false` = el enlace gris «Traslado» dentro de «+ Agregar factura». */
 export const GUIA_AGREGAR_TRASLADO_2026_10 = true;
+
+/** 🔴 ETIQUETAS › NUEVO ENVÍO CON UN SOLO BUSCADOR (13-nov-2026, propuesta).
+ *  Daniel: «quiero que pueda buscar por cliente y por número de pedido o
+ *  factura… al entrar a nuevo envío ahí de una se debe ir actualizando».
+ *  Un campo acepta cliente, N.° de factura o N.° de pedido; elegir factura o
+ *  pedido pone cliente, empresa, la factura marcada y el pedido. Al abrir se
+ *  traen las facturas de hoy en segundo plano (sin bloquear). La factura ya
+ *  etiquetada o ya en una guía se VE atenuada, nunca se marca.
+ *  `false` = el panel como estaba (cliente + «Buscar factura» aparte). */
+export const ETIQUETAS_BUSCADOR_UNICO_2026_11 = true;

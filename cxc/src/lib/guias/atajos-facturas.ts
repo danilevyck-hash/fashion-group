@@ -82,6 +82,9 @@ export interface FacturaDelCliente {
   total: number | null;
   /** N° de la guía VIVA donde esta factura ya aparece, o null. Aviso, nunca bloqueo. */
   yaSalioEn: number | null;
+  /** 13-nov-2026: `true` = la guía de `yaSalioEn` sigue «Pendiente Bodega» y la
+   *  factura SÍ se etiqueta. Ausente o `false` = bloquea como siempre. */
+  yaSalioPendiente?: boolean;
   /** N.° de pedido guardado con la factura (12-nov-2026); null = sin pedido o sin leer. */
   pedido?: string | null;
   /** ¿Ya se leyó el pedido del panel? `false` = la pantalla lo pide en segundo plano. */
@@ -272,6 +275,8 @@ export interface RenglonVivo {
   empresa: string | null;
   facturas: string | null;
   guiaNumero: number;
+  /** ¿La guía sigue «Pendiente Bodega»? (13-nov-2026: esa factura SÍ se etiqueta). */
+  pendiente?: boolean;
 }
 
 function claveYaSalio(empresaNombre: string | null | undefined, numeroNormalizado: string): string {
@@ -293,6 +298,23 @@ export function indiceYaSalio(renglones: readonly RenglonVivo[]): Map<string, nu
     }
   }
   return indice;
+}
+
+/**
+ * 🔴 13-nov-2026 (Daniel): una factura en una guía «Pendiente Bodega» SÍ se
+ * etiqueta; en una guía despachada, NO. `indice` = todas las guías vivas (el
+ * chip de Nueva guía no cambia); `despachadas` = solo las que NO están
+ * pendientes, y es la que bloquea en Etiquetas (pantalla y servidor). Si la
+ * factura está en una pendiente y en una despachada, bloquea.
+ */
+export function indicesYaSalio(renglones: readonly RenglonVivo[]): {
+  indice: Map<string, number>;
+  despachadas: Map<string, number>;
+} {
+  return {
+    indice: indiceYaSalio(renglones),
+    despachadas: indiceYaSalio(renglones.filter((r) => !r.pendiente)),
+  };
 }
 
 /** ¿En qué guía viva ya salió esta factura de ESTA empresa? null = no consta. */

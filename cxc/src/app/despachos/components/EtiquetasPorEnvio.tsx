@@ -52,6 +52,7 @@ import {
 } from "@/lib/guias/destinos-clientes";
 import {
   AYUDA_FORMATO,
+  etiquetaDeLaFactura,
   facturasParaEtiquetar,
   rotuloEstado,
   rotuloGuia,
@@ -67,6 +68,7 @@ import {
   MAX_PEDIDO,
   agruparEnEnvios,
   facturaDelBulto,
+  facturasAtenuadas,
   filtrarEnvios,
   moverEnElEnvio,
   normalizarNota,
@@ -79,7 +81,8 @@ import {
   type Envio,
 } from "@/lib/guias/etiquetas-por-envio";
 import { abrirPdfEnPestana } from "@/lib/guias/pdf-en-pestana";
-import { ETIQUETAS_2026_10, ETIQUETAS_TRASLADO_2026_10 } from "@/lib/guias/guias-2026-10";
+import { ETIQUETAS_2026_10, ETIQUETAS_BUSCADOR_UNICO_2026_11, ETIQUETAS_TRASLADO_2026_10 } from "@/lib/guias/guias-2026-10";
+import ResultadosDocumento, { type DocumentoHallado } from "./ResultadosDocumento";
 import { TEXTO_TRASLADO } from "@/lib/guias/atajos-facturas";
 import { B2B_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -226,6 +229,7 @@ export default function EtiquetasPorEnvio() {
           onCerrar={() => setPanel(false)}
           onListo={async (mensaje) => { setToast(mensaje); await cargar(); }}
           onRecargar={cargar}
+          onVer={(secuencial) => { setPanel(false); setFiltro("todas"); setBuscar(facturaParaMostrar(secuencial)); }}
         />
       ) : (
         <>
@@ -428,6 +432,8 @@ interface PanelProps {
   onCerrar: () => void;
   onListo: (mensaje: string) => Promise<void> | void;
   onRecargar: () => Promise<void> | void;
+  /** Ver en la lista el envío de una factura ya etiquetada (buscador único). */
+  onVer?: (secuencial: string) => void;
 }
 
 /** Lo que contesta `facturas-cliente?factura=`: una por empresa. */
@@ -457,7 +463,7 @@ async function pedirPedidos(hallados: Map<string, string | null>, empresa: strin
   } catch { /* sin conexión: el campo queda para escribirlo */ }
 }
 
-function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }: PanelProps) {
+function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, onVer }: PanelProps) {
   const [cliente, setCliente] = useState<{ nombre: string; codigo: string } | null>(null);
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -520,8 +526,8 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
       .catch(() => { /* sin botones de destino; se escribe a mano */ });
   }, []);
 
-  const cargarFacturas = useCallback(async (codigo: string) => {
-    setCargando(true);
+  const cargarFacturas = useCallback(async (codigo: string, silencioso = false) => {
+    if (!silencioso) setCargando(true);
     setSinLista(false);
     try {
       const r = await fetch(`/api/guias/facturas-cliente?codigo=${encodeURIComponent(codigo)}`, { cache: "no-store" });
@@ -542,10 +548,9 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
       setFacturas(lista);
       setHasta(d.hasta ?? null);
     } catch {
-      setFacturas(null);
-      setSinLista(true);
+      if (!silencioso) { setFacturas(null); setSinLista(true); }
     } finally {
-      setCargando(false);
+      if (!silencioso) setCargando(false);
     }
   }, [enCola]);
 
@@ -553,15 +558,34 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
     if (cliente?.codigo) void cargarFacturas(cliente.codigo);
   }, [cliente?.codigo, cargarFacturas]);
 
-  async function actualizarAhora() {
-    if (!cliente?.codigo || actualizando) return;
+  // 🔴 BUSCADOR ÚNICO (13-nov-2026): al abrir «Nuevo envío» se traen las
+  // facturas de HOY en segundo plano —nada se bloquea— y al volver se relee la
+  // lista del cliente elegido sin parpadeo. `ronda` vuelve a pedir el N.° de
+  // pedido que Switch no contestó mientras corría la actualización («ocupado»).
+  const [ronda, setRonda] = useState(0);
+  const clienteActual = useRef<string | null>(null);
+  clienteActual.current = cliente?.codigo || null;
+  const actualizandoRef = useRef(false);
+  const refrescar = useCallback(async (silencioso: boolean) => {
+    if (actualizandoRef.current) return;
+    actualizandoRef.current = true;
     setActualizando(true);
     try {
       await fetch("/api/guias/facturas-hoy", { method: "POST" }).catch(() => {});
-      await cargarFacturas(cliente.codigo);
+      if (clienteActual.current) await cargarFacturas(clienteActual.current, silencioso);
+      setRonda((n) => n + 1);
     } finally {
+      actualizandoRef.current = false;
       setActualizando(false);
     }
+  }, [cargarFacturas]);
+  useEffect(() => {
+    if (ETIQUETAS_BUSCADOR_UNICO_2026_11) void refrescar(true);
+  }, [refrescar]);
+
+  async function actualizarAhora() {
+    if (!cliente?.codigo) return;
+    await refrescar(false);
   }
 
   // Lo ya etiquetado no se ofrece, y se DICE cuánto se escondió. 🔴 1-oct-2026:
@@ -571,14 +595,27 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
 
   // 🔴 EL ENVÍO ES DE UNA EMPRESA: si el cliente tiene facturas en varias, se
   // elige cuál; con una sola, ya viene elegida.
+  // 🔴 BUSCADOR ÚNICO: lo ya etiquetado o ya en guía de los últimos días (y la
+  // factura buscada) se VE atenuado en su día, nunca se marca.
+  const atenuadas = ETIQUETAS_BUSCADOR_UNICO_2026_11 ? facturasAtenuadas(facturas ?? [], visibles, hoyPanama(), preElegida) : [];
+  const esAtenuada = new Set(atenuadas);
   const empresas = useMemo(() => {
     const vistas = new Map<string, string>();
-    for (const f of visibles) if (!vistas.has(f.empresa_key)) vistas.set(f.empresa_key, f.empresa);
+    for (const f of [...visibles, ...atenuadas]) if (!vistas.has(f.empresa_key)) vistas.set(f.empresa_key, f.empresa);
     return [...vistas.entries()].map(([key, nombre]) => ({ key, nombre }));
-  }, [visibles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibles, atenuadas.length]);
   const empresaElegida = empresas.length === 1 ? empresas[0].key : empresaKey;
   const deLaEmpresa = visibles.filter((f) => f.empresa_key === empresaElegida);
-  const { grupos, diasOcultos } = agruparPorDia(deLaEmpresa, diasVisibles);
+  const atenuadasDeLaEmpresa = atenuadas.filter((f) => f.empresa_key === empresaElegida);
+  const { grupos, diasOcultos } = agruparPorDia([...deLaEmpresa, ...atenuadasDeLaEmpresa], diasVisibles);
+  // El pie cuenta solo lo de ESTA empresa que no se ve (antes contaba las de todas).
+  const escondidasPie = ETIQUETAS_BUSCADOR_UNICO_2026_11
+    ? (facturas ?? []).filter((f) => f.empresa_key === empresaElegida && !esAtenuada.has(f) && f.switch_factura_id != null && etiquetaDeLaFactura(etiquetas, f.empresa_key, f.switch_factura_id) !== null).length
+    : escondidas;
+  const yaSalieronPie = ETIQUETAS_BUSCADOR_UNICO_2026_11
+    ? (facturas ?? []).filter((f) => f.empresa_key === empresaElegida && !esAtenuada.has(f) && !visibles.includes(f)).length - escondidasPie
+    : yaSalieron;
   const diaMasReciente = grupos[0]?.dia ?? null;
 
   const porClave = new Map(deLaEmpresa.map((f) => [claveFactura(f), f]));
@@ -613,7 +650,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
     }, 700);
     return () => { vigente = false; clearTimeout(t); setBuscandoPedido(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [llaveIds, pedidoTocado]);
+  }, [llaveIds, pedidoTocado, ronda]);
 
   // La vista previa de los rangos: lo mismo que va a salir en el papel.
   const previa = useMemo(() => {
@@ -675,7 +712,11 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   }
 
   /** Elige el cliente de la factura y la deja marcada en su empresa. */
-  function elegirFacturaHallada(h: FacturaHallada) {
+  function elegirFacturaHallada(h: FacturaHallada | DocumentoHallado) {
+    // Buscador único: el pedido viene con la factura y se propone al instante.
+    if ("pedidoLeido" in h && h.pedidoLeido && h.switch_factura_id != null) {
+      pedidosHallados.current.set(`${h.empresa_key}|${h.switch_factura_id}`, h.pedido);
+    }
     elegirCliente(h.cliente_nombre, h.cliente_codigo);
     // Mismo cliente: el efecto no vuelve a correr y la lista quedaría vacía.
     if (h.cliente_codigo === cliente?.codigo) void cargarFacturas(h.cliente_codigo);
@@ -832,8 +873,15 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
             codigosOcultos={CODIGOS_RETIRADOS_DE_GUIAS}
             permitirOtro={ETIQUETAS_TRASLADO_2026_10}
             onChange={elegirCliente}
+            {...(ETIQUETAS_BUSCADOR_UNICO_2026_11 ? {
+              placeholder: "Cliente, N.° de factura o de pedido",
+              inputClassName: "w-full min-h-[44px] rounded-md border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm",
+              arriba: (consulta: string, cerrar: () => void) => (
+                <ResultadosDocumento consulta={consulta} onElegir={(d) => { cerrar(); elegirFacturaHallada(d); }} />
+              ),
+            } : {})}
           />
-          <form
+          {!ETIQUETAS_BUSCADOR_UNICO_2026_11 && <><form
             className="mt-2 flex items-center gap-2"
             onSubmit={(e) => { e.preventDefault(); void buscarFactura(); }}
           >
@@ -869,7 +917,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
           )}
           {preElegida && facturas && !porClave.has(preElegida) && (
             <p className="mt-2 text-xs text-amber-700">Esa factura ya está etiquetada o ya salió en una guía.</p>
-          )}
+          )}</>}
         </div>
   );
   const bloqueTraslado = cliente && traslado && (
@@ -964,7 +1012,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
               </div>
             )}
 
-            {!cargando && deLaEmpresa.length > 0 && (
+            {!cargando && deLaEmpresa.length + atenuadasDeLaEmpresa.length > 0 && (
               <div className="space-y-4">
                 {grupos.map(({ dia, facturas: fs }) => {
                   const abierto = diaAbierto(dia, diaMasReciente, diasAlternados);
@@ -987,6 +1035,32 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                         <ul>
                           {fs.map((f) => {
                             const clave = claveFactura(f);
+                            if (esAtenuada.has(f)) {
+                              const et = f.switch_factura_id != null ? etiquetaDeLaFactura(etiquetas, f.empresa_key, f.switch_factura_id) : null;
+                              return (
+                                <li key={clave} data-atenuada={clave} className="flex min-h-[44px] flex-wrap items-center gap-3 border-t border-gray-100 py-1.5 text-sm text-gray-400 first:border-t-0">
+                                  <input type="checkbox" disabled aria-label={`${f.secuencial} no se puede marcar`} className="h-4 w-4 shrink-0" />
+                                  <span className="shrink-0 tabular-nums">{f.secuencial}</span>
+                                  <span className="ml-auto text-xs">
+                                    {et ? (
+                                      <>
+                                        Ya etiquetada el {fechaCorta(et.creado_en)}
+                                        {onVer && (
+                                          <>
+                                            {" · "}
+                                            <button type="button" onClick={() => onVer(f.secuencial)} className="text-gray-600 underline-offset-2 hover:text-black hover:underline">
+                                              Ver
+                                            </button>
+                                          </>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <>Ya está en la guía {f.yaSalioEn != null ? rotuloGuia(f.yaSalioEn) : ""}</>
+                                    )}
+                                  </span>
+                                </li>
+                              );
+                            }
                             const m = marcadas.find((x) => x.clave === clave);
                             const rango = previa.rangos.find((r) => r.fila.clave === clave);
                             // 🔴 1-oct-2026: el NÚMERO DE ORDEN de la factura (1, 2, 3…), que es el orden de los bultos.
@@ -1010,6 +1084,9 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
                                     </span>
                                   )}
                                   <span className="shrink-0 tabular-nums">{f.secuencial}</span>
+                                  {f.yaSalioPendiente && f.yaSalioEn != null && (
+                                    <span data-guia-pendiente className="text-xs text-gray-500">En la guía {rotuloGuia(f.yaSalioEn)} · pendiente</span>
+                                  )}
                                   {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): `facturas-cliente`
                                       manda `total: null` a quien no puede ver precio. */}
                                   {f.total != null && (
@@ -1089,11 +1166,11 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
               </div>
             )}
 
-            {!cargando && escondidas > 0 && (
-              <p className="mt-2 text-xs text-gray-500">{textoEscondidasPorEtiqueta(escondidas)}</p>
+            {!cargando && escondidasPie > 0 && (
+              <p className="mt-2 text-xs text-gray-500">{textoEscondidasPorEtiqueta(escondidasPie)}</p>
             )}
-            {!cargando && yaSalieron > 0 && (
-              <p className="mt-1 text-xs text-gray-500">{textoEscondidasPorGuia(yaSalieron)}</p>
+            {!cargando && yaSalieronPie > 0 && (
+              <p className="mt-1 text-xs text-gray-500">{textoEscondidasPorGuia(yaSalieronPie)}</p>
             )}
 
           </div>
