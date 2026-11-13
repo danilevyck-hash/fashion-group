@@ -8,20 +8,23 @@
  * contestan un PDF (DOMPDF) con el mismo texto. Una factura sin pedido no trae
  * la línea → `null`.
  *
- * Solo LEE. El login usa `changesession=SI` y saca a Daniel del panel de esa
- * empresa (lo acepta). UN login por empresa y por pedido de la pantalla, con
- * las facturas una tras otra; se cierra la sesión al terminar.
+ * Del panel solo LEE; lo leído se GUARDA con la factura
+ * (`switch_facturas.pedido_referencia` + `pedido_leido_en`). Lo llena el sync de
+ * facturas (`llenarPedidosGuardados`) y la pantalla lo recibe con la lista;
+ * leer en el momento queda de respaldo. El login usa `changesession=SI` y saca
+ * a Daniel del panel de esa empresa (lo acepta). UN login por empresa, con las
+ * facturas una tras otra; se cierra la sesión al terminar.
  */
 import { inflateSync } from "zlib";
 import { supabaseServer } from "@/lib/supabase-server";
 import { RUNNING_STALE_MIN } from "@/lib/switch-api/sync-log";
 import { cerrarSesionWeb, leerFacturaMostrar, loginSwitchWeb } from "@/lib/switch-api/web-client";
 import { normalizarPedido } from "./etiquetas-por-envio";
+import { TIPO_FACTURA } from "./atajos-facturas";
 
 /** Tope de la búsqueda entera (login + facturas). Medido: login 2–12 s, cada factura 0,5–3,5 s. */
 export const TOPE_BUSQUEDA_PEDIDO_MS = 12_000;
-/** Cuántas facturas se miran por pedido de la pantalla, como mucho. */
-export const MAX_FACTURAS_PEDIDO = 10;
+export { MAX_FACTURAS_PEDIDO } from "./etiquetas-por-envio";
 
 // Estricto: solo espacios entre «Pedido:» y el número; el número, NN-NNNNNN….
 const RE_PEDIDO = /Referencia\s+Pedido:\s*(\d{2}-\d{6,12})(?![\d-])/;
@@ -53,19 +56,29 @@ function textoDePdf(bytes: Uint8Array): string {
 }
 
 /**
- * La «Referencia Pedido» de la vista de una factura (HTML o PDF), o `null`.
- * Pasa por `normalizarPedido`: lo que no cabe en la etiqueta no se devuelve.
+ * Lo que dice la vista de una factura (HTML o PDF): si de verdad ES una factura
+ * —trae su CUFE de la DGI, o Vendedor y Cliente; la página del login no— y su «Referencia Pedido».
+ * Solo una vista que es factura se guarda: lo demás se vuelve a intentar.
  */
-export function extraerReferenciaPedido(pagina: Uint8Array | string): string | null {
+export function leerVistaFactura(pagina: Uint8Array | string): { esFactura: boolean; pedido: string | null } {
   let texto: string;
   if (typeof pagina === "string") texto = pagina;
   else if (Buffer.from(pagina.subarray(0, 5)).toString("latin1") === "%PDF-") texto = textoDePdf(pagina);
   else texto = new TextDecoder().decode(pagina);
   const plano = texto.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ");
   const hallado = RE_PEDIDO.exec(plano)?.[1];
-  if (!hallado) return null;
-  const n = normalizarPedido(hallado);
-  return n.ok ? n.valor : null;
+  const n = hallado ? normalizarPedido(hallado) : null;
+  // La electrónica trae CUFE; la vieja (Vistana 11-000003143, sin CUFE) trae Vendedor y Cliente. El login, nada de eso.
+  const esFactura = /\bCUFE\b/.test(plano) || (/\bVendedor\b/.test(plano) && /\bCliente\b/.test(plano));
+  return { esFactura, pedido: n?.ok ? n.valor : null };
+}
+
+/**
+ * La «Referencia Pedido» de la vista de una factura (HTML o PDF), o `null`.
+ * Pasa por `normalizarPedido`: lo que no cabe en la etiqueta no se devuelve.
+ */
+export function extraerReferenciaPedido(pagina: Uint8Array | string): string | null {
+  return leerVistaFactura(pagina).pedido;
 }
 
 /** ¿Hay una corrida de Switch de esa empresa en curso? Entonces no se entra al panel. */
@@ -82,22 +95,34 @@ async function hayCorridaEnCurso(empresaKey: string): Promise<boolean> {
   return (data ?? []).length > 0;
 }
 
+/** Guarda lo leído con la factura. Nunca lanza: si no se guarda, se vuelve a leer. */
+async function guardarPedido(empresaKey: string, id: number, pedido: string | null): Promise<void> {
+  const { error } = await supabaseServer
+    .from("switch_facturas")
+    .update({ pedido_referencia: pedido, pedido_leido_en: new Date().toISOString() })
+    .eq("empresa_key", empresaKey)
+    .eq("switch_factura_id", id);
+  if (error) console.error(`[guias/pedido] guardar ${empresaKey} ${id}:`, error.message);
+}
+
 export type PedidosPorFactura = Record<string, string | null>;
+export type MotivoPedido = "ocupado" | "error" | "tiempo";
 
 /**
- * El pedido de cada factura (`switch_factura_id`), o `null`. NUNCA lanza: un
- * login caído, una corrida en curso o el tope de tiempo dejan `null` en lo que
- * falte, y la pantalla deja el campo para escribirlo a mano.
+ * El pedido de cada factura (`switch_factura_id`), o `null`, y lo GUARDA con la
+ * factura. UN login para todas, una tras otra. NUNCA lanza: un login caído, una
+ * corrida en curso o el tope de tiempo dejan `null` en lo que falte.
  */
 export async function buscarPedidosDeFacturas(
   empresaKey: string,
   ids: readonly number[],
   topeMs: number = TOPE_BUSQUEDA_PEDIDO_MS,
-): Promise<{ pedidos: PedidosPorFactura; motivo?: "ocupado" | "error" | "tiempo" }> {
+): Promise<{ pedidos: PedidosPorFactura; leidas: number; motivo?: MotivoPedido }> {
   const pedidos: PedidosPorFactura = Object.fromEntries(ids.map((id) => [String(id), null]));
-  if (ids.length === 0) return { pedidos };
+  if (ids.length === 0) return { pedidos, leidas: 0 };
   const limite = Date.now() + topeMs;
-  let motivo: "ocupado" | "error" | "tiempo" | undefined;
+  let motivo: MotivoPedido | undefined;
+  let leidas = 0;
 
   const trabajo = (async () => {
     if (await hayCorridaEnCurso(empresaKey)) { motivo = "ocupado"; return; }
@@ -106,7 +131,11 @@ export async function buscarPedidosDeFacturas(
       for (const id of ids) {
         if (Date.now() >= limite) { motivo = "tiempo"; break; }
         try {
-          pedidos[String(id)] = extraerReferenciaPedido(await leerFacturaMostrar(sesion, id));
+          const vista = leerVistaFactura(await leerFacturaMostrar(sesion, id));
+          if (!vista.esFactura) { motivo = "error"; continue; }
+          pedidos[String(id)] = vista.pedido;
+          leidas++;
+          await guardarPedido(empresaKey, id, vista.pedido);
         } catch {
           motivo = "error";
         }
@@ -125,5 +154,53 @@ export async function buscarPedidosDeFacturas(
   clearTimeout(reloj);
   if (gano === "tiempo") motivo = "tiempo";
   // Copia: lo que llegue después del tope no cambia lo que ya se contestó.
-  return { pedidos: { ...pedidos }, ...(motivo ? { motivo } : {}) };
+  return { pedidos: { ...pedidos }, leidas, ...(motivo ? { motivo } : {}) };
+}
+
+/** Lo que el sync de facturas mira en cada corrida: los últimos 7 días… */
+export const DIAS_LLENAR_PEDIDO = 7;
+/** …como mucho 20 facturas por empresa… */
+export const MAX_LLENAR_PEDIDO = 20;
+/** …y como mucho 45 s por empresa, login incluido. Medido: login 1,4–8 s, cada factura 0,3–4 s. */
+export const TOPE_LLENAR_PEDIDO_MS = 45_000;
+
+export interface LlenadoPedidos {
+  empresaKey: string;
+  pendientes: number;
+  leidas: number;
+  motivo?: MotivoPedido;
+}
+
+/**
+ * 🔴 EL PEDIDO SE GUARDA CON LA FACTURA (12-nov-2026). Lo llama el sync de
+ * facturas (`/api/cron/switch-sync`) al terminar: las facturas de esta empresa
+ * de los últimos `dias` que todavía no se leyeron (`pedido_leido_en IS NULL`),
+ * las más nuevas primero, con UN login y como mucho `max` y `topeMs`. Sin
+ * pendientes NO abre sesión. NUNCA lanza: un fallo se anota y el sync sigue.
+ */
+export async function llenarPedidosGuardados(
+  empresaKey: string,
+  { dias = DIAS_LLENAR_PEDIDO, max = MAX_LLENAR_PEDIDO, topeMs = TOPE_LLENAR_PEDIDO_MS } = {},
+): Promise<LlenadoPedidos> {
+  try {
+    const desde = new Date(Date.now() - dias * 86_400_000).toISOString().slice(0, 10);
+    const { data, error } = await supabaseServer
+      .from("switch_facturas")
+      .select("switch_factura_id")
+      .eq("empresa_key", empresaKey)
+      .eq("tipo_comprobante", TIPO_FACTURA)
+      .is("pedido_leido_en", null)
+      .gte("fecha", desde)
+      .order("fecha", { ascending: false })
+      .order("switch_factura_id", { ascending: false })
+      .limit(max);
+    if (error) throw new Error(error.message);
+    const ids = ((data ?? []) as Array<{ switch_factura_id: number | string }>).map((r) => Number(r.switch_factura_id));
+    if (ids.length === 0) return { empresaKey, pendientes: 0, leidas: 0 };
+    const r = await buscarPedidosDeFacturas(empresaKey, ids, topeMs);
+    return { empresaKey, pendientes: ids.length, leidas: r.leidas, ...(r.motivo ? { motivo: r.motivo } : {}) };
+  } catch (e) {
+    console.error(`[guias/pedido] llenar ${empresaKey}:`, e instanceof Error ? e.message : String(e));
+    return { empresaKey, pendientes: 0, leidas: 0, motivo: "error" };
+  }
 }

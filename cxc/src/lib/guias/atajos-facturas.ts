@@ -82,6 +82,10 @@ export interface FacturaDelCliente {
   total: number | null;
   /** N° de la guía VIVA donde esta factura ya aparece, o null. Aviso, nunca bloqueo. */
   yaSalioEn: number | null;
+  /** N.° de pedido guardado con la factura (12-nov-2026); null = sin pedido o sin leer. */
+  pedido?: string | null;
+  /** ¿Ya se leyó el pedido del panel? `false` = la pantalla lo pide en segundo plano. */
+  pedidoLeido?: boolean;
 }
 
 /**

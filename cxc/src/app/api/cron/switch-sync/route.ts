@@ -58,6 +58,8 @@ import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 import { correrCentinelaTipos } from "@/lib/ventas/centinela-tipos";
 import { refrescarVistaClientes } from "@/lib/ventas/refrescar-vista-clientes";
 import { esEmpresaDelGrupo } from "@/lib/clientes/mundos";
+import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { llenarPedidosGuardados, type LlenadoPedidos } from "@/lib/guias/pedido-de-factura";
 
 type SyncTipo = "facturas" | "estadocuenta" | "all";
 
@@ -282,6 +284,23 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       ? await correrCentinelaTipos([...new Set(results.map((r) => r.empresaKey))])
       : [];
 
+  // ── EL N.° DE PEDIDO SE GUARDA CON LA FACTURA (12-nov-2026) ─────────────
+  //
+  // Despachos › Etiquetas lo propone al marcar una factura, y leerlo del panel
+  // en ese momento tardaba 3–12 s (casi todo el login). Aquí, ya con las
+  // facturas escritas: por empresa del grupo que trajo facturas, UN login y las
+  // que faltan de los últimos 7 días (tope 20 y 45 s). Sin pendientes no abre
+  // sesión. 🔴 Daniel aceptó que el login del panel lo saque de Switch en el
+  // día. NUNCA falla el sync ni toca el heartbeat: lo que no se lea vuelve a
+  // intentarse en la corrida siguiente.
+  const pedidos: LlenadoPedidos[] = [];
+  if (tipo === "facturas" || tipo === "all") {
+    const grupo = new Set<string>(B2B_EMPRESA_KEYS);
+    for (const empresaKey of new Set(results.map((r) => r.empresaKey))) {
+      if (grupo.has(empresaKey)) pedidos.push(await llenarPedidosGuardados(empresaKey));
+    }
+  }
+
   const slotParam = sp.get("slot");
   const slot = slotParam && /^(all|facturas|estadocuenta)-\d{4}$/.test(slotParam) ? slotParam : null;
   if (errors.length === 0) {
@@ -306,6 +325,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       results,
       errors,
       tiposSinClasificar: centinela.length,
+      pedidos,
     },
     { status: errors.length === 0 ? 200 : 207 },
   );

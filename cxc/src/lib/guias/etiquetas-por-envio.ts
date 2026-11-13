@@ -86,6 +86,31 @@ export function pedidoPropuesto(pedidos: readonly (string | null)[]): { valor: s
   return unido.length > MAX_PEDIDO ? { valor: "", noCabe: true } : { valor: unido, noCabe: false };
 }
 
+/** Cuántas facturas se leen del panel por pedido de la pantalla, como mucho. */
+export const MAX_FACTURAS_PEDIDO = 10;
+/** El respaldo en segundo plano mira solo lo reciente: lo mismo que llena el sync. */
+export const DIAS_RESPALDO_PEDIDO = 7;
+
+/**
+ * 🔴 EL RESPALDO (12-nov-2026): de las facturas que llegaron con la lista, las
+ * que todavía NADIE leyó (`pedidoLeido === false`) de los últimos 7 días, por
+ * empresa, las más nuevas primero y como mucho `MAX_FACTURAS_PEDIDO` (un login
+ * por empresa). Lo demás ya viene con su pedido —o sin él— en la misma lista.
+ */
+export function idsSinPedidoLeido(
+  facturas: readonly { empresa_key: string; switch_factura_id?: number | null; fecha: string; pedidoLeido?: boolean }[],
+  hoy: Date = new Date(),
+): Map<string, number[]> {
+  const desde = new Date(hoy.getTime() - DIAS_RESPALDO_PEDIDO * 86_400_000).toISOString().slice(0, 10);
+  const out = new Map<string, number[]>();
+  for (const f of [...facturas].sort((a, b) => b.fecha.localeCompare(a.fecha))) {
+    if (f.pedidoLeido !== false || f.switch_factura_id == null || f.fecha.slice(0, 10) < desde) continue;
+    const ids = out.get(f.empresa_key) ?? [];
+    if (ids.length < MAX_FACTURAS_PEDIDO) out.set(f.empresa_key, [...ids, f.switch_factura_id]);
+  }
+  return out;
+}
+
 // ─── Lo que viaja en el POST de un envío ─────────────────────────────────────
 
 export interface FacturaDelEnvio {
