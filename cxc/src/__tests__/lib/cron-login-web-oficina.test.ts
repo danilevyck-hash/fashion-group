@@ -101,15 +101,28 @@ const PUERTAS_LOGIN_WEB = [
   "syncEmpresaIngresos",
   "syncAllIngresos",
   "buscarPedidosDeFacturas",
+  "llenarPedidosGuardados",
 ];
+
+/**
+ * 🔴 LOS CRONS QUE DANIEL AUTORIZÓ A ABRIR EL LOGIN WEB EN EL DÍA (12-nov-2026).
+ * `switch-sync` (el sync de facturas, cada hora) lee el N.° de pedido de las
+ * facturas NUEVAS del grupo (`llenarPedidosGuardados`), para que Despachos ›
+ * Etiquetas lo tenga al instante. Daniel: «Que lo haga en la misma llamada que
+ * lo otro»; ya había aceptado que el login del panel lo saque de Switch. Solo
+ * abre sesión si hay facturas sin leer. Agregar otro aquí es decisión SUYA.
+ */
+const AUTORIZADOS_EN_OFICINA = new Set(["switch-sync"]);
 
 /** Crons cuyo route LLAMA a una puerta del login web. Sin listas escritas a
  *  mano: se recorre `app/api/cron/` y se mira el código, sin comentarios. */
 const aplicanLaReglaSolos: string[] = [];
+const autorizadosVistos: string[] = [];
 
 function cronsConLoginWeb(): string[] {
   const dir = path.join(SRC, "app", "api", "cron");
   aplicanLaReglaSolos.length = 0;
+  autorizadosVistos.length = 0;
   const out: string[] = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -124,6 +137,10 @@ function cronsConLoginWeb(): string[] {
     // y D; exigirle acá una hora de madrugada sería pedirle que no exista.
     if (/\bpasadaPuedeUsarLoginWeb\s*\(/.test(src)) {
       aplicanLaReglaSolos.push(entry.name);
+      continue;
+    }
+    if (AUTORIZADOS_EN_OFICINA.has(entry.name)) {
+      autorizadosVistos.push(entry.name);
       continue;
     }
     out.push(entry.name);
@@ -357,6 +374,11 @@ describe("E. un cron que abre el login web NO corre en horario de oficina", () =
   it("el único que se exime es la reconciliación, y porque aplica la regla sola", () => {
     cronsConLoginWeb();
     expect(aplicanLaReglaSolos).toEqual(["switch-reconciliacion"]);
+  });
+
+  it("🔴 el autorizado por Daniel existe y de verdad abre el login (si no, sobra en la lista)", () => {
+    cronsConLoginWeb();
+    expect(autorizadosVistos.sort()).toEqual([...AUTORIZADOS_EN_OFICINA].sort());
   });
 
   it("los cuatro que abren el login web son los esperados", () => {

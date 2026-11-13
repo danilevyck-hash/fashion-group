@@ -2650,3 +2650,15 @@ Aprobado por Daniel. El campo pasó de «N.° de pedido (opcional)» a **«N.° 
 - **En pantalla:** al marcar facturas, «Buscando pedido…» junto al rótulo y el campo se llena; varias facturas con pedidos distintos se juntan «16-000002889 / 16-000002898» si caben en 30; si no, el campo queda vacío y lo dice. Lo escrito a mano no se pisa; lo ya leído no se vuelve a pedir.
 - ⚠️ **Saca a Daniel del panel de esa empresa** (`changesession=SI`); él lo acepta. No es un cron: no tiene horario. Va declarado en `cron-login-web-oficina.test.ts` (bloque C y `PUERTAS_LOGIN_WEB`).
 - **Candado:** `guias-etiquetas-pedido-switch` (lector HTML/PDF, la unión, roles y el `null` cuando Switch falla).
+
+## 12-nov-2026 (tarde) — El pedido se guarda con la factura
+
+Daniel: «¿Por qué demoraría más? Que lo haga en la misma llamada que lo otro. Busca cómo ser más eficiente.»
+
+- **Medido (por empresa, login · cada factura · lectura):** Vistana 7,9 s · 1,0–1,3 s; Fashion Wear 5,2 s · 0,3–1,7 s; Fashion Shoes 1,5 s · 0,9–3,4 s; Active Shoes 5,1 s · 2,7–3,9 s; Active Wear 4,0 s · 0,3–1,0 s; Joystep 1,4 s · 0,8–3,0 s. El login son 4 pasos (página de login, POST, panel, verificación); leer el texto cuesta ≤ 15 ms. **El tiempo es el panel, no el código**: no se puede hacer rápido en el momento, hay que hacerlo antes.
+- **Ahora:** `switch_facturas.pedido_referencia` + `pedido_leido_en` (migración `20270113120000`, aplicada; el upsert del sync manda solo sus columnas y no las pisa). Las llena `llenarPedidosGuardados` al final de cada corrida de `switch-sync` con facturas: por empresa del grupo que trajo facturas, las no leídas de los últimos **7 días**, como mucho **20** y **45 s**, con **UN** login; sin pendientes **no abre sesión**; nunca entra a `errors` ni al heartbeat. Cero crons nuevos.
+- **Solo se guarda una vista que ES factura** (CUFE, o Vendedor y Cliente: la factura vieja de Vistana 11-000003143 no trae CUFE). La página del login no se guarda y se reintenta.
+- **En pantalla:** `facturas-cliente` trae `pedido` y `pedidoLeido` con cada factura → marcar la llena **al instante**. Lo no leído de 7 días se pide en segundo plano al cargar la lista (`/api/guias/etiquetas/pedido`, que ahora también guarda), y toda lectura del panel va en fila para que dos logins no se boten.
+- **Carga inicial (30 días):** 162 facturas de las 6 → **162 leídas (100 %)**, **153 con pedido (94,4 %)**; las otras 9 no tienen pedido en Switch. Active Wear y Joystep no facturaron en esos 30 días.
+- ⚠️ **Login del panel en el día:** `switch-sync` entra al panel cada hora si hay facturas nuevas sin leer (saca a Daniel de esa empresa; él lo aceptó). Está declarado en `cron-login-web-oficina.test.ts` (`AUTORIZADOS_EN_OFICINA`).
+- **Candado:** `guias-pedido-guardado` (la lista trae el pedido, el paso acotado y sin lanzar, el respaldo, y el sync que no lo cuenta como error).

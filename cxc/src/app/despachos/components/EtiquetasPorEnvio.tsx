@@ -72,6 +72,7 @@ import {
   normalizarNota,
   normalizarPedido,
   notasMasUsadas,
+  idsSinPedidoLeido,
   pedidoPropuesto,
   rangosDelEnvio,
   textoRango,
@@ -439,6 +440,23 @@ interface FacturaHallada {
   cliente_nombre: string;
 }
 
+/**
+ * Pide al panel de Switch el pedido de esas facturas (UN login) y lo anota en
+ * `hallados`. Solo se recuerda lo que se pudo leer: un error o el tope se
+ * vuelven a intentar. Nunca lanza.
+ */
+async function pedirPedidos(hallados: Map<string, string | null>, empresa: string, ids: readonly number[]): Promise<void> {
+  if (ids.length === 0) return;
+  try {
+    const r = await fetch(`/api/guias/etiquetas/pedido?empresa=${encodeURIComponent(empresa)}&ids=${ids.join(",")}`, { cache: "no-store" });
+    if (!r.ok) return;
+    const d = (await r.json().catch(() => null)) as { pedidos?: Record<string, string | null>; motivo?: string } | null;
+    if (!d?.pedidos) return;
+    if (!d.motivo) for (const id of ids) hallados.set(`${empresa}|${id}`, d.pedidos[String(id)] ?? null);
+    else for (const [id, p] of Object.entries(d.pedidos)) if (p) hallados.set(`${empresa}|${id}`, p);
+  } catch { /* sin conexión: el campo queda para escribirlo */ }
+}
+
 function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }: PanelProps) {
   const [cliente, setCliente] = useState<{ nombre: string; codigo: string } | null>(null);
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
@@ -460,6 +478,12 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
   const [avisoPedido, setAvisoPedido] = useState<string | null>(null);
   /** Lo que Switch ya contestó, por `empresa|switch_factura_id` (null = sin pedido). */
   const pedidosHallados = useRef(new Map<string, string | null>());
+  const cola = useRef<Promise<void>>(Promise.resolve());
+  /** Toda lectura del panel va en fila: dos logins a la vez se botan uno al otro. */
+  const enCola = useCallback((tarea: () => Promise<void>): Promise<void> => {
+    cola.current = cola.current.then(tarea, tarea);
+    return cola.current;
+  }, []);
   const [guardando, setGuardando] = useState(false);
   const [formato, setFormato] = useFormatoEtiquetas();
   const [error, setError] = useState<string | null>(null);
@@ -503,7 +527,19 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
       const r = await fetch(`/api/guias/facturas-cliente?codigo=${encodeURIComponent(codigo)}`, { cache: "no-store" });
       if (!r.ok) throw new Error("no ok");
       const d = (await r.json()) as { facturas?: Factura[]; hasta?: string | null };
-      setFacturas(Array.isArray(d.facturas) ? d.facturas : []);
+      const lista = Array.isArray(d.facturas) ? d.facturas : [];
+      // 🔴 EL PEDIDO LLEGA CON LA FACTURA (12-nov-2026): lo guardó el sync, así
+      // que marcar la factura lo propone al instante. Lo que nadie leyó todavía
+      // (una factura de hace minutos) se pide YA, en segundo plano, un login por
+      // empresa — no al marcar.
+      for (const f of lista) {
+        if (f.pedidoLeido && f.switch_factura_id != null) pedidosHallados.current.set(`${f.empresa_key}|${f.switch_factura_id}`, f.pedido ?? null);
+      }
+      const sinLeer = [...idsSinPedidoLeido(lista)];
+      if (sinLeer.length > 0) {
+        enCola(() => Promise.all(sinLeer.map(([emp, ids]) => pedirPedidos(pedidosHallados.current, emp, ids.filter((id) => !pedidosHallados.current.has(`${emp}|${id}`))))).then(() => undefined));
+      }
+      setFacturas(lista);
       setHasta(d.hasta ?? null);
     } catch {
       setFacturas(null);
@@ -511,7 +547,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [enCola]);
 
   useEffect(() => {
     if (cliente?.codigo) void cargarFacturas(cliente.codigo);
@@ -566,17 +602,13 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar }:
       setPedido(valor);
       setAvisoPedido(noCabe ? "Las facturas son de pedidos distintos y no caben juntos. Escríbelo a mano." : null);
     };
-    const faltan = idsDelEnvio.filter((id) => !pedidosHallados.current.has(`${empresaElegida}|${id}`));
-    if (faltan.length === 0) { proponer(); return; }
+    const faltan = () => idsDelEnvio.filter((id) => !pedidosHallados.current.has(`${empresaElegida}|${id}`));
+    if (faltan().length === 0) { proponer(); return; }
+    // Respaldo: lo que no vino con la lista. Primero se espera lo que ya se está
+    // pidiendo en segundo plano —dos logins seguidos se botan uno al otro—.
     const t = setTimeout(async () => {
       setBuscandoPedido(true);
-      try {
-        const r = await fetch(`/api/guias/etiquetas/pedido?empresa=${encodeURIComponent(empresaElegida)}&ids=${faltan.join(",")}`, { cache: "no-store" });
-        const d = (await r.json().catch(() => null)) as { pedidos?: Record<string, string | null>; motivo?: string } | null;
-        // Solo se recuerda lo que se pudo leer: un error o el tope se vuelven a intentar.
-        if (!d?.motivo) for (const id of faltan) pedidosHallados.current.set(`${empresaElegida}|${id}`, d?.pedidos?.[String(id)] ?? null);
-        else for (const [id, p] of Object.entries(d.pedidos ?? {})) if (p) pedidosHallados.current.set(`${empresaElegida}|${id}`, p);
-      } catch { /* sin conexión: el campo queda para escribirlo */ }
+      await enCola(() => pedirPedidos(pedidosHallados.current, empresaElegida, faltan()));
       if (vigente) { setBuscandoPedido(false); proponer(); }
     }, 700);
     return () => { vigente = false; clearTimeout(t); setBuscandoPedido(false); };

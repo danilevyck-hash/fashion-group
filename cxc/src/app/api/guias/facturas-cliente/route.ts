@@ -60,6 +60,8 @@ interface FacturaFila {
   secuencial: string | null;
   fecha: string | null;
   total: number | string | null;
+  pedido_referencia?: string | null;
+  pedido_leido_en?: string | null;
 }
 
 export async function GET(req: NextRequest) {
@@ -109,7 +111,7 @@ export async function GET(req: NextRequest) {
 
   const { data: facs, error: fErr } = await supabaseServer
     .from("switch_facturas")
-    .select("empresa_key, switch_factura_id, secuencial, fecha, total")
+    .select("empresa_key, switch_factura_id, secuencial, fecha, total, pedido_referencia, pedido_leido_en")
     .eq("tipo_comprobante", TIPO_FACTURA)
     .or(orFiltro)
     .order("fecha", { ascending: false })
@@ -144,6 +146,10 @@ export async function GET(req: NextRequest) {
         fecha: String(f.fecha),
         total: verPrecio ? Number(f.total ?? 0) : null,
         yaSalioEn: yaSalioEn(indice, empresa, String(f.secuencial)),
+        // 🔴 12-nov-2026: el N.° de pedido viaja CON la factura (lo guarda el
+        // sync de facturas). `pedidoLeido: false` = todavía nadie lo leyó.
+        pedido: f.pedido_referencia ?? null,
+        pedidoLeido: f.pedido_leido_en != null,
       };
     });
 
