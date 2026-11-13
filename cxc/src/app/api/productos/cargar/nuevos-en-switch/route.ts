@@ -25,7 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer, HAS_SERVICE_ROLE } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { COMPANIAS_DEPURADOR } from "@/lib/depurador/logic";
-import { contarContraSwitch, normalizarCodigo } from "@/lib/depurador/resumen-del-archivo";
+import { contarContraSwitch, normalizarCodigo, separarContraSwitch } from "@/lib/depurador/resumen-del-archivo";
 
 export const dynamic = "force-dynamic";
 
@@ -63,19 +63,24 @@ export async function POST(req: NextRequest) {
   if (codigos.length === 0) return NO_SE_SABE;
 
   const enSwitch = new Set<string>();
+  const descripcionEnSwitch: Record<string, string> = {};
   for (let i = 0; i < codigos.length; i += POR_TANDA) {
     const tanda = codigos.slice(i, i + POR_TANDA);
     const { data, error } = await supabaseServer
       .from("switch_articulo_info")
-      .select("codigo")
+      .select("codigo,descripcion")
       .eq("empresa_key", empresa)
       .in("codigo", tanda);
     // Un pedazo que falla invalida la cuenta entera: decir «40 nuevos» cuando
     // faltó mirar la mitad del archivo es peor que no decir nada.
     if (error) return NO_SE_SABE;
-    for (const r of data ?? []) enSwitch.add(normalizarCodigo((r as { codigo: string }).codigo));
+    for (const r of (data ?? []) as { codigo: string; descripcion: string | null }[]) {
+      const k = normalizarCodigo(r.codigo);
+      enSwitch.add(k);
+      if (r.descripcion) descripcionEnSwitch[k] = r.descripcion;
+    }
   }
 
   const { nuevos, yaEstan } = contarContraSwitch(codigos, enSwitch);
-  return NextResponse.json({ ok: true, nuevos, yaEstan });
+  return NextResponse.json({ ok: true, nuevos, yaEstan, ...separarContraSwitch(codigos, enSwitch), descripcionEnSwitch });
 }

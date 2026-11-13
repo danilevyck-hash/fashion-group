@@ -154,6 +154,24 @@ export interface ContraSwitch {
   nuevos: number;
   /** Códigos del archivo que ya existen en esa empresa. */
   yaEstan: number;
+  /** Cuáles son, para desplegarlos al tocar el número (13-nov-2026). Opcionales:
+   *  sin ellos la línea sigue diciendo solo los dos números. */
+  codigosNuevos?: string[];
+  codigosYaEstan?: string[];
+  /** La descripción que Switch YA tiene para cada código que ya está. */
+  descripcionEnSwitch?: Record<string, string>;
+}
+
+/** Los códigos del archivo, sin repetir, partidos en nuevos y ya están. PURA. */
+export function separarContraSwitch(
+  codigos: readonly (string | number | null | undefined)[],
+  enSwitch: ReadonlySet<string>,
+): { codigosNuevos: string[]; codigosYaEstan: string[] } {
+  const unicos = [...new Set(codigos.map(normalizarCodigo).filter(Boolean))];
+  return {
+    codigosNuevos: unicos.filter((k) => !enSwitch.has(k)),
+    codigosYaEstan: unicos.filter((k) => enSwitch.has(k)),
+  };
 }
 
 /** Recorta y sube a mayúsculas. Switch guarda los códigos en mayúscula y el
