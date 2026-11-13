@@ -52,7 +52,8 @@ describe("la ruta y la pantalla", () => {
     expect(v).toContain("/api/guias/facturas-cliente?factura=");
     expect(v).toContain("Buscar factura");
     expect(v).toContain("coincidencias.length > 1");
-    expect(v).toContain("setMarcadas([{ clave, bultos: \"\", nota: \"\" }])");
+    // 13-nov-2026: los bultos del pedido Preparado vienen puestos (vacío si no hay).
+    expect(v).toContain('setMarcadas([{ clave, bultos: "pedidoBultos" in h && h.pedidoBultos ? String(h.pedidoBultos) : "", nota: "" }])');
   });
 });
 

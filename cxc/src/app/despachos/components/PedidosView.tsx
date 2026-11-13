@@ -45,6 +45,7 @@ import {
   diasEnPreparado,
   preparadoViejo,
   lineaPreparadoHaceDias,
+  validarCantidadBultos,
   type EstadoFlujoSimple,
   type FirmasFlujoSimple,
 } from "@/lib/guias/pedidos-flujo-simple";
@@ -243,11 +244,11 @@ export default function PedidosView({
   const [porConfirmarSimple, setPorConfirmarSimple] = useState<{ pedido: PedidoBodega; destino: EstadoFlujoSimple } | null>(null);
 
   /** Mueve el pedido. Optimista, revierte si falla. */
-  async function moverSimple(p: PedidoBodega, destino: EstadoFlujoSimple) {
-    const antes = { estado: p.estado, espera_muestra_desde: p.espera_muestra_desde, espera_muestra_nota: p.espera_muestra_nota };
+  async function moverSimple(p: PedidoBodega, destino: EstadoFlujoSimple, bultos?: number) {
+    const antes = { estado: p.estado, bultos: p.bultos, espera_muestra_desde: p.espera_muestra_desde, espera_muestra_nota: p.espera_muestra_nota };
     // Marcar Preparado (o volver a Pendiente) quita la espera de muestra.
     const sinEspera = destino === "en_preparacion" ? {} : { espera_muestra_desde: null, espera_muestra_nota: null };
-    setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado: destino, ...sinEspera } : x)));
+    setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado: destino, ...(bultos != null ? { bultos } : {}), ...sinEspera } : x)));
     try {
       const r = await fetch("/api/guias/pedidos", {
         method: "PATCH",
@@ -256,6 +257,7 @@ export default function PedidosView({
           empresa_key: p.empresa_key,
           pedido_switch_id: p.pedido_switch_id,
           estado: destino,
+          ...(bultos != null ? { bultos } : {}),
         }),
       });
       const d = (await r.json().catch(() => null)) as Record<string, unknown> | null;
@@ -266,6 +268,21 @@ export default function PedidosView({
       const msg = e instanceof Error && e.message.length < 90 ? e.message : "No se pudo guardar el estado. Intenta de nuevo.";
       toast(msg, "error");
     }
+  }
+
+  // ── 🔴 13-nov-2026 (propuesta): «Preparado» pide los bultos ─────────────
+  // Un toque abre la ventana con UN número, obligatorio. El botón no se apaga:
+  // si falta el número, lo dice (como «Despachar»).
+  const [porPreparar, setPorPreparar] = useState<PedidoBodega | null>(null);
+  const [bultosTexto, setBultosTexto] = useState("");
+  const [errorBultos, setErrorBultos] = useState<string | null>(null);
+  function confirmarPreparado() {
+    if (!porPreparar) return;
+    const v = validarCantidadBultos(bultosTexto);
+    if (!v.ok) { setErrorBultos(v.error ?? "Escribe cuántos bultos son"); return; }
+    const p = porPreparar;
+    setPorPreparar(null);
+    void moverSimple(p, "preparado", v.valor);
   }
 
   // ── «En espera de muestra» (9-oct-2026) ─────────────────────────────────
@@ -592,7 +609,7 @@ export default function PedidosView({
           {chipUnidades}
           <button
             type="button"
-            onClick={() => void moverSimple(p, "preparado")}
+            onClick={() => { setPorPreparar(p); setBultosTexto(""); setErrorBultos(null); }}
             className="h-9 whitespace-nowrap rounded-md bg-black px-3 text-xs font-medium text-white transition active:scale-[0.97]"
           >
             Preparado
@@ -617,7 +634,7 @@ export default function PedidosView({
     // `p.piezas == null` = sin líneas todavía: se calla, no se inventa.
     const chipBultos = (
       <span className={`${base} border-gray-300 bg-white text-gray-700`}>
-        {p.piezas != null ? textoUnidades(p.piezas) : "—"}
+        {[p.bultos ? `${p.bultos} ${p.bultos === 1 ? "bulto" : "bultos"}` : null, p.piezas != null ? textoUnidades(p.piezas) : null].filter(Boolean).join(" · ") || "—"}
       </span>
     );
     if (e === "preparado") {
@@ -1005,6 +1022,32 @@ export default function PedidosView({
           message={confirmacionSimple.mensaje}
           confirmLabel={confirmacionSimple.boton}
         />
+      )}
+      {porPreparar && (
+        <ConfirmModal
+          open
+          onClose={() => setPorPreparar(null)}
+          onConfirm={confirmarPreparado}
+          title={`Pedido ${porPreparar.secuencial} · ${porPreparar.cliente_nombre}`}
+          message="Escribe cuántos bultos salieron. Etiquetas los trae puestos al elegir su factura."
+          confirmLabel="Marcar preparado"
+        >
+          <label className="block text-sm text-gray-700">
+            Bultos
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              autoFocus
+              aria-label="Cantidad de bultos"
+              value={bultosTexto}
+              onChange={(ev) => { setBultosTexto(ev.target.value); setErrorBultos(null); }}
+              onKeyDown={(ev) => { if (ev.key === "Enter") confirmarPreparado(); }}
+              className="mt-1 block h-12 w-32 rounded-md border border-gray-300 px-3 text-center text-lg font-semibold tabular-nums focus:border-gray-900 focus:outline-none"
+            />
+          </label>
+          {errorBultos && <p className="mt-1 text-sm text-red-600">{errorBultos}</p>}
+        </ConfirmModal>
       )}
       {muestra && (
         <ConfirmModal

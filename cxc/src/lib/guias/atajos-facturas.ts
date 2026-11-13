@@ -87,6 +87,9 @@ export interface FacturaDelCliente {
   yaSalioPendiente?: boolean;
   /** N.° de pedido guardado con la factura (12-nov-2026); null = sin pedido o sin leer. */
   pedido?: string | null;
+  /** 13-nov-2026 (propuesta): bultos que anotó bodega al marcar su pedido Preparado. */
+  pedidoBultos?: number;
+  pedidoPreparadoPor?: string | null;
   /** ¿Ya se leyó el pedido del panel? `false` = la pantalla lo pide en segundo plano. */
   pedidoLeido?: boolean;
 }

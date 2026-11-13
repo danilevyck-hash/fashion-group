@@ -30,6 +30,7 @@ import {
 } from "@/lib/guias/etiquetas-server";
 import { validarEnvioNuevo } from "@/lib/guias/etiquetas-por-envio";
 import { logActivity } from "@/lib/log-activity";
+import { recibirPedidosDeEtiquetas } from "@/lib/guias/pedido-recibido-por-etiqueta";
 
 export const dynamic = "force-dynamic";
 
@@ -88,8 +89,12 @@ export async function POST(req: NextRequest) {
       },
       auth.userName ?? undefined,
     );
+    // 🔴 13-nov-2026: el pedido Preparado de cada factura pasa a Recibido.
+    const pedidosRecibidos = await recibirPedidosDeEtiquetas(
+      ve.valor.empresa_key, re.etiquetas.map((e) => e.switch_factura_id), quien, auth.role, auth.userName ?? undefined,
+    );
     return NextResponse.json(
-      { ok: true, etiquetas: re.etiquetas, envio_id: re.etiquetas[0]?.envio_id ?? null },
+      { ok: true, etiquetas: re.etiquetas, envio_id: re.etiquetas[0]?.envio_id ?? null, pedidosRecibidos },
       { status: 201 },
     );
   }
@@ -117,5 +122,8 @@ export async function POST(req: NextRequest) {
     auth.userName ?? undefined,
   );
 
-  return NextResponse.json({ ok: true, etiqueta: r.etiqueta }, { status: 201 });
+  const pedidosRecibidos = await recibirPedidosDeEtiquetas(
+    r.etiqueta.empresa_key, [r.etiqueta.switch_factura_id], quien, auth.role, auth.userName ?? undefined,
+  );
+  return NextResponse.json({ ok: true, etiqueta: r.etiqueta, pedidosRecibidos }, { status: 201 });
 }

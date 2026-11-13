@@ -21,6 +21,7 @@ export interface DocumentoHallado {
   switch_factura_id: number | null;
   pedido: string | null;
   pedidoLeido: boolean;
+  pedidoBultos?: number;
 }
 
 /** Con al menos 3 dígitos se busca: menos encuentra media base. */

@@ -57,6 +57,8 @@ import {
   preparadoViejo,
   lineaPreparadoHaceDias,
   columnasDelPaso,
+  validarCantidadBultos,
+  pedidoDeReferencia,
   esDeshacerFlujoSimple,
 } from "@/lib/guias/pedidos-flujo-simple";
 
@@ -125,22 +127,36 @@ describe("🔴 3 · un solo número de bultos por pedido", () => {
   });
 
   // 🔴 12-nov-2026 (Daniel): «Preparado» es UN toque, sin número de bultos.
-  it("el servidor ya NO exige bultos para marcar Preparado", () => {
+  // 🔴 13-nov-2026 (Daniel): vuelven los bultos — revierte el 12-nov.
+  it("el servidor EXIGE los bultos para marcar Preparado (1 a 9999)", () => {
     const r = rutaLista();
-    expect(r).not.toContain("validarCantidadBultos");
-    expect(r).not.toContain("body?.bultos");
-    expect(columnasDelPaso("en_preparacion", "preparado", "jorman", "x")).not.toHaveProperty("bultos");
+    expect(r).toContain("validarCantidadBultos(body?.bultos)");
+    expect(validarCantidadBultos("").ok).toBe(false);
+    expect(validarCantidadBultos("0").ok).toBe(false);
+    expect(validarCantidadBultos("2.5").ok).toBe(false);
+    expect(validarCantidadBultos("10000").ok).toBe(false);
+    expect(validarCantidadBultos("6")).toEqual({ ok: true, valor: 6 });
+    expect(columnasDelPaso("en_preparacion", "preparado", "jorman", "x", 6)).toHaveProperty("bultos", 6);
   });
 
-  it("la fila de En preparación no tiene casilla de bultos: «Preparado» va directo", () => {
+  it("«Preparado» abre la ventanita de los bultos y manda el número", () => {
     const v = vista();
-    expect(v).not.toContain("bultoEnFila");
-    expect(v).not.toContain("Bultos del pedido");
-    expect(v).toContain('onClick={() => void moverSimple(p, "preparado")}');
+    expect(v).toContain("setPorPreparar(p)");
+    expect(v).toContain('aria-label="Cantidad de bultos"');
+    expect(v).toContain('void moverSimple(p, "preparado", v.valor)');
+    expect(v).toContain("...(bultos != null ? { bultos } : {})");
   });
 
-  it("ninguna fila muestra «N bultos»", () => {
-    expect(vista()).not.toMatch(/p\.bultos === 1 \? "bulto"/);
+  it("la fila vuelve a decir «N bultos · unidades»", () => {
+    expect(vista()).toMatch(/p\.bultos === 1 \? "bulto" : "bultos"/);
+  });
+
+  it("el N.° de pedido de la factura se lee exacto: 16-000002463 → 2463", () => {
+    expect(pedidoDeReferencia("16-000002463")).toBe(2463);
+    expect(pedidoDeReferencia(" 16-000000561 ")).toBe(561);
+    expect(pedidoDeReferencia("11-000003175")).toBeNull();
+    expect(pedidoDeReferencia("16-000002463 / 16-000002464")).toBeNull();
+    expect(pedidoDeReferencia(null)).toBeNull();
   });
 });
 
@@ -308,8 +324,8 @@ describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
 
   it("avanzar firma su columna", () => {
     expect(columnasDelPaso("pendiente", "en_preparacion", "jorman", ahora)).toEqual({ estado: "en_preparacion", en_preparacion_por: "jorman", en_preparacion_en: ahora });
-    expect(columnasDelPaso("en_preparacion", "preparado", "jorman", ahora)).toEqual({
-      estado: "preparado", preparado_por: "jorman", preparado_en: ahora,
+    expect(columnasDelPaso("en_preparacion", "preparado", "jorman", ahora, 6)).toEqual({
+      estado: "preparado", bultos: 6, preparado_por: "jorman", preparado_en: ahora,
       espera_muestra_desde: null, espera_muestra_por: null, espera_muestra_nota: null,
     });
     expect(columnasDelPaso("preparado", "recibido", "Angela", ahora)).toEqual({ estado: "recibido", recibido_por: "Angela", recibido_en: ahora });
@@ -324,7 +340,7 @@ describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
 
   it("el PATCH escribe con columnasDelPaso y deja rastro en el registro de actividad", () => {
     const r = rutaLista();
-    expect(r).toContain("columnasDelPaso(desde, estado, quienFirma, ahora)");
+    expect(r).toContain("columnasDelPaso(desde, estado, quienFirma, ahora, bultosNuevos)");
     expect(r).toContain('"deshacer_paso"');
     expect(r).toContain("antes: previo");
   });
@@ -348,7 +364,7 @@ describe("🔴 10 · las unidades también en Pendientes (Daniel, 8-oct-2026)", 
 
   it("Preparados y Recibidos también dicen las unidades", () => {
     const v = vista();
-    expect(v).toContain('{p.piezas != null ? textoUnidades(p.piezas) : "—"}');
+    expect(v).toContain('p.piezas != null ? textoUnidades(p.piezas) : null].filter(Boolean).join(" · ") || "—"');
     expect(v.match(/\{chipBultos\}\s*\{chipRecibido\}/g)?.length).toBe(2);
   });
 

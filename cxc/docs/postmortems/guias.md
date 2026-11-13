@@ -2545,7 +2545,7 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
   | Pendiente | Nadie: llega de Switch | — |
   | En preparación | Bodega (y admin): confirma que recibió la hoja del pedido | «Iniciar preparación», con confirmación |
   | Preparado | **Solo bodega** (y admin), **nunca la secretaria** (#664) | «Preparado», tras escribir los bultos; sin ventana de confirmación |
-  | Recibido | **Secretaria** (y admin) (#664, #677) | «Recibir», con confirmación |
+  | Recibido | **Secretaria** (y admin) (#664, #677) · 🔴 13-nov-2026: también solo, al generar la etiqueta de su factura | «Recibir», con confirmación |
 
 - El vendedor solo mira.
 - **Un solo número de bultos por pedido** (entero de 1 a 9999), escrito en la fila al marcar «Preparado». No hay bulto por artículo; el detalle del pedido es de solo lectura.
@@ -2556,7 +2556,7 @@ Daniel aprobó (5-oct-2026, *«toda sugerencia tuya es aceptada»*). Interruptor
 - **Aviso de Preparado sin recibir**: a los 2 días (`PREPARADO_VIEJO_DIAS`) la fila dice «Preparado hace N días» en ámbar.
 - **Las pestañas refrescan** (#707): tocar una vuelve a leer la lista de la base. Nunca llama a Switch.
 - **«Actualizar»** (línea «Actualizado hace X min») dispara el mismo sync de pedidos por `sync-now`, con su freno de 10 min. Los pedidos nuevos llegan por el cron `sync-pedidos`, cuatro pasadas al día (8:10 a. m. · 10:40 a. m. · 1:20 p. m. · 3:45 p. m. de Panamá).
-- **Pedidos termina en «Recibido»**: no crea envío de Etiquetas ni detecta la factura de Switch.
+- **Pedidos termina en «Recibido»**: no crea envío de Etiquetas. 🔴 Desde el 13-nov-2026 la factura SÍ se detecta (por su N.° de pedido) y la etiqueta lo marca Recibido: ver abajo.
 - **El rechazo nombra la sesión que llegó** (#677): ««Recibido» lo marca la secretaria. La sesión abierta es de jorman (bodega).» Una pestaña que queda con la sesión de otra persona vuelve a «/» (`lib/sesion-entre-pestanas.ts`).
 
 **Quién ve qué**
@@ -2693,3 +2693,15 @@ Daniel, textual: *«que se pueda eliminar también las despachadas y que lo pued
 - 🔴 **Ahora:** el pedido lo pone el SERVIDOR al guardar, factura por factura (`pedidosParaEtiquetar` en `pedido-de-factura.ts`, llamado desde `crearEnvio`): lo leído sale de `switch_facturas`; lo no leído (`pedido_leido_en` NULL) se lee del panel en ese momento; si Switch no contesta, se guarda igual sin pedido. Traslado o factura sin pedido = vacío.
 - 🔴 **No hay campo editable** (Daniel: «¿por qué el número de pedido se puede editar? No tiene sentido»). La pantalla muestra en solo lectura «Pedido 16-…» junto a cada factura del resumen, y un `pedido` que llegue en el POST se ignora. `pedidoPropuesto` se retiró.
 - **Candado:** `guias-etiquetas-por-envio-route` › 7 y 8.
+
+
+## 13-nov-2026 — Vuelven los bultos a Pedidos, llegan puestos a la etiqueta y la etiqueta recibe el pedido
+
+Daniel aprobó el mockup «HOY vs RECOMENDACIÓN» (`~/Desktop/pedido-bultos-etiqueta-mockup/`) y decidió: *1) sí, vuelven los bultos; 2) cambiarlos en la etiqueta NO corrige el pedido; 3) generar la etiqueta marca el pedido Recibido, porque si no queda pendiente para siempre.* Revierte lo de «Preparado sin bultos» del 12-nov-2026 (#754).
+
+- **Medido antes (60 días, solo lectura):** 162 pedidos preparados (julio 104, jorman 51), 142 con bultos —todos de antes del 12-nov—; los 13 preparados desde #754, sin bultos. 122 de 162 casan con su factura por N.° de pedido exacto (113 de 126 en 30 días; los que no, en su mayoría aún sin facturar). El formato es el mismo en los dos lados: `switch_pedidos.secuencial` = `16-` + id en 9 dígitos (95 de 95) y `pedido_referencia` siempre `16-#########` (169 de 169). **Ningún pedido partido en dos facturas**; una factura de varios pedidos no se puede medir (Switch guarda UNA «Referencia Pedido») y solo casaría el que Switch anota. 🔑 **64 etiquetas** salieron de facturas cuyo pedido ya tenía bultos, y en **61 el número fue el mismo**: bodega contaba dos veces.
+- **Pedidos:** «Preparado» abre una ventanita (`ConfirmModal`) con «Bultos», obligatorio, 1 a 9999; el botón «Marcar preparado» no se apaga y dice lo que falta. El servidor lo exige otra vez (`validarCantidadBultos`, `columnasDelPaso(…, bultos)`). La fila vuelve a decir «N bultos · unidades». Sin migración: la columna `pedidos_bodega_estado.bultos` nunca se fue.
+- **Etiquetas › Nuevo envío:** `facturas-cliente` (lista y buscador único) trae `pedidoBultos` y `pedidoPreparadoPor` del pedido Preparado o Recibido de la MISMA empresa (`pedidoDeReferencia`: `^16-(\d+)$`, exacto; falla ABIERTA). Al marcar la factura la casilla viene con ese número, editable, y debajo «Preparado por Jorman · 3 bultos». Cambiarla no toca el pedido.
+- 🔴 **La etiqueta recibe el pedido** (`lib/guias/pedido-recibido-por-etiqueta.ts`, en los dos caminos del POST de `/api/guias/etiquetas`, después de guardar): el pedido de cada factura que esté **Preparado** pasa a Recibido con `recibido_por` = quien generó la etiqueta (bodega incluida: es la única excepción a «Recibido lo marca la secretaria»), `UPDATE … WHERE estado = 'preparado'` para no pisar a otro, y `activity_logs` `recibido_por_etiqueta` con la fila de antes. Falla ABIERTA: si falla, la etiqueta queda y el pedido sigue Preparado. La pantalla dice «· pedido 16-… recibido».
+- ⚠️ **Anular o borrar la etiqueta NO revierte el Recibido** (decisión de Daniel). Riesgo: una etiqueta hecha a la factura equivocada deja recibido el pedido de esa factura; se corrige con «Volver a Preparado» de la secretaria.
+- **Candados:** `pedidos-flujo-simple` (bultos obligatorios, la ventanita, «N bultos», `pedidoDeReferencia`) · `pedidos-en-preparacion` · `etiquetas-por-numero-factura` · `pedido-recibido-por-etiqueta` (nuevo).
