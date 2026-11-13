@@ -21,6 +21,7 @@ import {
 import { ETIQUETAS_POR_ENVIO, type RenglonParaAtar } from "@/lib/guias/etiquetas-por-envio";
 import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import { entregadoPorElegido } from "@/lib/guias/despachado-por";
+import { textoGuiaDespachada } from "@/lib/guias/aviso-despachada";
 
 /** 🔴 1-oct-2026: lo que contesta el servidor si se completa sin «Despachado por». */
 const FALTA_DESPACHADO_POR = "Despachado por requerido";
@@ -41,33 +42,11 @@ async function notifyGuiaDespachada(guia: GuiaForNotify): Promise<void> {
   const numero = `GT-${String(guia.numero).padStart(3, "0")}`;
   const transp = transportistaLabel(guia) || "—";
   const vivos = (guia.guia_items || []).filter((i) => !i.deleted);
-
-  // Desglose: empresa → clientes (con bultos sumados por cliente) → total. empresa
-  // y bultos viven a nivel ítem (guia_items); un cliente puede repetir en varios
-  // ítems → se suman. Map preserva el orden de aparición (ya ordenado por `orden`).
-  const porEmpresa = new Map<string, Map<string, number>>();
-  let total = 0;
-  for (const i of vivos) {
-    const emp = (i.empresa || "").trim() || "Sin empresa";
-    const cli = (i.cliente || "").trim() || "Sin cliente";
-    const b = Number(i.bultos) || 0;
-    total += b;
-    if (!porEmpresa.has(emp)) porEmpresa.set(emp, new Map());
-    const clientes = porEmpresa.get(emp)!;
-    clientes.set(cli, (clientes.get(cli) ?? 0) + b);
-  }
-
   // Cuerpo monoespaciado: bloque <pre> (parse_mode HTML) para que alinee en
   // Telegram. Se escapan &<> del contenido dinámico (nombres de empresa/cliente).
-  const lineas: string[] = [`📦 ${numero} · ${transp}`];
-  for (const [emp, clientes] of porEmpresa) {
-    lineas.push("", emp);
-    for (const [cli, b] of clientes) lineas.push(`  ${cli} — ${b}`);
-  }
-  lineas.push("", `Total: ${total} bultos`);
-
+  const texto = textoGuiaDespachada(numero, transp, vivos);
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  await enviarNegocioPrivado(`<pre>${esc(lineas.join("\n"))}</pre>`, "HTML");
+  await enviarNegocioPrivado(`<pre>${esc(texto)}</pre>`, "HTML");
 }
 
 // ── GET ──
