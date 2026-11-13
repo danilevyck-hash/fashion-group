@@ -366,6 +366,10 @@
       "schedule": "0 14 * * 1"
     },
     {
+      "path": "/api/cron/despachos-correo",
+      "schedule": "45 23 * * *"
+    },
+    {
       "path": "/api/cron/asistencia-vigia",
       "schedule": "0 15 * * 1-5"
     },

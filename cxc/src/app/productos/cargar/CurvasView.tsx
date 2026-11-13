@@ -16,6 +16,8 @@ import { Ayuda } from "@/components/shared/Ayuda";
 import { logActivityClient } from "@/lib/logActivityClient";
 import { downloadWorkbook } from "@/lib/excel-export";
 import { Aviso } from "@/components/ui/Aviso";
+import { TALLAS_POR_PEDIDO_2026_11 } from "@/lib/tallas-pedido/interruptores";
+import TallasDePedido from "./TallasDePedido";
 
 const keyDe = (c: Curva) => `${c.referencia}|||${c.codigo}`;
 
@@ -144,6 +146,9 @@ export default function CurvasView() {
           </Ayuda>
         </div>
       </div>
+
+      {/* El Excel de tallas de un pedido (13-nov-2026); `false` = la pantalla de antes. */}
+      {TALLAS_POR_PEDIDO_2026_11 && <TallasDePedido />}
 
       {/* Dropzone (mismo patrón del Depurador) */}
       {!result && (
