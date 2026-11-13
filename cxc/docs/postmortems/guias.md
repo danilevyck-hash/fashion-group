@@ -2673,3 +2673,16 @@ Daniel: «… al entrar a nuevo envío ahí de una se debe ir actualizando».
 - 🔴 **La factura ya etiquetada o ya en una guía se VE atenuada y no se puede marcar** (`facturasAtenuadas`), con «Ya etiquetada el … · Ver». El pie cuenta por la empresa elegida.
 - 🔴 **Guía «Pendiente Bodega» no bloquea** (Daniel, 13-nov-2026): la factura que está en una guía todavía pendiente SÍ se marca y se etiqueta, con la línea «En la guía GT-xxx · pendiente». En una guía despachada (o en cualquier otro estado) sigue atenuada y el servidor contesta 409. `leerYaSalio` (`ya-salio-server.ts`) devuelve dos índices (`indicesYaSalio`): `indice` (todas, el chip de Nueva guía no cambia) y `despachadas` (lo que bloquea). Si está en una pendiente y en una despachada, bloquea. La ya etiquetada sigue bloqueada igual.
 - **Candados:** `etiquetas-buscador-unico` · `etiquetas-guia-pendiente`.
+
+
+## Eliminar guía — también despachadas y también bodega (13-nov-2026)
+
+Daniel, textual: *«que se pueda eliminar también las despachadas y que lo puedan hacer todos, porque en el usuario de julio no me salía eliminarla»*; y al eliminar, soltar las etiquetas atadas.
+
+- **Antes**: «Eliminar guía» (el «···» de la fila en Despachos › Guías de despacho) solo para admin y secretaria; Julio es bodega y no lo veía. La ruta `DELETE /api/guias/[id]` marcaba solo `guia_transporte.deleted` y dejaba `guia_items` vivos y las etiquetas (`guias_etiquetas.guia_item_id`) apuntando a un renglón de una guía borrada: inutilizables.
+- **Ahora**: elimina quien escribe guías, `GUIAS_WRITE_ROLES` (admin · secretaria · bodega), la MISMA lista en la pantalla (`DELETE_ROLES` de `GuiasList.tsx`) y en el servidor (`requireRole`). El vendedor sigue en solo lectura: ni ve la opción ni el servidor lo deja (403). **En cualquier estado**: es la excepción a «Completada = bloqueada».
+- **Qué escribe, en este orden** (se corta en el primer error y la guía sigue a la vista; repetir es seguro): (1) `guias_etiquetas.guia_item_id = NULL` para los renglones de la guía → las etiquetas vuelven a «Pendiente»; (2) `guia_items.deleted = true` por `guia_id`; (3) `guia_transporte.deleted = true`. Nada se borra de verdad.
+- **Rastro**: `activity_logs` `guia_delete` con `{ guiaId, numero, renglones, etiquetasSueltas }` y quién.
+- ⚠️ El detalle `/despachos/<id>` no tiene «···»; eliminar sigue en la fila de la lista.
+- Candados: `src/__tests__/api/guias-eliminar-route.test.ts` (roles, Completada, orden, falla sin dejar la guía borrada) y `guias-eliminar-en-la-fila.test.tsx` (bodega ve «Eliminar guía», vendedor no).
+- Primera aplicada a mano: GT-306 (guía de prueba de Julio, 3 etiquetas 152·153·154 sueltas).

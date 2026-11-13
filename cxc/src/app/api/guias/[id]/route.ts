@@ -15,6 +15,7 @@ import {
 import {
   marcarRenglonesConEtiquetas,
   reatarEtiquetas,
+  TABLA_ETIQUETAS,
   totalesPorRenglon,
 } from "@/lib/guias/etiquetas-server";
 import { ETIQUETAS_POR_ENVIO, type RenglonParaAtar } from "@/lib/guias/etiquetas-por-envio";
@@ -528,15 +529,51 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // ── DELETE (soft delete) ──
+// 🔴 13-nov-2026 (Daniel): «que se pueda eliminar también las despachadas y que
+// lo puedan hacer todos». Quien escribe guías (`GUIAS_WRITE_ROLES`: admin ·
+// secretaria · bodega) elimina, en CUALQUIER estado: es la excepción a
+// «Completada = bloqueada». El vendedor sigue en solo lectura.
+// Orden: soltar las etiquetas → renglones → guía. Si un paso falla se corta y la
+// guía sigue a la vista; repetir es seguro (cada paso es idempotente).
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, GUIAS_WRITE_ROLES);
   if (auth instanceof NextResponse) return auth;
   const { id } = params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-  const { error } = await supabaseServer.from("guia_transporte").update({ deleted: true }).eq("id", id);
+
+  const { data: items, error: iErr } = await supabaseServer.from("guia_items").select("id").eq("guia_id", id);
+  if (iErr) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  const itemIds = (items ?? []).map((i: { id: string }) => i.id);
+
+  let etiquetasSueltas = 0;
+  if (itemIds.length > 0) {
+    // Las etiquetas atadas a sus renglones vuelven a quedar disponibles.
+    const { data: sueltas, error: eErr } = await supabaseServer
+      .from(TABLA_ETIQUETAS)
+      .update({ guia_item_id: null })
+      .in("guia_item_id", itemIds)
+      .select("id");
+    if (eErr) return NextResponse.json({ error: "No se pudieron soltar las etiquetas" }, { status: 500 });
+    etiquetasSueltas = (sueltas ?? []).length;
+    const { error: dErr } = await supabaseServer.from("guia_items").update({ deleted: true }).eq("guia_id", id);
+    if (dErr) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+
+  const { data: guia, error } = await supabaseServer
+    .from("guia_transporte")
+    .update({ deleted: true })
+    .eq("id", id)
+    .select("numero")
+    .maybeSingle();
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
   const session = getSession(req);
-  await logActivity(session?.role || "unknown", "guia_delete", "guias", { guiaId: id }, session?.userName);
-  return NextResponse.json({ ok: true });
+  await logActivity(
+    session?.role || "unknown",
+    "guia_delete",
+    "guias",
+    { guiaId: id, numero: guia?.numero ?? null, renglones: itemIds.length, etiquetasSueltas },
+    session?.userName,
+  );
+  return NextResponse.json({ ok: true, etiquetasSueltas });
 }

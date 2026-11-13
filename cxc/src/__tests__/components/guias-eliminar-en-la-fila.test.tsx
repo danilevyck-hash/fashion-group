@@ -292,21 +292,22 @@ describe("🔴 el «···» está en la fila CERRADA — no hay que abrir la gu
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 quien no puede borrar NUNCA ve «Eliminar guía»", () => {
+describe("🔴 quien no puede borrar (vendedor) NUNCA ve «Eliminar guía»", () => {
   // ⚠️ CAMBIO DE DIRECCIÓN (5-sep-2026, «el panel de guías»). Antes este bloque
   // exigía que bodega y vendedor no vieran NINGÚN «···», porque el menú tenía un
   // solo ítem y era el destructivo. Desde que «Editar» se mudó al menú, bodega
   // —que sí puede editar— tiene menú. Lo que se protege es lo mismo y más
   // preciso: el permiso, no el dibujo. **«Eliminar guía» no le aparece a nadie
   // que no pueda borrar**, tenga menú o no.
-  it("bodega tiene menú porque puede EDITAR, pero ahí no está «Eliminar guía»", async () => {
+  // 🔴 13-nov-2026 (Daniel): «que lo puedan hacer todos, porque en el usuario de
+  // julio no me salía eliminarla». Bodega —quien despacha— ahora también elimina.
+  it("bodega: en una guía CERRADA el «···» trae «Editar» y «Eliminar guía»", async () => {
     const { container } = await abrirLista("bodega");
     expect(container.textContent).toContain("GT-231");
     const trigger = menuDe(container, "GT-231");
-    expect(trigger, "bodega perdió el «···» y con él «Editar»").toBeTruthy();
+    expect(trigger, "bodega perdió el «···»").toBeTruthy();
     fireEvent.click(trigger!);
-    expect(itemsAbiertos()).toEqual(["Editar"]);
-    expect(doc().textContent || "").not.toContain("Eliminar guía");
+    expect(itemsAbiertos()).toEqual(["Editar", "Eliminar guía"]);
   });
 
   it("vendedor: la lista NO dibuja ningún «···» — no edita ni borra", async () => {
