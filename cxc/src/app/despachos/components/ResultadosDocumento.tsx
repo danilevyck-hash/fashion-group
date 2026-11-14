@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { facturaParaMostrar } from "@/lib/guias/numero-factura";
 import { fechaCorta } from "./etiquetas-ui";
-import { fechaDeLaFactura } from "@/lib/guias/atajos-facturas";
+import { fechaDeLaFactura, separarRecientes } from "@/lib/guias/atajos-facturas";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { ETIQUETAS_FACTURAS_LISTA_2026_11 } from "@/lib/guias/guias-2026-10";
 
@@ -42,8 +42,10 @@ export default function ResultadosDocumento({
 }) {
   const numero = consultaDeNumero(consulta);
   const [estado, setEstado] = useState<{ para: string; docs: DocumentoHallado[] | null } | null>(null);
+  const [verViejas, setVerViejas] = useState(false);
 
   useEffect(() => {
+    setVerViejas(false);
     if (!numero) return;
     let vigente = true;
     const t = setTimeout(async () => {
@@ -60,6 +62,10 @@ export default function ResultadosDocumento({
 
   if (!numero) return null;
   const listo = estado?.para === numero ? estado.docs : undefined;
+  // 🔴 Lo de más de 30 días, plegado; si solo hay viejas, se muestran (un hallazgo no se esconde).
+  const partes = listo && ETIQUETAS_FACTURAS_LISTA_2026_11 ? separarRecientes(listo, hoyPanama()) : null;
+  const mostrar = partes && !verViejas ? partes.recientes : listo;
+  const plegadas = partes && !verViejas ? partes.viejas.length : 0;
   return (
     <div className="border-b border-gray-100" data-resultados-documento>
       {listo === undefined && <div className="px-3 py-2 text-xs text-gray-400">Buscando factura o pedido…</div>}
@@ -67,7 +73,7 @@ export default function ResultadosDocumento({
       {listo && listo.length === 0 && (
         <div className="px-3 py-2 text-xs text-gray-500">Ninguna factura ni pedido termina en {numero} en el último año.</div>
       )}
-      {listo?.map((d) => (
+      {mostrar?.map((d) => (
         <button
           key={`${d.tipo}-${d.empresa_key}-${d.secuencial}`}
           type="button"
@@ -86,6 +92,15 @@ export default function ResultadosDocumento({
           {!ETIQUETAS_FACTURAS_LISTA_2026_11 && <span className="shrink-0 text-xs tabular-nums text-gray-400">{fechaCorta(d.fecha)}</span>}
         </button>
       ))}
+      {plegadas > 0 && (
+        <button
+          type="button"
+          onMouseDown={(e) => { e.preventDefault(); setVerViejas(true); }}
+          className="flex min-h-[44px] w-full items-center px-3 py-1.5 text-left text-sm text-gray-500 transition hover:bg-gray-50"
+        >
+          {`Ver más (${plegadas})`}
+        </button>
+      )}
     </div>
   );
 }

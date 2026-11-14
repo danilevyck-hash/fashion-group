@@ -123,5 +123,7 @@ export const ETIQUETAS_BUSCADOR_UNICO_2026_11 = true;
  *  arriba, cada una con su fecha al lado («Factura 3370 · 12 nov»; el año solo
  *  si no es el actual). Lo mismo en lo que encuentra el buscador por número,
  *  para que una factura vieja con el mismo número se note por la fecha.
+ *  Lo de más de 30 días (fecha de factura, Panamá) empieza plegado en «Ver más (N)»;
+ *  si en la búsqueda solo hay viejas, se muestran (Daniel, 14-nov-2026).
  *  `false` = los días plegados y la fecha a la derecha, como estaba. */
 export const ETIQUETAS_FACTURAS_LISTA_2026_11 = true;

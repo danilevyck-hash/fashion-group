@@ -41,6 +41,7 @@ import {
   alternarDia,
   diaAbierto,
   fechaDeLaFactura,
+  separarRecientes,
   resumenDelDia,
   tituloDelDia,
   type FacturaDelCliente as Factura,
@@ -471,6 +472,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
   const [hasta, setHasta] = useState<string | null>(null);
   const [diasVisibles, setDiasVisibles] = useState(DIAS_CON_FACTURA_VISIBLES);
   const [diasAlternados, setDiasAlternados] = useState<ReadonlySet<string>>(new Set());
+  const [verViejas, setVerViejas] = useState(false);
   const [empresaKey, setEmpresaKey] = useState<string | null>(null);
   // 🔴 EN EL ORDEN EN QUE SE MARCAN: ése es el orden de la numeración corrida.
   const [marcadas, setMarcadas] = useState<Marcada[]>([]);
@@ -607,10 +609,13 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
   const atenuadasDeLaEmpresa = atenuadas.filter((f) => f.empresa_key === empresaElegida);
   // 🔴 FACTURAS EN UNA LISTA (`ETIQUETAS_FACTURAS_LISTA_2026_11`): un solo
   // «día» sin encabezado con TODAS, la más reciente arriba; sin «Ver más días».
-  const { grupos, diasOcultos } = ETIQUETAS_FACTURAS_LISTA_2026_11
-    ? { grupos: [{ dia: "", facturas: agruparPorDia([...deLaEmpresa, ...atenuadasDeLaEmpresa], Infinity).grupos.flatMap((g) => g.facturas) }], diasOcultos: 0 }
-    : agruparPorDia([...deLaEmpresa, ...atenuadasDeLaEmpresa], diasVisibles);
   const hoy = hoyPanama();
+  // 🔴 Daniel 14-nov-2026: lo de más de 30 días empieza plegado en «Ver más (N)».
+  const plana = separarRecientes(agruparPorDia([...deLaEmpresa, ...atenuadasDeLaEmpresa], Infinity).grupos.flatMap((g) => g.facturas), hoy);
+  const viejasPlegadas = ETIQUETAS_FACTURAS_LISTA_2026_11 && !verViejas ? plana.viejas.length : 0;
+  const { grupos, diasOcultos } = ETIQUETAS_FACTURAS_LISTA_2026_11
+    ? { grupos: [{ dia: "", facturas: verViejas ? [...plana.recientes, ...plana.viejas] : plana.recientes }], diasOcultos: 0 }
+    : agruparPorDia([...deLaEmpresa, ...atenuadasDeLaEmpresa], diasVisibles);
   // El pie cuenta solo lo de ESTA empresa que no se ve (antes contaba las de todas).
   const escondidasPie = ETIQUETAS_BUSCADOR_UNICO_2026_11
     ? (facturas ?? []).filter((f) => f.empresa_key === empresaElegida && !esAtenuada.has(f) && f.switch_factura_id != null && etiquetaDeLaFactura(etiquetas, f.empresa_key, f.switch_factura_id) !== null).length
@@ -692,6 +697,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
     setError(null);
     setDiasVisibles(DIAS_CON_FACTURA_VISIBLES);
     setDiasAlternados(new Set());
+    setVerViejas(false);
     setDestinoTocado(false);
     setDestino(codigo ? (destinoParaAutollenar(codigo, historicos[codigo] ?? [], definidos) ?? "") : "");
   }
@@ -1167,6 +1173,16 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
                     </div>
                   );
                 })}
+                {viejasPlegadas > 0 && (
+                  <button
+                    type="button"
+                    data-ver-mas-viejas
+                    onClick={() => setVerViejas(true)}
+                    className="inline-flex min-h-[44px] items-center text-sm text-gray-500 transition hover:text-black md:[@media(pointer:fine)]:min-h-0"
+                  >
+                    {`Ver más (${viejasPlegadas})`}
+                  </button>
+                )}
                 {diasOcultos > 0 && (
                   <button
                     type="button"
