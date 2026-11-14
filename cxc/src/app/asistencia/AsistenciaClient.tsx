@@ -105,7 +105,11 @@ import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { ASISTENCIA_PANTALLA_2026_09 } from "@/lib/asistencia/pantalla-2026-09";
 import { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
 import { aparatoDeQuienMira } from "@/lib/aparato";
-import PortadaCelular from "./PortadaCelular";
+import PortadaCelular, { useConteosPortada } from "./PortadaCelular";
+import { filasDeLaPortada } from "@/lib/asistencia/celular-asistencia";
+import {
+  ASIS_PASTILLA_EMPRESA_R110, ASIS_SIN_PORTADA_R110, opcionConNumeros, textoPastillaEmpresa,
+} from "@/lib/ui/revision-110-asistencia";
 import SelectorPeriodo from "@/components/asistencia/SelectorPeriodo";
 import {
   BarraDeControles, CLASE_FILA_MENU, ChipSelector, ProveedorBarraCelular, useBarraCelular,
@@ -347,11 +351,18 @@ function AsistenciaInner() {
   // 🔴 La portada es una PANTALLA, no un estado escondido: tocar una fila
   // escribe `?tab=`, que en el celular empuja historial, así que el Atrás
   // devuelve esta lista. Nada se monta hasta que se toca algo.
-  const enLaPortada = ASISTENCIA_PANTALLA_2026_09 && celular && !hayTab && visibles.length > 1;
+  // 73 (revisión 110): en el celular se entra directo a Asistencia; la portada se apaga.
+  const enLaPortada = ASISTENCIA_PANTALLA_2026_09 && celular && !hayTab && visibles.length > 1 && !ASIS_SIN_PORTADA_R110;
   // 🔴 LA BARRA DEL CELULAR (2-oct-2026, `BARRA_CELULAR_2026_10`): título con la
   // sección como selector, el período con el «···» y la acción principal abajo.
   // Apagada, o en la computadora, todo queda como estaba.
   const barra = useBarraCelular() && !enLaPortada;
+  // 73: los números de la portada viajan dentro de cada opción del título ▾.
+  // Las MISMAS lecturas de la portada; solo con la barra del celular.
+  const conteos = useConteosPortada(empresa, periodo.desde, periodo.hasta, ASIS_SIN_PORTADA_R110 && barra);
+  const opcionesDelTitulo = ASIS_SIN_PORTADA_R110
+    ? new Map(filasDeLaPortada(visibles, conteos).map((f) => [f.clave, opcionConNumeros(f.rotulo, f.detalle, f.cuenta)]))
+    : null;
   const conCalendario = !ayuda && !config ? PERIODO_EN_LA_BARRA[tab] : undefined;
 
   return (
@@ -387,7 +398,7 @@ function AsistenciaInner() {
           <div className="-mx-4 -mt-6">
             <BarraDeControles
               titulo="Asistencia"
-              pestanas={visibles.map(([k, label]) => ({ value: k, label }))}
+              pestanas={visibles.map(([k, label]) => ({ value: k, label, opcion: opcionesDelTitulo?.get(k) }))}
               activa={tab}
               onPestana={(k) => irAPestana(k as Tab)}
               periodo={conCalendario === undefined ? undefined : (
@@ -404,10 +415,15 @@ function AsistenciaInner() {
                 <ChipSelector
                   rotulo="Empresa"
                   valor={empresa}
-                  opciones={opciones.map((o) => ({ valor: o.clave, etiqueta: o.etiqueta }))}
+                  opciones={opciones.map((o) => ({
+                    valor: o.clave,
+                    etiqueta: ASIS_PASTILLA_EMPRESA_R110 ? textoPastillaEmpresa(o.etiqueta) : o.etiqueta,
+                  }))}
                   onCambiar={elegirEmpresa}
+                  sinRotulo={ASIS_PASTILLA_EMPRESA_R110}
                 />
               ) : null}
+              filaQueBaja={ASIS_PASTILLA_EMPRESA_R110}
               menu={
                 <>
                   {veConfig && (

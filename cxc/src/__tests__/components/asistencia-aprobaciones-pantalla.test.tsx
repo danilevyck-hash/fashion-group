@@ -117,7 +117,7 @@ describe("🔴 abre POR COLABORADOR: un renglón por persona con sus extras suma
     await montar();
     // 4 personas · 337 min = 5:37 h
     // 1-oct-2026, Daniel: nombres normales de ERP («por decidir · » → «pendientes · »).
-    expect(screen.getByTestId("por-decidir").textContent).toBe("4pendientes · 5:37 h");
+    expect(screen.getByTestId("por-decidir").textContent).toBe("4colaboradores · 4 días · 5:37 h");
   });
 });
 
@@ -137,7 +137,7 @@ describe("🔴 lo que mandan los botones", () => {
     expect(within(screen.getByTestId("vista-colaborador")).queryByText("KEVIN LUBO")).toBeNull();
     // 1-oct-2026, Daniel: nombres normales de ERP («name: /Ya decididas (1)/» → «name: /Procesadas (1)/»).
     expect(screen.getByRole("button", { name: /Procesadas \(1\)/ })).toBeTruthy();
-    expect(screen.getByTestId("por-decidir").textContent).toBe("3pendientes · 4:26 h");
+    expect(screen.getByTestId("por-decidir").textContent).toBe("3colaboradores · 3 días · 4:26 h");
   });
 
   it("UN DÍA de una persona (abriendo el ⌄): solo ese día", async () => {

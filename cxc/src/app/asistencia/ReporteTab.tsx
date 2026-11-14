@@ -9,6 +9,7 @@
 import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import type { OpcionEmpresa } from "@/lib/asistencia/empresa-para-todo";
+import { ASIS_CASILLA_44_R110, ASIS_HORAS_SIN_SEGUNDOS_R110, ASIS_SIN_FICHA_R110 } from "@/lib/ui/revision-110-asistencia";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import type { DragEvent as EventoArrastre } from "react";
@@ -1369,7 +1370,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
         extraMin: r.extraMin,
         diasARevisar: r.diasARevisar,
       },
-      { cuentaHorasExtra: cuentaHorasExtra(p) },
+      { cuentaHorasExtra: cuentaHorasExtra(p), horasCortas: ASIS_HORAS_SIN_SEGUNDOS_R110 },
     );
     const TONO: Record<string, string> = {
       rojo: "text-red-700 font-semibold",
@@ -1385,14 +1386,20 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
           }`}>
           <td className="px-3 py-3" colSpan={columnasDelReporte()}>
             <div className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                checked={seleccionada}
+              {/* 77 (revisión 110): la casilla se ve igual; el dedo la toca en 44 × 44. */}
+              <label
                 onClick={(e) => e.stopPropagation()}
-                onChange={(e) => { e.stopPropagation(); onSeleccionar(p.codigo); }}
-                aria-label={`Seleccionar ${persona}`}
-                className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-black"
-              />
+                className={ASIS_CASILLA_44_R110 ? "relative mt-1 flex shrink-0 cursor-pointer before:absolute before:-inset-3 before:content-['']" : "contents"}
+              >
+                <input
+                  type="checkbox"
+                  checked={seleccionada}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => { e.stopPropagation(); onSeleccionar(p.codigo); }}
+                  aria-label={`Seleccionar ${persona}`}
+                  className={`${ASIS_CASILLA_44_R110 ? "" : "mt-1 "}h-5 w-5 shrink-0 cursor-pointer accent-black`}
+                />
+              </label>
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-medium text-gray-900">
                   {persona}
@@ -1413,7 +1420,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
                   {datos.map((d, i) => (
                     <span key={d.clave}>
                       {i > 0 && <span className="text-gray-300"> · </span>}
-                      <span className={TONO[d.tono]}>{d.texto}</span>
+                      <span className={`${TONO[d.tono]}${ASIS_HORAS_SIN_SEGUNDOS_R110 ? " whitespace-nowrap" : ""}`}>{d.texto}</span>
                     </span>
                   ))}
                 </p>
@@ -1458,16 +1465,24 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
               salida, en burbuja: así el nombre arranca siempre en el mismo
               punto y la columna «Sale» deja de existir. */}
           {codigoIzquierda}
-          {persona}
+          {ASIS_SIN_FICHA_R110 && ASISTENCIA_PANTALLA_2026_09 && !p.nombre ? `Código ${persona}` : persona}
           {burbujaSalida}
           {!ASISTENCIA_PANTALLA_2026_09 && (p.nombre ? (
             <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
           ) : (
             <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
           ))}
-          {ASISTENCIA_PANTALLA_2026_09 && !p.nombre && (
+          {ASISTENCIA_PANTALLA_2026_09 && !p.nombre && (ASIS_SIN_FICHA_R110 ? (
+            // 78 (revisión 110): el mismo nombre que el celular, y el camino para resolverlo.
+            <span className="ml-1.5 text-xs">
+              <span className="text-gray-500">· sin ficha · </span>
+              <a href={rutaDePersona(p.codigo)} onClick={(e) => e.stopPropagation()} className="text-blue-600 hover:underline">
+                Crear ficha ›
+              </a>
+            </span>
+          ) : (
             <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
-          )}
+          ))}
           {/* 🔴 Dice por qué esta fila está vacía: no marcó. Sin esto se lee
               igual que alguien que trabajó y no tiene nada anotado. */}
           {esSinMarcas(p) && (

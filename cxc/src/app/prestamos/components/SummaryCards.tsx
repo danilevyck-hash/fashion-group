@@ -1,6 +1,7 @@
 "use client";
 
 import { fmt } from "@/lib/format";
+import { PRESTAMOS_LINEAS_ENTERAS_R110 } from "@/lib/ui/revision-110-asistencia";
 import { progressColor, progressColorText } from "./types";
 
 /**
@@ -45,6 +46,15 @@ export default function SummaryCards({
     cuotaTerceros > 0 ? `Terceros $${fmt(cuotaTerceros)}` : null,
   ].filter(Boolean).join(" · ");
 
+  const lineas = (
+    <>
+      {cuotas && <div className="text-sm text-gray-500 mt-1 tabular-nums">{cuotas} por quincena</div>}
+      <div className="text-sm text-gray-400 mt-1 tabular-nums">
+        Prestado ${fmt(prestado)} · Pagado ${fmt(pagado)}
+      </div>
+    </>
+  );
+
   return (
     <div className="rounded-lg border border-gray-200 p-4 mb-6">
       <div className="flex items-start justify-between gap-3">
@@ -69,10 +79,7 @@ export default function SummaryCards({
           <div className={`text-3xl font-semibold tabular-nums mt-0.5 ${saldoColor}`}>
             ${fmt(Math.abs(saldo))}
           </div>
-          {cuotas && <div className="text-sm text-gray-500 mt-1 tabular-nums">{cuotas} por quincena</div>}
-          <div className="text-sm text-gray-400 mt-1 tabular-nums">
-            Prestado ${fmt(prestado)} · Pagado ${fmt(pagado)}
-          </div>
+          {!PRESTAMOS_LINEAS_ENTERAS_R110 && lineas}
         </div>
 
         {quincenaEstado === "deducida" && (
@@ -82,6 +89,9 @@ export default function SummaryCards({
           <span className="shrink-0 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium">⚠ Deducción pendiente</span>
         )}
       </div>
+
+      {/* 97 (revisión 110): las dos líneas a todo el ancho; el aviso se queda al lado de SALDO. */}
+      {PRESTAMOS_LINEAS_ENTERAS_R110 && lineas}
 
       <div className="mt-4">
         <div className="flex items-center justify-between mb-1">

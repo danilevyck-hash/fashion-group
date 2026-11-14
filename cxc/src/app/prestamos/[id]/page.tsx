@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { ChevronLeft } from "lucide-react";
+import { PRESTAMOS_VOLVER_EN_TITULO_R110 } from "@/lib/ui/revision-110-asistencia";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { fmt, fmtDate } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -118,13 +120,28 @@ export default function PrestamoDetallePage() {
           { label: "Préstamos", onClick: () => router.push(volver) },
           { label: empleado.nombre },
         ]}
+        tituloEnLaPantalla={PRESTAMOS_VOLVER_EN_TITULO_R110}
       />
+      {/* 96 (revisión 110): en el celular el título ES el volver, como en el resto del celular. */}
+      {PRESTAMOS_VOLVER_EN_TITULO_R110 && (
+        <div data-fila-del-avatar className="px-4 pb-1 pt-3 sm:hidden">
+          <button
+            type="button"
+            onClick={() => router.push(volver)}
+            className="-ml-1.5 flex min-h-11 items-center gap-0.5 text-[22px] font-semibold leading-[1.2] tracking-tight text-gray-950 active:opacity-60"
+          >
+            <ChevronLeft className="h-6 w-6 text-blue-600" strokeWidth={2.25} aria-hidden />
+            Préstamos
+          </button>
+        </div>
+      )}
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <EmpleadoHeader
           empleado={empleado}
           onEdit={actions.openEditModal}
           onBack={() => router.push(volver)}
+          volverSoloEnComputadora={PRESTAMOS_VOLVER_EN_TITULO_R110}
         />
 
         <SummaryCards
