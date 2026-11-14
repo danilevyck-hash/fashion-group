@@ -1,4 +1,5 @@
 "use client";
+import { ASIS_PENDIENTES_CON_UNIDAD_R110, colaColaboradores } from "@/lib/ui/revision-110-asistencia";
 import { Aviso } from "@/components/ui/Aviso";
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -494,7 +495,12 @@ export default function AprobacionesTab({ empresa = "" }: {
             ) : (
               <>
                 <span className={numeroSinNegrita("text-[30px] font-semibold leading-none tracking-tight", "font-normal", barra)}>{porDecidirVistas.length}</span>
-                <span className="text-sm text-gray-600">pendientes · {hm(minutosVistos)} h</span>
+                <span className="text-sm text-gray-600">
+                  {/* 74 (revisión 110): la unidad dicha — «colaboradores · 118 días · 586:52 h». */}
+                  {ASIS_PENDIENTES_CON_UNIDAD_R110
+                    ? colaColaboradores(porDecidirVistas.length, porDecidirVistas.reduce((a, p) => a + p.diasPendientes, 0), minutosVistos)
+                    : <>pendientes · {hm(minutosVistos)} h</>}
+                </span>
               </>
             )}
           </div>

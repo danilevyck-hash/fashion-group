@@ -48,6 +48,7 @@ import { NOMBRE_CUENTA, type CuentaPrestamo } from "@/lib/prestamos-saldo";
 import { ORIGENES_ABONO } from "@/lib/asistencia/abono-extra";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+import { PRESTAMOS_ABONO_HOY_R110 } from "@/lib/ui/revision-110-asistencia";
 import { quincenasHasta } from "@/lib/asistencia/planilla";
 import { PARAM_NUEVO_PRESTAMO, enlaceAPrestamos } from "@/lib/prestamos-una-puerta";
 import type { Colaborador, DatosPrestamos } from "@/lib/prestamos-lista-server";
@@ -671,7 +672,8 @@ function AbonoModal(props: {
     ficha.saldoPrestamo > 0 ? "prestamo" : "dano",
   );
   const [monto, setMonto] = useState("");
-  const [fecha, setFecha] = useState(props.hasta);
+  // 106 (revisión 110): la misma fecha que propone la ficha del préstamo: hoy.
+  const [fecha, setFecha] = useState(PRESTAMOS_ABONO_HOY_R110 ? hoyPanama() : props.hasta);
   const [origen, setOrigen] = useState<string>(ORIGENES_ABONO[0]);
   const [guardando, setGuardando] = useState(false);
 

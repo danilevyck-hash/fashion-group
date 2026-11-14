@@ -117,10 +117,10 @@ describe("🔴 el control «Colaborador · Día»", () => {
 
   it("🔴 las dos vistas cuentan lo MISMO arriba: 1 por decidir · 1:32 h", async () => {
     await montar();
-    // 1-oct-2026, Daniel: nombres normales de ERP («toBe("1por decidir · 1:32 h")» → «toBe("1pendientes · 1:32 h")»).
-    expect(screen.getByTestId("por-decidir").textContent).toBe("1pendientes · 1:32 h");
+    // 1-oct-2026, Daniel: nombres normales de ERP («toBe("1por decidir · 1:32 h")» → «toBe("1colaborador · 2 días · 1:32 h")»).
+    expect(screen.getByTestId("por-decidir").textContent).toBe("1colaborador · 2 días · 1:32 h");
     await toca(screen.getByRole("tab", { name: "Día" }));
-    expect(screen.getByTestId("por-decidir").textContent).toBe("1pendientes · 1:32 h");
+    expect(screen.getByTestId("por-decidir").textContent).toBe("1colaborador · 2 días · 1:32 h");
   });
 });
 

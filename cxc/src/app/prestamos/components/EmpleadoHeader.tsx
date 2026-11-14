@@ -22,9 +22,11 @@ interface Props {
   onBack: () => void;
   /** Qué dice el botón de volver. «← Préstamos» (11-sep-2026): vuelve a la pestaña o a la lista. */
   volverA?: string;
+  /** 96 (revisión 110): en el celular «volver» vive en el título; el botón queda solo en la computadora. */
+  volverSoloEnComputadora?: boolean;
 }
 
-export default function EmpleadoHeader({ empleado, onEdit, onBack, volverA = "← Préstamos" }: Props) {
+export default function EmpleadoHeader({ empleado, onEdit, onBack, volverA = "← Préstamos", volverSoloEnComputadora = false }: Props) {
   return (
     <div className="flex items-start justify-between mb-6">
       <div>
@@ -45,7 +47,7 @@ export default function EmpleadoHeader({ empleado, onEdit, onBack, volverA = "�
       </div>
       <div className="flex flex-wrap gap-3">
         <button onClick={onEdit} className="inline-flex min-h-[44px] items-center justify-center border border-gray-200 px-4 rounded-md text-sm hover:border-gray-400 transition">Editar</button>
-        <button onClick={onBack} className="inline-flex min-h-[44px] items-center justify-center border border-gray-200 px-4 rounded-md text-sm hover:border-gray-400 transition">{volverA}</button>
+        <button onClick={onBack} className={`${volverSoloEnComputadora ? "hidden sm:inline-flex" : "inline-flex"} min-h-[44px] items-center justify-center border border-gray-200 px-4 rounded-md text-sm hover:border-gray-400 transition`}>{volverA}</button>
       </div>
     </div>
   );

@@ -193,6 +193,8 @@ function PortalA({ destino, children }: { destino: HTMLElement; children: ReactN
 export interface PestanaDeBarra {
   value: string;
   label: string;
+  /** Lo que dice la opción en la lista, si es más que el rótulo (con su número). */
+  opcion?: string;
 }
 
 export function BarraDeControles({
@@ -203,6 +205,7 @@ export function BarraDeControles({
   periodo,
   fila,
   menu,
+  filaQueBaja = false,
 }: {
   /** El nombre del módulo, para cuando no hay pestañas. */
   titulo: string;
@@ -215,6 +218,8 @@ export function BarraDeControles({
   fila?: ReactNode;
   /** Lo raro del módulo (ayuda, configuración), para el «···». */
   menu?: ReactNode;
+  /** Renglón 3: lo que no cabe baja a la línea de abajo en vez de apretarse. */
+  filaQueBaja?: boolean;
 }) {
   const ctx = useContext(Contexto);
   const pathname = usePathname();
@@ -248,7 +253,7 @@ export function BarraDeControles({
               etiqueta="Sección"
               valor={activa ?? ""}
               texto={texto}
-              opciones={pestanas!.map((p) => ({ valor: p.value, etiqueta: p.label }))}
+              opciones={pestanas!.map((p) => ({ valor: p.value, etiqueta: p.opcion ?? p.label }))}
               onCambiar={(v) => onPestana?.(v)}
             />
           ) : (
@@ -278,7 +283,7 @@ export function BarraDeControles({
       )}
 
       {/* 3 · Filtros y acciones con TEXTO. Sin nada, no se dibuja. */}
-      <div data-renglon="filtros" className={hayFila ? CLASE_RENGLON : "hidden"}>
+      <div data-renglon="filtros" className={hayFila ? (filaQueBaja ? "flex min-h-11 min-w-0 flex-wrap items-center gap-x-1.5 gap-y-2" : CLASE_RENGLON) : "hidden"}>
         <span ref={ponerIzq} className="contents" />
         {!filaJuntoAlPeriodo && fila}
         <span className="flex-1" />
@@ -377,21 +382,24 @@ export function ChipSelector({
   valor,
   opciones,
   onCambiar,
+  sinRotulo = false,
 }: {
   rotulo: string;
   valor: string;
   opciones: readonly { valor: string; etiqueta: string }[];
   onCambiar: (v: string) => void;
+  /** La pastilla dice solo lo elegido («Todas las empresas ▾»), sin «Empresa:», y no se aprieta. */
+  sinRotulo?: boolean;
 }) {
   const elegida = opciones.find((o) => o.valor === valor)?.etiqueta ?? valor;
   const puesto = opciones.length > 0 && valor !== opciones[0].valor;
   return (
     <span
       data-chip-selector
-      className={`${BASE_BOTON_TEXTO} min-w-0 ${puesto ? "border-gray-900 bg-gray-900 text-white" : ""}`}
+      className={`${BASE_BOTON_TEXTO} ${sinRotulo ? "shrink-0" : "min-w-0"} ${puesto ? "border-gray-900 bg-gray-900 text-white" : ""}`}
     >
       <span className="min-w-0 truncate">
-        {rotulo}: {elegida}
+        {sinRotulo ? elegida : <>{rotulo}: {elegida}</>}
       </span>
       <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
       <select

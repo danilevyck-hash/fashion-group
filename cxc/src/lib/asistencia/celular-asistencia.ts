@@ -26,7 +26,8 @@
  *      ya hacía cada pestaña.
  * ────────────────────────────────────────────────────────────────────────── */
 
-import { tiempoDelDia } from "./formato-tiempo";
+import { formatoTiempo, tiempoDelDia } from "./formato-tiempo";
+import { pendientesConUnidad } from "@/lib/ui/revision-110-asistencia";
 
 /** El tono de un dato de la tarjeta. Los mismos tres de todo el sistema. */
 export type Tono = "rojo" | "ambar" | "gris" | "verde";
@@ -70,8 +71,10 @@ export function datosDeLaTarjeta(r: {
   minutosTarde: number;
   extraMin: number;
   diasARevisar: number;
-}, opts?: { cuentaHorasExtra?: boolean }): DatoDeTarjeta[] {
+}, opts?: { cuentaHorasExtra?: boolean; horasCortas?: boolean }): DatoDeTarjeta[] {
   const out: DatoDeTarjeta[] = [];
+  // 76 (revisión 110): «5:48 h», como la computadora; solo se MUESTRA así.
+  const corto = !!opts?.horasCortas;
   const aus = Math.max(0, Math.trunc(r.ausenciasSinJustificar || 0));
   if (aus > 0) {
     out.push({ clave: "ausencias", tono: "rojo", texto: `${aus} ${aus === 1 ? "ausencia" : "ausencias"}` });
@@ -82,11 +85,11 @@ export function datosDeLaTarjeta(r: {
     out.push({
       clave: "tarde",
       tono: "ambar",
-      texto: (r.minutosTarde || 0) > 0 ? `${t} de ${min(r.minutosTarde)}` : t,
+      texto: (r.minutosTarde || 0) > 0 ? (corto ? `${t} ${formatoTiempo(r.minutosTarde, "hmm")} h` : `${t} de ${min(r.minutosTarde)}`) : t,
     });
   }
   if ((opts?.cuentaHorasExtra ?? true) && (r.extraMin || 0) > 0) {
-    out.push({ clave: "extras", tono: "gris", texto: `${min(r.extraMin)} de extra` });
+    out.push({ clave: "extras", tono: "gris", texto: corto ? `${formatoTiempo(r.extraMin, "hmm")} h de extra` : `${min(r.extraMin)} de extra` });
   }
   const rev = Math.max(0, Math.trunc(r.diasARevisar || 0));
   if (rev > 0) {
@@ -134,6 +137,13 @@ export interface ConteosPortada {
   quincenaCerrada: boolean | null;
   conDeuda: number | null;
   deudaTotal: string | null;
+  /**
+   * 74 (revisión 110): cuántos COLABORADORES tienen días por decidir y cuántos
+   * minutos suman. Con esto la fila dice la unidad: «36 colaboradores · 118
+   * días · 586:52 h». Sin él (interruptor apagado), lo de antes.
+   */
+  colaboradoresPorDecidir?: number | null;
+  minutosPorDecidir?: number | null;
 }
 
 /**
@@ -168,6 +178,16 @@ export function filasDeLaPortada(
       });
     } else if (clave === "aprobaciones") {
       const n = c.porDecidir;
+      const colab = c.colaboradoresPorDecidir;
+      if (n !== null && colab != null && n > 0) {
+        out.push({
+          clave, rotulo,
+          detalle: pendientesConUnidad(colab, n, c.minutosPorDecidir ?? 0),
+          cuenta: String(colab),
+          urgente: true,
+        });
+        continue;
+      }
       out.push({
         clave, rotulo,
         detalle: n === null ? null : n === 0 ? "sin pendientes" : `${n} pendientes${c.horasPorDecidir ? ` · ${c.horasPorDecidir}` : ""}`,

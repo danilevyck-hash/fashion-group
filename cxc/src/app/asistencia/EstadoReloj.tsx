@@ -39,6 +39,8 @@ import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
+import { ASIS_ACTUALIZADO_JUNTO_A_EMPRESA_R110 } from "@/lib/ui/revision-110-asistencia";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import { nombreRelojEnPantalla } from "@/lib/asistencia/agente";
 // 🔴 La pastilla de una sola fila sale del módulo puro: qué dice, a qué relojes
@@ -113,6 +115,8 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
    */
   empresa?: string | null;
 }) {
+  // 75 (revisión 110): en el celular, «Actualizado ↻» sube a la línea de la empresa.
+  const frescuraEnLaBarra = useHayBarraCelular() && ASIS_ACTUALIZADO_JUNTO_A_EMPRESA_R110;
   const { toast } = useToast();
   const [datos, setDatos] = useState<Respuesta | null>(null);
   // Arranca el spinner al instante, sin esperar el GET de vuelta. Se apaga
@@ -264,6 +268,16 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
       const vistos = relojes.map((r) => r.vistoEn ?? r.leidoHasta).filter((x): x is string => !!x);
       const ultimo = vistos.length ? vistos.reduce((a, b) => (Date.parse(a) > Date.parse(b) ? a : b)) : null;
       const conAviso = peor.salud !== "al_dia" || !!avisoDeLaPastilla(relojes) || faltaMigracion;
+      const linea = (
+          <LineaDeFrescura
+            actualizado={ultimo}
+            accion={TRAER_AHORA}
+            ocupado={ESPERANDO_A_LA_PC}
+            onActualizar={() => pedirATodos(puedenPedir.map((r) => r.dispositivo))}
+            actualizando={esperando && !relojes.every((r) => r.pedidoSinRespuesta)}
+            deshabilitado={puedenPedir.length === 0}
+          />
+      );
       return (
         <>
           {conAviso && (
@@ -273,14 +287,7 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
               {faltaMigracion && datos?.avisoMigracion && <span className="block text-xs">{datos.avisoMigracion}</span>}
             </Aviso>
           )}
-          <LineaDeFrescura
-            actualizado={ultimo}
-            accion={TRAER_AHORA}
-            ocupado={ESPERANDO_A_LA_PC}
-            onActualizar={() => pedirATodos(puedenPedir.map((r) => r.dispositivo))}
-            actualizando={esperando && !relojes.every((r) => r.pedidoSinRespuesta)}
-            deshabilitado={puedenPedir.length === 0}
-          />
+          {frescuraEnLaBarra ? <EnLaBarra pestana={["asistencia", "reporte"]} filaDer={linea} /> : linea}
         </>
       );
     }

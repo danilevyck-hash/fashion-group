@@ -31,7 +31,8 @@ import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { fmt, fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { facturasEnPantalla } from "@/lib/reclamos/facturas";
+import { facturasDe, facturasEnPantalla } from "@/lib/reclamos/facturas";
+import { RECLAMOS_FACTURAS_PLEGADAS_R110 } from "@/lib/ui/revision-110-asistencia";
 import { diasDesde } from "@/lib/reclamos/dias";
 import { fechaDeCobro } from "@/lib/reclamos/portada";
 import { textoReclamado } from "@/lib/reclamos/reclamado";
@@ -93,6 +94,7 @@ export default function DetalleCelular({
 }: Props) {
   const [hoja, setHoja] = useState<"mas" | "cobrar" | "correo" | "fotos" | "seguimiento" | null>(null);
   const [verTodos, setVerTodos] = useState(false);
+  const [verFacturas, setVerFacturas] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
@@ -144,6 +146,9 @@ export default function DetalleCelular({
 
   const comprobanteEsPdf = /\.pdf(\?|$)/i.test(current.comprobante_path || current.comprobante_url || "");
 
+  const facturasDelReclamo = facturasDe(current.nro_factura);
+  const facturasPlegadas = RECLAMOS_FACTURAS_PLEGADAS_R110 && facturasDelReclamo.length > 1;
+
   return (
     <div data-celular="reclamos-detalle" className="min-h-screen bg-fondo-celular pb-28">
 
@@ -154,7 +159,13 @@ export default function DetalleCelular({
           </h1>
           {/* La cabecera en DOS líneas, no en cinco: factura · fecha · marca · días. */}
           <p className="mt-0.5 text-[14px] leading-snug text-gray-500" data-medir="cabecera-celular">
-            Factura {facturasEnPantalla(current.nro_factura) || "—"}
+            {/* 83 (revisión 110): con varias facturas, «5 facturas» y los números al tocar. */}
+            {facturasPlegadas ? (
+              <button type="button" onClick={() => setVerFacturas((v) => !v)} aria-expanded={verFacturas}
+                className="text-blue-600 active:opacity-60">
+                {facturasDelReclamo.length} facturas
+              </button>
+            ) : <>Factura {facturasEnPantalla(current.nro_factura) || "—"}</>}
             {" · "}
             {current.fecha_factura
               ? fmtDate(current.fecha_factura)
@@ -165,6 +176,11 @@ export default function DetalleCelular({
               : ` · ${dias} día${dias === 1 ? "" : "s"}`)}
             {!esActiveShoes(current.empresa) && current.nro_orden_compra ? ` · N° de pedido ${current.nro_orden_compra}` : ""}
           </p>
+          {facturasPlegadas && verFacturas && (
+            <p data-facturas-del-reclamo className="mt-1 text-[14px] tabular-nums leading-snug text-gray-700">
+              {facturasEnPantalla(current.nro_factura)}
+            </p>
+          )}
           {!apple && pendiente && (
             <p className="mt-1 text-[13px] text-gray-400">{textoReclamado(current)}</p>
           )}

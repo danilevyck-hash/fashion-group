@@ -104,15 +104,15 @@ describe("3. 🔴 «+ Nuevo préstamo» ofrece solo a los de la empresa elegida"
     stubFetch();
     await montar("vistana");
     fireEvent.click(await screen.findByRole("button", { name: /\+ Nuevo préstamo/ }));
-    await screen.findByText("JULIO GARAY");
-    expect(screen.queryByText("KEVIN LUBO")).toBeNull();
+    await screen.findByText("Julio Garay"); // 107 (revisión 110): el selector dibuja con mayúscula inicial
+    expect(screen.queryByText("Kevin Lubo")).toBeNull();
   });
   it("⚠️ CONTROL: con «Todas», los dos", async () => {
     stubFetch();
     await montar("todas");
     fireEvent.click(await screen.findByRole("button", { name: /\+ Nuevo préstamo/ }));
-    await screen.findByText("JULIO GARAY");
-    expect(screen.getByText("KEVIN LUBO")).toBeTruthy();
+    await screen.findByText("Julio Garay"); // 107 (revisión 110): el selector dibuja con mayúscula inicial
+    expect(screen.getByText("Kevin Lubo")).toBeTruthy();
   });
 });
 
