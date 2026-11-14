@@ -25,3 +25,6 @@ export const VENTAS_CLIENTES_EMPRESA_EN_LA_BARRA_2026_11 = true;
 
 /** Asistencia › Justificaciones: el ⓘ en la esquina de la tarjeta, no en una fila sola. */
 export const AYUDA_EN_LA_TARJETA_2026_11 = true;
+
+/** Usuarios en el celular: sin la fila de pestañas repetida bajo el título «Usuarios ▾». */
+export const USUARIOS_SIN_PESTANAS_DOBLES_2026_11 = true;
