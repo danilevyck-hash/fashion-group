@@ -337,3 +337,42 @@ describe("por número de factura (14-nov-2026)", () => {
     expect(todos[1].fecha).toBe("2026-10-21");
   });
 });
+
+describe("la Opción lleva el código de la caja de ASW (14-nov-2026)", () => {
+  const asw = { proveedor: "asw" };
+  const linea = (cantidad: number) => [{ codigo: "TH1", descripcion: "Zapato", cantidad }];
+  const opciones = (despachos: TallaDeDespacho[], cantidad = 12) =>
+    [...new Set(armarTallasDelPedido(linea(cantidad), despachos).filas.filter((f) => !f.esTotal).map((f) => f.opcion))];
+
+  it("varias curvas → «Opción N · código»", () => {
+    const d = [...caja("TH1", "W1A", [["7", 1], ["8", 2], ["9", 1]], 2, asw), ...caja("TH1", "W1B", [["7", 2], ["8", 2], ["9", 2]], 2, asw)];
+    expect(opciones(d)).toEqual(["Opción 1 · W1A", "Opción 2 · W1B"]);
+  });
+
+  it("una sola curva → solo el código", () => {
+    expect(opciones(caja("TH1", "W1B", [["7", 2], ["8", 2], ["9", 2]], 2, asw))).toEqual(["W1B"]);
+  });
+
+  it("la misma curva con varios códigos → el que más se repite", () => {
+    const curva: [string, number][] = [["7", 2], ["8", 2], ["9", 2]];
+    const d = [
+      ...caja("TH1", "M1A", curva, 2, { ...asw, correo_id: "C1" }),
+      ...caja("TH1", "W1B", curva, 2, { ...asw, correo_id: "C2" }),
+      ...caja("TH1", "W1B", curva, 2, { ...asw, correo_id: "C3" }),
+    ];
+    expect(opciones(d)).toEqual(["W1B"]);
+  });
+
+  it("sin código, o sin saber que es de ASW → el texto de antes", () => {
+    expect(opciones(caja("TH1", "W1B", [["7", 2], ["8", 2], ["9", 2]], 2))).toEqual([""]);
+    const d = [...caja("TH1", SIN_CAJA, [["7", 1], ["8", 2]], 1, asw), ...caja("TH1", "W1B", [["7", 2], ["8", 2], ["9", 2]], 2, { proveedor: null })];
+    expect(opciones(d)).toEqual(["Opción 1", "Opción 2"]);
+  });
+
+  it("🔴 el N.° de cartón de Reebok / Fashion Fitness nunca sale", () => {
+    const d = caja("TH1", "ILPN18K000123#4", [["7", 2], ["8", 2], ["9", 2]], 1, { proveedor: "reebok" });
+    const filas = armarTallasDelPedido(linea(6), d).filas;
+    expect(filas.some((f) => f.opcion.includes("ILPN") || f.referencia.includes("ILPN"))).toBe(false);
+    expect(filas.every((f) => f.opcion === "")).toBe(true);
+  });
+});

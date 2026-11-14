@@ -16,6 +16,9 @@
 //     La MISMA curva en dos despachos (o con dos códigos de caja) es UNA opción:
 //     así se arregló THS10474T, que salía con las opciones 4 y 5 repitiendo las
 //     cajas de una sola talla 8 y 9 de las opciones 1 y 2.
+//   · La opción lleva el código de la caja (Daniel, 14-nov-2026): «Opción 1 ·
+//     W1B»; con una sola curva, solo «W1B»; sin código, como antes. Si la misma
+//     curva vino con varios códigos, va el que más se repite.
 //   · Sin despacho conocido → UNA fila AMARILLA (referencia, descripción y los
 //     pares del pedido; talla y código vacíos) para llenarla a mano.
 //   · Los pares del pedido NO llenan cajas completas → la opción entera va en
@@ -44,6 +47,8 @@ export interface TallaDeDespacho {
   factura: string;
   correo_id: string;
   fecha_despacho: string | null;
+  /** «asw», «reebok»… (columna `proveedor`; sin ella no se muestra código). */
+  proveedor?: string | null;
 }
 
 export type ColorFila = "amarillo" | "naranja" | null;
@@ -110,6 +115,29 @@ interface Curva {
   paresPorCaja: number;
   /** El despacho más reciente con esta curva (para el código de barra). */
   fecha: string;
+  /** Código de caja → cuántas cajas de despacho lo traen con esta curva. */
+  codigos: Map<string, number>;
+}
+
+/**
+ * El código de la curva (W1A, W1B, M1A…) SOLO si viene de ASW, que llena
+ * `codigo_caja` con su CODIGO_PREPACK. En Reebok / Fashion Fitness (y Active
+ * Wear) `codigo_caja` es un N.° de CARTÓN («ILPN18K…#3») o un SKU: no es una
+ * curva y nunca se muestra. Se decide por `proveedor`, no por la forma del texto.
+ */
+function codigoDeCurva(f: TallaDeDespacho): string | null {
+  if (f.proveedor !== "asw") return null;
+  const c = String(f.codigo_caja ?? "").trim();
+  return c && c !== SIN_CAJA ? c : null;
+}
+
+/** El código que más se repite; empate → el primero en orden alfabético. */
+function codigoMasFrecuente(codigos: Map<string, number>): string | null {
+  let mejor: string | null = null;
+  for (const [c, n] of [...codigos].sort(([a], [b]) => a.localeCompare(b))) {
+    if (mejor === null || n > codigos.get(mejor)!) mejor = c;
+  }
+  return mejor;
 }
 
 /**
@@ -133,8 +161,13 @@ function curvaDeCaja(filas: TallaDeDespacho[]): Curva | null {
   if (declarado !== null && paresPorCaja !== declarado) return null;
   tallas.sort((a, b) => compararTallas(a.talla, b.talla));
   const fecha = filas.map((f) => f.fecha_despacho ?? "").sort().at(-1) ?? "";
-  return { tallas, paresPorCaja, fecha };
+  return { tallas, paresPorCaja, fecha, codigos: codigosDe(filas) };
 }
+
+const codigosDe = (filas: TallaDeDespacho[]): Map<string, number> => {
+  const c = filas.map(codigoDeCurva).find((x) => x !== null);
+  return new Map(c ? [[c, 1]] : []);
+};
 
 const mcd = (a: number, b: number): number => (b ? mcd(b, a % b) : a);
 
@@ -150,7 +183,7 @@ function curvaDelDespacho(filas: TallaDeDespacho[]): Curva | null {
   const tallas = filas.map((f, i) => ({ talla: f.talla, porCaja: cant[i] / m, ean: f.ean }));
   tallas.sort((a, b) => compararTallas(a.talla, b.talla));
   const fecha = filas.map((f) => f.fecha_despacho ?? "").sort().at(-1) ?? "";
-  return { tallas, paresPorCaja: tallas.reduce((s, t) => s + t.porCaja, 0), fecha };
+  return { tallas, paresPorCaja: tallas.reduce((s, t) => s + t.porCaja, 0), fecha, codigos: codigosDe(filas) };
 }
 
 const firma = (c: Curva) => c.tallas.map((t) => `${t.talla}:${t.porCaja}`).join(",");
@@ -186,8 +219,11 @@ export function curvasDeReferencia(filas: TallaDeDespacho[]): Curva[] {
     // Misma curva: el código de barra sale del despacho más reciente; si le
     // falta a una talla, se toma del otro.
     const [nueva, vieja] = c.fecha > previa.fecha ? [c, previa] : [previa, c];
+    const codigos = new Map(previa.codigos);
+    for (const [cod, n] of c.codigos) codigos.set(cod, (codigos.get(cod) ?? 0) + n);
     unicas.set(k, {
       ...nueva,
+      codigos,
       tallas: nueva.tallas.map((t, i) => ({ ...t, ean: t.ean ?? vieja.tallas[i]?.ean ?? null })),
     });
   }
@@ -248,7 +284,9 @@ export function armarTallasDelPedido(
 
     let algunaCompleta = false;
     curvas.forEach((c, i) => {
-      const opcion = curvas.length > 1 ? `Opción ${i + 1}` : "";
+      const codigo = codigoMasFrecuente(c.codigos);
+      const numero = curvas.length > 1 ? `Opción ${i + 1}` : "";
+      const opcion = [numero, codigo].filter(Boolean).join(" · ");
       const cajas = cantidad / c.paresPorCaja;
       const completa = Number.isInteger(cajas) && cajas > 0;
       if (completa) algunaCompleta = true;

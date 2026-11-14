@@ -142,7 +142,7 @@ export async function leerFactura(empresa: string, id: number): Promise<PedidoLe
   };
 }
 
-const COLUMNAS = "referencia, codigo_caja, talla, ean, cantidad, cajas, pares_por_caja, factura, correo_id, fecha_despacho";
+const COLUMNAS = "referencia, codigo_caja, talla, ean, cantidad, cajas, pares_por_caja, factura, correo_id, fecha_despacho, proveedor";
 
 /** Las tallas de despacho de esas referencias (con y sin el «000» de niños). */
 export async function leerTallasDeDespacho(empresa: string, codigos: readonly string[]): Promise<TallaDeDespacho[]> {
