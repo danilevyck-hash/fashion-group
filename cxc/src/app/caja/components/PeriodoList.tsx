@@ -506,10 +506,15 @@ function ListaApple({
                       Período Nº {p.numero}
                       {abiertoP && <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Abierto</span>}
                     </span>
-                    <span className="mt-0.5 block truncate text-sm text-gray-500 tabular-nums">
+                    {/* 🔴 Un monto nunca se corta (nov-2026): la línea baja entre
+                        sus partes, cada parte entera («Gastado $1…» se cortaba). */}
+                    <span className="mt-0.5 block text-sm text-gray-500 tabular-nums">
                       {fmtDate(p.fecha_apertura)}
                       {p.fecha_cierre ? ` — ${fmtDate(p.fecha_cierre)}` : " · en curso"}
-                      {` · Gastado $${fmt(p.total_gastado)} · ${n} ${n === 1 ? "recibo" : "recibos"}`}
+                    </span>
+                    <span className="block text-sm text-gray-500 tabular-nums">
+                      <span className="whitespace-nowrap">{`Gastado $${fmt(p.total_gastado)}`}</span>
+                      {` · ${n} ${n === 1 ? "recibo" : "recibos"}`}
                     </span>
                   </span>
                   <span className={`shrink-0 text-sm tabular-nums ${saldoEsNegativo(saldo) ? "text-red-600" : "text-gray-900"}`}>

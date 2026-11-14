@@ -251,7 +251,7 @@ export function BarraDeControles({
               onCambiar={(v) => onPestana?.(v)}
             />
           ) : (
-            <span className="min-w-0 truncate">{texto}</span>
+            <TextoQueCabe>{texto}</TextoQueCabe>
           )}
         </p>
         <span ref={ponerIconos} className="contents" />
@@ -310,7 +310,7 @@ export function SelectorEnTexto({
 }) {
   return (
     <span className={`relative inline-flex min-h-[44px] min-w-0 items-center gap-1 ${className}`}>
-      <span className="min-w-0 truncate">{texto}</span>
+      <TextoQueCabe>{texto}</TextoQueCabe>
       <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" strokeWidth={2.25} aria-hidden />
       <select
         aria-label={etiqueta}
@@ -324,6 +324,44 @@ export function SelectorEnTexto({
       </select>
     </span>
   );
+}
+
+/**
+ * 🔴 NADA CORTADO (nov-2026): un título que no cabe se ACHICA antes de
+ * cortarse («Guías de despa…» → «Guías de despacho» a 18 px), como el título
+ * del iPhone. Baja de a 1 px hasta el 72 % de su tamaño (nunca de 14 px);
+ * solo si ni así cabe, recién ahí los «…».
+ */
+export function TextoQueCabe({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof window === "undefined") return;
+    const ajustar = () => {
+      el.style.fontSize = "";
+      let px = parseFloat(getComputedStyle(el).fontSize);
+      const minimo = Math.max(14, px * 0.72);
+      while (el.scrollWidth > el.clientWidth && px > minimo) {
+        px -= 1;
+        el.style.fontSize = `${px}px`;
+      }
+    };
+    ajustar();
+    // Lo que está al lado (la lupa, el «···», el avatar) y la letra llegan
+    // DESPUÉS del primer pintado: se vuelve a medir cuando cambia el ancho
+    // y cuando termina de cargar la letra.
+    // Se mira el ancho del PROPIO texto: el renglón no cambia, el espacio
+    // que le queda al título sí.
+    let ultimo = -1;
+    const ro = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(() => { if (el.clientWidth !== ultimo) { ultimo = el.clientWidth; ajustar(); } })
+      : null;
+    ro?.observe(el);
+    document.fonts?.ready.then(ajustar).catch(() => {});
+    window.addEventListener("resize", ajustar);
+    return () => { ro?.disconnect(); window.removeEventListener("resize", ajustar); };
+  }, [children]);
+  return <span ref={ref} className="min-w-0 truncate">{children}</span>;
 }
 
 /**

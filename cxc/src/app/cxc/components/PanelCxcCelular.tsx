@@ -59,7 +59,7 @@ import SyncStatus from "@/components/shared/SyncStatus";
 import { CXC_GRUPO_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { tituloCelular, usaBarraCelular } from "@/lib/navegacion/barra-controles-celular";
 import { ChevronDown, MoreHorizontal, Search } from "lucide-react";
-import { CLASE_TITULO_BARRA, IconoBarra } from "@/components/celular/BarraDeControles";
+import { CLASE_TITULO_BARRA, IconoBarra, TextoQueCabe } from "@/components/celular/BarraDeControles";
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR, SegmentadoCelular } from "@/components/celular/CabeceraCompacta";
 import { CXC_APPLE_2026_10, opcionesActualizarCxc, partirPorAtencion, saldoMas90 } from "@/lib/cxc/apple-2026-10";
 
@@ -203,7 +203,7 @@ export default function PanelCxcCelular({
               disabled={!puedeElegirEmpresa}
               className={`flex min-h-[44px] min-w-0 flex-1 items-center gap-1 text-left active:opacity-60 disabled:opacity-100 ${CLASE_TITULO_BARRA}`}
             >
-              <span className="truncate">Cuentas por cobrar</span>
+              <TextoQueCabe>Cuentas por cobrar</TextoQueCabe>
               {puedeElegirEmpresa && <ChevronDown className="h-5 w-5 shrink-0 text-gray-400" aria-hidden />}
             </button>
             <IconoBarra etiqueta="Buscar cliente" onClick={() => setBuscando(true)}>

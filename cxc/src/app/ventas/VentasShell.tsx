@@ -425,7 +425,9 @@ export function VentasShell({
             </div>
           ) : (
           <div className="flex w-full items-center gap-1.5">
-          <div className="min-w-0 flex-1 [&_button]:relative [&_button]:h-9 [&_button]:w-full [&_button]:text-[13px] [&_button]:before:absolute [&_button]:before:inset-x-0 [&_button]:before:-inset-y-1 [&_button]:before:content-['']">
+          {/* 🔴 Nada cortado (nov-2026): solo la lista se estira; las flechas
+              ‹ › conservan su ancho («‹ Año 202» se salía de la pantalla). */}
+          <div className="min-w-0 flex-1 [&>div]:w-full [&_[role=combobox]]:min-w-0 [&_[role=combobox]]:flex-1 [&_button]:relative [&_button]:h-9 [&_button]:text-[13px] [&_button]:before:absolute [&_button]:before:inset-x-0 [&_button]:before:-inset-y-1 [&_button]:before:content-['']">
             <PeriodoSelect
               valor={periodoAUrl(periodo)}
               opciones={opciones}
