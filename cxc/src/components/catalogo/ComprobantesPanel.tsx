@@ -556,19 +556,22 @@ export default function ComprobantesPanel({
   // 🔴 filtro-1 (revisión 110, aprobado 14-nov-2026): en el celular, el
   // buscador a todo el ancho y debajo «Todos los orígenes ▾» · «Pedidos ▾» ·
   // «Seleccionar todos» en UNA línea. Los mismos filtros y conteos de los chips.
+  // Sin «(18)» con 6 px de lado, la flecha de 12 px pegada al texto (el dibujo ya trae su aire) y 2 px entre piezas: así entran las dos
+  // cápsulas y «Seleccionar todos» en 358 pt (390 menos los márgenes).
+  const CAPSULA_JUSTA = "gap-0 px-1.5 [&>svg]:h-3 [&>svg]:w-3";
   const filtrosCelular = FILTRO_1_COMPROBANTES ? (
     <div data-filtro-1 className="mb-4 space-y-2 sm:hidden">
       <BuscadorGris valor={search} onCambiar={setSearch} placeholder="Buscar cliente o número" />
       {/* Cápsulas compactas para que las tres cosas quepan a 390 pt; si un día no caben, la fila baja, nunca se corta. */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Capsula etiqueta="Origen" compacta valor={origenFilter} onCambiar={(v) => setOrigenFilter(v as FiltroOrigen)}
+      <div data-filtro-1-fila className="flex flex-wrap items-center gap-0.5">
+        <Capsula etiqueta="Origen" compacta className={CAPSULA_JUSTA} valor={origenFilter} onCambiar={(v) => setOrigenFilter(v as FiltroOrigen)}
           conteoEnLaCapsula={false}
           opciones={chips.origen.opciones.map((c) => ({ valor: c.clave, etiqueta: c.clave === "todos" ? "Todos los orígenes" : c.label, conteo: c.conteo }))} />
-        <Capsula etiqueta="Tipo" compacta valor={vista} onCambiar={(v) => setVista(v as VistaComprobante)}
+        <Capsula etiqueta="Tipo" compacta className={CAPSULA_JUSTA} valor={vista} onCambiar={(v) => setVista(v as VistaComprobante)}
           conteoEnLaCapsula={false}
           opciones={chips.vista.opciones.map((c) => ({ valor: c.clave, etiqueta: c.label, conteo: c.conteo }))} />
         {puedeAdministrar && visibles.length > 0 && (
-          <label className="inline-flex min-h-[44px] shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap pl-1 text-[14px] text-gray-900">
+          <label data-seleccionar-todos className="inline-flex min-h-[44px] shrink-0 cursor-pointer select-none items-center gap-[3px] whitespace-nowrap text-[14px] text-gray-900">
             <input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4 cursor-pointer accent-black" />
             {ROTULO_SELECCIONAR_TODOS}
           </label>
