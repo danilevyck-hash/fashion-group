@@ -802,7 +802,6 @@ export default function EntregaForm({
                   onChange={(e) => setNombre(e.target.value)}
                   disabled={guardando}
                   maxLength={120}
-                  placeholder="Ej: Reposición vitrina, kit local nuevo…"
                   className="w-full rounded-md border border-gray-300 px-3 min-h-[44px] text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                 />
               </section>

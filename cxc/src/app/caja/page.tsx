@@ -88,7 +88,7 @@ export default function CajaPage() {
               value={fondoInput}
               onChange={(e) => setFondoInput(e.target.value)}
               className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition"
-              placeholder="200"
+              placeholder="0.00"
             />
           </div>
           {/* 🔴 La responsable es del PERÍODO y se elige UNA vez, aquí. Se

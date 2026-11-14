@@ -192,7 +192,7 @@ export default function EnviarEmailModal({ client, onClose, onSent }: Props) {
                   type="email"
                   value={destinatario}
                   onChange={(e) => setDestinatario(e.target.value)}
-                  placeholder="correo@cliente.com"
+                  placeholder="Correo del cliente"
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 {!preview.destinatario && (

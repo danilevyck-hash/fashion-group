@@ -454,7 +454,7 @@ export default function ReclamoDetail({
                 </label>
                 <label className="col-span-2 block">
                   <span className="text-xs text-gray-500">N° nota de crédito (opcional)</span>
-                  <input type="text" value={ncNum} onChange={(e) => setNcNum(e.target.value)} placeholder="Ej. 4020000422" className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
+                  <input type="text" value={ncNum} onChange={(e) => setNcNum(e.target.value)} className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
                 </label>
               </div>
               <div className="mt-3 flex gap-2">

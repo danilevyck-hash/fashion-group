@@ -946,7 +946,6 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
                   value={contenido}
                   autoCapitalize="characters"
                   onChange={(e) => { setContenido(e.target.value.toUpperCase()); setError(null); }}
-                  placeholder="Ej.: 3 MUEBLES CK"
                   className="w-full max-w-[240px] rounded-md border border-gray-300 px-3 text-base uppercase sm:text-sm outline-none transition focus:border-black min-h-[44px]"
                 />
               </div>
@@ -1140,7 +1139,6 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
                                         value={m.nota}
                                         autoCapitalize="characters"
                                         onChange={(e) => cambiar(clave, "nota", e.target.value.toUpperCase())}
-                                        placeholder="Ej.: FRÁGIL"
                                         className="w-full max-w-[240px] rounded-md border border-gray-200 px-3 text-base uppercase sm:text-sm outline-none transition focus:border-black min-h-[44px]"
                                       />
                                       {atajos.length > 0 && (

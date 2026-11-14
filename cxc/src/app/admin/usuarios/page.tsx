@@ -601,7 +601,7 @@ function UsuariosPageInner() {
                     id="usuario-empresa"
                     value={uCompany}
                     onChange={e => setUCompany(e.target.value)}
-                    placeholder="vistana, fashion_wear, etc."
+                    placeholder="Clave de la empresa"
                     /* text-base en móvil — anti-zoom de Safari, igual que los
                        demás campos del modal. */
                     className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm placeholder:text-gray-400 focus:outline-none focus:border-gray-900 transition"

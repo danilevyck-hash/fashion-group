@@ -267,7 +267,7 @@ export default function EnviarProveedorModal({
               type="text"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              placeholder="correo@proveedor.com, otro@proveedor.com"
+              placeholder="Correos del proveedor"
               className="w-full border border-gray-200 rounded-md px-3 py-2.5 sm:py-2 text-base sm:text-sm outline-none focus:border-black transition"
             />
           </div>
@@ -278,7 +278,7 @@ export default function EnviarProveedorModal({
               type="text"
               value={cc}
               onChange={(e) => setCc(e.target.value)}
-              placeholder="copia@correo.com, otra@correo.com (opcional)"
+              placeholder="Correos en copia (opcional)"
               className="w-full border border-gray-200 rounded-md px-3 py-2.5 sm:py-2 text-base sm:text-sm outline-none focus:border-black transition"
             />
           </div>
@@ -309,7 +309,7 @@ export default function EnviarProveedorModal({
                     type="text"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="correo@dominio.com"
+                    placeholder="Correo"
                     className="flex-1 border border-gray-200 rounded-md px-2 min-h-[44px] text-sm outline-none focus:border-black transition"
                   />
                   <button
@@ -342,7 +342,7 @@ export default function EnviarProveedorModal({
                               type="text"
                               value={editEmail}
                               onChange={(e) => setEditEmail(e.target.value)}
-                              placeholder="correo@dominio.com"
+                              placeholder="Correo"
                               className="flex-1 border border-gray-200 rounded-md px-2 min-h-[44px] text-sm outline-none focus:border-black"
                             />
                             <div className="flex gap-1">

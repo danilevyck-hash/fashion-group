@@ -344,7 +344,6 @@ export default function PreciosProveedorAyuda() {
           value={edicion.nota}
           onChange={(e) => setEdicion({ ...edicion, nota: e.target.value })}
           disabled={ocupado}
-          placeholder="Ej: el par completo"
           className="w-full rounded-md border border-gray-300 px-3 min-h-[44px] text-sm focus:border-black focus:outline-none disabled:opacity-60"
         />
       </div>

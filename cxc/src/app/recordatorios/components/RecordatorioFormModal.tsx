@@ -208,7 +208,7 @@ export default function RecordatorioFormModal({
               value={v.texto}
               onChange={(e) => set("texto", e.target.value)}
               rows={2}
-              placeholder="Recordar cobrar"
+              placeholder="Descripción"
               className={`${CTRL} resize-none`}
             />
           </Campo>

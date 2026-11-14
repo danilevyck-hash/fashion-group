@@ -173,7 +173,7 @@ export default function ReclamoForm({
             {!esActiveShoes(fEmpresa) && (
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-500">N° de pedido{ast}</label>
-                <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} placeholder="Ej. 10059874" className="border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none" />
+                <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} className="border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none" />
               </div>
             )}
             <div className="sm:col-span-3">

@@ -237,7 +237,6 @@ export default function CerrarPeriodoModal({ bloque, periodoId, onClose, onCerra
               type="text"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej. Temporada 2026, Enero–junio 2026"
               disabled={cerrando}
               maxLength={120}
               className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none disabled:bg-gray-50"
@@ -256,7 +255,7 @@ export default function CerrarPeriodoModal({ bloque, periodoId, onClose, onCerra
               type="text"
               value={notaCredito}
               onChange={(e) => setNotaCredito(e.target.value)}
-              placeholder="Ej. NC-000123"
+              placeholder="Número de nota de crédito"
               disabled={cerrando}
               maxLength={300}
               className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none disabled:bg-gray-50"

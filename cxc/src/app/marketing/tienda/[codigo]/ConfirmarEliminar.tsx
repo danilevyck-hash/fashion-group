@@ -73,7 +73,6 @@ export default function ConfirmarEliminar({
               rows={2}
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Se cargó dos veces, no era de esta tienda…"
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm focus:border-black focus:outline-none mb-3"
             />
           </>

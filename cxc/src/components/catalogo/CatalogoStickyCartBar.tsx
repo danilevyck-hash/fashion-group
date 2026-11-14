@@ -255,7 +255,6 @@ export default function CatalogoStickyCartBar({
             type="text"
             value={clientName || ""}
             onChange={(e) => onClientNameChange(e.target.value)}
-            placeholder="Ej: María Pérez"
             autoComplete="name"
             required
             aria-required="true"
