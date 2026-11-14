@@ -2077,7 +2077,6 @@ export function ModalCierre({
                   value={motivo}
                   onChange={(e) => setMotivo(e.target.value)}
                   rows={3}
-                  placeholder="Faltó cargar la incapacidad de Briceida"
                   className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-base outline-none transition focus:border-black sm:text-sm"
                 />
                 <span className="mt-1 block text-[12px] text-gray-500">

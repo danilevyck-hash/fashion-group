@@ -363,7 +363,6 @@ export default function BloqueDatosDelGasto({
           value={datos.nota}
           onChange={(e) => cambiar({ nota: e.target.value })}
           maxLength={120}
-          placeholder="Apertura, Remodelación…"
           className={CAMPO}
           autoFocus={MARKETING_APPLE_2026_10 && abrioObservaciones}
         />

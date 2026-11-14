@@ -107,7 +107,7 @@ export default function FeriadosTab() {
           <div className="min-w-[200px] flex-1">
             <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Descripción</label>
             <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
-              placeholder="Cierre por inventario" className={campo} />
+              className={campo} />
           </div>
           <button type="button" onClick={() => void agregar()} disabled={guardando}
             className="min-h-[44px] rounded-md bg-black px-4 text-sm text-white transition active:scale-[0.97] disabled:opacity-50">

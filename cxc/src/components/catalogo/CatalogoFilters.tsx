@@ -270,7 +270,7 @@ export function FiltroPrecioExacto({
   // lo abrió.
   const [espejo, setEspejo] = useState(() => !precio.hasta.trim());
 
-  // `placeholder:text-black/25`: con el color del chip, el "17.50" de ejemplo se
+  // `placeholder:text-black/25`: con el color del chip, el "0.00" de ejemplo se
   // leía como un precio YA puesto y hacía dudar de si el filtro estaba activo.
   const campo = `${chipInactive} w-24 min-h-[44px] rounded-lg px-3 text-sm tabular-nums outline-none transition placeholder:text-black/25`;
   const suave = "text-xs text-black/50";
@@ -308,7 +308,7 @@ export function FiltroPrecioExacto({
             onChange={e => cambiarDesde(e.target.value)}
             inputMode="decimal"
             type="text"
-            placeholder="17.50"
+            placeholder="0.00"
             aria-label="Precio desde"
             className={campo}
           />
@@ -320,7 +320,7 @@ export function FiltroPrecioExacto({
             onChange={e => cambiarHasta(e.target.value)}
             inputMode="decimal"
             type="text"
-            placeholder="17.50"
+            placeholder="0.00"
             aria-label="Precio hasta"
             className={campo}
           />

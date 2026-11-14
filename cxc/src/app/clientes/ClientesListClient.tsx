@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
 import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -186,12 +187,11 @@ export default function ClientesListClient({
             />
           </div>
 
-          <input
-            type="search"
+          <CampoBuscar
             placeholder="Buscar por nombre o código…"
+            aria-label="Buscar cliente por nombre o código"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="flex-1 border border-gray-200 rounded-md px-3 min-h-[44px] text-sm outline-none focus:border-black transition w-full"
           />
 
           {/* Chips. El número va pegado a la etiqueta y sale de contar, nunca de

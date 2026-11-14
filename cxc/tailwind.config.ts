@@ -10,6 +10,9 @@ const config: Config = {
       "fondo-celular": "#F2F2F7",
       "control-celular": "#E9E9EB",
       "pista-celular": "#E3E3E8",
+      // El borde de todo campo (nov-2026): el gris del iPhone, 3.3:1 sobre
+      // blanco. El gray-200 de antes (1.2:1) hacía invisibles los buscadores.
+      campo: "#8e8e93",
       reebok: {
         red: '#CC0000',
         dark: '#1a1a1a',

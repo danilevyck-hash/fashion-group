@@ -50,7 +50,7 @@ export default function FacturasChips({ facturas, onChange, rotulo = "Factura(s)
           onChange={(e) => setNueva(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); agregar(); } }}
           onBlur={agregar}
-          placeholder={facturas.length ? "+ otra factura" : "Ej. 3000012593"}
+          placeholder={facturas.length ? "+ otra factura" : "Número de factura"}
           aria-label={facturas.length ? "Otra factura" : "Factura"}
           className="border-b border-gray-200 py-3 xl:py-1.5 text-base xl:text-sm text-black outline-none min-w-[160px] flex-1"
         />

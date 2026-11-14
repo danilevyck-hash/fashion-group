@@ -97,7 +97,7 @@ export default function TallasDePedido() {
         <input
           className={`${campo} tabular-nums`}
           inputMode="numeric"
-          placeholder="16-000002182, 11-000003192 o 2182"
+          placeholder="Número completo o últimos dígitos"
           value={pedido}
           onChange={(e) => {
             setElegido(null);

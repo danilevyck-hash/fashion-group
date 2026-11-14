@@ -17,6 +17,7 @@
 // como cobrado, igual que hoy.
 // ============================================================================
 
+import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useUrlState } from "@/lib/hooks/useUrlState";
@@ -74,7 +75,8 @@ function Portada({ datos, onAbrir }: { datos: MarketingDelCobro; onAbrir: (marca
   return (
     <div className="space-y-6">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="text-lg font-semibold text-gray-900">Por cobrar</h2>
+        {/* En el celular el título ya dice «Por cobrar ▾»: aquí no se repite. */}
+        <h2 className={SECCION_EN_EL_TITULO_2026_11 ? "max-sm:sr-only text-lg font-semibold text-gray-900" : "text-lg font-semibold text-gray-900"}>Por cobrar</h2>
         {datos.abiertos.length > 0 && (
           <div className="text-sm text-gray-500">
             Total <span className="text-gray-900 font-semibold tabular-nums">{formatearMonto(total)}</span>

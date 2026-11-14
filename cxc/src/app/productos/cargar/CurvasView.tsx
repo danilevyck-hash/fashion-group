@@ -5,6 +5,7 @@
 // archivo, marca las combinaciones referencia+curva que quiere y descarga un
 // Excel con una sección por combinación. NO toca el Depurador ni su lógica.
 
+import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import { useMemo, useRef, useState } from "react";
 import { UploadCloud, Download, AlertTriangle, X } from "lucide-react";
 import type { NamedSheet } from "@/lib/depurador/logic";
@@ -134,7 +135,8 @@ export default function CurvasView() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
-      <div className="mb-5 border-b-2 border-gray-900 pb-4">
+      {/* En el celular el título ya dice «Tallas por bulto ▾»: el encabezado no se repite. */}
+      <div className={`mb-5 border-b-2 border-gray-900 pb-4${SECCION_EN_EL_TITULO_2026_11 ? " max-sm:hidden" : ""}`}>
         <div className="flex items-center gap-1">
           <h2 className="font-serif text-2xl font-semibold tracking-tight text-gray-900">Tallas por bulto</h2>
           {/* Los 3 pasos se aprenden una vez → ⓘ. */}

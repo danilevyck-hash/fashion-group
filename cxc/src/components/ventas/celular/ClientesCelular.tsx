@@ -27,8 +27,7 @@
 // ============================================================================
 
 import { BuscarEnLaBarra, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
-import { useState } from "react";
-import { Search } from "lucide-react";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
 import type { Cliente } from "../types";
 import {
   lineaGrisDelCliente,
@@ -82,7 +81,6 @@ export function ClientesCelular({
   ordenar,
   pie,
 }: Props) {
-  const [buscando, setBuscando] = useState(busqueda.length > 0);
   // 🔴 v2 de la barra del celular: la lupa se abre EN la barra y la empresa es
   // un ícono de la misma barra; la línea gris dice cuál está puesta.
   const hayBarra = useHayBarraCelular();
@@ -107,33 +105,21 @@ export function ClientesCelular({
           </>
         ) : (
           <div className="flex items-center gap-1">
-            {/* 🔴 BUSCAR ES UNA LUPA, NO UNA CAJA SIEMPRE ABIERTA: la caja se
-                llevaba un renglón entero en una lista de 115 nombres. */}
-            <button
-              type="button"
-              aria-label="Buscar cliente"
-              data-lupa-clientes
-              onClick={() => setBuscando((v) => !v)}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-gray-600 active:opacity-60"
-            >
-              <Search className="h-[18px] w-[18px]" />
-            </button>
             {ordenar}
             {accion}
           </div>
         )}
       />
 
-      {buscando && !hayBarra && (
+      {/* 14-nov-2026: el campo entero, siempre a la vista (nunca solo la lupa). */}
+      {!hayBarra && (
         <div className="px-4 pt-2">
-          <input
-            autoFocus
+          <CampoBuscar
             value={busqueda}
             onChange={(e) => onBusqueda(e.target.value)}
             placeholder="Buscar cliente o código…"
             aria-label="Buscar cliente o código"
             data-buscador-clientes
-            className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-[16px] text-gray-900 placeholder:text-gray-400"
           />
         </div>
       )}

@@ -531,7 +531,7 @@ export default function GuiasList({
                 <BuscarEnLaBarra
                   valor={search}
                   onCambiar={setSearch}
-                  placeholder="Transportista, cliente, factura o N° de guía"
+                  placeholder="Cliente, factura o N° de guía"
                   etiqueta="Buscar guía"
                 />
               </>

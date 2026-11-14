@@ -433,7 +433,6 @@ export default function GuiasConfiguracionView() {
                 type="text"
                 value={altaTiendas}
                 onChange={(e) => setAltaTiendas(e.target.value)}
-                placeholder="5, 6, 14, Mas Flow"
                 className={CAMPO}
               />
             </div>

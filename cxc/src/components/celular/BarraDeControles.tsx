@@ -37,6 +37,7 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { getModuleColor } from "@/lib/moduleColors";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { ATRIBUTO_BARRA_FIJA, CONSULTA_CELULAR } from "@/lib/navegacion/barra-celular";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { CLASE_VIDRIO, RADIO_VIDRIO, VIDRIO_2026_10, conVidrio } from "@/lib/ui/vidrio";
@@ -93,8 +94,8 @@ export const CLASE_FILA_MENU =
 // El proveedor: dónde caen los controles de cada pestaña
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Ranura = "iconos" | "filaIzq" | "filaDer" | "menu";
-const RANURAS: Ranura[] = ["iconos", "filaIzq", "filaDer", "menu"];
+type Ranura = "iconos" | "filaIzq" | "filaDer" | "menu" | "buscar";
+const RANURAS: Ranura[] = ["iconos", "filaIzq", "filaDer", "menu", "buscar"];
 const vacias = <T,>(v: T) => Object.fromEntries(RANURAS.map((r) => [r, v])) as Record<Ranura, T>;
 
 interface ContextoBarra {
@@ -167,7 +168,7 @@ export function EnLaBarra({
   const ctx = useContext(Contexto);
   const claves = pestana == null ? null : typeof pestana === "string" ? [pestana] : pestana;
   const visible = !!ctx && (!claves || claves.includes(ctx.activa ?? ""));
-  const nodos: Record<Ranura, ReactNode> = { iconos, filaIzq, filaDer, menu };
+  const nodos: Record<Ranura, ReactNode> = { iconos, filaIzq, filaDer, menu, buscar: null };
   useContar("iconos", visible && hay(iconos), ctx?.contar);
   useContar("filaIzq", visible && hay(filaIzq), ctx?.contar);
   useContar("filaDer", visible && hay(filaDer), ctx?.contar);
@@ -223,6 +224,7 @@ export function BarraDeControles({
   const ponerIconos = useCallback((el: HTMLElement | null) => poner?.("iconos", el), [poner]);
   const ponerIzq = useCallback((el: HTMLElement | null) => poner?.("filaIzq", el), [poner]);
   const ponerDer = useCallback((el: HTMLElement | null) => poner?.("filaDer", el), [poner]);
+  const ponerBuscar = useCallback((el: HTMLElement | null) => poner?.("buscar", el), [poner]);
 
   const conPestanas = !!pestanas && pestanas.length > 1;
   const etiquetaActiva = conPestanas ? pestanas!.find((p) => p.value === activa)?.label ?? null : null;
@@ -250,7 +252,7 @@ export function BarraDeControles({
               onCambiar={(v) => onPestana?.(v)}
             />
           ) : (
-            <span className="min-w-0 truncate">{texto}</span>
+            <TextoQueCabe>{texto}</TextoQueCabe>
           )}
         </p>
         <span ref={ponerIconos} className="contents" />
@@ -260,6 +262,9 @@ export function BarraDeControles({
           </IconoBarra>
         )}
       </div>
+
+      {/* 1b · Buscar: el campo entero, siempre a la vista (nunca solo la lupa). */}
+      <div ref={ponerBuscar} data-renglon="buscar" className={(ctx?.cuentas.buscar ?? 0) > 0 ? "flex min-w-0" : "hidden"} />
 
       {/* 2 · El período, a todo el ancho. */}
       {hay(periodo) && (
@@ -309,7 +314,7 @@ export function SelectorEnTexto({
 }) {
   return (
     <span className={`relative inline-flex min-h-[44px] min-w-0 items-center gap-1 ${className}`}>
-      <span className="min-w-0 truncate">{texto}</span>
+      <TextoQueCabe>{texto}</TextoQueCabe>
       <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" strokeWidth={2.25} aria-hidden />
       <select
         aria-label={etiqueta}
@@ -323,6 +328,44 @@ export function SelectorEnTexto({
       </select>
     </span>
   );
+}
+
+/**
+ * 🔴 NADA CORTADO (nov-2026): un título que no cabe se ACHICA antes de
+ * cortarse («Guías de despa…» → «Guías de despacho» a 18 px), como el título
+ * del iPhone. Baja de a 1 px hasta el 72 % de su tamaño (nunca de 14 px);
+ * solo si ni así cabe, recién ahí los «…».
+ */
+export function TextoQueCabe({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof window === "undefined") return;
+    const ajustar = () => {
+      el.style.fontSize = "";
+      let px = parseFloat(getComputedStyle(el).fontSize);
+      const minimo = Math.max(14, px * 0.72);
+      while (el.scrollWidth > el.clientWidth && px > minimo) {
+        px -= 1;
+        el.style.fontSize = `${px}px`;
+      }
+    };
+    ajustar();
+    // Lo que está al lado (la lupa, el «···», el avatar) y la letra llegan
+    // DESPUÉS del primer pintado: se vuelve a medir cuando cambia el ancho
+    // y cuando termina de cargar la letra.
+    // Se mira el ancho del PROPIO texto: el renglón no cambia, el espacio
+    // que le queda al título sí.
+    let ultimo = -1;
+    const ro = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(() => { if (el.clientWidth !== ultimo) { ultimo = el.clientWidth; ajustar(); } })
+      : null;
+    ro?.observe(el);
+    document.fonts?.ready.then(ajustar).catch(() => {});
+    window.addEventListener("resize", ajustar);
+    return () => { ro?.disconnect(); window.removeEventListener("resize", ajustar); };
+  }, [children]);
+  return <span ref={ref} className="min-w-0 truncate">{children}</span>;
 }
 
 /**
@@ -392,8 +435,8 @@ export function IconoBarra({
 }
 
 /**
- * 🔍 Buscar: la lupa del renglón 1; al tocarla, el campo ocupa ESE renglón con
- * «Cancelar». Con texto escrito se queda abierto: lo que filtra se ve.
+ * 🔍 Buscar: el campo ENTERO, siempre a la vista, en su propio renglón debajo
+ * del título (14-nov-2026: nada de lupa sola que hay que tocar para abrir).
  */
 export function BuscarEnLaBarra({
   valor,
@@ -406,38 +449,20 @@ export function BuscarEnLaBarra({
   placeholder: string;
   etiqueta: string;
 }) {
-  const [abierto, setAbierto] = useState(false);
-  const campo = useRef<HTMLInputElement | null>(null);
-  const visible = abierto || valor !== "";
-  useEffect(() => {
-    if (abierto) campo.current?.focus();
-  }, [abierto]);
-  if (!visible) {
-    return (
-      <IconoBarra etiqueta={etiqueta} onClick={() => setAbierto(true)}>
-        <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
-      </IconoBarra>
-    );
-  }
-  return (
-    <div data-buscar-barra className="absolute inset-0 z-10 flex items-center gap-2 bg-white">
-      <div className="relative min-w-0 flex-1">
-        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-        <input
-          ref={campo}
-          type="search"
-          value={valor}
-          onChange={(e) => onCambiar(e.target.value)}
-          placeholder={placeholder}
-          aria-label={etiqueta}
-          className="h-11 w-full rounded-md bg-gray-100 pl-9 pr-3 text-base text-gray-900 outline-none"
-        />
-      </div>
-      <button type="button" onClick={() => { onCambiar(""); setAbierto(false); }} className="min-h-[44px] shrink-0 px-1 text-[15px] text-blue-600">
-        Cancelar
-      </button>
-    </div>
+  const ctx = useContext(Contexto);
+  useContar("buscar", true, ctx?.contar);
+  const campo = (
+    <CampoBuscar
+      data-buscar-barra
+      value={valor}
+      onChange={(e) => onCambiar(e.target.value)}
+      placeholder={placeholder}
+      aria-label={etiqueta}
+      envoltorio="flex-1"
+    />
   );
+  if (!ctx) return campo;
+  return ctx.ranuras.buscar ? createPortal(campo, ctx.ranuras.buscar) : null;
 }
 
 export interface OpcionDeDescarga {

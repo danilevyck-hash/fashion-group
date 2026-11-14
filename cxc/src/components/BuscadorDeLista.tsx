@@ -1,16 +1,24 @@
 "use client";
 
+import { forwardRef, type InputHTMLAttributes } from "react";
+import { Search } from "lucide-react";
+
 /* ─────────────────────────────────────────────────────────────────────────────
  * EL BUSCADOR DE UNA LISTA — uno solo para todas (11-sep-2026).
  *
  * Daniel: *«pon buscador en módulos o tabs que lo ameriten, como colaboradores
  * por ejemplo»*.
  *
- * Es el mismo campo que ya tienen Guías, Cuentas por Cobrar y Reclamos: 44 px de
- * alto para el dedo, `text-base` en el celular (por debajo de 16 px el iPhone
- * hace zoom solo al tocarlo) y `sm:text-sm` en el escritorio, una línea abajo
- * que se pone negra al escribir, y su `aria-label` — el `placeholder` desaparece
- * apenas se teclea y un lector de pantalla se queda sin saber qué campo es.
+ * 44 px de alto para el dedo, `text-base` en el celular (por debajo de 16 px el
+ * iPhone hace zoom solo al tocarlo) y `sm:text-sm` en el escritorio, y su
+ * `aria-label` — el `placeholder` desaparece apenas se teclea y un lector de
+ * pantalla se queda sin saber qué campo es.
+ *
+ * 🔴 UN SOLO BUSCADOR QUE SE VE (nov-2026, `CampoBuscar`): caja blanca, borde
+ * `campo` (#8e8e93, 3.3:1 sobre blanco; el gris-200 de antes daba 1.2:1 y
+ * no se veía), esquinas `rounded-md` y la lupa adentro. Antes había una raya
+ * abajo (Préstamos, Caja, Asistencia), un relleno gris sin borde (Ventas ›
+ * Productos) y un borde casi invisible (Clientes).
  *
  * 🔴 Lo que filtra y con qué regla vive en `lib/buscar-en-lista.ts`; acá solo se
  * dibuja. Y el conteo «12 de 42 colaboradores» sale de ahí mismo, para que la
@@ -36,13 +44,12 @@ export default function BuscadorDeLista({
 }) {
   return (
     <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${className}`}>
-      <input
-        type="search"
+      <CampoBuscar
         value={valor}
         onChange={(e) => onCambiar(e.target.value)}
         placeholder={placeholder}
         aria-label={etiqueta ?? placeholder}
-        className="min-h-[44px] w-full max-w-xs border-b border-gray-200 text-base outline-none transition focus:border-black sm:w-64 sm:text-sm"
+        envoltorio="w-full max-w-xs sm:w-64"
       />
       {conteo !== "" && (
         <span data-testid="conteo-busqueda" className="text-sm tabular-nums text-gray-500">
@@ -76,3 +83,20 @@ export function VacioDeBusqueda({ texto, onLimpiar, rotulo }: {
     </div>
   );
 }
+
+/** La caja del buscador: blanca, borde visible (≥3:1), `rounded-md`, lugar para la lupa. */
+export const CLASE_CAMPO_BUSCAR =
+  "h-11 min-h-[44px] w-full rounded-md border border-campo bg-white pl-9 pr-3 text-base text-gray-900 outline-none transition placeholder:text-gray-500 focus:border-gray-900 sm:text-sm";
+
+/** El buscador de la casa: la caja de `CLASE_CAMPO_BUSCAR` con la lupa adentro. */
+export const CampoBuscar = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement> & { envoltorio?: string }
+>(function CampoBuscar({ envoltorio = "w-full", className = "", type = "search", ...props }, ref) {
+  return (
+    <div className={`relative min-w-0 ${envoltorio}`}>
+      <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+      <input ref={ref} type={type} {...props} className={`${CLASE_CAMPO_BUSCAR} ${className}`} />
+    </div>
+  );
+});

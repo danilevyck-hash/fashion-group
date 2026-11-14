@@ -1008,7 +1008,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                   min={0}
                   max={DESCUENTO_MAX}
                   step="any"
-                  placeholder="Ej. 25"
+                  placeholder="Porcentaje"
                   value={descuentoTexto}
                   onChange={(e) => cambiarDescuento(e.target.value)}
                   className={inputCls}

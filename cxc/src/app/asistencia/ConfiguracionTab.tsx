@@ -1500,7 +1500,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                                 // Se guarda al SALIR del campo, no en cada tecla:
                                 // un PUT por letra sería un PUT por letra.
                                 onBlur={() => void guardar(p.codigo, borrador)}
-                                placeholder="Ángela García"
                                 className={CAMPO}
                               />
                             </div>
@@ -1526,7 +1525,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                                 value={borrador.posicion}
                                 onChange={(e) => setBorrador({ ...borrador, posicion: e.target.value })}
                                 onBlur={() => void guardar(p.codigo, borrador)}
-                                placeholder="Asistente de Bodega"
                                 className={CAMPO}
                               />
                             </div>
@@ -1541,7 +1539,6 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                                 value={borrador.cedula}
                                 onChange={(e) => setBorrador({ ...borrador, cedula: e.target.value })}
                                 onBlur={() => void guardar(p.codigo, borrador)}
-                                placeholder="8-1010-2403"
                                 className={CAMPO}
                               />
                             </div>
@@ -1567,7 +1564,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                                 placeholder={
                                   borrador.servicioProfesional
                                     ? "No se le calcula pago"
-                                    : "850.00 — vacío si no lo sabes"
+                                    : "0.00 — vacío si no lo sabes"
                                 }
                                 className={`${CAMPO} tabular-nums disabled:bg-gray-100 disabled:text-gray-400`}
                               />

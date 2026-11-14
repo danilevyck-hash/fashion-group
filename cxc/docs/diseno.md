@@ -126,6 +126,13 @@ Antes de proponer un campo, una pestaña, una lista, un aviso o un estado nuevo,
 
 Cómo funciona por dentro (un solo número en todas las pantallas, quién cambia los datos) y cómo se le presenta: [asi-se-construye](../.claude/skills/asi-se-construye/SKILL.md) §§ 8, 16 y 17.
 
+## El celular en orden (Daniel, 14-nov-2026)
+
+- **El título es el selector de sección**, en todos los módulos con pestañas («Préstamos ▾»): nada de pestañas ni enlaces azules aparte.
+- **Un solo campo de búsqueda, visible**: el rectángulo entero con la lupa adentro (`CampoBuscar`). Nunca una lupa sola que hay que tocar para abrir. La ⌘K del encabezado es otra cosa y se queda.
+- **El texto gris de un campo dice qué va, sin ejemplos** («Número de factura», no «Ej: 01-123456»). Si el campo ya tiene rótulo, no lleva texto gris.
+- **Nada se corta**: un título largo achica la letra hasta que cabe; un renglón que no cabe pasa a dos líneas.
+
 ## Mockup: siempre, con capturas reales
 
 Daniel, 1-oct-2026: *«siempre mockup»* y *«dejamos fijo que las propuestas se muestran con capturas reales»*.

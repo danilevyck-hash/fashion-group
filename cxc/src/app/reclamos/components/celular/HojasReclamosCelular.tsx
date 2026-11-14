@@ -225,7 +225,6 @@ export function HojaCobrar({
                 type="text"
                 value={nc}
                 onChange={(e) => setNc(e.target.value)}
-                placeholder="Ej. 4020000422"
                 aria-label="N° de nota de crédito"
                 className="min-w-0 flex-1 bg-transparent text-right text-[17px] text-gray-900 outline-none"
               />
@@ -326,7 +325,7 @@ export function HojaCorreo({
                 inputMode="email"
                 value={cc}
                 onChange={(e) => setCc(e.target.value)}
-                placeholder="copia@correo.com"
+                placeholder="Correo en copia"
                 aria-label="CC"
                 className="min-w-0 flex-1 bg-transparent text-right text-[16px] text-gray-900 outline-none"
               />

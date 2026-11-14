@@ -266,7 +266,6 @@ export function MetaFormModal({
               id="meta-nombre"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-              placeholder="Meta del viaje"
               className={CAMPO}
             />
           </div>
@@ -314,7 +313,7 @@ export function MetaFormModal({
                 step="0.01"
                 value={objetivo}
                 onChange={(e) => setObjetivo(e.target.value)}
-                placeholder="420000"
+                placeholder="0.00"
                 className={`${CAMPO} tabular-nums`}
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -378,7 +377,7 @@ export function MetaFormModal({
                 id="meta-premio"
                 value={premio}
                 onChange={(e) => setPremio(e.target.value)}
-                placeholder="Un viaje para todas"
+                placeholder="Descripción del premio"
                 className={CAMPO}
               />
             </div>
@@ -394,7 +393,7 @@ export function MetaFormModal({
                 step="0.01"
                 value={premioMonto}
                 onChange={(e) => setPremioMonto(e.target.value)}
-                placeholder="2000"
+                placeholder="0.00"
                 className={`${CAMPO} tabular-nums`}
               />
             </div>

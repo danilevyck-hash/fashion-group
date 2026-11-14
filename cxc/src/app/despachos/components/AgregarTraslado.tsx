@@ -119,7 +119,6 @@ export default function AgregarTraslado({ items, onReemplazarItems, onLineaDeTra
             autoCapitalize="characters"
             value={contenido}
             onChange={(e) => { setContenido(e.target.value.toUpperCase()); setError(null); }}
-            placeholder="Ej.: 3 MUEBLES CK"
             className={`w-full max-w-[240px] uppercase ${CAMPO}`}
           />
         </div>

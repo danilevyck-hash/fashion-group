@@ -1428,7 +1428,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
               ) : (
                 <div className="flex items-center gap-2">
                   <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)}
-                    placeholder="cliente@correo.com" autoFocus
+                    placeholder="Correo del cliente" autoFocus
                     onKeyDown={e => e.key === "Enter" && sendToClient()}
                     className="flex-1 border border-gray-200 rounded-md px-2.5 min-h-[44px] text-xs outline-none focus:border-black transition" />
                   <button onClick={sendToClient} disabled={sendingToClient}

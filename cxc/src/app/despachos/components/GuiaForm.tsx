@@ -830,7 +830,7 @@ export default function GuiaForm({
           type="text"
           inputMode="numeric"
           value={item.facturas}
-          placeholder="10234, 10235"
+          placeholder="Número de factura"
           onChange={(e) => { onUpdateItem(idx, "facturas", e.target.value); marcarTocado(clave); }}
           className={ctrl(err || sep || fmt)}
         />
@@ -1088,7 +1088,6 @@ export default function GuiaForm({
             value={observaciones}
             onChange={e => setObservaciones(e.target.value)}
             rows={2}
-            placeholder="Ej. 3 muebles para la tienda"
             className="w-full min-h-[44px] resize-none rounded-lg border border-gray-200 bg-transparent px-3 py-2.5 text-base md:text-sm outline-none transition focus:border-black"
           />
         </div>

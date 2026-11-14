@@ -58,8 +58,9 @@ import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import SyncStatus from "@/components/shared/SyncStatus";
 import { CXC_GRUPO_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { tituloCelular, usaBarraCelular } from "@/lib/navegacion/barra-controles-celular";
-import { ChevronDown, MoreHorizontal, Search } from "lucide-react";
-import { CLASE_TITULO_BARRA, IconoBarra } from "@/components/celular/BarraDeControles";
+import { ChevronDown, MoreHorizontal } from "lucide-react";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
+import { CLASE_TITULO_BARRA, IconoBarra, TextoQueCabe } from "@/components/celular/BarraDeControles";
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR, SegmentadoCelular } from "@/components/celular/CabeceraCompacta";
 import { CXC_APPLE_2026_10, opcionesActualizarCxc, partirPorAtencion, saldoMas90 } from "@/lib/cxc/apple-2026-10";
 
@@ -129,7 +130,6 @@ export default function PanelCxcCelular({
   // v3.2: la cabecera compacta (tres renglones) vive detrás de la barra nueva.
   const compacta = usaBarraCelular(true);
   const apple = compacta && appleProp;
-  const [buscando, setBuscando] = useState(false);
   const puedeElegirEmpresa = !empresaRestriction && cxcCompanies.length > 1;
 
   // Los totales de la tira: EXACTAMENTE los mismos que la computadora, sobre el
@@ -203,12 +203,9 @@ export default function PanelCxcCelular({
               disabled={!puedeElegirEmpresa}
               className={`flex min-h-[44px] min-w-0 flex-1 items-center gap-1 text-left active:opacity-60 disabled:opacity-100 ${CLASE_TITULO_BARRA}`}
             >
-              <span className="truncate">Cuentas por cobrar</span>
+              <TextoQueCabe>Cuentas por cobrar</TextoQueCabe>
               {puedeElegirEmpresa && <ChevronDown className="h-5 w-5 shrink-0 text-gray-400" aria-hidden />}
             </button>
-            <IconoBarra etiqueta="Buscar cliente" onClick={() => setBuscando(true)}>
-              <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
-            </IconoBarra>
             {/* Sin nada que ofrecer no se dibuja el «···» (`diseno.md`). */}
             {(canExport || onBoston) && (
             <IconoBarra etiqueta="Más opciones" onClick={() => setHoja("mas")}>
@@ -375,21 +372,15 @@ export default function PanelCxcCelular({
       </>)}
 
       {/* ── Buscar ────────────────────────────────────────────────────────── */}
-      {(!compacta || buscando || search !== "") && (
       <div className="px-4 pt-3">
-        <input
-          type="search"
+        <CampoBuscar
           inputMode="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar cliente"
           aria-label="Buscar cliente"
-          className="w-full rounded-xl border border-transparent bg-control-celular px-4 py-3 text-[16px] text-gray-900 placeholder:text-gray-500 focus:border-gray-400 focus:outline-none"
-          autoFocus={compacta && buscando && search === ""}
-          onBlur={() => { if (search === "") setBuscando(false); }}
         />
       </div>
-      )}
 
       {lista.length > 1 && (
         <div data-ordenar-cxc className="flex justify-end px-4 pt-3">

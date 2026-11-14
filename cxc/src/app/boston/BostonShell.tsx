@@ -30,6 +30,8 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { hasModuleAccess } from "@/lib/auth-check";
 import AppHeader from "@/components/AppHeader";
+import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import BostonTab from "@/components/cxc/BostonTab";
 import { MODULO_BOSTON, rolesModuloBoston, type TabBoston } from "@/lib/boston/rol";
 import {
@@ -65,6 +67,8 @@ export function BostonShell() {
   // drill-down (ver § Navegación e Historial).
   const [tabRaw, setTab] = useUrlState("tab", "inicio");
   const tab = tabDeBoston(tabRaw, pestanas);
+  // Celular: el título es el selector de sección, como Despachos.
+  const barra = useBarraCelular(SECCION_EN_EL_TITULO_2026_11);
 
   /** Cambia de pestaña, o sale del módulo si esa pestaña ya vive en otro lado. */
   const irA = (destino: TabBoston) => {
@@ -77,13 +81,23 @@ export function BostonShell() {
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader module={rotuloModuloBoston()} />
+      <AppHeader module={rotuloModuloBoston()} tituloEnLaPantalla={barra} />
+      {barra && (
+        <ProveedorBarraCelular activo activa={tab}>
+          <BarraDeControles
+            titulo={rotuloModuloBoston()}
+            pestanas={pestanas.map(({ key, label }) => ({ value: key, label }))}
+            activa={tab}
+            onPestana={(v) => setTab(v as TabBoston)}
+          />
+        </ProveedorBarraCelular>
+      )}
 
       {/* Las pestañas. `data-pestanas` es el asidero de la MEDICIÓN: buscarlas
           por su clase de Tailwind devuelve media pantalla y el script pasa en
           verde sin haber mirado la barra — el mismo motivo por el que las
           pestañas del CXC llevan su marca fija. */}
-      <div className="max-w-6xl mx-auto px-2 lg:px-4 pt-2">
+      <div className={barra ? "hidden" : "max-w-6xl mx-auto px-2 lg:px-4 pt-2"}>
         <div
           data-pestanas="boston"
           className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto"

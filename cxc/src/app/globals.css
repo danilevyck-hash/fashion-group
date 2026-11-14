@@ -87,6 +87,18 @@ input, button, select, textarea {
   font-family: inherit;
 }
 
+/* 🔴 UN SOLO CAMPO QUE SE VE (nov-2026). El borde de un campo era gray-200
+   (#e5e7eb, 1.2:1 sobre blanco): casi invisible. Todo campo cuyo borde sea el
+   de por defecto o un gris claro (100/200/300) pasa al gris `campo` (3.3:1).
+   Especificidad (0,1,1): le gana al color suelto de Tailwind y pierde con
+   `focus:`/`hover:` (0,2,0). Un borde transparente o de otro color no cambia. */
+:where(input, textarea, select) {
+  border-color: theme("colors.campo");
+}
+:is(input, textarea, select):is(.border-gray-100, .border-gray-200, .border-gray-300) {
+  border-color: theme("colors.campo");
+}
+
 /* Tooltip */
 [data-tooltip] {
   position: relative;

@@ -248,7 +248,8 @@ describe("Campos de formulario de las listas", () => {
     // clientes no tienen provincia; Daniel: «si, no sirve»), así que ya no hay
     // un segundo control que medir en esa pantalla. Los chips que lo reemplazan
     // tienen su propia altura y su candado en `clientes-lista-pantalla`.
-    expect(clientes).toContain('className="flex-1 border border-gray-200 rounded-md px-3 min-h-[44px] text-sm');
+    // nov-2026: el buscador es `CampoBuscar` (44 px por `CLASE_CAMPO_BUSCAR`).
+    expect(clientes).toContain("<CampoBuscar");
     expect(clientes).not.toContain("Todas las provincias");
     // ⚠️ 20-sep-2026: Proveedores ya no tiene buscador — la lista son las siete
     // empresas y todo está a un toque. Lo cuida `proveedores-arriba-una-linea`.

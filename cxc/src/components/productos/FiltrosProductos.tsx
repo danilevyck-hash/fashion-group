@@ -13,6 +13,7 @@
 
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { vidrioSobre } from "@/lib/ui/vidrio";
 import { CHIP_V4 } from "@/lib/catalogo/catalogos-2026-10-b";
@@ -101,14 +102,12 @@ export function ChipLista({
       >
         {conBuscador && (
           <div className="bg-white px-2 pb-1 pt-1">
-            <input
+            <CampoBuscar
               autoFocus
-              type="search"
               value={q}
               onChange={e => setQ(e.target.value)}
               placeholder={`Buscar ${etiqueta.toLowerCase()}`}
               aria-label={`Buscar ${etiqueta.toLowerCase()}`}
-              className="h-10 w-full rounded-md bg-gray-100 px-3 text-base text-gray-900 outline-none sm:text-sm"
             />
           </div>
         )}
@@ -262,7 +261,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
   );
   const buscarCodigo = (
     <div className="relative w-40 shrink-0">
-      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
       <input
         type="search"
         value={codigo}

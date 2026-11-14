@@ -113,7 +113,7 @@ describe("🔴 los avisos se escriben con tilde", () => {
   it("«Ingresa un correo válido» al mandar un correo mal escrito", async () => {
     await pintar("confirmado");
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Enviar por correo al cliente/i })); });
-    const campo = await screen.findByPlaceholderText("cliente@correo.com");
+    const campo = await screen.findByPlaceholderText("Correo del cliente");
     fireEvent.change(campo, { target: { value: "sin-arroba" } });
     await act(async () => {
       fireEvent.click(screen.getAllByRole("button", { name: /^Enviar$/i })[0]);

@@ -207,8 +207,8 @@ describe("prendida", () => {
     render(<Pantalla activa="aprobaciones" enviar={() => {}} />);
     const barra = document.querySelector("[data-barra-celular]") as HTMLElement;
     const menu = document.querySelector("[data-hoja-mas]") as HTMLElement;
-    // 🔍 en el renglón 1; el período en el 2; empresa y Excel, con texto, en el 3.
-    const r1 = barra.querySelector('[data-renglon="titulo"]') as HTMLElement;
+    // Buscar, el campo entero, en su renglón; el período en el 2; empresa y Excel, con texto, en el 3.
+    const r1 = barra.querySelector('[data-renglon="buscar"]') as HTMLElement;
     const r2 = barra.querySelector('[data-renglon="periodo"]') as HTMLElement;
     const r3 = barra.querySelector('[data-renglon="filtros"]') as HTMLElement;
     expect(r1.contains(screen.getByLabelText("Buscar colaborador"))).toBe(true);
@@ -239,18 +239,16 @@ describe("prendida", () => {
     expect(document.querySelector('[data-renglon="periodo"]')).toBeNull();
   });
 
-  it("buscar no ocupa una fila: la lupa se abre EN la barra y filtra", () => {
+  it("buscar es el campo entero, siempre a la vista (nunca solo la lupa), y filtra", () => {
     render(<Pantalla activa="aprobaciones" enviar={() => {}} />);
-    expect(screen.queryByRole("searchbox")).toBeNull();
-    fireEvent.click(screen.getByLabelText("Buscar colaborador"));
     const campo = screen.getByRole("searchbox");
     const barra = document.querySelector("[data-barra-celular]") as HTMLElement;
     expect(barra.contains(campo)).toBe(true);
     fireEvent.change(campo, { target: { value: "Angel" } });
     expect(screen.getByTestId("buscando").textContent).toBe("Angel");
-    fireEvent.click(screen.getByText("Cancelar"));
+    fireEvent.change(campo, { target: { value: "" } });
     expect(screen.getByTestId("buscando").textContent).toBe("");
-    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(screen.getByRole("searchbox")).toBeTruthy();
   });
 
   it("el filtro puesto se ve: el chip dice cuál y va en negro", () => {

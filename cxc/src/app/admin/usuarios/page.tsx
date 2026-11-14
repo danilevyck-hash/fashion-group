@@ -2,6 +2,8 @@
 
 import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
+import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
@@ -92,6 +94,8 @@ function UsuariosPageInner() {
   // regalaría la pantalla entera de un saque. Se queda como estaba.
   const { authChecked, role } = useAuth({ moduleKey: "admin", allowedRoles: ["admin"] });
   const [tabRaw, setTab] = useUrlState("tab", "usuarios");
+  // Celular: el título es el selector de sección («Usuarios ▾»).
+  const barra = useBarraCelular(SECCION_EN_EL_TITULO_2026_11);
   // «Novedades» es SOLO de admin. El guard de arriba ya cierra la pantalla
   // entera, pero la pestaña se condiciona igual: así el permiso se lee en el
   // componente y un test lo puede exigir, en vez de depender de que nadie
@@ -317,9 +321,23 @@ function UsuariosPageInner() {
           Administración te sacaba del módulo al tocar su propio nombre.
           Ahora el breadcrumb es `Inicio › Administración › Usuarios`, y el
           grupo sale de `grupoDeModulo("usuarios")` — nunca escrito a mano. */}
-      <AppHeader module="Usuarios" grupo={grupoDeModulo("usuarios")} />
+      <AppHeader module="Usuarios" grupo={grupoDeModulo("usuarios")} tituloEnLaPantalla={barra && esAdmin} />
+      {barra && esAdmin && (
+        <ProveedorBarraCelular activo activa={tab}>
+          <BarraDeControles
+            titulo="Usuarios"
+            pestanas={[
+              { value: "usuarios", label: "Usuarios" },
+              { value: "novedades", label: "Novedades" },
+              { value: "visitas", label: "Actividad" },
+            ]}
+            activa={tab}
+            onPestana={setTab}
+          />
+        </ProveedorBarraCelular>
+      )}
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className={`max-w-5xl mx-auto px-6 ${barra && esAdmin ? "pb-8 pt-2" : "py-8"}`}>
         {/* Sin título grande: la barra sticky (celular), el breadcrumb
             (escritorio) y ahora también la pestaña dicen "Usuarios" — un h1
             visible encima de una pestaña con la misma palabra es el nombre 3×,
@@ -329,7 +347,7 @@ function UsuariosPageInner() {
         <h1 className="sr-only">Usuarios</h1>
 
         <Tabs value={tab} onValueChange={setTab} className={USUARIOS_APPLE_2026_10 ? "relative" : undefined}>
-          <TabsList className="-mx-6 mb-6 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-6 p-0 md:mx-0 md:px-0">
+          <TabsList className={`${barra && esAdmin ? "hidden " : ""}-mx-6 mb-6 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-6 p-0 md:mx-0 md:px-0`}>
             <TabsTrigger value="usuarios" className={TAB_TRIGGER_CLASS}>
               <UsersIcon className="hidden h-3.5 w-3.5 sm:block" /> Usuarios
             </TabsTrigger>
@@ -583,7 +601,7 @@ function UsuariosPageInner() {
                     id="usuario-empresa"
                     value={uCompany}
                     onChange={e => setUCompany(e.target.value)}
-                    placeholder="vistana, fashion_wear, etc."
+                    placeholder="Clave de la empresa"
                     /* text-base en móvil — anti-zoom de Safari, igual que los
                        demás campos del modal. */
                     className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm placeholder:text-gray-400 focus:outline-none focus:border-gray-900 transition"

@@ -136,7 +136,6 @@ export default function SeccionOtrosServicios({ codigo, refresco }: {
                 type="text" value={concepto}
                 onChange={(e) => setConcepto(e.target.value)}
                 aria-label="Concepto"
-                placeholder="Mensajería y flete"
                 className="min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
               />
             </label>

@@ -12,6 +12,8 @@ import FormulasConfig from "./FormulasConfig";
 import ReglasView from "./ReglasView";
 import CurvasView from "./CurvasView";
 import CatalogoDescripcionesAdmin from "./CatalogoDescripcionesAdmin";
+import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import { PESTANAS, VISTAS_POR_TAB, resolverTab, type Tab, type Vista } from "./pestanas";
 import { CARGAS_RECIENTES, PLANTILLA_APPLE_2026_10, navegacion } from "@/lib/depurador/plantilla-apple-2026-10";
 
@@ -107,6 +109,8 @@ function CargarInner() {
   const esAdmin = role === "admin";
   const { tab, vista, redirigido } = resolverTab(tabRaw, vistaRaw, esAdmin);
   const [refreshKey, setRefreshKey] = useState(0);
+  // Celular: el título es el selector de sección (sin enlaces azules ni «← Plantilla»).
+  const barra = useBarraCelular(SECCION_EN_EL_TITULO_2026_11);
 
   // El ?tab= viejo se reescribe en la URL (UN solo replace, con tab y vista
   // juntos: dos setValue seguidos se pisarían — cada uno parte de los params
@@ -171,7 +175,17 @@ function CargarInner() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader module="Plantilla Switch" />
+      <AppHeader module="Plantilla Switch" tituloEnLaPantalla={barra} />
+      <ProveedorBarraCelular activo={barra} activa={tab}>
+        {barra && (
+          <BarraDeControles
+            titulo="Plantilla Switch"
+            pestanas={PESTANAS.map((p) => ({ value: p.id, label: p.label }))}
+            activa={tab}
+            onPestana={(t) => irA(t as Tab, VISTAS_POR_TAB[t as Tab][0].id)}
+          />
+        )}
+      </ProveedorBarraCelular>
 
       <div className="mx-auto max-w-5xl px-4 pt-4">
         {/* ── 🩸 Las pestañas, MEDIDAS (30-jul-2026, build de producción) ──
@@ -191,14 +205,14 @@ function CargarInner() {
 
         {/* PLANTILLA_APPLE_2026_10: sin filas de pestañas. La caja abre sola,
             «Configuración» es un enlace y las demás vistas vuelven con «← Plantilla». */}
-        {nav.enlaces && (
+        {nav.enlaces && !barra && (
           <div className="flex justify-end gap-5">
             <button type="button" onClick={() => irA("tallas", "curvas")} className={enlace}>Tallas por bulto</button>
             <button type="button" onClick={() => irA("config", "formulas")} className={enlace}>Configuración</button>
           </div>
         )}
         {/* En Configuración, «← Plantilla» va en la MISMA línea que sus vistas. */}
-        {nav.volver && !nav.vistas && (
+        {nav.volver && !nav.vistas && !barra && (
           <button type="button" onClick={() => irA("plantilla", "nuevo")} className={enlace}>← Plantilla</button>
         )}
 
@@ -207,7 +221,7 @@ function CargarInner() {
             bulto» quedó con UNA sola vista, así que su fila no se dibuja. */}
         {nav.vistas && (
           <div className={nav.volver ? "flex items-center gap-4" : ""}>
-          {nav.volver && (
+          {nav.volver && !barra && (
             <button type="button" onClick={() => irA("plantilla", "nuevo")} className={`${enlace} shrink-0`}>← Plantilla</button>
           )}
           <div className={`${nav.volver ? "" : "mt-3 "}flex w-full flex-nowrap overflow-x-auto rounded-lg border border-gray-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>

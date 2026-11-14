@@ -98,7 +98,7 @@ export default function RenglonesDesdeFactura({ lineas, seleccion, setSeleccion 
                   <td className="py-1 pr-3 text-right tabular-nums">{l.cantidad}</td>
                   <td className="py-1 pr-3 text-right tabular-nums">${fmt(l.precio)}</td>
                   <td className="py-1 pr-3">
-                    {it ? <input type="text" value={it.talla} onChange={(e) => cambiar(idx, "talla", e.target.value)} placeholder="S · 32 · todas" aria-label="Talla" className={`${campo} w-24`} /> : <span className="text-gray-400">{l.talla || "—"}</span>}
+                    {it ? <input type="text" value={it.talla} onChange={(e) => cambiar(idx, "talla", e.target.value)} placeholder="Talla" aria-label="Talla" className={`${campo} w-24`} /> : <span className="text-gray-400">{l.talla || "—"}</span>}
                   </td>
                   <td className="py-1 pr-3 text-right">
                     {it ? <input type="number" min={0} value={it.cantidad} onChange={(e) => cambiar(idx, "cantidad", parseInt(e.target.value) || 0)} aria-label="Cantidad reclamada" className={`${campo} w-20 text-right`} /> : <span className="text-gray-300">—</span>}
@@ -143,7 +143,7 @@ export default function RenglonesDesdeFactura({ lineas, seleccion, setSeleccion 
               </label>
               {it && (
                 <div className="mt-2 grid grid-cols-2 gap-3">
-                  <label className="block"><span className="text-xs text-gray-500">Talla</span><input type="text" value={it.talla} onChange={(e) => cambiar(idx, "talla", e.target.value)} placeholder="S · 32 · todas" className="w-full border-b border-gray-200 py-2.5 text-base outline-none min-h-[44px]" /></label>
+                  <label className="block"><span className="text-xs text-gray-500">Talla</span><input type="text" value={it.talla} onChange={(e) => cambiar(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-200 py-2.5 text-base outline-none min-h-[44px]" /></label>
                   <label className="block"><span className="text-xs text-gray-500">Cant. reclamada</span><input type="number" inputMode="numeric" min={0} value={it.cantidad} onChange={(e) => cambiar(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none min-h-[44px]" /></label>
                   <label className="block"><span className="text-xs text-gray-500">Motivo</span><select value={it.motivo} onChange={(e) => cambiar(idx, "motivo", e.target.value)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none bg-transparent min-h-[44px]"><option value="">--</option>{DEFAULT_MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
                   <label className="block"><span className="text-xs text-gray-500">Género</span><select value={it.genero} onChange={(e) => cambiar(idx, "genero", e.target.value)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none bg-transparent min-h-[44px]"><option value="">Género…</option>{GENEROS.map((g) => <option key={g} value={g}>{generoLabel(g)}</option>)}</select></label>

@@ -126,7 +126,7 @@ async function abrirCajaCorreo(): Promise<HTMLInputElement> {
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /Enviar por correo al cliente/i }));
   });
-  return (await screen.findByPlaceholderText("cliente@correo.com")) as HTMLInputElement;
+  return (await screen.findByPlaceholderText("Correo del cliente")) as HTMLInputElement;
 }
 
 afterEach(() => {
@@ -182,7 +182,7 @@ describe("5.1 🔴 el correo viene YA ESCRITO del cliente elegido", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Enviar por correo al cliente/i }));
     });
-    const otraVez = (await screen.findByPlaceholderText("cliente@correo.com")) as HTMLInputElement;
+    const otraVez = (await screen.findByPlaceholderText("Correo del cliente")) as HTMLInputElement;
     expect(otraVez.value).toBe("compras@sportingshoes.com");
     expect(campo).toBeTruthy();
   });

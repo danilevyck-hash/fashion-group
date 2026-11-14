@@ -183,7 +183,6 @@ export function ModalRebote({
           value={motivo}
           onChange={(e) => onMotivo(e.target.value)}
           rows={3}
-          placeholder="Fondos insuficientes, firma incorrecta, etc."
           className="w-full border border-gray-200 rounded-lg py-2 px-3 text-base sm:text-sm outline-none focus:border-black transition resize-none mt-1 min-h-[48px]"
         />
         <div className="flex items-center gap-3 mt-4">
