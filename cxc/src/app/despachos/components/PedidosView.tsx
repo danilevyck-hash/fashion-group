@@ -1124,7 +1124,7 @@ export default function PedidosView({
       {barra && (
         <EnLaBarra
           pestana="pedidos"
-          filaIzq={pedidosCelular && ESTADOS_CELULAR !== "deslizar" ? segmentadoCelular : chips}
+          filaIzq={pedidosCelular && ESTADOS_CELULAR === "una-linea" ? segmentadoCelular : pedidosCelular && dosPorDos ? null : chips}
           menu={POR_EMPRESA ? (
             <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={CLASE_FILA_MENU}>
               <Printer size={18} strokeWidth={1.8} aria-hidden /> Imprimir
@@ -1133,6 +1133,8 @@ export default function PedidosView({
         />
       )}
 
+      {/* Dos por dos no cabe en el renglón de 44 px de la barra: va arriba de la página. */}
+      {pedidosCelular && dosPorDos && <div className="mb-2 flex">{segmentadoCelular}</div>}
       {filaEmpresaCelular}
       <div className={pedidosCelular ? "mb-2" : "mb-3 flex flex-wrap items-center justify-between gap-3"}>
         {/* AJUSTES_APPLE_6 (punto 2): el título en una línea y la frescura al lado si cabe; si no, debajo, chica.
