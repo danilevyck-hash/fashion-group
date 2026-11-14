@@ -37,6 +37,7 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { getModuleColor } from "@/lib/moduleColors";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { ATRIBUTO_BARRA_FIJA, CONSULTA_CELULAR } from "@/lib/navegacion/barra-celular";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { CLASE_VIDRIO, RADIO_VIDRIO, VIDRIO_2026_10, conVidrio } from "@/lib/ui/vidrio";
@@ -421,18 +422,14 @@ export function BuscarEnLaBarra({
   }
   return (
     <div data-buscar-barra className="absolute inset-0 z-10 flex items-center gap-2 bg-white">
-      <div className="relative min-w-0 flex-1">
-        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-        <input
-          ref={campo}
-          type="search"
-          value={valor}
-          onChange={(e) => onCambiar(e.target.value)}
-          placeholder={placeholder}
-          aria-label={etiqueta}
-          className="h-11 w-full rounded-md bg-gray-100 pl-9 pr-3 text-base text-gray-900 outline-none"
-        />
-      </div>
+      <CampoBuscar
+        ref={campo}
+        value={valor}
+        onChange={(e) => onCambiar(e.target.value)}
+        placeholder={placeholder}
+        aria-label={etiqueta}
+        envoltorio="flex-1"
+      />
       <button type="button" onClick={() => { onCambiar(""); setAbierto(false); }} className="min-h-[44px] shrink-0 px-1 text-[15px] text-blue-600">
         Cancelar
       </button>

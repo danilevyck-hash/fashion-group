@@ -15,6 +15,7 @@ import { PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
 import { hoyPanamaYmd, getQuincenaRangePanama } from "@/lib/prestamos-quincena";
 import type { Colaborador, DatosPrestamos, FilaPrestamo } from "@/lib/prestamos-lista-server";
 import AplicarQuincenaModal from "./components/AplicarQuincenaModal";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
 import NuevoMovimientoModal from "./components/NuevoMovimientoModal";
 import ElegirPersonaModal from "./components/ElegirPersonaModal";
 import { descargarHistorialPrestamos, type AmbitoHistorial } from "@/lib/prestamos-descargar-historial";
@@ -272,20 +273,25 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
           <div className="flex-1" />
 
-          <input
+          {/* Celular: buscador y empresa en su propia fila, a todo el ancho. */}
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+          <CampoBuscar
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar colaborador..."
-            className="min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition w-40"
+            aria-label="Buscar colaborador"
+            envoltorio="flex-1 sm:w-44 sm:flex-none"
+            className="min-h-[44px]"
           />
           <select
             value={filterEmpresa}
             onChange={e => setFilterEmpresa(e.target.value)}
-            className="min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition"
+            className="h-11 min-h-[44px] shrink-0 rounded-md border border-campo bg-white px-3 text-sm outline-none focus:border-gray-900 transition"
           >
             <option value="all">Todas</option>
             {empresas.map(e => <option key={e} value={e}>{e}</option>)}
           </select>
+          </div>
         </div>
 
         {loading ? (
