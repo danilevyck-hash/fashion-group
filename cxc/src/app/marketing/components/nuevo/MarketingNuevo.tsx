@@ -27,6 +27,8 @@ import { puedeEscribirMarketing } from "@/lib/marketing/roles";
 import { HREF_MOBILIARIO } from "@/lib/marketing/tiendas-y-marcas";
 import { PESTANA_ACTIVA, PESTANA_INACTIVA } from "@/lib/marketing/marketing-2026-10";
 import { SoloCobrableContexto } from "@/lib/marketing/solo-cobrable-contexto";
+import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import RegistrarGastoModal from "../RegistrarGastoModal";
 import PortadaProveedores from "../PortadaProveedores";
 import PorCobrarNuevo from "./PorCobrarNuevo";
@@ -47,6 +49,9 @@ export default function MarketingNuevo({ role, marcas }: { role: string; marcas:
     ? tabRaw
     : "por-cobrar";
   const escribe = puedeEscribirMarketing(role);
+  // Celular: el título es el selector («Por cobrar ▾»); Mobiliario y
+  // Proveedores entran a la misma lista en vez del «···».
+  const barra = useBarraCelular(SECCION_EN_EL_TITULO_2026_11);
   const [datos, setDatos] = useState<MarketingDelCobro | null>(null);
   const [error, setError] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -76,8 +81,24 @@ export default function MarketingNuevo({ role, marcas }: { role: string; marcas:
   return (
     <SoloCobrableContexto.Provider value>
       <div className="space-y-5" data-testid="marketing-nuevo">
-        <h1 className="text-2xl font-semibold text-gray-900 sm:sr-only">Marketing</h1>
-        <div className="flex items-center gap-1 border-b border-gray-200" role="tablist">
+        {barra && (
+          <div className="-mx-4 -mt-6">
+            <ProveedorBarraCelular activo activa={tab}>
+              <BarraDeControles
+                titulo="Marketing"
+                pestanas={[
+                  ...PESTANAS.map((p) => ({ value: p.id, label: p.rotulo })),
+                  { value: "proveedores", label: "Proveedores" },
+                  { value: "mobiliario", label: "Mobiliario" },
+                ]}
+                activa={tab}
+                onPestana={(v) => (v === "mobiliario" ? router.push(HREF_MOBILIARIO) : setTab(v as Pestana))}
+              />
+            </ProveedorBarraCelular>
+          </div>
+        )}
+        <h1 className={barra ? "sr-only" : "text-2xl font-semibold text-gray-900 sm:sr-only"}>Marketing</h1>
+        <div className={barra ? "hidden" : "flex items-center gap-1 border-b border-gray-200"} role="tablist">
           {PESTANAS.map((p) => (
             <button
               key={p.id}

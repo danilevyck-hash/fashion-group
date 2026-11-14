@@ -32,6 +32,14 @@
  *  Daniel aprobó el 2-oct-2026 la barra v3.3: prendida. */
 export const BARRA_CELULAR_2026_10 = true;
 
+/**
+ * 🔴 UNA SOLA FORMA DE CAMBIAR DE SECCIÓN EN EL CELULAR (nov-2026): el título
+ * es el selector («Pedidos ▾»). Plantilla Switch (enlaces azules), Marketing,
+ * Usuarios y Ventas Boston (pestañas subrayadas) pasan a `BarraDeControles`.
+ * `false` = esas cuatro pantallas como estaban. La computadora no cambia.
+ */
+export const SECCION_EN_EL_TITULO_2026_11 = true;
+
 /** ¿Se dibuja la barra nueva? Solo con el interruptor prendido y en el celular. */
 export function usaBarraCelular(esCelular: boolean, interruptor: boolean = BARRA_CELULAR_2026_10): boolean {
   return interruptor && esCelular;
