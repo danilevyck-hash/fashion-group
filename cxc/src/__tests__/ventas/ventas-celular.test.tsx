@@ -137,7 +137,7 @@ describe("2a · la tabla por empresa", () => {
     expect(porcentajeDeLaTabla(-0.78)).toEqual({ texto: "▼ −78%", tono: "dn" });
     expect(porcentajeDeLaTabla(0.04)).toEqual({ texto: "+4%", tono: "fl" });
     expect(porcentajeDeLaTabla(-0.004)).toEqual({ texto: "+0%", tono: "fl" });
-    expect(porcentajeDeLaTabla(null).texto).toBe("n/a");
+    expect(porcentajeDeLaTabla(null).texto).toBe("—"); // n.º 8, revisión 110
   });
 });
 

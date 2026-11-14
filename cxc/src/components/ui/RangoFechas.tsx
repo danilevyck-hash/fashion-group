@@ -61,6 +61,14 @@ import { CalendarDays } from "lucide-react";
 // archivo trae `react-day-picker` al bundle inicial y anula el `dynamic()`.
 import { aIso, deIso } from "./rango-fechas-iso";
 import { vidrioSobre, conVidrio, CLASE_VIDRIO, RADIO_VIDRIO } from "@/lib/ui/vidrio";
+import { VENTAS_RANGO_VIDRIO_GRUESO } from "@/lib/ui/revision-110-ventas";
+
+/** La hoja del calendario: casi blanca y con desenfoque largo (n.º 7). */
+const HOJA_QUE_SE_LEE = {
+  backgroundColor: "rgb(255 255 255 / 0.98)",
+  WebkitBackdropFilter: "blur(40px) saturate(180%)",
+  backdropFilter: "blur(40px) saturate(180%)",
+} as const;
 import {
   CALENDARIO_SIMPLE_2026_10, GUIA_PRIMER_DIA, GUIA_ULTIMO_DIA, etiquetaRangoCorta, ROTULO_BOTON_RANGO,
 } from "@/lib/ui/calendario-simple";
@@ -399,7 +407,12 @@ export default function RangoFechas({
       {abierto && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/40" onClick={() => { setAbierto(false); setAncla(null); }} />
-          <div className={conVidrio("absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col rounded-t-2xl bg-white shadow-xl", `absolute inset-x-2 bottom-2 flex max-h-[88vh] flex-col ${CLASE_VIDRIO} ${RADIO_VIDRIO}`)}>
+          <div
+            className={conVidrio("absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col rounded-t-2xl bg-white shadow-xl", `absolute inset-x-2 bottom-2 flex max-h-[88vh] flex-col ${CLASE_VIDRIO} ${RADIO_VIDRIO}`)}
+            // n.º 7 (revisión 110): el calendario es una hoja llena de números;
+            // con el 92 % se leían los montos de la tabla debajo de los días.
+            style={VENTAS_RANGO_VIDRIO_GRUESO ? HOJA_QUE_SE_LEE : undefined}
+          >
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
               <span className="text-sm font-medium text-gray-900" data-guia-calendario>{titulo}</span>
               <button

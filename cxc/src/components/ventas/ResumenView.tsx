@@ -39,6 +39,8 @@ import { pieCorteCosto } from "@/lib/ventas/margen-mes-en-curso";
 import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { cn } from "@/lib/utils";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { VENTAS_PIE_UNA_LINEA, VENTAS_TABLA_AL_MES_EN_CURSO } from "@/lib/ui/revision-110-ventas";
 import { variacionPct } from "@/lib/variacion";
 import { ResumenViewMobile } from "./ResumenViewMobile";
 import { NumeroDelResumen } from "./NumeroDelResumen";
@@ -206,6 +208,20 @@ export function ResumenView({
   // existía en el DOM mientras la fila estaba transformada.
   const raizRef = useRef<HTMLDivElement>(null);
   const focoPendiente = useRef<string | null>(null);
+  // n.º 103 (revisión 110): la tabla abre deslizada hasta el mes en curso
+  // («… SEP · OCT · NOV │ TOTAL»); octubre y noviembre quedaban tapados por las
+  // columnas fijas de la derecha. Solo mueve la vista, ningún número.
+  const deslizarRef = useRef<HTMLDivElement>(null);
+  const mesVisible = isClosedYear ? 12 : Number(hoyPanama().slice(5, 7));
+  useEffect(() => {
+    const cont = deslizarRef.current;
+    if (!VENTAS_TABLA_AL_MES_EN_CURSO || !cont) return;
+    const th = cont.querySelector<HTMLElement>(`th[data-mes-col="${mesVisible - 1}"]`);
+    const fija = cont.querySelector<HTMLElement>('th[data-col-fija="total"]');
+    if (!th || !fija) return;
+    const anchoFijo = cont.getBoundingClientRect().right - fija.getBoundingClientRect().left;
+    cont.scrollLeft = Math.max(0, th.offsetLeft + th.offsetWidth - (cont.clientWidth - anchoFijo));
+  }, [mesVisible, data]);
   const cerrarFila = useCallback(() => {
     setFilaDetalle((actual) => {
       focoPendiente.current = actual?.focoCelda ?? null;
@@ -513,7 +529,7 @@ export function ResumenView({
 
       {/* Heatmap table */}
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
+        <div ref={deslizarRef} className="overflow-x-auto">
           <table className="w-full border-collapse" style={{ minWidth: 1100 }}>
             {/* Cabecera fija al scrollear (sticky top). Las esquinas Empresa,
                 Total y Proyección quedan sticky en ambos ejes (left/right +
@@ -523,8 +539,8 @@ export function ResumenView({
                 <th className="sticky left-0 top-0 z-30 min-w-[120px] bg-gray-100 px-2.5 py-3.5 text-xs font-medium uppercase tracking-wide text-gray-500">
                   Empresa
                 </th>
-                {cols.map(c => (
-                  <th key={c} className="sticky top-0 z-20 bg-gray-100 px-1.5 py-3.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
+                {cols.map((c, ci) => (
+                  <th key={c} data-mes-col={ci} className="sticky top-0 z-20 bg-gray-100 px-1.5 py-3.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
                     {c}
                   </th>
                 ))}
@@ -691,9 +707,28 @@ export function ResumenView({
           </table>
         </div>
         {(partialFooter || mesesGris || pieCorte) && (
+          VENTAS_PIE_UNA_LINEA ? (
+            // n.º 11 (revisión 110): UNA línea; el detalle, en el ⓘ.
+            <p
+              data-pie-matriz="escritorio"
+              className="flex items-center gap-1 truncate border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500"
+            >
+              <span className="truncate">{pieCorto(data, !!mesesGris)}</span>
+              <span
+                role="img"
+                tabIndex={0}
+                aria-label={[partialFooter, pieCorte, mesesGris ? LEYENDA_MESES_PROYECTADOS : null].filter(Boolean).join(". ")}
+                title={[partialFooter, pieCorte, mesesGris ? LEYENDA_MESES_PROYECTADOS : null].filter(Boolean).join(". ")}
+                className="inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center rounded-full text-gray-400 hover:text-gray-700"
+              >
+                ⓘ
+              </span>
+            </p>
+          ) : (
           <p data-pie-matriz="escritorio" className="border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500">
             {[partialFooter, pieCorte, mesesGris ? LEYENDA_MESES_PROYECTADOS : null].filter(Boolean).join(" · ")}
           </p>
+          )
         )}
       </Card>
 
@@ -1280,6 +1315,19 @@ function parseIsoDateResumen(iso: string): Date {
 // VOCABULARIO (limpieza jul-2026): el pill de arriba dice "Sincronizado <fecha>"
 // (cuándo corrió el sync) y este footer "Datos hasta el <día>" (hasta dónde
 // llega la data). Son dos cosas distintas y se leen distinto a propósito.
+/** n.º 11 · «Datos al 13 nov · vs 1–13 nov 2025 · en gris, proyección». */
+function pieCorto(data: VentasResumen, conGris: boolean): string {
+  const partes: string[] = [];
+  if (data.es_periodo_parcial && data.fecha_corte && data.dia_corte_anio_anterior) {
+    const cur = parseIsoDateResumen(data.fecha_corte);
+    const prev = parseIsoDateResumen(data.dia_corte_anio_anterior);
+    partes.push(`Datos al ${cur.getDate()} ${MONTHS[cur.getMonth()].toLowerCase()}`);
+    partes.push(`vs 1–${prev.getDate()} ${MONTHS[prev.getMonth()].toLowerCase()} ${prev.getFullYear()}`);
+  }
+  if (conGris) partes.push("en gris, proyección");
+  return partes.join(" · ");
+}
+
 function buildPartialFooter(data: VentasResumen): string | null {
   if (!data.es_periodo_parcial || !data.fecha_corte || !data.dia_corte_anio_anterior) return null;
   const cur = parseIsoDateResumen(data.fecha_corte);
