@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { Check, Printer, Undo2 } from "lucide-react";
 import { ConfirmModal } from "@/components/ui";
 import { AJUSTES_APPLE_6_2026_10 as CIRCULO } from "@/lib/ajustes-apple-6-2026-10";
+import { PEDIDOS_CELULAR_2026_11 as PEDIDOS_CELULAR } from "@/lib/ui/celular-optimizar-2026-11";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, ChipSelector, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { useToast } from "@/components/ToastSystem";
@@ -419,6 +420,40 @@ export default function PedidosView({
       )}
     </div>
   );
+
+  // 🔴 Celular (14-nov-2026, `PEDIDOS_CELULAR_2026_11`): los estados no se
+  // deslizan. Un segmentado de anchos iguales, como iOS; un nombre largo
+  // («En preparación») baja a dos líneas en vez de cortarse. La empresa va en
+  // su propia fila, debajo (`filaEmpresaCelular`).
+  const segmentadoCelular = (
+    <div
+      role="group"
+      aria-label="Estado"
+      data-segmentado-pedidos
+      className="grid w-full min-w-0 shrink grow basis-full gap-1 rounded-xl bg-pista-celular p-1"
+      style={{ gridTemplateColumns: `repeat(${CHIPS.length}, minmax(0, 1fr))` }}
+    >
+      {CHIPS.map((c) => (
+        <button
+          key={c.value}
+          type="button"
+          aria-pressed={filtro === c.value}
+          onClick={() => { setFiltro(c.value); void cargar(); }}
+          className={`relative min-h-9 rounded-lg px-1 text-[12px] font-medium leading-tight transition active:scale-[0.97] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] ${
+            filtro === c.value ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"
+          }`}
+        >
+          {c.label}
+        </button>
+      ))}
+    </div>
+  );
+  const pedidosCelular = barra && PEDIDOS_CELULAR;
+  const filaEmpresaCelular = pedidosCelular && NUEVO && hayQueElegirEmpresa ? (
+    <div data-fila-empresa className="mb-2 flex">
+      <ChipSelector rotulo="Empresa" valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />
+    </div>
+  ) : null;
 
   // v2: chip chico que se toca para cambiar; quien no marca ve el mismo rótulo, quieto.
   const chipEstado = (p: PedidoBodega) => {
@@ -1080,7 +1115,7 @@ export default function PedidosView({
       {barra && (
         <EnLaBarra
           pestana="pedidos"
-          filaIzq={chips}
+          filaIzq={pedidosCelular ? segmentadoCelular : chips}
           menu={POR_EMPRESA ? (
             <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={CLASE_FILA_MENU}>
               <Printer size={18} strokeWidth={1.8} aria-hidden /> Imprimir
@@ -1089,14 +1124,19 @@ export default function PedidosView({
         />
       )}
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        {/* AJUSTES_APPLE_6 (punto 2): el título en una línea y la frescura al lado si cabe; si no, debajo, chica. */}
-        <div data-titulo-pedidos className={CIRCULO ? "flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5" : undefined}>
-          <p className="text-base font-semibold text-gray-900">
+      {filaEmpresaCelular}
+      <div className={pedidosCelular ? "mb-2" : "mb-3 flex flex-wrap items-center justify-between gap-3"}>
+        {/* AJUSTES_APPLE_6 (punto 2): el título en una línea y la frescura al lado si cabe; si no, debajo, chica.
+            En el celular (14-nov-2026) van en UNA línea: el resumen a la izquierda y la frescura a la derecha. */}
+        <div
+          data-titulo-pedidos
+          className={pedidosCelular ? "flex min-w-0 items-center justify-between gap-1.5" : CIRCULO ? "flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5" : undefined}
+        >
+          <p className={pedidosCelular ? "min-w-0 text-[13px] font-semibold leading-snug text-gray-900" : "text-base font-semibold text-gray-900"}>
             {pedidos ? (CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy)) : " "}
           </p>
           <LineaDeFrescura
-            className={CIRCULO ? "!text-xs" : undefined}
+            className={pedidosCelular ? "shrink-0 !text-[12px]" : CIRCULO ? "!text-xs" : undefined}
             actualizado={actualizado}
             opciones={susEmpresas.map((empresa) => ({ modulo: "pedidos", empresa, label: nombreCortoEmpresa(empresa) }))}
             secuencial
