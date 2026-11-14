@@ -26,6 +26,20 @@
 import Link from "next/link";
 import { money, moneyK } from "./formato";
 import { fmtFrescura } from "@/lib/ventas/referencia-info";
+import { VG_INVENTARIO_PIE_UNA_LINEA } from "@/lib/ui/revision-110-ventas";
+import { Ayuda } from "@/components/shared/Ayuda";
+
+/** n.º 26 · «Sin dato de Boston ni Multifashion · 844 u. sin costo». */
+export function pieInventario(inv: Pick<InventarioData, "sinInventario" | "sinCosto">): string {
+  const partes: string[] = [];
+  const nombres = inv.sinInventario.map((s) => s.name);
+  if (nombres.length > 0) {
+    const lista = nombres.length === 1 ? nombres[0] : `${nombres.slice(0, -1).join(", ")} ni ${nombres[nombres.length - 1]}`;
+    partes.push(`Sin dato de ${lista}`);
+  }
+  if (inv.sinCosto.unidades > 0) partes.push(`${piezas(inv.sinCosto.unidades)} u. sin costo`);
+  return partes.join(" · ");
+}
 
 export interface InventarioEmpresaRow {
   key: string;
@@ -104,9 +118,11 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
       </div>
       {/* La bajada dice CUÁL de los dos números es plata. Sin ella, los $4,06M
           de abajo se leen como parte de lo que tiene. */}
+      {!VG_INVENTARIO_PIE_UNA_LINEA && (
       <p className="mt-0.5 text-xs text-gray-500">
         Valorizado al costo. El valor a precio de venta es referencial, no realizado.
       </p>
+      )}
 
       <div className="mt-3 space-y-2">
         {inv.porEmpresa.map((e) => (
@@ -144,7 +160,22 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
       </div>
 
       {/* ── Lo que NO se midió, dicho con todas las letras ── */}
-      {(inv.sinInventario.length > 0 || inv.sinCosto.articulos > 0) && (
+      {VG_INVENTARIO_PIE_UNA_LINEA ? (
+        <p data-pie-inventario className="mt-3 flex items-center gap-1 border-t border-gray-100 pt-3 text-xs text-gray-500">
+          <span className="min-w-0 truncate">{pieInventario(inv) || "Valorizado al costo"}</span>
+          <Ayuda titulo="Inventario: qué se cuenta" className="-my-3">
+            <p>Valorizado al costo. El valor a precio de venta es referencial, no realizado.</p>
+            {inv.sinInventario.map((x) => (
+              <p key={x.key} className="mt-1">{x.name}: {x.motivo}</p>
+            ))}
+            {inv.sinCosto.articulos > 0 && (
+              <p className="mt-1">
+                {piezas(inv.sinCosto.unidades)} unidades ({inv.sinCosto.articulos} {inv.sinCosto.articulos === 1 ? "artículo" : "artículos"}) no tienen costo cargado en Switch: quedan fuera del valor de arriba.
+              </p>
+            )}
+          </Ayuda>
+        </p>
+      ) : (inv.sinInventario.length > 0 || inv.sinCosto.articulos > 0) && (
         <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
           {inv.sinInventario.map((s) => (
             <p key={s.key} data-fila-sin-inventario={s.key} className="text-xs text-gray-500">

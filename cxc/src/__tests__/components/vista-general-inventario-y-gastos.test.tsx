@@ -22,6 +22,7 @@
  */
 
 import { describe, it, expect, afterEach } from "vitest";
+import { VG_INVENTARIO_PIE_UNA_LINEA } from "@/lib/ui/revision-110-ventas";
 import { render, screen, cleanup } from "@testing-library/react";
 
 import InventarioPorEmpresa, {
@@ -79,6 +80,15 @@ describe("🔴 el inventario se abre POR EMPRESA", () => {
 
   it("🔴 Boston y Multifashion se NOMBRAN con su motivo, y NUNCA en $0", () => {
     render(<InventarioPorEmpresa inv={INV} />);
+    if (VG_INVENTARIO_PIE_UNA_LINEA) {
+      // n.º 26 (revisión 110): UNA línea gris al pie que las NOMBRA; el motivo, en el ⓘ.
+      const pie = document.querySelector("[data-pie-inventario]")!.textContent!;
+      for (const s of INV.sinInventario) expect(pie).toContain(s.name);
+      expect(pie).not.toContain("$0");
+      expect(document.querySelector('[data-fila-inventario="confecciones_boston"]')).toBeNull();
+      expect(document.querySelector('[data-fila-inventario="american_classic"]')).toBeNull();
+      return;
+    }
     for (const s of INV.sinInventario) {
       const fila = document.querySelector(`[data-fila-sin-inventario="${s.key}"]`);
       expect(fila, `falta el aviso de ${s.key}`).not.toBeNull();
@@ -143,6 +153,10 @@ describe("🔴 la pantalla dice CUÁNDO se midió, siempre", () => {
 describe("🔴 lo que quedó sin valorizar se dice, no se suma como cero", () => {
   it("las 873 piezas sin costo salen en pantalla", () => {
     render(<InventarioPorEmpresa inv={INV} />);
+    if (VG_INVENTARIO_PIE_UNA_LINEA) {
+      expect(document.querySelector("[data-pie-inventario]")!.textContent).toContain("873 u. sin costo");
+      return;
+    }
     const t = document.querySelector('[data-col="sin-costo"]')!.textContent!;
     expect(t).toContain("873 unidades"); // 1-oct-2026, Daniel: nombres normales de ERP
     expect(t).toContain("7 artículos");

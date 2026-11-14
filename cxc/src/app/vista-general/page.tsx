@@ -21,6 +21,28 @@ import InventarioPorEmpresa, {
   type InventarioData,
 } from "./InventarioPorEmpresa";
 import { moneyK, pct } from "./formato";
+import { capitalizarNombre, esGritado } from "@/lib/nombre-en-pantalla";
+import {
+  VG_ALERTAS_EMPRESA_ABAJO,
+  VG_ALERTAS_SIN_ROJO,
+  VG_CXP_SIN_VENCIDO,
+  VG_DISPONIBILIDAD_AVISA_FECHA,
+  VG_PERIODO_SIN_AIRE,
+} from "@/lib/ui/revision-110-ventas";
+
+/** n.º 23 · Un saldo de banco con más de 7 días se avisa en ámbar. */
+const DIAS_SALDO_VIEJO = 7;
+function saldoViejo(iso: string, hoy: string): boolean {
+  const a = Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${hoy}T00:00:00Z`);
+  return Number.isFinite(a) && Number.isFinite(b) && (b - a) / 86_400_000 > DIAS_SALDO_VIEJO;
+}
+
+/** n.º 27 · El proveedor como se escribe: «LATIN FITNESS GROUP» → «Latin Fitness Group»; «S.A.» se queda. */
+function nombreProveedor(n: string): string {
+  if (!VG_ALERTAS_SIN_ROJO || !esGritado(n)) return n;
+  return capitalizarNombre(n).replace(/(?:\p{L}\.){2,}/gu, (m) => m.toLocaleUpperCase("es"));
+}
 
 // ── Tipos del API ─────────────────────────────────────────────────────────────
 
@@ -131,9 +153,9 @@ function VistaGeneralInner() {
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Vista general" />
-      <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className={`max-w-5xl mx-auto px-4 ${VG_PERIODO_SIN_AIRE ? "pt-2 pb-8 md:py-6" : "py-8"}`}>
         {/* Encabezado + navegación de mes */}
-        <div className="mb-8">
+        <div className={VG_PERIODO_SIN_AIRE ? "mb-3 md:mb-5" : "mb-8"}>
           {/* Sin título grande: "Vista General" ya lo dicen la barra sticky
               (celular) y el breadcrumb (escritorio). Queda sr-only para no
               dejar la página sin encabezado. El `mt-3` de la fila de mes se fue
@@ -259,7 +281,9 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         label="Disponibilidad"
         value={disponibilidad ? moneyK(disponibilidad.total) : "—"}
         sub={disponibilidad
-          ? <span className="text-gray-400">al {fechaCorta(disponibilidad.fechaMasVieja)}</span>
+          ? VG_DISPONIBILIDAD_AVISA_FECHA && saldoViejo(disponibilidad.fechaMasVieja, hoyPanama())
+            ? <span data-saldo-viejo className="text-amber-600 font-medium">sin actualizar desde el {fechaCorta(disponibilidad.fechaMasVieja)}</span>
+            : <span className="text-gray-400">al {fechaCorta(disponibilidad.fechaMasVieja)}</span>
           : <span className="text-gray-400">Sin saldos cargados</span>}
       />
 
@@ -303,9 +327,16 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         label="Cuentas por pagar"
         value={moneyK(cxp.total)}
         sub={
+          VG_CXP_SIN_VENCIDO ? (
+            // n.º 22: la edad, no la mora — nunca «vencido» (regla de Proveedores).
+            <span className={cxp.vencido > 0 ? "text-gray-700 font-medium" : "text-gray-400"}>
+              {moneyK(cxp.vencido)} con más de 90 días
+            </span>
+          ) : (
           <span className={cxp.vencido > 0 ? "text-amber-600 font-medium" : "text-gray-400"}>
             {moneyK(cxp.vencido)} vencido +90d
           </span>
+          )
         }
       />
     </div>
@@ -379,7 +410,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
           ) : (
             data.cxc.topClientes.map((c) => (
               <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/cxc" className={FILA_ALERTA}>
-                <span className={`${NOMBRE_ALERTA} truncate`}>{c.nombre}<span className="text-gray-400 text-[12px]"> · {c.empresa}</span></span>
+                <NombreAlerta nombre={c.nombre} empresa={c.empresa} />
                 <span className="text-sm font-semibold text-red-600 tabular-nums shrink-0">{moneyK(c.saldo)}</span>
               </Link>
             ))
@@ -393,8 +424,8 @@ function Atencion({ data }: { data: VistaGeneral }) {
           ) : (
             data.cxp.topProveedores.map((p) => (
               <Link key={`${p.empresa}-${p.nombre}`} href="/proveedores" className={FILA_ALERTA}>
-                <span className={`${NOMBRE_ALERTA} truncate`}>{p.nombre}<span className="text-gray-400 text-[12px]"> · {p.empresa}</span></span>
-                <span className="text-sm font-semibold text-red-600 tabular-nums shrink-0">{moneyK(p.saldo)}</span>
+                <NombreAlerta nombre={nombreProveedor(p.nombre)} empresa={p.empresa} />
+                <span className={`text-sm font-semibold tabular-nums shrink-0 ${VG_ALERTAS_SIN_ROJO ? "text-gray-800" : "text-red-600"}`}>{moneyK(p.saldo)}</span>
               </Link>
             ))
           )}
@@ -407,7 +438,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
           ) : (
             data.reclamos.antiguos.map((r) => (
               <Link key={r.id} href={enlaceDetalleReclamo(r.id, r.empresa)} className={FILA_ALERTA}>
-                <span className={`${NOMBRE_ALERTA} truncate`}>{r.nro}<span className="text-gray-400 text-[12px]"> · {r.empresa}</span></span>
+                <NombreAlerta nombre={r.nro} empresa={r.empresa} />
                 <span className="text-sm font-semibold text-amber-600 tabular-nums shrink-0">{r.dias}d</span>
               </Link>
             ))
@@ -415,6 +446,19 @@ function Atencion({ data }: { data: VistaGeneral }) {
         </AlertCard>
       </div>
     </div>
+  );
+}
+
+/** n.º 28: la empresa baja a su propia línea gris; nada se corta. */
+function NombreAlerta({ nombre, empresa }: { nombre: string; empresa: string }) {
+  if (!VG_ALERTAS_EMPRESA_ABAJO) {
+    return <span className={`${NOMBRE_ALERTA} truncate`}>{nombre}<span className="text-gray-400 text-[12px]"> · {empresa}</span></span>;
+  }
+  return (
+    <span className="flex min-w-0 flex-col leading-tight">
+      <span className={`${NOMBRE_ALERTA} break-words`}>{nombre}</span>
+      <span className="text-[12px] text-gray-400">{empresa}</span>
+    </span>
   );
 }
 

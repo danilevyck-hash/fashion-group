@@ -41,6 +41,7 @@ import {
   type MotivoSinGastoEgresos,
 } from "@/lib/egresos/gasto-mostrable";
 import { money } from "./formato";
+import { VG_GASTOS_PAUSADO_UNA_LINEA } from "@/lib/ui/revision-110-ventas";
 
 export interface GastoEmpresaRow {
   key: string;
@@ -69,7 +70,29 @@ export function pillGasto(g: GastoEmpresaRow): { label: string; cls: string } | 
   return { label: "Sin datos", cls: "bg-gray-100 text-gray-500" };
 }
 
+/** El registro de gastos está pausado (7-oct-2026): ninguna empresa trae
+ *  número y todas dicen el motivo de la pausa. */
+const MOTIVOS_DE_PAUSA: ReadonlySet<string> = new Set(["sin_movimientos", "sin_datos"]);
+export function gastosPausados(filas: readonly { gasto: number | null; motivo: string | null }[]): boolean {
+  return filas.length > 0 && filas.every((f) => f.gasto === null && !!f.motivo && MOTIVOS_DE_PAUSA.has(f.motivo));
+}
+
 export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; mes: string }) {
+  // n.º 24 (revisión 110): mientras esté pausado, UNA línea y no 8 renglones iguales.
+  if (VG_GASTOS_PAUSADO_UNA_LINEA && gastos.disponible && gastosPausados(gastos.porEmpresa)) {
+    return (
+      <div data-panel="gastos" data-gastos-pausado className="rounded-[14px] border border-gray-200 bg-white px-4">
+        <Link
+          href={`/gastos-contabilidad?mes=${mes}`}
+          className="flex min-h-[52px] items-center gap-2 text-sm"
+        >
+          <span className="font-semibold text-gray-700">Gastos</span>
+          <span className="text-gray-500">· registro pausado</span>
+          <span className="ml-auto text-xs font-medium text-blue-600">Ir a Gastos ›</span>
+        </Link>
+      </div>
+    );
+  }
   return (
     <div data-panel="gastos" className="rounded-[14px] border border-gray-200 bg-white p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

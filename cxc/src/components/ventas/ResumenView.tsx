@@ -40,6 +40,7 @@ import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./Fi
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { cn } from "@/lib/utils";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { VENTAS_PIE_UNA_LINEA, VENTAS_TABLA_AL_MES_EN_CURSO } from "@/lib/ui/revision-110-ventas";
 import { variacionPct } from "@/lib/variacion";
 import { ResumenViewMobile } from "./ResumenViewMobile";
@@ -711,18 +712,14 @@ export function ResumenView({
             // n.º 11 (revisión 110): UNA línea; el detalle, en el ⓘ.
             <p
               data-pie-matriz="escritorio"
-              className="flex items-center gap-1 truncate border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500"
+              className="flex items-center gap-1 border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500"
             >
               <span className="truncate">{pieCorto(data, !!mesesGris)}</span>
-              <span
-                role="img"
-                tabIndex={0}
-                aria-label={[partialFooter, pieCorte, mesesGris ? LEYENDA_MESES_PROYECTADOS : null].filter(Boolean).join(". ")}
-                title={[partialFooter, pieCorte, mesesGris ? LEYENDA_MESES_PROYECTADOS : null].filter(Boolean).join(". ")}
-                className="inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center rounded-full text-gray-400 hover:text-gray-700"
-              >
-                ⓘ
-              </span>
+              <Ayuda titulo="Qué dice esta tabla" className="-my-3">
+                {[partialFooter, pieCorte, mesesGris ? LEYENDA_MESES_PROYECTADOS : null].filter(Boolean).map((t) => (
+                  <p key={t as string} className="mt-1 first:mt-0">{t}</p>
+                ))}
+              </Ayuda>
             </p>
           ) : (
           <p data-pie-matriz="escritorio" className="border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500">
