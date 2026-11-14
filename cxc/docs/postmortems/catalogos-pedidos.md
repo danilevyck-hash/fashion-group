@@ -3539,8 +3539,11 @@ Daniel aprobó las capturas «hoy vs recomendación» el 6-oct-2026. Administrar
 - Niños: Switch escribe `TH101074T000` y ASW `TH101074T`: se busca también sin el «000» final.
 - Sin datos del proveedor → una fila **AMARILLA** con los pares del pedido, sin talla ni código (como el Excel de referencia que hizo Daniel). Si los pares del pedido no llenan cajas enteras → la opción entera **NARANJA**, con Pares **vacío**.
 - Una caja que no cuadra (una talla que no divide exacto, o la suma distinta de los pares por caja) no se ofrece.
-- 🔑 **Las curvas salen del despacho MÁS RECIENTE de la referencia** (`delUltimoDespacho`), como hizo Daniel a mano («la entrada más reciente que tenga correo»): las curvas viejas no se mezclan. Se casa por REFERENCIA, nunca por fecha: el aviso de ASW puede llegar 2+ semanas antes del ingreso en Switch.
-- Tallas conocidas pero sin caja (Reebok «Detalle despacho») → las tallas con su código de barra en NARANJA y Pares vacío.
+- 🔑 **Se ofrecen las curvas de TODOS los despachos** (Daniel, 13-nov-2026: «si un mismo artículo llegó en varios despachos con curvas distintas, guarda todas»); la misma curva repetida sigue siendo UNA opción. Reemplaza la regla anterior del despacho más reciente. Se casa por REFERENCIA, nunca por fecha: el aviso de ASW puede llegar 2+ semanas antes del ingreso.
+- 🔴 **Ropa y accesorios (sin caja; Daniel aprobó el 13-nov-2026)**: el lector de ASW guarda también las filas sin CODIGO_PREPACK (`codigo_caja` = «SIN CAJA»); la curva es el reparto por talla de ESE despacho reducido a su mínima proporción (S 6 · M 12 · L 12 · XL 6 · XXL 6 → 1-2-2-1-1). Si el pedido es múltiplo → cantidades exactas; si no → NARANJA con tallas y código de barra y cantidades vacías. Lo mismo para el «Detalle despacho» de Reebok.
+- Tallas de ropa en el orden de la tienda: XXS · XS · S · M · L · XL · XXL… (`ORDEN_ROPA`), nunca por abecedario.
+- Active Wear: Switch pega la talla al código («RBKFP26008_M», «RBKFP26097_10»); se busca también sin ella. Active Wear (Reebok) manda además «Packing_List_Ordenes N Active» (Bultos × Empaque, `leerEmpaqueActiveWear`).
+- 🩸 **Multifashion NO entra** (Daniel, 13-nov-2026): «MULTI FASHION HOLDING» ya no tiene empresa en el lector y sus 54 filas se borraron (`DELETE … WHERE empresa_key = 'american_classic'`).
 
 **La carga.** Historial desde el 9-mar-2026 (lo que guarda el buzón), cargado a mano el 13-nov-2026. Lo nuevo: cron `despachos-correo` (23:45 UTC, Microsoft Graph, Mail.Read de aplicación), **APAGADO** (`DESPACHOS_CORREO_AUTOMATICO = false`) y sin credenciales hasta que Daniel autorice la app en Microsoft Entra (variables `GRAPH_TENANT_ID` · `GRAPH_CLIENT_ID` · `GRAPH_CLIENT_SECRET`). Avisa por 🔧 SISTEMA solo si Microsoft rechaza la llave o llega un «_TXT» con columnas desconocidas.
 
@@ -3548,10 +3551,14 @@ Daniel aprobó las capturas «hoy vs recomendación» el 6-oct-2026. Administrar
 
 | Empresa | Remitente / adjunto | Referencia | Talla | Código de barra | Cantidad | Caja | Factura |
 |---|---|---|---|---|---|---|---|
-| Fashion Shoes (TH), Fashion Wear (TH), Vistana (CK), Active Wear (KL), Multifashion (KL) | @aswgr.com · `<factura>_TXT.txt/.xlsx/.xls` (78–79 columnas, `;`) | REFERENCIA | TALLA | EAN | CANTIDAD | CODIGO_PREPACK · CANTIDAD_PREPACK (cajas) · CANTIDAD_ORD_X_PP (pares por caja) | FACT |
+| Fashion Shoes (TH), Fashion Wear (TH), Vistana (CK), Active Wear (KL) | @aswgr.com · `<factura>_TXT.txt/.xlsx/.xls` (78–79 columnas, `;`) | REFERENCIA | TALLA | EAN | CANTIDAD | CODIGO_PREPACK · CANTIDAD_PREPACK (cajas) · CANTIDAD_ORD_X_PP (pares por caja) | FACT |
 | Active Shoes (Reebok) | @fashionfitnessgroup.com · «Packing List Ordenes <pedido>.xlsx» | Articulo (fila de talla) | Talla | Barcode | Cant Empaque | Nro Carton (fila del cartón; sus tallas debajo) | «PL <Nro Pedido>» |
 | Active Shoes (Reebok) | @fashionfitnessgroup.com · «Detalle despacho Active.xlsx» | SKU Father | Talla | EAN (si no, UPC) | Quantity | — (no trae; «SIN CAJA») | Document Number |
 
 Las columnas de ASW son las mismas en las cinco empresas (Vistana agrega una 79.ª, «CANTIDAD PRELIMINAR»); lo que cambia es el CONTENIDO: la ropa (CK, TH de Fashion Wear) casi nunca trae caja. Cruce contra `switch_ingresos_mercancia` por referencia (13-nov-2026): Fashion Shoes 404 de 414 (las 10 que no, exhibidores TWSPF…), Vistana 83/83, Active Wear 5/5, Active Shoes 146/146; Multifashion no tiene ingresos en esa tabla.
+
+**La carga completa (13-nov-2026).** Se revisaron TODOS los correos de ASW del 9-mar al 13-nov (145 correos, 403 adjuntos de despacho) y los de @fashionfitnessgroup.com (46 adjuntos), cada adjunto de cada correo. 38.182 filas: Fashion Shoes 3.688 · Vistana 7.004 · Fashion Wear 11.223 · Active Wear 456 · Active Shoes 15.811. Se excluyeron las facturas que ASW anuló en un reenvío (2000013476, 2000013482, 2000013847, 5000001392, 5000001586). Quedaron INCOMPLETAS porque el lector de correo corta a 200.000 caracteres: 2000013357, 2000014566, 2000014569, 3000015883–15888 (T.47208) y el «Detalle_ Despacho» de Reebok de agosto.
+
+**Cobertura** (ingresos de Switch desde el 9-mar, por referencia; solo proveedores que mandan aviso): Fashion Shoes 39 → 30 completos · 6 parciales · 3 sin nada; Vistana 138 → 125 · 8 · 5; Fashion Wear 190 → 157 · 28 · 5; Active Wear 7 → 5 · 2 · 0; Active Shoes 19 → 17 · 2 · 0. Sin aviso por naturaleza: Aqualinda (agua), Movado (relojes), Beli 18, American Unique Brands, Boston (tazas), traslados de Active Wear.
 
 Candado: `tallas-por-pedido.test.ts` (pedido 2182 real como fixture + cada regla + los dos formatos de Reebok; 6 mutaciones cazadas y un control).

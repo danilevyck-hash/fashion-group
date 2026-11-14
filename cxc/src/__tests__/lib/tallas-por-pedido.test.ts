@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import XLSX from "xlsx-js-style";
 import fixture from "./fixtures/tallas-pedido-2182.json";
 import {
-  armarTallasDelPedido, candidatosDeReferencia, curvasDeReferencia, delUltimoDespacho, idDelPedido, nombreDelArchivo,
+  armarTallasDelPedido, candidatosDeReferencia, compararTallas, curvasDeReferencia, idDelPedido, nombreDelArchivo,
   type TallaDeDespacho,
 } from "@/lib/tallas-pedido/armar";
 import { adjuntosDeDespacho, empresaDelDestinatario, leerAdjuntoDeDespacho, leerDespacho, proveedorDelCorreo, SIN_CAJA } from "@/lib/tallas-pedido/despacho-archivo";
@@ -93,12 +93,42 @@ describe("las reglas, una por una", () => {
     expect(filas.filter((f) => f.esTotal).map((f) => f.opcion)).toEqual(["Opción 1", "Opción 2", "Opción 3"]);
   });
 
-  it("las curvas salen del despacho MÁS RECIENTE de la referencia", () => {
-    const viejo = caja("K", "A", [["7", 12]], 1, { correo_id: "C1", factura: "F1", fecha_despacho: "2026-05-01", ean: "viejo" });
+  it("se ofrecen las curvas de TODOS los despachos (Opción 1, 2…)", () => {
+    const viejo = caja("K", "A", [["7", 12]], 1, { correo_id: "C1", factura: "F1", fecha_despacho: "2026-05-01" });
     const nuevo = caja("K", "B", [["8", 12]], 1, { correo_id: "C2", factura: "F2", fecha_despacho: "2026-10-01" });
-    expect(delUltimoDespacho([...viejo, ...nuevo])).toEqual(nuevo);
     const { filas } = armarTallasDelPedido([{ codigo: "K", descripcion: "x", cantidad: 12 }], [...nuevo, ...viejo]);
-    expect(filas.filter((f) => !f.esTotal).map((f) => f.talla)).toEqual(["8"]);
+    expect(filas.filter((f) => !f.esTotal).map((f) => [f.talla, f.opcion])).toEqual([["7", "Opción 1"], ["8", "Opción 2"]]);
+  });
+
+  it("ropa (sin caja): la curva mínima del despacho; si no la completa, NARANJA con tallas y código", () => {
+    // Vistana 3000016324, 4LB145G602: S 6 · M 12 · L 12 · XL 6 · XXL 6 → 1-2-2-1-1.
+    const ropa: TallaDeDespacho[] = [["S", 6], ["M", 12], ["L", 12], ["XL", 6], ["XXL", 6]].map(([talla, cantidad]) => ({
+      referencia: "4LB145G602", codigo_caja: SIN_CAJA, talla: String(talla), ean: `e${talla}`, cantidad: Number(cantidad),
+      cajas: null, pares_por_caja: null, factura: "3000016324", correo_id: "C", fecha_despacho: "2026-11-13",
+    }));
+    const exacto = armarTallasDelPedido([{ codigo: "4LB145G602", descripcion: "Men-Polos", cantidad: 14 }], ropa);
+    expect(exacto.filas.map((f) => [f.talla, f.pares, f.color])).toEqual([
+      ["S", 2, null], ["M", 4, null], ["L", 4, null], ["XL", 2, null], ["XXL", 2, null], ["", 14, null],
+    ]);
+    const corto = armarTallasDelPedido([{ codigo: "4LB145G602", descripcion: "Men-Polos", cantidad: 12 }], ropa);
+    expect(corto.filas.map((f) => [f.talla, f.codigoBarra, f.pares, f.color])).toEqual([
+      ["S", "eS", null, "naranja"], ["M", "eM", null, "naranja"], ["L", "eL", null, "naranja"],
+      ["XL", "eXL", null, "naranja"], ["XXL", "eXXL", null, "naranja"], ["", "", 12, "naranja"],
+    ]);
+  });
+
+  it("Active Wear (Packing_List_Ordenes): una fila por talla con bultos × empaque", () => {
+    const filas = leerAdjuntoDeDespacho([
+      ["Nro Pedido", "Articulo", "SKU", "Descripcion", "Bar Code", "TALLA", "Bultos", "Empaque", "Piezas total"],
+      ["3003591", "RBKFP26008", "RBKFP26008M", "Tee", "4066000000017", "M", 2, 12, 24],
+    ], { correo_id: "C", proveedor: "reebok" });
+    expect(filas).toEqual([expect.objectContaining({ empresa_key: "active_wear", referencia: "RBKFP26008", talla: "M", cajas: 2, pares_por_caja: 12, cantidad: 24, factura: "PL 3003591" })]);
+  });
+
+  it("Active Wear: Switch pega la talla («RBKFP26008_M») y encuentra al proveedor «RBKFP26008»", () => {
+    expect(candidatosDeReferencia("RBKFP26008_M")).toEqual(["RBKFP26008_M", "RBKFP26008"]);
+    expect(candidatosDeReferencia("RBKFP26097_10")).toEqual(["RBKFP26097_10", "RBKFP26097"]);
+    expect(candidatosDeReferencia("25FCTBAW001-2")).toEqual(["25FCTBAW001-2"]);
   });
 
   it("curvas distintas → Opción 1, 2… ordenadas por talla", () => {
@@ -133,6 +163,11 @@ describe("las reglas, una por una", () => {
     expect(curvasDeReferencia(mala)).toEqual([]);
   });
 
+  it("la ropa va de la talla más chica a la más grande", () => {
+    expect(["L", "XS", "M", "XXL", "S", "XL"].sort(compararTallas)).toEqual(["XS", "S", "M", "L", "XL", "XXL"]);
+    expect(["10", "M", "6"].sort(compararTallas)).toEqual(["6", "10", "M"]);
+  });
+
   it("el N.° de pedido y el nombre del archivo", () => {
     expect(idDelPedido("16-000002182")).toBe(2182);
     expect(idDelPedido("2182")).toBe(2182);
@@ -143,7 +178,7 @@ describe("las reglas, una por una", () => {
 
 describe("el archivo de ASW", () => {
   const H = ["FACT", "FECHA", "REFERENCIA", "EAN", "TALLA", "CANTIDAD", "NO_TRANSPORTE", "NOMBRE_DESTINATARIO_MERCANCIAS", "CODIGO_PREPACK", "CANTIDAD_PREPACK", "CANTIDAD_ORD_X_PP"];
-  it("lee las columnas, suma la misma caja repartida en dos posiciones y salta lo que no tiene caja", () => {
+  it("lee las columnas, suma la misma caja repartida en dos posiciones y guarda la ropa sin caja", () => {
     const r = leerDespacho(
       [
         H,
@@ -156,14 +191,15 @@ describe("el archivo de ASW", () => {
     );
     expect(r.filas).toEqual([
       expect.objectContaining({ empresa_key: "fashion_shoes", referencia: "FM0FM062760GY", talla: "40", cantidad: 4, cajas: 4, pares_por_caja: 8, fecha_despacho: "2026-10-26", transporte: "48198", factura: "2000015336", ean: "8721386978487" }),
+      expect.objectContaining({ referencia: "AM0AM006", talla: "OS", cantidad: 7, codigo_caja: SIN_CAJA, cajas: null }),
     ]);
-    expect(r.descartadas).toBe(2);
+    expect(r.descartadas).toBe(1);
     expect(r.destinatariosDesconocidos).toEqual(["OTRA EMPRESA S.A."]);
   });
 
   it("destinatarios, correos y adjuntos", () => {
     expect(empresaDelDestinatario("VISTANA INTERNACIONAL PANAMA, S.A.")).toBe("vistana");
-    expect(empresaDelDestinatario("MULTI FASHION HOLDING CORP.")).toBe("american_classic");
+    expect(empresaDelDestinatario("MULTI FASHION HOLDING CORP.")).toBeNull();
     expect(empresaDelDestinatario("FASHIONS SHOES")).toBeNull();
     expect(proveedorDelCorreo("itorres@aswgr.com", "NOTIFICACION DE DESPACHO DE FASHION SHOES HOLDING T.48286")).toBe("asw");
     expect(proveedorDelCorreo("itorres@aswgr.com", "Recuperar: NOTIFICACION DE DESPACHO DE X")).toBeNull();
@@ -199,7 +235,7 @@ describe("Reebok (Active Shoes): otro formato", () => {
     expect(x.map((f) => f.pares)).toEqual([2, 4, 6]);
   });
 
-  it("Detalle despacho: tallas y código de barra sin caja → NARANJA con los pares vacíos", () => {
+  it("Detalle despacho: sin caja, la curva es el reparto del despacho", () => {
     const filas = leerAdjuntoDeDespacho(
       [
         ["Document Number", "Posting Date", "BP Reference No.", "SKU Father", "SKU", "Talla", "EAN", "UPC", "Quantity"],
@@ -212,9 +248,12 @@ describe("Reebok (Active Shoes): otro formato", () => {
       ["100272101", "7.5", "1200186497703", SIN_CAJA, "4146", "2026-10-30"],
       ["100272101", "6", "199307377364", SIN_CAJA, "4146", "2026-10-30"],
     ]);
-    const { filas: x, resumen } = armarTallasDelPedido([{ codigo: "100272101", descripcion: "x", cantidad: 8 }], filas as TallaDeDespacho[]);
-    expect(x.map((f) => [f.talla, f.pares, f.color])).toEqual([["6", null, "naranja"], ["7.5", null, "naranja"], ["", 8, "naranja"]]);
-    expect(resumen.aMano).toBe(1);
+    // Sin caja: la curva es el reparto del despacho (6:3 · 7.5:5 = 8 pares).
+    const ocho = armarTallasDelPedido([{ codigo: "100272101", descripcion: "x", cantidad: 8 }], filas as TallaDeDespacho[]);
+    expect(ocho.filas.map((f) => [f.talla, f.pares, f.color])).toEqual([["6", 3, null], ["7.5", 5, null], ["", 8, null]]);
+    const diez = armarTallasDelPedido([{ codigo: "100272101", descripcion: "x", cantidad: 10 }], filas as TallaDeDespacho[]);
+    expect(diez.filas.map((f) => [f.talla, f.pares, f.color])).toEqual([["6", null, "naranja"], ["7.5", null, "naranja"], ["", 10, "naranja"]]);
+    expect(diez.resumen.aMano).toBe(1);
   });
 
   it("formato desconocido → null (se avisa), y el correo de Reebok se reconoce", () => {
