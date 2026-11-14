@@ -16,6 +16,7 @@ import SyncStatus from "@/components/shared/SyncStatus";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 import type { TabBoston } from "@/lib/boston/rol";
+import { BOSTON_SIN_DE_BOSTON, BOSTON_TRAMOS_EN_COLUMNAS } from "@/lib/ui/revision-110-ventas";
 
 // 🔴 La lista se DERIVA de `empresasCarteraAparte()` (= estadoCuenta:true +
 // cxc:false, o sea SOLO Boston) en vez de escribirse a mano, que es la misma
@@ -60,7 +61,7 @@ function Tarjeta({
     >
       <span className="block text-xs uppercase tracking-wide text-gray-500">{titulo}</span>
       <span className="block mt-1 text-2xl font-semibold tabular-nums text-gray-900">{valor}</span>
-      <span className="block mt-0.5 text-xs text-gray-500">{pie}</span>
+      {pie && <span className="block mt-0.5 text-xs text-gray-500">{pie}</span>}
     </button>
   );
 }
@@ -110,7 +111,7 @@ export default function InicioBoston({ onIr }: { onIr: (t: TabBoston) => void })
         <Tarjeta
           titulo="Colaboradores con préstamo"
           valor={isLoading ? "—" : String(data?.prestamos.personas ?? 0)}
-          pie="de Confecciones Boston"
+          pie={BOSTON_SIN_DE_BOSTON ? "" : "de Confecciones Boston"}
           onIr={() => onIr("prestamos")}
         />
       </div>
@@ -120,6 +121,22 @@ export default function InicioBoston({ onIr }: { onIr: (t: TabBoston) => void })
       {c && (
         <div className="mt-3 rounded-xl border border-gray-200 bg-white p-4">
           <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Antigüedad de saldos</p>
+          {BOSTON_TRAMOS_EN_COLUMNAS ? (
+            // n.º 47 (revisión 110): tres columnas, cada tramo con su monto
+            // DEBAJO; nada queda pegado al rótulo del tramo siguiente.
+            <div data-tramos-boston className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3 sm:gap-4">
+              {([
+                ["0-90 días", "text-emerald-600", c.d0_90],
+                ["91-120 días", "text-amber-600", c.d91_120],
+                ["+120 días", "text-red-600", c.d121_plus],
+              ] as const).map(([rotulo, tono, monto]) => (
+                <p key={rotulo} className="flex items-baseline justify-between gap-2 sm:block">
+                  <span className={`${tono} sm:block`}>{rotulo}</span>
+                  <span className="tabular-nums font-medium sm:block sm:pt-0.5 sm:text-base">${fmt(monto)}</span>
+                </p>
+              ))}
+            </div>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
             <p className="flex items-baseline justify-between gap-2">
               <span className="text-emerald-600">0-90 días</span>
@@ -134,6 +151,7 @@ export default function InicioBoston({ onIr }: { onIr: (t: TabBoston) => void })
               <span className="tabular-nums font-medium">${fmt(c.d121_plus)}</span>
             </p>
           </div>
+          )}
         </div>
       )}
     </div>
