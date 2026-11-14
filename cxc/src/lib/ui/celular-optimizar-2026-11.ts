@@ -22,3 +22,6 @@ export const CXC_ORDENAR_JUNTO_AL_BUSCADOR_2026_11 = true;
 
 /** Ventas › Clientes en el celular: el chip de empresa en la fila de «Ordenar». */
 export const VENTAS_CLIENTES_EMPRESA_EN_LA_BARRA_2026_11 = true;
+
+/** Asistencia › Justificaciones: el ⓘ en la esquina de la tarjeta, no en una fila sola. */
+export const AYUDA_EN_LA_TARJETA_2026_11 = true;
