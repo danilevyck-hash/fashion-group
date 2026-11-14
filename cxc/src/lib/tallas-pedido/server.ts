@@ -2,8 +2,9 @@
 // despachos guardadas en `despacho_tallas`. Las decisiones viven en `armar.ts`.
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { bajarLineas, hayQueBajar, leerLineas } from "@/lib/guias/pedido-detalle-server";
-import { candidatosDeReferencia, type LineaDelPedido, type TallaDeDespacho } from "./armar";
+import { candidatosDeReferencia, coincideElPedido, type LineaDelPedido, type TallaDeDespacho } from "./armar";
 import type { FilaDespacho } from "./despacho-archivo";
 
 export interface PedidoLeido {
@@ -49,6 +50,39 @@ export async function leerPedido(empresa: string, id: number): Promise<PedidoLei
     cliente: data?.cliente_nombre ?? null,
     lineas: [...porCodigo.values()],
   };
+}
+
+export interface PedidoEncontrado {
+  empresa: string;
+  id: number;
+  secuencial: string;
+  cliente: string;
+  fecha: string;
+}
+
+/**
+ * El pedido escrito, buscado en las 6 empresas de Fashion Group (sin Boston ni
+ * Multifashion), entre los pedidos activos que trae `sync-pedidos`. Los más
+ * recientes primero; como mucho 10.
+ * ponytail: solo pedidos ACTIVOS (switch_pedidos); uno ya facturado no aparece.
+ */
+export async function buscarPedido(escrito: string): Promise<PedidoEncontrado[]> {
+  const filas = await leerTodoPaginado<{ empresa_key: string; pedido_switch_id: number; secuencial: string; cliente_nombre: string; fecha: string }>(
+    "switch_pedidos",
+    (pedirCount, desde, hasta) =>
+      supabaseServer
+        .from("switch_pedidos")
+        .select("empresa_key, pedido_switch_id, secuencial, cliente_nombre, fecha", pedirCount ? { count: "exact" } : undefined)
+        .in("empresa_key", [...B2B_EMPRESA_KEYS])
+        .order("fecha", { ascending: false })
+        .order("empresa_key")
+        .order("pedido_switch_id")
+        .range(desde, hasta),
+  );
+  return filas
+    .filter((f) => coincideElPedido(escrito, f.secuencial))
+    .slice(0, 10)
+    .map((f) => ({ empresa: f.empresa_key, id: f.pedido_switch_id, secuencial: f.secuencial, cliente: f.cliente_nombre, fecha: f.fecha.slice(0, 10) }));
 }
 
 const COLUMNAS = "referencia, codigo_caja, talla, ean, cantidad, cajas, pares_por_caja, factura, correo_id, fecha_despacho";

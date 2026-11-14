@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import XLSX from "xlsx-js-style";
 import fixture from "./fixtures/tallas-pedido-2182.json";
 import {
-  armarTallasDelPedido, candidatosDeReferencia, compararTallas, curvasDeReferencia, idDelPedido, nombreDelArchivo,
+  armarTallasDelPedido, candidatosDeReferencia, coincideElPedido, compararTallas, curvasDeReferencia, idDelPedido, nombreDelArchivo,
   type TallaDeDespacho,
 } from "@/lib/tallas-pedido/armar";
 import { adjuntosDeDespacho, empresaDelDestinatario, leerAdjuntoDeDespacho, leerDespacho, proveedorDelCorreo, SIN_CAJA } from "@/lib/tallas-pedido/despacho-archivo";
@@ -173,6 +173,19 @@ describe("las reglas, una por una", () => {
     expect(idDelPedido("2182")).toBe(2182);
     expect(idDelPedido("abc")).toBeNull();
     expect(nombreDelArchivo("16-000002182", "2026-11-13")).toBe("Tallas-16-000002182-2026-11-13.xlsx");
+  });
+
+  it("el pedido se encuentra por el número completo o por sus últimos dígitos, nunca por parecido", () => {
+    for (const escrito of ["16-000002182", "16000002182", "000002182", "2182", " 2182 ", "182"]) {
+      expect(coincideElPedido(escrito, "16-000002182"), escrito).toBe(true);
+    }
+    expect(coincideElPedido("2182", "16-000012182")).toBe(true); // últimos 4 de otro pedido: sale en la lista
+    expect(coincideElPedido("0182", "16-000010182")).toBe(true);
+    expect(coincideElPedido("2183", "16-000002182")).toBe(false);
+    expect(coincideElPedido("21820", "16-000002182")).toBe(false);
+    expect(coincideElPedido("17-000002182", "16-000002182")).toBe(false);
+    expect(coincideElPedido("", "16-000002182")).toBe(false);
+    expect(coincideElPedido("abc", "16-000002182")).toBe(false);
   });
 });
 
