@@ -13,10 +13,11 @@ export const PEDIDOS_CELULAR_2026_11 = true;
 /**
  * Despachos › Pedidos en el celular: cómo se dibujan los cuatro estados.
  * "deslizar" = la fila de chips de siempre. Daniel (14-nov-2026) no quiso
- * «En preparación» en dos líneas; se le muestran "una-linea" y "dos-por-dos".
+ * «En preparación» en dos líneas; vio "una-linea" y "dos-por-dos" y eligió
+ * "una-linea" (los 4 en una línea, 13 px; 12 px bajo 380 px de ancho).
  */
 export type FormaEstadosCelular = "deslizar" | "una-linea" | "dos-por-dos";
-export const ESTADOS_CELULAR_2026_11: FormaEstadosCelular = "deslizar";
+export const ESTADOS_CELULAR_2026_11: FormaEstadosCelular = "una-linea";
 
 /** `LineaDeFrescura` en el celular: el ↻ más grande, en un cuadro de 44 px. */
 export const FRESCURA_GIRO_GRANDE_2026_11 = true;
