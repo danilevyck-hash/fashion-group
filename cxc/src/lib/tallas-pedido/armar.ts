@@ -23,8 +23,12 @@
 //     pares del pedido; talla y código vacíos) para llenarla a mano.
 //   · Los pares del pedido NO llenan cajas completas → la opción entera va en
 //     NARANJA con los Pares VACÍOS, para llenarlos a mano. Nunca decimales.
-//   · Tallas conocidas pero sin caja (Reebok «Detalle despacho») → las tallas y
-//     su código de barra en NARANJA, con los Pares VACÍOS.
+//   · Reebok sin cartón («Detalle despacho», 14-nov-2026): la curva es el total
+//     que llegó por talla —sumando todas sus facturas— dividido entre el MCD,
+//     igual que la ropa: 3,6,3,6,3,3,6,3,3 → 1,2,1,2,1,1,2,1,1. Si la referencia
+//     tiene cartones del Packing List, todo sigue como antes.
+//   · Tallas conocidas pero sin curva posible → las tallas y su código de barra
+//     en NARANJA, con los Pares VACÍOS.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { SIN_CAJA } from "./despacho-archivo";
@@ -202,8 +206,36 @@ function compararCurvas(a: Curva, b: Curva): number {
   return a.tallas.length - b.tallas.length;
 }
 
+const esDetalleReebok = (f: TallaDeDespacho) => f.proveedor === "reebok" && f.codigo_caja === SIN_CAJA;
+
+/**
+ * Reebok «Detalle despacho» (sin cartón): UNA curva con el total que llegó por
+ * talla en todas sus facturas, reducida por el MCD (`curvaDelDespacho`, la de la
+ * ropa). La misma factura repetida en otro correo cuenta una sola vez.
+ */
+function curvaDelDetalleReebok(filas: TallaDeDespacho[]): Curva | null {
+  const unicas = new Map<string, TallaDeDespacho>();
+  for (const f of filas) {
+    const k = `${f.factura}|${f.talla}`;
+    if (!unicas.has(k)) unicas.set(k, f);
+  }
+  const porTalla = new Map<string, TallaDeDespacho>();
+  for (const f of unicas.values()) {
+    const p = porTalla.get(f.talla);
+    const reciente = !p || (f.fecha_despacho ?? "") > (p.fecha_despacho ?? "") ? f : p;
+    porTalla.set(f.talla, { ...reciente, cantidad: (p ? Number(p.cantidad) : 0) + Number(f.cantidad), ean: reciente.ean ?? (reciente === f ? p?.ean : f.ean) ?? null });
+  }
+  return porTalla.size ? curvaDelDespacho([...porTalla.values()]) : null;
+}
+
 /** Las curvas DISTINTAS de una referencia, ya ordenadas. */
 export function curvasDeReferencia(filas: TallaDeDespacho[]): Curva[] {
+  // Solo «Detalle despacho» de Reebok (ningún cartón): UNA curva por el MCD del
+  // total. Con cartones del Packing List, todo sigue como antes.
+  if (filas.length && filas.every(esDetalleReebok)) {
+    const c = curvaDelDetalleReebok(filas);
+    return c ? [c] : [];
+  }
   const porCaja = new Map<string, TallaDeDespacho[]>();
   for (const f of filas) {
     const k = [f.correo_id, f.factura, normRef(f.referencia), f.codigo_caja].join("|");
