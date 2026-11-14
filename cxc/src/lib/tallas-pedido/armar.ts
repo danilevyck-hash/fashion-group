@@ -296,3 +296,21 @@ export function coincideElPedido(escrito: string, secuencial: string): boolean {
   const d = String(escrito ?? "").replace(/\D/g, "");
   return d.length > 0 && String(secuencial ?? "").replace(/\D/g, "").endsWith(d);
 }
+
+/**
+ * Una referencia repetida (talla o color distintos en Switch) se suma en una
+ * sola línea, en el orden en que aparece. Igual para pedido y factura.
+ */
+export function sumarPorCodigo(lineas: readonly LineaDelPedido[]): LineaDelPedido[] {
+  const porCodigo = new Map<string, LineaDelPedido>();
+  for (const l of lineas) {
+    const previa = porCodigo.get(l.codigo);
+    porCodigo.set(l.codigo, previa ? { ...previa, cantidad: previa.cantidad + l.cantidad } : { codigo: l.codigo, descripcion: l.descripcion, cantidad: l.cantidad });
+  }
+  return [...porCodigo.values()];
+}
+
+/** Pedidos y facturas encontrados, los más recientes primero; como mucho 10. */
+export function juntarEncontrados<T extends { fecha: string }>(...grupos: T[][]): T[] {
+  return grupos.flat().sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 10);
+}

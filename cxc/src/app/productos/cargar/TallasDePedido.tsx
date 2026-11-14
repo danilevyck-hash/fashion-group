@@ -1,21 +1,23 @@
 "use client";
 
-// Plantilla Switch › Tallas por bulto — el «Excel de tallas» de un pedido
-// (13-nov-2026). Se escribe el número de pedido (completo o sus últimos dígitos);
-// el servidor lo busca en las 6 empresas (varios = se toca uno), lee el
-// pedido de Switch y las tallas de los despachos del proveedor, y de esas MISMAS
+// Plantilla Switch › Tallas por bulto — el «Excel de tallas» de un pedido o de
+// una factura (13/14-nov-2026). Se escribe el número (completo o sus últimos
+// dígitos); el servidor lo busca en pedidos activos y facturas de las 6 empresas
+// (varios = se toca uno), lee sus renglones y las tallas de los despachos del
+// proveedor, y de esas MISMAS
 // filas salen la vista previa y el Excel (`lib/tallas-pedido/excel.ts`).
 
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { fmtDate } from "@/lib/format";
-import type { PedidoEncontrado } from "@/lib/tallas-pedido/server";
+import type { PedidoEncontrado, TipoDocumento } from "@/lib/tallas-pedido/server";
 import { idDelPedido, nombreDelArchivo, type FilaTallas, type ResumenTallas } from "@/lib/tallas-pedido/armar";
 import { logActivityClient } from "@/lib/logActivityClient";
 import { Aviso } from "@/components/ui/Aviso";
 
 interface Respuesta {
+  tipo: TipoDocumento;
   empresa: string;
   pedido: { secuencial: string; cliente: string | null };
   filas: FilaTallas[];
@@ -25,11 +27,12 @@ interface Respuesta {
 
 // En pantalla, los dos tonos de la paleta; el Excel lleva el amarillo y el naranja de verdad.
 const FONDO_FILA = { amarillo: "bg-amber-100", naranja: "bg-amber-300" } as const;
+const TIPO = { pedido: "Pedido", factura: "Factura" } as const;
 const campo = "mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900";
 
 export default function TallasDePedido() {
-  // Vacía = buscar en las 6 empresas; puesta = la que se tocó en la lista.
-  const [empresa, setEmpresa] = useState("");
+  // Nada = buscar en las 6 empresas; puesto = el que se tocó en la lista.
+  const [elegido, setElegido] = useState<PedidoEncontrado | null>(null);
   const [opciones, setOpciones] = useState<PedidoEncontrado[]>([]);
   const [pedido, setPedido] = useState("");
   const [datos, setDatos] = useState<Respuesta | null>(null);
@@ -47,10 +50,13 @@ export default function TallasDePedido() {
     const t = setTimeout(async () => {
       setCargando(true);
       try {
-        const r = await fetch(`/api/productos/tallas-pedido?empresa=${empresa}&pedido=${encodeURIComponent(pedido.trim())}`);
+        const q = elegido
+          ? `empresa=${elegido.empresa}&tipo=${elegido.tipo}&id=${elegido.id}`
+          : `pedido=${encodeURIComponent(pedido.trim())}`;
+        const r = await fetch(`/api/productos/tallas-pedido?${q}`);
         const j = await r.json().catch(() => ({}));
         if (!vigente) return;
-        if (!r.ok) setError(j.error ?? "No se pudo leer el pedido.");
+        if (!r.ok) setError(j.error ?? "No se pudo leer el pedido o la factura.");
         else if (j.opciones) setOpciones(j.opciones);
         else setDatos(j as Respuesta);
       } catch {
@@ -63,7 +69,7 @@ export default function TallasDePedido() {
       vigente = false;
       clearTimeout(t);
     };
-  }, [empresa, pedido]);
+  }, [elegido, pedido]);
 
   const descargar = async () => {
     if (!datos || bajando) return;
@@ -73,11 +79,11 @@ export default function TallasDePedido() {
         import("@/lib/tallas-pedido/excel"),
         import("@/lib/excel-export"),
       ]);
-      downloadWorkbook(libroDeTallas(datos.filas, `Pedido ${datos.pedido.secuencial}`), nombreDelArchivo(datos.pedido.secuencial, datos.hoy));
+      downloadWorkbook(libroDeTallas(datos.filas, `${TIPO[datos.tipo]} ${datos.pedido.secuencial}`), nombreDelArchivo(datos.pedido.secuencial, datos.hoy));
       logActivityClient({
         action: "descarga_tallas_pedido",
         module: "depurador",
-        details: { empresa: datos.empresa, pedido: datos.pedido.secuencial, ...datos.resumen },
+        details: { tipo: datos.tipo, empresa: datos.empresa, pedido: datos.pedido.secuencial, ...datos.resumen },
       });
     } finally {
       setBajando(false);
@@ -85,38 +91,40 @@ export default function TallasDePedido() {
   };
 
   return (
-    <section className="mb-8" aria-label="Excel de tallas de un pedido">
+    <section className="mb-8" aria-label="Excel de tallas de un pedido o factura">
       <label className="block max-w-sm text-xs font-medium text-gray-500">
-        Número de pedido
+        Número de pedido o factura
         <input
           className={`${campo} tabular-nums`}
           inputMode="numeric"
-          placeholder="16-000002182 o 2182"
+          placeholder="16-000002182, 11-000003192 o 2182"
           value={pedido}
           onChange={(e) => {
-            setEmpresa("");
+            setElegido(null);
             setPedido(e.target.value);
           }}
         />
       </label>
 
-      {cargando && <p className="mt-3 text-sm text-gray-500">Leyendo el pedido…</p>}
+      {cargando && <p className="mt-3 text-sm text-gray-500">Buscando…</p>}
       {error && <Aviso tono="error" className="mt-3">{error}</Aviso>}
 
       {opciones.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-sm text-gray-600">Hay {opciones.length} pedidos con ese número. Selecciona uno:</p>
+          <p className="mb-2 text-sm text-gray-600">Hay {opciones.length} resultados con ese número. Selecciona uno:</p>
           <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
             {opciones.map((o) => (
-              <li key={`${o.empresa}-${o.id}`}>
+              <li key={`${o.tipo}-${o.empresa}-${o.id}`}>
                 <button
                   type="button"
                   onClick={() => {
-                    setEmpresa(o.empresa);
+                    setElegido(o);
                     setPedido(o.secuencial);
                   }}
                   className="flex w-full flex-wrap items-baseline gap-x-2 px-4 py-3 text-left text-sm hover:bg-gray-50 active:bg-gray-100"
                 >
+                  <span className="font-medium text-gray-900">{TIPO[o.tipo]}</span>
+                  <span className="text-gray-600">·</span>
                   <span className="font-medium text-gray-900">{nombreCortoEmpresa(o.empresa)}</span>
                   <span className="text-gray-600">· {o.cliente} · {fmtDate(o.fecha)} ·</span>
                   <span className="tabular-nums text-gray-900">{o.secuencial}</span>
@@ -131,7 +139,7 @@ export default function TallasDePedido() {
         <>
           <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
             <div className="text-sm text-gray-900">
-              <span className="font-semibold">Pedido {datos.pedido.secuencial}</span> · {nombreCortoEmpresa(datos.empresa)}
+              <span className="font-semibold">{TIPO[datos.tipo]} {datos.pedido.secuencial}</span> · {nombreCortoEmpresa(datos.empresa)}
               {datos.pedido.cliente && <> · {datos.pedido.cliente}</>} · <span className="tabular-nums">{datos.resumen.pares}</span> pares
             </div>
             <div className="mt-1 text-sm tabular-nums text-gray-600">
