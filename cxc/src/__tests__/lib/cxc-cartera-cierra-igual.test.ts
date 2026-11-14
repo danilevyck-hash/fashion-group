@@ -215,12 +215,12 @@ describe("🔴 3 · la hoja lleva su bloque y cierra con el total de la pantalla
     const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA), "x").Sheets["Cartera"];
     // 3 encabezados · 4 el único que se cobra · 5 «Total por cobrar» · 6 el
     // rótulo del bloque · 7 y 8 los dos a favor.
-    expect(celda(ws, "A4")).toBe("D-25");
-    expect(celda(ws, "B5")).toBe(ROTULO_TOTAL_POR_COBRAR);
-    expect(celda(ws, "F5")).toBe(1700);
-    expect(celda(ws, "B6")).toBe(rotuloSaldoAFavor(2));
-    expect(celda(ws, "A7")).toBe("D-139");
-    expect(celda(ws, "A8")).toBe("TCKCTA");
+    expect(celda(ws, "A2")).toBe("D-25");
+    expect(celda(ws, "B3")).toBe(ROTULO_TOTAL_POR_COBRAR);
+    expect(celda(ws, "F3")).toBe(1700);
+    expect(celda(ws, "B4")).toBe(rotuloSaldoAFavor(2));
+    expect(celda(ws, "A5")).toBe("D-139");
+    expect(celda(ws, "A6")).toBe("TCKCTA");
   });
 
   it("🔴 el Total general es NÚMERO, con su formato, y vale lo de la pantalla", () => {
@@ -239,9 +239,9 @@ describe("🔴 3 · la hoja lleva su bloque y cierra con el total de la pantalla
   it("«Detallado por compañía»: el bloque cae en su columna y el total cuadra", () => {
     const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), bloquesSaldoAFavor(CARTERA, DOS), "x")
       .Sheets["Cartera por empresa"];
-    expect(celda(ws, "C6")).toBe(ROTULO_TOTAL_POR_COBRAR);
-    expect(celda(ws, "C7")).toBe(rotuloSaldoAFavor(2));
-    expect(celda(ws, "A8")).toBe("D-139");
+    expect(celda(ws, "C4")).toBe(ROTULO_TOTAL_POR_COBRAR);
+    expect(celda(ws, "C5")).toBe(rotuloSaldoAFavor(2));
+    expect(celda(ws, "A6")).toBe("D-139");
     const filaTotal = Object.keys(ws)
       .filter((k) => /^C\d+$/.test(k))
       .find((k) => ws[k]?.v === ROTULO_TOTAL_GENERAL);
@@ -251,7 +251,7 @@ describe("🔴 3 · la hoja lleva su bloque y cierra con el total de la pantalla
 
   it("⚠️ sin nadie a favor la hoja sale como siempre", () => {
     const ws = libroTotalPorCliente(filasTotalPorCliente(SOLO_DEUDA), filasSaldoAFavor(SOLO_DEUDA), "x").Sheets["Cartera"];
-    expect(ws["!autofilter"]).toEqual({ ref: "A3:F4" });
+    expect(ws["!autofilter"]).toEqual({ ref: "A1:F2" });
     const textos = Object.values(ws).map((c) => (c as { v?: unknown })?.v).filter((v) => typeof v === "string");
     expect(textos).toContain("Total");
     expect(textos).not.toContain(ROTULO_TOTAL_GENERAL);

@@ -305,7 +305,8 @@ describe("🔴 el botón de la casa se dibuja negro, y solo donde LO ES", () => 
     // Medir el que no era fue el error de la primera versión: `MenuDescargar`
     // es el `PDF · EXCEL` gris de ADENTRO del menú, no el botón que se busca.
     const barra = leer("src/app/cxc/page.tsx");
-    expect(/bg-black[\s\S]{0,900}?Descargar\n/.test(barra), "el botón de la barra dejó de ser negro").toBe(true);
+    // Revisión 110 (n.º 20): «Descargar» pasó a claro con borde, por su interruptor.
+    expect(/CLASE_BOTON_DESCARGAR[\s\S]{0,900}?Descargar\n/.test(barra), "el botón de la barra perdió su clase").toBe(true);
   });
 
   it("🔴 CONTROL · un DESPLEGABLE no es el botón negro: lleva borde", () => {

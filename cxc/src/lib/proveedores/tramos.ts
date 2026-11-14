@@ -35,6 +35,9 @@
 // usar.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { montoConSigno } from "./tono";
+import { PROVEEDORES_TRAMOS_EN_DIAS } from "@/lib/ui/revision-110-cxc";
+
 /** Los OCHO tramos que manda Switch, en su orden, tal como los escribe. */
 export const BUCKETS_SWITCH = [
   "0-30",
@@ -56,9 +59,9 @@ export const TRAMOS: readonly {
   label: string;
   buckets: readonly string[];
 }[] = [
-  { key: "t0_90", label: "0-90 d", buckets: ["0-30", "31-60", "61-90"] },
-  { key: "t91_120", label: "91-120 d", buckets: ["91-120"] },
-  { key: "t121_365", label: "121-365 d", buckets: ["121-180", "181-270", "271-365"] },
+  { key: "t0_90", label: PROVEEDORES_TRAMOS_EN_DIAS ? "0-90 días" : "0-90 d", buckets: ["0-30", "31-60", "61-90"] },
+  { key: "t91_120", label: PROVEEDORES_TRAMOS_EN_DIAS ? "91-120 días" : "91-120 d", buckets: ["91-120"] },
+  { key: "t121_365", label: PROVEEDORES_TRAMOS_EN_DIAS ? "121-365 días" : "121-365 d", buckets: ["121-180", "181-270", "271-365"] },
   { key: "tMas365", label: "+1 año", buckets: ["Mas de 365"] },
 ] as const;
 
@@ -165,7 +168,7 @@ export function frasePartida(
   fmt: (n: number) => string,
 ): string | null {
   if (s.a_favor === 0) return null;
-  return `Pendiente $${fmt(s.debes)} · Saldo a favor $${fmt(s.a_favor)} · Por pagar $${fmt(s.por_pagar)}`;
+  return `Pendiente $${fmt(s.debes)} · Saldo a favor $${fmt(s.a_favor)} · Por pagar ${montoConSigno(s.por_pagar, fmt)}`;
 }
 
 /** Suma dos particiones (empresa → pie del grupo) conservando la resta. */

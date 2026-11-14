@@ -32,6 +32,7 @@ import {
   mesLabel,
   sanitizeFilenamePart,
 } from "@/lib/cxc/estado-cuenta-email";
+import { CXC_PDF_UN_SOLO_NOMBRE } from "@/lib/ui/revision-110-cxc";
 import { buildEstadoCuentaPDF } from "@/lib/pdf-estado-cuenta";
 import type { EstadoCuenta } from "@/app/cxc/components/EstadoCuentaDrawer";
 
@@ -315,13 +316,19 @@ export async function POST(req: NextRequest) {
       empresas: [emp],
       total: emp.subtotal,
     };
-    const { doc } = buildEstadoCuentaPDF(pdfData, nombre);
+    // n.º 18 (revisión 110): el adjunto se llama igual que la descarga —el
+    // nombre lo da `buildEstadoCuentaPDF`—; con varias empresas lleva la suya,
+    // como la descarga con una empresa elegida.
+    const varias = result.empresas.length > 1;
+    const { doc, filename: nombreDescarga } = buildEstadoCuentaPDF(pdfData, nombre, { unaEmpresaElegida: varias });
     const base64 = Buffer.from(doc.output("arraybuffer")).toString("base64");
     // 🔴 MISMO FORMATO QUE LA DESCARGA (7-oct-2026): el nombre del cliente
     // primero y la fecha legible; la empresa se agrega porque este correo
     // adjunta UN PDF POR EMPRESA y, sin ella, dos adjuntos del mismo cliente
     // se llamarían igual.
-    const filename = `${sanitizeFilenamePart(`Estado de cuenta - ${nombre} - ${emp.empresa_nombre} - ${mes}`)}.pdf`;
+    const filename = CXC_PDF_UN_SOLO_NOMBRE
+      ? nombreDescarga
+      : `${sanitizeFilenamePart(`Estado de cuenta - ${nombre} - ${emp.empresa_nombre} - ${mes}`)}.pdf`;
     attachments.push({ filename, content: base64 });
   }
 

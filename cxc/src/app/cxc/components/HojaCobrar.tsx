@@ -41,7 +41,8 @@ import { aparatoDeQuienMira } from "@/lib/aparato";
 import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 import { montoExacto, type RenglonEmpresaCliente } from "@/lib/cxc/lista-celular";
-import { montoDeTabla, nombreCortoEmpresa, totalDelDesglose } from "@/lib/cxc/desglose-celular-2026-11";
+import { CXC_UN_NOMBRE_ESTADO_DE_CUENTA } from "@/lib/ui/revision-110-cxc";
+import { montoDeTabla, nombreCortoEmpresa, totalDelDesglose, type TotalDesglose } from "@/lib/cxc/desglose-celular-2026-11";
 import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 
 /** El código Switch (D-XXX) es el mismo en todas las empresas del cliente. */
@@ -356,29 +357,7 @@ export default function HojaCobrar({
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
           Desglose por empresa ({desglose.length})
         </p>
-        <table className="w-full text-[12.5px] tabular-nums tracking-tight">
-          <thead>
-            <tr className="text-[11px] font-medium uppercase text-gray-400">
-              <th className="text-left font-medium pb-1.5">Empresa</th>
-              <th className="text-right font-medium pb-1.5 pl-1.5 text-emerald-600">0-90</th>
-              <th className="text-right font-medium pb-1.5 pl-1.5 text-amber-600">91-120</th>
-              <th className="text-right font-medium pb-1.5 pl-1.5 text-red-500">+120</th>
-              <th className="text-right font-medium pb-1.5 pl-1.5">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {desglose.map((f) => (
-              <FilaDesglose key={f.key} fila={f} />
-            ))}
-            <tr className="border-t border-gray-300 font-semibold">
-              <td className="pt-2 text-left">Total</td>
-              <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-emerald-700">{montoDeTabla(total.current)}</td>
-              <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-amber-600">{montoDeTabla(total.watch)}</td>
-              <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-red-600">{montoDeTabla(total.overdue)}</td>
-              <td className="pt-2 pl-1.5 text-right whitespace-nowrap">{montoDeTabla(total.total)}</td>
-            </tr>
-          </tbody>
-        </table>
+        <TablaDesgloseEmpresas filas={desglose} total={total} />
       </div>
 
       {avisos}
@@ -389,7 +368,7 @@ export default function HojaCobrar({
           onClick={() => setSalidasAbiertas(true)}
           className="block w-full rounded-md bg-black px-4 py-3.5 text-base font-semibold text-white transition active:scale-[0.97]"
         >
-          Enviar estado de cuenta
+          {CXC_UN_NOMBRE_ESTADO_DE_CUENTA ? "Estado de cuenta" : "Enviar estado de cuenta"}
         </button>
       ) : (
         <div className="space-y-1">
@@ -428,7 +407,7 @@ export default function HojaCobrar({
     <ModalOverlay onBackdropClick={onClose} align="center">
       <div className="bg-white rounded-t-2xl sm:rounded-lg w-full sm:max-w-md mx-0 sm:mx-4 mb-0 sm:my-16 border border-gray-200 max-h-[92vh] overflow-y-auto">
         <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">{cuerpoDesglose ? (datos?.clienteNombre || nombre) : "Enviar estado de cuenta"}</h2>
+          <h2 className="text-base font-semibold text-gray-900">{cuerpoDesglose ? (datos?.clienteNombre || nombre) : (CXC_UN_NOMBRE_ESTADO_DE_CUENTA ? "Estado de cuenta" : "Enviar estado de cuenta")}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -467,6 +446,39 @@ function FilaAccion({
         {detalle && <span className="block text-xs text-gray-500 mt-0.5 truncate">{detalle}</span>}
       </button>
     </li>
+  );
+}
+
+/**
+ * La tabla «Empresa · 0-90 · 91-120 · +120 · Total» de un cliente. La usan la
+ * hoja del celular y, desde la n.º 16 de la revisión 110, la página del
+ * cliente: un dato, un solo dibujo.
+ */
+export function TablaDesgloseEmpresas({ filas, total }: { filas: RenglonEmpresaCliente[]; total: TotalDesglose }) {
+  return (
+    <table className="w-full text-[12.5px] tabular-nums tracking-tight">
+      <thead>
+        <tr className="text-[11px] font-medium uppercase text-gray-400">
+          <th className="text-left font-medium pb-1.5">Empresa</th>
+          <th className="text-right font-medium pb-1.5 pl-1.5 text-emerald-600">0-90</th>
+          <th className="text-right font-medium pb-1.5 pl-1.5 text-amber-600">91-120</th>
+          <th className="text-right font-medium pb-1.5 pl-1.5 text-red-500">+120</th>
+          <th className="text-right font-medium pb-1.5 pl-1.5">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {filas.map((f) => (
+          <FilaDesglose key={f.key} fila={f} />
+        ))}
+        <tr className="border-t border-gray-300 font-semibold">
+          <td className="pt-2 text-left">Total</td>
+          <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-emerald-700">{montoDeTabla(total.current)}</td>
+          <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-amber-600">{montoDeTabla(total.watch)}</td>
+          <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-red-600">{montoDeTabla(total.overdue)}</td>
+          <td className="pt-2 pl-1.5 text-right whitespace-nowrap">{montoDeTabla(total.total)}</td>
+        </tr>
+      </tbody>
+    </table>
   );
 }
 

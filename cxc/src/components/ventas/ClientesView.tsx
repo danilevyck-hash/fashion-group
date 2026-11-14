@@ -1,5 +1,7 @@
 "use client";
 
+import { TEXTO_SIN_CODIGO, tieneCodigoDeSwitch } from "@/lib/clientes/sin-codigo";
+import { CLIENTE_SIN_CODIGO_SIN_ENLACE as SIN_CODIGO_SIN_ENLACE } from "@/lib/ui/revision-110-cxc";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -1096,6 +1098,16 @@ function ClienteRow({
             18 px de alto y el iPad horizontal (1194) cae del lado de la
             tabla y se toca con el dedo. Envolver las dos líneas da los 44 px
             SIN agrandar la fila ni un píxel. */}
+        {SIN_CODIGO_SIN_ENLACE && !tieneCodigoDeSwitch(c.id) ? (
+          // n.º 104 (revisión 110): sin código no hay ficha; se dice, sin enlace.
+          <div className="flex min-h-[44px] max-w-full flex-col justify-center text-left font-medium leading-tight">
+            <span data-col="nombre">
+              {c.nombre}
+              {c.esDelGrupo && <DelGrupoBadge />}
+            </span>
+            <span data-col="codigo" className="text-xs font-normal leading-tight text-gray-500">{TEXTO_SIN_CODIGO}</span>
+          </div>
+        ) : (
         <Link
           href={`/clientes/${encodeURIComponent(c.id)}`}
           className="flex min-h-[44px] max-w-full flex-col justify-center text-left font-medium leading-tight hover:text-blue-600"
@@ -1106,6 +1118,7 @@ function ClienteRow({
           </span>
           <span data-col="codigo" className="tabular-nums text-xs font-normal leading-tight text-gray-500">{c.id}</span>
         </Link>
+        )}
       </td>
       {/* 🔴 SIEMPRE EL NÚMERO. Antes decía «6 empresas» cuando eran varias y
           «Vistana International» cuando era una: dos preguntas distintas bajo
@@ -1210,6 +1223,14 @@ function ClienteCard({
             se los toma del relleno de la tarjeta, así que la lista no se
             estira ni se pierde densidad. */}
         <div className="flex items-baseline justify-between gap-2">
+          {SIN_CODIGO_SIN_ENLACE && !tieneCodigoDeSwitch(c.id) ? (
+            <span className="flex min-h-[44px] min-w-0 flex-1 items-center truncate text-[15px] font-medium leading-tight text-gray-950">
+              <span data-col="nombre" className="truncate">
+                {c.nombre}
+                {c.esDelGrupo && <DelGrupoBadge />}
+              </span>
+            </span>
+          ) : (
           <Link
             href={`/clientes/${encodeURIComponent(c.id)}`}
             onClick={(e) => e.stopPropagation()}
@@ -1220,9 +1241,10 @@ function ClienteCard({
               {c.esDelGrupo && <DelGrupoBadge />}
             </span>
           </Link>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">
-          <span data-col="codigo" className="tabular-nums">{c.id}</span>
+          <span data-col="codigo" className="tabular-nums">{SIN_CODIGO_SIN_ENLACE && !tieneCodigoDeSwitch(c.id) ? TEXTO_SIN_CODIGO : c.id}</span>
           {/* Mismo criterio que la columna del escritorio: el NÚMERO. Cuáles
               son sale al tocar la tarjeta (`ClienteSheet`). */}
           {showEmpresa && (

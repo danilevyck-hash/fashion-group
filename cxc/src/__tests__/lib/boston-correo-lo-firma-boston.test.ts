@@ -425,7 +425,8 @@ describe("🔴 el rastro del envío", () => {
     expect(payload.from.toLowerCase()).not.toContain("fashion group");
     expect(payload.html.toLowerCase()).not.toContain("fashion group");
     expect(payload.attachments).toHaveLength(1);
-    expect(payload.attachments[0].filename).toContain("Confecciones Boston");
+    // Revisión 110 (n.º 18): el adjunto se llama igual que la descarga; la firma de Boston va EN el papel.
+    expect(payload.attachments[0].filename).toMatch(/^Estado de cuenta - /);
     expect(payload.attachments[0].filename.toLowerCase()).not.toContain("fashion group");
   });
 });

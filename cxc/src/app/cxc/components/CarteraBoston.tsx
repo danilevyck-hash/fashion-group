@@ -75,9 +75,12 @@ import TiraTotales from "./TiraTotales";
 import ClientTable from "./ClientTable";
 import MenuDescargar from "./MenuDescargar";
 import PanelCxcMobile from "./PanelCxcMobile";
+import PanelCxcCelular from "./PanelCxcCelular";
+import type { Company } from "@/lib/companies";
 import { SkeletonRow } from "./Skeleton";
 import { useDescargasCartera } from "../hooks/useDescargasCartera";
 import { vidrioSobre } from "@/lib/ui/vidrio";
+import { CLASE_BOTON_DESCARGAR, CXC_BOSTON_COMO_GRUPO_CELULAR, CXC_UN_NOMBRE_ESTADO_DE_CUENTA } from "@/lib/ui/revision-110-cxc";
 
 /** Solo Boston: la lista se DERIVA (`estadoCuenta:true` + `cxc:false`), nunca se escribe. */
 const EMPRESAS_BOSTON = empresasCarteraAparte();
@@ -122,9 +125,10 @@ function DetalleBoston({
             onClick={(e) => { e.stopPropagation(); onCobrar(client); }}
             className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white transition active:scale-[0.97]"
           >
-            Enviar estado de cuenta
+            {CXC_UN_NOMBRE_ESTADO_DE_CUENTA ? "Estado de cuenta" : "Enviar estado de cuenta"}
           </button>
         )}
+        {!CXC_UN_NOMBRE_ESTADO_DE_CUENTA && (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onDocumentos(client); }}
@@ -132,12 +136,20 @@ function DetalleBoston({
         >
           Estado de cuenta
         </button>
+        )}
       </div>
     </div>
   );
 }
 
-export default function CarteraBoston() {
+export default function CarteraBoston({
+  onGrupo = null,
+  empresasDelGrupo = [],
+}: {
+  /** n.º 13: volver a la cartera del grupo desde el título del celular. `null` = este rol solo ve Boston. */
+  onGrupo?: ((empresa: string) => void) | null;
+  empresasDelGrupo?: Company[];
+} = {}) {
   const { data, error, isLoading, mutate } = useSWR("/api/cxc/boston", fetcher, {
     dedupingInterval: 60_000,
     revalidateOnFocus: true,
@@ -263,6 +275,33 @@ export default function CarteraBoston() {
   return (
     <PullToRefresh onRefresh={async () => { await mutate(); }}>
       <div data-cartera="boston">
+        {CXC_BOSTON_COMO_GRUPO_CELULAR ? (
+          // n.º 13 (revisión 110): en el celular, la MISMA pantalla del grupo con
+          // los datos de Boston (de su ruta, nunca sumados al grupo).
+          <PanelCxcCelular
+            filtered={filtered}
+            roleClients={clients}
+            cxcCompanies={COMPANIAS}
+            search={search}
+            setSearch={setSearch}
+            riskFilter={riskFilter}
+            setRiskFilter={handleRiskFilterChange}
+            companyFilter="all"
+            setCompanyFilter={NADA}
+            onCobrar={setCobrarA}
+            diasSinPagarDe={diasSinPagarDe}
+            canExport
+            onDescargar={descargar}
+            empresaRestriction={EMPRESA_BOSTON}
+            onSyncedNow={() => void mutate()}
+            avisoMontos={data?.avisoMontos ?? null}
+            onBoston={null}
+            cartera="boston"
+            onGrupo={onGrupo}
+            empresasDelGrupo={empresasDelGrupo}
+            empresasFrescura={EMPRESAS_BOSTON}
+          />
+        ) : (
         <PanelCxcMobile
           filtered={filtered}
           roleClients={clients}
@@ -287,6 +326,7 @@ export default function CarteraBoston() {
           avisoMontos={data?.avisoMontos ?? null}
           cartera="boston"
         />
+        )}
 
         <div className="hidden lg:block max-w-6xl mx-auto px-6 py-8">
           <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -312,7 +352,7 @@ export default function CarteraBoston() {
                   onClick={() => setShowExport(!showExport)}
                   aria-haspopup="menu"
                   aria-expanded={showExport}
-                  className="text-sm bg-black text-white px-4 rounded-lg font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2 min-h-[44px]"
+                  className={`text-sm px-4 rounded-lg font-medium active:scale-[0.97] transition-all flex items-center gap-2 min-h-[44px] ${CLASE_BOTON_DESCARGAR}`}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   Descargar

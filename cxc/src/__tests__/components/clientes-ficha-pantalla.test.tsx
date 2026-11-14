@@ -337,11 +337,11 @@ describe("7 · «Cobrar» abre la MISMA hoja del CXC, sin salir de la ficha", ()
     fireEvent.click(screen.getByRole("button", { name: "Estado de cuenta" }));
     // 1-oct-2026, Daniel: nombres normales de ERP: la hoja se titula «Enviar estado de cuenta».
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Enviar estado de cuenta" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Estado de cuenta" })).toBeTruthy();
     });
     // ⚠️ Se busca DENTRO de la hoja: «Correo» también es el rótulo del bloque
     // de contacto de la ficha, que sigue debajo.
-    const hoja = screen.getByRole("heading", { name: "Enviar estado de cuenta" }).closest("div")!.parentElement!;
+    const hoja = screen.getByRole("heading", { name: "Estado de cuenta" }).closest("div")!.parentElement!;
     for (const salida of ["Correo", "WhatsApp", "Copiar mensaje", "Descargar PDF"]) {
       expect(hoja.textContent, salida).toContain(salida);
     }
