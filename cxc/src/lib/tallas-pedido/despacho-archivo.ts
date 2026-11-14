@@ -27,6 +27,8 @@ export interface FilaDespacho {
   factura: string;
   proveedor: string;
   correo_id: string;
+  /** Reebok: la letra de la curva del cartón («100272017-C» → «C»). Sin letra, no va. */
+  curva?: string | null;
 }
 
 export interface LecturaDespacho {
@@ -214,7 +216,7 @@ export function proveedorDelCorreo(remitente: string, asunto: string): string | 
  */
 export function adjuntosDeDespacho<T extends { name: string }>(adjuntos: readonly T[], proveedor = "asw"): T[] {
   // Reebok: «Packing List Ordenes <pedido>.xlsx» (la caja) y «Detalle despacho Active.xlsx» (las tallas).
-  if (proveedor === "reebok") return adjuntos.filter((a) => /^(packing list|detalle[ _]despacho).*\.xlsx?$/i.test(a.name.trim()));
+  if (proveedor === "reebok") return adjuntos.filter((a) => /^(packing[ _]list|detalle[ _]despacho).*\.xlsx?$/i.test(a.name.trim()));
   const porBase = new Map<string, T>();
   for (const a of adjuntos) {
     // «2000015706_TXT.txt» o, a veces, «2000014480.txt» (sin «_TXT»): la factura sola.
@@ -270,6 +272,7 @@ function leerPackingListReebok(filas: readonly (readonly Celda[])[], correo_id: 
   const out: FilaDespacho[] = [];
   let carton = "";
   let pedido = "";
+  let curva: string | null = null;
   for (const [n, f] of filas.slice(1).entries()) {
     const c = (k: number) => (k >= 0 ? f[k] : null);
     if (String(c(cCart) ?? "").trim()) {
@@ -277,6 +280,8 @@ function leerPackingListReebok(filas: readonly (readonly Celda[])[], correo_id: 
       // precisión y dos cartones podrían quedar con el mismo.
       carton = `${String(c(cCart)).trim()}#${n}`;
       pedido = String(c(cPed) ?? "").trim() || pedido;
+      // La fila del cartón trae la curva en el SKU: «100272017-C» → «C».
+      curva = /^[^-]+-([A-Z0-9]{1,3})$/.exec(norm(c(cSku)))?.[1] ?? null;
     }
     const cantidad = num(c(cCant));
     const talla = tallaTexto(c(cTalla));
@@ -285,7 +290,7 @@ function leerPackingListReebok(filas: readonly (readonly Celda[])[], correo_id: 
     out.push({
       empresa_key: "active_shoes", referencia, codigo_caja: carton, talla,
       ean: eanTexto(c(cBar)) ?? eanTexto(c(cSku)), cantidad, cajas: 1, pares_por_caja: null,
-      fecha_despacho: null, transporte: null, factura: `PL ${pedido || "—"}`, proveedor: "reebok", correo_id,
+      fecha_despacho: null, transporte: null, factura: `PL ${pedido || "—"}`, proveedor: "reebok", correo_id, curva,
     });
   }
   // Pares por caja = la suma del cartón.
@@ -354,6 +359,9 @@ export function leerAdjuntoDeDespacho(
   filas: readonly (readonly Celda[])[],
   origen: { correo_id: string; proveedor: string },
 ): FilaDespacho[] | null {
+  // Los Packing List de Reebok traen un membrete arriba: el encabezado está más abajo.
+  const desde = Math.max(0, filas.slice(0, 40).findIndex((f) => esPackingListReebok(f ?? [])));
+  if (desde > 0) filas = filas.slice(desde);
   const h = filas[0] ?? [];
   if (esHojaDeDespacho(h)) return leerDespacho(filas, origen).filas;
   if (esPackingListReebok(h)) return leerPackingListReebok(filas, origen.correo_id);
