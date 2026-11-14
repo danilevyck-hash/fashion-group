@@ -407,3 +407,37 @@ describe("Reebok: la letra de la curva del cartón (14-nov-2026)", () => {
     expect(new Set(ops)).toEqual(new Set([""]));
   });
 });
+
+describe("Reebok sin cartón: la curva es el total por talla ÷ MCD (Daniel, 14-nov-2026)", () => {
+  // Ejemplo de Daniel: 3,6,3,6,3,3,6,3,3 → 1,2,1,2,1,1,2,1,1 (12 pares por curva).
+  const tallas = ["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9"];
+  const total = [3, 6, 3, 6, 3, 3, 6, 3, 3];
+  // Llegó en DOS facturas (la segunda con 1/3): se suma lo que llegó por talla.
+  const detalle = (factura: string, parte: number, correo_id = "C1"): TallaDeDespacho[] => tallas.map((talla, i) => ({
+    referencia: "100276216", codigo_caja: SIN_CAJA, talla, ean: `e${talla}`, cantidad: (total[i] / 3) * parte,
+    cajas: null, pares_por_caja: null, factura, correo_id, fecha_despacho: "2026-10-30", proveedor: "reebok",
+  }));
+  const despachos = [...detalle("4147", 2), ...detalle("4148", 1), ...detalle("4148", 1, "C2")]; // 4148 repetida en otro correo: cuenta una vez
+
+  it("una sola curva, con el MCD del total", () => {
+    const [c, ...resto] = curvasDeReferencia(despachos);
+    expect(resto).toEqual([]);
+    expect(c.tallas.map((t) => t.porCaja)).toEqual([1, 2, 1, 2, 1, 1, 2, 1, 1]);
+  });
+
+  it("24 pares → 2 curvas completas; 18 → NARANJA, sin decimales", () => {
+    const veinticuatro = armarTallasDelPedido([{ codigo: "100276216", descripcion: "x", cantidad: 24 }], despachos).filas;
+    expect(veinticuatro.map((f) => [f.talla, f.pares, f.color, f.opcion])).toEqual([
+      ...tallas.map((t, i) => [t, [2, 4, 2, 4, 2, 2, 4, 2, 2][i], null, ""]), ["", 24, null, ""],
+    ]);
+    const dieciocho = armarTallasDelPedido([{ codigo: "100276216", descripcion: "x", cantidad: 18 }], despachos).filas;
+    expect(dieciocho.every((f) => f.color === "naranja")).toBe(true);
+    expect(dieciocho.filter((f) => !f.esTotal).every((f) => f.pares === null)).toBe(true);
+  });
+
+  it("con cartones del Packing List, mandan los cartones como antes (con su letra)", () => {
+    const cartones = caja("100276216", "0807499903#1", [["7", 1], ["8", 2], ["9", 1]], 1, { proveedor: "reebok", curva: "A", factura: "PL 1" });
+    const ops = armarTallasDelPedido([{ codigo: "100276216", descripcion: "x", cantidad: 4 }], [...cartones, ...detalle("4147", 3)]).filas;
+    expect(ops.some((f) => f.opcion.endsWith("· A") && f.pares === 2 && f.talla === "8")).toBe(true);
+  });
+});
