@@ -19,3 +19,6 @@ export const CLIENTES_ORDENAR_ARRIBA_2026_11 = true;
 
 /** Cuentas por cobrar en el celular: «Ordenar» al lado del buscador, no en una fila sola. */
 export const CXC_ORDENAR_JUNTO_AL_BUSCADOR_2026_11 = true;
+
+/** Ventas › Clientes en el celular: el chip de empresa en la fila de «Ordenar». */
+export const VENTAS_CLIENTES_EMPRESA_EN_LA_BARRA_2026_11 = true;
