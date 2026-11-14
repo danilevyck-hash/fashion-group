@@ -11,10 +11,22 @@
  * de `egresos_varios`: vistana julio · fashion_wear mayo · fashion_shoes abril ·
  * active_wear abril · active_shoes, joystep y american_classic sin una sola fila.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+
+// Revisión 110 (14-nov-2026), n.º 94 y 95: este archivo cuida la pantalla con
+// los interruptores APAGADOS (el camino de vuelta); el último bloque los prende.
+const r110 = vi.hoisted(() => ({ prendido: false }));
+vi.mock("@/lib/ui/revision-110-marketing", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/ui/revision-110-marketing")>();
+  return {
+    ...real,
+    get GASTOS_AVISO_CORTO_2026_11() { return r110.prendido; },
+    get GASTOS_PAUSA_UNA_VEZ_2026_11() { return r110.prendido; },
+  };
+});
 import { render, screen, cleanup, within } from "@testing-library/react";
 
-import ResumenEgresos, { fraseAlDia } from "@/app/gastos-contabilidad/components/ResumenEgresos";
+import ResumenEgresos, { fraseAlDia, hayPausaEnElMes } from "@/app/gastos-contabilidad/components/ResumenEgresos";
 import type { EmpresaEgresosResumen } from "@/app/gastos-contabilidad/components/tipos";
 import type { ResumenEgresosMes } from "@/lib/egresos/reglas";
 import type { AlDia } from "@/lib/egresos/al-dia";
@@ -189,5 +201,31 @@ describe("fraseAlDia — los bordes", () => {
     ] as AlDia[]) {
       expect(fraseAlDia(a, true)).not.toMatch(/Al día/);
     }
+  });
+});
+
+describe("Revisión 110 · n.º 94 y 95 — la pausa una vez y el aviso corto", () => {
+  afterEach(() => { r110.prendido = false; });
+
+  it("n.º 95: el mes a medio cargar se dice corto, con los DOS números", () => {
+    r110.prendido = true;
+    expect(
+      fraseAlDia({ estado: "quizas_incompleto", mes: "2026-05", gastoCent: 25_743, habitualCent: 2_184_632 }, true),
+    ).toBe("Mayo 2026 incompleto: $257.43 (lo habitual, $21,846.32)");
+  });
+
+  it("n.º 94: ninguna fila repite «Registro de gastos pausado.»; se sabe que hay pausa para decirla una vez", () => {
+    r110.prendido = true;
+    const mes = PRODUCCION.map((e) =>
+      e.empresaKey === "joystep" ? { ...e, resumen: { ...e.resumen, estado: "sin_movimientos" as const } } : e,
+    );
+    const { container } = render(<ResumenEgresos empresas={mes} onAbrir={() => {}} apple />);
+    expect(container.textContent).not.toContain("Registro de gastos pausado");
+    expect(hayPausaEnElMes(mes)).toBe(true);
+  });
+
+  it("CONTROL: con todas al día no hay pausa que decir; Boston (carga manual) no cuenta", () => {
+    const todas = PRODUCCION.filter((e) => e.resumen.estado === "con_movimientos" || !e.descargaAutomatica);
+    expect(hayPausaEnElMes(todas)).toBe(false);
   });
 });

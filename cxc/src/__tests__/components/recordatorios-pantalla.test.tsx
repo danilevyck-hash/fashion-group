@@ -53,6 +53,21 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
 
+// Revisión 110 (14-nov-2026), n.º 98: con el interruptor PRENDIDO la caja de
+// escribir de abajo SALE (una sola puerta: «＋ Nuevo»). Este archivo sigue
+// cuidando la caja con el interruptor APAGADO —el camino de vuelta— y el último
+// bloque prende el interruptor y exige que no se dibuje.
+const r110 = vi.hoisted(() => ({ unaPuerta: false }));
+vi.mock("@/lib/ui/revision-110-marketing", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/ui/revision-110-marketing")>();
+  return {
+    ...real,
+    get RECORDATORIOS_UNA_PUERTA_2026_11() {
+      return r110.unaPuerta;
+    },
+  };
+});
+
 vi.mock("@/lib/hooks/useAuth", () => ({
   useAuth: () => ({ authChecked: true, role: "admin", isOwner: true }),
 }));
@@ -689,5 +704,26 @@ describe("el CALENDARIO sigue siendo un MODO, no una pestaña", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Calendario$/ }));
     expect(container.textContent).toContain("2 cheques");
     expect(container.textContent).not.toContain("$3,000.00");
+  });
+});
+
+describe("Revisión 110 · n.º 98 y 99 — una sola puerta y el buscador a la izquierda", () => {
+  beforeEach(() => { r110.unaPuerta = true; });
+  afterEach(() => { r110.unaPuerta = false; });
+
+  it("🔴 n.º 98: la caja «Nuevo recordatorio» de abajo NO se dibuja; «＋ Nuevo» queda como única puerta", () => {
+    const { container } = pintar({ recordatorios: [] });
+    expect(screen.queryByPlaceholderText("Nuevo recordatorio")).toBeNull();
+    expect(container.querySelectorAll("[data-puerta-boton]").length).toBe(1);
+  });
+
+  it("n.º 99: el buscador va PRIMERO en la fila y el botón de alta al final", () => {
+    const { container } = pintar({ recordatorios: [] });
+    const fila = container.querySelector("[data-fila-buscador]") as HTMLElement;
+    expect(fila, "no se dibujó la fila del buscador").toBeTruthy();
+    const hijos = Array.from(fila.children);
+    expect(hijos[0].tagName).toBe("INPUT");
+    expect((hijos[0] as HTMLInputElement).placeholder).toBe("Buscar cheque o cliente");
+    expect(hijos[hijos.length - 1].hasAttribute("data-puerta-boton")).toBe(true);
   });
 });

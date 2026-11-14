@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { getVisibleModules } from "@/lib/modules";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { hrefDelResultado, type TiendaDeMarketing } from "@/lib/search/marketing";
+import { empresasDelSaldo } from "@/lib/search/empresas-cxc";
+import { BUSQUEDA_CXC_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-marketing";
 
 interface CxcResult { id: string; nombre?: string | null; nombre_normalized: string; total: number; company_key: string }
 interface ReclamoResult { id: string; nro_reclamo: string; nro_factura: string; empresa: string; estado: string; fecha_reclamo: string }
@@ -141,7 +143,9 @@ function flatten(r: SearchResults): FlatItem[] {
       module: "Cuentas por cobrar",
       // El nombre como lo escribe Switch; `nombre_normalized` es la llave en MAYÚSCULAS, no se muestra.
       label: c.nombre || c.nombre_normalized,
-      sub: `$${fmtMoney(c.total)} — ${c.company_key}`,
+      sub: BUSQUEDA_CXC_EMPRESAS_2026_11
+        ? [`$${fmtMoney(c.total)}`, empresasDelSaldo(c.company_key)].filter(Boolean).join(" · ")
+        : `$${fmtMoney(c.total)} — ${c.company_key}`,
       href: `/cxc?search=${encodeURIComponent(c.nombre_normalized)}`,
       icon: "📊",
     });

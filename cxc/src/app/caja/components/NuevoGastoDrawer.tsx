@@ -10,6 +10,7 @@ import GastoForm, { normalizeStr } from "./GastoForm";
 import AvisoSaldoNegativo from "./AvisoSaldoNegativo";
 import AvisoAntesDeGuardar from "./AvisoAntesDeGuardar";
 import ZonaFotos from "./ZonaFotos";
+import { CAJA_AVISO_AL_GUARDAR_2026_11 } from "@/lib/ui/revision-110-marketing";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
 import { centavos } from "@/lib/caja/dinero";
@@ -136,6 +137,15 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
   }
 
   async function save(opts: { andNew: boolean; skipNegativeCheck?: boolean; skipAvisos?: boolean }) {
+    // n.º 93: el aviso sale al tocar Guardar, con TODO lo que falta de una vez.
+    if (CAJA_AVISO_AL_GUARDAR_2026_11) {
+      const faltan = camposQueFaltan({ proveedor: gProveedor, categoria: gCategoria, subtotal: subtotalNum });
+      if (faltan.length > 0) {
+        setError(`Falta: ${faltan.join(", ")}.`);
+        requestAnimationFrame(() => document.querySelector("[data-caja-error]")?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+        return;
+      }
+    }
     if (!opts.skipAvisos) {
       const mensajes = avisosDeEsteGasto();
       if (mensajes.length > 0) {
@@ -255,17 +265,21 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
   const values = { gFecha, gDescripcion, gProveedor, gNroFactura, gSubtotal, gItbmsPct, gCategoria };
   const setters = { setGFecha, setGDescripcion, setGProveedor, setGNroFactura, setGSubtotal, setGItbmsPct, setGCategoria };
 
+  // n.º 93: los botones nacen ENCENDIDOS (solo se apagan mientras guarda) y
+  // enteros; lo que falta se dice al tocar Guardar.
+  const avisoAlGuardar = CAJA_AVISO_AL_GUARDAR_2026_11;
+  const botonApagado = avisoAlGuardar ? addingGasto : !canSave;
   const footer = (
     <div className="skin-caja flex items-center justify-between gap-2">
-      <div className="text-xs" style={{ color: "var(--caja-fg-muted)" }}>
+      <div className={`text-xs${avisoAlGuardar ? " hidden sm:block" : ""}`} style={{ color: "var(--caja-fg-muted)" }}>
         {canSave ? (
           <>Total: <span className="caja-mono" style={{ color: "var(--caja-fg-strong)", fontWeight: 600 }}>${fmt(totalNum)}</span></>
-        ) : "Completa los campos obligatorios."}
+        ) : avisoAlGuardar ? null : "Completa los campos obligatorios."}
       </div>
-      <div className="flex gap-2">
+      <div className={`flex gap-2${avisoAlGuardar ? " flex-1 sm:flex-none [&>button]:flex-1 sm:[&>button]:flex-none [&>button]:whitespace-nowrap" : ""}`}>
         <button
           onClick={() => save({ andNew: true })}
-          disabled={!canSave}
+          disabled={botonApagado}
           className="inline-flex items-center justify-center text-sm font-medium px-3 min-h-[44px] rounded-md transition-colors disabled:opacity-40"
           style={{ background: "#fff", color: "var(--caja-fg-default)", border: "1px solid var(--caja-border-default)" }}
         >
@@ -273,7 +287,7 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
         </button>
         <button
           onClick={() => save({ andNew: false })}
-          disabled={!canSave}
+          disabled={botonApagado}
           className="inline-flex items-center justify-center text-sm font-medium px-3 min-h-[44px] rounded-md transition-transform active:scale-[0.97] disabled:opacity-40"
           style={{ background: "var(--caja-accent)", color: "#fff" }}
         >
@@ -287,7 +301,7 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
     <>
       <div className="skin-caja px-5 py-5">
         {error && (
-          <p className="text-sm mb-4 px-3 py-2 rounded-md" style={{ color: "var(--caja-danger-onSoft)", background: "var(--caja-danger-soft)", border: "1px solid var(--caja-danger-border)" }}>
+          <p data-caja-error className="text-sm mb-4 px-3 py-2 rounded-md" style={{ color: "var(--caja-danger-onSoft)", background: "var(--caja-danger-soft)", border: "1px solid var(--caja-danger-border)" }}>
             {error}
           </p>
         )}
@@ -352,4 +366,17 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
       {contenido}
     </Drawer>
   );
+}
+
+/**
+ * n.º 93 · Lo que falta para guardar un gasto, en el orden del formulario. La
+ * regla es la MISMA de `canSave` (proveedor, categoría y subtotal); la nota es
+ * opcional desde el 20-sep-2026.
+ */
+export function camposQueFaltan(c: { proveedor: string; categoria: string; subtotal: number }): string[] {
+  const faltan: string[] = [];
+  if (!c.proveedor.trim()) faltan.push("proveedor");
+  if (!c.categoria.trim()) faltan.push("categoría");
+  if (!(c.subtotal > 0)) faltan.push("subtotal");
+  return faltan;
 }

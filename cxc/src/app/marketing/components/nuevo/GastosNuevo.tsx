@@ -20,6 +20,7 @@ import type { MkMarca } from "@/lib/marketing/types";
 import type { FilaDeTienda } from "@/lib/marketing/vista-tienda";
 import FichaTiendaAcciones, { type AccionDeFila } from "../../tienda/[codigo]/FichaTiendaAcciones";
 import { BOTON_PRINCIPAL } from "./PorCobrarNuevo";
+import { MKT_GASTOS_TABLA_CABE_2026_11 } from "@/lib/ui/revision-110-marketing";
 import { BuscadorConFiltros } from "@/components/filtros/FiltroA";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
@@ -101,6 +102,14 @@ function Filtro({
   );
 }
 
+/**
+ * n.º 91 · ¿La columna «Estado» solo repetiría el filtro? Con «Por cobrar», sí.
+ * Con «No recuperable» NO: ahí la columna lleva también la observación.
+ */
+export function columnaEstadoSobra(filtroEstado: string): boolean {
+  return filtroEstado === "por_cobrar";
+}
+
 export function pctDe(g: Pick<GastoDeLaLista, "monto" | "aCobrar" | "estado">): number | null {
   if (g.estado === "no_recuperable" || g.monto <= 0) return null;
   return Math.round((g.aCobrar / g.monto) * 100);
@@ -167,6 +176,9 @@ export default function GastosNuevo({
       (!estado || g.estado === estado) &&
       (!FILTRO_A_2026_11 || coincideGasto(g, busqueda)),
   );
+  // n.º 91: con el filtro en «Por cobrar», la columna «Estado» repetiría el
+  // filtro en cada fila; se va y la tabla cabe. Con «Todos», vuelve.
+  const conEstado = !(MKT_GASTOS_TABLA_CABE_2026_11 && columnaEstadoSobra(estado));
   const monto = filtrados.reduce((s, g) => s + g.monto, 0);
   const aCobrar = filtrados.reduce((s, g) => s + g.aCobrar, 0);
 
@@ -247,7 +259,7 @@ export default function GastosNuevo({
               <th className="text-right font-medium px-2 py-2">Monto</th>
               <th className="text-right font-medium px-2 py-2">Se cobra</th>
               <th className="text-right font-medium px-2 py-2">Monto a cobrar</th>
-              <th className="text-left font-medium px-4 py-2">Estado</th>
+              {conEstado && <th className="text-left font-medium px-4 py-2">Estado</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -268,8 +280,9 @@ export default function GastosNuevo({
                   <td className="px-2 py-2 text-gray-600 whitespace-nowrap">{g.marcaNombre ?? "—"}</td>
                   <td className="px-2 py-2 text-gray-600 max-w-[12rem] truncate">{g.tiendaNombre}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{formatearMonto(g.monto)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums text-gray-600">{pct === null ? "—" : `${pct} %`}</td>
+                  <td className={`px-2 py-2 text-right tabular-nums text-gray-600${MKT_GASTOS_TABLA_CABE_2026_11 ? " whitespace-nowrap" : ""}`}>{pct === null ? "—" : `${pct} %`}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{g.estado === "no_recuperable" ? "—" : formatearMonto(g.aCobrar)}</td>
+                  {conEstado && (
                   <td className="px-4 py-2 whitespace-nowrap">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${CHIP_ESTADO[g.estado]}`}>{ROTULO_ESTADO[g.estado]}</span>
                     {g.estado === "no_recuperable" && g.nota && (
@@ -278,6 +291,7 @@ export default function GastosNuevo({
                       </span>
                     )}
                   </td>
+                  )}
                 </tr>
               );
             })}

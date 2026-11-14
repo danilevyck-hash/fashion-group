@@ -7,6 +7,7 @@ import { SkeletonTable, EmptyState } from "@/components/ui";
 import OverflowMenu, { OverflowMenuItem } from "@/components/ui/OverflowMenu";
 import { lineaPeriodoCaja } from "@/lib/egresos/apple-2026-10";
 import { Aviso } from "@/components/ui/Aviso";
+import { CAJA_SALDO_EN_EL_TITULO_2026_11 } from "@/lib/ui/revision-110-marketing";
 
 interface Props {
   periodos: CajaPeriodo[];
@@ -501,6 +502,26 @@ function ListaApple({
             return (
               <li key={p.id} data-periodo-apple={p.id} className="flex min-h-[56px] items-center gap-2 pr-2">
                 <button type="button" onClick={() => onLoadDetail(p.id)} className="flex min-w-0 flex-1 items-center gap-4 py-2.5 pl-4 text-left transition hover:bg-gray-50">
+                  {CAJA_SALDO_EN_EL_TITULO_2026_11 ? (
+                  // n.º 92: el saldo sube a la línea del título y el gasto cabe en una línea.
+                  <span className="min-w-0 flex-1" data-periodo-saldo-arriba>
+                    <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                      Período Nº {p.numero}
+                      {abiertoP && <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Abierto</span>}
+                      <span className={`ml-auto shrink-0 font-normal tabular-nums ${saldoEsNegativo(saldo) ? "text-red-600" : "text-gray-900"}`}>
+                        {montoEnPantalla(saldo)}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block text-sm text-gray-500 tabular-nums">
+                      {fmtDate(p.fecha_apertura)}
+                      {p.fecha_cierre ? ` — ${fmtDate(p.fecha_cierre)}` : " · en curso"}
+                    </span>
+                    <span className="block whitespace-nowrap text-sm text-gray-500 tabular-nums">
+                      {`Gastado $${fmt(p.total_gastado)} · ${n} ${n === 1 ? "recibo" : "recibos"}`}
+                    </span>
+                  </span>
+                  ) : (
+                  <>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
                       Período Nº {p.numero}
@@ -520,6 +541,8 @@ function ListaApple({
                   <span className={`shrink-0 text-sm tabular-nums ${saldoEsNegativo(saldo) ? "text-red-600" : "text-gray-900"}`}>
                     {montoEnPantalla(saldo)}
                   </span>
+                  </>
+                  )}
                   <span aria-hidden className="shrink-0 text-gray-300">›</span>
                 </button>
                 <OverflowMenu items={itemsDe(p)} />
