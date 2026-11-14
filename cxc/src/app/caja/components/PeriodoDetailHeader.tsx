@@ -3,6 +3,7 @@
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaPeriodo } from "./types";
 import OverflowMenu, { OverflowMenuItem } from "@/components/ui/OverflowMenu";
+import { CAJA_MENU_EN_EL_TITULO_2026_11 as EN_EL_TITULO } from "@/lib/ui/celular-optimizar-2026-11";
 import { etiquetaResponsable } from "@/lib/caja/responsable";
 import { montoEnPantalla, saldoEsNegativo } from "@/lib/caja/dinero";
 import { lineaPeriodoCaja } from "@/lib/egresos/apple-2026-10";
@@ -206,7 +207,10 @@ export default function PeriodoDetailHeader({
     const neg = saldoEsNegativo(saldo);
     return (
       <div data-cabecera-apple className="max-w-6xl mx-auto px-4 sm:px-9 pt-6 pb-2">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        {/* 14-nov-2026 (`CAJA_MENU_EN_EL_TITULO_2026_11`): las acciones no
+            bajan a una fila sola en el celular; se quedan arriba a la derecha
+            y es el título el que se acomoda en dos líneas. */}
+        <div className={EN_EL_TITULO ? "flex items-start justify-between gap-x-2 sm:gap-x-4" : "flex flex-wrap items-center justify-between gap-x-4 gap-y-1"}>
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
             <button onClick={onBack} className="inline-flex min-h-[44px] items-center text-sm text-blue-600 hover:text-blue-800">‹ Períodos</button>
             <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Período Nº {current.numero}</h1>

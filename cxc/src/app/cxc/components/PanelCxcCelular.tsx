@@ -38,6 +38,7 @@ import {
   type SortKey,
 } from "@/lib/cxc-orden";
 import { OrdenarEnLaBarra } from "@/components/ui/OrdenTabla";
+import { CXC_ORDENAR_JUNTO_AL_BUSCADOR_2026_11 as JUNTO } from "@/lib/ui/celular-optimizar-2026-11";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import {
@@ -372,17 +373,26 @@ export default function PanelCxcCelular({
       </>)}
 
       {/* ── Buscar ────────────────────────────────────────────────────────── */}
-      <div className="px-4 pt-3">
-        <CampoBuscar
-          inputMode="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar cliente"
-          aria-label="Buscar cliente"
-        />
+      {/* 14-nov-2026 (`CXC_ORDENAR_JUNTO_AL_BUSCADOR_2026_11`): «Ordenar» va
+          al lado del buscador, en la misma fila, en vez de una fila sola. */}
+      <div className={JUNTO ? "flex items-center gap-2 px-4 pt-3" : "px-4 pt-3"}>
+        <div className={JUNTO ? "min-w-0 flex-1" : undefined}>
+          <CampoBuscar
+            inputMode="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar cliente"
+            aria-label="Buscar cliente"
+          />
+        </div>
+        {JUNTO && lista.length > 1 && (
+          <span data-ordenar-cxc className="contents">
+            <OrdenarEnLaBarra api={apiOrden} opciones={OPCIONES_ORDEN_CELULAR} />
+          </span>
+        )}
       </div>
 
-      {lista.length > 1 && (
+      {!JUNTO && lista.length > 1 && (
         <div data-ordenar-cxc className="flex justify-end px-4 pt-3">
           <OrdenarEnLaBarra api={apiOrden} opciones={OPCIONES_ORDEN_CELULAR} />
         </div>

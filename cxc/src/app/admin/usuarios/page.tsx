@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
 import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { USUARIOS_SIN_PESTANAS_DOBLES_2026_11 as SIN_DOBLES } from "@/lib/ui/celular-optimizar-2026-11";
 import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
@@ -347,7 +348,11 @@ function UsuariosPageInner() {
         <h1 className="sr-only">Usuarios</h1>
 
         <Tabs value={tab} onValueChange={setTab} className={USUARIOS_APPLE_2026_10 ? "relative" : undefined}>
-          <TabsList className={`${barra && esAdmin ? "hidden " : ""}-mx-6 mb-6 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-6 p-0 md:mx-0 md:px-0`}>
+          {/* 🩸 14-nov-2026 (`USUARIOS_SIN_PESTANAS_DOBLES_2026_11`): con la barra
+              del celular las pestañas debían esconderse —el título «Usuarios ▾»
+              ya cambia de sección—, pero `hidden` iba ANTES de `flex` y la
+              mezcla de clases se quedaba con `flex`: salían dos veces. */}
+          <TabsList className={`${barra && esAdmin && !SIN_DOBLES ? "hidden " : ""}-mx-6 mb-6 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-6 p-0 md:mx-0 md:px-0${barra && esAdmin && SIN_DOBLES ? " !hidden" : ""}`}>
             <TabsTrigger value="usuarios" className={TAB_TRIGGER_CLASS}>
               <UsersIcon className="hidden h-3.5 w-3.5 sm:block" /> Usuarios
             </TabsTrigger>

@@ -26,6 +26,7 @@
 // `ClientesView`, con los mismos montos y los mismos deltas de la computadora.
 // ============================================================================
 
+import { VENTAS_CLIENTES_EMPRESA_EN_LA_BARRA_2026_11 as EMPRESA_EN_LA_BARRA } from "@/lib/ui/celular-optimizar-2026-11";
 import { BuscarEnLaBarra, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
 import type { Cliente } from "../types";
@@ -84,10 +85,24 @@ export function ClientesCelular({
   // 🔴 v2 de la barra del celular: la lupa se abre EN la barra y la empresa es
   // un ícono de la misma barra; la línea gris dice cuál está puesta.
   const hayBarra = useHayBarraCelular();
+  // 14-nov-2026 (`VENTAS_CLIENTES_EMPRESA_EN_LA_BARRA_2026_11`): con la barra,
+  // el chip de empresa va en la fila de «Ordenar», a la izquierda, en vez de
+  // ocupar su propia fila bajo la línea gris.
+  const chipArriba = hayBarra && !!ordenar && EMPRESA_EN_LA_BARRA;
+  const chipEmpresa = (
+    <button
+      type="button"
+      onClick={onEmpresa}
+      data-chip-empresa
+      className="min-h-[36px] shrink-0 rounded-full border border-gray-300 bg-white px-3 text-[13px] font-medium text-gray-800 active:opacity-60"
+    >
+      {empresaRotulo} ▾
+    </button>
+  );
 
   return (
     <PantallaVentas>
-      {hayBarra && ordenar && <EnLaBarra filaDer={ordenar} />}
+      {hayBarra && ordenar && <EnLaBarra filaIzq={chipArriba ? chipEmpresa : undefined} filaDer={ordenar} />}
       <TituloVentas
         enLaBarra
         titulo="Clientes"
@@ -126,16 +141,7 @@ export function ClientesCelular({
 
       {/* 🔴 «TODAS LAS EMPRESAS» ES UN CHIP, no un desplegable de ancho casi
           completo: en la práctica casi nunca se toca. */}
-      <div className="flex flex-wrap gap-2 px-4 pt-3">
-        <button
-          type="button"
-          onClick={onEmpresa}
-          data-chip-empresa
-          className="min-h-[36px] rounded-full border border-gray-300 bg-white px-3 text-[13px] font-medium text-gray-800 active:opacity-60"
-        >
-          {empresaRotulo} ▾
-        </button>
-      </div>
+      {!chipArriba && <div className="flex flex-wrap gap-2 px-4 pt-3">{chipEmpresa}</div>}
 
       <GrupoVentas className="mt-3">
         {filas.length === 0 && (

@@ -12,6 +12,7 @@ import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directorio";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { AYUDA_EN_LA_TARJETA_2026_11 as AYUDA_EN_LA_TARJETA } from "@/lib/ui/celular-optimizar-2026-11";
 import { horasParaGuardar, motivoAdmiteHoras, textoPermiso, ventanaDe } from "@/lib/asistencia/permiso-horas";
 
 import RangoFechas from "@/components/ui/RangoFechas";
@@ -119,25 +120,36 @@ export default function JustificacionesTab() {
     } catch (e) { toast(e instanceof Error ? e.message : "No se pudo eliminar", "error"); }
   }
 
+  const ayuda = (
+    <Ayuda titulo="Cuándo cargar una justificación" etiqueta="Cuándo cargarlas">
+      <p>
+        Márcalas el día que pasan y la quincena se cierra sola. También puedes
+        cargarlas <b>hacia atrás</b>.
+      </p>
+    </Ayuda>
+  );
+
   const campo = "min-h-[44px] w-full rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm";
 
   return (
     <div className="space-y-5">
       {/* Cuándo conviene cargarlas se aprende una vez: va en el ⓘ. Lo que hay
           que hacer está en el formulario de abajo. */}
-      <div className="-ml-2 -mt-2">
-        <Ayuda titulo="Cuándo cargar una justificación" etiqueta="Cuándo cargarlas">
-          <p>
-            Márcalas el día que pasan y la quincena se cierra sola. También puedes
-            cargarlas <b>hacia atrás</b>.
-          </p>
-        </Ayuda>
-      </div>
+      {/* 14-nov-2026 (`AYUDA_EN_LA_TARJETA_2026_11`): el ⓘ ya no ocupa una
+          fila sola; va al lado del primer rótulo de la tarjeta. */}
+      {!AYUDA_EN_LA_TARJETA && <div className="-ml-2 -mt-2">{ayuda}</div>}
 
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Colaborador</label>
+            {AYUDA_EN_LA_TARJETA ? (
+              <div className="mb-1 flex items-center justify-between">
+                <label className="block text-xs uppercase tracking-wide text-gray-400">Colaborador</label>
+                <div className="-my-3 -mr-2">{ayuda}</div>
+              </div>
+            ) : (
+              <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Colaborador</label>
+            )}
             {/* Los que tienen nombre van arriba y alfabéticos; los que todavía
                 no, agrupados abajo y por número de verdad (5 antes que 49).
                 Siguen siendo ELEGIBLES: son gente que marca y a la que hay que

@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Toast, SkeletonTable, EmptyState, AnimatedNumber } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import { PRESTAMOS_CELULAR_2026_11 as CELULAR } from "@/lib/ui/celular-optimizar-2026-11";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
 import { hoyPanamaYmd, getQuincenaRangePanama } from "@/lib/prestamos-quincena";
@@ -239,7 +240,10 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <h1 className="sr-only">Préstamos</h1>
 
-        <div className="flex flex-wrap items-center gap-2 mb-5">
+        {/* 14-nov-2026 (`PRESTAMOS_CELULAR_2026_11`): en el celular las dos
+            tarjetas van lado a lado (dos columnas iguales) y «Aplicar
+            quincena» debajo a todo el ancho; antes cada una ocupaba su fila. */}
+        <div className={CELULAR ? "mb-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center" : "flex flex-wrap items-center gap-2 mb-5"}>
           <div className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2">
             <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo pendiente total</div>
             <div className={`text-lg font-semibold tabular-nums ${totalSaldo > 0 ? "text-red-600" : "text-gray-400"}`}>$<AnimatedNumber value={totalSaldo} formatter={(n: number) => fmt(n)} /></div>
@@ -251,7 +255,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           {quincenaPendientesN > 0 && (
             <button
               onClick={() => setConfirmAplicarQ(true)}
-              className="sm:ml-auto inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition"
+              className="col-span-2 sm:ml-auto inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition"
             >
               Aplicar quincena ({quincenaPendientesN})
             </button>
@@ -286,7 +290,10 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           <select
             value={filterEmpresa}
             onChange={e => setFilterEmpresa(e.target.value)}
-            className="h-11 min-h-[44px] shrink-0 rounded-md border border-campo bg-white px-3 text-sm outline-none focus:border-gray-900 transition"
+            // El celular le daba a «Todas» el ancho del nombre de empresa más
+            // largo y el buscador quedaba en «Buscar co». Ahora el select es
+            // angosto y el buscador se lleva el resto.
+            className={`h-11 min-h-[44px] shrink-0 rounded-md border border-campo bg-white px-3 text-sm outline-none focus:border-gray-900 transition ${CELULAR ? "w-28 sm:w-auto" : ""}`}
           >
             <option value="all">Todas</option>
             {empresas.map(e => <option key={e} value={e}>{e}</option>)}

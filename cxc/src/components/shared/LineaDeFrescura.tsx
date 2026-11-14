@@ -25,6 +25,7 @@ import SyncNowButton, { CLASE_BOTON_LINEA, type SyncNowOpcion } from "./SyncNowB
 import { useEstadoSync, type SyncTable } from "./useEstadoSync";
 import { haceCuantoFrescura, horaDeFrescura } from "@/lib/ui/frescura";
 import { TEXTO_ACTUALIZANDO } from "@/lib/ui/actualizar-ahora";
+import { FRESCURA_GIRO_GRANDE_2026_11 as GIRO_GRANDE } from "@/lib/ui/celular-optimizar-2026-11";
 
 type Forma = "celular" | "computadora";
 
@@ -72,11 +73,17 @@ function DesdeSyncStatus(props: LineaDeFrescuraProps & { tabla: SyncTable }) {
   return <Linea {...props} iso={data?.last_global ?? null} />;
 }
 
-/** El ↻. Gira mientras actualiza. */
-function Giro({ girando }: { girando: boolean }) {
-  return (
+/** El ↻. Gira mientras actualiza. `grande`: el del celular, en un cuadro de 44 px. */
+function Giro({ girando, grande = false }: { girando: boolean; grande?: boolean }) {
+  const giro = (
     <span aria-hidden className={`inline-block leading-none ${girando ? "animate-spin" : ""}`}>
       ↻
+    </span>
+  );
+  if (!grande) return giro;
+  return (
+    <span aria-hidden className="-ml-3 -mr-3 inline-flex h-11 w-11 shrink-0 items-center justify-center text-[22px]">
+      {giro}
     </span>
   );
 }
@@ -109,7 +116,11 @@ function Linea(props: LineaDeFrescuraProps & { iso: string | null }) {
     forma === "celular" ? (
       <>
         <span className="text-gray-500">{corriendo ? `${ocupado}${progreso}` : texto ?? accion}</span>
-        <span aria-label={accion} className="text-blue-600"> <Giro girando={corriendo} /></span>
+        {GIRO_GRANDE ? (
+          <span aria-label={accion} className="text-blue-600"><Giro girando={corriendo} grande /></span>
+        ) : (
+          <span aria-label={accion} className="text-blue-600"> <Giro girando={corriendo} /></span>
+        )}
       </>
     ) : (
       <>
