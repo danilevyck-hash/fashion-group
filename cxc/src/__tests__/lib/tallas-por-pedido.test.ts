@@ -4,12 +4,14 @@
 // los totales, los amarillos y los naranjas; con casos chicos, cada regla.
 import { describe, it, expect } from "vitest";
 import XLSX from "xlsx-js-style";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import fixture from "./fixtures/tallas-pedido-2182.json";
 import {
   armarTallasDelPedido, candidatosDeReferencia, coincideElPedido, compararTallas, curvasDeReferencia, idDelPedido, juntarEncontrados, nombreDelArchivo, sumarPorCodigo,
   type TallaDeDespacho,
 } from "@/lib/tallas-pedido/armar";
-import { adjuntosDeDespacho, empresaDelDestinatario, leerAdjuntoDeDespacho, leerDespacho, proveedorDelCorreo, SIN_CAJA } from "@/lib/tallas-pedido/despacho-archivo";
+import { adjuntosDeDespacho, empresaDelDestinatario, leerAdjuntoDeDespacho, leerDespacho, proveedorDelCorreo, SIN_CAJA, type Celda } from "@/lib/tallas-pedido/despacho-archivo";
 import { libroDeTallas, FONDO } from "@/lib/tallas-pedido/excel";
 
 const caja = (referencia: string, codigo_caja: string, tallas: [string, number][], cajas: number, extra: Partial<TallaDeDespacho> = {}): TallaDeDespacho[] =>
@@ -374,5 +376,34 @@ describe("la Opción lleva el código de la caja de ASW (14-nov-2026)", () => {
     const filas = armarTallasDelPedido(linea(6), d).filas;
     expect(filas.some((f) => f.opcion.includes("ILPN") || f.referencia.includes("ILPN"))).toBe(false);
     expect(filas.every((f) => f.opcion === "")).toBe(true);
+  });
+});
+
+describe("Reebok: la letra de la curva del cartón (14-nov-2026)", () => {
+  // Archivo REAL: «Packing List Ordenes 3003924.xlsx» (membrete arriba, dos cartones: B y A).
+  const libro = XLSX.read(readFileSync(join(__dirname, "../fixtures/reebok-packing-list-3003924.xlsx")), { type: "buffer" });
+  const hoja = XLSX.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]], { header: 1, raw: true, defval: null }) as Celda[][];
+  const filas = leerAdjuntoDeDespacho(hoja, { correo_id: "C", proveedor: "reebok" })!;
+
+  it("la letra sale del SKU del cartón y la llevan todas sus tallas", () => {
+    expect(filas.length).toBe(18);
+    expect(filas.filter((f) => f.referencia === "100272254").every((f) => f.curva === "B")).toBe(true);
+    expect(filas.filter((f) => f.referencia === "100272299").every((f) => f.curva === "A")).toBe(true);
+  });
+
+  it("el Excel la muestra como ASW: «A», nunca el N.° de cartón", () => {
+    const opciones = armarTallasDelPedido([{ codigo: "100272299", descripcion: "x", cantidad: 12 }], filas as TallaDeDespacho[])
+      .filas.map((f) => f.opcion);
+    expect(new Set(opciones)).toEqual(new Set(["A"]));
+    const dos = [...filas, ...filas.filter((f) => f.referencia === "100272254").map((f) => ({ ...f, referencia: "100272299", codigo_caja: "X#9" }))];
+    const ops = armarTallasDelPedido([{ codigo: "100272299", descripcion: "x", cantidad: 12 }], dos as TallaDeDespacho[]).filas.map((f) => f.opcion);
+    expect([...new Set(ops)].sort()).toEqual(["Opción 1 · B", "Opción 2 · A"].sort());
+    expect(ops.some((o) => o.includes("0001973"))).toBe(false);
+  });
+
+  it("sin letra → como antes (sin código)", () => {
+    const sin = filas.map((f) => ({ ...f, curva: null }));
+    const ops = armarTallasDelPedido([{ codigo: "100272299", descripcion: "x", cantidad: 12 }], sin as TallaDeDespacho[]).filas.map((f) => f.opcion);
+    expect(new Set(ops)).toEqual(new Set([""]));
   });
 });

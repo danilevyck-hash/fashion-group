@@ -49,6 +49,8 @@ export interface TallaDeDespacho {
   fecha_despacho: string | null;
   /** «asw», «reebok»… (columna `proveedor`; sin ella no se muestra código). */
   proveedor?: string | null;
+  /** Reebok: la letra de la curva del cartón (columna `curva`). */
+  curva?: string | null;
 }
 
 export type ColorFila = "amarillo" | "naranja" | null;
@@ -120,12 +122,13 @@ interface Curva {
 }
 
 /**
- * El código de la curva (W1A, W1B, M1A…) SOLO si viene de ASW, que llena
- * `codigo_caja` con su CODIGO_PREPACK. En Reebok / Fashion Fitness (y Active
- * Wear) `codigo_caja` es un N.° de CARTÓN («ILPN18K…#3») o un SKU: no es una
- * curva y nunca se muestra. Se decide por `proveedor`, no por la forma del texto.
+ * El código de la curva: en ASW, `codigo_caja` (su CODIGO_PREPACK: W1A, W1B…);
+ * en Reebok, la letra del cartón (`curva`: A, B, C…; 14-nov-2026). En Reebok /
+ * Fashion Fitness (y Active Wear) `codigo_caja` es un N.° de CARTÓN
+ * («ILPN18K…#3») o un SKU: nunca se muestra. Se decide por `proveedor`.
  */
 function codigoDeCurva(f: TallaDeDespacho): string | null {
+  if (f.proveedor === "reebok") return f.curva?.trim() || null;
   if (f.proveedor !== "asw") return null;
   const c = String(f.codigo_caja ?? "").trim();
   return c && c !== SIN_CAJA ? c : null;
