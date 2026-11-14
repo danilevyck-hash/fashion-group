@@ -286,3 +286,13 @@ export function idDelPedido(texto: string): number | null {
   const n = Number(m[1]);
   return Number.isSafeInteger(n) && n > 0 ? n : null;
 }
+
+/**
+ * ¿El número escrito es este pedido? Sirve el número completo («16-000002182»,
+ * «2182») o sus últimos dígitos («2182», «0182»): los dígitos escritos tienen
+ * que ser el FINAL de los dígitos del secuencial. Nunca por parecido.
+ */
+export function coincideElPedido(escrito: string, secuencial: string): boolean {
+  const d = String(escrito ?? "").replace(/\D/g, "");
+  return d.length > 0 && String(secuencial ?? "").replace(/\D/g, "").endsWith(d);
+}

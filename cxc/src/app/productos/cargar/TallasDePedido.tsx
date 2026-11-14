@@ -1,18 +1,22 @@
 "use client";
 
 // Plantilla Switch › Tallas por bulto — el «Excel de tallas» de un pedido
-// (13-nov-2026). Se escribe la empresa y el N.° de pedido; el servidor lee el
+// (13-nov-2026). Se escribe el número de pedido (completo o sus últimos dígitos);
+// el servidor lo busca en las 6 empresas (varios = se toca uno), lee el
 // pedido de Switch y las tallas de los despachos del proveedor, y de esas MISMAS
 // filas salen la vista previa y el Excel (`lib/tallas-pedido/excel.ts`).
 
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
-import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { fmtDate } from "@/lib/format";
+import type { PedidoEncontrado } from "@/lib/tallas-pedido/server";
 import { idDelPedido, nombreDelArchivo, type FilaTallas, type ResumenTallas } from "@/lib/tallas-pedido/armar";
 import { logActivityClient } from "@/lib/logActivityClient";
 import { Aviso } from "@/components/ui/Aviso";
 
 interface Respuesta {
+  empresa: string;
   pedido: { secuencial: string; cliente: string | null };
   filas: FilaTallas[];
   resumen: ResumenTallas;
@@ -24,7 +28,9 @@ const FONDO_FILA = { amarillo: "bg-amber-100", naranja: "bg-amber-300" } as cons
 const campo = "mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900";
 
 export default function TallasDePedido() {
-  const [empresa, setEmpresa] = useState("fashion_shoes");
+  // Vacía = buscar en las 6 empresas; puesta = la que se tocó en la lista.
+  const [empresa, setEmpresa] = useState("");
+  const [opciones, setOpciones] = useState<PedidoEncontrado[]>([]);
   const [pedido, setPedido] = useState("");
   const [datos, setDatos] = useState<Respuesta | null>(null);
   const [error, setError] = useState("");
@@ -34,6 +40,7 @@ export default function TallasDePedido() {
   // Se lee solo: medio segundo después de escribir un número de pedido válido.
   useEffect(() => {
     setDatos(null);
+    setOpciones([]);
     setError("");
     if (idDelPedido(pedido) === null) return;
     let vigente = true;
@@ -44,6 +51,7 @@ export default function TallasDePedido() {
         const j = await r.json().catch(() => ({}));
         if (!vigente) return;
         if (!r.ok) setError(j.error ?? "No se pudo leer el pedido.");
+        else if (j.opciones) setOpciones(j.opciones);
         else setDatos(j as Respuesta);
       } catch {
         if (vigente) setError("Sin conexión. Intenta de nuevo.");
@@ -69,7 +77,7 @@ export default function TallasDePedido() {
       logActivityClient({
         action: "descarga_tallas_pedido",
         module: "depurador",
-        details: { empresa, pedido: datos.pedido.secuencial, ...datos.resumen },
+        details: { empresa: datos.empresa, pedido: datos.pedido.secuencial, ...datos.resumen },
       });
     } finally {
       setBajando(false);
@@ -78,35 +86,52 @@ export default function TallasDePedido() {
 
   return (
     <section className="mb-8" aria-label="Excel de tallas de un pedido">
-      <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
-        <label className="text-xs font-medium text-gray-500">
-          Empresa
-          <select className={campo} value={empresa} onChange={(e) => setEmpresa(e.target.value)}>
-            {B2B_EMPRESA_KEYS.map((k) => (
-              <option key={k} value={k}>{nombreCortoEmpresa(k)}</option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs font-medium text-gray-500">
-          N.° de pedido
-          <input
-            className={`${campo} tabular-nums`}
-            inputMode="numeric"
-            placeholder="16-000002182"
-            value={pedido}
-            onChange={(e) => setPedido(e.target.value)}
-          />
-        </label>
-      </div>
+      <label className="block max-w-sm text-xs font-medium text-gray-500">
+        Número de pedido
+        <input
+          className={`${campo} tabular-nums`}
+          inputMode="numeric"
+          placeholder="16-000002182 o 2182"
+          value={pedido}
+          onChange={(e) => {
+            setEmpresa("");
+            setPedido(e.target.value);
+          }}
+        />
+      </label>
 
       {cargando && <p className="mt-3 text-sm text-gray-500">Leyendo el pedido…</p>}
       {error && <Aviso tono="error" className="mt-3">{error}</Aviso>}
+
+      {opciones.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-sm text-gray-600">Hay {opciones.length} pedidos con ese número. Selecciona uno:</p>
+          <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
+            {opciones.map((o) => (
+              <li key={`${o.empresa}-${o.id}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmpresa(o.empresa);
+                    setPedido(o.secuencial);
+                  }}
+                  className="flex w-full flex-wrap items-baseline gap-x-2 px-4 py-3 text-left text-sm hover:bg-gray-50 active:bg-gray-100"
+                >
+                  <span className="font-medium text-gray-900">{nombreCortoEmpresa(o.empresa)}</span>
+                  <span className="text-gray-600">· {o.cliente} · {fmtDate(o.fecha)} ·</span>
+                  <span className="tabular-nums text-gray-900">{o.secuencial}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {datos && (
         <>
           <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
             <div className="text-sm text-gray-900">
-              <span className="font-semibold">Pedido {datos.pedido.secuencial}</span>
+              <span className="font-semibold">Pedido {datos.pedido.secuencial}</span> · {nombreCortoEmpresa(datos.empresa)}
               {datos.pedido.cliente && <> · {datos.pedido.cliente}</>} · <span className="tabular-nums">{datos.resumen.pares}</span> pares
             </div>
             <div className="mt-1 text-sm tabular-nums text-gray-600">
