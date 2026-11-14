@@ -5,11 +5,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Despachos › Pedidos en el celular: los estados en un segmentado de anchos
- * iguales (no se deslizan), la empresa en su propia fila y el resumen con la
- * frescura en UNA línea.
+ * Despachos › Pedidos en el celular: la empresa en su propia fila y el resumen
+ * con la frescura en UNA línea (aprobado por Daniel el 14-nov-2026).
  */
 export const PEDIDOS_CELULAR_2026_11 = true;
+
+/**
+ * Despachos › Pedidos en el celular: cómo se dibujan los cuatro estados.
+ * "deslizar" = la fila de chips de siempre. Daniel (14-nov-2026) no quiso
+ * «En preparación» en dos líneas; se le muestran "una-linea" y "dos-por-dos".
+ */
+export type FormaEstadosCelular = "deslizar" | "una-linea" | "dos-por-dos";
+export const ESTADOS_CELULAR_2026_11: FormaEstadosCelular = "deslizar";
 
 /** `LineaDeFrescura` en el celular: el ↻ más grande, en un cuadro de 44 px. */
 export const FRESCURA_GIRO_GRANDE_2026_11 = true;

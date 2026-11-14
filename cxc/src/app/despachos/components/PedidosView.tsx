@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { Check, Printer, Undo2 } from "lucide-react";
 import { ConfirmModal } from "@/components/ui";
 import { AJUSTES_APPLE_6_2026_10 as CIRCULO } from "@/lib/ajustes-apple-6-2026-10";
-import { PEDIDOS_CELULAR_2026_11 as PEDIDOS_CELULAR } from "@/lib/ui/celular-optimizar-2026-11";
+import { ESTADOS_CELULAR_2026_11 as ESTADOS_CELULAR, PEDIDOS_CELULAR_2026_11 as PEDIDOS_CELULAR } from "@/lib/ui/celular-optimizar-2026-11";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, ChipSelector, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { useToast } from "@/components/ToastSystem";
@@ -412,7 +412,8 @@ export default function PedidosView({
           </button>
         ))}
       </div>
-      {NUEVO && hayQueElegirEmpresa && <ChipSelector rotulo="Empresa" valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
+      {/* Con `PEDIDOS_CELULAR_2026_11` la empresa del celular va en su propia fila. */}
+      {NUEVO && hayQueElegirEmpresa && !(barra && PEDIDOS_CELULAR) && <ChipSelector rotulo="Empresa" valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
       {POR_EMPRESA && !barra && (
         <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={`${CLASE_BOTON_TEXTO} gap-1.5`}>
           <Printer size={15} strokeWidth={1.8} aria-hidden /> Imprimir
@@ -421,31 +422,39 @@ export default function PedidosView({
     </div>
   );
 
-  // 🔴 Celular (14-nov-2026, `PEDIDOS_CELULAR_2026_11`): los estados no se
-  // deslizan. Un segmentado de anchos iguales, como iOS; un nombre largo
-  // («En preparación») baja a dos líneas en vez de cortarse. La empresa va en
-  // su propia fila, debajo (`filaEmpresaCelular`).
+  // 🔴 Celular (14-nov-2026): los estados en el celular tienen su propio
+  // interruptor, `ESTADOS_CELULAR_2026_11` (ver su comentario):
+  //   · "deslizar"   = la fila de chips de siempre (se desliza de lado);
+  //   · "una-linea"  = segmentado de iOS, los 4 en UNA línea, sin deslizar;
+  //   · "dos-por-dos"= cuatro botones iguales en dos filas de dos.
+  // La empresa va en su propia fila, debajo (`filaEmpresaCelular`).
+  const dosPorDos = ESTADOS_CELULAR === "dos-por-dos";
   const segmentadoCelular = (
     <div
       role="group"
       aria-label="Estado"
       data-segmentado-pedidos
-      className="grid w-full min-w-0 shrink grow basis-full gap-1 rounded-xl bg-pista-celular p-1"
-      style={{ gridTemplateColumns: `repeat(${CHIPS.length}, minmax(0, 1fr))` }}
+      className={dosPorDos
+        ? "grid w-full min-w-0 shrink grow basis-full grid-cols-2 gap-2"
+        : "flex w-full min-w-0 shrink grow basis-full gap-0.5 rounded-xl bg-pista-celular p-1"}
     >
-      {CHIPS.map((c) => (
-        <button
-          key={c.value}
-          type="button"
-          aria-pressed={filtro === c.value}
-          onClick={() => { setFiltro(c.value); void cargar(); }}
-          className={`relative min-h-9 rounded-lg px-1 text-[12px] font-medium leading-tight transition active:scale-[0.97] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] ${
-            filtro === c.value ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"
-          }`}
-        >
-          {c.label}
-        </button>
-      ))}
+      {CHIPS.map((c) => {
+        const activo = filtro === c.value;
+        const clase = dosPorDos
+          ? `min-h-11 rounded-lg border px-2 text-[14px] font-medium transition active:scale-[0.97] ${activo ? "border-gray-900 bg-gray-900 text-white" : "border-gray-300 bg-white text-gray-700"}`
+          : `relative min-h-9 flex-auto whitespace-nowrap rounded-lg px-1 text-[13px] font-medium tracking-tight transition active:scale-[0.97] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] max-[379px]:text-[12px] ${activo ? "bg-white text-gray-900 shadow-sm" : "text-gray-600"}`;
+        return (
+          <button
+            key={c.value}
+            type="button"
+            aria-pressed={activo}
+            onClick={() => { setFiltro(c.value); void cargar(); }}
+            className={clase}
+          >
+            {c.label}
+          </button>
+        );
+      })}
     </div>
   );
   const pedidosCelular = barra && PEDIDOS_CELULAR;
@@ -1115,7 +1124,7 @@ export default function PedidosView({
       {barra && (
         <EnLaBarra
           pestana="pedidos"
-          filaIzq={pedidosCelular ? segmentadoCelular : chips}
+          filaIzq={pedidosCelular && ESTADOS_CELULAR !== "deslizar" ? segmentadoCelular : chips}
           menu={POR_EMPRESA ? (
             <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={CLASE_FILA_MENU}>
               <Printer size={18} strokeWidth={1.8} aria-hidden /> Imprimir
