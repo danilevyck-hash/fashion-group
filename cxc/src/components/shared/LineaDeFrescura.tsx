@@ -36,6 +36,9 @@ interface Comun {
   accion?: string;
   /** Lo que dice mientras corre. «Actualizando…» por defecto. */
   ocupado?: string;
+  /** Celular: «↻ 10:01 am», sin «Actualizado», para cerrar una línea de
+   *  filtros (revisión 110, Ventas › Clientes). */
+  soloHora?: boolean;
 }
 
 type Fuente =
@@ -113,7 +116,12 @@ function Linea(props: LineaDeFrescuraProps & { iso: string | null }) {
 
   // Lo que dice el toque, en reposo y mientras corre.
   const rotulo = (corriendo: boolean, progreso: string = ""): ReactNode =>
-    forma === "celular" ? (
+    forma === "celular" && props.soloHora ? (
+      <span className="inline-flex items-center gap-1 whitespace-nowrap text-[13px]">
+        <span aria-label={accion} className="text-blue-600"><Giro girando={corriendo} /></span>
+        <span className="tabular-nums text-gray-500">{corriendo ? "…" : cuando ?? ""}</span>
+      </span>
+    ) : forma === "celular" ? (
       <>
         <span className="text-gray-500">{corriendo ? `${ocupado}${progreso}` : texto ?? accion}</span>
         {GIRO_GRANDE ? (

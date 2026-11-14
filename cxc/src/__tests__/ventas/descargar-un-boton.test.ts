@@ -77,7 +77,8 @@ describe("la hoja de «Descargar»", () => {
 describe("las tres pestañas en un solo Excel", () => {
   it("las hojas son tres y se llaman como las pestañas", () => {
     expect([...HOJAS_DE_LAS_TRES]).toEqual(["Resumen", "Clientes", "Productos"]);
-    expect(nombreDeLasTres(2026)).toBe("ventas-2026.xlsx");
+    // n.º 12 (revisión 110): la forma del sistema, con la fecha de la descarga.
+    expect(nombreDeLasTres(2026)).toMatch(/^Ventas-Resumen-Clientes-Productos-\d{4}-\d{2}-\d{2}\.xlsx$/);
   });
 
   it("🔴 NO hay un generador nuevo: llama a los TRES de siempre", () => {

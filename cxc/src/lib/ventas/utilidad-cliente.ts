@@ -13,6 +13,7 @@
 import { EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { fmtPorcentaje } from "@/lib/ventas/format";
 import type { CuadreUtilidad } from "@/lib/ventas/una-sola-venta";
+import { nombreExcelVentas } from "@/lib/ventas/nombre-archivo";
 
 /** Las cinco que `utilidad_por_cliente(p_anio)` (v1) lleva escritas en su WHERE.
  *  Solo se usa para rotular la respuesta cuando la migración de la v2 todavía
@@ -156,6 +157,6 @@ export async function exportUtilidadToExcel(
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
   downloadWorkbook(
     workbookFromSheets([{ name: "Utilidad por cliente", ws }]),
-    `utilidad-por-cliente-${resp.year}.xlsx`,
+    nombreExcelVentas(["Clientes", "Utilidad"], `utilidad-por-cliente-${resp.year}.xlsx`),
   );
 }

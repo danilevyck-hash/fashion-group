@@ -31,11 +31,20 @@ import { BuscarEnLaBarra, EnLaBarra, useHayBarraCelular } from "@/components/cel
 import { CampoBuscar } from "@/components/BuscadorDeLista";
 import type { Cliente } from "../types";
 import {
+  SIN_CODIGO_EN_SWITCH,
   lineaGrisDelCliente,
   montoDeLaTabla,
   porcentajeDelCliente,
+  tieneCodigoDeCliente,
+  ultimaCompraCorta,
   ultimaCompraEnPalabras,
 } from "@/lib/ventas/celular";
+import {
+  VENTAS_SIN_CODIGO_NO_ES_ENLACE,
+  VENTAS_ULTIMA_COMPRA_CORTA,
+} from "@/lib/ui/revision-110-ventas";
+import { fmtMargenPantalla, fmtMoneySigned } from "@/lib/ventas/utilidad-cliente";
+import type { UtilidadDelCliente } from "@/lib/ventas/utilidad-por-codigo";
 import {
   ESTILO_COLCHON_DERECHA,
   GrupoVentas,
@@ -65,6 +74,11 @@ interface Props {
   ordenar?: React.ReactNode;
   /** Lo que está pasando abajo del todo (los sin compras, «Otros»…). */
   pie?: React.ReactNode;
+  /** Revisión 110 (rec-c): «Todas las empresas ▾ · Ordenar ▾ · ↻ hora» en una
+   *  línea y sin «N clientes». */
+  unaLista?: boolean;
+  /** Revisión 110 (rec-c): la utilidad del cliente, si hay (solo año completo). */
+  utilidadDe?: (c: Cliente) => UtilidadDelCliente | undefined;
 }
 
 export function ClientesCelular({
@@ -81,6 +95,8 @@ export function ClientesCelular({
   frescura,
   ordenar,
   pie,
+  unaLista = false,
+  utilidadDe,
 }: Props) {
   // 🔴 v2 de la barra del celular: la lupa se abre EN la barra y la empresa es
   // un ícono de la misma barra; la línea gris dice cuál está puesta.
@@ -88,7 +104,7 @@ export function ClientesCelular({
   // 14-nov-2026 (`VENTAS_CLIENTES_EMPRESA_EN_LA_BARRA_2026_11`): con la barra,
   // el chip de empresa va en la fila de «Ordenar», a la izquierda, en vez de
   // ocupar su propia fila bajo la línea gris.
-  const chipArriba = hayBarra && !!ordenar && EMPRESA_EN_LA_BARRA;
+  const chipArriba = hayBarra && !!ordenar && (EMPRESA_EN_LA_BARRA || unaLista);
   const chipEmpresa = (
     <button
       type="button"
@@ -102,12 +118,16 @@ export function ClientesCelular({
 
   return (
     <PantallaVentas>
-      {hayBarra && ordenar && <EnLaBarra filaIzq={chipArriba ? chipEmpresa : undefined} filaDer={ordenar} />}
+      {hayBarra && ordenar && (unaLista ? (
+        <EnLaBarra filaIzq={<>{chipEmpresa}{ordenar}</>} filaDer={frescura} />
+      ) : (
+        <EnLaBarra filaIzq={chipArriba ? chipEmpresa : undefined} filaDer={ordenar} />
+      ))}
       <TituloVentas
         enLaBarra
         titulo="Clientes"
         detalle={<>{`${total.toLocaleString("en-US")} clientes · año ${selectedYear}`}{frescura && <> · {frescura}</>}</>}
-        detalleEnLaBarra={<>{`${total.toLocaleString("en-US")} clientes`}{frescura && <> · {frescura}</>}</>}
+        detalleEnLaBarra={unaLista ? null : <>{`${total.toLocaleString("en-US")} clientes`}{frescura && <> · {frescura}</>}</>}
         accion={hayBarra ? (
           <>
             <BuscarEnLaBarra
@@ -151,8 +171,11 @@ export function ClientesCelular({
         )}
         {filas.map((c) => {
           const pct = porcentajeDelCliente(c.delta);
-          const ultima = ultimaCompraEnPalabras(c.ultimaIso, hoy);
-          const gris = lineaGrisDelCliente(c.id, c.empresas_count, ultima);
+          const ultimaLarga = ultimaCompraEnPalabras(c.ultimaIso, hoy);
+          const ultima = VENTAS_ULTIMA_COMPRA_CORTA ? ultimaCompraCorta(ultimaLarga) : ultimaLarga;
+          const sinCodigo = VENTAS_SIN_CODIGO_NO_ES_ENLACE && !tieneCodigoDeCliente(c.id);
+          const gris = lineaGrisDelCliente(sinCodigo ? SIN_CODIGO_EN_SWITCH : c.id, c.empresas_count, ultima);
+          const util = utilidadDe?.(c);
           return (
             <button
               key={`${c.empresaKey}|${c.id}`}
@@ -170,6 +193,13 @@ export function ClientesCelular({
                 >
                   {gris}
                 </span>
+                {util && (
+                  <span data-utilidad-cliente className="mt-0.5 block truncate text-[12px] tabular-nums text-gray-500">
+                    Utilidad{" "}
+                    <span className={util.utilidad < 0 ? "text-red-600" : "text-gray-700"}>{fmtMoneySigned(util.utilidad).replace(/\.\d\d$/, "")}</span>
+                    {" · "}Margen {fmtMargenPantalla(util.margen)}
+                  </span>
+                )}
               </span>
               <span className="shrink-0 text-right">
                 {/* 🔴 EL % ES LO MÁS GRANDE DE LA FILA, y lleva su color. */}

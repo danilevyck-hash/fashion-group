@@ -58,6 +58,8 @@ import type { Multifashion } from "@/components/ventas/types";
 import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { MF_CLIENTES_SIN_REPETIR } from "@/lib/ui/revision-110-ventas";
+import { HUECO_LINEA_CLIENTES } from "@/components/multifashion/ClientesMultifashionSubtab";
 import RangoFechas from "@/components/ui/RangoFechas";
 import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
@@ -279,6 +281,7 @@ export function MultifashionShell({
   const frescuraCel = conFrescura ? (
     <LineaDeFrescura
       forma="celular"
+      soloHora={MF_CLIENTES_SIN_REPETIR && tab === "clientes"}
       tabla="facturas"
       empresas={["american_classic"]}
       opciones={[{ modulo: "facturas", empresa: "american_classic" }]}
@@ -440,9 +443,16 @@ export function MultifashionShell({
               <span className="text-gray-500"> · {hoyCel.ayer}</span>
             </p>
           ) : subtituloCel && <p className="text-sm text-gray-500">{subtituloCel}</p>}
-          {frescuraCel && (
+          {frescuraCel && (MF_CLIENTES_SIN_REPETIR && tab === "clientes" ? (
+            // n.º 44b (revisión 110): «77 frecuentes · 975 con descuento 5%
+            // pendiente · ↻ 10:01 am» en UNA línea de 12 px, sin partirse; la
+            // pestaña llena el hueco. La hora va corta («↻ h:mm»).
+            <span data-celular="subtitulo" className="-my-2.5 flex w-full min-w-0 items-center gap-1 whitespace-nowrap text-[11px] text-gray-500 [&_span]:!text-[11px]">
+              <span id={HUECO_LINEA_CLIENTES} />
+              {frescuraCel}
+            </span>          ) : (
             <span data-celular="subtitulo" className="-my-2.5 whitespace-nowrap text-sm text-gray-500">{frescuraCel}</span>
-          )}
+          ))}
         </div>
       )}
       {MULTIFASHION_CELULAR && !barra && (

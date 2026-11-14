@@ -212,6 +212,7 @@ describe("🔴 1 · /boston para David tiene solo Inicio y Ventas", () => {
 
   it("las tarjetas del Inicio cuya pestaña se fue llevan a donde vive eso ahora", () => {
     const pestanas = pestanasDeBoston({ tieneCxc: true });
+    // n.º 105 (revisión 110): abre la pestaña de Boston.
     expect(destinoFueraDeBoston("cxc", pestanas)).toBe("/cxc?tab=boston");
     expect(destinoFueraDeBoston("planilla", pestanas)).toBe(`/asistencia?tab=planilla&empresa=${EMPRESA_BOSTON}`);
     expect(destinoFueraDeBoston("prestamos", pestanas)).toBe(`/asistencia?tab=prestamos&empresa=${EMPRESA_BOSTON}`);

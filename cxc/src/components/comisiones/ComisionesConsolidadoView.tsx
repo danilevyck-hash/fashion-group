@@ -81,6 +81,7 @@ import {
   hayQueDescargarTotal,
   tituloDescarga,
 } from "@/lib/comisiones/descarga";
+import { COMISIONES_RESTA_CON_ROTULO } from "@/lib/ui/revision-110-ventas";
 import { nombreArchivoComisionesMes } from "@/lib/comisiones/nombre-archivo";
 import { esTodoElAnio, etiquetaPeriodo } from "@/lib/comisiones/periodo";
 import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
@@ -451,7 +452,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
                 saber que dentro de −$1,513.08 hay $1,573.08 restados. */}
             {desglose && (
               <span className="block text-xs font-normal text-gray-500">
-                {fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}
+                {COMISIONES_RESTA_CON_ROTULO
+                          ? `Comisión ${fmtMoney(desglose.bruto)} · Descuento ${fmtMoney(desglose.descuento)}`
+                          : <>{fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}</>}
               </span>
             )}
           </td>

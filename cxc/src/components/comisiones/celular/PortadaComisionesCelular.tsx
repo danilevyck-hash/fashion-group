@@ -55,7 +55,16 @@ import type { RangoConsulta } from "@/lib/comisiones/vendedores-rango";
 import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR } from "@/components/celular/CabeceraCompacta";
 import { CLASE_BOTON_TEXTO } from "@/components/celular/BarraDeControles";
-import { ROTULO_DESCARGAR_V2, ROTULO_TOTAL_V2, type ResumenDelTotal } from "@/lib/comisiones/apple-v2";
+import { ROTULO_DESCARGAR_V2, ROTULO_TOTAL_V2, lineaBajoElTotal, type ResumenDelTotal } from "@/lib/comisiones/apple-v2";
+import { ChevronDown } from "lucide-react";
+import { SelectorEnTexto } from "@/components/celular/BarraDeControles";
+import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
+import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
+import {
+  COMISIONES_BARRA_COMUN,
+  COMISIONES_DESGLOSE_EN_CELULAR,
+  COMISIONES_MES_COMPLETO,
+} from "@/lib/ui/revision-110-ventas";
 
 interface OpcionVista {
   valor: string;
@@ -163,9 +172,34 @@ export function PortadaComisionesCelular({
     <b className="font-semibold text-gray-900">{fmtMoney(total)} {ROTULO_TOTAL_A_PAGAR}</b>
   ) : null;
 
+  // n.º 30 (revisión 110): la barra de todos los módulos — «Comisiones ▾»
+  // (Comisiones · Configuración) y «···» con Descargar.
+  const barraComun = COMISIONES_BARRA_COMUN && v2;
+  const titulo = barraComun ? (
+    <div data-fila-del-avatar data-barra-comisiones className="flex items-center justify-between gap-3 px-4 pt-2">
+      <h1 className={tituloCelular("min-w-0 text-[30px] font-bold leading-tight tracking-tight text-gray-900")}>
+        {hayConfig ? (
+          <SelectorEnTexto
+            etiqueta="Sección"
+            valor={enConfig ? "config" : "comisiones"}
+            texto={enConfig ? "Configuración" : "Comisiones"}
+            opciones={[
+              { valor: "comisiones", etiqueta: "Comisiones" },
+              { valor: "config", etiqueta: "Configuración" },
+            ]}
+            onCambiar={(v) => { if ((v === "config") !== enConfig) onConfig(); }}
+          />
+        ) : (
+          "Comisiones"
+        )}
+      </h1>
+      {conDescarga && !enConfig && <BotonPuntos onClick={() => setMenu(true)} ariaLabel="Más opciones" />}
+    </div>
+  ) : null;
+
   return (
     <PantallaCel>
-      <TituloCel
+      {titulo ?? <TituloCel
         titulo={v2 && enConfig ? "Configuración" : "Comisiones"}
         detalle={v2 ? undefined : 
           /* 🔴 EL TOTAL SE LEE SIN BAJAR. Sale de la vista del grupo; con el ⚙
@@ -205,7 +239,7 @@ export function PortadaComisionesCelular({
             {!v2 && <>{conDescarga && <BotonPuntos onClick={() => setMenu(true)} ariaLabel="Más opciones" />}</>}
           </div>
         }
-      />
+      />}
 
       {/* 🔴 UNA FILA: la empresa y el mes con sus flechas. */}
       {/* CALENDARIO_SIMPLE_2026_10: la empresa arriba y, debajo, el mes con
@@ -219,7 +253,12 @@ export function PortadaComisionesCelular({
           data-chip-vista
           className={`min-h-[36px] min-w-0 flex-1 truncate rounded-full border border-gray-300 bg-white text-left font-medium text-gray-900 active:opacity-60 ${simple ? "px-2.5 text-[13px]" : "px-3 text-[14px]"}`}
         >
-          {etiquetaVista} ▾
+          {COMISIONES_MES_COMPLETO ? (
+            <span className="inline-flex max-w-full items-center gap-0.5">
+              <span className="truncate">{etiquetaVista}</span>
+              <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
+            </span>
+          ) : <>{etiquetaVista} ▾</>}
         </button>
         {conPeriodo && (
           <div className={`flex shrink-0 items-center ${simple ? "gap-0.5" : "gap-1"}`} data-mes-celular>
@@ -244,6 +283,7 @@ export function PortadaComisionesCelular({
                 alDerecha
                 rangoAparte={simple}
                 conFlechas={false}
+                rotulo={COMISIONES_MES_COMPLETO ? etiquetaPeriodo(year, mes) : undefined}
               />
             ) : (
             <span className="whitespace-nowrap text-[14px] font-medium text-gray-900">
@@ -281,11 +321,20 @@ export function PortadaComisionesCelular({
           {resumen && (
             <span className={`${CLASE_TOTAL_CELULAR} ${resumen.total < 0 ? "!text-red-600" : ""}`}>{fmtMoney(resumen.total)}</span>
           )}
+          {COMISIONES_DESGLOSE_EN_CELULAR && resumen ? (
+            // n.º 33: el mismo desglose de la computadora; la hora va al final
+            // de la misma línea y baja sola si no cabe.
+            <span data-desglose-comisiones className="block pt-1 text-[13px] text-gray-500">
+              {lineaBajoElTotal(resumen)}
+              {frescura ? <> · <span className="inline-flex">{frescura}</span></> : null}
+            </span>
+          ) : (
           <span className={CLASE_LINEA_TOTAL}>
             {resumen ? ROTULO_TOTAL_V2 : null}
             {resumen && frescura ? " · " : null}
             {frescura}
           </span>
+          )}
         </div>
       )}
 

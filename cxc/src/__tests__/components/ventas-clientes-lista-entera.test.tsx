@@ -28,6 +28,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { VENTAS_CLIENTES_UNA_LISTA } from "@/lib/ui/revision-110-ventas";
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { ClientesView } from "@/components/ventas/ClientesView";
 import { textoEmpresas, textoSinCompras } from "@/components/ventas/ClientesView";
@@ -246,13 +247,21 @@ describe("5 · ⛔ el desplegable del universo ya no existe", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("6 · Ventas · Utilidad — solo cambian las columnas", () => {
-  it("el control segmentado ofrece los DOS, con las palabras del Resumen, y ya no «Margen %»", () => {
+  // 🔴 Revisión 110 (rec-c, 14-nov-2026): UNA sola lista. Con
+  // `VENTAS_CLIENTES_UNA_LISTA` prendido el control Ventas | Utilidad ya no
+  // se dibuja; apagado, ofrece exactamente los dos.
+  it("sin control segmentado con la lista única; apagado, Ventas y Utilidad", () => {
     pintar();
     const grupos = [...document.querySelectorAll("[data-control-segmentado]")];
+    if (VENTAS_CLIENTES_UNA_LISTA) {
+      expect(grupos).toHaveLength(0);
+      return;
+    }
     expect(grupos.length).toBeGreaterThanOrEqual(1);
-    const textos = grupos.map((g) => g.textContent ?? "");
-    expect(textos.some((t) => t.includes("Ventas") && t.includes("Utilidad"))).toBe(true);
-    expect(textos.some((t) => t.includes("Margen %"))).toBe(false);
+    for (const g of grupos) {
+      const tabs = [...g.querySelectorAll('[role="tab"]')].map((t) => t.textContent?.trim());
+      expect(tabs).toEqual(["Ventas", "Utilidad"]);
+    }
   });
 
   it("🔴 el buscador y el desplegable de empresa son los MISMOS en los dos", () => {

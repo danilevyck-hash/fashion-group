@@ -41,6 +41,8 @@ import {
   type MotivoSinGastoEgresos,
 } from "@/lib/egresos/gasto-mostrable";
 import { money, moneyK, pct } from "./formato";
+import { gastosPausados } from "./GastosPorEmpresa";
+import { VG_RENTABILIDAD_COMPACTA } from "@/lib/ui/revision-110-ventas";
 
 /** Una empresa con SU venta, SU utilidad y SU gasto — nunca los de otra. */
 export interface RentabilidadEmpresaRow {
@@ -106,6 +108,25 @@ export default function RentabilidadPorEmpresa({
   mes: string;
 }) {
   const [abierta, setAbierta] = useState<string | null>(null);
+
+  // n.º 25 (revisión 110): con Gastos pausado no hay rentabilidad que mostrar;
+  // queda «Empresa · Ventas», un renglón cada una, y el porqué al pie.
+  if (VG_RENTABILIDAD_COMPACTA && rows.length > 0 && gastosPausados(rows.map((r) => ({ gasto: r.rentabilidad, motivo: r.motivo })))) {
+    return (
+      <div className="mb-8" data-rentabilidad-compacta>
+        <h2 className="mb-3 text-sm font-semibold text-gray-900">Ventas por empresa</h2>
+        <div className="divide-y divide-gray-100 rounded-[14px] border border-gray-200 bg-white px-4">
+          {rows.map((e) => (
+            <div key={e.key} data-fila-rentabilidad={e.key} className="flex min-h-[44px] items-center justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate text-gray-800">{e.name}</span>
+              <span className="shrink-0 font-medium tabular-nums text-gray-900">{moneyK(e.ventas)}</span>
+            </div>
+          ))}
+        </div>
+        <p data-rentabilidad-pausada className="mt-2 text-xs text-gray-500">Rentabilidad: vuelve al reanudar Gastos</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mb-8">

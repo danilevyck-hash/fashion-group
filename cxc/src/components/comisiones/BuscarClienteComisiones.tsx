@@ -11,6 +11,7 @@ import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { facturaParaMostrar } from "@/lib/comisiones/factura-en-pantalla";
 import { separarRetenciones } from "@/lib/comisiones/buscar-cliente";
+import { COMISIONES_BUSCADOR_CORTO } from "@/lib/ui/revision-110-ventas";
 
 interface Fila {
   fecha: string;
@@ -125,7 +126,8 @@ export function BuscarClienteComisiones({ year, mes, empresa, children }: { year
           type="text"
           role="searchbox"
           aria-label="Buscar cliente"
-          placeholder="Buscar cliente por nombre o código"
+          // n.º 32 (revisión 110): busca por nombre o por código, dicho corto.
+          placeholder={COMISIONES_BUSCADOR_CORTO ? "Buscar cliente o código" : "Buscar cliente por nombre o código"}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="min-h-[44px] w-full rounded-lg border border-gray-200 bg-white pl-9 pr-10 text-[15px] text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-900"

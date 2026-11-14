@@ -92,6 +92,9 @@ import { AtencionMultifashion, useMetaQueNoLlega } from "./PiezasApple";
 import { Aviso } from "@/components/ui/Aviso";
 import { workbookBlob } from "@/lib/excel-export";
 import { saveAs } from "file-saver";
+import { MF_VENDEDORAS_REMITE_AL_RESUMEN } from "@/lib/ui/revision-110-ventas";
+import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
+import { MULTIFASHION_SUMA_HOY_2026_10, ventaDeHoyParaElMes } from "@/lib/multifashion/celular";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -248,6 +251,27 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
     { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
   );
 
+  // n.º 45 (revisión 110): el número del Resumen para el MISMO mes — las mismas
+  // dos lecturas que el Resumen (detalle del mes + la venta de hoy) y la misma
+  // cuenta (`ventaDeHoyParaElMes`). Solo lee; nada se recalcula.
+  const conResumen = MF_VENDEDORAS_REMITE_AL_RESUMEN && apple && rpcPeriodo === "mes";
+  const { data: detalleMes } = useSWR<{ totales: { ventas: number }; is_mes_actual: boolean; dia_actual: number }>(
+    conResumen ? `/api/multifashion/detalle-mensual?year=${year}&mes=${rpcMes}` : null,
+    async (url: string) => {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
+  );
+  const { data: ventaHoyMes } = useVentaHoy(0, conResumen);
+  // Sin el dato del Resumen (o con una respuesta rara) la línea queda como antes.
+  const resumenDelMes = conResumen && Number.isFinite(detalleMes?.totales?.ventas)
+    ? detalleMes!.totales.ventas + ((MULTIFASHION_SUMA_HOY_2026_10 ? ventaDeHoyParaElMes({
+        esMesActual: detalleMes!.is_mes_actual, anio: year, mes: rpcMes, diaActual: detalleMes!.dia_actual, hoy: ventaHoyMes,
+      }) : null) ?? 0)
+    : null;
+
   const loading = isLoading && !resp;
   const errorMsg = error ? (error instanceof Error ? error.message : "error inesperado") : null;
 
@@ -346,7 +370,10 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   const bonoPie = !esRango ? bonoCorto(bonos) : null;
   const pieSinBono = resp && resp.vendedoras.length > 0
     ? [
-        `${montoCorto(resp.ventas_total)} ventas`,
+        // n.º 45 (revisión 110): dice de qué es el total y cuánto dice el Resumen.
+        resumenDelMes != null
+          ? `${montoCorto(resp.ventas_total)} de vendedoras (Resumen: ${montoCorto(resumenDelMes)})`
+          : `${montoCorto(resp.ventas_total)} ventas`,
         `${resp.tickets_total.toLocaleString()} ${resp.tickets_total === 1 ? "ticket" : "tickets"}`,
         notaComparacion,
       ].filter(Boolean).join(" · ")

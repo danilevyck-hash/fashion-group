@@ -132,7 +132,9 @@ describe("Nombres cortados — letra más chica, nunca por debajo de 12px", () =
   it("Vista General: los nombres de las alertas bajan a text-xs (13px)", () => {
     expect(vistaGeneral).toContain('const NOMBRE_ALERTA = "text-xs text-gray-700"');
     // Las 3 listas (CXC, Proveedores, Reclamos) usan la MISMA constante.
-    expect([...vistaGeneral.matchAll(/\$\{NOMBRE_ALERTA\} truncate/g)]).toHaveLength(3);
+    // n.º 28 (revisión 110): las 3 listas pasan por UN componente (`NombreAlerta`).
+    expect([...vistaGeneral.matchAll(/<NombreAlerta /g)]).toHaveLength(3);
+    expect(vistaGeneral).toContain("${NOMBRE_ALERTA} truncate");
     expect(vistaGeneral).not.toContain('className="text-sm text-gray-700 truncate"');
   });
 

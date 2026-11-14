@@ -20,6 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import { VENTAS_PIE_UNA_LINEA } from "@/lib/ui/revision-110-ventas";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { ResumenView, MODO_OPCIONES } from "@/components/ventas/ResumenView";
 import type { VentasResumen, ProyeccionResp } from "@/components/ventas/types";
@@ -236,10 +237,11 @@ describe("5 · el pie dice hasta qué día vale el margen del mes", () => {
   it("escritorio y celular: «Utilidad y margen de septiembre al 10 de septiembre…»", () => {
     pintar();
     const frase = "Utilidad y margen de septiembre al 10 de septiembre, el último día con costo cargado";
-    expect(document.querySelector('[data-pie-matriz="escritorio"]')?.textContent).toContain(frase);
+    // n.º 11 (revisión 110): en la computadora, la línea corta lo dice; la frase entera, en el ⓘ.
+    expect(document.querySelector('[data-pie-matriz="escritorio"]')?.textContent).toContain(VENTAS_PIE_UNA_LINEA ? "margen al 10 sep" : frase);
     expect(document.querySelector('[data-leyenda-proyectado="celular"]')?.textContent).toContain(frase);
     // Y sigue diciendo hasta qué día llega la venta.
-    expect(document.querySelector('[data-pie-matriz="escritorio"]')?.textContent).toContain("Datos hasta el 11 sep");
+    expect(document.querySelector('[data-pie-matriz="escritorio"]')?.textContent).toContain(VENTAS_PIE_UNA_LINEA ? "Datos al 11 sep" : "Datos hasta el 11 sep");
   });
 
   it("sin corte (la RPC todavía no existe, o año cerrado) no se afirma nada", () => {
