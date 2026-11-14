@@ -75,3 +75,11 @@ export const REFERENCIA_RECEPCIONES_DOS_LINEAS = true;
 export const CLASE_BOTON_DESCARGAR = CXC_DESCARGAR_SECUNDARIO
   ? "border border-gray-300 bg-white text-gray-900 hover:bg-gray-50"
   : "bg-black text-white hover:bg-gray-800";
+
+/**
+ * n.º 21 en la computadora: «Estado de cuenta» no cabe junto al total en dos de
+ * doce columnas y pisaba los montos. Con el interruptor, el nombre cede una
+ * columna al total (3 + 3); apagado, el 4 + 2 de antes.
+ */
+export const CLASE_CXC_COL_NOMBRE = CXC_UN_NOMBRE_ESTADO_DE_CUENTA ? "col-span-3" : "col-span-4";
+export const CLASE_CXC_COL_TOTAL = CXC_UN_NOMBRE_ESTADO_DE_CUENTA ? "col-span-3" : "col-span-2";

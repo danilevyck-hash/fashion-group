@@ -54,7 +54,7 @@ describe("CXC › Panel — el corte tarjeta/tabla sube de md (768) a lg (1024)"
     expect(columnaNombre).toBeLessThan(270); // "GRUP MEL INTERNATIONAL SA(AGUAS)" mide 270
     // Y la celda del nombre sigue siendo col-span-4 (si cambia, este número miente).
     // Revisión 110 (n.º 108): el nombre ya no se corta; la celda sigue siendo col-span-4.
-    expect(leer("src/app/cxc/components/ClientRow.tsx")).toMatch(/col-span-4 font-medium/);
+    expect(leer("src/app/cxc/components/ClientRow.tsx")).toMatch(/CLASE_CXC_COL_NOMBRE\} font-medium/);
   });
 });
 

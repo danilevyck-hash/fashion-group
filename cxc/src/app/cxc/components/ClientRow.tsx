@@ -4,7 +4,7 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
-import { CXC_NOMBRE_COMPLETO, CXC_UN_NOMBRE_ESTADO_DE_CUENTA } from "@/lib/ui/revision-110-cxc";
+import { CLASE_CXC_COL_NOMBRE, CLASE_CXC_COL_TOTAL, CXC_NOMBRE_COMPLETO, CXC_UN_NOMBRE_ESTADO_DE_CUENTA } from "@/lib/ui/revision-110-cxc";
 
 function riskInfo(total: number, current: number, watch: number, overdue: number): { border: string; tooltip: string } {
   if (total < 0) return { border: "border-l-blue-400", tooltip: "Saldo a favor: saldo negativo (nota de crédito o sobrepago)" };
@@ -62,7 +62,7 @@ export default function ClientRow({
         className={`grid grid-cols-12 gap-2 px-4 py-3 text-sm cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
         onClick={onToggle}
       >
-        <div className={`col-span-4 font-medium flex items-center gap-1.5 min-w-0 ${CXC_NOMBRE_COMPLETO ? "" : "truncate"}`}>
+        <div className={`${CLASE_CXC_COL_NOMBRE} font-medium flex items-center gap-1.5 min-w-0 ${CXC_NOMBRE_COMPLETO ? "" : "truncate"}`}>
           {/* La casilla es para MANDAR A VARIOS, o sea cobrar: al saldo a favor
               tampoco se le dibuja. Se reserva su ancho para que las filas del
               bloque «Saldo a favor» no queden corridas. */}
@@ -106,7 +106,7 @@ export default function ClientRow({
         <div className="col-span-2 text-right tabular-nums text-red-600">
           {client.overdue === 0 ? <span className="text-gray-300">—</span> : fmt(client.overdue)}
         </div>
-        <div className="col-span-2 text-right tabular-nums font-semibold flex items-center justify-end gap-2">
+        <div className={`${CLASE_CXC_COL_TOTAL} text-right tabular-nums font-semibold flex items-center justify-end gap-2`}>
           <span>{fmt(client.total)}</span>
           {/* 🔴 SIN BOTÓN PARA EL SALDO A FAVOR (8-sep-2026). La regla vive en
               `lib/cxc/cobrable.ts`: a quien le debemos plata no se le cobra. La

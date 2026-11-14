@@ -203,8 +203,9 @@ export default function ClientesListClient({
                     { col: "debe", rotulo: "Saldo" },
                   ]} />
                 </div>
-                <div className="ml-auto min-w-0 truncate text-right">
+                <div className="ml-auto shrink-0 whitespace-nowrap text-right text-xs">
                   <LineaDeFrescura
+                    className="text-xs"
                     actualizado={actualizado}
                     opciones={[{ modulo: "clientes-master" }]}
                     onSuccess={async () => { router.refresh(); await mutate(); }}
