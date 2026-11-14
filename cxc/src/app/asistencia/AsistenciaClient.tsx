@@ -65,6 +65,9 @@
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { FILTRO_6_ASISTENCIA_CONFIG, FILTRO_7_ASISTENCIA_APROBACIONES } from "@/lib/ui/revision-110-filtros";
+import { BuscarEnLaBarra, EnLaBarra } from "@/components/celular/BarraDeControles";
+import { Capsula } from "@/components/filtros/FiltroA";
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Settings } from "lucide-react";
@@ -196,6 +199,8 @@ function AsistenciaInner() {
   const [tabEnUrl, setTab] = useUrlState<Tab>("tab", SIN_TAB_EN_URL);
   const tabRaw: Tab = tabEnUrl || pestanaPorDefecto(PERSONA_EN_EL_CENTRO);
   const [ayuda, setAyuda] = useState(false);
+  /** filtro-6: el buscador de Configuración › Horarios (solo pantalla, no se guarda). */
+  const [buscarHorario, setBuscarHorario] = useState("");
   // 🔑 DOS lectores de la MISMA llave: abrir ⚙ es una pantalla (en el celular
   // empuja historial y el Atrás la cierra); cambiar Horarios ↔ Feriados adentro
   // es del mismo nivel y reemplaza. Ver `useUrlState` › CLAVES_DE_PANTALLA.
@@ -374,7 +379,8 @@ function AsistenciaInner() {
           `PortadaCelular`; adentro de una pestaña no hay ninguno y lo pone el
           layout (24-sep-2026). */}
       <AppHeader module="Asistencia y planilla" tituloEnLaPantalla={enLaPortada || barra} />
-      <ProveedorBarraCelular activo={barra} activa={tab}>
+      {/* filtro-6: con ⚙ abierta, la barra es de Configuración (no de la pestaña escondida). */}
+      <ProveedorBarraCelular activo={barra} activa={FILTRO_6_ASISTENCIA_CONFIG && config && !ayuda ? "configuracion" : tab}>
       <div className="mx-auto max-w-6xl px-4 py-6">
         {/* Sin título grande: "Asistencia" ya lo dicen la barra sticky
             (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar
@@ -411,7 +417,7 @@ function AsistenciaInner() {
                   anchoCompleto
                 />
               )}
-              fila={opciones.length > 1 && !(FILTRO_A_2026_11 && (tab === "asistencia" || tab === "reporte" || tab === "colaboradores")) ? (
+              fila={opciones.length > 1 && !(FILTRO_A_2026_11 && (tab === "asistencia" || tab === "reporte" || tab === "colaboradores")) && !(FILTRO_7_ASISTENCIA_APROBACIONES && tab === "aprobaciones" && !config) && !(FILTRO_6_ASISTENCIA_CONFIG && config) ? (
                 <ChipSelector
                   rotulo="Empresa"
                   valor={empresa}
@@ -581,7 +587,20 @@ function AsistenciaInner() {
                 active={config}
                 onChange={(v) => cambiarConfig(v)}
               />
-              <ConfiguracionTab ajuste={config} />
+              {/* 🔴 filtro-6 (revisión 110, aprobado 14-nov-2026): en el celular,
+                  «Buscar colaborador» y «Todas las empresas ▾» en UNA línea, que
+                  filtran Horarios. Solo pantalla: nada de lo que se guarda cambia. */}
+              {barra && FILTRO_6_ASISTENCIA_CONFIG && config === "horarios" && (
+                <EnLaBarra pestana="configuracion" iconos={
+                  <BuscarEnLaBarra valor={buscarHorario} onCambiar={setBuscarHorario} placeholder="Colaborador"
+                    etiqueta="Colaborador"
+                    alLado={opciones.length > 1 ? (
+                      <Capsula etiqueta="Empresa" compacta alinear="derecha" valor={empresa}
+                        opciones={opciones.map((o) => ({ valor: o.clave, etiqueta: o.etiqueta }))} onCambiar={elegirEmpresa} />
+                    ) : undefined} />
+                } />
+              )}
+              <ConfiguracionTab ajuste={config} {...(barra && FILTRO_6_ASISTENCIA_CONFIG ? { empresa, buscarHorario } : {})} />
             </div>
           )}
           {/* 🔴 Con la ayuda (o ⚙) abierta las pestañas se ESCONDEN, no se
@@ -621,7 +640,7 @@ function AsistenciaInner() {
             )}
             {monta("aprobaciones") && (
               <div hidden={seEsconde("aprobaciones", tab)} className={escondida("aprobaciones")}>
-                <AprobacionesTab empresa={empresa} />
+                <AprobacionesTab empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} />
               </div>
             )}
             {/* 🔴 «COLABORADORES» ES LA MISMA PANTALLA, EN MODO LISTA. Daniel:

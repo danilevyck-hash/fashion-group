@@ -248,7 +248,8 @@ describe("🔴 el control cabe en un iPhone", () => {
     // 🔄 6-sep-2026: la fila del admin es UNA sola para las 4 marcas y vive en
     // `ProductoFila.tsx`. El `flex-wrap sm:flex-nowrap` no se tocó.
     const fila = leer("src/app/catalogos/admin/[marca]/ProductoFila.tsx");
-    expect(fila).toContain('className="flex flex-wrap sm:flex-nowrap items-center gap-3"');
+    // filtro-2 (revisión 110): la fila compacta del celular es una rejilla; la de siempre no cambia.
+    expect(fila).toContain('"flex flex-wrap sm:flex-nowrap items-center gap-3"');
   });
 
   it("los botones respetan el blanco táctil de 44px", () => {

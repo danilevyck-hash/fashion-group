@@ -21,6 +21,8 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import { accionesDelGasto, fotosSoloVer } from "@/lib/caja/menu-del-gasto";
 import CampoFecha from "@/components/ui/CampoFecha";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
+import { FILTRO_4_CAJA_PERIODO } from "@/lib/ui/revision-110-filtros";
 
 // 🔴 6-oct-2026: tocar un encabezado ordena; sin tocar, el más nuevo arriba
 // (como siempre). La fecha arranca de la más nueva, como un número.
@@ -281,9 +283,22 @@ export default function GastoTable({
           catálogo: correr el breakpoint no arreglaba nada, envolver sí.) */}
       {/* 🔴 El buscador va ARRIBA de los chips: los chips describen lo que la
           búsqueda dejó, así que primero se busca y después se elige categoría. */}
+      {/* 🔴 filtro-4 (revisión 110, aprobado 14-nov-2026): en el celular,
+          «Buscar proveedor» y «Todas las categorías ▾» en UNA línea; los montos
+          por categoría viven en el menú. Busca lo mismo de siempre. */}
+      {FILTRO_4_CAJA_PERIODO && gastos.length > 0 && (
+        <LineaBuscarYCapsulas compacto className="mb-3 sm:hidden" busqueda={busqueda} onBuscar={setBusqueda} placeholder="Proveedor">
+          <Capsula etiqueta="Categoría" compacta alinear="derecha" valor={selectedCat ?? ""}
+            onCambiar={(v) => setSelectedCat(v || null)}
+            opciones={[
+              { valor: "", etiqueta: "Todas las categorías", detalle: `$${fmt(grandTotal)}` },
+              ...catEntries.map(([cat, total]) => ({ valor: cat, etiqueta: cat, detalle: `$${fmt(total)}` })),
+            ]} />
+        </LineaBuscarYCapsulas>
+      )}
       {gastos.length > 0 && (
         <BuscadorDeLista
-          className="mb-3"
+          className={FILTRO_4_CAJA_PERIODO ? "mb-3 hidden sm:flex" : "mb-3"}
           valor={busqueda}
           onCambiar={setBusqueda}
           placeholder={PLACEHOLDER_GASTO}
@@ -297,7 +312,7 @@ export default function GastoTable({
       )}
 
       {buscados.length > 0 && (
-        <div className="flex flex-wrap gap-2 pb-2 mb-3.5">
+        <div className={`${FILTRO_4_CAJA_PERIODO ? "hidden sm:flex" : "flex"} flex-wrap gap-2 pb-2 mb-3.5`}>
           <Chip
             label="Todas"
             amount={grandTotal}

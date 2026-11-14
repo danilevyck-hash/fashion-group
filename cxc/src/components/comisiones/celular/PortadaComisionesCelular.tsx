@@ -65,6 +65,10 @@ import {
   COMISIONES_DESGLOSE_EN_CELULAR,
   COMISIONES_MES_COMPLETO,
 } from "@/lib/ui/revision-110-ventas";
+import { Capsula } from "@/components/filtros/FiltroA";
+import { RanurasBuscarCliente } from "../BuscarClienteComisiones";
+import { COMISIONES_BUSCAR_CLIENTE } from "@/lib/comisiones/buscar-cliente";
+import { FILTRO_3_COMISIONES } from "@/lib/ui/revision-110-filtros";
 
 interface OpcionVista {
   valor: string;
@@ -196,8 +200,31 @@ export function PortadaComisionesCelular({
       {conDescarga && !enConfig && <BotonPuntos onClick={() => setMenu(true)} ariaLabel="Más opciones" />}
     </div>
   ) : null;
+  // 🔴 filtro-3 (revisión 110, aprobado 14-nov-2026): el período solo en su
+  // línea; el buscador y «Todas las empresas ▾» en otra; y «Total a pagar $X ·
+  // Actualizado h:mm ↻» en UNA, pegada a la lista que suma. Solo cuando el
+  // buscador está (la MISMA condición de `ComisionesView`); si no, lo de hoy.
+  const f3 = FILTRO_3_COMISIONES && v2 && COMISIONES_BUSCAR_CLIENTE && conDescarga && !rango && !enConfig;
+  const ranurasF3 = f3 ? {
+    alLado: (
+      <Capsula etiqueta="Empresa" compacta alinear="derecha" valor={vista} onCambiar={onVista}
+        opciones={opciones.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta }))} />
+    ),
+    antesDeLaLista: resumen || frescura ? (
+      <div data-filtro-3-total className="flex items-center justify-between gap-2 px-4 pb-1 text-[13px] text-gray-500">
+        {resumen ? (
+          <span className="whitespace-nowrap">
+            {ROTULO_TOTAL_V2}{" "}
+            <b className={`text-[17px] font-semibold tabular-nums ${resumen.total < 0 ? "text-red-600" : "text-gray-900"}`}>{fmtMoney(resumen.total)}</b>
+          </span>
+        ) : <span />}
+        {frescura && <span className="shrink-0">{frescura}</span>}
+      </div>
+    ) : null,
+  } : null;
 
   return (
+    <RanurasBuscarCliente.Provider value={ranurasF3}>
     <PantallaCel>
       {titulo ?? <TituloCel
         titulo={v2 && enConfig ? "Configuración" : "Comisiones"}
@@ -246,8 +273,8 @@ export function PortadaComisionesCelular({
           «Rango» en la misma línea (con los dos al lado no entraba la empresa). */}
       {/* CALENDARIO_SIMPLE_2026_10: empresa, ‹ Oct 2026 › y «Rango» en UNA línea
           (la empresa en 13 px; si un nombre largo no entra, se corta con «…»). */}
-      <div className={`mt-3 flex items-center justify-between px-4 ${simple ? "gap-1.5" : "gap-2"}`}>
-        <button
+      <div className={`mt-3 flex items-center px-4 ${f3 ? "justify-start" : "justify-between"} ${simple ? "gap-1.5" : "gap-2"}`}>
+        {!f3 && <button
           type="button"
           onClick={() => setEligiendoEmpresa(true)}
           data-chip-vista
@@ -259,7 +286,7 @@ export function PortadaComisionesCelular({
               <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
             </span>
           ) : <>{etiquetaVista} ▾</>}
-        </button>
+        </button>}
         {conPeriodo && (
           <div className={`flex shrink-0 items-center ${simple ? "gap-0.5" : "gap-1"}`} data-mes-celular>
             {!rango && (
@@ -316,7 +343,7 @@ export function PortadaComisionesCelular({
           frescura, como CxC («+90 días $X · Actualizado 4:00 pm ↻»). Las bases
           van solo en la computadora: en 390 px la línea se cortaba y el ↻ —lo
           que se toca— quedaba fuera. */}
-      {v2 && !enConfig && (resumen || frescura) && (
+      {v2 && !enConfig && !f3 && (resumen || frescura) && (
         <div data-numero-comisiones className="px-4 pt-3">
           {resumen && (
             <span className={`${CLASE_TOTAL_CELULAR} ${resumen.total < 0 ? "!text-red-600" : ""}`}>{fmtMoney(resumen.total)}</span>
@@ -403,5 +430,6 @@ export function PortadaComisionesCelular({
         }))}
       />
     </PantallaCel>
+    </RanurasBuscarCliente.Provider>
   );
 }

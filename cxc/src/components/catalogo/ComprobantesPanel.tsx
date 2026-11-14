@@ -79,6 +79,9 @@ import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import { ID_ACCIONES_EN_LA_BARRA } from "@/lib/catalogo/catalogos-2026-10";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+import { BuscadorGris, Capsula } from "@/components/filtros/FiltroA";
+import { FILTRO_1_COMPROBANTES } from "@/lib/ui/revision-110-filtros";
+import { ROTULO_SELECCIONAR_TODOS } from "@/lib/catalogo/cuantas-comprobantes";
 
 // La fila que se pinta. Su forma vive en `lib/catalogo/fila-comprobante.ts`.
 export type { FilaComprobante, FilaDeOrders };
@@ -550,8 +553,34 @@ export default function ComprobantesPanel({
     </div>
   );
 
+  // 🔴 filtro-1 (revisión 110, aprobado 14-nov-2026): en el celular, el
+  // buscador a todo el ancho y debajo «Todos los orígenes ▾» · «Pedidos ▾» ·
+  // «Seleccionar todos» en UNA línea. Los mismos filtros y conteos de los chips.
+  const filtrosCelular = FILTRO_1_COMPROBANTES ? (
+    <div data-filtro-1 className="mb-4 space-y-2 sm:hidden">
+      <BuscadorGris valor={search} onCambiar={setSearch} placeholder="Buscar cliente o número" />
+      {/* Cápsulas compactas para que las tres cosas quepan a 390 pt; si un día no caben, la fila baja, nunca se corta. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Capsula etiqueta="Origen" compacta valor={origenFilter} onCambiar={(v) => setOrigenFilter(v as FiltroOrigen)}
+          conteoEnLaCapsula={false}
+          opciones={chips.origen.opciones.map((c) => ({ valor: c.clave, etiqueta: c.clave === "todos" ? "Todos los orígenes" : c.label, conteo: c.conteo }))} />
+        <Capsula etiqueta="Tipo" compacta valor={vista} onCambiar={(v) => setVista(v as VistaComprobante)}
+          conteoEnLaCapsula={false}
+          opciones={chips.vista.opciones.map((c) => ({ valor: c.clave, etiqueta: c.label, conteo: c.conteo }))} />
+        {puedeAdministrar && visibles.length > 0 && (
+          <label className="inline-flex min-h-[44px] shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap pl-1 text-[14px] text-gray-900">
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4 cursor-pointer accent-black" />
+            {ROTULO_SELECCIONAR_TODOS}
+          </label>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div>
+      {filtrosCelular}
+      <div className={filtrosCelular ? "hidden sm:block" : undefined}>
       {v4 ? (
         <>
           {barra ? (botonExcelV4 && createPortal(botonExcelV4, barra)) : botonExcelV4 && <div className="flex justify-end mb-2">{botonExcelV4}</div>}
@@ -606,6 +635,7 @@ export default function ComprobantesPanel({
       </div>
       </>
       )}
+      </div>
 
       {visibles.length === 0 ? (
         <div className="text-center py-16">
@@ -630,11 +660,11 @@ export default function ComprobantesPanel({
           {/* Selección masiva: "todos" = filas visibles. Todo el bloque es de
               admin/secretaria — `bulk-delete` responde 403 al vendedor. */}
           {puedeAdministrar && (
-            <div className="flex items-center justify-between gap-3 mb-3 min-h-[38px]">
+            <div className={`items-center justify-between gap-3 mb-3 min-h-[38px] ${filtrosCelular && selectedRows.length === 0 ? "hidden sm:flex" : "flex"}`}>
               {/* 🔴 EL BLANCO QUE SE TOCA MIDE 44 (24-sep-2026): la casilla es
                   de 16 px y el rótulo entero es lo que se toca, así que el
                   mínimo se le pide a la etiqueta, no al cuadradito. */}
-              <label className={`inline-flex items-center gap-2 px-1 text-sm text-gray-600 cursor-pointer select-none${
+              <label className={`${filtrosCelular ? "hidden sm:inline-flex" : "inline-flex"} items-center gap-2 px-1 text-sm text-gray-600 cursor-pointer select-none${
                 CATALOGO_ORDEN_CELULAR ? " min-h-[44px]" : ""
               }`}>
                 <input

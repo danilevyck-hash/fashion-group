@@ -153,9 +153,11 @@ describe("E. las pantallas cuelgan del MISMO selector", () => {
     expect(src).toMatch(/useUrlState<string>\(PARAM_EMPRESA, ""\)/);
     expect(src).toMatch(/useLastUsed\(RECORDAR_EMPRESA, ""\)/);
     expect(src).toMatch(/aria-label="Empresa"/);
-    for (const c of ["<PlanillaTab empresa={empresa} />", "<PrestamosTab empresa={empresa} />", "<AprobacionesTab empresa={empresa} />"]) {
+    for (const c of ["<PlanillaTab empresa={empresa} />", "<PrestamosTab empresa={empresa} />"]) {
       expect(src).toContain(c);
     }
+    // filtro-7 (revisión 110): Aprobaciones suma la cápsula; el empresa sigue igual.
+    expect(src).toMatch(/<AprobacionesTab empresa=\{empresa\}[^>]*\/>/);
     // La cápsula de empresa de Colaboradores (14-nov-2026) suma props; el empresa sigue igual.
     expect(src).toMatch(/<ConfiguracionTab personaEnElCentro empresa=\{empresa\}[^>]*\/>/);
   });

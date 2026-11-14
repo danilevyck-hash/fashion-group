@@ -33,6 +33,8 @@ export interface OpcionA {
   etiqueta: string;
   /** «Todos 50»: el número gris al final del renglón. */
   conteo?: number;
+  /** Texto gris al final del renglón del menú (p. ej. un monto «$52.05»); nunca en la cápsula. */
+  detalle?: string;
 }
 
 export interface FiltroDeLaHoja {
@@ -112,7 +114,10 @@ export function BuscadorGris({
   placeholder,
   derecha,
   className,
+  compacto = false,
 }: {
+  /** Junto a una cápsula a 390 pt: el texto de ayuda en 14 px y menos aire a los lados. */
+  compacto?: boolean;
   valor: string;
   onCambiar: (v: string) => void;
   /** «Buscar» + lo que de verdad busca: «Buscar código o descripción». */
@@ -123,14 +128,14 @@ export function BuscadorGris({
 }) {
   return (
     <div data-buscador-gris className={cn("relative min-w-0", className)}>
-      <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+      <Search aria-hidden className={cn("pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500", compacto && "left-2.5")} />
       <input
         type="search"
         value={valor}
         onChange={(e) => onCambiar(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className={cn(CAMPO_GRIS, derecha ? "pr-12" : "pr-3")}
+        className={cn(CAMPO_GRIS, derecha ? "pr-12" : "pr-3", compacto && "pl-8 pr-2 placeholder:text-[14px]")}
       />
       {derecha && <div className="absolute inset-y-0 right-0 flex items-center">{derecha}</div>}
     </div>
@@ -402,7 +407,7 @@ export function RenglonInterruptor({ etiqueta, activo, onCambiar }: { etiqueta: 
  * Una cápsula con su menú de ✓: «Todas las empresas ▾», «Todos 50 ▾». Dice
  * SIEMPRE qué filtra (Daniel, 14-nov-2026): nunca «Todas ▾» a secas.
  */
-export function Capsula({ etiqueta, opciones, valor, onCambiar, alinear = "izquierda", className }: {
+export function Capsula({ etiqueta, opciones, valor, onCambiar, alinear = "izquierda", className, conteoEnLaCapsula = true, compacta = false }: {
   /** Para el lector de pantalla: «Empresa». */
   etiqueta: string;
   opciones: readonly OpcionA[];
@@ -410,6 +415,10 @@ export function Capsula({ etiqueta, opciones, valor, onCambiar, alinear = "izqui
   onCambiar: (v: string) => void;
   alinear?: "izquierda" | "derecha";
   className?: string;
+  /** `false` = «Pedidos ▾» en la cápsula; el conteo se lee solo en el menú. */
+  conteoEnLaCapsula?: boolean;
+  /** 36 px a la vista y 14 px de letra (44 px al tocar): para que quepa junto al buscador a 390 pt. */
+  compacta?: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const ancla = useRef<HTMLButtonElement>(null);
@@ -426,11 +435,12 @@ export function Capsula({ etiqueta, opciones, valor, onCambiar, alinear = "izqui
         onClick={() => setAbierto((a) => !a)}
         className={cn(
           "inline-flex h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-gray-200 bg-white px-3.5 text-[15px] text-gray-900 transition active:scale-[0.97]",
+          compacta && "relative h-9 gap-0.5 px-2.5 text-[14px] before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']",
           className,
         )}
       >
         <span>{elegida?.etiqueta}</span>
-        {elegida?.conteo != null && <span className="tabular-nums">{elegida.conteo.toLocaleString("en-US")}</span>}
+        {conteoEnLaCapsula && elegida?.conteo != null && <span className="tabular-nums">{elegida.conteo.toLocaleString("en-US")}</span>}
         <ChevronDown aria-hidden className="h-4 w-4 text-gray-500" />
       </button>
       <DesplegableFlotante
@@ -440,7 +450,8 @@ export function Capsula({ etiqueta, opciones, valor, onCambiar, alinear = "izqui
         marca={`capsula-${etiqueta.toLowerCase()}`}
         role="listbox"
         aria-label={etiqueta}
-        anchoMinimo={220}
+        anchoMinimo={opciones.some((o) => o.detalle != null) ? 280 : 220}
+        altoDeseado={Math.min(opciones.length * 44 + 8, 480)}
         alinear={alinear}
         className={vidrioSobre("max-h-[60vh] overflow-y-auto rounded-xl border border-black/10 bg-white py-1 shadow-lg")}
       >
@@ -454,8 +465,9 @@ export function Capsula({ etiqueta, opciones, valor, onCambiar, alinear = "izqui
             className="flex min-h-[44px] w-full items-center gap-3 px-4 text-left text-[15px] text-gray-900 transition hover:bg-black/5"
           >
             <span className="w-4 shrink-0">{o.valor === valor && <Check aria-hidden className="h-4 w-4" />}</span>
-            <span className="flex-1">{o.etiqueta}</span>
+            <span className="min-w-0 flex-1 whitespace-nowrap">{o.etiqueta}</span>
             {o.conteo != null && <span className="tabular-nums text-gray-500">{o.conteo.toLocaleString("en-US")}</span>}
+            {o.detalle != null && <span className="shrink-0 tabular-nums text-gray-500">{o.detalle}</span>}
           </button>
         ))}
       </DesplegableFlotante>
@@ -469,7 +481,9 @@ export function Capsula({ etiqueta, opciones, valor, onCambiar, alinear = "izqui
  * acorta es el texto del buscador («Buscar»). Con dos cápsulas (`abajo`), el
  * buscador va solo y ellas en la línea de abajo (Asistencia › Colaboradores).
  */
-export function LineaBuscarYCapsulas({ busqueda, onBuscar, placeholder, children, abajo = false, className }: {
+export function LineaBuscarYCapsulas({ busqueda, onBuscar, placeholder, children, abajo = false, className, compacto = false }: {
+  /** El buscador compacto (texto de ayuda en 14 px), para que quepa junto a la cápsula. */
+  compacto?: boolean;
   busqueda: string;
   onBuscar: (v: string) => void;
   placeholder: string;
@@ -481,7 +495,7 @@ export function LineaBuscarYCapsulas({ busqueda, onBuscar, placeholder, children
 }) {
   return (
     <div data-linea-buscar className={cn("flex items-center gap-2", abajo && "flex-wrap", className)}>
-      <BuscadorGris valor={busqueda} onCambiar={onBuscar} placeholder={placeholder} className={abajo ? "w-full" : "min-w-0 flex-1"} />
+      <BuscadorGris valor={busqueda} onCambiar={onBuscar} placeholder={placeholder} compacto={compacto} className={abajo ? "w-full" : "min-w-0 flex-1"} />
       <div className="flex shrink-0 items-center gap-2">{children}</div>
     </div>
   );
