@@ -1174,7 +1174,16 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
 
           </div>
         );
-  const campoDestino = (
+  // 🔴 14-nov-2026: en 135 envíos nadie cambió el destino que puso el sistema.
+  // Autollenado se VE, no se escribe; «Cambiar» abre el campo de siempre.
+  const campoDestino = destino && !destinoTocado ? (
+    <div className="flex max-w-sm min-h-[44px] items-center justify-between gap-3">
+      <span className="text-base font-medium sm:text-sm">{destino}</span>
+      <button type="button" onClick={() => setDestinoTocado(true)} className="min-h-[44px] rounded-md px-2 text-sm text-gray-500 transition hover:text-black active:scale-[0.97]">
+        Cambiar
+      </button>
+    </div>
+  ) : (
     <>
         <input
           type="text"
