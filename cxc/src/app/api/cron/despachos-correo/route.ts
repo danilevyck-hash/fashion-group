@@ -3,9 +3,9 @@
 // proveedor (ASW) de los últimos 3 días y guarda las tallas de sus adjuntos
 // «<factura>_TXT» en `despacho_tallas` (Plantilla Switch › Tallas por bulto).
 //
-// 🔴 APAGADO (`DESPACHOS_CORREO_AUTOMATICO = false`) hasta que Daniel autorice la
-// app en Microsoft Entra. Apagado contesta 200 sin hacer nada y sin sembrar
-// latido: es seed-tolerante, así que el vigía no lo reclama.
+// Prendido el 13-nov-2026 (`DESPACHOS_CORREO_AUTOMATICO`; app «Fashion Group
+// correo» en Microsoft Entra, el secreto vence en nov-2028). Apagado contesta 200
+// sin hacer nada y sin sembrar latido: es seed-tolerante.
 // Una entrada de cron, una ocurrencia (23:45 UTC = 6:45 p. m. de Panamá). No
 // toca Switch. Un correo ya cargado no se vuelve a bajar.
 // Avisa por 🔧 SISTEMA solo lo que pide hacer algo: la llave de Microsoft dejó de
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     await enviarSistema(
       "Las tallas de los despachos de ASW dejaron de cargarse solas.\n" +
         "Qué significa: Microsoft no aceptó la llave del sistema para leer el correo (puede haber vencido).\n" +
-        "Qué hacer: en Microsoft Entra, crea un secreto nuevo para la app «Fashion Group – despachos» y cámbialo en Vercel (GRAPH_CLIENT_SECRET).",
+        "Qué hacer: en Microsoft Entra, crea un secreto nuevo para la app «Fashion Group correo» y cámbialo en Vercel (GRAPH_CLIENT_SECRET).",
     );
     return NextResponse.json({ error: "token" }, { status: 500 });
   }

@@ -10,11 +10,12 @@ export const TALLAS_POR_PEDIDO_2026_11 = true;
 
 /**
  * `true` = el cron `despachos-correo` lee el buzón por Microsoft Graph y guarda
- * las tallas de los despachos nuevos. APAGADO hasta que Daniel autorice la app
- * en Microsoft Entra (Mail.Read) y estén las credenciales en Vercel:
- * `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET`.
+ * las tallas de los despachos nuevos. Prendido el 13-nov-2026: Daniel creó la
+ * app «Fashion Group correo» en Microsoft Entra (Mail.Read de aplicación) y las
+ * credenciales están en Vercel: `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`,
+ * `GRAPH_CLIENT_SECRET`. 🔴 El secreto VENCE en nov-2028: renovarlo antes.
  */
-export const DESPACHOS_CORREO_AUTOMATICO = false;
+export const DESPACHOS_CORREO_AUTOMATICO = true;
 
 /** Quién usa la pantalla: los mismos de Plantilla Switch. Admin pasa siempre. */
 export const ROLES_TALLAS_PEDIDO = ["admin", "secretaria"] as const;

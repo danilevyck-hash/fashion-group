@@ -538,9 +538,8 @@ export const SEED_TOLERANT_CRONS = [
   // ese vigía es fail-CLOSED ante una fila ausente y hoy la fila no existe).
   "reclamos-viejos",
   // Tallas de los despachos de ASW desde el correo (23:45 UTC = 6:45 p. m.
-  // Panamá, 13-nov-2026). APAGADO (`DESPACHOS_CORREO_AUTOMATICO = false`) hasta
-  // que Daniel autorice la app de Microsoft: apagado no siembra latido, por eso
-  // seed-tolerante. No toca Switch. Promover a CRONS_FAIL_CLOSED cuando lleve
+  // Panamá, 13-nov-2026). Prendido el 13-nov-2026; apagado no siembra latido,
+  // por eso seed-tolerante. No toca Switch. Promover a CRONS_FAIL_CLOSED cuando lleve
   // días prendido.
   "despachos-correo",
   // Limpieza de los Excel del Historial del Depurador a los 90 días (03:20
