@@ -16,3 +16,6 @@ export const FRESCURA_GIRO_GRANDE_2026_11 = true;
 
 /** Clientes (lista) en el celular: «Ordenar» en la línea de la frescura, no en una fila sola. */
 export const CLIENTES_ORDENAR_ARRIBA_2026_11 = true;
+
+/** Cuentas por cobrar en el celular: «Ordenar» al lado del buscador, no en una fila sola. */
+export const CXC_ORDENAR_JUNTO_AL_BUSCADOR_2026_11 = true;
