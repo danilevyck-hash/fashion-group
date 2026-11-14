@@ -28,3 +28,6 @@ export const AYUDA_EN_LA_TARJETA_2026_11 = true;
 
 /** Usuarios en el celular: sin la fila de pestañas repetida bajo el título «Usuarios ▾». */
 export const USUARIOS_SIN_PESTANAS_DOBLES_2026_11 = true;
+
+/** Préstamos en el celular: las dos tarjetas lado a lado y el buscador sin cortarse. */
+export const PRESTAMOS_CELULAR_2026_11 = true;
