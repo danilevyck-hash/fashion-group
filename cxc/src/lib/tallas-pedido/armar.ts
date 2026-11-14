@@ -7,7 +7,11 @@
 //     Pares · Opción, y una fila «Total <referencia>» por referencia u opción.
 //   · Pares de la talla = (pares del pedido ÷ pares por caja) × pares de esa
 //     talla en la caja. El total cuadra con los pares del pedido.
-//   · Las curvas salen del despacho MÁS RECIENTE de la referencia.
+//   · Se ofrecen TODAS las curvas distintas de todos los despachos (Daniel,
+//     13-nov-2026: «si llegó en varios despachos con curvas distintas, todas»).
+//   · Ropa y accesorios (sin caja): la curva es el reparto por talla del
+//     despacho reducido a su mínima proporción; si el pedido no la completa,
+//     NARANJA con las tallas y el código de barra y las cantidades vacías.
 //   · Varias curvas DISTINTAS para la referencia → «Opción 1», «Opción 2»…
 //     La MISMA curva en dos despachos (o con dos códigos de caja) es UNA opción:
 //     así se arregló THS10474T, que salía con las opciones 4 y 5 repitiendo las
@@ -19,6 +23,8 @@
 //   · Tallas conocidas pero sin caja (Reebok «Detalle despacho») → las tallas y
 //     su código de barra en NARANJA, con los Pares VACÍOS.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import { SIN_CAJA } from "./despacho-archivo";
 
 export interface LineaDelPedido {
   codigo: string;
@@ -63,12 +69,17 @@ export interface ResumenTallas {
   pares: number;
 }
 
-const normRef = (s: string) => String(s ?? "").trim().toUpperCase().replace(/\s+/g, "");
+export const normRef = (s: string) => String(s ?? "").trim().toUpperCase().replace(/\s+/g, "");
 
 /** Switch escribe TH101074T000; ASW, TH101074T. Se aceptan las dos. */
 export function candidatosDeReferencia(codigoSwitch: string): string[] {
   const r = normRef(codigoSwitch);
-  return r.endsWith("000") && r.length > 3 ? [r, r.slice(0, -3)] : [r];
+  if (r.endsWith("000") && r.length > 3) return [r, r.slice(0, -3)];
+  // Active Wear escribe en Switch la talla pegada: «RBKFP26008_M», «RBKFP26097_10»;
+  // el proveedor, «RBKFP26008».
+  const sinTalla = r.replace(/_(XXS|XS|S|M|L|XL|XXL|2XL|3XL|\d{1,2})$/, "");
+  if (sinTalla !== r && sinTalla) return [r, sinTalla];
+  return [r];
 }
 
 /** Tallas numéricas ascendentes, luego las de texto. */
@@ -78,8 +89,15 @@ export function compararTallas(a: string, b: string): number {
   if (aN && bN) return na - nb;
   if (aN) return -1;
   if (bN) return 1;
+  // Ropa: de la más chica a la más grande, no por abecedario (S, M, L, XL…).
+  const ia = ORDEN_ROPA.indexOf(a.toUpperCase()), ib = ORDEN_ROPA.indexOf(b.toUpperCase());
+  if (ia >= 0 && ib >= 0) return ia - ib;
+  if (ia >= 0) return -1;
+  if (ib >= 0) return 1;
   return a.localeCompare(b, "es");
 }
+
+const ORDEN_ROPA = ["XXS", "XS", "S", "SM", "M", "ML", "L", "LXL", "XL", "XXL", "2XL", "XXXL", "3XL", "OS", "OSFM", "OSFA"];
 
 interface TallaDeCurva {
   talla: string;
@@ -99,6 +117,7 @@ interface Curva {
  * o la suma no da los pares por caja): una curva dudosa no se ofrece.
  */
 function curvaDeCaja(filas: TallaDeDespacho[]): Curva | null {
+  if (filas[0]?.codigo_caja === SIN_CAJA) return curvaDelDespacho(filas);
   const total = filas.reduce((s, f) => s + Number(f.cantidad), 0);
   const declarado = filas.find((f) => f.pares_por_caja && f.pares_por_caja > 0)?.pares_por_caja ?? null;
   const cajasDecl = filas.find((f) => f.cajas && f.cajas > 0)?.cajas ?? null;
@@ -115,6 +134,23 @@ function curvaDeCaja(filas: TallaDeDespacho[]): Curva | null {
   tallas.sort((a, b) => compararTallas(a.talla, b.talla));
   const fecha = filas.map((f) => f.fecha_despacho ?? "").sort().at(-1) ?? "";
   return { tallas, paresPorCaja, fecha };
+}
+
+const mcd = (a: number, b: number): number => (b ? mcd(b, a % b) : a);
+
+/**
+ * Ropa y accesorios (sin caja; Daniel, 13-nov-2026): la curva es el reparto por
+ * talla de ESE despacho reducido a su mínima proporción. S 6 · M 12 · L 12 ·
+ * XL 6 · XXL 6 → 1-2-2-1-1 (7 piezas). Una cantidad no entera → sin curva.
+ */
+function curvaDelDespacho(filas: TallaDeDespacho[]): Curva | null {
+  const cant = filas.map((f) => Number(f.cantidad));
+  if (cant.some((n) => !Number.isInteger(n) || n <= 0)) return null;
+  const m = cant.reduce(mcd, 0);
+  const tallas = filas.map((f, i) => ({ talla: f.talla, porCaja: cant[i] / m, ean: f.ean }));
+  tallas.sort((a, b) => compararTallas(a.talla, b.talla));
+  const fecha = filas.map((f) => f.fecha_despacho ?? "").sort().at(-1) ?? "";
+  return { tallas, paresPorCaja: tallas.reduce((s, t) => s + t.porCaja, 0), fecha };
 }
 
 const firma = (c: Curva) => c.tallas.map((t) => `${t.talla}:${t.porCaja}`).join(",");
@@ -158,20 +194,6 @@ export function curvasDeReferencia(filas: TallaDeDespacho[]): Curva[] {
   return [...unicas.values()].sort(compararCurvas);
 }
 
-/**
- * Las filas del despacho MÁS RECIENTE que trae curva para la referencia (como
- * armó Daniel el Excel del 2182: «la entrada más reciente que tenga correo»).
- * Las curvas de despachos viejos no se mezclan: darían opciones que ya no
- * vienen. Sin ninguna curva, todas las filas (para las tallas sin caja).
- */
-export function delUltimoDespacho(filas: readonly TallaDeDespacho[]): TallaDeDespacho[] {
-  const conCurva = filas.filter((f) => f.pares_por_caja || f.cajas);
-  if (conCurva.length === 0) return [...filas];
-  const clave = (f: TallaDeDespacho) => `${f.fecha_despacho ?? ""}|${f.correo_id}|${f.factura}`;
-  const ultima = conCurva.map(clave).sort().at(-1);
-  return conCurva.filter((f) => clave(f) === ultima);
-}
-
 /** Las filas del Excel y la línea de resumen. */
 export function armarTallasDelPedido(
   lineas: readonly LineaDelPedido[],
@@ -192,7 +214,7 @@ export function armarTallasDelPedido(
     const cantidad = Number(l.cantidad) || 0;
     pares += cantidad;
     const deEsta = candidatosDeReferencia(referencia).flatMap((r) => porRef.get(r) ?? []);
-    const curvas = curvasDeReferencia(delUltimoDespacho(deEsta));
+    const curvas = curvasDeReferencia(deEsta);
 
     if (curvas.length === 0 && deEsta.length > 0) {
       // Hay tallas pero ninguna caja (el «Detalle despacho» de Reebok): se

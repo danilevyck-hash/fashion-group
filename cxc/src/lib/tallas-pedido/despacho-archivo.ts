@@ -7,7 +7,8 @@
 //   FACT · FECHA (MMDDAAAA) · REFERENCIA · EAN · TALLA · CANTIDAD · NO_TRANSPORTE
 //   · NOMBRE_DESTINATARIO_MERCANCIAS · CODIGO_PREPACK · CANTIDAD_PREPACK
 //   · CANTIDAD_ORD_X_PP
-// Una fila sin caja (CODIGO_PREPACK vacío) no tiene curva: se cuenta y se deja.
+// Una fila sin caja (CODIGO_PREPACK vacío: ropa, accesorios) se guarda con caja
+// «SIN CAJA»: su curva sale del reparto por talla del despacho (`armar.ts`).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type Celda = string | number | boolean | null | undefined;
@@ -30,7 +31,7 @@ export interface FilaDespacho {
 
 export interface LecturaDespacho {
   filas: FilaDespacho[];
-  /** Filas del archivo sin caja, sin referencia o de una empresa que no es del grupo. */
+  /** Filas del archivo sin referencia, talla o cantidad, o de una empresa que no entra. */
   descartadas: number;
   /** Destinatarios que no se reconocieron (para decirlo, nunca para adivinar). */
   destinatariosDesconocidos: string[];
@@ -48,8 +49,8 @@ const DESTINATARIOS: readonly [prefijo: string, empresa: string][] = [
   ["ACTIVE WEAR", "active_wear"],
   ["ACTIVE SHOES", "active_shoes"],
   ["JOYSTEP", "joystep"],
-  // Razón social de Multifashion (`empresa-fiscal.ts`).
-  ["MULTI FASHION HOLDING", "american_classic"],
+  // Multifashion (MULTI FASHION HOLDING CORP.) NO entra (Daniel, 13-nov-2026):
+  // sus renglones se descartan como destinatario desconocido.
 ];
 
 const norm = (v: Celda) =>
@@ -137,12 +138,14 @@ export function leerDespacho(
     const dest = get(fila, "dest");
     const empresa = dest ? empresaDelDestinatario(dest) : origen.empresaPorDefecto ?? null;
     if (dest && !empresa) desconocidos.add(String(dest).trim());
-    if (!referencia || !codigo_caja || !talla || cantidad === null || !empresa) {
+    // Sin caja = ropa o accesorio: se guarda igual (su curva sale del reparto por talla).
+    if (!referencia || !talla || cantidad === null || !empresa) {
       descartadas++;
       continue;
     }
     const factura = String(get(fila, "fact") ?? "").trim() || "—";
-    const clave = [factura, referencia, codigo_caja, talla].join("|");
+    const caja = codigo_caja || SIN_CAJA;
+    const clave = [factura, referencia, caja, talla].join("|");
     const previa = porClave.get(clave);
     if (previa) {
       // La misma caja en dos posiciones de la factura: se suman los pares Y las
@@ -159,7 +162,7 @@ export function leerDespacho(
     porClave.set(clave, {
       empresa_key: empresa,
       referencia,
-      codigo_caja,
+      codigo_caja: caja,
       talla,
       ean: eanTexto(get(fila, "ean")),
       cantidad,
@@ -315,6 +318,35 @@ function leerDetalleReebok(filas: readonly (readonly Celda[])[], correo_id: stri
 }
 
 /**
+ * «Packing List Ordenes <pedido> Active.xlsx» de Active Wear (camisetas Reebok):
+ * Nro Pedido · Articulo · SKU · Descripcion · Bar Code · TALLA · Bultos · Empaque
+ * · Piezas total. Cada renglón es UNA talla en «Bultos» cajas de «Empaque» piezas.
+ */
+export function esEmpaqueActiveWear(encabezado: readonly Celda[]): boolean {
+  const i = indices(encabezado);
+  return i("BULTOS") >= 0 && i("EMPAQUE") >= 0 && i("PIEZAS TOTAL") >= 0 && i("TALLA") >= 0 && i("ARTICULO") >= 0;
+}
+
+function leerEmpaqueActiveWear(filas: readonly (readonly Celda[])[], correo_id: string): FilaDespacho[] {
+  const i = indices(filas[0] ?? []);
+  const [cPed, cArt, cSku, cBar, cTalla, cBultos, cEmp, cTotal] = ["NRO PEDIDO", "ARTICULO", "SKU", "BAR CODE", "TALLA", "BULTOS", "EMPAQUE", "PIEZAS TOTAL"].map(i);
+  const out: FilaDespacho[] = [];
+  for (const f of filas.slice(1)) {
+    const c = (k: number) => (k >= 0 ? f[k] : null);
+    const referencia = norm(c(cArt)).replace(/\s+/g, "");
+    const talla = tallaTexto(c(cTalla));
+    const cantidad = num(c(cTotal));
+    if (!referencia || !talla || cantidad === null || cantidad <= 0) continue;
+    out.push({
+      empresa_key: "active_wear", referencia, codigo_caja: norm(c(cSku)) || `${referencia}-${talla}`, talla,
+      ean: eanTexto(c(cBar)), cantidad, cajas: num(c(cBultos)), pares_por_caja: num(c(cEmp)),
+      fecha_despacho: null, transporte: null, factura: `PL ${String(c(cPed) ?? "").trim() || "—"}`, proveedor: "reebok", correo_id,
+    });
+  }
+  return out;
+}
+
+/**
  * UN adjunto → filas, con el lector de SU formato (se reconoce por el
  * encabezado, nunca por parecido). `null` = formato desconocido (se avisa).
  */
@@ -326,5 +358,6 @@ export function leerAdjuntoDeDespacho(
   if (esHojaDeDespacho(h)) return leerDespacho(filas, origen).filas;
   if (esPackingListReebok(h)) return leerPackingListReebok(filas, origen.correo_id);
   if (esDetalleReebok(h)) return leerDetalleReebok(filas, origen.correo_id);
+  if (esEmpaqueActiveWear(h)) return leerEmpaqueActiveWear(filas, origen.correo_id);
   return null;
 }
