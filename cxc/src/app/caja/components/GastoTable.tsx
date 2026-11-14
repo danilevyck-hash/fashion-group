@@ -287,7 +287,7 @@ export default function GastoTable({
           «Buscar proveedor» y «Todas las categorías ▾» en UNA línea; los montos
           por categoría viven en el menú. Busca lo mismo de siempre. */}
       {FILTRO_4_CAJA_PERIODO && gastos.length > 0 && (
-        <LineaBuscarYCapsulas compacto className="mb-3 sm:hidden" busqueda={busqueda} onBuscar={setBusqueda} placeholder="Proveedor">
+        <LineaBuscarYCapsulas compacto className="mb-3 sm:hidden" busqueda={busqueda} onBuscar={setBusqueda} placeholder="Buscar proveedor">
           <Capsula etiqueta="Categoría" compacta alinear="derecha" valor={selectedCat ?? ""}
             onCambiar={(v) => setSelectedCat(v || null)}
             opciones={[

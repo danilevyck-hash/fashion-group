@@ -592,7 +592,7 @@ function AsistenciaInner() {
                   filtran Horarios. Solo pantalla: nada de lo que se guarda cambia. */}
               {barra && FILTRO_6_ASISTENCIA_CONFIG && config === "horarios" && (
                 <EnLaBarra pestana="configuracion" iconos={
-                  <BuscarEnLaBarra valor={buscarHorario} onCambiar={setBuscarHorario} placeholder="Colaborador"
+                  <BuscarEnLaBarra valor={buscarHorario} onCambiar={setBuscarHorario} placeholder="Buscar colaborador"
                     etiqueta="Colaborador"
                     alLado={opciones.length > 1 ? (
                       <Capsula etiqueta="Empresa" compacta alinear="derecha" valor={empresa}

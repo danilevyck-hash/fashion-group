@@ -168,7 +168,7 @@ export default function HistorialView({ refreshKey = 0, limite }: HistorialViewP
           lo mismo de siempre (marca, empresa, usuario o fecha). */}
       {!limite && FILTRO_5_PLANTILLA_HISTORIAL && (
         <div className="mb-3 space-y-2 sm:hidden">
-          <LineaBuscarYCapsulas compacto busqueda={busqueda} onBuscar={setBusqueda} placeholder="Marca o usuario">
+          <LineaBuscarYCapsulas compacto busqueda={busqueda} onBuscar={setBusqueda} placeholder="Buscar marca">
             <Capsula etiqueta="Empresa" compacta alinear="derecha" valor={empresaFiltro} onCambiar={setEmpresaFiltro}
               opciones={[{ valor: "", etiqueta: "Todas las empresas" }, ...COMPANIAS_DEPURADOR.map((c) => ({ valor: c.label, etiqueta: c.label }))]} />
           </LineaBuscarYCapsulas>

@@ -352,7 +352,7 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
                 <BuscarEnLaBarra
                   valor={busqueda}
                   onCambiar={setBusqueda}
-                  placeholder={capsulaEmpresa ? "Colaborador" : PLACEHOLDER_COLABORADOR}
+                  placeholder={capsulaEmpresa ? "Buscar colaborador" : PLACEHOLDER_COLABORADOR}
                   etiqueta="Buscar colaborador por nombre o código"
                   alLado={capsulaEmpresa}
                 />
