@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import XLSX from "xlsx-js-style";
 import fixture from "./fixtures/tallas-pedido-2182.json";
 import {
-  armarTallasDelPedido, candidatosDeReferencia, coincideElPedido, compararTallas, curvasDeReferencia, idDelPedido, nombreDelArchivo,
+  armarTallasDelPedido, candidatosDeReferencia, coincideElPedido, compararTallas, curvasDeReferencia, idDelPedido, juntarEncontrados, nombreDelArchivo, sumarPorCodigo,
   type TallaDeDespacho,
 } from "@/lib/tallas-pedido/armar";
 import { adjuntosDeDespacho, empresaDelDestinatario, leerAdjuntoDeDespacho, leerDespacho, proveedorDelCorreo, SIN_CAJA } from "@/lib/tallas-pedido/despacho-archivo";
@@ -298,5 +298,42 @@ describe("el Excel", () => {
     expect(ws.A7.s?.font?.bold).toBe(true);
     expect(ws.A8.s?.fill?.fgColor?.rgb).toBe(FONDO.amarillo);
     expect(() => XLSX.write(libro, { type: "array", bookType: "xlsx" })).not.toThrow();
+  });
+});
+
+describe("por número de factura (14-nov-2026)", () => {
+  it("el número completo distingue factura (11-) de pedido (16-); los últimos dígitos sirven para los dos", () => {
+    expect(coincideElPedido("11-000003192", "11-000003192")).toBe(true);
+    expect(coincideElPedido("11-000003192", "16-000003192")).toBe(false);
+    expect(coincideElPedido("3192", "11-000003192")).toBe(true);
+    expect(coincideElPedido("3192", "16-000003192")).toBe(true);
+  });
+
+  it("los renglones de la factura (misma referencia en varias tallas) se suman y arman el mismo Excel", () => {
+    // En la factura la referencia puede venir en un renglón por talla o color;
+    // el Excel la quiere en una línea, como el pedido.
+    const renglones = [
+      { codigo: "TH101074T000", descripcion: "Tenis", cantidad: 4 },
+      { codigo: "OTRA1", descripcion: "Sandalia", cantidad: 3 },
+      { codigo: "TH101074T000", descripcion: "Tenis", cantidad: 8 },
+    ];
+    const lineas = sumarPorCodigo(renglones);
+    expect(lineas).toEqual([
+      { codigo: "TH101074T000", descripcion: "Tenis", cantidad: 12 },
+      { codigo: "OTRA1", descripcion: "Sandalia", cantidad: 3 },
+    ]);
+    const { filas, resumen } = armarTallasDelPedido(lineas, caja("TH101074T", "C1", [["7", 2], ["8", 2]], 3));
+    expect(resumen).toMatchObject({ referencias: 2, conTallas: 1, aMano: 1, pares: 15 });
+    expect(filas.find((f) => f.esTotal && f.referencia.startsWith("Total TH101074T000"))?.pares).toBe(12);
+  });
+
+  it("pedidos y facturas encontrados se juntan, los más recientes primero, como mucho 10", () => {
+    const de = (tipo: string, fecha: string) => ({ tipo, fecha });
+    const pedidos = [de("pedido", "2026-11-10")];
+    const facturas = Array.from({ length: 12 }, (_, i) => de("factura", `2026-10-${String(i + 10).padStart(2, "0")}`));
+    const todos = juntarEncontrados(pedidos, facturas);
+    expect(todos).toHaveLength(10);
+    expect(todos[0]).toEqual(de("pedido", "2026-11-10"));
+    expect(todos[1].fecha).toBe("2026-10-21");
   });
 });
