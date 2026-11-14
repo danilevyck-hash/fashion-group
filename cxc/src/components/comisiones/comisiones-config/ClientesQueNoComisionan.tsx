@@ -70,7 +70,6 @@ import {
   type ReglaEnPalabras,
 } from "@/lib/comisiones/exclusiones-en-palabras";
 import { COMISIONES_EXCLUSIONES_FILTROS } from "@/lib/ui/revision-110-ventas";
-import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { ChevronDown } from "lucide-react";
 
 interface ListaExclusiones {
@@ -479,7 +478,7 @@ export function ClientesQueNoComisionan({ onSaved, v2 = false }: { onSaved: (msg
               aria-label="Filtrar por empresa"
               className={`min-h-[44px] rounded-md border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-black ${COMISIONES_EXCLUSIONES_FILTROS ? "appearance-none pr-8" : ""}`}
             >
-              <option value={TODAS}>{COMISIONES_EXCLUSIONES_FILTROS ? ROTULO_TODAS : ROTULO_FILTRO_EMPRESA}</option>
+              <option value={TODAS}>{COMISIONES_EXCLUSIONES_FILTROS ? "Todas las empresas" : ROTULO_FILTRO_EMPRESA}</option>
               {EMPRESAS_COMISIONAN.map((k) => (
                 <option key={k} value={k}>{nombreEmpresa(k)}</option>
               ))}

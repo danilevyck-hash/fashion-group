@@ -57,6 +57,8 @@ import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
 import type { Multifashion } from "@/components/ventas/types";
 import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { MF_CLIENTES_SIN_REPETIR } from "@/lib/ui/revision-110-ventas";
+import { HUECO_LINEA_CLIENTES } from "@/components/multifashion/ClientesMultifashionSubtab";
 import RangoFechas from "@/components/ui/RangoFechas";
 import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
@@ -439,9 +441,16 @@ export function MultifashionShell({
               <span className="text-gray-500"> · {hoyCel.ayer}</span>
             </p>
           ) : subtituloCel && <p className="text-sm text-gray-500">{subtituloCel}</p>}
-          {frescuraCel && (
+          {frescuraCel && (MF_CLIENTES_SIN_REPETIR && tab === "clientes" ? (
+            // n.º 44b (revisión 110): «77 frecuentes · 975 con descuento… ·
+            // Actualizado 10:01 am ↻» en UNA línea; la pestaña llena el hueco.
+            <span data-celular="subtitulo" className="-my-2.5 text-[13px] text-gray-500 [&_*]:!text-[13px]">
+              <span id={HUECO_LINEA_CLIENTES} />
+              <span className="inline-flex whitespace-nowrap">{frescuraCel}</span>
+            </span>
+          ) : (
             <span data-celular="subtitulo" className="-my-2.5 whitespace-nowrap text-sm text-gray-500">{frescuraCel}</span>
-          )}
+          ))}
         </div>
       )}
       {MULTIFASHION_CELULAR && !barra && (
