@@ -117,3 +117,13 @@ export const GUIA_AGREGAR_TRASLADO_2026_10 = true;
  *  etiquetada o ya en una guía se VE atenuada, nunca se marca.
  *  `false` = el panel como estaba (cliente + «Buscar factura» aparte). */
 export const ETIQUETAS_BUSCADOR_UNICO_2026_11 = true;
+
+/** 🔴 ETIQUETAS › NUEVO ENVÍO: LAS FACTURAS EN UNA LISTA, CON SU FECHA (14-nov-2026, propuesta).
+ *  Sin días que abrir: todas las facturas en una lista, la más reciente
+ *  arriba, cada una con su fecha al lado («Factura 3370 · 12 nov»; el año solo
+ *  si no es el actual). Lo mismo en lo que encuentra el buscador por número,
+ *  para que una factura vieja con el mismo número se note por la fecha.
+ *  Lo de más de 30 días (fecha de factura, Panamá) empieza plegado en «Ver más (N)»;
+ *  si en la búsqueda solo hay viejas, se muestran (Daniel, 14-nov-2026).
+ *  `false` = los días plegados y la fecha a la derecha, como estaba. */
+export const ETIQUETAS_FACTURAS_LISTA_2026_11 = true;

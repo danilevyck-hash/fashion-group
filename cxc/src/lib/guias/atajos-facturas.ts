@@ -261,6 +261,37 @@ export function tituloDelDia(dia: string): string {
   return `${DIAS_SEMANA[diaSemana]} ${d} ${MESES_CORTOS[m - 1]}`;
 }
 
+/**
+ * La fecha de una factura al lado de su número: «12 nov», y con el año solo si
+ * no es el de `hoy` (YYYY-MM-DD en Panamá): «4 mar 2026». Puro.
+ */
+export function fechaDeLaFactura(fechaIso: string, hoy: string): string {
+  const dia = fechaPanamaDe(fechaIso);
+  const [y, m, d] = String(dia ?? "").split("-").map(Number);
+  if (!y || !m || m < 1 || m > 12 || !d) return "";
+  return `${d} ${MESES_CORTOS[m - 1]}${String(y) === hoy.slice(0, 4) ? "" : ` ${y}`}`;
+}
+
+/** Lo de más de estos días (por fecha de factura, en Panamá) empieza plegado en «Ver más». */
+export const DIAS_FACTURAS_RECIENTES = 30;
+
+/**
+ * Parte una lista (ya ordenada) en las de los últimos `dias` y las más viejas,
+ * sin reordenar. 🔴 Si NINGUNA es reciente, no se pliega nada: un resultado
+ * que solo trae viejas (p. ej. la búsqueda exacta de un número) se muestra.
+ */
+export function separarRecientes<T extends { fecha: string }>(
+  lista: readonly T[],
+  hoy: string,
+  dias: number = DIAS_FACTURAS_RECIENTES,
+): { recientes: T[]; viejas: T[] } {
+  const [y, m, d] = hoy.split("-").map(Number);
+  const corte = new Date(Date.UTC(y, m - 1, d - dias)).toISOString().slice(0, 10);
+  const recientes = lista.filter((f) => fechaPanamaDe(f.fecha) >= corte);
+  if (recientes.length === 0) return { recientes: [...lista], viejas: [] };
+  return { recientes, viejas: lista.filter((f) => !recientes.includes(f)) };
+}
+
 /** ¿La factura es del día `hoy` (YYYY-MM-DD en Panamá)? Para mostrar la hora. */
 export function esDeHoy(fechaIso: string, hoy: string): boolean {
   return fechaPanamaDe(fechaIso) === hoy;
