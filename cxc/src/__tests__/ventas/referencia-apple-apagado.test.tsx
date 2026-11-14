@@ -15,6 +15,13 @@ const interruptor = vi.hoisted(() => ({ prendido: false }));
 vi.mock("@/lib/ventas/referencia-apple-2026-10", () => ({
   get REFERENCIA_APPLE_2026_10() { return interruptor.prendido; },
 }));
+// Revisión 110 (n.º 109 · 110): con SUS interruptores apagados, la pantalla de hoy
+// tiene que salir idéntica; prendidos, los cuida referencia-agotado.test.ts.
+vi.mock("@/lib/ui/revision-110-cxc", async (orig) => ({
+  ...(await orig<typeof import("@/lib/ui/revision-110-cxc")>()),
+  REFERENCIA_AGOTADO: false,
+  REFERENCIA_RECEPCIONES_DOS_LINEAS: false,
+}));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/referencia",
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),

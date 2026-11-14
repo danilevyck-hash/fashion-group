@@ -282,9 +282,9 @@ describe("excel-proveedores — buildProveedoresSheet", () => {
 
     // Encabezados en la fila 1, con los CUATRO tramos.
     expect(ws.A1.v).toBe("Empresa / Proveedor");
-    expect(ws.B1.v).toBe("0-90 d");
-    expect(ws.C1.v).toBe("91-120 d");
-    expect(ws.D1.v).toBe("121-365 d");
+    expect(ws.B1.v).toBe("0-90 días");
+    expect(ws.C1.v).toBe("91-120 días");
+    expect(ws.D1.v).toBe("121-365 días");
     expect(ws.E1.v).toBe("+1 año");
     expect(ws.F1.v).toBe("Por pagar");
 

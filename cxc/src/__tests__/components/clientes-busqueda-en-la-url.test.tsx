@@ -72,7 +72,7 @@ function pintar() {
   );
 }
 
-const buscador = () => screen.getByPlaceholderText(/Buscar por nombre/i) as HTMLInputElement;
+const buscador = () => screen.getByPlaceholderText(/Buscar nombre/i) as HTMLInputElement;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. LO QUE SE ESCRIBE VA A LA URL — con `replace`, nunca con `push`
@@ -121,7 +121,7 @@ describe("🔴 la búsqueda VIVE en la URL", () => {
     // los 150 clientes no la tienen; Daniel: «si, no sirve»). Un chip es un
     // filtro del MISMO nivel: `replace`, nunca `push`.
     pintar();
-    fireEvent.click(screen.getByRole("button", { name: /Sin correo/ }));
+    fireEvent.click(document.querySelector('[data-vista-opcion="sin-correo"]')!);
     expect(REPLACE).toHaveBeenCalled();
     expect(REPLACE.mock.calls.at(-1)![0]).toContain("filtro=sin-correo");
     expect(PUSH).not.toHaveBeenCalled();

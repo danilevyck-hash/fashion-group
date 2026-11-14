@@ -426,7 +426,8 @@ describe("🔴 podar el título NO deja la pantalla sin encabezado", () => {
     // botones a la derecha—, así que `justify-between` es lo correcto ahí y
     // exigirle `end` sería exigirle que los junte.
     const filasQueQuedaronConUnSoloBoton = [
-      "app/clientes/ClientesListClient.tsx",
+      // Clientes salió el 14-nov-2026 (revisión 110): su h1 ya no vive en una
+      // fila de botones; la frescura va al final de la línea de «Todos ▾».
       "app/despachos/components/GuiasList.tsx",
       "app/reclamos/components/EmpresaSelector.tsx",
       "app/recordatorios/RecordatoriosClient.tsx",

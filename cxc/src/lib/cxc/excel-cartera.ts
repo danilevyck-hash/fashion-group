@@ -16,6 +16,7 @@
 // `buildReportSheet`): filtrar no la esconde ni la suma como si fuera un cliente.
 // ─────────────────────────────────────────────────────────────────────────────
 import XLSX from "xlsx-js-style";
+import { CXC_EXCEL_FILA_1 } from "@/lib/ui/revision-110-cxc";
 import {
   buildReportSheet,
   workbookFromSheets,
@@ -71,8 +72,9 @@ function filaDeSuma(rotulo: string, antes: number, t: { t0: number; t1: number; 
  * recalcula los dos. Ningún número cambia.
  */
 function subtotalConFormula(ws: XLSX.WorkSheet, filaSubtotal: number, primeraCol: number): void {
-  // Título en la 1, vacía la 2, encabezados en la 3: los datos arrancan en la 4.
-  const primera = 4;
+  // Encabezados en la 1 y datos desde la 2 (n.º 17, revisión 110). Con el
+  // interruptor apagado: título en la 1, vacía la 2, encabezados en la 3.
+  const primera = CXC_EXCEL_FILA_1 ? 2 : 4;
   const fila = primera + filaSubtotal;
   for (let c = primeraCol; c < primeraCol + 4; c++) {
     const ref = XLSX.utils.encode_cell({ r: fila - 1, c });
@@ -97,7 +99,7 @@ export function libroTotalPorCliente(filas: FilaCliente[], aFavor: FilaCliente[]
   }
   const t = aFavor.length > 0 ? totalGeneral(filas, aFavor) : totalDeLasFilas(filas);
   const ws = buildReportSheet({
-    titulo,
+    titulo: CXC_EXCEL_FILA_1 ? undefined : titulo,
     columns,
     rows,
     totals: ["", aFavor.length > 0 ? ROTULO_TOTAL_GENERAL : "Total", t.t0, t.t1, t.t2, t.total],
@@ -132,7 +134,7 @@ export function libroPorCompania(bloques: BloqueCliente[], aFavor: BloqueCliente
   }
   const t = aFavor.length > 0 ? totalGeneral(bloques, aFavor) : totalDeLasFilas(bloques);
   const ws = buildReportSheet({
-    titulo,
+    titulo: CXC_EXCEL_FILA_1 ? undefined : titulo,
     columns,
     rows,
     totals: ["", "", aFavor.length > 0 ? ROTULO_TOTAL_GENERAL : "Total", t.t0, t.t1, t.t2, t.total],

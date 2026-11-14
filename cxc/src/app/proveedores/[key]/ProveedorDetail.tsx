@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
+import TituloQueVuelve from "@/components/celular/TituloQueVuelve";
+import { PROVEEDORES_TITULO_VUELVE } from "@/lib/ui/revision-110-cxc";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { EmptyState } from "@/components/ui";
 import { fmt, fmtDate } from "@/lib/format";
@@ -89,7 +91,9 @@ export default function ProveedorDetail({ fichaKey, apple = PROVEEDORES_APPLE_20
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader module="Proveedores" breadcrumbs={[{ label: data?.nombre ?? "…" }]} />
+      <AppHeader module="Proveedores" breadcrumbs={[{ label: data?.nombre ?? "…" }]} tituloEnLaPantalla={PROVEEDORES_TITULO_VUELVE} />
+      {/* n.º 53 (revisión 110): en el celular el título «‹ Proveedores» vuelve; sin la fila azul. */}
+      {PROVEEDORES_TITULO_VUELVE && <TituloQueVuelve href="/proveedores" rotulo="Proveedores" />}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
         {/* Apple: «← Proveedores» va en la misma línea del nombre (diseno.md). */}
         {!apple && (
@@ -298,7 +302,7 @@ function FichaApple({
       <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-3">
-            <Link href="/proveedores" className="inline-flex min-h-[44px] items-center text-sm text-blue-600 hover:text-blue-800">‹ Proveedores</Link>
+            <Link href="/proveedores" className={`${PROVEEDORES_TITULO_VUELVE ? "hidden sm:inline-flex" : "inline-flex"} min-h-[44px] items-center text-sm text-blue-600 hover:text-blue-800`}>‹ Proveedores</Link>
             <h1 className="text-2xl font-semibold tracking-tight">{nombreProveedorEnPantalla(data.nombre, capitalizarNombre)}</h1>
           </div>
           {/* v2: tipo, otras grafías y «Actualizado» en UNA línea gris. */}

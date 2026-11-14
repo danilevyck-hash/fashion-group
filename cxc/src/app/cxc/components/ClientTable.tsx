@@ -35,6 +35,11 @@ interface Props {
   renderDetalle?: (client: ConsolidatedClient, abierto: boolean) => ReactNode;
   /** Sin casillas de «mandar a varios» (Boston no tiene lote). Por defecto, con casillas. */
   sinSeleccion?: boolean;
+  /**
+   * n.º 19 (revisión 110): hay filtros puestos además de la búsqueda. La lista
+   * vacía lo dice y ofrece quitarlos. Sin esto, «Sin resultados» como siempre.
+   */
+  onQuitarFiltros?: (() => void) | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,6 +80,7 @@ export default function ClientTable({
   marcaEnvioDe,
   renderDetalle,
   sinSeleccion = false,
+  onQuitarFiltros = null,
 }: Props) {
   const [expanded, setExpanded] = usePersistedState<string | null>("cxc", "expanded", null);
 
@@ -162,7 +168,18 @@ export default function ClientTable({
             </svg>
             {/* Una sola línea: "prueba con otra búsqueda" no agrega nada a "Sin
                 resultados" con el buscador lleno delante. */}
-            <p className="text-sm text-gray-400">Sin resultados</p>
+            <p className="text-sm text-gray-400">
+              {onQuitarFiltros ? "Sin resultados con los filtros puestos" : "Sin resultados"}
+            </p>
+            {onQuitarFiltros && (
+              <button
+                type="button"
+                onClick={onQuitarFiltros}
+                className="mt-1 min-h-[44px] text-sm font-medium text-blue-600 hover:text-blue-800"
+              >
+                Quitar filtros
+              </button>
+            )}
           </div>
         )}
 

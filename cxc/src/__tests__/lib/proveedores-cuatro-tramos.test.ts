@@ -57,7 +57,7 @@ describe("🔴 los cuatro tramos son los ocho de Switch, repartidos", () => {
   });
 
   it("son CUATRO y se leen por su rango — nunca «vencido»", () => {
-    expect(TRAMOS.map((t) => t.label)).toEqual(["0-90 d", "91-120 d", "121-365 d", "+1 año"]);
+    expect(TRAMOS.map((t) => t.label)).toEqual(["0-90 días", "91-120 días", "121-365 días", "+1 año"]);
     for (const t of TRAMOS) {
       expect(t.label.toLowerCase()).not.toContain("vencid");
       expect(t.label.toLowerCase()).not.toContain("por vencer");

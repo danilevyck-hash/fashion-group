@@ -28,6 +28,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import TituloQueVuelve from "@/components/celular/TituloQueVuelve";
+import { CLIENTES_FICHA_TITULO_VUELVE as FICHA_TITULO_VUELVE } from "@/lib/ui/revision-110-cxc";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { rolesClientes } from "@/lib/clientes/roles";
 import { Toast, AccordionContent } from "@/components/ui";
@@ -293,9 +295,12 @@ export default function ClienteDetail({
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader module="Clientes" breadcrumbs={[{ label: cliente.codigo }]} />
+      <AppHeader module="Clientes" breadcrumbs={[{ label: cliente.codigo }]} tituloEnLaPantalla={FICHA_TITULO_VUELVE} />
+      {/* n.º 50 (revisión 110): en el celular el título «‹ Clientes» vuelve a la
+          lista; la fila «← Clientes» de abajo se va. */}
+      {FICHA_TITULO_VUELVE && <TituloQueVuelve href="/clientes" rotulo="Clientes" />}
       <main className={`max-w-4xl mx-auto px-4 sm:px-6 py-6${CONTENIDO_ANCHO_2026_10 ? ` ${CLASE_COLUMNA_QUE_ESCALA}` : ""}`}>
-        <div className="mb-2">
+        <div className={FICHA_TITULO_VUELVE ? "mb-2 hidden sm:block" : "mb-2"}>
           <Link href="/clientes" className="inline-flex min-h-[44px] items-center text-xs text-gray-500 hover:text-black transition">
             ← Clientes
           </Link>
@@ -535,7 +540,7 @@ export default function ClienteDetail({
                   {initialData.ultimas_guias.map((g) => (
                     <li key={g.id}>
                       <Link
-                        href={`/guias/${g.id}/imprimir`}
+                        href={`/despachos/${g.id}/imprimir`}
                         className="-mx-2 flex items-center justify-between rounded px-2 py-2 text-sm transition hover:bg-gray-50"
                       >
                         <span className="text-gray-700">Guía #{g.numero}</span>

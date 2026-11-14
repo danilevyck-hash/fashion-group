@@ -37,6 +37,7 @@
 
 import { EMPRESA_BOSTON, PESTANAS_BOSTON, ROL_BOSTON, esGerenteBoston, type TabBoston } from "./rol";
 import { ROLES_CXC } from "@/lib/cxc/roles";
+import { BOSTON_TARJETA_ABRE_BOSTON } from "@/lib/ui/revision-110-cxc";
 import type { Cartera } from "@/lib/cxc/cartera";
 
 /** El interruptor. `true` = David ve Ventas Boston + Cuentas por Cobrar + Asistencia. */
@@ -104,7 +105,9 @@ export function destinoFueraDeBoston(tab: TabBoston, pestanas: readonly PestanaB
   switch (tab) {
     case "cxc":
     case "clientes":
-      return "/cxc";
+      // n.º 105 (revisión 110): la tarjeta de Boston abre la cartera de BOSTON,
+      // nunca la del grupo. Quien solo ve Boston aterriza ahí igual.
+      return BOSTON_TARJETA_ABRE_BOSTON ? "/cxc?tab=boston" : "/cxc";
     case "planilla":
       return `/asistencia?tab=planilla&${empresa}`;
     case "prestamos":

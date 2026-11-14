@@ -47,6 +47,7 @@ import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import UndoToast from "@/components/UndoToast";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
+import { CXC_BUSCAR_SIN_FILTRO_ESCONDIDO, CLASE_BOTON_DESCARGAR, CXC_EMPRESA_BAJO_EL_TITULO, CXC_BOSTON_COMO_GRUPO_CELULAR } from "@/lib/ui/revision-110-cxc";
 import { ultimoPagoDelCliente, empresasDelCliente } from "@/lib/cxc/lista-celular";
 import { CXC_DESGLOSE_CELULAR_2026_11 } from "@/lib/cxc/desglose-celular-2026-11";
 import { fechaCortaPago } from "@/lib/cxc/pagos-por-fecha";
@@ -216,9 +217,13 @@ function AdminDashboardInner() {
   const [riskFilter, setRiskFilter] = useUrlState<RiskFilter>("risk", "all");
   // Tocar una píldora de tramo FILTRA y ORDENA por ese tramo en una sola acción,
   // y tocar la que ya está activa la apaga. Toda la regla vive en lib/cxc-orden.
+  const [sinPagarRaw, setSinPagar] = useUrlState("sinpagar", "");
   const handleRiskFilterChange = useCallback((tocada: RiskFilter) => {
     setRiskFilter(siguienteRiskFilter(riskFilter, tocada));
-  }, [riskFilter, setRiskFilter]);
+    // n.º 19: «Total» es «todo»; también apaga el chip «sin pago en +90 días»,
+    // que antes quedaba prendido sin que se notara y escondía clientes.
+    if (CXC_BUSCAR_SIN_FILTRO_ESCONDIDO && tocada === "all") setSinPagar("");
+  }, [riskFilter, setRiskFilter, setSinPagar]);
 
   // Per-user empresa restriction (e.g. Edwin only sees Vistana International)
   const [empresaRestriction, setEmpresaRestriction] = useState<string | null>(null);
@@ -272,7 +277,6 @@ function AdminDashboardInner() {
   // 🔴 EL AVISO «SIN PAGAR HACE +90 D» ES UN FILTRO MÁS, y vive en la URL como
   // los otros (`?sinpagar=1`), con `replace`: es un filtro del MISMO nivel, así
   // que el Atrás del navegador no tiene que ciclar por él.
-  const [sinPagarRaw, setSinPagar] = useUrlState("sinpagar", "");
   const sinPagarActivo = sinPagarRaw === "1";
   const toggleSinPagar = useCallback(() => {
     setSinPagar(sinPagarActivo ? "" : "1");
@@ -522,7 +526,7 @@ function AdminDashboardInner() {
     if (!puedeQuedarseEnCxc(userRole)) return null;
     return (
       <div>
-        <AppHeader module="Cuentas por cobrar" />
+        <AppHeader module="Cuentas por cobrar" tituloEnLaPantalla={CXC_BOSTON_COMO_GRUPO_CELULAR && CXC_CELULAR} />
         <CarteraBoston />
       </div>
     );
@@ -727,13 +731,13 @@ function AdminDashboardInner() {
       {/* 🔴 EN EL CELULAR LA CARTERA DEL GRUPO YA DICE «Por cobrar» en grande
           (`PanelCxcCelular`): el layout no pone otro título. En Boston no —esa
           pantalla no trae título propio— y ahí sí lo pone el layout. */}
-      <AppHeader module="Cuentas por cobrar" tituloEnLaPantalla={CXC_CELULAR && tab === "grupo"} />
+      <AppHeader module="Cuentas por cobrar" tituloEnLaPantalla={CXC_CELULAR && (tab === "grupo" || CXC_BOSTON_COMO_GRUPO_CELULAR)} />
 
       {/* 🔴 EN EL CELULAR LAS PESTAÑAS SE VAN DE LA CARTERA DEL GRUPO
           (24-sep-2026): Boston es un botón arriba a la derecha de la lista, y
           el alto que ocupaban vuelve a los clientes. En Boston SÍ se dibujan —
           es la única forma de volver— y en la computadora no cambia nada. */}
-      <div className={CXC_CELULAR && tab === "grupo" ? "hidden lg:block" : undefined}>
+      <div className={CXC_CELULAR && (tab === "grupo" || CXC_BOSTON_COMO_GRUPO_CELULAR) ? "hidden lg:block" : undefined}>
         <TabsCartera role={userRole} tab={tab} onTab={setTab} />
       </div>
 
@@ -741,7 +745,12 @@ function AdminDashboardInner() {
         // 🔴 La pestaña de Boston del ADMIN monta la MISMA cartera que ve David
         // (23-sep-2026): una sola pantalla de Boston, no dos. Con el
         // interruptor apagado, la pestaña de siempre.
-        VENTAS_BOSTON ? <CarteraBoston /> : (
+        VENTAS_BOSTON ? (
+          <CarteraBoston
+            onGrupo={(empresa) => { setTab("grupo"); setCompanyFilter(empresa); }}
+            empresasDelGrupo={empresaRestriction ? [] : cxcCompanies}
+          />
+        ) : (
           <div className="max-w-6xl mx-auto px-4 py-4 pb-16">
             <BostonTab />
           </div>
@@ -827,7 +836,7 @@ function AdminDashboardInner() {
             aria-label="Empresa"
             className="border border-gray-200 rounded-lg px-3 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white disabled:opacity-60"
           >
-            <option value="all">Todas</option>
+            <option value="all">{CXC_EMPRESA_BAJO_EL_TITULO ? "Todas las empresas" : "Todas"}</option>
             {cxcCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
           </select>
         )}
@@ -864,7 +873,7 @@ function AdminDashboardInner() {
                 onClick={() => setShowExport(!showExport)}
                 aria-haspopup="menu"
                 aria-expanded={showExport}
-                className="text-sm bg-black text-white px-4 rounded-lg font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2 min-h-[44px]"
+                className={`text-sm px-4 rounded-lg font-medium active:scale-[0.97] transition-all flex items-center gap-2 min-h-[44px] ${CLASE_BOTON_DESCARGAR}`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Descargar
@@ -940,6 +949,11 @@ function AdminDashboardInner() {
         onSeleccionarTodos={alternarSeleccionTodos}
         avisoSinPagarDe={avisoSinPagarDe}
         marcaEnvioDe={marcaEnvioDe}
+        onQuitarFiltros={
+          CXC_BUSCAR_SIN_FILTRO_ESCONDIDO && search && (riskFilter !== "all" || sinPagarActivo)
+            ? () => { setRiskFilter("all"); setSinPagar(""); }
+            : null
+        }
       />
 
       {/* Mandar a varios: UN correo por DIRECCIÓN, nunca uno por cliente. */}

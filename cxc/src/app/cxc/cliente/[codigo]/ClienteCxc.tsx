@@ -32,6 +32,14 @@ import { carteraDelRolEnCxc } from "@/lib/boston/ventas-boston";
 import useAdminData from "../../hooks/useAdminData";
 import { useUltimosPagosGrupo } from "../../hooks/useUltimosPagosGrupo";
 import UltimosPagosPorFecha from "../../components/UltimosPagosPorFecha";
+import { TablaDesgloseEmpresas } from "../../components/HojaCobrar";
+import TituloQueVuelve from "@/components/celular/TituloQueVuelve";
+import { totalDelDesglose } from "@/lib/cxc/desglose-celular-2026-11";
+import {
+  CXC_CLIENTE_TABLA_DE_LA_HOJA,
+  CXC_CLIENTE_TITULO_VUELVE,
+  CXC_UN_NOMBRE_ESTADO_DE_CUENTA,
+} from "@/lib/ui/revision-110-cxc";
 import CobrarEnFicha from "@/app/clientes/[codigo]/CobrarEnFicha";
 import type { FilaAgingCliente } from "@/lib/clientes/cliente-para-cobrar";
 import type { ConsolidatedClient } from "@/lib/types";
@@ -161,11 +169,28 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
 
   return (
     <div className="min-h-screen bg-fondo-celular">
-      <AppHeader module="Cuentas por cobrar" />
+      <AppHeader module="Cuentas por cobrar" tituloEnLaPantalla={CXC_CLIENTE_TITULO_VUELVE} />
 
       <div className="mx-auto max-w-2xl pb-12">
+        {/* n.º 15 (revisión 110): en el celular el título vuelve a la lista y
+            «Estado de cuenta» va a su derecha; la fila repetida se va. */}
+        {CXC_CLIENTE_TITULO_VUELVE && (
+          <TituloQueVuelve
+            href="/cxc"
+            rotulo="Cuentas por cobrar"
+            accion={client && seLeCobra(client.total) ? (
+              <button
+                type="button"
+                onClick={() => setHoja(true)}
+                className="min-h-[44px] shrink-0 px-1 text-[17px] font-medium text-blue-600 active:opacity-60"
+              >
+                Estado de cuenta
+              </button>
+            ) : null}
+          />
+        )}
         {/* ── Volver y «Cobrar» ──────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-2 pt-1">
+        <div className={`${CXC_CLIENTE_TITULO_VUELVE ? "hidden sm:flex" : "flex"} items-center justify-between px-2 pt-1`}>
           <Link href="/cxc" className="min-h-[44px] px-3 text-[17px] leading-[44px] text-blue-600 active:opacity-60">
             ‹ Cuentas por cobrar
           </Link>
@@ -173,10 +198,10 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
             <button
               type="button"
               onClick={() => setHoja(true)}
-              aria-label="Enviar estado de cuenta"
+              aria-label="Estado de cuenta"
               className="min-h-[44px] px-3 text-[17px] font-medium text-blue-600 active:opacity-60"
             >
-              Enviar
+              {CXC_UN_NOMBRE_ESTADO_DE_CUENTA ? "Estado de cuenta" : "Enviar"}
             </button>
           )}
         </div>
@@ -208,6 +233,13 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
             <h2 className="px-5 pb-1 pt-5 text-[12px] uppercase tracking-wider text-gray-500">
               Por empresa · {filas.length}
             </h2>
+            {CXC_CLIENTE_TABLA_DE_LA_HOJA ? (
+              // n.º 16 (revisión 110): la MISMA tabla de la hoja; con
+              // encabezados no hace falta la leyenda de colores.
+              <div data-lista="cxc-cliente-empresas" className="mx-4 rounded-2xl bg-white px-4 py-3">
+                <TablaDesgloseEmpresas filas={filas} total={totalDelDesglose(filas)} />
+              </div>
+            ) : (<>
             <p className="px-5 pb-2 text-[12px] text-gray-400">
               verde 0-90 días · ámbar 91-120 días · rojo +120 días
             </p>
@@ -237,6 +269,7 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
                 </li>
               ))}
             </ul>
+            </>)}
           </>
         )}
 

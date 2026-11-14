@@ -27,6 +27,8 @@
 // columna.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { PROVEEDORES_SIGNO_UNICO } from "@/lib/ui/revision-110-cxc";
+
 /** El único tono de los montos que se deben. */
 export const TONO_MONTO = "text-gray-700";
 /** El cero, que además se dibuja como «—». */
@@ -44,6 +46,14 @@ export function tonoDeMonto(valor: number): string {
 /** Cómo se escribe un monto de tramo: cero es «—», negativo lleva su signo. */
 export function textoDeMonto(valor: number, fmt: (n: number) => string): string {
   if (valor === 0) return "—";
-  if (valor < 0) return `-$${fmt(Math.abs(valor))}`;
+  return montoConSigno(valor, fmt);
+}
+
+/**
+ * Un monto con su signo, escrito de UNA sola forma en todo el módulo (n.º 51,
+ * revisión 110): «−$284.62», signo menos antes del $. Nunca «$-284.62».
+ */
+export function montoConSigno(valor: number, fmt: (n: number) => string): string {
+  if (valor < 0) return `${PROVEEDORES_SIGNO_UNICO ? "−" : "-"}$${fmt(Math.abs(valor))}`;
   return `$${fmt(valor)}`;
 }

@@ -47,6 +47,7 @@ import { barrasDeVentana, fmtFechaCorta, fmtMesAnio, fmtMesCorto, pctVendido } f
 import { etiquetaEmpresa, fmtInt, fmtMoney, fmtPct } from "./ReferenciaTarjeta";
 import { REFERENCIA_APPLE_2026_10 } from "@/lib/ventas/referencia-apple-2026-10";
 import { useEsCelularReferencia } from "./useEsCelularReferencia";
+import { REFERENCIA_AGOTADO, REFERENCIA_RECEPCIONES_DOS_LINEAS } from "@/lib/ui/revision-110-cxc";
 
 // ─── Textos (una sola definición para pantalla y candado) ────────────────────
 
@@ -59,7 +60,20 @@ export function textoOchenta(l: LlegadaMedida | null): string {
 /** «vendida» cuando ya salió entera; si no, «queda N %». */
 export function textoQueda(l: LlegadaMedida | null): string {
   if (!l || l.quedaPct == null) return "—";
-  return l.quedaPct === 0 ? "vendida" : `queda ${l.quedaPct} %`;
+  return l.quedaPct === 0 ? (REFERENCIA_AGOTADO ? "Agotado" : "vendida") : `queda ${l.quedaPct} %`;
+}
+
+/**
+ * La celda STOCK de Existencias (n.º 109, revisión 110): el cero dice «Agotado»,
+ * igual que en Últimas recepciones. Sin dato de Switch y con todo lo comprado ya
+ * vendido también es «Agotado» (Switch deja de listar el artículo cerrado); sin
+ * dato y con piezas por vender sigue «—»: no se inventa.
+ */
+export function textoStock(stock: number | null, comprado: number | null, vendido: number): string {
+  if (stock != null && stock !== 0) return fmtInt(stock);
+  if (!REFERENCIA_AGOTADO) return stock == null ? "—" : fmtInt(stock);
+  if (stock === 0) return "Agotado";
+  return comprado != null && comprado > 0 && vendido >= comprado ? "Agotado" : "—";
 }
 
 /** «27 desde oct 2022». `null` = no hay ninguna registrada. */
@@ -112,7 +126,7 @@ function TablaMercancia({
             <td className="py-2 text-left text-gray-900">{comprado == null ? "—" : fmtInt(comprado)}</td>
             <td className="py-2 text-right text-gray-900">{fmtInt(vendido)}</td>
             <td className="py-2 text-right text-lg font-semibold text-gray-900">
-              {stock == null ? "—" : fmtInt(stock)}
+              {textoStock(stock, comprado, vendido)}
             </td>
             <td className="py-2 text-right text-gray-900">{textoPct(parteVendida)}</td>
           </tr>
@@ -128,7 +142,23 @@ function TablaLlegadas({ ultima, vara }: { ultima: LlegadaMedida | null; vara: L
   if (filas.length === 0) return null;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[300px] text-sm tabular-nums">
+      {REFERENCIA_RECEPCIONES_DOS_LINEAS && (
+        // n.º 110 (revisión 110): en el celular cada recepción en dos líneas,
+        // sin la tabla de cuatro columnas que no cabe. Mismos números.
+        <ul data-referencia="recepciones-celular" className="text-sm tabular-nums sm:hidden">
+          {filas.map((l) => (
+            <li key={l.fecha} className="border-b border-gray-100 py-2 last:border-0">
+              <p className="text-gray-900">
+                {fmtMesAnio(l.fecha.slice(0, 7))} <span className="text-gray-400">·</span> {ROTULOS.piezas} {fmtInt(l.unidades)}
+              </p>
+              <p className="text-gray-600">
+                {ROTULOS.ochenta} {textoOchenta(l)} <span className="text-gray-400">·</span> {textoQueda(l)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <table className={`w-full min-w-[300px] text-sm tabular-nums${REFERENCIA_RECEPCIONES_DOS_LINEAS ? " hidden sm:table" : ""}`}>
         <thead>
           <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-600">
             <th className="py-1 text-left font-medium">{ROTULOS.llegada}</th>
