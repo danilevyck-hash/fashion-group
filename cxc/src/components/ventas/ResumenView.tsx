@@ -714,8 +714,8 @@ export function ResumenView({
               data-pie-matriz="escritorio"
               className="flex items-center gap-1 border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500"
             >
-              <span className="truncate">{pieCorto(data, !!mesesGris)}</span>
-              <Ayuda titulo="Qué dice esta tabla" className="-my-3">
+              <span className="truncate">{pieCorto(data, !!mesesGris, !!pieCorte)}</span>
+              <Ayuda titulo="Información" className="-my-3">
                 {[partialFooter, pieCorte, mesesGris ? LEYENDA_MESES_PROYECTADOS : null].filter(Boolean).map((t) => (
                   <p key={t as string} className="mt-1 first:mt-0">{t}</p>
                 ))}
@@ -1312,15 +1312,16 @@ function parseIsoDateResumen(iso: string): Date {
 // VOCABULARIO (limpieza jul-2026): el pill de arriba dice "Sincronizado <fecha>"
 // (cuándo corrió el sync) y este footer "Datos hasta el <día>" (hasta dónde
 // llega la data). Son dos cosas distintas y se leen distinto a propósito.
-/** n.º 11 · «Datos al 13 nov · vs 1–13 nov 2025 · en gris, proyección». */
-function pieCorto(data: VentasResumen, conGris: boolean): string {
+/** n.º 11 · «Datos al 13 nov · margen al 12 nov · en gris, proyección».
+ *  Sin «vs 1–13 nov» (Daniel: «no pongas vs 1–5 sep, ensucia»); el detalle, en el ⓘ. */
+function pieCorto(data: VentasResumen, conGris: boolean, conCorteCosto: boolean): string {
+  const corto = (iso: string) => {
+    const d = parseIsoDateResumen(iso);
+    return `${d.getDate()} ${MONTHS[d.getMonth()].toLowerCase()}`;
+  };
   const partes: string[] = [];
-  if (data.es_periodo_parcial && data.fecha_corte && data.dia_corte_anio_anterior) {
-    const cur = parseIsoDateResumen(data.fecha_corte);
-    const prev = parseIsoDateResumen(data.dia_corte_anio_anterior);
-    partes.push(`Datos al ${cur.getDate()} ${MONTHS[cur.getMonth()].toLowerCase()}`);
-    partes.push(`vs 1–${prev.getDate()} ${MONTHS[prev.getMonth()].toLowerCase()} ${prev.getFullYear()}`);
-  }
+  if (data.es_periodo_parcial && data.fecha_corte) partes.push(`Datos al ${corto(data.fecha_corte)}`);
+  if (conCorteCosto && data.corte_costo) partes.push(`margen al ${corto(data.corte_costo)}`);
   if (conGris) partes.push("en gris, proyección");
   return partes.join(" · ");
 }

@@ -123,7 +123,7 @@ export default function RentabilidadPorEmpresa({
             </div>
           ))}
         </div>
-        <p data-pie-rentabilidad className="mt-2 text-xs text-gray-500">Rentabilidad: vuelve al reanudar Gastos</p>
+        <p data-rentabilidad-pausada className="mt-2 text-xs text-gray-500">Rentabilidad: vuelve al reanudar Gastos</p>
       </div>
     );
   }

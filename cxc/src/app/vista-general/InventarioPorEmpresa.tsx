@@ -163,7 +163,7 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
       {VG_INVENTARIO_PIE_UNA_LINEA ? (
         <p data-pie-inventario className="mt-3 flex items-center gap-1 border-t border-gray-100 pt-3 text-xs text-gray-500">
           <span className="min-w-0 truncate">{pieInventario(inv) || "Valorizado al costo"}</span>
-          <Ayuda titulo="Inventario: qué se cuenta" className="-my-3">
+          <Ayuda titulo="Información" className="-my-3">
             <p>Valorizado al costo. El valor a precio de venta es referencial, no realizado.</p>
             {inv.sinInventario.map((x) => (
               <p key={x.key} className="mt-1">{x.name}: {x.motivo}</p>
