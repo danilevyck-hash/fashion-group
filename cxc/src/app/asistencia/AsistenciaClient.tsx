@@ -64,6 +64,7 @@
 //
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Settings } from "lucide-react";
@@ -399,7 +400,7 @@ function AsistenciaInner() {
                   anchoCompleto
                 />
               )}
-              fila={opciones.length > 1 ? (
+              fila={opciones.length > 1 && !(FILTRO_A_2026_11 && (tab === "asistencia" || tab === "reporte" || tab === "colaboradores")) ? (
                 <ChipSelector
                   rotulo="Empresa"
                   valor={empresa}
@@ -589,7 +590,7 @@ function AsistenciaInner() {
                 hidden={seEsconde("reporte", tab) && seEsconde("asistencia", tab)}
                 className={seEsconde("reporte", tab) && seEsconde("asistencia", tab) ? "hidden" : undefined}
               >
-                <ReporteTab empresa={empresa} />
+                <ReporteTab empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} />
               </div>
             )}
             {monta("justificaciones") && (
@@ -616,7 +617,7 @@ function AsistenciaInner() {
                 🔴 Horarios, Feriados y Reglas se mudaron a ⚙ el 29-sep-2026. */}
             {monta("colaboradores") && (
               <div hidden={seEsconde("colaboradores", tab)} className={escondida("colaboradores")}>
-                <ConfiguracionTab personaEnElCentro empresa={empresa} />
+                <ConfiguracionTab personaEnElCentro empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} />
               </div>
             )}
             {monta("configuracion") && (

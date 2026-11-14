@@ -43,7 +43,8 @@ import {
   transicionDeLaBarra,
 } from "@/lib/navegacion/barra-celular";
 import { useColchonDelFlotante } from "@/lib/navegacion/useColchonDelFlotante";
-import { ALTO_TAB_BAR, MARGEN_TAB_BAR, TAB_BAR_2026_10, pestanasDelRol, rotuloDePestana } from "@/lib/navegacion/tab-bar";
+import { ALTO_TAB_BAR, MARGEN_TAB_BAR, TAB_BAR_2026_10, barraFijaDe, pestanasDelRol, rotuloDePestana } from "@/lib/navegacion/tab-bar";
+import { BARRA_SIN_MAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { House, MoreHorizontal } from "lucide-react";
 import { useBarraCelular } from "@/lib/navegacion/useBarraCelular";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
@@ -117,6 +118,8 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   const userName = useNombreVisible();
   const [userRole, setUserRole] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
+  // El usuario de login («daniel»): decide si su barra de abajo es fija.
+  const [usuarioLogin, setUsuarioLogin] = useState("");
 
   // El alto REAL de este bloque se publica en `--fg-altura-encabezado` para que
   // las barras pegajosas de los módulos se peguen DEBAJO y no encima
@@ -132,10 +135,20 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
 
   useEffect(() => {
     setUserRole(sessionStorage.getItem("cxc_role") || "");
+    setUsuarioLogin(sessionStorage.getItem("fg_user_name") || "");
     try {
       const mods = sessionStorage.getItem("fg_modules");
       if (mods) setFgModules(JSON.parse(mods));
     } catch { /* ignore */ }
+    // 🔴 Sin parpadeo (14-nov-2026): el orden de la persona se lee en la MISMA
+    // pasada que el rol; antes llegaba un pintado después y la barra mostraba
+    // primero la lista del rol.
+    if (BARRA_SIN_MAS_2026_11) {
+      try {
+        const guardado = sessionStorage.getItem("fg_orden_pestanas");
+        if (guardado) { setOrdenPersona(JSON.parse(guardado)); setOrdenListo(true); }
+      } catch { /* sin memoria: se pide */ }
+    }
   }, []);
 
   const visibleNav = userRole ? getVisibleGroups(userRole, fgModules) : [];
@@ -213,11 +226,17 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
   // El orden de ESTA persona lo da el servidor (fijo por semana); mientras
   // llega, o sin datos, manda el de su rol. Una vez por sesión.
   const [ordenPersona, setOrdenPersona] = useState<string[]>([]);
+  // `false` mientras no se sabe el orden de la persona: la barra todavía no
+  // dibuja sus módulos (con `BARRA_SIN_MAS_2026_11`; antes, el del rol).
+  const [ordenListo, setOrdenListo] = useState(!BARRA_SIN_MAS_2026_11);
+  const fija = barraFijaDe(usuarioLogin);
   useEffect(() => {
     if (!TAB_BAR_2026_10 || !userRole) return;
+    // La barra fija (Daniel) no depende de sus visitas: no se pregunta.
+    if (fija) { setOrdenListo(true); return; }
     try {
       const guardado = sessionStorage.getItem("fg_orden_pestanas");
-      if (guardado) { setOrdenPersona(JSON.parse(guardado)); return; }
+      if (guardado) { setOrdenPersona(JSON.parse(guardado)); setOrdenListo(true); return; }
     } catch { /* sin memoria: se pide */ }
     fetch("/api/visitas/mis-modulos")
       .then(r => (r.ok ? r.json() : { orden: [] }))
@@ -226,9 +245,10 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
         setOrdenPersona(orden);
         try { sessionStorage.setItem("fg_orden_pestanas", JSON.stringify(orden)); } catch { /* sin memoria */ }
       })
-      .catch(() => { /* falla abierta: orden del rol */ });
-  }, [userRole]);
-  const pestanas = TAB_BAR_2026_10 && !soloMarca ? pestanasDelRol(userRole, fgModules, ordenPersona, casa) : [];
+      .catch(() => { /* falla abierta: orden del rol */ })
+      .finally(() => setOrdenListo(true));
+  }, [userRole, fija]);
+  const pestanas = TAB_BAR_2026_10 && !soloMarca && ordenListo ? pestanasDelRol(userRole, fgModules, ordenPersona, casa, usuarioLogin) : [];
   const enInicio = pathname === "/home" || yaEstaEnSuCasa(pathname, casa);
   const hayTabBar = pestanas.length > 0;
   // 🔴 «Más» (2-oct-2026): una hoja SOBRE la pantalla con lo que NO está en la
@@ -437,7 +457,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
       {NOVEDADES_AVISO && <NovedadesAviso moduloKey={moduloDeRuta(pathname, ALL_MODULES)} />}
       </>)}
 
-      {hayAvatar && <AvatarDelUsuario flotante nombre={userName} rol={userRole} extra={hayTabBar ? undefined : acciones} />}
+      {hayAvatar && <AvatarDelUsuario flotante nombre={userName} rol={userRole} extra={hayTabBar && !BARRA_SIN_MAS_2026_11 ? undefined : acciones} />}
 
       {/* Mobile search overlay */}
       {mobileSearchOpen && (
@@ -620,6 +640,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
       {hayTabBar && (
         <nav
           data-tab-bar
+          data-vidrio-grueso={BARRA_SIN_MAS_2026_11 ? "" : undefined}
           aria-label="Módulos frecuentes"
           className="vidrio fixed z-30 flex items-stretch rounded-full px-1 sm:hidden"
           style={{ left: 12, right: 12, height: ALTO_TAB_BAR, bottom: `max(${MARGEN_TAB_BAR}px, env(safe-area-inset-bottom))` }}
@@ -647,14 +668,14 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
               </button>
             );
           })}
-          <button
+          {!BARRA_SIN_MAS_2026_11 && <button
             onClick={() => setDrawerOpen(true)}
             aria-label="Más módulos"
             className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium transition active:scale-[0.97] ${drawerOpen ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
           >
             <MoreHorizontal size={22} strokeWidth={drawerOpen ? 2 : 1.6} />
             <span>Más</span>
-          </button>
+          </button>}
         </nav>
       )}
 

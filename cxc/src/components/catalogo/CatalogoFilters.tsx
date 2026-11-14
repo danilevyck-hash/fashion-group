@@ -109,6 +109,8 @@
 // ancestro con overflow, y hay un candado (`__tests__/desplegables-flotan`) que
 // pone el build rojo si alguien escribe uno nuevo.
 
+import { BuscadorConFiltros, RenglonInterruptor, SeccionHoja, type FiltroDeLaHoja, type FiltroPuesto } from "@/components/filtros/FiltroA";
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useRef, useState, type ReactNode } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import {
@@ -389,9 +391,110 @@ interface CatalogoFiltersProps {
   /** «[Buscar…] [Filtros] [↕]» en UNA fila (`CATALOGOS_APPLE_2026_10_B`):
    *  la cantidad va en gris dentro del campo y los filtros se abren abajo. */
   unaFila?: boolean;
+  /** Filtro «a»: «Actualizado 2:41 pm ↻» del celular, al lado de la cantidad. */
+  frescuraCelular?: ReactNode;
 }
 
-export default function CatalogoFilters({
+/**
+ * 🔴 Filtro «a» (revisión 14-nov-2026, `FILTRO_A_2026_11`): en el celular, el
+ * buscador gris con el ícono de filtros; Ordenar, Género, Categoría, el precio
+ * y «2+ bultos» viven en la hoja «Filtros». De `sm` para arriba, lo de hoy.
+ */
+export default function CatalogoFilters(props: CatalogoFiltersProps) {
+  if (!FILTRO_A_2026_11) return <CatalogoFiltrosDeHoy {...props} />;
+  return (
+    <>
+      <CatalogoFiltroACelular {...props} />
+      <div className="hidden sm:block"><CatalogoFiltrosDeHoy {...props} /></div>
+    </>
+  );
+}
+
+const ORDEN_CATALOGO = [
+  { valor: "relevancia", etiqueta: "Relevancia" },
+  { valor: "precio-asc", etiqueta: "Precio: menor a mayor" },
+  { valor: "precio-desc", etiqueta: "Precio: mayor a menor" },
+  { valor: "nombre-az", etiqueta: "Nombre A-Z" },
+];
+
+function CatalogoFiltroACelular({
+  marca, searchInput, onSearchChange, gender, onGenderChange, category, onCategoryChange,
+  bultosFilter = false, onBultosFilterChange, precio = PRECIO_VACIO, onPrecioChange, preciosDisponibles = [],
+  sortBy, onSortByChange, filteredCount, onClearAll, genderOptions, categoryOptions, frescuraCelular,
+}: CatalogoFiltersProps) {
+  const theme = getMarcaTheme(marca)!;
+  const f = theme.filtros;
+  const generoOpts = (genderOptions ?? f.genderOptions).filter(o => o.value);
+  const categoriaOpts = (categoryOptions ?? f.categoryOptions).filter(o => o.value);
+  const conCategorias = theme.features.categoryChips && categoriaOpts.length > 0;
+  const conBultos = theme.features.filtroBultos && !!onBultosFilterChange;
+  const conPrecio = theme.features.filtroPrecio && !!onPrecioChange;
+  const hayPrecio = conPrecio && !!(precio.desde.trim() || precio.hasta.trim());
+  const textoPrecio = precio.desde.trim() === precio.hasta.trim() || !precio.hasta.trim()
+    ? `$${precio.desde.trim()}` : `$${precio.desde.trim() || "0"}–$${precio.hasta.trim()}`;
+  const filtros: FiltroDeLaHoja[] = [
+    ...(generoOpts.length > 0 ? [{ clave: "genero", etiqueta: "Género", opciones: generoOpts.map(o => ({ valor: o.value, etiqueta: o.label })), valor: gender, onCambiar: onGenderChange }] : []),
+    ...(conCategorias ? [{ clave: "categoria", etiqueta: "Categoría", todos: "Todas", opciones: categoriaOpts.map(o => ({ valor: o.value, etiqueta: o.label })), valor: category, onCambiar: onCategoryChange }] : []),
+  ];
+  const puestosExtra: FiltroPuesto[] = [
+    ...(conBultos && bultosFilter ? [{ clave: "bultos", texto: "2+ bultos", onQuitar: () => onBultosFilterChange!(false) }] : []),
+    ...(hayPrecio ? [{ clave: "precio", texto: textoPrecio, onQuitar: () => onPrecioChange!(PRECIO_VACIO) }] : []),
+  ];
+  return (
+    <div data-filtro-a-catalogo className="mb-3 space-y-2 sm:hidden">
+      <BuscadorConFiltros
+        busqueda={searchInput}
+        onBuscar={onSearchChange}
+        placeholder="Buscar nombre o código"
+        orden={{ opciones: ORDEN_CATALOGO, valor: sortBy || "relevancia", onCambiar: onSortByChange }}
+        filtros={filtros}
+        puestosExtra={puestosExtra}
+        onRestablecer={() => { onClearAll(); onSortByChange("relevancia"); }}
+        extra={(conPrecio || conBultos) ? (
+          <>
+            {conPrecio && (
+              <SeccionHoja titulo="Precio">
+                <PrecioDesdeHasta precio={precio} onChange={onPrecioChange!} precios={preciosDisponibles} />
+              </SeccionHoja>
+            )}
+            {conBultos && (
+              <SeccionHoja titulo="Disponibilidad">
+                <RenglonInterruptor etiqueta="2+ bultos" activo={bultosFilter} onCambiar={v => onBultosFilterChange!(v)} />
+              </SeccionHoja>
+            )}
+          </>
+        ) : undefined}
+      />
+      <div data-cantidad className="flex flex-wrap items-center gap-x-1.5 text-sm text-gray-500">
+        <span>{filteredCount} {filteredCount === 1 ? "producto" : "productos"}</span>
+        {frescuraCelular && <><span aria-hidden="true" className="text-gray-300">·</span><span className="inline-flex [&>*]:!m-0">{frescuraCelular}</span></>}
+      </div>
+    </div>
+  );
+}
+
+/** «Desde» y «Hasta» como renglones de la hoja. El ESPEJO de siempre: mientras
+ *  «Hasta» siga igual a «Desde» (o vacío), escribir «Desde» lo copia. */
+function PrecioDesdeHasta({ precio, onChange, precios }: { precio: FiltroPrecio; onChange: (p: FiltroPrecio) => void; precios: number[] }) {
+  const espejo = !precio.hasta.trim() || precio.hasta === precio.desde;
+  const aviso = mensajeFiltroPrecio(precio.desde, precio.hasta, precios);
+  const renglon = (etiqueta: string, valor: string, cambiar: (v: string) => void) => (
+    <label className="flex min-h-[44px] items-center justify-between gap-3 px-4">
+      <span className="text-[17px] text-gray-900">{etiqueta}</span>
+      <input value={valor} onChange={e => cambiar(e.target.value)} inputMode="decimal" placeholder="$0.00"
+        className="w-28 bg-transparent text-right text-[17px] tabular-nums text-gray-900 outline-none placeholder:text-gray-400" />
+    </label>
+  );
+  return (
+    <div className="divide-y divide-gray-200 bg-white">
+      {renglon("Desde", precio.desde, v => onChange({ desde: v, hasta: espejo ? v : precio.hasta }))}
+      {renglon("Hasta", precio.hasta, v => onChange({ desde: precio.desde, hasta: v }))}
+      {aviso && <p className="px-4 py-2 text-xs text-gray-500">{aviso}</p>}
+    </div>
+  );
+}
+
+function CatalogoFiltrosDeHoy({
   marca,
   searchInput, onSearchChange,
   gender, onGenderChange,

@@ -4,10 +4,15 @@
 // ofrece un módulo que el menú no ofrece, y quien tiene un solo módulo no la ve.
 import { readFileSync } from "fs";
 import { join } from "path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PESTANAS_DE_MODULO, TAB_BAR_2026_10, ordenPorUso, pestanasDelRol, ventanaDeLaSemana } from "@/lib/navegacion/tab-bar";
 import { gruposDelCajon } from "@/lib/navegacion/cajon-por-grupos";
 import { VIDRIO_V2_2026_10 } from "@/lib/ui/vidrio";
+
+// Este archivo cuida la pantalla de ANTES: la revisión del 14-nov-2026 va detrás
+// de su interruptor y se prueba en `navegacion/revision-110-fase1.test.ts`.
+vi.mock("@/lib/ui/revision-110-2026-11", async (orig) => ({ ...(await orig<object>()), BARRA_SIN_MAS_2026_11: false, BARRA_EN_LISTAS_2026_11: false }));
+
 
 const ROLES = ["admin", "secretaria", "bodega", "vendedor", "contabilidad", "gerente_boston", "gerente_acs", "marcacion"];
 const delMenu = (rol: string) => gruposDelCajon(rol).flatMap((g) => g.modulos.map((m) => m.key));
@@ -62,7 +67,7 @@ describe("barra de pestañas", () => {
 
   it("se esconde con una acción fija abajo (CSS)", () => {
     const css = readFileSync(join(__dirname, "../../app/globals.css"), "utf8");
-    expect(css).toMatch(/body:has\(\[data-barra-fija-abajo\]:not\(\[data-aviso-instalar\]\)\) \[data-tab-bar\]\s*\{\s*display: none;/);
+    expect(css).toMatch(/body:has\(\[data-barra-fija-abajo\]:not\(\[data-aviso-instalar\]\)(:not\(\[data-sobre-tab-bar\]\))?\) \[data-tab-bar\]\s*\{\s*display: none;/);
   });
 });
 

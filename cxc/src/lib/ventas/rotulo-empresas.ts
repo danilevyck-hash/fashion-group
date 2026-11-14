@@ -12,10 +12,13 @@
 // no puedan volver a llamar distinto a lo mismo.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { TODAS_LAS_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 
-export const ROTULO_TODAS = "Todas";
-/** Alias de antes: hoy también dice «Todas». */
+/** 🔴 «Todas las empresas» (Daniel, 14-nov-2026): una cápsula SIEMPRE dice qué
+ *  filtra, nunca «Todas ▾» a secas. Con el interruptor apagado, lo de antes. */
+export const ROTULO_TODAS = TODAS_LAS_EMPRESAS_2026_11 ? "Todas las empresas" : "Todas";
+/** Alias de antes: el mismo rótulo. */
 export const ROTULO_TODAS_LAS_EMPRESAS = ROTULO_TODAS;
 
 /** El valor con el que viaja «todas» en Ventas › Clientes (la ruta ya lo lee). */

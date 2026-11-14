@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { ReactNode } from "react";
 import { TrendingUp, Users, UserCircle, Package } from "lucide-react";
 import type { Multifashion } from "@/components/ventas/types";
 import { VendedorasSubtab } from "./VendedorasSubtab";
@@ -78,8 +79,8 @@ interface MultifashionViewProps {
 }
 
 export function MultifashionView({
-  data, tab, onTabChange, periodo, corte, isClosedYear, syncTick, celular,
-}: MultifashionViewProps) {
+  data, tab, onTabChange, periodo, corte, isClosedYear, syncTick, celular, frescuraCelular,
+}: MultifashionViewProps & { frescuraCelular?: ReactNode }) {
   // En el celular las pestañas se reemplazan por los cuatro renglones del
   // Resumen; en computadora la tira no se toca.
   const enCelular = MULTIFASHION_CELULAR && celular != null;
@@ -152,7 +153,7 @@ export function MultifashionView({
         </TabsContent>
         <TabsContent value="productos" className={enCelular ? "mt-0 sm:mt-5" : "mt-5"}>
           {PRODUCTOS_FILTROS_2026_10 ? (
-            <ProductosFiltrosMf selectedYear={selectedYear} mes={mes} periodo={periodo} />
+            <ProductosFiltrosMf selectedYear={selectedYear} mes={mes} periodo={periodo} frescuraCelular={frescuraCelular} />
           ) : (
             <ProductosSubtab selectedYear={selectedYear} mes={mes} periodo={periodo} />
           )}

@@ -38,7 +38,8 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { getModuleColor } from "@/lib/moduleColors";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
-import { ATRIBUTO_BARRA_FIJA, CONSULTA_CELULAR } from "@/lib/navegacion/barra-celular";
+import { ATRIBUTO_BARRA_FIJA, ATRIBUTO_SOBRE_LA_BARRA, CONSULTA_CELULAR } from "@/lib/navegacion/barra-celular";
+import { BARRA_EN_LISTAS_2026_11, TODAS_LAS_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { CLASE_VIDRIO, RADIO_VIDRIO, VIDRIO_2026_10, conVidrio } from "@/lib/ui/vidrio";
 import {
@@ -391,7 +392,8 @@ export function ChipSelector({
       className={`${BASE_BOTON_TEXTO} min-w-0 ${puesto ? "border-gray-900 bg-gray-900 text-white" : ""}`}
     >
       <span className="min-w-0 truncate">
-        {rotulo}: {elegida}
+        {/* «Todas las empresas» ya dice qué filtra: sin «Empresa:» delante (14-nov-2026). */}
+        {TODAS_LAS_EMPRESAS_2026_11 && /^Todas las /.test(elegida) ? elegida : `${rotulo}: ${elegida}`}
       </span>
       <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
       <select
@@ -600,13 +602,15 @@ export interface AccionPrincipal {
   rotulo: ReactNode;
   onClick: () => void;
   disabled?: boolean;
+  /** Lista principal: la barra de pestañas se queda y este botón va encima. */
+  sobreLaBarra?: boolean;
 }
 
 /**
  * El botón negro fijo abajo, como «Guardar guía» y «Nuevo reclamo».
  * 🔴 Publica su alto en `--fg-alto-barra-fija`: el ☰ y los avisos suben.
  */
-export function BarraAccionFija({ rotulo, onClick, disabled }: AccionPrincipal) {
+export function BarraAccionFija({ rotulo, onClick, disabled, sobreLaBarra }: AccionPrincipal) {
   const cajon = useRef<HTMLDivElement | null>(null);
   usePublicarAltoBarraFija(cajon);
   // 🔑 Al final de `<body>`: un `transform` de un contenedor (el «tirar para
@@ -617,6 +621,7 @@ export function BarraAccionFija({ rotulo, onClick, disabled }: AccionPrincipal) 
       ref={cajon}
       data-accion-celular
       {...{ [ATRIBUTO_BARRA_FIJA]: "" }}
+      {...(sobreLaBarra && BARRA_EN_LISTAS_2026_11 ? { [ATRIBUTO_SOBRE_LA_BARRA]: "" } : {})}
       className={conVidrio(
         "fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 pt-3 backdrop-blur",
         `fixed inset-x-2 bottom-2 z-20 p-2 ${CLASE_VIDRIO} ${RADIO_VIDRIO}`,

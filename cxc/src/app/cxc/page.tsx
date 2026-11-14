@@ -1,5 +1,6 @@
 "use client";
 
+import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useUrlState } from "@/lib/hooks/useUrlState";
@@ -827,7 +828,7 @@ function AdminDashboardInner() {
             aria-label="Empresa"
             className="border border-gray-200 rounded-lg px-3 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white disabled:opacity-60"
           >
-            <option value="all">Todas</option>
+            <option value="all">{ROTULO_TODAS}</option>
             {cxcCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
           </select>
         )}

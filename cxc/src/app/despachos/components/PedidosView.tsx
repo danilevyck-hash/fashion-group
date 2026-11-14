@@ -7,6 +7,7 @@
 // «Actualizar» trae las 6 empresas una tras otra por `sync-now` (módulo
 // «pedidos»), como Ventas y CxC con «Todas».
 
+import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { useEffect, useState } from "react";
 import { Check, Printer, Undo2 } from "lucide-react";
 import { ConfirmModal } from "@/components/ui";
@@ -358,7 +359,7 @@ export default function PedidosView({
     c === "antiguedad" ? -Date.parse(p.fecha) : c === "cliente" ? p.cliente_nombre : vendedorEnPantalla(p.vendedor_nombre));
   // Con una sola empresa el chip no decide nada: no se dibuja (docs/diseno.md).
   const OPCIONES_EMPRESA = [
-    { valor: "todas", etiqueta: "Todas" },
+    { valor: "todas", etiqueta: ROTULO_TODAS },
     ...susEmpresas.map((k) => ({ valor: k, etiqueta: nombreCortoEmpresa(k) })),
   ];
   const hayQueElegirEmpresa = susEmpresas.length > 1;

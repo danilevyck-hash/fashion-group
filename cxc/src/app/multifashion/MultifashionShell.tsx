@@ -57,6 +57,7 @@ import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
 import type { Multifashion } from "@/components/ventas/types";
 import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import RangoFechas from "@/components/ui/RangoFechas";
 import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
@@ -428,7 +429,7 @@ export function MultifashionShell({
       {/* 🔴 EL ENCABEZADO DEL CELULAR (24-sep-2026): el mes es el título, «‹
           Agosto» cambia de mes y «Octubre ›» solo si el mes no es el actual —
           NUNCA hacia el futuro. Reemplaza al desplegable de 57 meses. */}
-      {barra && (hoyCel || subtituloCel || frescuraCel) && (
+      {barra && (hoyCel || subtituloCel || frescuraCel) && !(FILTRO_A_2026_11 && tab === "productos") && (
         // Hoy · ayer a la izquierda y la frescura al final del MISMO renglón
         // (Daniel, 11-oct-2026). Si no cabe, la frescura baja sola: nunca se corta.
         // `-my-2.5`: el ↻ se sigue tocando en 44 px sin darle ese alto al renglón.
@@ -521,6 +522,7 @@ export function MultifashionShell({
           corte={corte}
           isClosedYear={isClosedYear}
           syncTick={syncTick}
+          frescuraCelular={FILTRO_A_2026_11 ? frescuraCel : null}
           celular={MULTIFASHION_CELULAR ? { pantalla: pantallaCel, onAbrir: abrirRenglon, onAbrirMes: abrirMes, soloElMes: barra } : undefined}
         />
       ) : (

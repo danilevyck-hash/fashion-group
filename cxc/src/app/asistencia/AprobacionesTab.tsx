@@ -362,6 +362,7 @@ export default function AprobacionesTab({ empresa = "" }: {
           }
           accion={{
             rotulo: rotuloLote,
+            sobreLaBarra: true,
             disabled: bloqueado || pendientes.length === 0,
             onClick: () => void decidir(pendientes, "si"),
           }}

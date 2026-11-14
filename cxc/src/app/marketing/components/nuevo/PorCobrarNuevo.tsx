@@ -17,6 +17,8 @@
 // como cobrado, igual que hoy.
 // ============================================================================
 
+import { ATRIBUTO_BARRA_FIJA, ATRIBUTO_SOBRE_LA_BARRA } from "@/lib/navegacion/barra-celular";
+import { BARRA_EN_LISTAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -277,7 +279,7 @@ function DetalleDelCobro({
         Descargar ZIP lleva todo lo abierto · al cerrar, el ZIP del cierre lleva solo lo incluido
       </p>
 
-      <div ref={barraRef} className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div ref={barraRef} {...(BARRA_EN_LISTAS_2026_11 ? { [ATRIBUTO_BARRA_FIJA]: "", [ATRIBUTO_SOBRE_LA_BARRA]: "" } : {})} className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3">
           <div className="text-sm text-gray-600 mr-auto">
             {plural(incluidas.length, "gasto", "gastos")} · {plural(tiendasIncluidas, "tienda", "tiendas")}

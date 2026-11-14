@@ -240,7 +240,7 @@ export default function EtiquetasPorEnvio() {
               {barra ? (
                 <>
                   {lineaResumen && <div className="mb-3">{lineaResumen}</div>}
-                  <EnLaBarra accion={sinTabla ? null : { rotulo: "Nuevo envío", onClick: () => setPanel(true) }} />
+                  <EnLaBarra accion={sinTabla ? null : { rotulo: "Nuevo envío", onClick: () => setPanel(true), sobreLaBarra: true }} />
                 </>
               ) : (
                 <div className="flex items-center justify-end mb-6 flex-wrap gap-4">

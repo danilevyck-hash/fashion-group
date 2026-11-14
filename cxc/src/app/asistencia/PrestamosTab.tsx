@@ -358,7 +358,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
           </button>
         </>
       }
-      accion={{ rotulo: "+ Nuevo préstamo", onClick: () => void abrirNuevoPrestamo() }}
+      accion={{ rotulo: "+ Nuevo préstamo", onClick: () => void abrirNuevoPrestamo(), sobreLaBarra: true }}
     />
   ) : (
     <div className="flex items-center gap-2">

@@ -36,6 +36,11 @@ import { gruposDelCajon } from "@/lib/navegacion/cajon-por-grupos";
 import { casaDelRol } from "@/lib/navegacion/casa-del-rol";
 import { ALTO_HOJA_MAS } from "@/components/estructura/HojaMas";
 
+// Este archivo cuida la pantalla de ANTES: la revisión del 14-nov-2026 va detrás
+// de su interruptor y se prueba en `navegacion/revision-110-fase1.test.ts`.
+vi.mock("@/lib/ui/revision-110-2026-11", async (orig) => ({ ...(await orig<object>()), BARRA_SIN_MAS_2026_11: false }));
+
+
 const fetchMock = vi.fn();
 const scrollTo = vi.fn();
 

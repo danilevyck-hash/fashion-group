@@ -1,6 +1,8 @@
 "use client";
 
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
+import { TODAS_LAS_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -282,9 +284,9 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           <CampoBuscar
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar colaborador..."
+            placeholder={TODAS_LAS_EMPRESAS_2026_11 ? "Buscar" : "Buscar colaborador..."}
             aria-label="Buscar colaborador"
-            envoltorio="flex-1 sm:w-44 sm:flex-none"
+            envoltorio="min-w-0 flex-1 sm:w-44 sm:flex-none"
             className="min-h-[44px]"
           />
           <select
@@ -293,9 +295,9 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             // El celular le daba a «Todas» el ancho del nombre de empresa más
             // largo y el buscador quedaba en «Buscar co». Ahora el select es
             // angosto y el buscador se lleva el resto.
-            className={`h-11 min-h-[44px] shrink-0 rounded-md border border-campo bg-white px-3 text-sm outline-none focus:border-gray-900 transition ${CELULAR ? "w-28 sm:w-auto" : ""}`}
+            className={`h-11 min-h-[44px] shrink-0 rounded-md border border-campo bg-white px-3 text-sm outline-none focus:border-gray-900 transition ${CELULAR && !TODAS_LAS_EMPRESAS_2026_11 ? "w-28 sm:w-auto" : ""}`}
           >
-            <option value="all">Todas</option>
+            <option value="all">{ROTULO_TODAS}</option>
             {empresas.map(e => <option key={e} value={e}>{e}</option>)}
           </select>
           </div>

@@ -82,7 +82,7 @@ describe("A. 🔴 «Reporte» se llama «Asistencia», y el orden es el del trab
     // este caso protege sigue siendo lo mismo: que esa clave monte ESE
     // componente, y no otro.
     expect(puro("src/app/asistencia/AsistenciaClient.tsx")).toMatch(/\(monta\("reporte"\) \|\| monta\("asistencia"\)\) &&/);
-    expect(puro("src/app/asistencia/AsistenciaClient.tsx")).toMatch(/<ReporteTab empresa=\{empresa\} \/>/);
+    expect(puro("src/app/asistencia/AsistenciaClient.tsx")).toMatch(/<ReporteTab empresa=\{empresa\}[^>]*\/>/);
   });
 });
 
@@ -90,7 +90,8 @@ describe("B. 🔴 las opciones salen del rol", () => {
   it("admin: «Todas» + las cuatro, con nombre corto", () => {
     expect(empresasQueVe("admin")).toEqual(EMPRESAS_ASISTENCIA);
     const o = opcionesDeEmpresa("admin");
-    expect(o[0]).toEqual({ clave: TODAS, etiqueta: "Todas" });
+    // 14-nov-2026, Daniel: la cápsula dice qué filtra — «Todas las empresas».
+    expect(o[0]).toEqual({ clave: TODAS, etiqueta: "Todas las empresas" });
     expect(o.map((x) => x.clave)).toEqual([TODAS, ...EMPRESAS_ASISTENCIA]);
     expect(o.find((x) => x.clave === "american_classic")!.etiqueta).toBe("Multifashion");
   });
@@ -152,9 +153,11 @@ describe("E. las pantallas cuelgan del MISMO selector", () => {
     expect(src).toMatch(/useUrlState<string>\(PARAM_EMPRESA, ""\)/);
     expect(src).toMatch(/useLastUsed\(RECORDAR_EMPRESA, ""\)/);
     expect(src).toMatch(/aria-label="Empresa"/);
-    for (const c of ["<PlanillaTab empresa={empresa} />", "<PrestamosTab empresa={empresa} />", "<AprobacionesTab empresa={empresa} />", "<ConfiguracionTab personaEnElCentro empresa={empresa} />"]) {
+    for (const c of ["<PlanillaTab empresa={empresa} />", "<PrestamosTab empresa={empresa} />", "<AprobacionesTab empresa={empresa} />"]) {
       expect(src).toContain(c);
     }
+    // La cápsula de empresa de Colaboradores (14-nov-2026) suma props; el empresa sigue igual.
+    expect(src).toMatch(/<ConfiguracionTab personaEnElCentro empresa=\{empresa\}[^>]*\/>/);
   });
   it("Planilla ya no tiene su propio selector, y con «Todas» pide elegir", () => {
     const src = puro("src/app/asistencia/PlanillaTab.tsx");

@@ -17,6 +17,7 @@
 // filtro. Boston no entra: la lista de empresas la manda quien llama.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { useMemo } from "react";
 import { ModalOverlay } from "@/components/ui";
 import type { Company } from "@/lib/companies";
@@ -71,7 +72,7 @@ export function HojaElegirEmpresa({
   onElegir: (key: string) => void;
   onCerrar: () => void;
 }) {
-  const opciones = [{ key: "all", name: "Todas" }, ...empresas];
+  const opciones = [{ key: "all", name: ROTULO_TODAS }, ...empresas];
   return (
     <Hoja titulo="Seleccionar empresa" onCerrar={onCerrar}>
       <ul className="divide-y divide-gray-100">

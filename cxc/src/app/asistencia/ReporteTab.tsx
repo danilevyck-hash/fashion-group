@@ -6,6 +6,9 @@
 // Todo en MINUTOS, nunca horas decimales: "295 minutos" se le discute a una
 // persona, "4,92 horas" no le dice nada a nadie.
 
+import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import type { OpcionEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import type { DragEvent as EventoArrastre } from "react";
@@ -194,9 +197,12 @@ const sinExtra = () => <span className="text-gray-300" title={SIN_EXTRA_TITULO}>
 type ColReporte = "colaborador" | "dias" | "ausencias" | "tardanzas" | "tardanza" | "almuerzo" | "salida" | "noTrabajado" | "extras";
 const COLS_REPORTE: readonly ColReporte[] = ["colaborador", "dias", "ausencias", "tardanzas", "tardanza", "almuerzo", "salida", "noTrabajado", "extras"];
 
-export default function ReporteTab({ empresa = "" }: {
+export default function ReporteTab({ empresa = "", opcionesEmpresa, onEmpresa }: {
   /** El selector de arriba de las pestañas (10-sep-2026). «todas» o vacío = todas. */
   empresa?: string;
+  /** Filtro «a» (14-nov-2026): la cápsula de empresa va al lado del buscador. */
+  opcionesEmpresa?: readonly OpcionEmpresa[];
+  onEmpresa?: (e: string) => void;
 } = {}) {
   const { toast } = useToast();
   const barra = useHayBarraCelular();
@@ -666,11 +672,11 @@ export default function ReporteTab({ empresa = "" }: {
             {barra ? (
               <EnLaBarra
                 pestana={["asistencia", "reporte"]}
-                iconos={
+                iconos={FILTRO_A_2026_11 ? undefined : (
                   <>
                     <BuscarEnLaBarra valor={q} onCambiar={setQ} placeholder={PLACEHOLDER_COLABORADOR} etiqueta="Buscar colaborador" />
                   </>
-                }
+                )}
                 menu={
                   <>
                     <button type="button" disabled={!visibles?.length} onClick={() => void bajarExcel()} className={CLASE_FILA_MENU}>
@@ -684,6 +690,15 @@ export default function ReporteTab({ empresa = "" }: {
               />
             ) : (
               <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegirPeriodo} />
+            )}
+            {/* 🔴 Filtro «a» (14-nov-2026, filtro-a-6): buscador y empresa en UNA línea. */}
+            {barra && FILTRO_A_2026_11 && (
+              <LineaBuscarYCapsulas className="w-full" busqueda={q} onBuscar={setQ} placeholder="Buscar">
+                {opcionesEmpresa && opcionesEmpresa.length > 1 && onEmpresa && (
+                  <Capsula etiqueta="Empresa" alinear="derecha" valor={empresa}
+                    opciones={opcionesEmpresa.map((o) => ({ valor: o.clave, etiqueta: o.etiqueta }))} onCambiar={onEmpresa} />
+                )}
+              </LineaBuscarYCapsulas>
             )}
 
             {/* 🔴 EL BUSCADOR, ABIERTO (29-sep-2026). Daniel: *«buscar con la

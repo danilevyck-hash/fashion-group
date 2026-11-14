@@ -1,3 +1,5 @@
+import { AlertTriangle } from "lucide-react";
+import { ICONOS_DE_LINEA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 /**
  * LA LÍNEA que dice qué documento se quedó afuera del total.
  *
@@ -25,7 +27,7 @@ export default function AvisoRechazosSwitch({
       data-aviso="rechazos-switch"
       className={`flex items-start gap-1.5 text-sm text-amber-700 ${className}`}
     >
-      <span aria-hidden="true">⚠️</span>
+      {ICONOS_DE_LINEA_2026_11 ? <AlertTriangle aria-hidden="true" className="h-4 w-4 shrink-0" /> : <span aria-hidden="true">⚠️</span>}
       <span>{texto}</span>
     </p>
   );

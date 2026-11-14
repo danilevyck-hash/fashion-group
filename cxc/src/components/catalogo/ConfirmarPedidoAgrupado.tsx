@@ -16,6 +16,8 @@
 // 🔴 Las dos salidas siguen siendo `onElegir("pedido" | "cotizacion")`: el
 // checkout, el 422 sin cliente, el precio y el payload no cambian.
 
+import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
+import { BARRA_EN_LISTAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useRef, useState, type ReactNode } from "react";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { fmt } from "@/lib/format";
@@ -143,7 +145,7 @@ export default function ConfirmarPedidoAgrupado(p: Props) {
       {p.avisos}
 
       {/* Barra fija abajo, de vidrio. */}
-      <div ref={barraRef} data-medir="barra-confirmar"
+      <div ref={barraRef} data-medir="barra-confirmar" {...(BARRA_EN_LISTAS_2026_11 ? { [ATRIBUTO_BARRA_FIJA]: "" } : {})}
         className={`fixed inset-x-0 bottom-0 z-40 ${VIDRIO} rounded-none border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)]`}>
         <div className="mx-auto w-full max-w-3xl px-4 py-3">
           {intento && p.faltaTexto && (

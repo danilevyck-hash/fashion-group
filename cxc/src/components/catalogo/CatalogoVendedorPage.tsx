@@ -14,6 +14,7 @@
 // carrito NO se lee ni se escribe mientras el modo está vivo, así que lo que el
 // vendedor tuviera armado aparte queda intacto. Ver lib/catalogo/modo-pedido.ts.
 
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -824,7 +825,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
         {/* 🔴 4-oct-2026: en el celular «Actualizar» ya no vive en el «···»:
             es la línea de frescura, arriba del buscador. */}
-        {CATALOGOS_APPLE_2026_10 && (
+        {CATALOGOS_APPLE_2026_10 && !FILTRO_A_2026_11 && (
           <div className="hidden max-sm:block mb-2">
             <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} forma="celular" />
           </div>
@@ -852,6 +853,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           categoryOptions={categoryOptions}
           apple={CATALOGOS_APPLE_2026_10}
           unaFila={CATALOGOS_APPLE_2026_10_B.buscadorEnUnaFila}
+          frescuraCelular={CATALOGOS_APPLE_2026_10 && FILTRO_A_2026_11 ? <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} forma="celular" /> : undefined}
         />
 
         {/* ── Sync + Share/Download row ── */}

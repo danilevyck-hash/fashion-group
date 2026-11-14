@@ -34,11 +34,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { Info, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import { nombreRelojEnPantalla } from "@/lib/asistencia/agente";
 // 🔴 La pastilla de una sola fila sale del módulo puro: qué dice, a qué relojes
@@ -264,6 +265,29 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
       const vistos = relojes.map((r) => r.vistoEn ?? r.leidoHasta).filter((x): x is string => !!x);
       const ultimo = vistos.length ? vistos.reduce((a, b) => (Date.parse(a) > Date.parse(b) ? a : b)) : null;
       const conAviso = peor.salud !== "al_dia" || !!avisoDeLaPastilla(relojes) || faltaMigracion;
+      const frescura = (
+        <LineaDeFrescura
+          actualizado={ultimo}
+          accion={TRAER_AHORA}
+          ocupado={ESPERANDO_A_LA_PC}
+          onActualizar={() => pedirATodos(puedenPedir.map((r) => r.dispositivo))}
+          actualizando={esperando && !relojes.every((r) => r.pedidoSinRespuesta)}
+          deshabilitado={puedenPedir.length === 0}
+        />
+      );
+      // 🔴 Revisión 14-nov-2026 (filtro-a-6): el aviso GRIS de los relojes y
+      // «Actualizado 13 nov ↻» comparten UNA línea gris. Ámbar o rojo siguen
+      // en su caja: esos sí piden atención.
+      if (FILTRO_A_2026_11 && conAviso && tono === "info" && !avisoDeLaPastilla(relojes) && !faltaMigracion) {
+        return (
+          <div data-relojes-y-frescura className="flex w-full flex-wrap items-center gap-x-1 text-[12px] text-gray-500 [&_[data-frescura]]:!text-[12px]">
+            <Info aria-hidden className="h-3.5 w-3.5 shrink-0" />
+            <span>{apagado ?? textoDelAviso(relojes)}</span>
+            <span aria-hidden className="text-gray-300">·</span>
+            <span className="inline-flex whitespace-nowrap [&>*]:!m-0">{frescura}</span>
+          </div>
+        );
+      }
       return (
         <>
           {conAviso && (

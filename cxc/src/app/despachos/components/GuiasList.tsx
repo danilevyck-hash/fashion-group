@@ -552,7 +552,7 @@ export default function GuiasList({
                 </button>
               </>
             ) : null}
-            accion={canCreate ? { rotulo: "Nueva guía", onClick: onNewGuia } : null}
+            accion={canCreate ? { rotulo: "Nueva guía", onClick: onNewGuia, sobreLaBarra: true } : null}
           />
         )}
         <div className={barra && !selectionMode ? "hidden" : undefined}>

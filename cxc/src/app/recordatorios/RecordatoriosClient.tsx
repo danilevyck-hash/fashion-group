@@ -535,7 +535,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
                 }
               />
             </ProveedorBarraCelular>
-            <BarraAccionFija rotulo="＋ Nuevo" disabled={!isOnline} onClick={() => setPuertaAbierta(true)} />
+            <BarraAccionFija sobreLaBarra rotulo="＋ Nuevo" disabled={!isOnline} onClick={() => setPuertaAbierta(true)} />
           </>
         )}
         <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>

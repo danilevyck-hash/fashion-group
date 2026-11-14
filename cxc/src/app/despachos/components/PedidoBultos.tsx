@@ -39,6 +39,8 @@
 // así se muestran.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
+import { BARRA_EN_LISTAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, Printer } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
@@ -491,6 +493,7 @@ export default function PedidoBultos({
       {puedePonerAqui && marcadas.size > 0 && (
         <div
           ref={barraRef}
+          {...(BARRA_EN_LISTAS_2026_11 ? { [ATRIBUTO_BARRA_FIJA]: "" } : {})}
           className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6"
         >
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">

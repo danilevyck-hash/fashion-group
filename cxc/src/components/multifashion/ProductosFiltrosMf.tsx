@@ -6,7 +6,7 @@
 // atención (no hay «venta en 90 días» por código). Sin «Mayores variaciones».
 // El período es el del módulo.
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import useSWR from "swr";
 import { PantallaProductos } from "@/components/productos/FiltrosProductos";
 import { CHIPS_MULTIFASHION, articulosMultifashion, type AtencionMultifashion, type DepartamentosPorCodigo } from "@/lib/multifashion/productos-filtros";
@@ -23,7 +23,7 @@ interface Resp {
   ranking: { codigos: RenglonRanking[] };
 }
 
-export function ProductosFiltrosMf({ selectedYear, mes, periodo }: { selectedYear: number; mes: number; periodo: Periodo }) {
+export function ProductosFiltrosMf({ selectedYear, mes, periodo, frescuraCelular }: { selectedYear: number; mes: number; periodo: Periodo; frescuraCelular?: ReactNode }) {
   // La MISMA dirección que la pestaña de siempre (misma caché).
   const api = periodo.tipo === "rango" ? "rango" : periodo.tipo === "ultimos" && periodo.n === 12 ? "12m" : "mes";
   const url = periodo.tipo === "rango"
@@ -49,6 +49,7 @@ export function ProductosFiltrosMf({ selectedYear, mes, periodo }: { selectedYea
       chips={CHIPS_MULTIFASHION}
       conInventario={!!data?.stock && Object.keys(data.stock).length > 0}
       sinAtencion={!data?.atencion}
+      frescuraCelular={frescuraCelular}
     />
   );
 }

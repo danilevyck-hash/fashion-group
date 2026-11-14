@@ -15,6 +15,8 @@
 // que es donde sirve.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { AlertTriangle } from "lucide-react";
+import { ICONOS_DE_LINEA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useEffect } from "react";
 import Link from "next/link";
 
@@ -32,7 +34,7 @@ export default function CxcError({
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-6 text-center">
-      <div className="text-amber-500 text-4xl" aria-hidden>⚠</div>
+      {ICONOS_DE_LINEA_2026_11 ? <AlertTriangle aria-hidden className="h-10 w-10 text-amber-500" /> : <div className="text-amber-500 text-4xl" aria-hidden>⚠</div>}
       <h2 className="text-lg font-semibold text-gray-800">
         No se pudo mostrar Cuentas por cobrar
       </h2>

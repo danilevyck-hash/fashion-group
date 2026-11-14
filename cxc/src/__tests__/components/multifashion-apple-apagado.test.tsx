@@ -44,6 +44,11 @@ import { armarUniverso, type FilaFactura, type FilaRegistrado } from "@/lib/mult
 import { avanceMeta } from "@/lib/multifashion/metas-avance";
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
 
+// Este archivo cuida la pantalla de ANTES: la revisión del 14-nov-2026 va detrás
+// de su interruptor y se prueba en `navegacion/revision-110-fase1.test.ts`.
+vi.mock("@/lib/ui/revision-110-2026-11", async (orig) => ({ ...(await orig<object>()), ICONOS_DE_LINEA_2026_11: false }));
+
+
 const HOY = "2026-09-23";
 
 const DETALLE = {

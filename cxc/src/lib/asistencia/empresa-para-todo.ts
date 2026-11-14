@@ -13,6 +13,7 @@
 // y sin «Todas» (con una sola empresa, «Todas» no ofrece nada).
 // 🔴 Planilla lo REUSA como su selector, pero ahí «Todas» no vale: pide elegir.
 // ─────────────────────────────────────────────────────────────────────────────
+import { TODAS_LAS_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { EMPRESAS_ASISTENCIA } from "./config";
 import { EMPRESA_BOSTON, esGerenteBoston } from "@/lib/boston/rol";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
@@ -55,7 +56,8 @@ export interface OpcionEmpresa { clave: string; etiqueta: string }
 export function opcionesDeEmpresa(rol: string | null | undefined, alcance?: AlcanceDeEmpresas): OpcionEmpresa[] {
   const mias = empresasQueVe(rol, alcance);
   const propias = mias.map((k) => ({ clave: k, etiqueta: nombreCortoEmpresa(k) }));
-  return mias.length > 1 ? [{ clave: TODAS, etiqueta: "Todas" }, ...propias] : propias;
+  const todas = TODAS_LAS_EMPRESAS_2026_11 ? "Todas las empresas" : "Todas";
+  return mias.length > 1 ? [{ clave: TODAS, etiqueta: todas }, ...propias] : propias;
 }
 
 export const esTodas = (e: string | null | undefined): boolean =>

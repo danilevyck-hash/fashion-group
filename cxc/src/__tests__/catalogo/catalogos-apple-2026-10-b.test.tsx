@@ -19,6 +19,11 @@ import CatalogoFilters from "@/components/catalogo/CatalogoFilters";
 import { CATALOGOS_APPLE_2026_10_B, CHIP_V4, barraDeSubruta, precioAlAplicar, textoChipPrecio } from "@/lib/catalogo/catalogos-2026-10-b";
 import { precioEnFiltro } from "@/lib/catalogo/filtros-extra";
 
+// Este archivo cuida la pantalla de ANTES: la revisión del 14-nov-2026 va detrás
+// de su interruptor y se prueba en `navegacion/revision-110-fase1.test.ts`.
+vi.mock("@/lib/ui/revision-110-2026-11", async (orig) => ({ ...(await orig<object>()), FILTRO_A_2026_11: false }));
+
+
 const RAIZ = process.cwd();
 const leer = (p: string) => fs.readFileSync(path.join(RAIZ, p), "utf8");
 afterEach(() => cleanup());

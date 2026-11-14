@@ -76,13 +76,13 @@ describe("Préstamos · los 5 controles medidos por debajo de 44", () => {
 
   it("el buscador llega a 44 (medía 38)", () => {
     // 1-oct-2026, Daniel: nombres normales de ERP («lista.indexOf('placeholder="Buscar empleado..."')» → «lista.indexOf('placeholder="Buscar colaborador..."')»).
-    const i = lista.indexOf('placeholder="Buscar colaborador..."');
+    const i = lista.indexOf('"Buscar colaborador..."}');
     expect(i).toBeGreaterThan(-1);
     expect(lista.slice(i, i + 250)).toContain("min-h-[44px]");
   });
 
   it("el selector de empresa llega a 44 (medía 39)", () => {
-    const i = lista.indexOf('<option value="all">Todas</option>');
+    const i = lista.indexOf('<option value="all">{ROTULO_TODAS}</option>');
     expect(i).toBeGreaterThan(-1);
     expect(lista.slice(i - 400, i)).toContain("min-h-[44px]");
   });

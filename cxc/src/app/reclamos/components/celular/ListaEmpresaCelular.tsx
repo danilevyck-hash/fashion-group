@@ -262,6 +262,7 @@ export default function ListaEmpresaCelular({
 
       {selectionMode ? (
         <CtaFija
+          sobreLaBarra
           marca="seleccion"
           disabled={elegidos.length === 0 || ocupado}
           onClick={() => (filtro === "por-cobrar" ? setHoja("correo") : void descargarLote("pdf"))}
@@ -271,7 +272,7 @@ export default function ListaEmpresaCelular({
             : `Descargar ${elegidos.length === 1 ? "el reclamo" : `los ${elegidos.length}`} en PDF`}
         </CtaFija>
       ) : (
-        <CtaFija marca="nuevo" onClick={onNewReclamo}>Nuevo reclamo</CtaFija>
+        <CtaFija sobreLaBarra marca="nuevo" onClick={onNewReclamo}>Nuevo reclamo</CtaFija>
       )}
 
       {hoja === "mas" && (

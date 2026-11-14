@@ -95,8 +95,8 @@ beforeEach(() => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("a · cómo se llama «todas» depende de la lista, no de la pantalla", () => {
-  it("🔴 UN solo nombre en todo el sistema: «Todas» (Daniel, 5-oct-2026)", () => {
-    expect(ROTULO_TODAS).toBe("Todas");
+  it("🔴 UN solo nombre en todo el sistema: «Todas las empresas» (Daniel, 14-nov-2026; era «Todas» desde el 5-oct)", () => {
+    expect(ROTULO_TODAS).toBe("Todas las empresas");
     expect(ROTULO_TODAS_LAS_EMPRESAS).toBe(ROTULO_TODAS);
   });
 

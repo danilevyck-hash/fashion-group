@@ -1,4 +1,7 @@
 "use client";
+import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import type { OpcionEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { Aviso } from "@/components/ui/Aviso";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -385,7 +388,10 @@ const firma = (b: Borrador) =>
 const bajaCompleta = (b: Borrador) =>
   (b.fechaSalida.trim() === "") === (b.motivoSalida.trim() === "");
 
-export default function ConfiguracionTab({ personaEnElCentro = false, empresa = "", ajuste }: {
+export default function ConfiguracionTab({ personaEnElCentro = false, empresa = "", ajuste, opcionesEmpresa, onEmpresa }: {
+  /** Filtro «a» (14-nov-2026): la cápsula de empresa va debajo del buscador. */
+  opcionesEmpresa?: readonly OpcionEmpresa[];
+  onEmpresa?: (e: string) => void;
   /** 🔴 5a — ⚙ Configuración: dibuja SOLO esa sección, sin la lista de gente.
    *  Horarios y Feriados leen lo suyo; solo Reglas pide la configuración. */
   ajuste?: AjusteDeAsistencia;
@@ -1116,6 +1122,23 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
             {/* Cómo se llena la lista se aprende una vez: al ⓘ. Lo que sí pide
                 acción —cuántas fichas faltan, quién sigue marcando después de
                 irse— se queda en pantalla, abajo. */}
+            {/* 🔴 Filtro «a» (14-nov-2026, filtro-a-4): el buscador y, debajo,
+                «Todos 50 ▾» y «Todas las empresas ▾». */}
+            {barra && personaEnElCentro && FILTRO_A_2026_11 && (
+              <LineaBuscarYCapsulas abajo busqueda={busqueda} onBuscar={setBusqueda} placeholder="Buscar colaborador">
+                <Capsula etiqueta="Vista" valor={filtro === "para-pagar" || filtro === "completar" ? filtro : "todos"}
+                  onCambiar={(v) => setFiltro(v as typeof filtro)}
+                  opciones={[
+                    { valor: "todos", etiqueta: "Todos", conteo: activos.length },
+                    ...(conteo.paraPagar > 0 ? [{ valor: "para-pagar", etiqueta: CHIP_PARA_PAGAR, conteo: conteo.paraPagar }] : []),
+                    ...(conteo.completar > 0 ? [{ valor: "completar", etiqueta: CHIP_COMPLETAR, conteo: conteo.completar }] : []),
+                  ]} />
+                {opcionesEmpresa && opcionesEmpresa.length > 1 && onEmpresa && (
+                  <Capsula etiqueta="Empresa" valor={empresa}
+                    opciones={opcionesEmpresa.map((o) => ({ valor: o.clave, etiqueta: o.etiqueta }))} onCambiar={onEmpresa} />
+                )}
+              </LineaBuscarYCapsulas>
+            )}
             <div className={barra && personaEnElCentro ? "hidden" : "-ml-2 -mt-1"}>
               <Ayuda titulo="Cómo se llena esta lista" etiqueta="Cómo se llena">
                 <p>
@@ -1198,7 +1221,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                     apenas cambias algo.
                   </div>
                 }
-                filaIzq={
+                filaIzq={FILTRO_A_2026_11 ? undefined :
                   <ControlSegmentado
                     ancho="contenido"
                     ariaLabel="Filtrar la lista"
@@ -1216,7 +1239,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                     ]}
                   />
                 }
-                iconos={
+                iconos={FILTRO_A_2026_11 ? undefined :
                   <BuscarEnLaBarra
                     valor={busqueda}
                     onCambiar={setBusqueda}
@@ -1224,7 +1247,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                     etiqueta="Buscar colaborador por nombre o código"
                   />
                 }
-                accion={puedeTocarLaFicha ? { rotulo: "+ Nuevo colaborador", onClick: () => router.push(RUTA_PERSONA_NUEVA) } : null}
+                accion={puedeTocarLaFicha ? { rotulo: "+ Nuevo colaborador", onClick: () => router.push(RUTA_PERSONA_NUEVA), sobreLaBarra: true } : null}
               />
             )}
             <div className={barra && personaEnElCentro ? "hidden" : ASISTENCIA_PANTALLA_2026_09 ? "flex flex-wrap items-center gap-2" : "flex flex-wrap gap-2"}>

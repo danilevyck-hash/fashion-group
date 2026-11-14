@@ -22,6 +22,7 @@
 // con `CXC_CELULAR` en `false`, y conserva todos sus candados.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { useEffect, useMemo, useState } from "react";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
@@ -296,7 +297,7 @@ export default function PanelCxcCelular({
           disabled={!!empresaRestriction || cxcCompanies.length <= 1}
           className="mt-0.5 min-h-[44px] -ml-1 px-1 text-[15px] text-gray-500 active:opacity-60 disabled:opacity-100"
         >
-          {empresaElegida ?? "Todas"}
+          {empresaElegida ?? ROTULO_TODAS}
           {!empresaRestriction && cxcCompanies.length > 1 && " ▾"}
         </button>
       </div>

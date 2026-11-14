@@ -20,6 +20,7 @@ import {
 import { anotarDescarga } from "@/lib/ventas/descarga";
 import { textoCuadreProductos, type CuadreProductos } from "@/lib/ventas/una-sola-venta";
 import { type ArticuloVendido, type ChipFiltro, type TotalesFiltro } from "@/lib/productos/filtros";
+import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 
 const CHIPS_VENTAS: ChipFiltro[] = [
   { campo: "departamento", etiqueta: "Departamento" },
@@ -27,7 +28,7 @@ const CHIPS_VENTAS: ChipFiltro[] = [
   { campo: "descripcion", etiqueta: "Descripción", conBuscador: true },
 ];
 
-const EMPRESAS = [{ valor: "todas", etiqueta: "Todas" }, ...PRODUCTOS_EMPRESAS.map(e => ({ valor: e.key, etiqueta: e.nombre }))];
+const EMPRESAS = [{ valor: "todas", etiqueta: ROTULO_TODAS }, ...PRODUCTOS_EMPRESAS.map(e => ({ valor: e.key, etiqueta: e.nombre }))];
 
 interface Respuesta { desde: string; hasta: string; hoy: string; articulos: ArticuloVendido[]; cuadre: CuadreProductos | null }
 
@@ -81,6 +82,16 @@ export function ProductosFiltros({ desde, hasta, periodo, enBarra }: {
       totalesSinFiltro={totalesSinFiltro}
       notaTotales={nota ? <> <Ayuda titulo="Información">{nota}</Ayuda></> : null}
       enBarra={enBarra}
+      filtrosAntesA={[{
+        clave: "empresa",
+        etiqueta: "Empresa",
+        opciones: EMPRESAS,
+        valor: empresa,
+        porDefecto: "todas",
+        onCambiar: v => setMemoria(v || "todas"),
+      }]}
+      onRestablecerAntes={() => setMemoria("todas")}
+      frescuraCelular={<FrescuraVentasCel onActualizado={() => void mutate()} />}
       desglosePor={empresa === "todas" ? "empresa" : undefined}
       onDescargar={(renglones, totales) => {
         // Baja lo que está en pantalla: los renglones y el total con los filtros.

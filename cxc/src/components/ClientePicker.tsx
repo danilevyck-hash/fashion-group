@@ -92,6 +92,8 @@
 // siempre a la vista**, y la lista puede ser más ancha que la columna para que
 // los nombres largos del directorio no salgan truncados.
 
+import { Plus } from "lucide-react";
+import { ICONOS_DE_LINEA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   useBusquedaClientes,
@@ -412,7 +414,7 @@ export default function ClientePicker({
             ) : q ? (
               <Opcion destacada onElegir={() => elegir(q, "")}>
                 <span className="min-w-0">
-                  <span className="block">➕ Ingresar manualmente</span>
+                  <span className="flex items-center gap-1">{ICONOS_DE_LINEA_2026_11 ? <Plus aria-hidden className="h-4 w-4 shrink-0" /> : "➕"} Ingresar manualmente</span>
                   <span className="block text-xs opacity-80 truncate">
                     Se guarda &ldquo;{q}&rdquo;
                   </span>
