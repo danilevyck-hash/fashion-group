@@ -45,7 +45,7 @@ describe("🔴 un solo tono: ni rojo ni ámbar en los montos de CxP", () => {
   it("el cero sigue en gris claro y dibujado como «—»", () => {
     expect(tonoDeMonto(0)).toContain("gray-300");
     expect(textoDeMonto(0, (n) => String(n))).toBe("—");
-    expect(textoDeMonto(-250, (n) => n.toFixed(2))).toBe("-$250.00");
+    expect(textoDeMonto(-250, (n) => n.toFixed(2))).toBe("−$250.00");
     expect(textoDeMonto(250, (n) => n.toFixed(2))).toBe("$250.00");
   });
 

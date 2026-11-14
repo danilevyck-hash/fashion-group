@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
+import { RECLAMOS_BUSCADOR_ANCHO_R110, RECLAMOS_RECLAMADO_SOLO_FECHA_R110 } from "@/lib/ui/revision-110-asistencia";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { mailtoHref } from "@/lib/contact-links";
@@ -242,10 +243,12 @@ export default function EmpresaList({
     const f = fechaDeCobro(r);
     return <span className="tabular-nums text-gray-600">{f ? fmtDate(f) : "—"}</span>;
   }
-  function celdaReclamado(r: Reclamo) {
+  function celdaReclamado(r: Reclamo, enTabla = false) {
     if (!esPendiente(r)) return <span className="text-gray-400">Cobrado</span>;
     const sin = !estaReclamado(r);
-    return <span className={sin ? "text-red-600 font-medium" : "text-gray-500"}>{textoReclamado(r)}</span>;
+    // 84 (revisión 110): la columna ya se llama «Reclamado»: la celda lleva solo la fecha.
+    const texto = enTabla && RECLAMOS_RECLAMADO_SOLO_FECHA_R110 && !sin && r.reclamado_en ? fmtDate(r.reclamado_en.slice(0, 10)) : textoReclamado(r);
+    return <span className={sin ? "text-red-600 font-medium" : "text-gray-500"}>{texto}</span>;
   }
   // 🔴 Apple (5-oct-2026): la fila sin botones a la vista, solo el «···». Medido:
   // 9 correos en TODA la historia del módulo; la fila ya abre el reclamo, donde
@@ -360,7 +363,8 @@ export default function EmpresaList({
         <button onClick={() => setFiltroUrl("cobrados")} aria-pressed={filtro === "cobrados"} className={`${pill} ${filtro === "cobrados" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
           Cobrados <span className="ml-1 opacity-70 tabular-nums">{cobrados.length}</span>
         </button>
-        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por N° reclamo, factura o estilo…" aria-label="Buscar" className="min-h-[44px] border-b border-gray-200 text-base sm:text-sm outline-none w-full sm:w-64 sm:ml-2" />
+        {/* 85 (revisión 110): «Buscar» a la izquierda llenando el ancho; Pendientes y Cobrados a la derecha. Sigue buscando por reclamo, factura y estilo. */}
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={RECLAMOS_BUSCADOR_ANCHO_R110 ? "Buscar" : "Buscar por N° reclamo, factura o estilo…"} aria-label="Buscar por N° reclamo, factura o estilo" className={RECLAMOS_BUSCADOR_ANCHO_R110 ? "order-first min-h-[44px] w-full min-w-0 border-b border-gray-200 text-base outline-none sm:w-auto sm:flex-1 sm:text-sm" : "min-h-[44px] border-b border-gray-200 text-base sm:text-sm outline-none w-full sm:w-64 sm:ml-2"} />
       </div>
 
       {visibles.length === 0 ? (() => {
@@ -433,7 +437,7 @@ export default function EmpresaList({
                         </td>
                         <td className="py-3 text-gray-500 tabular-nums">{facturasEnPantalla(r.nro_factura) || "—"}</td>
                         <td className="py-3 text-right text-gray-600">{celdaDias(r)}</td>
-                        <td className="py-3 pl-4">{celdaReclamado(r)}</td>
+                        <td className="py-3 pl-4">{celdaReclamado(r, true)}</td>
                         {filtro === "cobrados" && <td className="py-3">{celdaCobrado(r)}</td>}
                         <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
                         {!selectionMode && <td className="py-2 text-right">{acciones(r)}</td>}

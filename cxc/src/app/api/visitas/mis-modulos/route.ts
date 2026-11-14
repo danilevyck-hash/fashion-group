@@ -17,7 +17,7 @@ import { verifySession } from "@/lib/session-cookie";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { TABLA_VISITAS } from "@/lib/visitas/registro";
-import { ordenPorUso, ventanaDeLaSemana, type FilaUso } from "@/lib/navegacion/tab-bar";
+import { ordenPorUso, sinVisitasDelRobot, ventanaDeLaSemana, type FilaUso } from "@/lib/navegacion/tab-bar";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -29,12 +29,12 @@ export async function GET(req: NextRequest) {
 
   let orden: string[] = [];
   try {
-    const filas = await leerTodoPaginado<FilaUso>(
+    const filas = await leerTodoPaginado<FilaUso & { dia: string }>(
       `${TABLA_VISITAS} (barra de pestañas)`,
       (pedirCount, inicio, fin) =>
         supabaseServer
           .from(TABLA_VISITAS)
-          .select("modulo, aparato, visitas", pedirCount ? { count: "exact" } : {})
+          .select("dia, modulo, aparato, visitas", pedirCount ? { count: "exact" } : {})
           .eq("user_id", sesion.userId)
           .gte("dia", desde)
           .lt("dia", hasta)
@@ -43,7 +43,8 @@ export async function GET(req: NextRequest) {
           .order("aparato", { ascending: true })
           .range(inicio, fin),
     );
-    orden = ordenPorUso(filas);
+    // El robot de capturas del 14-nov-2026 entró con el usuario de Daniel: no es uso.
+    orden = ordenPorUso(sinVisitasDelRobot(filas, sesion.userName));
   } catch (e) {
     console.error("[visitas] no se pudo leer el orden de la barra:", e instanceof Error ? e.message : String(e));
   }

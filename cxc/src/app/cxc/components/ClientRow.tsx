@@ -4,6 +4,7 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
+import { CLASE_CXC_COL_NOMBRE, CLASE_CXC_COL_TOTAL, CXC_NOMBRE_COMPLETO, CXC_UN_NOMBRE_ESTADO_DE_CUENTA } from "@/lib/ui/revision-110-cxc";
 
 function riskInfo(total: number, current: number, watch: number, overdue: number): { border: string; tooltip: string } {
   if (total < 0) return { border: "border-l-blue-400", tooltip: "Saldo a favor: saldo negativo (nota de crédito o sobrepago)" };
@@ -61,7 +62,7 @@ export default function ClientRow({
         className={`grid grid-cols-12 gap-2 px-4 py-3 text-sm cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
         onClick={onToggle}
       >
-        <div className="col-span-4 font-medium truncate flex items-center gap-1.5 min-w-0">
+        <div className={`${CLASE_CXC_COL_NOMBRE} font-medium flex items-center gap-1.5 min-w-0 ${CXC_NOMBRE_COMPLETO ? "" : "truncate"}`}>
           {/* La casilla es para MANDAR A VARIOS, o sea cobrar: al saldo a favor
               tampoco se le dibuja. Se reserva su ancho para que las filas del
               bloque «Saldo a favor» no queden corridas. */}
@@ -80,6 +81,16 @@ export default function ClientRow({
           <svg width="10" height="10" viewBox="0 0 10 10" className={`flex-shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} fill="currentColor">
             <path d="M3 1l5 4-5 4V1z"/>
           </svg>
+          {/* n.º 108 (revisión 110): el nombre COMPLETO arriba y «Último pago»
+              debajo; antes el aviso le robaba el ancho y el nombre se cortaba. */}
+          {CXC_NOMBRE_COMPLETO ? (
+            <span className="min-w-0 flex flex-col">
+              <span className="break-words" title={nombre}>{nombre}</span>
+              {avisoSinPagar && (
+                <span className="text-xs font-normal text-gray-500">{avisoSinPagar}</span>
+              )}
+            </span>
+          ) : (<>
           <span className="truncate" title={nombre}>{nombre}</span>
           {/* 🔴 SE VE SIEMPRE (20-sep-2026, pedido de Daniel). 🩸 Se dibujaba
               solo con el filtro de «+90 d» encendido; desde que la lista ABRE
@@ -88,13 +99,14 @@ export default function ClientRow({
           {avisoSinPagar && (
             <span className="shrink-0 text-xs text-gray-400 whitespace-nowrap">{avisoSinPagar}</span>
           )}
+          </>)}
         </div>
         <div className="col-span-2 text-right tabular-nums text-emerald-700">{client.current === 0 ? <span className="text-gray-300">—</span> : fmt(client.current)}</div>
         <div className="col-span-2 text-right tabular-nums text-amber-600">{client.watch === 0 ? <span className="text-gray-300">—</span> : fmt(client.watch)}</div>
         <div className="col-span-2 text-right tabular-nums text-red-600">
           {client.overdue === 0 ? <span className="text-gray-300">—</span> : fmt(client.overdue)}
         </div>
-        <div className="col-span-2 text-right tabular-nums font-semibold flex items-center justify-end gap-2">
+        <div className={`${CLASE_CXC_COL_TOTAL} text-right tabular-nums font-semibold flex items-center justify-end gap-2`}>
           <span>{fmt(client.total)}</span>
           {/* 🔴 SIN BOTÓN PARA EL SALDO A FAVOR (8-sep-2026). La regla vive en
               `lib/cxc/cobrable.ts`: a quien le debemos plata no se le cobra. La
@@ -103,11 +115,11 @@ export default function ClientRow({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onCobrar(client); }}
-              aria-label="Enviar estado de cuenta"
-              title="Enviar estado de cuenta"
-              className="shrink-0 rounded-md bg-black px-2.5 py-1 text-xs font-medium text-white transition active:scale-[0.97] hover:bg-gray-800"
+              aria-label="Estado de cuenta"
+              title="Estado de cuenta"
+              className="shrink-0 whitespace-nowrap rounded-md bg-black px-2.5 py-1 text-xs font-medium text-white transition active:scale-[0.97] hover:bg-gray-800"
             >
-              Enviar
+              {CXC_UN_NOMBRE_ESTADO_DE_CUENTA ? "Estado de cuenta" : "Enviar"}
             </button>
           )}
         </div>

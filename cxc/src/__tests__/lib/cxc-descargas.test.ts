@@ -173,7 +173,7 @@ describe("🔴 2 · en ningún lado se exporta CSV", () => {
 describe("🔴 3 · qué columnas trae cada archivo", () => {
   it("«Total por cliente»: Código · Cliente · tres tramos · Total", () => {
     const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA), "x").Sheets["Cartera"];
-    const cabecera = ["A3", "B3", "C3", "D3", "E3", "F3"].map((c) => ws[c]?.v);
+    const cabecera = ["A1", "B1", "C1", "D1", "E1", "F1"].map((c) => ws[c]?.v);
     expect(cabecera).toEqual([
       "Código", "Cliente",
       tramoLabel("current"), tramoLabel("watch"), tramoLabel("overdue"), "Total",
@@ -182,7 +182,7 @@ describe("🔴 3 · qué columnas trae cada archivo", () => {
 
   it("«Detallado por compañía»: la Compañía entra en el medio y nada más", () => {
     const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), bloquesSaldoAFavor(CARTERA, DOS), "x").Sheets["Cartera por empresa"];
-    const cabecera = ["A3", "B3", "C3", "D3", "E3", "F3", "G3"].map((c) => ws[c]?.v);
+    const cabecera = ["A1", "B1", "C1", "D1", "E1", "F1", "G1"].map((c) => ws[c]?.v);
     expect(cabecera).toEqual([
       "Código", "Cliente", "Empresa",
       tramoLabel("current"), tramoLabel("watch"), tramoLabel("overdue"), "Total",
@@ -388,11 +388,10 @@ describe("🔴 7 · los dos PDF son el MISMO documento", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("🔴 8 · el Excel sale por el estándar de la casa", () => {
-  it("título en la fila 1, fila 2 VACÍA, encabezados en la 3", () => {
+  it("encabezados en la fila 1 (n.º 17, revisión 110): sin banda de título arriba", () => {
     const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA), "Total por cliente — Vistana").Sheets["Cartera"];
-    expect(ws["A1"]?.v).toBe("Total por cliente — Vistana");
-    expect(ws["A2"]).toBeUndefined();
-    expect(ws["A3"]?.v).toBe("Código");
+    expect(ws["A1"]?.v).toBe("Código");
+    expect(ws["A2"]?.v).toBe("D-25");
   });
 
   it("…con FILTRO desde los encabezados, y el Total fuera del filtro", () => {
@@ -402,25 +401,25 @@ describe("🔴 8 · el Excel sale por el estándar de la casa", () => {
     // sostiene no cambió: el filtro arranca en los encabezados y la fila de
     // totales queda AFUERA.
     const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA), "x").Sheets["Cartera"];
-    expect(ws["!autofilter"]).toEqual({ ref: "A3:F7" });
+    expect(ws["!autofilter"]).toEqual({ ref: "A1:F5" });
     // Sin nadie a favor, la hoja de siempre: encabezados y una fila.
     const soloDeuda = libroTotalPorCliente(filasTotalPorCliente([CITY]), filasSaldoAFavor([CITY]), "x").Sheets["Cartera"];
-    expect(soloDeuda["!autofilter"]).toEqual({ ref: "A3:F4" });
+    expect(soloDeuda["!autofilter"]).toEqual({ ref: "A1:F2" });
   });
 
   it("🔴 la plata es NÚMERO con formato, nunca el texto «$1,234.56»", () => {
     const ws = libroTotalPorCliente(filasTotalPorCliente(CARTERA), filasSaldoAFavor(CARTERA), "x").Sheets["Cartera"];
-    expect(ws["F4"]?.t).toBe("n");
-    expect(ws["F4"]?.v).toBe(1700);
-    expect(ws["F4"]?.z).toBe("$#,##0.00");
+    expect(ws["F2"]?.t).toBe("n");
+    expect(ws["F2"]?.v).toBe(1700);
+    expect(ws["F2"]?.z).toBe("$#,##0.00");
   });
 
   it("🔴 en el Excel el código y el cliente se REPITEN en cada renglón", () => {
     // En el papel las compañías van adentro del cliente; en la hoja no: sin el
     // nombre en cada fila no se puede filtrar ni armar una tabla dinámica.
     const ws = libroPorCompania(bloquesPorCompania(CARTERA, DOS), bloquesSaldoAFavor(CARTERA, DOS), "x").Sheets["Cartera por empresa"];
-    expect([ws["A4"]?.v, ws["B4"]?.v, ws["C4"]?.v]).toEqual(["D-25", "City Mall Paso Canoa", "Vistana International"]);
-    expect([ws["A5"]?.v, ws["B5"]?.v, ws["C5"]?.v]).toEqual(["D-25", "City Mall Paso Canoa", "Fashion Wear"]);
+    expect([ws["A2"]?.v, ws["B2"]?.v, ws["C2"]?.v]).toEqual(["D-25", "City Mall Paso Canoa", "Vistana International"]);
+    expect([ws["A3"]?.v, ws["B3"]?.v, ws["C3"]?.v]).toEqual(["D-25", "City Mall Paso Canoa", "Fashion Wear"]);
   });
 
   it("sale por `workbookBytes` (la fila fija la pone él)", () => {

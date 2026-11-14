@@ -14,7 +14,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Home } from "lucide-react";
 import FGLogo from "@/components/FGLogo";
-import { useSidebarCollapsed, writeSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
+import { plegadoPorPantalla, useSidebarCollapsed, writeSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
 import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
 import { recordModuleClick } from "@/lib/module-frequents";
 import { getModuleColorByKey } from "@/lib/moduleColors";
@@ -56,7 +56,8 @@ export default function BarraLateral2026() {
           <FGLogo variant="icon" theme="light" size={22} />
           {!collapsed && <span className="truncate text-sm font-medium text-gray-800">Fashion Group</span>}
         </Link>
-        <button
+        {/* En Inicio va plegada siempre (n.º 38): el botón no haría nada. */}
+        {!plegadoPorPantalla(pathname) && <button
           onClick={() => writeSidebarCollapsed(!collapsed)}
           aria-label={collapsed ? "Expandir barra lateral" : "Colapsar barra lateral"}
           title={collapsed ? "Expandir" : "Colapsar"}
@@ -65,7 +66,7 @@ export default function BarraLateral2026() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points={collapsed ? "9 18 15 12 9 6" : "15 18 9 12 15 6"} />
           </svg>
-        </button>
+        </button>}
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2">

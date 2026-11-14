@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { fmt } from "@/lib/format";
 import type { Colaborador } from "@/lib/prestamos-lista-server";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+import { PRESTAMOS_NOMBRES_CAPITALIZADOS_R110 } from "@/lib/ui/revision-110-asistencia";
 
 /**
  * ELEGIR A LA PERSONA — de Asistencia, buscando por nombre.
@@ -86,7 +88,7 @@ export default function ElegirPersonaModal({
                       onClick={() => onElegir(c)}
                       className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg px-3 text-left transition hover:bg-gray-50"
                     >
-                      <span className="min-w-0 truncate text-sm font-medium">{c.nombre}</span>
+                      <span className="min-w-0 truncate text-sm font-medium">{PRESTAMOS_NOMBRES_CAPITALIZADOS_R110 ? capitalizarNombre(c.nombre) : c.nombre}</span>
                       <span className="shrink-0 text-xs tabular-nums text-gray-500">
                         {c.saldo > 0 ? `Saldo $${fmt(c.saldo)}` : "Sin saldo"}
                       </span>

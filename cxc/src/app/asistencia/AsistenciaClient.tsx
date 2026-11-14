@@ -64,6 +64,10 @@
 //
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { FILTRO_6_ASISTENCIA_CONFIG, FILTRO_7_ASISTENCIA_APROBACIONES } from "@/lib/ui/revision-110-filtros";
+import { BuscarEnLaBarra, EnLaBarra } from "@/components/celular/BarraDeControles";
+import { Capsula } from "@/components/filtros/FiltroA";
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Settings } from "lucide-react";
@@ -104,7 +108,11 @@ import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { ASISTENCIA_PANTALLA_2026_09 } from "@/lib/asistencia/pantalla-2026-09";
 import { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
 import { aparatoDeQuienMira } from "@/lib/aparato";
-import PortadaCelular from "./PortadaCelular";
+import PortadaCelular, { useConteosPortada } from "./PortadaCelular";
+import { filasDeLaPortada } from "@/lib/asistencia/celular-asistencia";
+import {
+  ASIS_PASTILLA_EMPRESA_R110, ASIS_SIN_PORTADA_R110, opcionConNumeros, textoPastillaEmpresa,
+} from "@/lib/ui/revision-110-asistencia";
 import SelectorPeriodo from "@/components/asistencia/SelectorPeriodo";
 import {
   BarraDeControles, CLASE_FILA_MENU, ChipSelector, ProveedorBarraCelular, useBarraCelular,
@@ -191,6 +199,8 @@ function AsistenciaInner() {
   const [tabEnUrl, setTab] = useUrlState<Tab>("tab", SIN_TAB_EN_URL);
   const tabRaw: Tab = tabEnUrl || pestanaPorDefecto(PERSONA_EN_EL_CENTRO);
   const [ayuda, setAyuda] = useState(false);
+  /** filtro-6: el buscador de Configuración › Horarios (solo pantalla, no se guarda). */
+  const [buscarHorario, setBuscarHorario] = useState("");
   // 🔑 DOS lectores de la MISMA llave: abrir ⚙ es una pantalla (en el celular
   // empuja historial y el Atrás la cierra); cambiar Horarios ↔ Feriados adentro
   // es del mismo nivel y reemplaza. Ver `useUrlState` › CLAVES_DE_PANTALLA.
@@ -346,11 +356,18 @@ function AsistenciaInner() {
   // 🔴 La portada es una PANTALLA, no un estado escondido: tocar una fila
   // escribe `?tab=`, que en el celular empuja historial, así que el Atrás
   // devuelve esta lista. Nada se monta hasta que se toca algo.
-  const enLaPortada = ASISTENCIA_PANTALLA_2026_09 && celular && !hayTab && visibles.length > 1;
+  // 73 (revisión 110): en el celular se entra directo a Asistencia; la portada se apaga.
+  const enLaPortada = ASISTENCIA_PANTALLA_2026_09 && celular && !hayTab && visibles.length > 1 && !ASIS_SIN_PORTADA_R110;
   // 🔴 LA BARRA DEL CELULAR (2-oct-2026, `BARRA_CELULAR_2026_10`): título con la
   // sección como selector, el período con el «···» y la acción principal abajo.
   // Apagada, o en la computadora, todo queda como estaba.
   const barra = useBarraCelular() && !enLaPortada;
+  // 73: los números de la portada viajan dentro de cada opción del título ▾.
+  // Las MISMAS lecturas de la portada; solo con la barra del celular.
+  const conteos = useConteosPortada(empresa, periodo.desde, periodo.hasta, ASIS_SIN_PORTADA_R110 && barra);
+  const opcionesDelTitulo = ASIS_SIN_PORTADA_R110
+    ? new Map(filasDeLaPortada(visibles, conteos).map((f) => [f.clave, opcionConNumeros(f.rotulo, f.detalle, f.cuenta)]))
+    : null;
   const conCalendario = !ayuda && !config ? PERIODO_EN_LA_BARRA[tab] : undefined;
 
   return (
@@ -362,7 +379,8 @@ function AsistenciaInner() {
           `PortadaCelular`; adentro de una pestaña no hay ninguno y lo pone el
           layout (24-sep-2026). */}
       <AppHeader module="Asistencia y planilla" tituloEnLaPantalla={enLaPortada || barra} />
-      <ProveedorBarraCelular activo={barra} activa={tab}>
+      {/* filtro-6: con ⚙ abierta, la barra es de Configuración (no de la pestaña escondida). */}
+      <ProveedorBarraCelular activo={barra} activa={FILTRO_6_ASISTENCIA_CONFIG && config && !ayuda ? "configuracion" : tab}>
       <div className="mx-auto max-w-6xl px-4 py-6">
         {/* Sin título grande: "Asistencia" ya lo dicen la barra sticky
             (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar
@@ -386,7 +404,7 @@ function AsistenciaInner() {
           <div className="-mx-4 -mt-6">
             <BarraDeControles
               titulo="Asistencia"
-              pestanas={visibles.map(([k, label]) => ({ value: k, label }))}
+              pestanas={visibles.map(([k, label]) => ({ value: k, label, opcion: opcionesDelTitulo?.get(k) }))}
               activa={tab}
               onPestana={(k) => irAPestana(k as Tab)}
               periodo={conCalendario === undefined ? undefined : (
@@ -399,14 +417,19 @@ function AsistenciaInner() {
                   anchoCompleto
                 />
               )}
-              fila={opciones.length > 1 ? (
+              fila={opciones.length > 1 && !(FILTRO_A_2026_11 && (tab === "asistencia" || tab === "reporte" || tab === "colaboradores")) && !(FILTRO_7_ASISTENCIA_APROBACIONES && tab === "aprobaciones" && !config) && !(FILTRO_6_ASISTENCIA_CONFIG && config) ? (
                 <ChipSelector
                   rotulo="Empresa"
                   valor={empresa}
-                  opciones={opciones.map((o) => ({ valor: o.clave, etiqueta: o.etiqueta }))}
+                  opciones={opciones.map((o) => ({
+                    valor: o.clave,
+                    etiqueta: ASIS_PASTILLA_EMPRESA_R110 ? textoPastillaEmpresa(o.etiqueta) : o.etiqueta,
+                  }))}
                   onCambiar={elegirEmpresa}
+                  sinRotulo={ASIS_PASTILLA_EMPRESA_R110}
                 />
               ) : null}
+              filaQueBaja={ASIS_PASTILLA_EMPRESA_R110}
               menu={
                 <>
                   {veConfig && (
@@ -564,7 +587,20 @@ function AsistenciaInner() {
                 active={config}
                 onChange={(v) => cambiarConfig(v)}
               />
-              <ConfiguracionTab ajuste={config} />
+              {/* 🔴 filtro-6 (revisión 110, aprobado 14-nov-2026): en el celular,
+                  «Buscar colaborador» y «Todas las empresas ▾» en UNA línea, que
+                  filtran Horarios. Solo pantalla: nada de lo que se guarda cambia. */}
+              {barra && FILTRO_6_ASISTENCIA_CONFIG && config === "horarios" && (
+                <EnLaBarra pestana="configuracion" iconos={
+                  <BuscarEnLaBarra valor={buscarHorario} onCambiar={setBuscarHorario} placeholder="Buscar colaborador"
+                    etiqueta="Colaborador"
+                    alLado={opciones.length > 1 ? (
+                      <Capsula etiqueta="Empresa" compacta alinear="derecha" valor={empresa}
+                        opciones={opciones.map((o) => ({ valor: o.clave, etiqueta: o.etiqueta }))} onCambiar={elegirEmpresa} />
+                    ) : undefined} />
+                } />
+              )}
+              <ConfiguracionTab ajuste={config} {...(barra && FILTRO_6_ASISTENCIA_CONFIG ? { empresa, buscarHorario } : {})} />
             </div>
           )}
           {/* 🔴 Con la ayuda (o ⚙) abierta las pestañas se ESCONDEN, no se
@@ -589,7 +625,7 @@ function AsistenciaInner() {
                 hidden={seEsconde("reporte", tab) && seEsconde("asistencia", tab)}
                 className={seEsconde("reporte", tab) && seEsconde("asistencia", tab) ? "hidden" : undefined}
               >
-                <ReporteTab empresa={empresa} />
+                <ReporteTab empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} />
               </div>
             )}
             {monta("justificaciones") && (
@@ -604,7 +640,7 @@ function AsistenciaInner() {
             )}
             {monta("aprobaciones") && (
               <div hidden={seEsconde("aprobaciones", tab)} className={escondida("aprobaciones")}>
-                <AprobacionesTab empresa={empresa} />
+                <AprobacionesTab empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} />
               </div>
             )}
             {/* 🔴 «COLABORADORES» ES LA MISMA PANTALLA, EN MODO LISTA. Daniel:
@@ -616,7 +652,7 @@ function AsistenciaInner() {
                 🔴 Horarios, Feriados y Reglas se mudaron a ⚙ el 29-sep-2026. */}
             {monta("colaboradores") && (
               <div hidden={seEsconde("colaboradores", tab)} className={escondida("colaboradores")}>
-                <ConfiguracionTab personaEnElCentro empresa={empresa} />
+                <ConfiguracionTab personaEnElCentro empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} />
               </div>
             )}
             {monta("configuracion") && (

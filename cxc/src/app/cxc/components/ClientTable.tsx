@@ -1,5 +1,6 @@
 "use client";
 
+import { CLASE_CXC_COL_NOMBRE, CLASE_CXC_COL_TOTAL } from "@/lib/ui/revision-110-cxc";
 import type { ReactNode } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
@@ -35,6 +36,11 @@ interface Props {
   renderDetalle?: (client: ConsolidatedClient, abierto: boolean) => ReactNode;
   /** Sin casillas de «mandar a varios» (Boston no tiene lote). Por defecto, con casillas. */
   sinSeleccion?: boolean;
+  /**
+   * n.º 19 (revisión 110): hay filtros puestos además de la búsqueda. La lista
+   * vacía lo dice y ofrece quitarlos. Sin esto, «Sin resultados» como siempre.
+   */
+  onQuitarFiltros?: (() => void) | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,6 +81,7 @@ export default function ClientTable({
   marcaEnvioDe,
   renderDetalle,
   sinSeleccion = false,
+  onQuitarFiltros = null,
 }: Props) {
   const [expanded, setExpanded] = usePersistedState<string | null>("cxc", "expanded", null);
 
@@ -127,7 +134,7 @@ export default function ClientTable({
       <div className="border border-gray-200 rounded-b-lg sm:rounded-t-none rounded-t-lg overflow-hidden">
         {/* Desktop header — hidden on mobile since mobile uses card layout */}
         <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
-          <div className="col-span-4 flex items-center gap-1.5">
+          <div className={`${CLASE_CXC_COL_NOMBRE} flex items-center gap-1.5`}>
             {!sinSeleccion && (
               <input
                 type="checkbox"
@@ -150,7 +157,7 @@ export default function ClientTable({
           <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition font-semibold text-gray-600" data-tooltip="+120 días · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("overdue")}>
             +120 d<span aria-hidden className="ml-1 inline-block w-2 text-xs leading-none">{sortArrow("overdue")}</span>
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Saldo total · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("total")}>
+          <div className={`${CLASE_CXC_COL_TOTAL} text-right cursor-pointer hover:text-gray-900 transition`} data-tooltip="Saldo total · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("total")}>
             Total<span aria-hidden className="ml-1 inline-block w-2 text-xs leading-none">{sortArrow("total")}</span>
           </div>
         </div>
@@ -162,7 +169,18 @@ export default function ClientTable({
             </svg>
             {/* Una sola línea: "prueba con otra búsqueda" no agrega nada a "Sin
                 resultados" con el buscador lleno delante. */}
-            <p className="text-sm text-gray-400">Sin resultados</p>
+            <p className="text-sm text-gray-400">
+              {onQuitarFiltros ? "Sin resultados con los filtros puestos" : "Sin resultados"}
+            </p>
+            {onQuitarFiltros && (
+              <button
+                type="button"
+                onClick={onQuitarFiltros}
+                className="mt-1 min-h-[44px] text-sm font-medium text-blue-600 hover:text-blue-800"
+              >
+                Quitar filtros
+              </button>
+            )}
           </div>
         )}
 

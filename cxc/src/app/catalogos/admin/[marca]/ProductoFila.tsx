@@ -42,8 +42,11 @@ const ACEPTA = "image/jpeg,image/png,image/webp,image/avif,image/gif";
 export type TieneVariantes = (sku: string | null) => number;
 
 export default function ProductoFila({
-  marca, product, onCambio, tieneVariantes, showToast,
+  marca, product, onCambio, tieneVariantes, showToast, compacta = false,
 }: {
+  /** filtro-2 (revisión 110, celular): nombre completo, «código · precio» en
+   *  gris y «Subir otra» · «Ocultar» más chicos al lado de la foto. */
+  compacta?: boolean;
   marca: MarcaUiKey;
   product: AdminProducto;
   onCambio: () => Promise<void>;
@@ -103,11 +106,11 @@ export default function ProductoFila({
         const f = e.dataTransfer.files?.[0];
         if (f) void subirFoto(f);
       }}
-      className={`bg-white border rounded-lg p-2.5 transition ${
+      className={compacta ? `bg-white px-4 py-3 transition ${encima ? "bg-gray-50" : escondido ? "opacity-80" : ""}` : `bg-white border rounded-lg p-2.5 transition ${
         encima ? "border-gray-800 bg-gray-50" : escondido ? "border-gray-100 opacity-80" : "border-gray-200"
       }`}
     >
-      <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
+      <div className={compacta ? "grid grid-cols-[88px_minmax(0,1fr)] items-start gap-x-3 gap-y-2" : "flex flex-wrap sm:flex-nowrap items-center gap-3"}>
         {/* 🔴 EN EL CELULAR, UNA FILA POR PRODUCTO (24-sep-2026).
             🩸 Medido: **15 pares de textos encimados** en una sola pantalla.
             «En bodega: 14» caía encima de «Subir otra» (34 × 37 px) y de
@@ -120,9 +123,9 @@ export default function ProductoFila({
             una fila de ancho completo y los botones bajan enteros debajo.
             `sm:contents` hace que este envoltorio DESAPAREZCA de `sm` para
             arriba: la computadora queda exactamente igual que hoy. */}
-        <div className={CATALOGO_ORDEN_CELULAR ? "flex w-full min-w-0 items-center gap-3 sm:contents" : "contents"}>
+        <div className={compacta ? "contents" : CATALOGO_ORDEN_CELULAR ? "flex w-full min-w-0 items-center gap-3 sm:contents" : "contents"}>
         {/* Miniatura */}
-        <div className="relative w-[88px] h-[88px] shrink-0 rounded-md overflow-hidden bg-gray-100">
+        <div className={`relative w-[88px] h-[88px] shrink-0 rounded-md overflow-hidden bg-gray-100${compacta ? " row-span-2" : ""}`}>
           {tieneFoto(product) ? (
             <Image src={product.image_url!} alt={product.name} fill sizes="88px" className="object-contain" unoptimized />
           ) : (
@@ -140,6 +143,25 @@ export default function ProductoFila({
         </div>
 
         {/* Datos */}
+        {compacta ? (
+        <div className="min-w-0">
+          <div className="flex items-start gap-2">
+            <h3 className="text-[15px] font-semibold leading-snug text-gray-900">{product.name}</h3>
+            {escondido && (
+              <span className="mt-0.5 shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-white">Oculto</span>
+            )}
+          </div>
+          <p className="mt-0.5 text-[13px] tabular-nums text-gray-500">
+            {[product.sku, product.price != null ? fmtPrecio(product.price) : null].filter(Boolean).join(" · ")}
+          </p>
+          <p className={`text-[13px] tabular-nums ${agotado ? "text-gray-400" : "text-gray-500"}`}>
+            {agotado
+              ? ["Agotado", lineaDeExistencias(null, product.existencia)].filter((t) => t !== "").join(" · ")
+              : lineaDeExistencias(disponible, product.existencia)}
+          </p>
+          {error && <p className="text-[11px] text-red-600 leading-tight mt-1">{error}</p>}
+        </div>
+        ) : (
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             {product.sku && (
@@ -179,6 +201,7 @@ export default function ProductoFila({
           </div>
           {error && <p className="text-[11px] text-red-600 leading-tight mt-1">{error}</p>}
         </div>
+        )}
         </div>
 
         {/* Acciones */}
@@ -186,7 +209,7 @@ export default function ProductoFila({
             se lleva el ancho completo y reparte, así que «Subir otra» y
             «Esconder» dejan de ser una lotería. De `sm` para arriba, la fila de
             siempre. */}
-        <div className={CATALOGO_ORDEN_CELULAR
+        <div className={compacta ? "col-start-2 grid grid-cols-2 items-center gap-2 [&>button]:min-h-[34px] [&>button]:relative [&>button]:before:absolute [&>button]:before:inset-x-0 [&>button]:before:-inset-y-[5px] [&>button]:before:content-['']" : CATALOGO_ORDEN_CELULAR
           ? "shrink-0 grid w-full grid-cols-2 items-center gap-2 sm:flex sm:w-auto sm:flex-wrap"
           : "shrink-0 flex flex-wrap items-center gap-2"}>
           <input
@@ -260,7 +283,7 @@ export default function ProductoFila({
       </div>
 
       {/* Las otras fotos que trajo el ZIP del B2B. */}
-      <div className="mt-2 sm:pl-[100px]">
+      <div className={compacta ? "mt-2 pl-[100px]" : "mt-2 sm:pl-[100px]"}>
         <VariantePicker
           marca={marca}
           product={product}

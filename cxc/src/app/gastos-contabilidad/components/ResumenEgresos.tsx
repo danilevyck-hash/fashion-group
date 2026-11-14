@@ -19,6 +19,7 @@ import type { AlDia } from "@/lib/egresos/al-dia";
 import type { EmpresaEgresosResumen } from "./tipos";
 import { mesLargo, usd } from "./tipos";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+import { GASTOS_AVISO_CORTO_2026_11, GASTOS_PAUSA_UNA_VEZ_2026_11 } from "@/lib/ui/revision-110-marketing";
 
 // 🔴 6-oct-2026: tocar un encabezado ordena las empresas (solo el ORDEN: ningún
 // monto se suma entre empresas). Sin monto del mes, al final.
@@ -68,8 +69,26 @@ export function fraseAlDia(alDia: AlDia | undefined, descargaAutomatica: boolean
     case "mes_en_curso":
       return `Cargado hasta ${mesLargo(alDia.mes)}, que todavía va corriendo`;
     case "quizas_incompleto":
+      // n.º 95: corto. Los dos números siguen a la vista para juzgarlo.
+      if (GASTOS_AVISO_CORTO_2026_11) {
+        const mes = mesLargo(alDia.mes);
+        return `${mes.charAt(0).toUpperCase()}${mes.slice(1)} incompleto: ${usd(alDia.gastoCent)} (lo habitual, ${usd(alDia.habitualCent)})`;
+      }
       return `Cargado hasta ${mesLargo(alDia.mes)} · ese mes va en ${usd(alDia.gastoCent)} y lo habitual aquí es ${usd(alDia.habitualCent)}: puede estar a medio cargar`;
   }
+}
+
+/** La frase de la pausa, la MISMA que dice `explicacionEgresos`. */
+export const FRASE_PAUSA = "Registro de gastos pausado.";
+
+/**
+ * n.º 94 · ¿Alguna empresa diría «Registro de gastos pausado.»? Entonces se dice
+ * UNA vez, junto al mes, y ninguna fila la repite.
+ */
+export function hayPausaEnElMes(empresas: ReadonlyArray<Pick<EmpresaEgresosResumen, "descargaAutomatica" | "ultimoMesConMovimientos" | "resumen">>): boolean {
+  return empresas.some(
+    (e) => explicacionEgresos(e.resumen.estado, e.ultimoMesConMovimientos, e.descargaAutomatica) === FRASE_PAUSA,
+  );
 }
 
 /** Sólo `con_movimientos` autoriza a pintar el número como un hecho. */
@@ -122,7 +141,7 @@ export function explicacionEgresos(
       return "";
     case "sin_movimientos":
     case "sin_datos":
-      return "Registro de gastos pausado.";
+      return FRASE_PAUSA;
   }
 }
 
@@ -160,15 +179,18 @@ function armarFilas(empresas: EmpresaEgresosResumen[]): Fila[] {
       etiquetaEstado,
       salidaTexto: hayMonto ? usd(empresa.resumen.totalSalidaCent) : etiquetaEstado,
       gastoTexto: hayMonto ? usd(empresa.resumen.totalGastoCent) : "—",
-      explicacion: explicacionEgresos(
-        estado,
-        empresa.ultimoMesConMovimientos,
-        empresa.descargaAutomatica,
+      explicacion: sinLaPausa(
+        explicacionEgresos(estado, empresa.ultimoMesConMovimientos, empresa.descargaAutomatica),
       ),
       alDiaTexto: fraseAlDia(empresa.alDia, empresa.descargaAutomatica),
       alDiaDudoso: empresa.alDia?.estado === "quizas_incompleto",
     };
   });
+}
+
+/** n.º 94: la pausa ya se dijo junto al mes; la fila no la repite. */
+function sinLaPausa(explicacion: string): string {
+  return GASTOS_PAUSA_UNA_VEZ_2026_11 && explicacion === FRASE_PAUSA ? "" : explicacion;
 }
 
 /** La línea de "hasta dónde llega esta empresa". Va DEBAJO del nombre, en las

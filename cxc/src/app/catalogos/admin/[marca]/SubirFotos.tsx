@@ -25,7 +25,7 @@
 // 27-78 MB y Vercel corta el cuerpo de una petición en ~4,5 MB.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { validateProductPhoto, uploadProductPhoto } from "./photoUpload";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
@@ -58,8 +58,10 @@ const FASE_LABEL: Record<ProgresoZip["fase"], string> = {
 };
 
 export default function SubirFotos({
-  marca, products, onFotoSubida, onZipListo, showToast, plegable = false,
+  marca, products, onFotoSubida, onZipListo, showToast, plegable = false, grupo,
 }: {
+  /** filtro-2 (revisión 110): renglones que van en el MISMO grupo, debajo de «Subir fotos». */
+  grupo?: ReactNode;
   /** `CATALOGOS_APPLE_V2_2026_10`: sin nada subiendo, el cuadro es UNA fila
    *  con › que lo abre. Arrastrar encima de la fila sube igual. */
   plegable?: boolean;
@@ -175,7 +177,7 @@ export default function SubirFotos({
   const hayAlgo = cola.length > 0 || zipsEnEspera.length > 0 || zipTrabajando || !!zipResultado || !!zipError;
   if (plegable && !abierto && !hayAlgo) {
     return (
-      <section data-medir="subir-fotos-plegado" className="mb-4 rounded-lg border border-gray-200 bg-white">
+      <section data-medir="subir-fotos-plegado" className={`mb-4 rounded-lg border border-gray-200 bg-white${grupo ? " divide-y divide-gray-100 overflow-hidden" : ""}`}>
         <button
           type="button"
           onClick={() => setAbierto(true)}
@@ -190,11 +192,14 @@ export default function SubirFotos({
             <span aria-hidden="true" className="text-gray-300">›</span>
           </span>
         </button>
+        {grupo}
       </section>
     );
   }
 
   return (
+    <>
+    {grupo && <section className="mb-4 divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white">{grupo}</section>}
     <section className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-1">
@@ -364,6 +369,7 @@ export default function SubirFotos({
         </div>
       )}
     </section>
+    </>
   );
 }
 

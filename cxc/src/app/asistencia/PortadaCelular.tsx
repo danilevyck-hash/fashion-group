@@ -28,7 +28,8 @@ import { useEffect, useState } from "react";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { empresaParaPedir } from "@/lib/asistencia/empresa-para-todo";
 import { resumenPendientes, type DiaAprobacion } from "@/lib/asistencia/aprobaciones";
-import { hm } from "@/lib/asistencia/aprobaciones-vistas";
+import { hm, resumenPorDecidir } from "@/lib/asistencia/aprobaciones-vistas";
+import { ASIS_PENDIENTES_CON_UNIDAD_R110 } from "@/lib/ui/revision-110-asistencia";
 import {
   PORTADA_EMPRESA, PORTADA_PANTALLAS, filasDeLaPortada, type ConteosPortada,
 } from "@/lib/asistencia/celular-asistencia";
@@ -49,85 +50,7 @@ export default function PortadaCelular({
   hasta: string;
   onAbrir: (tab: string) => void;
 }) {
-  const [conteos, setConteos] = useState<ConteosPortada>({
-    colaboradores: null, sinFicha: null, personasDelReporte: null, ausencias: null,
-    porDecidir: null, horasPorDecidir: null, quincenaCerrada: null,
-    conDeuda: null, deudaTotal: null,
-  });
-
-  useEffect(() => {
-    let vivo = true;
-    const emp = empresaParaPedir(empresa);
-    const q = new URLSearchParams({ desde, hasta });
-    if (emp) q.set("empresa", emp);
-
-    /** Los colaboradores y cuántos no tienen ficha. La MISMA ruta de la pestaña. */
-    void (async () => {
-      try {
-        const r = await fetch("/api/asistencia/configuracion", { cache: "no-store" });
-        if (!r.ok) return;
-        const j = (await r.json()) as { resumen?: { total?: number; sinConfigurar?: number } };
-        if (!vivo) return;
-        setConteos((c) => ({
-          ...c,
-          colaboradores: j.resumen?.total ?? null,
-          sinFicha: j.resumen?.sinConfigurar ?? null,
-        }));
-      } catch { /* sin número, la fila no dice nada */ }
-    })();
-
-    /** Las horas extra por decidir. La MISMA lectura de Aprobaciones. */
-    void (async () => {
-      try {
-        const p = new URLSearchParams(q);
-        p.set("aprobaciones", "1");
-        const r = await fetch(`/api/asistencia/planilla?${p}`, { cache: "no-store" });
-        if (!r.ok) return;
-        const j = (await r.json()) as { aprobaciones?: DiaAprobacion[] };
-        if (!vivo) return;
-        const { pendientes, minutos } = resumenPendientes(j.aprobaciones ?? []);
-        setConteos((c) => ({
-          ...c,
-          porDecidir: pendientes,
-          horasPorDecidir: pendientes > 0 ? `${hm(minutos)} h` : null,
-        }));
-      } catch { /* sin número, la fila no dice nada */ }
-    })();
-
-    /** Quién debe. La MISMA lectura de Préstamos. */
-    void (async () => {
-      try {
-        const r = await fetch(`/api/asistencia/prestamos-deuda?${new URLSearchParams({ desde, hasta })}`, { cache: "no-store" });
-        if (!r.ok) return;
-        const j = (await r.json()) as { fichas?: { empresa?: string | null; saldo?: number }[] };
-        if (!vivo) return;
-        // 🔑 El MISMO filtro por empresa que la pestaña, y el MISMO campo de
-        // saldo. Acá no se recalcula nada: se suman los saldos que ya vienen.
-        const fichas = (j.fichas ?? []).filter((f) => !emp || f.empresa === emp);
-        const total = fichas.reduce((a, f) => a + (f.saldo ?? 0), 0);
-        setConteos((c) => ({
-          ...c,
-          conDeuda: fichas.length,
-          deudaTotal: fichas.length > 0 ? money(total) : null,
-        }));
-      } catch { /* sin número, la fila no dice nada */ }
-    })();
-
-    /** ¿Esta quincena ya está cerrada? Solo con UNA empresa elegida. */
-    if (emp) {
-      void (async () => {
-        try {
-          const r = await fetch(`/api/asistencia/planilla-guardada?${q}`, { cache: "no-store" });
-          if (!r.ok) return;
-          const j = (await r.json()) as { cerrada?: { estado?: string } | null };
-          if (!vivo) return;
-          setConteos((c) => ({ ...c, quincenaCerrada: j.cerrada?.estado === "cerrada" }));
-        } catch { /* sin dato, la fila no dice nada */ }
-      })();
-    }
-
-    return () => { vivo = false; };
-  }, [empresa, desde, hasta]);
+  const conteos = useConteosPortada(empresa, desde, hasta);
 
   const filas = filasDeLaPortada(pestanas, conteos);
 
@@ -191,4 +114,98 @@ export default function PortadaCelular({
       </section>
     </div>
   );
+}
+
+/**
+ * Los números de la portada. Las MISMAS lecturas de cada pestaña; solo leen.
+ * 73 (revisión 110): también los usa el selector de secciones del título,
+ * ahora que en el celular se entra directo a Asistencia.
+ */
+export function useConteosPortada(empresa: string, desde: string, hasta: string, activo = true): ConteosPortada {
+  const [conteos, setConteos] = useState<ConteosPortada>({
+    colaboradores: null, sinFicha: null, personasDelReporte: null, ausencias: null,
+    porDecidir: null, horasPorDecidir: null, quincenaCerrada: null,
+    conDeuda: null, deudaTotal: null,
+  });
+
+  useEffect(() => {
+    if (!activo) return;
+    let vivo = true;
+    const emp = empresaParaPedir(empresa);
+    const q = new URLSearchParams({ desde, hasta });
+    if (emp) q.set("empresa", emp);
+
+    /** Los colaboradores y cuántos no tienen ficha. La MISMA ruta de la pestaña. */
+    void (async () => {
+      try {
+        const r = await fetch("/api/asistencia/configuracion", { cache: "no-store" });
+        if (!r.ok) return;
+        const j = (await r.json()) as { resumen?: { total?: number; sinConfigurar?: number } };
+        if (!vivo) return;
+        setConteos((c) => ({
+          ...c,
+          colaboradores: j.resumen?.total ?? null,
+          sinFicha: j.resumen?.sinConfigurar ?? null,
+        }));
+      } catch { /* sin número, la fila no dice nada */ }
+    })();
+
+    /** Las horas extra por decidir. La MISMA lectura de Aprobaciones. */
+    void (async () => {
+      try {
+        const p = new URLSearchParams(q);
+        p.set("aprobaciones", "1");
+        const r = await fetch(`/api/asistencia/planilla?${p}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const j = (await r.json()) as { aprobaciones?: DiaAprobacion[] };
+        if (!vivo) return;
+        const { pendientes, minutos } = resumenPendientes(j.aprobaciones ?? []);
+        setConteos((c) => ({
+          ...c,
+          porDecidir: pendientes,
+          horasPorDecidir: pendientes > 0 ? `${hm(minutos)} h` : null,
+          // 74 (revisión 110): cuántos colaboradores, de la MISMA lectura.
+          ...(ASIS_PENDIENTES_CON_UNIDAD_R110
+            ? { colaboradoresPorDecidir: resumenPorDecidir(j.aprobaciones ?? []).renglones, minutosPorDecidir: minutos }
+            : {}),
+        }));
+      } catch { /* sin número, la fila no dice nada */ }
+    })();
+
+    /** Quién debe. La MISMA lectura de Préstamos. */
+    void (async () => {
+      try {
+        const r = await fetch(`/api/asistencia/prestamos-deuda?${new URLSearchParams({ desde, hasta })}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const j = (await r.json()) as { fichas?: { empresa?: string | null; saldo?: number }[] };
+        if (!vivo) return;
+        // 🔑 El MISMO filtro por empresa que la pestaña, y el MISMO campo de
+        // saldo. Acá no se recalcula nada: se suman los saldos que ya vienen.
+        const fichas = (j.fichas ?? []).filter((f) => !emp || f.empresa === emp);
+        const total = fichas.reduce((a, f) => a + (f.saldo ?? 0), 0);
+        setConteos((c) => ({
+          ...c,
+          conDeuda: fichas.length,
+          deudaTotal: fichas.length > 0 ? money(total) : null,
+        }));
+      } catch { /* sin número, la fila no dice nada */ }
+    })();
+
+    /** ¿Esta quincena ya está cerrada? Solo con UNA empresa elegida. */
+    if (emp) {
+      void (async () => {
+        try {
+          const r = await fetch(`/api/asistencia/planilla-guardada?${q}`, { cache: "no-store" });
+          if (!r.ok) return;
+          const j = (await r.json()) as { cerrada?: { estado?: string } | null };
+          if (!vivo) return;
+          setConteos((c) => ({ ...c, quincenaCerrada: j.cerrada?.estado === "cerrada" }));
+        } catch { /* sin dato, la fila no dice nada */ }
+      })();
+    }
+
+    return () => { vivo = false; };
+  }, [empresa, desde, hasta, activo]);
+
+  return conteos;
 }

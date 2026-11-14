@@ -1,5 +1,6 @@
 "use client";
 
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -67,7 +68,7 @@ export default function EmpresaSelector({
   const nombreCorto = (empresa: string) => { const k = empresaKeyDeReclamo(empresa); return k ? nombreCortoEmpresa(k) : empresa; };
   const veTotales = role === "admin" || role === "secretaria";
   const buscador = (clase: string) => (
-    <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo, estilo o empresa…" className={`border-b border-gray-200 py-2 min-h-[44px] text-base sm:text-sm outline-none focus:border-black transition max-w-md ${clase}`} />
+    <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo, estilo o empresa…" className={`border-b border-gray-200 py-2 min-h-[44px] text-base sm:text-sm outline-none focus:border-black transition ${BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "" : "max-w-md"} ${clase}`} />
   );
   const botonNuevo = (clase = "") => (
     <button onClick={onNewReclamo} className={`text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all ${clase}`}>Nuevo reclamo</button>

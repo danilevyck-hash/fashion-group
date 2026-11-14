@@ -50,6 +50,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Error al leer el estado de cuenta" }, { status: 500 });
   }
 
+  // n.º 21 (revisión 110): «Descargar PDF» en la hoja de Boston pide el estado
+  // de cuenta ENTERO para armar el mismo papel del correo (firma Boston: la
+  // casa se deriva de su `empresa_key`). Solo lee; nada más cambia.
+  if (req.nextUrl.searchParams.get("forma") === "papel") return NextResponse.json(estado);
+
   // La forma que el cajón ya dibujaba. Boston es UNA empresa, así que sus
   // documentos son los de su única fila: no hay desglose que aplanar.
   const documentos = (estado.empresas[0]?.documentos ?? []).map((d) => ({

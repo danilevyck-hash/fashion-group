@@ -176,7 +176,8 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
       seleccion={{ anio: year, mes: esTodoElAnio(mes) || enRango ? null : mes }}
       onMes={(y, m) => onChange(y, m)}
       todoElAnio={{ activo: !enRango && esTodoElAnio(mes) ? year : null, onElegir: (y) => onChange(y, MES_TODO_EL_ANIO) }}
-      botonClassName={`w-[110px] shrink-0 px-2.5 sm:w-auto sm:px-3 ${rangoAlLado ? "" : className ?? ""}`}
+      // Con `rotulo` (el mes escrito completo, revisión 110 n.º 31) el botón mide lo que su texto.
+      botonClassName={`${rotulo ? "w-auto" : "w-[110px]"} shrink-0 px-2.5 sm:w-auto sm:px-3 ${rangoAlLado ? "" : className ?? ""}`}
     />
   ) : (
     <div className={`relative ${rangoAlLado ? "" : className ?? ""}`}>

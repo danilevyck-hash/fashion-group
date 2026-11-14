@@ -104,7 +104,9 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     const src = leer("src/app/despachos/components/PedidosView.tsx");
     expect(src).toContain("POR_EMPRESA ? tabla : tablaV2");
     expect(src).toContain("POR_EMPRESA && !barra && (");
-    expect(src).toContain("menu={POR_EMPRESA ? (");
+    // Revisión 110 · n.º 60: en el celular la impresora va en el título (o en el «···» con el interruptor apagado).
+    expect(src).toContain("iconos={POR_EMPRESA && PEDIDOS_IMPRESORA_EN_EL_TITULO");
+    expect(src).toContain("menu={POR_EMPRESA && !PEDIDOS_IMPRESORA_EN_EL_TITULO ? (");
   });
 
   // Daniel, 6-oct-2026: «Vendedor y empresa se confunden» y «Compañía debe tener más protagonismo».
@@ -150,7 +152,7 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     expect(pdf).not.toMatch(/NAVY|CEBRA|estilosDeTabla|\.total\b|fmt\(/);
     const src = leer("src/app/despachos/components/PedidosView.tsx");
     expect(src).toContain("construirPdfPedidos(titulo, visibles, hoy)");
-    expect(src.match(/onClick=\{\(\) => void imprimir\(\)\}/g)).toHaveLength(2); // compu + «···»
+    expect(src.match(/onClick=\{\(\) => void imprimir\(\)\}/g)).toHaveLength(3); // compu + ícono del título + «···» (apagado)
   });
 
   it("la primera columna dice la antigüedad: hoy · ayer · hace N días", () => {

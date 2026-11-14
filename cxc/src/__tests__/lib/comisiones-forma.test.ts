@@ -551,9 +551,9 @@ describe("🔴 20 · los que no se pagan, detrás de «Ver los que no se pagan»
 describe("🔴 se fueron las CUATRO pestañas: un selector y un ⚙", () => {
   const shell = plano(leer("src/components/comisiones/ComisionesView.tsx"));
 
-  it("la primera opción se llama «Todas», como en todo el sistema (Daniel, 5-oct-2026)", () => {
-    expect(ROTULO_GRUPO).toBe("Todas");
-    expect(OPCIONES_VISTA[0]).toMatchObject({ valor: VISTA_GRUPO, etiqueta: "Todas" });
+  it("la primera opción se llama «Todas las empresas», como en todo el sistema (Daniel, 14-nov-2026)", () => {
+    expect(ROTULO_GRUPO).toBe("Todas las empresas");
+    expect(OPCIONES_VISTA[0]).toMatchObject({ valor: VISTA_GRUPO, etiqueta: "Todas las empresas" });
     expect(OPCIONES_VISTA.some((o) => o.etiqueta === "Fashion Group")).toBe(false);
   });
 

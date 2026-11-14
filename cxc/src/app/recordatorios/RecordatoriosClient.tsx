@@ -80,6 +80,7 @@ import RecordatorioFormModal, {
   type RecordatorioFormValues,
 } from "./components/RecordatorioFormModal";
 import LineaNueva, { type RecordatorioRapido } from "./components/LineaNueva";
+import { RECORDATORIOS_BUSCADOR_IZQUIERDA_2026_11, RECORDATORIOS_UNA_PUERTA_2026_11 } from "@/lib/ui/revision-110-marketing";
 import { useAccionesCheque } from "./acciones-cheque";
 import PuertaRecordar from "./components/PuertaRecordar";
 import AgendaLista from "./components/AgendaLista";
@@ -504,6 +505,19 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
   const chequeDelDia = dayModal ? cheques.filter((c) => c.fecha_deposito === dayModal) : [];
   const recsDelDia = dayModal ? recordatorios.filter((r) => ocurreEn(r, dayModal)) : [];
 
+  // UN solo botón de alta (una sola puerta), en la fila que toque.
+  const botonNuevo = (
+    <button
+      data-puerta-boton
+      onClick={() => setPuertaAbierta(true)}
+      disabled={!isOnline}
+      title={!isOnline ? "Sin conexión" : undefined}
+      className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      ＋ Nuevo
+    </button>
+  );
+
   return (
     <PullToRefresh
       onRefresh={async () => {
@@ -535,31 +549,57 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
                 }
               />
             </ProveedorBarraCelular>
-            <BarraAccionFija rotulo="＋ Nuevo" disabled={!isOnline} onClick={() => setPuertaAbierta(true)} />
+            <BarraAccionFija sobreLaBarra rotulo="＋ Nuevo" disabled={!isOnline} onClick={() => setPuertaAbierta(true)} />
           </>
         )}
         <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
           {/* Sin título grande: "Recordatorios" ya lo dicen la barra sticky
               (celular) y el breadcrumb (escritorio). Queda sr-only para no
               dejar la página sin encabezado. */}
+          <div className="flex flex-col">
+          <h1 className="sr-only">Recordatorios</h1>
+          {/* n.º 99 (computadora): el buscador a la IZQUIERDA llenando el ancho; los botones a la derecha. */}
+          {RECORDATORIOS_BUSCADOR_IZQUIERDA_2026_11 && !barra ? (
+            <div data-fila-buscador className="mb-6 flex flex-wrap items-center gap-3">
+              {viewMode === "lista" ? (
+                <input
+                  type="search"
+                  aria-label="Buscar"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar cheque o cliente"
+                  className="min-w-0 flex-1 basis-60 text-base sm:text-sm border border-gray-200 rounded-full px-4 min-h-[44px] outline-none focus:border-black transition"
+                />
+              ) : (
+                <span className="flex-1" />
+              )}
+              <div className="flex gap-2 bg-gray-100 rounded-full p-0.5 w-fit">
+                {(["lista", "calendario"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={viewMode === v}
+                    onClick={() => setViewMode(v)}
+                    className={`min-h-[44px] px-4 text-xs rounded-full transition inline-flex items-center justify-center ${viewMode === v ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}
+                  >
+                    {v === "lista" ? "Lista" : "Calendario"}
+                  </button>
+                ))}
+              </div>
+              {botonNuevo}
+            </div>
+          ) : null}
+          {!(RECORDATORIOS_BUSCADOR_IZQUIERDA_2026_11 && !barra) && (
+          <>
           <div className={barra ? "hidden" : undefined}>
           <div className="flex items-center justify-end mb-5">
-            <h1 className="sr-only">Recordatorios</h1>
             <div className="flex flex-wrap items-center gap-3">
               {/* 🔴 El botón de Excel se retiró el 5-sep-2026 (Daniel: «se va»).
                   Los datos siguen en la base; lo que se fue es la descarga. */}
               {/* 🔴 UNA SOLA PUERTA (22-sep-2026). Acá había «Nuevo Cheque», y
                   la caja de escribir vivía aparte más abajo: dos puertas que no
                   se conocían. Daniel: «cheque es un motivo de recordatorio». */}
-              <button
-                data-puerta-boton
-                onClick={() => setPuertaAbierta(true)}
-                disabled={!isOnline}
-                title={!isOnline ? "Sin conexión" : undefined}
-                className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                ＋ Nuevo
-              </button>
+              {botonNuevo}
             </div>
           </div>
 
@@ -600,6 +640,9 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
               </div>
             )}
           </div>
+          </>
+          )}
+          </div>
 
           {viewMode === "lista" &&
             (loading ? (
@@ -622,7 +665,8 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
               Estaba arriba de la lista, con todo el ancho y nueve botones, y se
               usó DOS veces en 17 días mientras los cheques son 19 filas. La
               lista es lo que se viene a ver; esto es un atajo para una nota. */}
-          {viewMode === "lista" && !loading && (
+          {/* n.º 98: una sola puerta para crear («＋ Nuevo»); la caja de abajo sale. */}
+          {viewMode === "lista" && !loading && !RECORDATORIOS_UNA_PUERTA_2026_11 && (
             <LineaNueva
               hoy={hoy}
               puedeElegirDestino={initialData.puedeElegirDestino}

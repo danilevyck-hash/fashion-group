@@ -137,7 +137,7 @@ describe("🔴 3 · cambiar de pestaña refresca desde la base, sin Switch", () 
 
   it("`cargar` solo lee /api/guias/pedidos con GET, nada de sync", () => {
     const v = vista();
-    const cargar = v.slice(v.indexOf("async function cargar()"), v.indexOf("useEffect(() => { void cargar(); }, []);"));
+    const cargar = v.slice(v.indexOf("async function cargar("), v.indexOf("useEffect(() => { void cargar(); }, []);"));
     expect(cargar).toContain('fetch("/api/guias/pedidos", { cache: "no-store" })');
     expect(cargar).not.toMatch(/\bsync|switch/i);
   });

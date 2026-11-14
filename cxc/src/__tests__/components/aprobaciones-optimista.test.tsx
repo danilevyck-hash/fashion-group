@@ -107,11 +107,11 @@ describe("🔴 1 · el toque se ve en el acto, sin esperar el fetch", () => {
   it("el renglón se va y el contador baja ANTES de que el POST conteste", async () => {
     await montar();
     // 1-oct-2026, Daniel: nombres normales de ERP («por decidir · » → «pendientes · »).
-    expect(contador()).toBe("3pendientes · 3:53 h");
+    expect(contador()).toBe("3colaboradores · 3 días · 3:53 h");
     await toca(boton(/^Sí a KEVIN LUBO$/));
     expect(posts).toHaveLength(1);           // el POST salió…
     expect(enLista("KEVIN LUBO")).toBe(false); // …y el renglón ya se fue
-    expect(contador()).toBe("2pendientes · 2:42 h");
+    expect(contador()).toBe("2colaboradores · 2 días · 2:42 h");
   });
 
   it("🔴 solo lo que viaja se apaga; otra persona se puede tocar → dos POST", async () => {
@@ -133,7 +133,7 @@ describe("🔴 4 · si el POST falla, el renglón vuelve a como estaba", () => {
     await waitFor(() => expect(enLista("KEVIN LUBO")).toBe(true));
     expect(boton(/^Sí a KEVIN LUBO$/).disabled).toBe(false);
     expect(screen.getByText(/No se pudo guardar/)).toBeTruthy();
-    expect(contador()).toBe("3pendientes · 3:53 h");
+    expect(contador()).toBe("3colaboradores · 3 días · 3:53 h");
   });
 });
 

@@ -102,11 +102,10 @@ describe("en el celular, elegir una sección SIEMPRE la abre", () => {
     });
   }
 
-  it("desde la portada, tocar «Asistencia» abre Asistencia", async () => {
+  // 73 (revisión 110, `ASIS_SIN_PORTADA_R110`): sin portada, entrar sin `?tab=`
+  // ya es estar en Asistencia, con el título como único selector.
+  it("sin `?tab=`, el celular entra directo a Asistencia", async () => {
     montar("");
-    const fila = await screen.findByRole("button", { name: /^Asistencia/ });
-    await act(async () => { fireEvent.click(fila); });
-    expect(tabEscrita()).toBe("asistencia");
     await waitFor(() =>
       expect((screen.getByRole("combobox", { name: "Sección" }) as HTMLSelectElement).value).toBe("asistencia"));
   });

@@ -69,9 +69,11 @@ interface Props {
    * Sin la prop, la lista es la de siempre.
    */
   conMonto?: boolean;
+  /** n.º 44 (revisión 110): los tres chips en UNA fila. */
+  chipsEnUnaFila?: boolean;
 }
 
-export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false }: Props) {
+export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false, chipsEnUnaFila = false }: Props) {
   // El chip vive en la URL: un enlace a «los que no vuelven» se puede compartir
   // y el back del navegador no cicla por los chips (van con `replace`).
   const [chipUrl, setChip] = useUrlState<string>("mfCliChip", CHIP_INICIAL);
@@ -148,7 +150,7 @@ export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false }: Pr
       <Card className="overflow-hidden p-0">
         {/* LOS TRES CHIPS. «Frecuentes» se retiró: el que compra seguido no
             necesita que lo busquen. Las TARJETAS de arriba no se tocaron. */}
-        <div data-elemento={conMonto ? "chips" : undefined} className="flex flex-wrap items-center gap-1.5 border-b border-gray-100 px-3 py-2">
+        <div data-elemento={conMonto ? "chips" : undefined} className={chipsEnUnaFila ? "flex flex-nowrap items-center gap-1.5 border-b border-gray-100 px-2 py-2" : "flex flex-wrap items-center gap-1.5 border-b border-gray-100 px-3 py-2"}>
           {CHIPS.map((c) => (
             <button
               key={c}
@@ -157,13 +159,15 @@ export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false }: Pr
               aria-pressed={chip === c}
               className={cn(
                 "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
+                chipsEnUnaFila && "min-w-0 shrink whitespace-nowrap !gap-1 !px-2.5",
                 chip === c
                   ? "border-gray-900 bg-gray-900 text-white"
                   : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900",
               )}
             >
-              {ROTULO_CHIP[c]}
-              <span className={cn(" tabular-nums", chip === c ? "text-white/80" : "text-gray-400")}>
+              {/* En una fila: si no cabe, se corta el rótulo con «…», nunca el número. */}
+              {chipsEnUnaFila ? <span className="min-w-0 truncate">{ROTULO_CHIP[c]}</span> : ROTULO_CHIP[c]}
+              <span className={cn(" tabular-nums", chipsEnUnaFila && "shrink-0", chip === c ? "text-white/80" : "text-gray-400")}>
                 {conteos[c].toLocaleString()}
               </span>
             </button>

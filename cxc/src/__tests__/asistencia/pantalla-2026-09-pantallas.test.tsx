@@ -214,7 +214,7 @@ describe("B · Asistencia en el celular", () => {
     await screen.findByText("Ana Trejos");
     expect(screen.getByText(lineaDeDias(1, "17:00"))).toBeTruthy();
     // Ana llegó 17 minutos tarde: la tarjeta lo dice con el mismo formato.
-    expect(screen.getByText(/1 tardanza de 17m$/)).toBeTruthy();
+    expect(screen.getByText(/1 tardanza 0:17 h$/)).toBeTruthy();
     // Jailine no tiene nada: se dice en verde, nunca con un cero.
     expect(screen.getByText(SIN_NADA_QUE_REVISAR)).toBeTruthy();
   });

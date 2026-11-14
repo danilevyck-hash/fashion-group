@@ -39,6 +39,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { fmtMoneyCompact } from "./format";
+import { VENTAS_SIN_NA } from "@/lib/ui/revision-110-ventas";
 
 /** 🔴 Hoy PRENDIDO. `false` = las tres pestañas de antes, intactas. */
 export const VENTAS_CELULAR = true;
@@ -132,7 +133,8 @@ export function montoDeLaTabla(n: number | null | undefined): string {
 export function porcentajeDeLaTabla(
   ratio: number | null | undefined,
 ): { texto: string; tono: "up" | "dn" | "fl" } {
-  if (ratio == null || !Number.isFinite(ratio)) return { texto: "n/a", tono: "fl" };
+  // n.º 8 (revisión 110): «—», como la computadora; «n/a» era inglés.
+  if (ratio == null || !Number.isFinite(ratio)) return { texto: VENTAS_SIN_NA ? "—" : "n/a", tono: "fl" };
   const pct = ratio * 100;
   const entero = Math.round(Math.abs(pct));
   if (pct > 5) return { texto: `▲ +${entero}%`, tono: "up" };
@@ -344,3 +346,22 @@ export const TITULO_HOJA_DESCARGA = "Descargar";
 export function subtituloDeLaPestana(pestana: string, periodo: string): string {
   return `${pestana} · ${periodo}`;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Revisión 110 (14-nov-2026)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** n.º 4 · «Última compra: hace 2 días» → «hace 2 días» (la lista no la corta). */
+export function ultimaCompraCorta(u: UltimaCompraEnPalabras | null): UltimaCompraEnPalabras | null {
+  if (!u) return null;
+  return { ...u, texto: u.texto.replace(/^Última compra:\s*/, "") };
+}
+
+/** n.º 104 · Un cliente sin código en Switch llega con «—»: no tiene ficha. */
+export function tieneCodigoDeCliente(id: string | null | undefined): boolean {
+  const t = (id ?? "").trim();
+  return t !== "" && t !== "—" && t !== "-";
+}
+
+/** Lo que dice el lugar del código cuando no hay. */
+export const SIN_CODIGO_EN_SWITCH = "Sin código en Switch";

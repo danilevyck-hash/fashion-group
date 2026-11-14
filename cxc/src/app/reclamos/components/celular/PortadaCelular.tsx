@@ -217,7 +217,7 @@ export default function PortadaCelular({
         </>
       )}
 
-      <CtaFija onClick={onNewReclamo}>Nuevo reclamo</CtaFija>
+      <CtaFija sobreLaBarra onClick={onNewReclamo}>Nuevo reclamo</CtaFija>
     </div>
   );
 }

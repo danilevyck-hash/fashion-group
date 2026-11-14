@@ -1,5 +1,7 @@
 "use client";
 
+import { useBarraCelular } from "@/components/celular/BarraDeControles";
+import { PLANTILLA_BUSCAR_CORTO } from "@/lib/ui/revision-110-despachos";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   EMPRESAS_DESTINO, MARCA_CATALOGO, descripcionesDeMarca, norm, marcaKey, marcaRubroKey,
@@ -115,6 +117,8 @@ export default function FormulasConfig({ scope = "depurador", apple = false, emb
   /** Dentro del grupo «Multifashion»: solo la lista, sin ayuda, buscador ni «+ Agregar marca». */
   embebido?: boolean;
 }) {
+  // n.º 88: en el celular el buscador va al lado de un botón y se cortaba; dice «Buscar» (sigue buscando marca y descripción).
+  const buscarCorto = useBarraCelular() && PLANTILLA_BUSCAR_CORTO;
   // Si el scope cambia, el padre debe remontar con key={scope} (el estado inicial
   // del catálogo se siembra una sola vez).
   const cfg = useMemo(
@@ -307,7 +311,7 @@ export default function FormulasConfig({ scope = "depurador", apple = false, emb
 
       {!embebido && <div className="mb-5 flex items-center justify-between gap-3">
         <input
-          value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar marca o descripción…"
+          value={search} onChange={(e) => setSearch(e.target.value)} placeholder={buscarCorto ? "Buscar" : "Buscar marca o descripción…"}
           className="min-h-[44px] w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
         />
         <button type="button" onClick={addMarca}

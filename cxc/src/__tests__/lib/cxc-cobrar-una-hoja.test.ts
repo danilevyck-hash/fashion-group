@@ -163,7 +163,8 @@ describe("🩸 las seis puertas viejas ya no existen", () => {
     const fila = leer("src/app/cxc/components/ClientRow.tsx");
     expect(fila).toContain("onCobrar");
     // 1-oct-2026, Daniel: nombres normales de ERP — en la fila no cabe más que «Enviar».
-    expect(fila).toMatch(/>\s*Enviar\s*</);
+    // Revisión 110 (n.º 21): un solo nombre, «Estado de cuenta».
+    expect(fila).toContain('"Estado de cuenta"');
   });
 
   it("y también en la tarjeta del celular", () => {

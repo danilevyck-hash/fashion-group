@@ -40,6 +40,7 @@
 //    en el iPad las acciones quedaban fuera de la pantalla.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -61,7 +62,8 @@ import {
   pasaLosDosFiltros,
   type VistaComprobante,
 } from "@/lib/catalogo/chips-comprobantes";
-import { pasaFiltroOrigen, type FiltroOrigen } from "@/lib/catalogo/origen-comprobante";
+import { pasaFiltroOrigen, unSoloOrigen, type FiltroOrigen } from "@/lib/catalogo/origen-comprobante";
+import { COMPROBANTES_ORIGEN_SOLO_SI_VARIA } from "@/lib/ui/revision-110-despachos";
 import {
   textoEliminarSeleccionados,
   textoPieDeComprobantes,
@@ -77,6 +79,9 @@ import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import { ID_ACCIONES_EN_LA_BARRA } from "@/lib/catalogo/catalogos-2026-10";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+import { BuscadorGris, Capsula } from "@/components/filtros/FiltroA";
+import { FILTRO_1_COMPROBANTES } from "@/lib/ui/revision-110-filtros";
+import { ROTULO_SELECCIONAR_TODOS } from "@/lib/catalogo/cuantas-comprobantes";
 
 // La fila que se pinta. Su forma vive en `lib/catalogo/fila-comprobante.ts`.
 export type { FilaComprobante, FilaDeOrders };
@@ -361,6 +366,9 @@ export default function ComprobantesPanel({
   // Agrupar por mes (el feed viene por fecha desc → los grupos salen del más
   // nuevo al más viejo).
   const grupos = agruparPorMes(visibles);
+  // n.º 57: si todos los comprobantes a la vista tienen el MISMO origen, la
+  // columna «Origen» lo repetiría en cada fila; el chip de arriba ya lo dice.
+  const sinOrigen = COMPROBANTES_ORIGEN_SOLO_SI_VARIA && unSoloOrigen(visibles);
   // 6-oct-2026: en la computadora cada encabezado ordena DENTRO de su mes; sin
   // tocar, lo más reciente arriba como siempre.
   const orden = useOrdenTabla<"origen" | "cliente" | "vendedor" | "total" | "fecha">("catalogo-comprobantes", {
@@ -497,6 +505,7 @@ export default function ComprobantesPanel({
 
   const propsDeFila = (pedido: FilaComprobante): PropsFila => ({
     pedido,
+    sinOrigen,
     marca,
     theme,
     esOrders: isOrdersRow(pedido),
@@ -536,7 +545,7 @@ export default function ComprobantesPanel({
     </button>
   ) : null;
   const buscadorV4 = (
-    <div className="relative sm:flex-1">
+    <div className={`relative sm:flex-1 ${BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "md:order-first" : ""}`}>
       <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
@@ -544,8 +553,37 @@ export default function ComprobantesPanel({
     </div>
   );
 
+  // 🔴 filtro-1 (revisión 110, aprobado 14-nov-2026): en el celular, el
+  // buscador a todo el ancho y debajo «Todos los orígenes ▾» · «Pedidos ▾» ·
+  // «Seleccionar todos» en UNA línea. Los mismos filtros y conteos de los chips.
+  // Sin «(18)» con 6 px de lado, la flecha de 12 px pegada al texto (el dibujo ya trae su aire) y 2 px entre piezas: así entran las dos
+  // cápsulas y «Seleccionar todos» en 358 pt (390 menos los márgenes).
+  const CAPSULA_JUSTA = "gap-0 px-1.5 [&>svg]:h-3 [&>svg]:w-3";
+  const filtrosCelular = FILTRO_1_COMPROBANTES ? (
+    <div data-filtro-1 className="mb-4 space-y-2 sm:hidden">
+      <BuscadorGris valor={search} onCambiar={setSearch} placeholder="Buscar cliente o número" />
+      {/* Cápsulas compactas para que las tres cosas quepan a 390 pt; si un día no caben, la fila baja, nunca se corta. */}
+      <div data-filtro-1-fila className="flex flex-wrap items-center gap-0.5">
+        <Capsula etiqueta="Origen" compacta className={CAPSULA_JUSTA} valor={origenFilter} onCambiar={(v) => setOrigenFilter(v as FiltroOrigen)}
+          conteoEnLaCapsula={false}
+          opciones={chips.origen.opciones.map((c) => ({ valor: c.clave, etiqueta: c.clave === "todos" ? "Todos los orígenes" : c.label, conteo: c.conteo }))} />
+        <Capsula etiqueta="Tipo" compacta className={CAPSULA_JUSTA} valor={vista} onCambiar={(v) => setVista(v as VistaComprobante)}
+          conteoEnLaCapsula={false}
+          opciones={chips.vista.opciones.map((c) => ({ valor: c.clave, etiqueta: c.label, conteo: c.conteo }))} />
+        {puedeAdministrar && visibles.length > 0 && (
+          <label data-seleccionar-todos className="inline-flex min-h-[44px] shrink-0 cursor-pointer select-none items-center gap-[3px] whitespace-nowrap text-[14px] text-gray-900">
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4 cursor-pointer accent-black" />
+            {ROTULO_SELECCIONAR_TODOS}
+          </label>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div>
+      {filtrosCelular}
+      <div className={filtrosCelular ? "hidden sm:block" : undefined}>
       {v4 ? (
         <>
           {barra ? (botonExcelV4 && createPortal(botonExcelV4, barra)) : botonExcelV4 && <div className="flex justify-end mb-2">{botonExcelV4}</div>}
@@ -600,6 +638,7 @@ export default function ComprobantesPanel({
       </div>
       </>
       )}
+      </div>
 
       {visibles.length === 0 ? (
         <div className="text-center py-16">
@@ -624,11 +663,11 @@ export default function ComprobantesPanel({
           {/* Selección masiva: "todos" = filas visibles. Todo el bloque es de
               admin/secretaria — `bulk-delete` responde 403 al vendedor. */}
           {puedeAdministrar && (
-            <div className="flex items-center justify-between gap-3 mb-3 min-h-[38px]">
+            <div className={`items-center justify-between gap-3 mb-3 min-h-[38px] ${filtrosCelular && selectedRows.length === 0 ? "hidden sm:flex" : "flex"}`}>
               {/* 🔴 EL BLANCO QUE SE TOCA MIDE 44 (24-sep-2026): la casilla es
                   de 16 px y el rótulo entero es lo que se toca, así que el
                   mínimo se le pide a la etiqueta, no al cuadradito. */}
-              <label className={`inline-flex items-center gap-2 px-1 text-sm text-gray-600 cursor-pointer select-none${
+              <label className={`${filtrosCelular ? "hidden sm:inline-flex" : "inline-flex"} items-center gap-2 px-1 text-sm text-gray-600 cursor-pointer select-none${
                 CATALOGO_ORDEN_CELULAR ? " min-h-[44px]" : ""
               }`}>
                 <input
@@ -669,7 +708,7 @@ export default function ComprobantesPanel({
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className={puedeAdministrar ? "w-8 pl-4 pr-1 py-3" : "w-0 p-0"}></th>
-                      <ThOrden col="origen" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Origen</ThOrden>
+                      {!sinOrigen && <ThOrden col="origen" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Origen</ThOrden>}
                       <ThOrden col="cliente" api={orden} className="text-left px-2 lg:px-4 py-3 font-medium text-gray-500">Cliente</ThOrden>
                       <ThOrden col="vendedor" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Vendedor</ThOrden>
                       {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): el servidor ya le manda

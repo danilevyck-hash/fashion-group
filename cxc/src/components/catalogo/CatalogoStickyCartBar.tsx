@@ -4,6 +4,8 @@
 // MARCA_THEME. Las secciones Pedido/Pre-orden del mini-carrito son feature
 // (preorder, hoy solo Reebok).
 
+import { ATRIBUTO_BARRA_FIJA, ATRIBUTO_SOBRE_LA_BARRA } from "@/lib/navegacion/barra-celular";
+import { BARRA_EN_LISTAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
@@ -184,6 +186,7 @@ export default function CatalogoStickyCartBar({
     <>
     <div
       ref={barraRef}
+      {...(BARRA_EN_LISTAS_2026_11 ? { [ATRIBUTO_BARRA_FIJA]: "", [ATRIBUTO_SOBRE_LA_BARRA]: "" } : {})}
       className="fixed bottom-0 left-0 right-0 z-40"
       style={{ animation: "slideUp 0.25s ease-out" }}
     >

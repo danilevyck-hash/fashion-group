@@ -37,13 +37,47 @@
 import type { AppModule } from "@/lib/modules";
 import { gruposDelCajon } from "@/lib/navegacion/cajon-por-grupos";
 import { esRolMarcacion } from "@/lib/marcacion/rol";
+import { BARRA_SIN_MAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 
 /** `false` = el botón redondo ☰ de hoy (y el menú del usuario dentro del ☰).
  *  Daniel aprobó el 2-oct-2026 la barra de pestañas y el avatar: prendida. */
 export const TAB_BAR_2026_10 = true;
 
-/** Cuántos módulos van en la barra: Inicio + 3 + «Más» = 5, el tope de iOS. */
-export const PESTANAS_DE_MODULO = 3;
+/** Cuántos módulos van en la barra: 5 destinos, el tope de iOS. Con «Más»
+ *  eran Inicio + 3 + «Más»; sin «Más» (14-nov-2026, n.º 37) son Inicio + 4. */
+export const PESTANAS_DE_MODULO = BARRA_SIN_MAS_2026_11 ? 4 : 3;
+
+/**
+ * 🔴 LA BARRA FIJA DE UNA PERSONA (Daniel, 14-nov-2026, mockup 37c): la suya es
+ * Inicio · Catálogos · Ventas · Por cobrar · Asistencia, y no se recalcula con
+ * sus visitas. Por el usuario de login (`fg_users.name`), en minúsculas.
+ * Igual se filtra con los módulos que la persona tiene.
+ */
+export const BARRA_FIJA_POR_USUARIO: Readonly<Record<string, readonly string[]>> = {
+  daniel: ["catalogos", "ventas", "cxc", "asistencia"],
+};
+
+/** La barra fija de este usuario, o `null` si la suya es la automática. */
+export function barraFijaDe(usuario: string | null | undefined): readonly string[] | null {
+  if (!BARRA_SIN_MAS_2026_11 || !usuario) return null;
+  return BARRA_FIJA_POR_USUARIO[usuario.trim().toLowerCase()] ?? null;
+}
+
+/**
+ * 🔴 EL ROBOT DE CAPTURAS NO CUENTA COMO USO (14-nov-2026). Ese día un robot
+ * recorrió todas las pantallas con el usuario de Daniel para sacar las fotos
+ * de la revisión: esas visitas no son de nadie. Se quitan al ordenar la barra.
+ */
+export const VISITAS_DEL_ROBOT: readonly { usuario: string; dia: string }[] = [
+  { usuario: "daniel", dia: "2026-11-14" },
+];
+
+/** Las filas de uso sin las visitas del robot de capturas. */
+export function sinVisitasDelRobot<T extends { dia: string }>(filas: readonly T[], usuario: string | null | undefined): T[] {
+  const u = (usuario ?? "").trim().toLowerCase();
+  const dias = new Set(VISITAS_DEL_ROBOT.filter((r) => r.usuario === u).map((r) => r.dia));
+  return dias.size === 0 ? [...filas] : filas.filter((f) => !dias.has(f.dia));
+}
 
 /** Alto de la barra (cápsula de iOS 26) y su separación del piso. */
 export const ALTO_TAB_BAR = 60;
@@ -99,11 +133,20 @@ export function pestanasDelRol(
   ordenDeLaPersona: readonly string[] = [],
   /** La casa del rol: ya es la pestaña «Inicio», no se repite. */
   casaHref = "/home",
+  /** El usuario de login: si tiene barra fija, manda la suya. */
+  usuario?: string | null,
 ): AppModule[] {
   if (!role || esRolMarcacion(role)) return [];
   const todos = gruposDelCajon(role, fgModules).flatMap((g) => g.modulos);
   if (todos.length <= 1) return [];
   const delMenu = todos.filter((m) => m.href !== casaHref);
+  const fija = barraFijaDe(usuario);
+  if (fija) {
+    return fija
+      .map((k) => delMenu.find((m) => m.key === k))
+      .filter((m): m is AppModule => !!m)
+      .slice(0, PESTANAS_DE_MODULO);
+  }
   const uso = [...(FIJAS_POR_ROL[role] ?? []), ...ordenDeLaPersona, ...(USO_MEDIDO_POR_ROL[role] ?? [])];
   const rango = (k: string) => {
     const i = uso.indexOf(k);
@@ -134,6 +177,8 @@ export function ventanaDeLaSemana(hoyYmd: string): { desde: string; hasta: strin
 
 /** Una fila de `visitas_modulo`, lo justo para ordenar. */
 export interface FilaUso {
+  /** YYYY-MM-DD; solo hace falta para quitar al robot de capturas. */
+  dia?: string;
   modulo: string;
   aparato: string;
   visitas: number;

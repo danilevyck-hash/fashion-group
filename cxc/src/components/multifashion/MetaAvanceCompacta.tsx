@@ -21,7 +21,8 @@
 // siempre sigue existiendo para el interruptor apagado.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Pencil, TrendingDown, TrendingUp } from "lucide-react";
+import { ICONOS_DE_LINEA_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { Pencil, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { textoAporteNoAsignado } from "@/lib/multifashion/metas-clave";
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
@@ -59,7 +60,7 @@ export function MetaAvanceCompacta({ meta, puedeEditar, onEditar }: Props) {
             {meta.tipo === "vendedora" && " · meta de cada vendedora"}
             {!meta.activa && " · pausada"}
             {(meta.premio || meta.premioMonto != null) && (
-              <> · 🏆 {meta.premio}{meta.premioMonto != null && <span className="tabular-nums"> ({fmtMoney(meta.premioMonto)})</span>}</>
+              <> · {ICONOS_DE_LINEA_2026_11 ? <Trophy aria-hidden className="inline h-3.5 w-3.5 align-[-2px]" /> : "🏆"} {meta.premio}{meta.premioMonto != null && <span className="tabular-nums"> ({fmtMoney(meta.premioMonto)})</span>}</>
             )}
           </p>
         </div>

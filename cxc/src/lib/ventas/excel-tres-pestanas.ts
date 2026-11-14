@@ -24,6 +24,7 @@ import type { VentasResumen } from "@/components/ventas/types";
 import type { ModoExcelResumen } from "./excel";
 import type { ClientesExcelOpts } from "./clientes-excel";
 import type { ProductosResponse } from "./productos";
+import { nombreExcelVentas } from "@/lib/ventas/nombre-archivo";
 
 /** Los nombres de las tres hojas, en el orden de las pestañas. */
 export const HOJAS_DE_LAS_TRES = ["Resumen", "Clientes", "Productos"] as const;
@@ -37,7 +38,7 @@ export interface LasTresPestanas {
 
 /** «Ventas-2026.xlsx» — el archivo de las tres. */
 export function nombreDeLasTres(year: number): string {
-  return `ventas-${year}.xlsx`;
+  return nombreExcelVentas(["Resumen", "Clientes", "Productos"], `ventas-${year}.xlsx`);
 }
 
 /**

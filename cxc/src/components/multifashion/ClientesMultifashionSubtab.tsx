@@ -35,6 +35,8 @@
 // identidad es el CÓDIGO de Switch.
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { MF_CLIENTES_SIN_REPETIR } from "@/lib/ui/revision-110-ventas";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { Package, Users, ChevronDown, Store, Repeat, UserPlus, Moon, Percent } from "lucide-react";
@@ -184,6 +186,20 @@ export function computeRange(
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
+/** El id del hueco que el encabezado del celular deja junto a «Actualizado ↻». */
+export const HUECO_LINEA_CLIENTES = "mf-linea-clientes";
+
+/** En el celular entra al renglón de «Actualizado ↻»; sin ese renglón, va sola. */
+function LineaResumenClientes({ texto }: { texto: string }) {
+  const [hueco, setHueco] = useState<HTMLElement | null>(null);
+  useEffect(() => { setHueco(document.getElementById(HUECO_LINEA_CLIENTES)); }, []);
+  if (hueco && hueco.offsetParent !== null) {
+    return createPortal(<span data-elemento="resumen-clientes" className="tabular-nums">{texto} ·</span>, hueco);
+  }
+  const linea = <span data-elemento="resumen-clientes" className="text-sm text-gray-500 tabular-nums">{texto}</span>;
+  return <p className="-mb-2">{linea}</p>;
+}
+
 export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: ClientesMultifashionSubtabProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -307,13 +323,22 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, periodo }: Clien
             </Card>
           ) : (
             <>
-              {fidel && (
+              {fidel && MF_CLIENTES_SIN_REPETIR && (
+                // n.º 44 / 44b (revisión 110): sin el «891» grande —lo dice el
+                // chip— y la línea solo con lo que los chips no dicen. Los
+                // «nuevos del mes» se fueron de aquí: la tarjeta contaba los
+                // REGISTRADOS y el chip a quien COMPRÓ por primera vez (21 vs 20).
+                <LineaResumenClientes
+                  texto={`${fidel.cards.frecuentes.toLocaleString("en-US")} frecuentes · ${fidel.cards.cinco_pendiente.toLocaleString("en-US")} con descuento 5% pendiente`}
+                />
+              )}
+              {fidel && !MF_CLIENTES_SIN_REPETIR && (
                 <NumeroGrande
                   monto={numeroNoVuelven(clientesLista).toLocaleString("en-US")}
                   linea={`no vuelven · ${fidel.cards.frecuentes.toLocaleString("en-US")} frecuentes · ${fidel.cards.nuevos_mes.toLocaleString("en-US")} nuevos del mes · ${fidel.cards.cinco_pendiente.toLocaleString("en-US")} con descuento 5% pendiente`}
                 />
               )}
-              {fidel && <ListaSeguimientoClientes clientes={clientesLista} hoy={fidel.hoy} conMonto />}
+              {fidel && <ListaSeguimientoClientes clientes={clientesLista} hoy={fidel.hoy} conMonto chipsEnUnaFila={MF_CLIENTES_SIN_REPETIR} />}
               {pie && <p data-elemento="pie-clientes" className="text-xs text-gray-500 tabular-nums">{pie}</p>}
             </>
           )}

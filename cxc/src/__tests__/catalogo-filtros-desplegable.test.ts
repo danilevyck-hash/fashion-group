@@ -116,7 +116,10 @@ describe("la fila que se arrastraba sale de la pantalla del celular y del iPad",
     // esos mismos controles— y vive detrás de `CATALOGO_ORDEN_CELULAR`. Si
     // aparece un segundo `sm:hidden`, alguien volvió a partir la pantalla por
     // otro lado y hay que mirarlo.
-    expect((FUENTE.match(/\bsm:hidden\b/g) ?? []).length).toBe(1);
+    // 14-nov-2026: el segundo es el filtro «a» del celular (`FILTRO_A_2026_11`),
+    // que reemplaza toda la fila en el teléfono; ningún otro.
+    expect((FUENTE.match(/\bsm:hidden\b/g) ?? []).length).toBe(2);
+    expect(FUENTE).toContain('data-filtro-a-catalogo className="mb-3 space-y-2 sm:hidden"');
   });
 
   it("y de `lg` para arriba las PÍLDORAS también envuelven — nada se arrastra", () => {

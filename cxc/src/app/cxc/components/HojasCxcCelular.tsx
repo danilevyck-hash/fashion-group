@@ -17,11 +17,13 @@
 // filtro. Boston no entra: la lista de empresas la manda quien llama.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { useMemo } from "react";
 import { ModalOverlay } from "@/components/ui";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import MenuDescargar from "./MenuDescargar";
+import { CXC_EMPRESA_BAJO_EL_TITULO } from "@/lib/ui/revision-110-cxc";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { carteraPorEmpresa, haceCuanto, montoExacto } from "@/lib/cxc/lista-celular";
 import type { ClaveDescarga } from "@/lib/cxc/descargas";
@@ -60,34 +62,51 @@ function Hoja({
 // 1 · Elegir empresa
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** La clave de la opción «Confecciones Boston» del título (n.º 13). No es una empresa del grupo. */
+export const ELEGIDA_BOSTON = "__boston__";
+
 export function HojaElegirEmpresa({
   empresas,
   elegida,
   onElegir,
   onCerrar,
+  conBoston = false,
+  conTodas = true,
 }: {
   empresas: Company[];
   elegida: string;
   onElegir: (key: string) => void;
   onCerrar: () => void;
+  /** n.º 13: «Confecciones Boston» al final, aparte —nunca sumada al grupo—. */
+  conBoston?: boolean;
+  /** Ofrecer «Todas las empresas» (el grupo entero). */
+  conTodas?: boolean;
 }) {
-  const opciones = [{ key: "all", name: "Todas" }, ...empresas];
+  const rotuloTodas = CXC_EMPRESA_BAJO_EL_TITULO ? "Todas las empresas" : ROTULO_TODAS;
+  const opciones = [...(conTodas ? [{ key: "all", name: rotuloTodas }] : []), ...empresas];
+  const fila = (key: string, name: string) => (
+    <li key={key}>
+      <button
+        type="button"
+        onClick={() => onElegir(key)}
+        className="flex min-h-[44px] w-full items-center justify-between px-5 py-3 text-left text-[17px] text-gray-900 active:bg-gray-50"
+      >
+        <span>{name}</span>
+        {elegida === key && <span className="text-blue-600">✓</span>}
+      </button>
+    </li>
+  );
   return (
     <Hoja titulo="Seleccionar empresa" onCerrar={onCerrar}>
       <ul className="divide-y divide-gray-100">
-        {opciones.map((o) => (
-          <li key={o.key}>
-            <button
-              type="button"
-              onClick={() => onElegir(o.key)}
-              className="flex min-h-[44px] w-full items-center justify-between px-5 py-3 text-left text-[17px] text-gray-900 active:bg-gray-50"
-            >
-              <span>{o.name}</span>
-              {elegida === o.key && <span className="text-blue-600">✓</span>}
-            </button>
-          </li>
-        ))}
+        {opciones.map((o) => fila(o.key, o.name))}
       </ul>
+      {conBoston && (
+        // Aparte, con su propio bloque: es otra cartera, no una empresa más del grupo.
+        <ul data-opcion-boston className="mt-2 border-t-8 border-gray-100">
+          {fila(ELEGIDA_BOSTON, "Confecciones Boston")}
+        </ul>
+      )}
     </Hoja>
   );
 }

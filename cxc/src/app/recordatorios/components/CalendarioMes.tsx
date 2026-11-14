@@ -14,6 +14,8 @@
  * arreglo viajaron con su código.
  */
 
+import { Bell } from "lucide-react";
+import { ICONOS_DE_LINEA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useRef, useState } from "react";
 import { StatusBadge } from "@/components/ui";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
@@ -439,7 +441,7 @@ export default function CalendarioMes({
           <span className="w-2 h-2 rounded-full bg-gray-300" /> Depositado
         </span>
         <span className="flex items-center gap-1">
-          <span aria-hidden>🔔</span> Recordatorio
+          {ICONOS_DE_LINEA_2026_11 ? <Bell aria-hidden className="h-3.5 w-3.5" /> : <span aria-hidden>🔔</span>} Recordatorio
         </span>
       </div>
     </div>

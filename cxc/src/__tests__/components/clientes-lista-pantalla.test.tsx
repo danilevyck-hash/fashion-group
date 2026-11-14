@@ -104,8 +104,9 @@ describe("🔴 LOS 150 EN UNA SOLA LISTA, SIN PÁGINAS", () => {
 describe("🔴 LOS CHIPS, CON SU CONTEO CALCULADO", () => {
   it("los cinco, con los números de este ejemplo", () => {
     pintar();
-    const chips = [...document.querySelectorAll('[data-bloque="chips"] button')].map((b) =>
-      (b.textContent ?? "").replace(/\s+/g, " ").trim(),
+    // Revisión 110: las 5 vistas viven en el menú «Todos 5 ▾».
+    const chips = [...document.querySelectorAll("[data-vista-opcion]")].map((b) =>
+      (b.textContent ?? "").replace("✓", "").replace(/\s+/g, " ").trim(),
     );
     expect(chips).toEqual([
       "Todos 5",
@@ -118,7 +119,7 @@ describe("🔴 LOS CHIPS, CON SU CONTEO CALCULADO", () => {
 
   it("tocar un chip filtra la lista a esos clientes", () => {
     pintar();
-    fireEvent.click(screen.getByRole("button", { name: /Sin contacto/ }));
+    fireEvent.click(document.querySelector('[data-vista-opcion="sin-contacto"]')!);
     // El chip viaja a la URL con REPLACE (es un filtro del mismo nivel).
     expect(REPLACE.mock.calls.at(-1)![0]).toContain("filtro=sin-contacto");
     expect(PUSH).not.toHaveBeenCalled();
@@ -136,7 +137,7 @@ describe("🔴 LOS CHIPS, CON SU CONTEO CALCULADO", () => {
     // Un chip que dice «Sin correo 1» porque estás buscando «City» no sirve.
     QUERY = "search=City";
     pintar();
-    const todos = [...document.querySelectorAll('[data-bloque="chips"] button')][0];
+    const todos = document.querySelector("[data-menu-vistas]")!;
     expect((todos.textContent ?? "").replace(/\s+/g, " ").trim()).toBe("Todos 5");
     expect(nombresEnTabla().length).toBe(2);
   });
@@ -234,15 +235,15 @@ describe("🔴 ORDENAR TOCANDO EL ENCABEZADO", () => {
 describe("el buscador", () => {
   it("busca por nombre y por código", async () => {
     pintar();
-    fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/i), { target: { value: "D-142" } });
+    fireEvent.change(screen.getByPlaceholderText(/Buscar nombre/i), { target: { value: "D-142" } });
     await waitFor(() => expect(nombresEnTabla()).toEqual(["Sporting Shoes N 4"]));
   });
 
   it("y por razón social, que es como la conoce contabilidad", async () => {
     pintar();
-    fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/i), { target: { value: "Sule" } });
+    fireEvent.change(screen.getByPlaceholderText(/Buscar nombre/i), { target: { value: "Sule" } });
     await waitFor(() => expect(nombresEnTabla().length).toBe(0));
-    fireEvent.change(screen.getByPlaceholderText(/Buscar por nombre/i), { target: { value: "Sporting Shoes, S.A." } });
+    fireEvent.change(screen.getByPlaceholderText(/Buscar nombre/i), { target: { value: "Sporting Shoes, S.A." } });
     await waitFor(() => expect(nombresEnTabla()).toEqual(["Sporting Shoes N 4"]));
   });
 });

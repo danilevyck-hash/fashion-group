@@ -83,7 +83,7 @@ describe("A. 🔴 la pestaña se llama «Colaboradores»", () => {
     // este caso protege sigue siendo lo mismo: que esa clave monte ESE
     // componente, y no otro.
     expect(src).toMatch(/monta\("colaboradores"\) &&/);
-    expect(src).toMatch(/<ConfiguracionTab personaEnElCentro empresa=\{empresa\} \/>/);
+    expect(src).toMatch(/<ConfiguracionTab personaEnElCentro empresa=\{empresa\}[^>]*\/>/);
     expect(src).not.toMatch(/tab === "personas"/);
   });
 });

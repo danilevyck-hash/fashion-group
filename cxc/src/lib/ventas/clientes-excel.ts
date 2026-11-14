@@ -33,6 +33,7 @@ import { rotuloCompras, rotuloVs, type PeriodoVentas } from "@/lib/ventas/period
 // TOTAL dice cuántos clientes suma y que el mostrador queda afuera. El número
 // del total NO cambia.
 import { UNA_SOLA_VENTA, nombreMostradorExcel, rotuloTotalClientes } from "@/lib/ventas/una-sola-venta";
+import { nombreExcelVentas } from "@/lib/ventas/nombre-archivo";
 
 export interface ClientesExcelOpts {
   /** Año de la columna «Compras» (el nombre del archivo lo lleva). */
@@ -117,6 +118,6 @@ export async function exportClientesToExcel(opts: ClientesExcelOpts): Promise<vo
     : String(opts.year);
   downloadWorkbook(
     workbookFromSheets([{ name: "Clientes", ws }]),
-    `ventas-clientes-${sufijo}.xlsx`,
+    nombreExcelVentas(["Clientes"], `ventas-clientes-${sufijo}.xlsx`),
   );
 }

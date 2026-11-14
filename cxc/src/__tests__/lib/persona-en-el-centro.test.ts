@@ -208,7 +208,7 @@ describe("B. 🔴 DE 6 A 4 PESTAÑAS, Y PERSONAS ES LA PRIMERA", () => {
     // quedan MONTADAS y se esconden (`monta(...)`, `pestanas-vivas.ts`). Lo que
     // este caso protege sigue siendo lo mismo: el MISMO componente, no uno nuevo.
     expect(src).toMatch(/monta\("colaboradores"\) &&/);
-    expect(src).toMatch(/<ConfiguracionTab personaEnElCentro empresa=\{empresa\} \/>/);
+    expect(src).toMatch(/<ConfiguracionTab personaEnElCentro empresa=\{empresa\}[^>]*\/>/);
     expect(src).toMatch(/monta\("configuracion"\) &&/);
     expect(src).toMatch(/<ConfiguracionTab \/>/);
     // Y la decisión de qué pestañas hay NO vive en el JSX.

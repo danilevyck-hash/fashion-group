@@ -103,7 +103,8 @@ describe("las tres pantallas usan la cabecera compacta, detrás del interruptor"
     expect(s).toMatch(/const compacta = usaBarraCelular\(true\)/);
     expect(s).toMatch(/<SegmentadoCelular[\s\S]*?rojo: k === "overdue"[\s\S]*?\$\{chipCorto\(k\)\}/);
     expect(s).toMatch(/onElegir=\{\(k\) => setRiskFilter\(k\)\}/);
-    expect(s).toMatch(/onBoston=\{compacta \? onBoston : null\}/);
+    // Revisión 110 (n.º 13): con el interruptor, Boston se elige en el título y sale del «···».
+    expect(s).toMatch(/onBoston=\{compacta && !titulo2026 \? onBoston : null\}/);
     expect(s).toContain("<CampoBuscar");
     expect(s).not.toContain("setBuscando");
     // La rama de siempre sigue ahí, intacta.

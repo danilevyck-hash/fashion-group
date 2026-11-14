@@ -34,6 +34,10 @@ import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
 import { fmt } from "@/lib/format";
 import { waHref } from "@/lib/contact-links";
+import type { EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
+import { CXC_UN_NOMBRE_ESTADO_DE_CUENTA } from "@/lib/ui/revision-110-cxc";
 
 export interface ClienteCobrarBoston {
   codigo: string;
@@ -107,6 +111,10 @@ export default function BostonHojaCobrar({
   const [aviso, setAviso] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [cargando, setCargando] = useState(false);
+  // n.º 21: el papel se pide AL ABRIR, como en el grupo: iOS no abre la hoja de
+  // compartir si entre el toque y el archivo hay una espera de red.
+  const [papel, setPapel] = useState<EstadoCuenta | null>(null);
+  const [ocupado, setOcupado] = useState(false);
 
   const abierta = !!cliente;
   const codigo = cliente?.codigo ?? null;
@@ -127,6 +135,17 @@ export default function BostonHojaCobrar({
     return () => { cancelado = true; };
   }, [abierta, codigo]);
 
+  useEffect(() => {
+    if (!CXC_UN_NOMBRE_ESTADO_DE_CUENTA || !abierta || !codigo) return;
+    let cancelado = false;
+    setPapel(null);
+    fetch(`/api/cxc/boston/estado-cuenta?codigo=${encodeURIComponent(codigo)}&forma=papel`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("http"))))
+      .then((d: EstadoCuenta) => { if (!cancelado) setPapel(d); })
+      .catch(() => { /* el botón queda en «Preparando…»; el resto de la hoja sirve */ });
+    return () => { cancelado = true; };
+  }, [abierta, codigo]);
+
   if (!cliente) return null;
 
   const tel = cliente.celular || cliente.telefono;
@@ -138,6 +157,26 @@ export default function BostonHojaCobrar({
     if (!href) { setAviso("Este cliente no tiene teléfono — cárgalo en Switch."); return; }
     window.open(href, "_blank");
     onClose();
+  }
+
+  async function descargarPdf() {
+    if (!cliente || !papel) return;
+    setOcupado(true);
+    try {
+      const { buildEstadoCuentaPDF } = await import("@/lib/pdf-estado-cuenta");
+      const { doc, filename } = buildEstadoCuentaPDF(papel, cliente.nombre);
+      const file = new File([doc.output("blob")], filename, { type: "application/pdf" });
+      if (aparatoDeQuienMira() === "celular") {
+        await compartirArchivo(file, { title: "Estado de cuenta", text: `Estado de cuenta — ${cliente.nombre}` });
+      } else {
+        descargarArchivo(file);
+      }
+    } catch (e) {
+      console.error("[cxc/boston] PDF:", e);
+      setAviso("No se pudo preparar el PDF. Intenta de nuevo en unos segundos.");
+    } finally {
+      setOcupado(false);
+    }
   }
 
   function copiar() {
@@ -162,7 +201,7 @@ export default function BostonHojaCobrar({
     <ModalOverlay onBackdropClick={onClose} align="start">
       <div className="bg-white rounded-lg w-full sm:max-w-md mx-0 sm:mx-4 my-0 sm:my-16 border border-gray-200">
         <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">Enviar estado de cuenta</h2>
+          <h2 className="text-base font-semibold text-gray-900">{CXC_UN_NOMBRE_ESTADO_DE_CUENTA ? "Estado de cuenta" : "Enviar estado de cuenta"}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -225,6 +264,22 @@ export default function BostonHojaCobrar({
                 <span className="block text-sm font-medium text-gray-900">Copiar mensaje</span>
               </button>
             </li>
+            {CXC_UN_NOMBRE_ESTADO_DE_CUENTA && (
+            <li>
+              <button
+                type="button"
+                disabled={!papel || ocupado}
+                onClick={descargarPdf}
+                className="w-full text-left px-4 py-3 min-h-[44px] transition hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              >
+                <span className="block text-sm font-medium text-gray-900">Descargar PDF</span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  {papel ? `${preview?.totalDocs ?? papel.empresas[0]?.documentos.length ?? 0} documentos con saldo` : "Preparando…"}
+                </span>
+              </button>
+            </li>
+            )}
+            {!CXC_UN_NOMBRE_ESTADO_DE_CUENTA && (
             <li>
               <button
                 type="button"
@@ -239,7 +294,18 @@ export default function BostonHojaCobrar({
                 </span>
               </button>
             </li>
+            )}
           </ul>
+          {/* Los documentos se MIRAN: enlace, como en la hoja del grupo. */}
+          {CXC_UN_NOMBRE_ESTADO_DE_CUENTA && (
+            <button
+              type="button"
+              onClick={() => onVerDocumentos(cliente)}
+              className="inline-flex items-center min-h-[44px] text-sm font-medium text-blue-600 hover:text-blue-800 transition"
+            >
+              Estado de cuenta ›
+            </button>
+          )}
         </div>
       </div>
     </ModalOverlay>

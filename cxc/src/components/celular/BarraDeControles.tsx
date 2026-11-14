@@ -38,7 +38,9 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { getModuleColor } from "@/lib/moduleColors";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
-import { ATRIBUTO_BARRA_FIJA, CONSULTA_CELULAR } from "@/lib/navegacion/barra-celular";
+import { BuscadorGris } from "@/components/filtros/FiltroA";
+import { ATRIBUTO_BARRA_FIJA, ATRIBUTO_SOBRE_LA_BARRA, CONSULTA_CELULAR } from "@/lib/navegacion/barra-celular";
+import { BARRA_EN_LISTAS_2026_11, TODAS_LAS_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { CLASE_VIDRIO, RADIO_VIDRIO, VIDRIO_2026_10, conVidrio } from "@/lib/ui/vidrio";
 import {
@@ -193,6 +195,8 @@ function PortalA({ destino, children }: { destino: HTMLElement; children: ReactN
 export interface PestanaDeBarra {
   value: string;
   label: string;
+  /** Lo que dice la opción en la lista, si es más que el rótulo (con su número). */
+  opcion?: string;
 }
 
 export function BarraDeControles({
@@ -203,6 +207,7 @@ export function BarraDeControles({
   periodo,
   fila,
   menu,
+  filaQueBaja = false,
 }: {
   /** El nombre del módulo, para cuando no hay pestañas. */
   titulo: string;
@@ -215,6 +220,8 @@ export function BarraDeControles({
   fila?: ReactNode;
   /** Lo raro del módulo (ayuda, configuración), para el «···». */
   menu?: ReactNode;
+  /** Renglón 3: lo que no cabe baja a la línea de abajo en vez de apretarse. */
+  filaQueBaja?: boolean;
 }) {
   const ctx = useContext(Contexto);
   const pathname = usePathname();
@@ -248,7 +255,7 @@ export function BarraDeControles({
               etiqueta="Sección"
               valor={activa ?? ""}
               texto={texto}
-              opciones={pestanas!.map((p) => ({ valor: p.value, etiqueta: p.label }))}
+              opciones={pestanas!.map((p) => ({ valor: p.value, etiqueta: p.opcion ?? p.label }))}
               onCambiar={(v) => onPestana?.(v)}
             />
           ) : (
@@ -278,7 +285,7 @@ export function BarraDeControles({
       )}
 
       {/* 3 · Filtros y acciones con TEXTO. Sin nada, no se dibuja. */}
-      <div data-renglon="filtros" className={hayFila ? CLASE_RENGLON : "hidden"}>
+      <div data-renglon="filtros" className={hayFila ? (filaQueBaja ? "flex min-h-11 min-w-0 flex-wrap items-center gap-x-1.5 gap-y-2" : CLASE_RENGLON) : "hidden"}>
         <span ref={ponerIzq} className="contents" />
         {!filaJuntoAlPeriodo && fila}
         <span className="flex-1" />
@@ -377,21 +384,28 @@ export function ChipSelector({
   valor,
   opciones,
   onCambiar,
+  soloValor = false,
+  sinRotulo = false,
 }: {
   rotulo: string;
   valor: string;
   opciones: readonly { valor: string; etiqueta: string }[];
   onCambiar: (v: string) => void;
+  /** Sin el «Rótulo:» delante, cuando la opción ya dice qué es («Todas las empresas ▾»). */
+  soloValor?: boolean;
+  /** La pastilla dice solo lo elegido («Todas las empresas ▾»), sin «Empresa:», y no se aprieta. */
+  sinRotulo?: boolean;
 }) {
   const elegida = opciones.find((o) => o.valor === valor)?.etiqueta ?? valor;
   const puesto = opciones.length > 0 && valor !== opciones[0].valor;
   return (
     <span
       data-chip-selector
-      className={`${BASE_BOTON_TEXTO} min-w-0 ${puesto ? "border-gray-900 bg-gray-900 text-white" : ""}`}
+      className={`${BASE_BOTON_TEXTO} ${sinRotulo ? "shrink-0" : "min-w-0"} ${puesto ? "border-gray-900 bg-gray-900 text-white" : ""}`}
     >
       <span className="min-w-0 truncate">
-        {rotulo}: {elegida}
+        {/* «Todas las empresas» ya dice qué filtra: sin «Empresa:» delante (14-nov-2026). */}
+        {soloValor || sinRotulo || (TODAS_LAS_EMPRESAS_2026_11 && /^Todas las /.test(elegida)) ? elegida : <>{rotulo}: {elegida}</>}
       </span>
       <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
       <select
@@ -443,15 +457,24 @@ export function BuscarEnLaBarra({
   onCambiar,
   placeholder,
   etiqueta,
+  alLado,
 }: {
   valor: string;
   onCambiar: (v: string) => void;
   placeholder: string;
   etiqueta: string;
+  /** Revisión 110 (filtro-6/7): la cápsula que va al lado, en la MISMA línea;
+   *  con ella el buscador es el gris de iOS. */
+  alLado?: ReactNode;
 }) {
   const ctx = useContext(Contexto);
   useContar("buscar", true, ctx?.contar);
-  const campo = (
+  const campo = alLado ? (
+    <div data-buscar-barra className="flex min-w-0 flex-1 items-center gap-2">
+      <BuscadorGris valor={valor} onCambiar={onCambiar} placeholder={placeholder} compacto className="min-w-0 flex-1" />
+      {alLado}
+    </div>
+  ) : (
     <CampoBuscar
       data-buscar-barra
       value={valor}
@@ -600,13 +623,15 @@ export interface AccionPrincipal {
   rotulo: ReactNode;
   onClick: () => void;
   disabled?: boolean;
+  /** Lista principal: la barra de pestañas se queda y este botón va encima. */
+  sobreLaBarra?: boolean;
 }
 
 /**
  * El botón negro fijo abajo, como «Guardar guía» y «Nuevo reclamo».
  * 🔴 Publica su alto en `--fg-alto-barra-fija`: el ☰ y los avisos suben.
  */
-export function BarraAccionFija({ rotulo, onClick, disabled }: AccionPrincipal) {
+export function BarraAccionFija({ rotulo, onClick, disabled, sobreLaBarra }: AccionPrincipal) {
   const cajon = useRef<HTMLDivElement | null>(null);
   usePublicarAltoBarraFija(cajon);
   // 🔑 Al final de `<body>`: un `transform` de un contenedor (el «tirar para
@@ -617,6 +642,7 @@ export function BarraAccionFija({ rotulo, onClick, disabled }: AccionPrincipal) 
       ref={cajon}
       data-accion-celular
       {...{ [ATRIBUTO_BARRA_FIJA]: "" }}
+      {...(sobreLaBarra && BARRA_EN_LISTAS_2026_11 ? { [ATRIBUTO_SOBRE_LA_BARRA]: "" } : {})}
       className={conVidrio(
         "fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 pt-3 backdrop-blur",
         `fixed inset-x-2 bottom-2 z-20 p-2 ${CLASE_VIDRIO} ${RADIO_VIDRIO}`,

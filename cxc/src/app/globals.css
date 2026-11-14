@@ -48,12 +48,22 @@
     --fg-alto-tab-bar: calc(60px + max(8px, env(safe-area-inset-bottom)));
     padding-bottom: calc(var(--fg-alto-tab-bar) + 8px);
   }
-  body.fg-con-tabbar:has([data-barra-fija-abajo]:not([data-aviso-instalar])) {
+  body.fg-con-tabbar:has([data-barra-fija-abajo]:not([data-aviso-instalar]):not([data-sobre-tab-bar])) {
     --fg-alto-tab-bar: 0px;
     padding-bottom: 56px;
   }
-  body:has([data-barra-fija-abajo]:not([data-aviso-instalar])) [data-tab-bar] {
+  body:has([data-barra-fija-abajo]:not([data-aviso-instalar]):not([data-sobre-tab-bar])) [data-tab-bar] {
     display: none;
+  }
+  /* 🔴 LISTAS PRINCIPALES (14-nov-2026, `BARRA_EN_LISTAS_2026_11`): la barra de
+     pestañas se queda, y la acción fija («Nueva guía», «Nuevo reclamo»…) se
+     sienta encima de ella. La lista deja lugar para las dos. */
+  body.fg-con-tabbar [data-sobre-tab-bar] {
+    bottom: calc(var(--fg-alto-tab-bar) + 6px) !important;
+    padding-bottom: 0.5rem !important;
+  }
+  body.fg-con-tabbar:has([data-sobre-tab-bar]) {
+    padding-bottom: calc(var(--fg-alto-tab-bar) + var(--fg-alto-barra-fija, 72px) + 16px);
   }
 }
 
@@ -488,6 +498,15 @@ html[data-vidrio="v2"] .vidrio.rounded-2xl {
     corner-shape: squircle;
     border-radius: 40px;
   }
+}
+/* 🔴 LA BARRA DE PESTAÑAS, CON EL VIDRIO GRUESO (14-nov-2026, revisión n.º 42,
+   `BARRA_SIN_MAS_2026_11`): con el 22 % de blanco, el renglón que pasaba por
+   debajo se leía encima de los íconos. Mismo material que las hojas. */
+html[data-vidrio="v2"] [data-tab-bar][data-vidrio-grueso] {
+  background-color: rgb(255 255 255 / 0.92);
+  background-image: none;
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html[data-vidrio="v2"] .vidrio {

@@ -107,7 +107,7 @@ describe("🩸 al saldo A FAVOR no se le cobra", () => {
   it("el que DEBE tiene su botón «Cobrar»", () => {
     pintarFila(DEBE);
     // 1-oct-2026, Daniel: nombres normales de ERP — «Cobrar» pasó a «Enviar estado de cuenta» (y «Enviar» donde no cabe).
-    expect(screen.getByRole("button", { name: "Enviar estado de cuenta" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Estado de cuenta" })).toBeTruthy();
     cleanup();
   });
 

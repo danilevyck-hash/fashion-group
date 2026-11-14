@@ -29,6 +29,7 @@
  *     que ya fuerza la empresa para David y recorta por el alcance.
  * ────────────────────────────────────────────────────────────────────────── */
 
+import { ASIS_PENDIENTES_DOS_RENGLONES_R110, pendientesEnDosRenglones } from "@/lib/ui/revision-110-asistencia";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 // 🔴 LA MISMA VENTANA DE CONFIRMACIÓN QUE LA PLANILLA: es donde se ven los
@@ -239,7 +240,12 @@ export default function TableroCierre({
                   {/* 13a (29-sep-2026, audit aprobado por Daniel): decía «1 cosa · 4
                       con horas extra sin decidir · 1:19 h»; el «N cosa(s) ·»
                       repetía lo que ya dice la frase. Queda solo la frase. */}
-                  {f.estado === "con-pendientes" && f.primeroQueFalta ? f.primeroQueFalta : textoQueFalta(f)}
+                  {(() => {
+                    const texto = f.estado === "con-pendientes" && f.primeroQueFalta ? f.primeroQueFalta : textoQueFalta(f);
+                    // 81 (revisión 110): en el celular, «15 sin decidir» y debajo «121:36 h».
+                    const dos = ASIS_PENDIENTES_DOS_RENGLONES_R110 && soloInforma ? pendientesEnDosRenglones(texto) : null;
+                    return dos ? <><span className="block whitespace-nowrap">{dos[0]}</span><span className="block whitespace-nowrap tabular-nums">{dos[1]}</span></> : texto;
+                  })()}
                 </td>
                 <td className="px-2 py-2.5 text-right">
                   {/* 🔴 13a (29-sep-2026, audit aprobado por Daniel): el «Cerrar»

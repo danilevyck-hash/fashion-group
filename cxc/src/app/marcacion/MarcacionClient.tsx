@@ -1,4 +1,5 @@
 "use client";
+import { CAJON_PEGADO_EN_COMPUTADORA_R110, MARCACION_BOTON_PEGADO_R110 } from "@/lib/ui/revision-110-asistencia";
 import { Aviso } from "@/components/ui/Aviso";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -643,7 +644,7 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
       />
 
       <main
-        className={`mx-auto w-full max-w-md px-4 pt-6 ${MARCACION_UN_TOQUE ? CLASES_AIRE_PARA_EL_BOTON : "pb-16"}`}
+        className={`mx-auto w-full max-w-md px-4 pt-6 ${MARCACION_UN_TOQUE ? `${CLASES_AIRE_PARA_EL_BOTON}${MARCACION_BOTON_PEGADO_R110 ? ` sm:pb-16 ${CAJON_PEGADO_EN_COMPUTADORA_R110}` : ""}` : "pb-16"}`}
       >
         {/* 🔴 MIENTRAS NO HAY DATO SE DIBUJA EL ESQUELETO, NUNCA UN BLANCO.
             Esto solo se ve cuando el servidor no pudo armar el estado (ver

@@ -10,6 +10,8 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { PeriodoSelect } from "@/components/multifashion/PeriodoSelect";
 import RangoFechas from "@/components/ui/RangoFechas";
+// n.º 6 (revisión 110): «Noviembre 2026», como el Resumen.
+import { VENTAS_MES_COMPLETO } from "@/lib/ui/revision-110-ventas";
 import {
   mesDelPeriodo,
   mesVecino,
@@ -75,6 +77,7 @@ export function usePeriodoProductos(disabled: boolean) {
             anterior={mesVecino(periodo, -1, opciones)}
             siguiente={mesVecino(periodo, 1, opciones)}
             compacto
+            mesCompleto={VENTAS_MES_COMPLETO}
           />
           {botonRango}
         </>

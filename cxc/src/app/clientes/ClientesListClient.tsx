@@ -34,6 +34,9 @@ import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import { dinero } from "@/lib/clientes/ficha";
 import { CLIENTES_APPLE_2026_10 } from "@/lib/clientes/apple-2026-10";
 import { OrdenarEnLaBarra, ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
+import { ChevronDown } from "lucide-react";
+import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, HojaMenu } from "@/components/celular/BarraDeControles";
+import { CLIENTES_LISTA_DESPLEGABLES as LISTA_DESPLEGABLES } from "@/lib/ui/revision-110-cxc";
 import {
   contarChips,
   contarClientes,
@@ -179,8 +182,39 @@ export default function ClientesListClient({
       <AppHeader module="Clientes" />
       <PullToRefresh onRefresh={onRefresh}>
         <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+          <h1 className="sr-only">Clientes</h1>
+          {LISTA_DESPLEGABLES ? (
+            // Revisión 110 (filtro-a-3, aprobado): el buscador en su línea; debajo
+            // «Todos 148 ▾» · «Ordenar ▾» · «Actualizado hh:mm ↻». Las 5 vistas y
+            // sus conteos son los mismos de los chips; solo cambian de forma.
+            <>
+              <CampoBuscar
+                placeholder="Buscar nombre o código"
+                aria-label="Buscar cliente por nombre o código"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+              <div data-bloque="vistas" className="mt-3 flex min-w-0 items-center gap-2">
+                <MenuDeVistas chips={chips} elegido={chip} onElegir={(id) => setChipUrl(id)} />
+                <div className="lg:hidden">
+                  <OrdenarEnLaBarra api={ordenTabla} opciones={[
+                    { col: "cliente", rotulo: "Cliente" },
+                    { col: "compras", rotulo: `Compras ${anio}` },
+                    { col: "debe", rotulo: "Saldo" },
+                  ]} />
+                </div>
+                <div className="ml-auto shrink-0 whitespace-nowrap text-right text-xs">
+                  <LineaDeFrescura
+                    className="text-xs"
+                    actualizado={actualizado}
+                    opciones={[{ modulo: "clientes-master" }]}
+                    onSuccess={async () => { router.refresh(); await mutate(); }}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (<>
           <div className="mb-3 flex flex-wrap items-center gap-3">
-            <h1 className="sr-only">Clientes</h1>
             <LineaDeFrescura
               actualizado={actualizado}
               opciones={[{ modulo: "clientes-master" }]}
@@ -241,6 +275,7 @@ export default function ClientesListClient({
             ]} />
             </div>
           )}
+          </>)}
 
           {/* 🔴 Apple (5-oct-2026): «150 clientes» arriba repetía el chip «Todos
               150». Se va; al buscar, «12 de 150» baja al pie. */}
@@ -393,6 +428,47 @@ export default function ClientesListClient({
         </main>
       </PullToRefresh>
     </div>
+  );
+}
+
+/**
+ * «Todos 148 ▾»: las 5 vistas de la lista en UN menú (revisión 110). La cápsula
+ * dice la vista puesta y su conteo; el menú, las 5 con su conteo y ✓ en la elegida.
+ */
+function MenuDeVistas({
+  chips,
+  elegido,
+  onElegir,
+}: {
+  chips: { id: ChipId; etiqueta: string; cuantos: number }[];
+  elegido: ChipId;
+  onElegir: (id: ChipId) => void;
+}) {
+  const [abierta, setAbierta] = useState(false);
+  const cerrar = useCallback(() => setAbierta(false), []);
+  const puesto = chips.find((c) => c.id === elegido) ?? chips[0];
+  return (
+    <>
+      <button type="button" data-menu-vistas onClick={() => setAbierta(true)} className={CLASE_BOTON_TEXTO}>
+        {puesto?.etiqueta} <span className="ml-1 tabular-nums">{puesto?.cuantos}</span>
+        <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
+      </button>
+      <HojaMenu abierta={abierta} onCerrar={cerrar} titulo="Mostrar">
+        {chips.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            data-vista-opcion={c.id}
+            aria-pressed={c.id === elegido}
+            onClick={() => onElegir(c.id)}
+            className={`${CLASE_FILA_MENU} justify-between ${c.id === elegido ? "font-semibold" : ""}`}
+          >
+            <span>{c.id === elegido ? "✓ " : ""}{c.etiqueta}</span>{" "}
+            <span className="tabular-nums text-gray-400">{c.cuantos}</span>
+          </button>
+        ))}
+      </HojaMenu>
+    </>
   );
 }
 

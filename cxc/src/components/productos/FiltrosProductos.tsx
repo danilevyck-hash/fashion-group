@@ -22,6 +22,8 @@ import { BuscarEnLaBarra, EnLaBarra } from "@/components/celular/BarraDeControle
 import { fmtMoney } from "@/lib/ventas/format";
 import { fmtPorcentaje } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
+import { BuscadorConFiltros, type FiltroDeLaHoja } from "@/components/filtros/FiltroA";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11, FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { OrdenarEnLaBarra, ThOrden, useOrdenTabla, type OrdenTablaApi } from "@/components/ui/OrdenTabla";
 import {
   coberturaDe,
@@ -157,6 +159,12 @@ export interface PantallaProductosProps {
   notaTotales?: ReactNode;
   /** Ventas en el celular: el 🔍 y los chips van a la barra v3.3. */
   enBarra?: boolean;
+  /** Filtro «a» del celular: los filtros de antes del resto (Empresa en Ventas). */
+  filtrosAntesA?: readonly FiltroDeLaHoja[];
+  /** «Restablecer» de lo que trae la pantalla de afuera (Empresa → Todas). */
+  onRestablecerAntes?: () => void;
+  /** «Actualizado 10:01 am ↻» del celular, al final de la línea del resumen. */
+  frescuraCelular?: ReactNode;
   /** Con una descripción elegida, cuánto vende cada valor de este campo
    *  («Women-Sandals → Fashion Shoes $X · Vistana $Y»). Ventas: «empresa». */
   desglosePor?: string;
@@ -260,14 +268,14 @@ export function PantallaProductos(p: PantallaProductosProps) {
     </>
   );
   const buscarCodigo = (
-    <div className="relative w-40 shrink-0">
+    <div className={cn("relative", BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "order-first min-w-[240px] flex-1" : cn("shrink-0", FILTRO_A_2026_11 ? "w-64" : "w-40"))}>
       <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
       <input
         type="search"
         value={codigo}
         onChange={e => { setCodigo(e.target.value); setVisibles(TANDA); }}
-        placeholder="Código"
-        aria-label="Buscar un código"
+        placeholder={FILTRO_A_2026_11 ? "Buscar código o descripción" : "Código"}
+        aria-label={FILTRO_A_2026_11 ? "Buscar código o descripción" : "Buscar un código"}
         className="h-9 w-full rounded-full border border-gray-200 bg-white pl-8 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-900 focus:outline-none sm:text-[13px]"
       />
     </div>
@@ -289,9 +297,60 @@ export function PantallaProductos(p: PantallaProductosProps) {
     </div>
   );
 
+  // 🔴 Filtro «a» (revisión 14-nov-2026): en el celular, buscador gris con el
+  // ícono de filtros; Ordenar y los chips viven en la hoja «Filtros».
+  const filtroA = FILTRO_A_2026_11;
+  const ordenA = orden.orden?.col ?? "venta";
+  const filtrosHoja: FiltroDeLaHoja[] = [
+    ...(p.filtrosAntesA ?? []),
+    ...chipsVisibles.map(({ chip, opciones }) => ({
+      clave: chip.campo,
+      etiqueta: chip.etiqueta,
+      todos: chip.campo === "descripcion" || chip.campo === "marca" ? "Todas" : "Todos",
+      opciones: opciones.map(o => ({ valor: o, etiqueta: o })),
+      valor: elegidos[chip.campo] ?? "",
+      onCambiar: (v: string) => elegir(chip.campo, v),
+    })),
+  ];
+  const buscadorA = (
+    <BuscadorConFiltros
+      className="sm:hidden"
+      busqueda={codigo}
+      onBuscar={v => { setCodigo(v); setVisibles(TANDA); }}
+      placeholder="Buscar código o descripción"
+      orden={{
+        // Como el mockup: Venta primero (es como abre) y Descripción al final.
+        opciones: [...opcionesOrden.filter(o => o.col === "venta"), ...opcionesOrden.filter(o => o.col !== "venta" && o.col !== "descripcion"), ...opcionesOrden.filter(o => o.col === "descripcion")]
+          .map(o => ({ valor: o.col, etiqueta: o.rotulo })),
+        valor: ordenA,
+        onCambiar: v => orden.poner(v === "venta" ? null : { col: v as ColOrden, dir: v === "descripcion" ? "asc" : "desc" }),
+      }}
+      filtros={filtrosHoja}
+      onRestablecer={() => {
+        setElegidos({}); setCodigo(""); orden.poner(null); setVisibles(TANDA); setAbierta(null);
+        p.onRestablecerAntes?.();
+      }}
+    />
+  );
+
   return (
     <div data-pantalla-productos className="space-y-3">
-      {p.enBarra ? (
+      {filtroA && (
+        <>
+          {buscadorA}
+          {p.enBarra && descargar && <EnLaBarra pestana="productos" menu={descargar} />}
+        </>
+      )}
+      {filtroA ? (
+        <div data-filtros-productos className="hidden flex-wrap items-center gap-2 py-1 sm:flex">
+          {p.antes}
+          {chipsNodo}
+          {buscarCodigo}
+          {p.despues && <span className="flex-1" />}
+          {p.despues}
+          {descargar}
+        </div>
+      ) : p.enBarra ? (
         <EnLaBarra
           pestana="productos"
           iconos={<BuscarEnLaBarra valor={codigo} onCambiar={v => { setCodigo(v); setVisibles(TANDA); }} placeholder="Buscar un código…" etiqueta="Buscar un código" />}
@@ -332,6 +391,9 @@ export function PantallaProductos(p: PantallaProductosProps) {
                 </>
               )}
               {!filtro && p.notaTotales}
+              {filtroA && p.frescuraCelular && (
+                <span className="whitespace-nowrap sm:hidden"><span className="mx-1.5 text-gray-300">·</span>{p.frescuraCelular}</span>
+              )}
             </p>
             {atencion}
           </div>

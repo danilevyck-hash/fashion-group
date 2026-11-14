@@ -22,6 +22,7 @@ import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import PageTransition from "@/components/PageTransition";
 import { SemillaSesionProvider } from "@/lib/sesion-semilla-provider";
 import { leerSemillaDeSesion } from "@/lib/sesion-semilla-servidor";
+import { SIN_AVISO_INSTALAR_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import "./globals.css";
 
 // Geist Mono via el package oficial de Vercel (`geist`). Next 14.2.3 todavía
@@ -82,7 +83,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <PageTransition>{children}</PageTransition>
               </SidebarAwareMain>
             </ContextMenuProviderWrapper>
-            <InstallPrompt />
+            {/* «Instala Fashion Group» se retiró en todo lado (revisión 14-nov-2026). */}
+            {!SIN_AVISO_INSTALAR_2026_11 && <InstallPrompt />}
             <SWUpdater />
             {/* No dibuja nada: anota en silencio qué módulo se abrió, como mucho
                 una vez cada 10 min por pestaña. Ver src/lib/visitas/registro.ts. */}

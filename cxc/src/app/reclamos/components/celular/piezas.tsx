@@ -9,7 +9,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useRef, type ReactNode } from "react";
-import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
+import { ATRIBUTO_BARRA_FIJA, ATRIBUTO_SOBRE_LA_BARRA } from "@/lib/navegacion/barra-celular";
+import { BARRA_EN_LISTAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
 
@@ -90,11 +91,14 @@ export function CtaFija({
   onClick,
   disabled,
   marca,
+  sobreLaBarra,
 }: {
   children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
   marca?: string;
+  /** Lista principal: la barra de pestañas se queda y este botón va encima. */
+  sobreLaBarra?: boolean;
 }) {
   // 🔴 DICE CUÁNTO MIDE PARA QUE EL BOTÓN REDONDO DEL MENÚ SE LE SUBA ENCIMA
   // (24-sep-2026). Sin la franja de arriba, las tres rayas viven en un botón
@@ -107,6 +111,7 @@ export function CtaFija({
       ref={cajon}
       data-cta={marca ?? "principal"}
       {...{ [ATRIBUTO_BARRA_FIJA]: "" }}
+      {...(sobreLaBarra && BARRA_EN_LISTAS_2026_11 ? { [ATRIBUTO_SOBRE_LA_BARRA]: "" } : {})}
       className={conVidrio(
         "fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 pt-3 backdrop-blur",
         `fixed inset-x-2 bottom-2 z-20 p-2 ${CLASE_VIDRIO} ${RADIO_VIDRIO}`,

@@ -174,7 +174,8 @@ describe("🔴 al buscar un MODELO sale su tarjeta y debajo sus colores", () => 
     // nov 2025 · 360 · 21 sem · vendida
     expect(screen.getAllByText("nov 2025").length).toBeGreaterThan(0);
     expect(screen.getAllByText("21 sem").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("vendida").length).toBeGreaterThan(0);
+    // Revisión 110 (n.º 109): «vendida» pasó a «Agotado».
+    expect(screen.getAllByText("Agotado").length).toBeGreaterThan(0);
     // 🔴 Y se dice que es aproximado: no se le atribuye una venta a una compra.
     expect(screen.getAllByText(/aprox\./).length).toBeGreaterThan(0);
   });

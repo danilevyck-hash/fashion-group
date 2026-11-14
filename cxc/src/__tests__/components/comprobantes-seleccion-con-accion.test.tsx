@@ -90,7 +90,7 @@ function pintar(pedidos: UnifiedPedido[], puedeAdministrar = true) {
 }
 
 const casillaTodos = () =>
-  screen.getByText(new RegExp("^Seleccionar todos")).closest("label")!.querySelector("input")!;
+  screen.getAllByText(new RegExp("^Seleccionar todos")).at(-1)!.closest("label")!.querySelector("input")!;
 const botonBorrar = () =>
   [...document.querySelectorAll("button")].find((b) =>
     (b.textContent || "").startsWith("Eliminar seleccionados"),

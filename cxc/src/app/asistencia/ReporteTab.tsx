@@ -6,6 +6,10 @@
 // Todo en MINUTOS, nunca horas decimales: "295 minutos" se le discute a una
 // persona, "4,92 horas" no le dice nada a nadie.
 
+import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11, FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import type { OpcionEmpresa } from "@/lib/asistencia/empresa-para-todo";
+import { ASIS_CASILLA_44_R110, ASIS_HORAS_SIN_SEGUNDOS_R110, ASIS_SIN_FICHA_R110 } from "@/lib/ui/revision-110-asistencia";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import type { DragEvent as EventoArrastre } from "react";
@@ -194,9 +198,12 @@ const sinExtra = () => <span className="text-gray-300" title={SIN_EXTRA_TITULO}>
 type ColReporte = "colaborador" | "dias" | "ausencias" | "tardanzas" | "tardanza" | "almuerzo" | "salida" | "noTrabajado" | "extras";
 const COLS_REPORTE: readonly ColReporte[] = ["colaborador", "dias", "ausencias", "tardanzas", "tardanza", "almuerzo", "salida", "noTrabajado", "extras"];
 
-export default function ReporteTab({ empresa = "" }: {
+export default function ReporteTab({ empresa = "", opcionesEmpresa, onEmpresa }: {
   /** El selector de arriba de las pestañas (10-sep-2026). «todas» o vacío = todas. */
   empresa?: string;
+  /** Filtro «a» (14-nov-2026): la cápsula de empresa va al lado del buscador. */
+  opcionesEmpresa?: readonly OpcionEmpresa[];
+  onEmpresa?: (e: string) => void;
 } = {}) {
   const { toast } = useToast();
   const barra = useHayBarraCelular();
@@ -666,11 +673,11 @@ export default function ReporteTab({ empresa = "" }: {
             {barra ? (
               <EnLaBarra
                 pestana={["asistencia", "reporte"]}
-                iconos={
+                iconos={FILTRO_A_2026_11 ? undefined : (
                   <>
                     <BuscarEnLaBarra valor={q} onCambiar={setQ} placeholder={PLACEHOLDER_COLABORADOR} etiqueta="Buscar colaborador" />
                   </>
-                }
+                )}
                 menu={
                   <>
                     <button type="button" disabled={!visibles?.length} onClick={() => void bajarExcel()} className={CLASE_FILA_MENU}>
@@ -685,6 +692,15 @@ export default function ReporteTab({ empresa = "" }: {
             ) : (
               <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegirPeriodo} />
             )}
+            {/* 🔴 Filtro «a» (14-nov-2026, filtro-a-6): buscador y empresa en UNA línea. */}
+            {barra && FILTRO_A_2026_11 && (
+              <LineaBuscarYCapsulas className="w-full" busqueda={q} onBuscar={setQ} placeholder="Buscar colaborador">
+                {opcionesEmpresa && opcionesEmpresa.length > 1 && onEmpresa && (
+                  <Capsula etiqueta="Empresa" alinear="derecha" valor={empresa}
+                    opciones={opcionesEmpresa.map((o) => ({ valor: o.clave, etiqueta: o.etiqueta }))} onCambiar={onEmpresa} />
+                )}
+              </LineaBuscarYCapsulas>
+            )}
 
             {/* 🔴 EL BUSCADOR, ABIERTO (29-sep-2026). Daniel: *«buscar con la
                 barra abierta si hay espacio, como en los otros módulos»*. 🩸 Era
@@ -692,7 +708,7 @@ export default function ReporteTab({ empresa = "" }: {
                 Ahora es el campo con borde y la lupa adentro, igual que en
                 Préstamos y Cuentas por Cobrar; en el celular baja a su propio
                 renglón. Sigue filtrando contra el SERVIDOR, como siempre. */}
-            <div className={barra ? "hidden" : "relative min-w-[180px] flex-1 sm:max-w-xs"}>
+            <div className={barra ? "hidden" : `relative min-w-[180px] flex-1 ${BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "" : "sm:max-w-xs"}`}>
               <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 type="search" value={q} onChange={(e) => setQ(e.target.value)}
@@ -1354,7 +1370,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
         extraMin: r.extraMin,
         diasARevisar: r.diasARevisar,
       },
-      { cuentaHorasExtra: cuentaHorasExtra(p) },
+      { cuentaHorasExtra: cuentaHorasExtra(p), horasCortas: ASIS_HORAS_SIN_SEGUNDOS_R110 },
     );
     const TONO: Record<string, string> = {
       rojo: "text-red-700 font-semibold",
@@ -1370,14 +1386,20 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
           }`}>
           <td className="px-3 py-3" colSpan={columnasDelReporte()}>
             <div className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                checked={seleccionada}
+              {/* 77 (revisión 110): la casilla se ve igual; el dedo la toca en 44 × 44. */}
+              <label
                 onClick={(e) => e.stopPropagation()}
-                onChange={(e) => { e.stopPropagation(); onSeleccionar(p.codigo); }}
-                aria-label={`Seleccionar ${persona}`}
-                className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-black"
-              />
+                className={ASIS_CASILLA_44_R110 ? "relative mt-1 flex shrink-0 cursor-pointer before:absolute before:-inset-3 before:content-['']" : "contents"}
+              >
+                <input
+                  type="checkbox"
+                  checked={seleccionada}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => { e.stopPropagation(); onSeleccionar(p.codigo); }}
+                  aria-label={`Seleccionar ${persona}`}
+                  className={`${ASIS_CASILLA_44_R110 ? "" : "mt-1 "}h-5 w-5 shrink-0 cursor-pointer accent-black`}
+                />
+              </label>
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-medium text-gray-900">
                   {persona}
@@ -1398,7 +1420,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
                   {datos.map((d, i) => (
                     <span key={d.clave}>
                       {i > 0 && <span className="text-gray-300"> · </span>}
-                      <span className={TONO[d.tono]}>{d.texto}</span>
+                      <span className={`${TONO[d.tono]}${ASIS_HORAS_SIN_SEGUNDOS_R110 ? " whitespace-nowrap" : ""}`}>{d.texto}</span>
                     </span>
                   ))}
                 </p>
@@ -1443,16 +1465,24 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
               salida, en burbuja: así el nombre arranca siempre en el mismo
               punto y la columna «Sale» deja de existir. */}
           {codigoIzquierda}
-          {persona}
+          {ASIS_SIN_FICHA_R110 && ASISTENCIA_PANTALLA_2026_09 && !p.nombre ? `Código ${persona}` : persona}
           {burbujaSalida}
           {!ASISTENCIA_PANTALLA_2026_09 && (p.nombre ? (
             <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
           ) : (
             <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
           ))}
-          {ASISTENCIA_PANTALLA_2026_09 && !p.nombre && (
+          {ASISTENCIA_PANTALLA_2026_09 && !p.nombre && (ASIS_SIN_FICHA_R110 ? (
+            // 78 (revisión 110): el mismo nombre que el celular, y el camino para resolverlo.
+            <span className="ml-1.5 text-xs">
+              <span className="text-gray-500">· sin ficha · </span>
+              <a href={rutaDePersona(p.codigo)} onClick={(e) => e.stopPropagation()} className="text-blue-600 hover:underline">
+                Crear ficha ›
+              </a>
+            </span>
+          ) : (
             <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
-          )}
+          ))}
           {/* 🔴 Dice por qué esta fila está vacía: no marcó. Sin esto se lee
               igual que alguien que trabajó y no tiene nada anotado. */}
           {esSinMarcas(p) && (

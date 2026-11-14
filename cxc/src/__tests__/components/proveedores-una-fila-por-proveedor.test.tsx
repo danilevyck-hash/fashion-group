@@ -147,9 +147,9 @@ describe("🔴 la lista son las empresas", () => {
   it("🔴 los CUATRO tramos son los encabezados, no los tres del CXC", async () => {
     await pintar();
     const t = within(tabla());
-    expect(t.getByText("0-90 d")).toBeTruthy();
-    expect(t.getByText("91-120 d")).toBeTruthy();
-    expect(t.getByText("121-365 d")).toBeTruthy();
+    expect(t.getByText("0-90 días")).toBeTruthy();
+    expect(t.getByText("91-120 días")).toBeTruthy();
+    expect(t.getByText("121-365 días")).toBeTruthy();
     expect(t.getByText("+1 año")).toBeTruthy();
     // 🩸 «121d+» juntaba cuatro meses con tres años.
     expect(t.queryByText("121d+")).toBeNull();

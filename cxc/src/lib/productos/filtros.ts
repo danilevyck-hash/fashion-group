@@ -23,6 +23,8 @@
 
 // 🔴 PRENDIDO el 5-oct-2026: Daniel aprobó el mockup («sí») y la migración
 // 20261229120000 quedó aplicada (camino rápido). `false` = Productos de antes.
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+
 export const PRODUCTOS_FILTROS_2026_10 = true;
 
 /** Un código con su clasificación. Montos ya firmados (las NC restan). */
@@ -64,7 +66,11 @@ export interface TotalesFiltro {
 
 const norm = (s: string) => s.toLowerCase();
 
-/** Los artículos que pasan el buscador de código y los chips elegidos. */
+/**
+ * Los artículos que pasan el buscador y los chips elegidos. Con
+ * `FILTRO_A_2026_11` el buscador mira el código O la descripción («Buscar
+ * código o descripción», revisión 14-nov-2026); apagado, solo el código.
+ */
 export function filtrarArticulos(
   articulos: readonly ArticuloVendido[],
   codigo: string,
@@ -73,7 +79,7 @@ export function filtrarArticulos(
   const q = norm(codigo.trim());
   const activos = Object.entries(elegidos).filter(([, v]) => v);
   return articulos.filter(a =>
-    (!q || norm(a.codigo).includes(q)) &&
+    (!q || norm(a.codigo).includes(q) || (FILTRO_A_2026_11 && (norm(a.descripcion ?? "").includes(q) || norm(a.campos.descripcion ?? "").includes(q)))) &&
     activos.every(([campo, v]) => (a.campos[campo] ?? "") === v),
   );
 }

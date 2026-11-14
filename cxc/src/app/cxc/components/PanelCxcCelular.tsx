@@ -22,6 +22,7 @@
 // con `CXC_CELULAR` en `false`, y conserva todos sus candados.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { useEffect, useMemo, useState } from "react";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
@@ -54,7 +55,8 @@ import {
 } from "@/lib/cxc/lista-celular";
 import type { ClaveDescarga } from "@/lib/cxc/descargas";
 import type { FormatoDescarga } from "../hooks/useDescargasCartera";
-import { HojaElegirEmpresa, HojaPorEmpresa, HojaMasOpciones } from "./HojasCxcCelular";
+import { ELEGIDA_BOSTON, HojaElegirEmpresa, HojaPorEmpresa, HojaMasOpciones } from "./HojasCxcCelular";
+import { CXC_BOSTON_COMO_GRUPO_CELULAR, CXC_EMPRESA_BAJO_EL_TITULO } from "@/lib/ui/revision-110-cxc";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import SyncStatus from "@/components/shared/SyncStatus";
 import { CXC_GRUPO_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
@@ -105,6 +107,17 @@ export interface PanelCxcCelularProps {
   onBoston: (() => void) | null;
   /** `CXC_APPLE_2026_10` (4-oct-2026). Solo cuenta con la barra v3.3. */
   apple?: boolean;
+  /**
+   * n.º 13 (revisión 110): la MISMA pantalla sirve la cartera de Boston, con
+   * sus datos (que llegan por su propia ruta: nada se suma con el grupo).
+   */
+  cartera?: "grupo" | "boston";
+  /** En Boston: volver al grupo desde el título (con la empresa elegida). `null` = este rol solo ve Boston. */
+  onGrupo?: ((empresa: string) => void) | null;
+  /** En Boston: las empresas del grupo que ofrece el título para volver. */
+  empresasDelGrupo?: Company[];
+  /** Las empresas cuya frescura se dice. Por defecto, las 6 del grupo. */
+  empresasFrescura?: readonly string[];
 }
 
 export default function PanelCxcCelular({
@@ -126,12 +139,20 @@ export default function PanelCxcCelular({
   avisoMontos,
   onBoston,
   apple: appleProp = CXC_APPLE_2026_10,
+  cartera = "grupo",
+  onGrupo = null,
+  empresasDelGrupo = [],
+  empresasFrescura = CXC_GRUPO_EMPRESA_KEYS,
 }: PanelCxcCelularProps) {
+  const enBoston = cartera === "boston";
+  // n.º 13: la cartera se elige en el título; Boston es una opción aparte al final.
+  const titulo2026 = CXC_BOSTON_COMO_GRUPO_CELULAR;
+  const puedeCambiarCartera = titulo2026 && (enBoston ? !!onGrupo : !!onBoston);
   const [hoja, setHoja] = useState<"empresa" | "porEmpresa" | "mas" | null>(null);
   // v3.2: la cabecera compacta (tres renglones) vive detrás de la barra nueva.
   const compacta = usaBarraCelular(true);
   const apple = compacta && appleProp;
-  const puedeElegirEmpresa = !empresaRestriction && cxcCompanies.length > 1;
+  const puedeElegirEmpresa = (!enBoston && !empresaRestriction && cxcCompanies.length > 1) || puedeCambiarCartera;
 
   // Los totales de la tira: EXACTAMENTE los mismos que la computadora, sobre el
   // mismo universo (`roleClients` = `kpiClients`). Acá solo se suman.
@@ -183,12 +204,12 @@ export default function PanelCxcCelular({
       <LineaDeFrescura
         forma="celular"
         tabla="estadocuenta"
-        empresas={companyFilter === "all" ? CXC_GRUPO_EMPRESA_KEYS : [companyFilter]}
+        empresas={companyFilter === "all" ? empresasFrescura : [companyFilter]}
         opciones={opcionesActualizarCxc(companyFilter)}
         secuencial={companyFilter === "all"}
         onSuccess={() => onSyncedNow?.()}
       />
-      <SyncStatus tabla="estadocuenta" empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS} empresaLabels={EMPRESA_KEY_TO_NAME} />
+      <SyncStatus tabla="estadocuenta" empresasEsperadas={empresasFrescura} empresaLabels={EMPRESA_KEY_TO_NAME} />
     </div>
   );
 
@@ -208,12 +229,18 @@ export default function PanelCxcCelular({
               {puedeElegirEmpresa && <ChevronDown className="h-5 w-5 shrink-0 text-gray-400" aria-hidden />}
             </button>
             {/* Sin nada que ofrecer no se dibuja el «···» (`diseno.md`). */}
-            {(canExport || onBoston) && (
+            {(canExport || (onBoston && !titulo2026)) && (
             <IconoBarra etiqueta="Más opciones" onClick={() => setHoja("mas")}>
               <MoreHorizontal className="h-5 w-5" strokeWidth={2} aria-hidden />
             </IconoBarra>
             )}
           </div>
+          {/* n.º 14 (revisión 110): qué cartera se está mirando, en gris bajo el título. */}
+          {CXC_EMPRESA_BAJO_EL_TITULO && (
+            <p data-empresa-bajo-titulo className="-mt-1 truncate text-[13px] text-gray-500">
+              {enBoston ? "Confecciones Boston" : empresaElegida ?? "Todas las empresas"}
+            </p>
+          )}
           <AvisoRechazosSwitch texto={avisoMontos} />
           {/* 2 · el total a 36 px; tocarlo abre la cartera por empresa */}
           <button type="button" onClick={() => setHoja("porEmpresa")} className="block w-full pt-1 text-left active:opacity-60">
@@ -225,6 +252,10 @@ export default function PanelCxcCelular({
                 ? <span className="text-red-600">+90 días {montoExacto(mas90)}</span>
                 : subtituloCompacto({ cuantos: lista.length, risk: riskFilter, unaEmpresa: empresaElegida })}
               {" · "}
+              {enBoston ? (
+                // Boston no se actualiza a mano (~20 min): la hora sola, como en la computadora.
+                <LineaDeFrescura forma="celular" tabla="estadocuenta" empresas={empresasFrescura} />
+              ) : (
               <LineaDeFrescura
                 forma="celular"
                 tabla="estadocuenta"
@@ -233,6 +264,7 @@ export default function PanelCxcCelular({
                 secuencial={companyFilter === "all"}
                 onSuccess={() => onSyncedNow?.()}
               />
+              )}
             </span>
           ) : (
           <span className={CLASE_LINEA_TOTAL}>
@@ -242,7 +274,7 @@ export default function PanelCxcCelular({
           {/* 🔴 4-oct-2026: sin la barra Apple, la misma línea va bajo el total;
               con ella, el aviso de la empresa sin actualizar, aparte. */}
           {apple
-            ? <SyncStatus tabla="estadocuenta" empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS} empresaLabels={EMPRESA_KEY_TO_NAME} />
+            ? <SyncStatus tabla="estadocuenta" empresasEsperadas={empresasFrescura} empresaLabels={EMPRESA_KEY_TO_NAME} />
             : frescura}
           {/* 3 · los tres tramos, delgados; tocar el prendido lo apaga (como hoy) */}
           <div className="pt-3">
@@ -296,7 +328,7 @@ export default function PanelCxcCelular({
           disabled={!!empresaRestriction || cxcCompanies.length <= 1}
           className="mt-0.5 min-h-[44px] -ml-1 px-1 text-[15px] text-gray-500 active:opacity-60 disabled:opacity-100"
         >
-          {empresaElegida ?? "Todas"}
+          {empresaElegida ?? (CXC_EMPRESA_BAJO_EL_TITULO ? "Todas las empresas" : ROTULO_TODAS)}
           {!empresaRestriction && cxcCompanies.length > 1 && " ▾"}
         </button>
       </div>
@@ -439,10 +471,17 @@ export default function PanelCxcCelular({
       {/* ── Las hojas ─────────────────────────────────────────────────────── */}
       {hoja === "empresa" && (
         <HojaElegirEmpresa
-          empresas={cxcCompanies}
-          elegida={companyFilter}
-          onElegir={(k) => { setCompanyFilter(k); setHoja(null); }}
+          empresas={enBoston ? (onGrupo ? empresasDelGrupo : []) : (!empresaRestriction ? cxcCompanies : [])}
+          elegida={enBoston ? ELEGIDA_BOSTON : companyFilter}
+          onElegir={(k) => {
+            setHoja(null);
+            if (k === ELEGIDA_BOSTON) { if (!enBoston) onBoston?.(); return; }
+            if (enBoston) onGrupo?.(k);
+            else setCompanyFilter(k);
+          }}
           onCerrar={() => setHoja(null)}
+          conBoston={puedeCambiarCartera || (enBoston && titulo2026)}
+          conTodas={enBoston ? !!onGrupo : !empresaRestriction}
         />
       )}
       {hoja === "porEmpresa" && (
@@ -458,7 +497,7 @@ export default function PanelCxcCelular({
           canExport={canExport}
           onDescargar={(clave, formato) => { setHoja(null); onDescargar(clave, formato); }}
           onCerrar={() => setHoja(null)}
-          onBoston={compacta ? onBoston : null}
+          onBoston={compacta && !titulo2026 ? onBoston : null}
         />
       )}
     </div>

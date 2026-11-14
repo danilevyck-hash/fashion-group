@@ -145,6 +145,8 @@ export function NumerosPedido({
 
 export interface PropsFila {
   pedido: FilaComprobante;
+  /** Revisión 110 · n.º 57: la columna «Origen» no se dibuja (todas dicen lo mismo). */
+  sinOrigen?: boolean;
   marca: MarcaUiKey;
   theme: MarcaTheme;
   esOrders: boolean;
@@ -205,9 +207,11 @@ export function FilaTabla(p: PropsFila) {
           />
         )}
       </td>
-      <td className="px-4 py-3">
-        <OrigenBadge marca={p.marca} origen={p.pedido.origen} confirmadoCliente={!!p.pedido.confirmado_cliente_at} />
-      </td>
+      {!p.sinOrigen && (
+        <td className="px-4 py-3">
+          <OrigenBadge marca={p.marca} origen={p.pedido.origen} confirmadoCliente={!!p.pedido.confirmado_cliente_at} />
+        </td>
+      )}
       <td className="px-2 lg:px-4 py-3 text-gray-900">
         <NombreCliente pedido={p.pedido} clienteLabel={p.clienteLabel} />
         <NumerosPedido pedido={p.pedido} esOrders={p.esOrders} hoy={p.hoy} />

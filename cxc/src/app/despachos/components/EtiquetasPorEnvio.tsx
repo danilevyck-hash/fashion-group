@@ -25,6 +25,7 @@
 // (`EtiquetasView.tsx`), que no se tocó.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
@@ -101,6 +102,8 @@ import { Aviso } from "@/components/ui/Aviso";
 import { EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { GUIAS_LISTA_APPLE_2026_10, resumenDeEnvios } from "@/lib/guias/lista-apple-2026-10";
 import { diaPanama } from "@/lib/guias/pendientes-aviso";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
+import { ETIQUETAS_FILA_LIMPIA } from "@/lib/ui/revision-110-despachos";
 
 /**
  * 🔴 EL PDF DEL ENVÍO, en pestaña nueva (la MISMA puerta que la pantalla de
@@ -240,7 +243,7 @@ export default function EtiquetasPorEnvio() {
               {barra ? (
                 <>
                   {lineaResumen && <div className="mb-3">{lineaResumen}</div>}
-                  <EnLaBarra accion={sinTabla ? null : { rotulo: "Nuevo envío", onClick: () => setPanel(true) }} />
+                  <EnLaBarra accion={sinTabla ? null : { rotulo: "Nuevo envío", onClick: () => setPanel(true), sobreLaBarra: true }} />
                 </>
               ) : (
                 <div className="flex items-center justify-end mb-6 flex-wrap gap-4">
@@ -265,6 +268,16 @@ export default function EtiquetasPorEnvio() {
           )}
 
           <div className="mb-4 flex flex-wrap items-center gap-4">
+            {ETIQUETAS_FILA_LIMPIA ? (
+              // n.º 70: el buscador de la casa, con lupa, como el de Guías.
+              <CampoBuscar
+                envoltorio={BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "flex-1 min-w-[150px]" : "flex-1 min-w-[150px] sm:max-w-sm"}
+                value={buscar}
+                onChange={(ev) => setBuscar(ev.target.value)}
+                placeholder="Buscar factura, cliente o destino"
+                aria-label="Buscar factura, cliente o destino"
+              />
+            ) : (
             <input
               type="text"
               value={buscar}
@@ -273,6 +286,7 @@ export default function EtiquetasPorEnvio() {
               aria-label="Buscar factura, cliente o destino"
               className="flex-1 min-w-[150px] max-w-sm border border-gray-200 rounded-lg px-3 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]"
             />
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -306,11 +320,32 @@ export default function EtiquetasPorEnvio() {
                           <span className="min-w-0 truncate text-sm font-medium">{v.cliente_nombre}</span>
                           <span className="shrink-0 text-sm tabular-nums">{v.total} {v.total === 1 ? "bulto" : "bultos"}</span>
                         </div>
+                        {ETIQUETAS_FILA_LIMPIA ? (
+                          // n.º 70 (Daniel, 14-nov-2026): sin «Pendiente de guía» —el
+                          // filtro ya lo dice—; destino · factura ENTERA en una línea.
+                          // Si no cabe se corta el destino, nunca la factura. Lo que va
+                          // adentro (la nota) queda en la computadora y al abrir el envío.
+                          <>
+                            <div data-linea-envio className="mt-0.5 flex min-w-0 text-xs text-gray-500">
+                              {enGuia && <span className="shrink-0 whitespace-pre">{rotuloEstado(v)} · </span>}
+                              {/* El destino cede primero (encoge 1000 veces más); las
+                                  facturas, si son varias, bajan de línea entre comas. */}
+                              {v.destino && <span className="min-w-0 truncate [flex-shrink:1000]">{v.destino}</span>}
+                              <span className="min-w-0 tabular-nums">
+                                {v.destino ? "\u00a0· " : ""}
+                                {v.filas.map((f, i) => (
+                                  <span key={f.id} className="whitespace-nowrap">{i > 0 ? ", " : ""}{f.secuencial}</span>
+                                ))}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
                         <div className="mt-0.5 truncate text-xs text-gray-500">
                           <span className={enGuia ? undefined : "text-amber-700"}>{rotuloEstado(v)}</span>
                           {" · "}
                           {[v.destino, v.filas.map((f) => f.secuencial).join(", "), nota].filter(Boolean).join(" · ")}
                         </div>
+                        )}
                       </div>
                       <OverflowMenu items={menuDelEnvio(v)} />
                     </li>

@@ -13,6 +13,7 @@ import { ventanaUnAnioAntes, type VentanaComparativa } from "@/lib/ventas/client
 import { hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { UNA_SOLA_VENTA, filasDeCierreProductos, type CuadreProductos } from "@/lib/ventas/una-sola-venta";
+import { nombreExcelVentas } from "@/lib/ventas/nombre-archivo";
 
 // 🔴 LAS SEIS DE FASHION GROUP, Y NADA MÁS (11-sep-2026). Default Fashion Wear.
 //
@@ -392,8 +393,11 @@ export async function exportProductosToExcel(
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
   downloadWorkbook(
     workbookFromSheets([{ name: "Productos", ws }]),
-    `productos-${resp.empresa}-${periodoSlug(resp.mes, resp.periodo ?? "ytd")}-${resp.year}` +
-      (cliente ? `-${cliente.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}` : "") +
-      ".xlsx",
+    nombreExcelVentas(
+      ["Productos"],
+      `productos-${resp.empresa}-${periodoSlug(resp.mes, resp.periodo ?? "ytd")}-${resp.year}` +
+        (cliente ? `-${cliente.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}` : "") +
+        ".xlsx",
+    ),
   );
 }

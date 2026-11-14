@@ -50,6 +50,7 @@ import {
 } from "@/lib/cxc/boston-correo";
 import { buildCuentasHtml, sanitizeFilenamePart } from "@/lib/cxc/estado-cuenta-email";
 import { diasDesdeEnvio, esCanalEnvio, textoUltimoEnvio, VENTANA_MARCA_DIAS } from "@/lib/cxc/envios-registro";
+import { CXC_PDF_UN_SOLO_NOMBRE } from "@/lib/ui/revision-110-cxc";
 import { buildEstadoCuentaPDF } from "@/lib/pdf-estado-cuenta";
 import { hoyPanama } from "@/lib/fecha-panama";
 import type { EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
@@ -220,12 +221,15 @@ export async function POST(req: NextRequest) {
   // 🔴 UN SOLO PDF: Boston es UNA compañía, así que no hay desglose por empresa.
   // Es el MISMO papel del grupo (`buildEstadoCuentaPDF`, la forma de Switch) y
   // sale firmado por Boston porque la casa se deriva de su `empresa_key`.
-  const { doc } = buildEstadoCuentaPDF(estadoCuenta, nombre);
+  const { doc, filename: nombreDescarga } = buildEstadoCuentaPDF(estadoCuenta, nombre);
   const adjunto = {
     // 🔴 MISMO FORMATO QUE LA DESCARGA (7-oct-2026): el nombre del cliente
     // primero y la fecha legible; la casa se agrega porque este PDF sale
     // firmado por Boston, no por el grupo.
-    filename: `${sanitizeFilenamePart(`Estado de cuenta - ${nombre} - ${CASA_BOSTON.nombre} - ${mes}`)}.pdf`,
+    // n.º 18 (revisión 110): el mismo nombre que la descarga.
+    filename: CXC_PDF_UN_SOLO_NOMBRE
+      ? nombreDescarga
+      : `${sanitizeFilenamePart(`Estado de cuenta - ${nombre} - ${CASA_BOSTON.nombre} - ${mes}`)}.pdf`,
     content: Buffer.from(doc.output("arraybuffer")).toString("base64"),
   };
 

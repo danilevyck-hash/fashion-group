@@ -20,6 +20,17 @@ import type { MkMarca } from "@/lib/marketing/types";
 import type { FilaDeTienda } from "@/lib/marketing/vista-tienda";
 import FichaTiendaAcciones, { type AccionDeFila } from "../../tienda/[codigo]/FichaTiendaAcciones";
 import { BOTON_PRINCIPAL } from "./PorCobrarNuevo";
+import { MKT_GASTOS_TABLA_CABE_2026_11 } from "@/lib/ui/revision-110-marketing";
+import { BuscadorConFiltros } from "@/components/filtros/FiltroA";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+
+/** «Buscar proveedor o factura» (revisión 14-nov-2026): sin acentos ni mayúsculas. */
+export function coincideGasto(g: Pick<GastoDeLaLista, "proveedor" | "numero">, q: string): boolean {
+  const n = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const t = n(q.trim());
+  return !t || n(g.proveedor ?? "").includes(t) || n(g.numero ?? "").includes(t);
+}
 
 export const ROTULO_TIPO: Record<GastoDeLaLista["tipo"], string> = {
   factura: "Factura",
@@ -91,6 +102,14 @@ function Filtro({
   );
 }
 
+/**
+ * n.º 91 · ¿La columna «Estado» solo repetiría el filtro? Con «Por cobrar», sí.
+ * Con «No recuperable» NO: ahí la columna lleva también la observación.
+ */
+export function columnaEstadoSobra(filtroEstado: string): boolean {
+  return filtroEstado === "por_cobrar";
+}
+
 export function pctDe(g: Pick<GastoDeLaLista, "monto" | "aCobrar" | "estado">): number | null {
   if (g.estado === "no_recuperable" || g.monto <= 0) return null;
   return Math.round((g.aCobrar / g.monto) * 100);
@@ -131,6 +150,7 @@ export default function GastosNuevo({
   const [tienda, setTienda] = useState("");
   const [tipo, setTipo] = useState("");
   const [estado, setEstado] = useState<string>(ESTADO_AL_ABRIR);
+  const [busqueda, setBusqueda] = useState("");
   const [accion, setAccion] = useState<AccionDeFila>(null);
   const [tiendaDeLaAccion, setTiendaDeLaAccion] = useState("");
 
@@ -153,8 +173,12 @@ export default function GastosNuevo({
       (!marca || g.marcaNombre === marca) &&
       (!tienda || g.tiendaCodigo === tienda) &&
       (!tipo || g.tipo === tipo) &&
-      (!estado || g.estado === estado),
+      (!estado || g.estado === estado) &&
+      (!FILTRO_A_2026_11 || coincideGasto(g, busqueda)),
   );
+  // n.º 91: con el filtro en «Por cobrar», la columna «Estado» repetiría el
+  // filtro en cada fila; se va y la tabla cabe. Con «Todos», vuelve.
+  const conEstado = !(MKT_GASTOS_TABLA_CABE_2026_11 && columnaEstadoSobra(estado));
   const monto = filtrados.reduce((s, g) => s + g.monto, 0);
   const aCobrar = filtrados.reduce((s, g) => s + g.aCobrar, 0);
 
@@ -168,7 +192,31 @@ export default function GastosNuevo({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:flex md:flex-wrap md:items-end gap-x-3 gap-y-2 md:[&>*]:w-48">
+      {FILTRO_A_2026_11 && (
+        <BuscadorConFiltros
+          className="md:hidden"
+          busqueda={busqueda}
+          onBuscar={setBusqueda}
+          placeholder="Buscar proveedor o factura"
+          filtros={[
+            { clave: "estado", etiqueta: "Estado", segmentado: true, opciones: Object.entries(ROTULO_ESTADO).map(([v, e]) => ({ valor: v, etiqueta: e })), valor: estado, onCambiar: setEstado },
+            { clave: "marca", etiqueta: "Marca", todos: "Todas", opciones: opcionesMarca.map((m) => ({ valor: m, etiqueta: m })), valor: marca, onCambiar: setMarca },
+            { clave: "tienda", etiqueta: "Tienda", todos: "Todas", opciones: opcionesTienda.map(([v, e]) => ({ valor: v, etiqueta: e })), valor: tienda, onCambiar: setTienda },
+            { clave: "tipo", etiqueta: "Tipo", todos: "Todos", opciones: Object.entries(ROTULO_TIPO).map(([v, e]) => ({ valor: v, etiqueta: e })), valor: tipo, onCambiar: setTipo },
+          ]}
+          onRestablecer={() => { quitarFiltros(); setBusqueda(""); }}
+        />
+      )}
+      <div className={`${FILTRO_A_2026_11 ? "hidden md:flex" : "grid grid-cols-2 md:flex"} md:flex-wrap md:items-end gap-x-3 gap-y-2 md:[&>*]:w-48`}>
+        {FILTRO_A_2026_11 && (
+          <CampoBuscar
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar proveedor o factura"
+            aria-label="Buscar proveedor o factura"
+            envoltorio="md:!w-72"
+          />
+        )}
         <Filtro id="filtro-marca" rotulo="Marca" todas="Todas" valor={marca} onChange={setMarca} opciones={opcionesMarca.map((m) => [m, m] as const)} />
         <Filtro id="filtro-tienda" rotulo="Tienda" todas="Todas" valor={tienda} onChange={setTienda} opciones={opcionesTienda} />
         <Filtro id="filtro-tipo" rotulo="Tipo" todas="Todos" valor={tipo} onChange={setTipo} opciones={Object.entries(ROTULO_TIPO)} />
@@ -182,7 +230,7 @@ export default function GastosNuevo({
           <span className="text-gray-900 font-semibold tabular-nums">{formatearMonto(aCobrar)}</span>
         </span>
         {hayFiltro && (
-          <button type="button" onClick={quitarFiltros} className="text-blue-600 hover:text-blue-800 min-h-[44px] inline-flex items-center">
+          <button type="button" onClick={quitarFiltros} data-quitar-filtros className={`text-blue-600 hover:text-blue-800 min-h-[44px] items-center ${FILTRO_A_2026_11 ? "hidden md:inline-flex" : "inline-flex"}`}>
             Quitar filtros
           </button>
         )}
@@ -211,7 +259,7 @@ export default function GastosNuevo({
               <th className="text-right font-medium px-2 py-2">Monto</th>
               <th className="text-right font-medium px-2 py-2">Se cobra</th>
               <th className="text-right font-medium px-2 py-2">Monto a cobrar</th>
-              <th className="text-left font-medium px-4 py-2">Estado</th>
+              {conEstado && <th className="text-left font-medium px-4 py-2">Estado</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -232,8 +280,9 @@ export default function GastosNuevo({
                   <td className="px-2 py-2 text-gray-600 whitespace-nowrap">{g.marcaNombre ?? "—"}</td>
                   <td className="px-2 py-2 text-gray-600 max-w-[12rem] truncate">{g.tiendaNombre}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{formatearMonto(g.monto)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums text-gray-600">{pct === null ? "—" : `${pct} %`}</td>
+                  <td className={`px-2 py-2 text-right tabular-nums text-gray-600${MKT_GASTOS_TABLA_CABE_2026_11 ? " whitespace-nowrap" : ""}`}>{pct === null ? "—" : `${pct} %`}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{g.estado === "no_recuperable" ? "—" : formatearMonto(g.aCobrar)}</td>
+                  {conEstado && (
                   <td className="px-4 py-2 whitespace-nowrap">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${CHIP_ESTADO[g.estado]}`}>{ROTULO_ESTADO[g.estado]}</span>
                     {g.estado === "no_recuperable" && g.nota && (
@@ -242,6 +291,7 @@ export default function GastosNuevo({
                       </span>
                     )}
                   </td>
+                  )}
                 </tr>
               );
             })}

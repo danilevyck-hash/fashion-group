@@ -40,6 +40,7 @@ import { Ayuda } from "@/components/shared/Ayuda";
 import { sePagaComision } from "@/lib/comisiones/sin-pago";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { estaRetirado } from "@/lib/comisiones/retirados";
+import { COMISIONES_TASA_ENTERA } from "@/lib/ui/revision-110-ventas";
 
 interface ConfigRow {
   vendedor_nombre: string;
@@ -54,8 +55,12 @@ const toPct = (dec: number): string => (dec * 100).toFixed(2);
 // Math.round previo (que mal-redondeaba tasas con >2 decimales).
 const fromPct = (pct: string): number => (parseFloat(pct) || 0) / 100;
 
+// n.º 35 (revisión 110): sin las flechitas del número, que tapaban el segundo
+// decimal («0.5C»); la casilla deja ver «0.50» entero. El valor no cambia.
+const SIN_FLECHAS = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 const CAJA_PCT =
-  "w-16 rounded-md border border-gray-200 px-2 py-1.5 text-right text-sm tabular-nums outline-none transition focus:border-black";
+  "w-16 rounded-md border border-gray-200 px-2 py-1.5 text-right text-sm tabular-nums outline-none transition focus:border-black"
+  + (COMISIONES_TASA_ENTERA ? ` ${SIN_FLECHAS}` : "");
 
 export function TasasPorVendedor({ onSaved }: { onSaved: (msg: string) => void }) {
   const [rows, setRows] = useState<ConfigRow[]>([]);

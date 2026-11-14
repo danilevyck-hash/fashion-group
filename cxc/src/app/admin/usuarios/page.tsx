@@ -2,7 +2,10 @@
 
 import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
-import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { BarraDeControles, EnLaBarra, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { USUARIOS_EMPRESA_POR_NOMBRE_2026_11, USUARIOS_NUEVO_EN_EL_TITULO_2026_11 } from "@/lib/ui/revision-110-marketing";
+import { mapEmpresaName } from "@/lib/empresa-mapping";
+import { opcionesDeEmpresa } from "@/lib/usuarios/opciones-empresa";
 import { USUARIOS_SIN_PESTANAS_DOBLES_2026_11 as SIN_DOBLES } from "@/lib/ui/celular-optimizar-2026-11";
 import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -335,6 +338,22 @@ function UsuariosPageInner() {
             activa={tab}
             onPestana={setTab}
           />
+          {/* n.º 100: «＋ Nuevo usuario» sube a la línea del título; la lista sube. */}
+          {USUARIOS_NUEVO_EN_EL_TITULO_2026_11 && (
+            <EnLaBarra
+              pestana="usuarios"
+              iconos={
+                <button
+                  type="button"
+                  onClick={openNewUser}
+                  data-nuevo-usuario-titulo
+                  className="shrink-0 whitespace-nowrap text-sm bg-black text-white px-3 min-h-[44px] rounded-md active:scale-[0.97]"
+                >
+                  ＋ Nuevo usuario
+                </button>
+              }
+            />
+          )}
         </ProveedorBarraCelular>
       )}
 
@@ -378,7 +397,7 @@ function UsuariosPageInner() {
           <TabsContent value="usuarios" className="mt-0">
         {/* La fila del botón quedó con un solo hijo visible → `justify-end`:
             con `between` el botón se iría al borde izquierdo. */}
-        <div className={USUARIOS_APPLE_2026_10 ? "mb-4 flex justify-end sm:hidden" : "mb-8 flex items-end justify-end gap-4 flex-wrap"}>
+        <div className={USUARIOS_NUEVO_EN_EL_TITULO_2026_11 && barra && esAdmin ? "hidden" : USUARIOS_APPLE_2026_10 ? "mb-4 flex justify-end sm:hidden" : "mb-8 flex items-end justify-end gap-4 flex-wrap"}>
           {botonNuevoUsuario}
         </div>
 
@@ -413,7 +432,7 @@ function UsuariosPageInner() {
                         <div className="text-xs text-gray-500 mt-0.5">{etiquetaDeRol(u.role)}</div>
                         {u.associated_company && (
                           <div className="text-xs text-gray-400 mt-1 truncate" title={u.associated_company}>
-                            {u.associated_company}
+                            {USUARIOS_EMPRESA_POR_NOMBRE_2026_11 ? mapEmpresaName(u.associated_company) : u.associated_company}
                           </div>
                         )}
                         {hasOverride && (
@@ -602,6 +621,19 @@ function UsuariosPageInner() {
                       <p>Solo cambia algo para los vendedores: los deja ver en Cuentas por cobrar únicamente los clientes de esa empresa. En blanco, ven las de todas.</p>
                     </Ayuda>
                   </div>
+                  {USUARIOS_EMPRESA_POR_NOMBRE_2026_11 ? (
+                    // n.º 102: se selecciona por el NOMBRE; se guarda la misma clave de siempre.
+                    <select
+                      id="usuario-empresa"
+                      value={uCompany}
+                      onChange={e => setUCompany(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm focus:outline-none focus:border-gray-900 transition"
+                    >
+                      {opcionesDeEmpresa(uCompany).map(([valor, rotulo]) => (
+                        <option key={valor} value={valor}>{rotulo}</option>
+                      ))}
+                    </select>
+                  ) : (
                   <input
                     id="usuario-empresa"
                     value={uCompany}
@@ -611,6 +643,7 @@ function UsuariosPageInner() {
                        demás campos del modal. */
                     className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm placeholder:text-gray-400 focus:outline-none focus:border-gray-900 transition"
                   />
+                  )}
                 </div>
 
                 {/* Override de módulos per-usuario */}
@@ -927,7 +960,7 @@ function ListaPorRol({
                 const personalizado = Array.isArray(u.modulos_override) && u.modulos_override.length > 0;
                 const detalle = [
                   !u.active ? "Inactivo" : null,
-                  u.associated_company,
+                  u.associated_company && USUARIOS_EMPRESA_POR_NOMBRE_2026_11 ? mapEmpresaName(u.associated_company) : u.associated_company,
                   personalizado ? "Permisos personalizados" : null,
                   visto ? `Última sesión ${relativeTime(visto)}` : "Sin sesiones",
                 ].filter(Boolean).join(" · ");

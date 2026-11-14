@@ -1,10 +1,14 @@
 "use client";
 
+import { Zap } from "lucide-react";
+import { BUSCAR_DICE_QUE_2026_11, ICONOS_DE_LINEA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getVisibleModules } from "@/lib/modules";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { hrefDelResultado, type TiendaDeMarketing } from "@/lib/search/marketing";
+import { empresasDelSaldo } from "@/lib/search/empresas-cxc";
+import { BUSQUEDA_CXC_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-marketing";
 
 interface CxcResult { id: string; nombre?: string | null; nombre_normalized: string; total: number; company_key: string }
 interface ReclamoResult { id: string; nro_reclamo: string; nro_factura: string; empresa: string; estado: string; fecha_reclamo: string }
@@ -139,7 +143,9 @@ function flatten(r: SearchResults): FlatItem[] {
       module: "Cuentas por cobrar",
       // El nombre como lo escribe Switch; `nombre_normalized` es la llave en MAYÚSCULAS, no se muestra.
       label: c.nombre || c.nombre_normalized,
-      sub: `$${fmtMoney(c.total)} — ${c.company_key}`,
+      sub: BUSQUEDA_CXC_EMPRESAS_2026_11
+        ? [`$${fmtMoney(c.total)}`, empresasDelSaldo(c.company_key)].filter(Boolean).join(" · ")
+        : `$${fmtMoney(c.total)} — ${c.company_key}`,
       href: `/cxc?search=${encodeURIComponent(c.nombre_normalized)}`,
       icon: "📊",
     });
@@ -291,6 +297,17 @@ export default function SearchBar({ compact, fullScreen, onClose, alineado }: {
   const [activeIdx, setActiveIdx] = useState(-1);
   const [expanded, setExpanded] = useState(!compact);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  // n.º 40 (14-nov-2026): en el celular el buscador dice solo «Buscar»; la
+  // computadora conserva el «(⌘K)», que ahí sí sirve.
+  const [conTeclado, setConTeclado] = useState(false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(min-width: 640px)");
+    const poner = () => setConTeclado(mq.matches);
+    poner();
+    mq.addEventListener("change", poner);
+    return () => mq.removeEventListener("change", poner);
+  }, []);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -476,7 +493,7 @@ export default function SearchBar({ compact, fullScreen, onClose, alineado }: {
               onClick={() => { router.push(quickAction.href); onClose?.(); }}
               className="w-full flex items-center gap-3 py-2.5 text-left bg-blue-50 hover:bg-blue-100 rounded-md px-2 mb-3 transition"
             >
-              <span className="text-base">⚡</span>
+              {ICONOS_DE_LINEA_2026_11 ? <Zap aria-hidden className="h-4 w-4 shrink-0 text-blue-700" /> : <span className="text-base">⚡</span>}
               <div className="flex-1 min-w-0"><div className="text-sm font-medium text-blue-700">{quickAction.label}</div></div>
               <span className="text-blue-400 text-xs">→</span>
             </button>
@@ -530,7 +547,7 @@ export default function SearchBar({ compact, fullScreen, onClose, alineado }: {
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => { if (searched) setOpen(true); }}
           onKeyDown={onKeyDown}
-          placeholder="Buscar… (⌘K)"
+          placeholder={BUSCAR_DICE_QUE_2026_11 && !conTeclado ? "Buscar" : "Buscar… (⌘K)"}
           /* 356×37 medidos en /home. `text-base sm:text-sm`: por debajo de 16px
              Safari hace zoom al enfocar y te deja la pantalla corrida. */
           className={`w-full pl-10 pr-10 py-2 min-h-[44px] text-base sm:text-sm rounded-lg outline-none ${inputBg} bg-transparent`}
@@ -563,7 +580,7 @@ export default function SearchBar({ compact, fullScreen, onClose, alineado }: {
                     : "bg-blue-50/50"
                   }`}
                 >
-                  <span className="text-lg flex-shrink-0">⚡</span>
+                  {ICONOS_DE_LINEA_2026_11 ? <Zap aria-hidden className="h-[18px] w-[18px] flex-shrink-0 text-blue-700" /> : <span className="text-lg flex-shrink-0">⚡</span>}
                   <div className="min-w-0 flex-1">
                     <div className={`text-sm font-medium text-blue-700`}>{quickAction.label}</div>
                   </div>

@@ -10,13 +10,18 @@
 //   · las tablas de la lista de abajo usan el núcleo común, y las que Daniel
 //     decidió que NO se ordenan siguen sin ordenarse.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { alTocar, flecha, leerOrden, ordenarFilas } from "@/lib/orden-tabla";
 import { PantallaProductos } from "@/components/productos/FiltrosProductos";
 import type { ArticuloVendido } from "@/lib/productos/filtros";
+
+// Este archivo cuida la pantalla de ANTES: la revisión del 14-nov-2026 va detrás
+// de su interruptor y se prueba en `navegacion/revision-110-fase1.test.ts`.
+vi.mock("@/lib/ui/revision-110-2026-11", async (orig) => ({ ...(await orig<object>()), FILTRO_A_2026_11: false }));
+
 
 describe("la regla", () => {
   it("la primera vez: texto A→Z, números de mayor a menor; otra vez invierte", () => {

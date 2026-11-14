@@ -1,5 +1,7 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
+import { ICONOS_DE_LINEA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
@@ -121,7 +123,7 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
   return createPortal(
     <div {...backdropAlarma} className="fade-in fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-lg rounded-2xl border-4 border-red-500 bg-white p-6">
-        <div className="mb-2 text-center text-5xl">⚠️</div>
+        {ICONOS_DE_LINEA_2026_11 ? <AlertTriangle aria-hidden className="mx-auto mb-2 h-12 w-12 text-red-600" /> : <div className="mb-2 text-center text-5xl">⚠️</div>}
         <h2 className="text-center text-xl font-bold text-red-700">
           {items.length} descripción(es) por revisar
         </h2>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,11 +38,20 @@ import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
 import { textoFrescura } from "@/lib/ventas/frescura";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import { esMostrador } from "@/lib/clientes/mostrador";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import { utilidadPorCodigo, type UtilidadDelCliente } from "@/lib/ventas/utilidad-por-codigo";
+import { fmtMargenPantalla, fmtMoneySigned } from "@/lib/ventas/utilidad-cliente";
+import { SIN_CODIGO_EN_SWITCH, tieneCodigoDeCliente } from "@/lib/ventas/celular";
+import {
+  VENTAS_CLIENTE_A_LA_IZQUIERDA,
+  VENTAS_CLIENTES_UNA_LISTA as UNA_LISTA,
+  VENTAS_SIN_CODIGO_NO_ES_ENLACE,
+} from "@/lib/ui/revision-110-ventas";
 
 // 🔴 6-oct-2026: el orden por encabezado es el COMÚN (`OrdenTabla`); se
 // recuerda solo durante la visita, porque cómo ABRE la lista es decisión de
 // Daniel (abajo).
-const COLUMNAS_ORDEN = ["nombre", "empresa", "ytd", "delta", "ultima"] as const;
+const COLUMNAS_ORDEN = ["nombre", "empresa", "ytd", "delta", "ultima", "utilidad", "margen"] as const;
 type SortKey = (typeof COLUMNAS_ORDEN)[number];
 
 // Mapping de tono semántico → clase Tailwind para celdas con bg claro.
@@ -238,7 +248,8 @@ export function ClientesView({
   const [utilidadFilas, setUtilidadFilas] = useState<UtilidadClienteRow[]>([]);
   const [bajando, setBajando] = useState(false);
 
-  const enUtilidad = modo !== "ventas";
+  // 🔴 Revisión 110 (rec-c): UNA sola lista; el modo Utilidad ya no existe.
+  const enUtilidad = !UNA_LISTA && modo !== "ventas";
 
   // 🔴 LO QUE SE SIRVIÓ, no lo que se pidió: si se pidió «Últimos 12 meses» y
   // la vista todavía no trae esa suma (migración pendiente) o el año está
@@ -249,6 +260,19 @@ export function ClientesView({
     : data.ventana
       ? { tipo: "ultimos", n: data.ventana }
       : { tipo: "anio", anio: selectedYear };
+  // 🔴 Revisión 110 (rec-c): «Utilidad · Margen» en la tarjeta SOLO con un año
+  // completo — la vista Utilidad es por año. Es la SUMA de sus filas por código
+  // (`utilidadPorCodigo`): ningún cálculo nuevo.
+  const conUtilidad = UNA_LISTA && periodoServido.tipo === "anio";
+  useEffect(() => {
+    if (!conUtilidad) { setUtilidadData(null); return; }
+    let vivo = true;
+    fetch(`/api/ventas/utilidad-cliente?year=${selectedYear}`, { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<UtilidadClienteResponse>) : null))
+      .then((d) => { if (vivo) setUtilidadData(d); })
+      .catch(() => { if (vivo) setUtilidadData(null); });
+    return () => { vivo = false; };
+  }, [conUtilidad, selectedYear]);
   const ventanaPedida = ventanaParaClientes(periodo);
   const qsVentana = (ventanaPedida ? `&ventana=${ventanaPedida}` : "")
     + (periodo.tipo === "rango" ? `&desde=${periodo.desde}&hasta=${periodo.hasta}` : "");
@@ -434,6 +458,11 @@ export function ClientesView({
   // `universe` y en la búsqueda desde el 27-jul-2026. Cambia dónde se ven.
   const totalOtros = orphans.length;
 
+  const utilidadMapa = useMemo(
+    () => utilidadPorCodigo(conUtilidad ? utilidadData?.rows : null, empresa),
+    [conUtilidad, utilidadData, empresa],
+  );
+
   const filtered = useMemo(() => {
     // 🔴 LOS HUÉRFANOS ENTRAN A LA LISTA, no a una fila agregada. Antes acá se
     // partía el universo en `masters` (lo que se listaba) y `orphans` (lo que
@@ -457,10 +486,16 @@ export function ClientesView({
     }
     // «Nuevo» (sin base, `delta: null`) va al final en los dos sentidos: no es un cambio.
     r = orden.ordenar(r, (c, col) =>
-      col === "nombre" ? c.nombre : col === "empresa" ? c.empresa : col === "ytd" ? c.ytd : col === "delta" ? c.delta : c.ultimaIso,
+      col === "nombre" ? c.nombre
+        : col === "empresa" ? (UNA_LISTA ? c.empresas_count : c.empresa)
+        : col === "ytd" ? c.ytd
+        : col === "delta" ? c.delta
+        : col === "utilidad" ? utilidadMapa.get(c.id)?.utilidad ?? null
+        : col === "margen" ? utilidadMapa.get(c.id)?.margen ?? null
+        : c.ultimaIso,
     );
     return r;
-  }, [universe, search, orden]);
+  }, [universe, search, orden, utilidadMapa]);
 
   /**
    * 🔴 LOS TRES BLOQUES DE LA LISTA, en el orden en que se ven.
@@ -492,7 +527,17 @@ export function ClientesView({
   const ordenarCelular = (
     <OrdenarEnLaBarra
       api={orden}
-      opciones={[
+      opciones={UNA_LISTA ? [
+        { col: "ytd", rotulo: "Ventas" },
+        ...(conUtilidad ? [
+          { col: "utilidad" as const, rotulo: "Utilidad" },
+          { col: "margen" as const, rotulo: "Margen %" },
+        ] : []),
+        { col: "delta", rotulo: "Variación vs año anterior" },
+        { col: "ultima", rotulo: "Última compra" },
+        { col: "nombre", rotulo: "Cliente" },
+        { col: "empresa", rotulo: "Cantidad de empresas" },
+      ] : [
         { col: "ytd", rotulo: "Compras del año" },
         { col: "ultima", rotulo: "Última compra" },
         { col: "delta", rotulo: "Variación vs año anterior" },
@@ -503,7 +548,28 @@ export function ClientesView({
   );
 
   const mostrarRanking = orden.orden?.col === "ytd";
-  const colSpanTabla = mostrarRanking ? 6 : 5;
+  const colSpanTabla = (mostrarRanking ? 6 : 5) + (conUtilidad ? 2 : 0);
+
+  /** Revisión 110: el Excel de utilidad por cliente, ahora en el «···». Baja
+   *  las filas de la vista Utilidad (una por cliente y empresa) de la empresa
+   *  elegida, con la búsqueda puesta. */
+  const filasUtilidadExcel = useMemo(() => {
+    return (utilidadData?.rows ?? []).filter((r) =>
+      (empresa === "todas" || r.empresaKey === empresa)
+      && (!search.trim() || coincideBusqueda(search, [r.cliente, r.codigo ?? "", r.empresa])));
+  }, [utilidadData, empresa, search]);
+  const onExcelUtilidad = async () => {
+    if (!utilidadData) return;
+    setBajando(true);
+    try {
+      await exportUtilidadToExcel(utilidadData, filasUtilidadExcel);
+      anotarDescarga("clientes", { modo: "utilidad", anio: selectedYear, empresa });
+    } catch (err) {
+      console.error("[ventas/clientes] excel utilidad failed", err);
+    } finally {
+      setBajando(false);
+    }
+  };
 
   /** Cuántos clientes se están viendo. En Utilidad/Margen la cuenta la manda
    *  esa vista (son otras filas: una por cliente Y EMPRESA). */
@@ -553,8 +619,9 @@ export function ClientesView({
   // dibujando lo de siempre.
   if (enCelular && !enUtilidad) {
     const hoy = hoyPanama();
-    const rotuloEmpresa =
-      EMPRESA_OPCIONES.find((o) => o.valor === empresa)?.etiqueta ?? ROTULO_TODAS;
+    const rotuloEmpresa = UNA_LISTA && empresa === VALOR_TODAS
+      ? "Todas las empresas"
+      : EMPRESA_OPCIONES.find((o) => o.valor === empresa)?.etiqueta ?? ROTULO_TODAS;
     const sinCompras = bloques.enCero.length;
     return (
       <>
@@ -569,7 +636,9 @@ export function ClientesView({
           onEmpresa={() => setEmpresaAbierta(true)}
           onTocarCliente={setSheetCliente}
           ordenar={ordenarCelular}
-          frescura={FRESCURA_VISIBLE_2026_10 ? <FrescuraVentasCel onActualizado={() => { void reloadData(); onReloadData?.(); }} /> : undefined}
+          unaLista={UNA_LISTA}
+          utilidadDe={conUtilidad ? (c) => utilidadMapa.get(c.id) : undefined}
+          frescura={FRESCURA_VISIBLE_2026_10 ? <FrescuraVentasCel soloHora={UNA_LISTA} onActualizado={() => { void reloadData(); onReloadData?.(); }} /> : undefined}
           accion={
             <MenuVentasCelular
               pestana="clientes"
@@ -578,6 +647,11 @@ export function ClientesView({
               onEstaPestana={onExcel}
               onLasTres={() => onDescargarLasTres?.()}
               onActualizado={() => { void reloadData(); onReloadData?.(); }}
+              extra={conUtilidad && utilidadData ? {
+                rotulo: "Utilidad por cliente",
+                detalle: `Año ${selectedYear}, una fila por cliente y empresa`,
+                onClick: onExcelUtilidad,
+              } : null}
             />
           }
           pie={
@@ -617,6 +691,7 @@ export function ClientesView({
             sheetCliente ? (ultimaCompraEnPalabras(sheetCliente.ultimaIso, hoy)?.texto ?? null) : null
           }
           year={selectedYear}
+          utilidadPorEmpresa={sheetCliente && conUtilidad ? utilidadMapa.get(sheetCliente.id)?.porEmpresa : undefined}
         />
       </>
     );
@@ -644,6 +719,7 @@ export function ClientesView({
             cliente dos veces. Lo único que cambia entre los tres son las
             COLUMNAS: el buscador, las píldoras de empresa y el Excel son los
             mismos y no se resetean al cambiar. */}
+        {!UNA_LISTA && (
         <ControlSegmentado
           options={MODO_OPCIONES}
           active={modo}
@@ -651,8 +727,10 @@ export function ClientesView({
           ariaLabel="Indicador"
           className="lg:hidden"
         />
+        )}
 
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          {!UNA_LISTA && (
           <ControlSegmentado
             options={MODO_OPCIONES}
             active={modo}
@@ -661,8 +739,9 @@ export function ClientesView({
             ancho="contenido"
             className="hidden lg:inline-flex"
           />
+          )}
 
-          <div className="relative min-w-[180px] max-w-full flex-1 md:max-w-[320px]">
+          <div className={`relative min-w-[180px] max-w-full flex-1 ${BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "md:order-first" : "md:max-w-[320px]"}`}>
             {/* La lupa se centra con top-1/2 (antes top-2.5 asumía el h-9 del
                 Input; ahora el campo mide 44 y quedaría alta). */}
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
@@ -721,6 +800,13 @@ export function ClientesView({
           >
             <Download className="mr-1.5 h-3.5 w-3.5" /> {ROTULO_DESCARGAR_EXCEL}
           </Button>
+          {/* Revisión 110: el Excel de utilidad por cliente, en el «···». */}
+          {conUtilidad && (
+            <OverflowMenu
+              ariaLabel="Más opciones de Clientes"
+              items={[{ label: "Descargar utilidad por cliente", onClick: () => void onExcelUtilidad(), disabled: !utilidadData || bajando }]}
+            />
+          )}
 
           {/* Contador — desktop, a la derecha: cuántos, y de cuándo son los
               datos (🔴 la línea de frescura, 11-sep-2026: la vista se refresca
@@ -802,7 +888,7 @@ export function ClientesView({
                 {mostrarRanking && (
                   <th className="border-b border-gray-200 bg-gray-100 px-2.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">#</th>
                 )}
-                <ThOrden col="nombre" api={orden} className={TH_ORDEN}>Cliente</ThOrden>
+                <ThOrden col="nombre" api={orden} className={cn(TH_ORDEN, VENTAS_CLIENTE_A_LA_IZQUIERDA && "text-left")}>Cliente</ThOrden>
                 {/* 🔴 «Empresa» DICE SIEMPRE EL NÚMERO (5-sep-2026). La columna
                     mezclaba dos cosas: a veces «6 empresas» (cuántas le compran)
                     y a veces «Vistana International» (cuál). Dos preguntas
@@ -810,7 +896,7 @@ export function ClientesView({
                     decide cómo se entiende la fila entera. Ahora la columna
                     contesta UNA: cuántas. Cuáles, y con cuánto en cada una, sale
                     al abrir la fila. */}
-                <ThOrden col="empresa" api={orden} className={TH_ORDEN}>Empresas</ThOrden>
+                <ThOrden col="empresa" api={orden} className={cn(TH_ORDEN, VENTAS_CLIENTE_A_LA_IZQUIERDA && "text-left")}>Empresas</ThOrden>
                 {/* 🔴 LA COLUMNA DICE QUÉ PERÍODO SUMA (11-sep-2026): «Compras ·
                     Año 2026» o «Compras · Últimos 12 meses», el que el servidor
                     SIRVIÓ. Decía «Compras 2026» a secas. */}
@@ -820,6 +906,8 @@ export function ClientesView({
                     entiende solo, y el año es el REAL. */}
                 <ThOrden col="delta" api={orden} derecha className={TH_ORDEN}>{rotuloVs(periodoServido, anioComparativo)}</ThOrden>
                 <ThOrden col="ultima" api={orden} derecha className={TH_ORDEN}>Última compra</ThOrden>
+                {conUtilidad && <ThOrden col="utilidad" api={orden} derecha className={TH_ORDEN}>Utilidad</ThOrden>}
+                {conUtilidad && <ThOrden col="margen" api={orden} derecha className={TH_ORDEN}>Margen %</ThOrden>}
               </tr>
             </thead>
             <tbody>
@@ -830,6 +918,8 @@ export function ClientesView({
                   displayRank={idx + 1}
                   mostrarRanking={mostrarRanking}
                   resaltado={!!resaltado && c.id === resaltado}
+                  conUtilidad={conUtilidad}
+                  utilidad={utilidadMapa.get(c.id)}
                 />
               ))}
 
@@ -846,6 +936,8 @@ export function ClientesView({
                   displayRank={bloques.conCompras.length + idx + 1}
                   mostrarRanking={mostrarRanking}
                   resaltado={!!resaltado && c.id === resaltado}
+                  conUtilidad={conUtilidad}
+                  utilidad={utilidadMapa.get(c.id)}
                 />
               ))}
 
@@ -870,6 +962,7 @@ export function ClientesView({
                   <td data-col="ytd" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right text-sm font-medium text-gray-700 tabular-nums">{fmtMoney(mostradorRow.ytd)}</td>
                   <td className="border-b border-gray-200 px-2.5 py-3 text-right text-gray-400">—</td>
                   <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right text-xs text-gray-500 tabular-nums">{mostradorRow.ultima || "—"}</td>
+                  {conUtilidad && <td colSpan={2} className="border-b border-gray-200" />}
                 </tr>
               )}
 
@@ -898,6 +991,8 @@ export function ClientesView({
                   displayRank={bloques.conCompras.length + bloques.huerfanos.length + idx + 1}
                   mostrarRanking={mostrarRanking}
                   resaltado={!!resaltado && c.id === resaltado}
+                  conUtilidad={conUtilidad}
+                  utilidad={utilidadMapa.get(c.id)}
                 />
               ))}
 
@@ -1060,8 +1155,13 @@ function ClienteRow({
   displayRank,
   mostrarRanking,
   resaltado = false,
+  conUtilidad = false,
+  utilidad,
 }: {
   c: Cliente;
+  /** Revisión 110: las columnas Utilidad y Margen % (solo año completo). */
+  conUtilidad?: boolean;
+  utilidad?: UtilidadDelCliente;
   /** Llegó por `?cliente=` desde la ficha: la fila se marca para reconocerla. */
   resaltado?: boolean;
   /** Posición 1..N en el orden actual. Solo se DIBUJA cuando el orden es por
@@ -1096,6 +1196,16 @@ function ClienteRow({
             18 px de alto y el iPad horizontal (1194) cae del lado de la
             tabla y se toca con el dedo. Envolver las dos líneas da los 44 px
             SIN agrandar la fila ni un píxel. */}
+        {VENTAS_SIN_CODIGO_NO_ES_ENLACE && !tieneCodigoDeCliente(c.id) ? (
+          // n.º 104: sin código no hay ficha; el enlace llevaba a «no existe».
+          <span data-sin-codigo className="flex min-h-[44px] max-w-full flex-col justify-center text-left font-medium leading-tight">
+            <span data-col="nombre">
+              {c.nombre}
+              {c.esDelGrupo && <DelGrupoBadge />}
+            </span>
+            <span data-col="codigo" className="text-xs font-normal leading-tight text-gray-500">{SIN_CODIGO_EN_SWITCH}</span>
+          </span>
+        ) : (
         <Link
           href={`/clientes/${encodeURIComponent(c.id)}`}
           className="flex min-h-[44px] max-w-full flex-col justify-center text-left font-medium leading-tight hover:text-blue-600"
@@ -1106,6 +1216,7 @@ function ClienteRow({
           </span>
           <span data-col="codigo" className="tabular-nums text-xs font-normal leading-tight text-gray-500">{c.id}</span>
         </Link>
+        )}
       </td>
       {/* 🔴 SIEMPRE EL NÚMERO. Antes decía «6 empresas» cuando eran varias y
           «Vistana International» cuando era una: dos preguntas distintas bajo
@@ -1159,6 +1270,16 @@ function ClienteRow({
         <CambioCelda c={c} />
       </td>
       <td data-col="ultima" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right text-xs text-gray-500 tabular-nums">{c.ultima || "—"}</td>
+      {conUtilidad && (
+        <td data-col="utilidad" className={cn("whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right text-sm tabular-nums", (utilidad?.utilidad ?? 0) < 0 ? "text-red-600" : "text-gray-950")}>
+          {utilidad ? fmtMoneySigned(utilidad.utilidad) : "—"}
+        </td>
+      )}
+      {conUtilidad && (
+        <td data-col="margen" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right text-xs tabular-nums text-gray-700">
+          {utilidad ? fmtMargenPantalla(utilidad.margen) : "—"}
+        </td>
+      )}
     </tr>
   );
 }
@@ -1210,6 +1331,14 @@ function ClienteCard({
             se los toma del relleno de la tarjeta, así que la lista no se
             estira ni se pierde densidad. */}
         <div className="flex items-baseline justify-between gap-2">
+          {VENTAS_SIN_CODIGO_NO_ES_ENLACE && !tieneCodigoDeCliente(c.id) ? (
+            <span data-sin-codigo className="flex min-h-[44px] min-w-0 flex-1 items-center truncate text-[15px] font-medium leading-tight text-gray-950">
+              <span data-col="nombre" className="truncate">
+                {c.nombre}
+                {c.esDelGrupo && <DelGrupoBadge />}
+              </span>
+            </span>
+          ) : (
           <Link
             href={`/clientes/${encodeURIComponent(c.id)}`}
             onClick={(e) => e.stopPropagation()}
@@ -1220,9 +1349,10 @@ function ClienteCard({
               {c.esDelGrupo && <DelGrupoBadge />}
             </span>
           </Link>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">
-          <span data-col="codigo" className="tabular-nums">{c.id}</span>
+          <span data-col="codigo" className="tabular-nums">{VENTAS_SIN_CODIGO_NO_ES_ENLACE && !tieneCodigoDeCliente(c.id) ? SIN_CODIGO_EN_SWITCH : c.id}</span>
           {/* Mismo criterio que la columna del escritorio: el NÚMERO. Cuáles
               son sale al tocar la tarjeta (`ClienteSheet`). */}
           {showEmpresa && (

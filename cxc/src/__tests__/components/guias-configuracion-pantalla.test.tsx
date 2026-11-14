@@ -191,11 +191,13 @@ describe("la lista va agrupada por cliente y DICE si autollena", () => {
     const grupoUno = container.querySelector('[data-testid="grupo-D-35"]');
     const grupoVarios = container.querySelector('[data-testid="grupo-D-142"]');
     const grupoMixto = container.querySelector('[data-testid="grupo-D-26"]');
-    expect(grupoUno?.textContent).toContain("Se completa automáticamente al seleccionar el cliente."); // 1-oct-2026, Daniel: nombres normales de ERP
+    // Revisión 110 · n.º 71: con uno marcado «Siempre», la frase ya no se repite
+    // en la tarjeta (arriba lo dice una vez); sin ninguno marcado, sí.
+    expect(grupoUno?.textContent).not.toContain("Se completa automáticamente al seleccionar el cliente.");
     // D-142: dos destinos y NINGUNO marcado — nada se llena solo.
     expect(grupoVarios?.textContent).toContain("Se ofrecen como botones y la persona elige.");
     // D-26: varios destinos y UNO marcado — el de siempre se llena solo.
-    expect(grupoMixto?.textContent).toContain(
+    expect(grupoMixto?.textContent).not.toContain(
       // 🔄 19-sep-2026: la frase decía «El de siempre…», la MISMA que el
       // renglón usaba de estado y de acción. Ahora la marca se llama
       // «Siempre» y ponerla, «Poner siempre» (ver `rotulos-configuracion.ts`).

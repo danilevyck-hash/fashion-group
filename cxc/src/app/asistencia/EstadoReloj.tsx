@@ -34,11 +34,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { Info, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
+import { ASIS_ACTUALIZADO_JUNTO_A_EMPRESA_R110 } from "@/lib/ui/revision-110-asistencia";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import { nombreRelojEnPantalla } from "@/lib/asistencia/agente";
 // 🔴 La pastilla de una sola fila sale del módulo puro: qué dice, a qué relojes
@@ -113,6 +116,8 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
    */
   empresa?: string | null;
 }) {
+  // 75 (revisión 110): en el celular, «Actualizado ↻» sube a la línea de la empresa.
+  const frescuraEnLaBarra = useHayBarraCelular() && ASIS_ACTUALIZADO_JUNTO_A_EMPRESA_R110;
   const { toast } = useToast();
   const [datos, setDatos] = useState<Respuesta | null>(null);
   // Arranca el spinner al instante, sin esperar el GET de vuelta. Se apaga
@@ -264,6 +269,43 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
       const vistos = relojes.map((r) => r.vistoEn ?? r.leidoHasta).filter((x): x is string => !!x);
       const ultimo = vistos.length ? vistos.reduce((a, b) => (Date.parse(a) > Date.parse(b) ? a : b)) : null;
       const conAviso = peor.salud !== "al_dia" || !!avisoDeLaPastilla(relojes) || faltaMigracion;
+      const frescura = (
+        <LineaDeFrescura
+          actualizado={ultimo}
+          accion={TRAER_AHORA}
+          ocupado={ESPERANDO_A_LA_PC}
+          onActualizar={() => pedirATodos(puedenPedir.map((r) => r.dispositivo))}
+          actualizando={esperando && !relojes.every((r) => r.pedidoSinRespuesta)}
+          deshabilitado={puedenPedir.length === 0}
+        />
+      );
+      // 🔴 Revisión 14-nov-2026 (filtro-a-6): el aviso GRIS de los relojes y
+      // «Actualizado 13 nov ↻» comparten UNA línea gris. Ámbar o rojo siguen
+      // en su caja: esos sí piden atención.
+      // En el celular, «↻ 13 nov» (sin «Actualizado») para que todo quepa en
+      // UNA línea sin partirse; el aviso se corta con «…» solo como último recurso.
+      if (FILTRO_A_2026_11 && conAviso && tono === "info" && !avisoDeLaPastilla(relojes) && !faltaMigracion) {
+        const props = {
+          actualizado: ultimo,
+          accion: TRAER_AHORA,
+          ocupado: ESPERANDO_A_LA_PC,
+          onActualizar: () => pedirATodos(puedenPedir.map((r) => r.dispositivo)),
+          actualizando: esperando && !relojes.every((r) => r.pedidoSinRespuesta),
+          deshabilitado: puedenPedir.length === 0,
+        };
+        return (
+          <div data-relojes-y-frescura className="flex w-full min-w-0 flex-nowrap items-center gap-x-1 whitespace-nowrap text-[12px] text-gray-500 [&_[data-frescura]]:!text-[12px] [&_[data-frescura]_span]:!text-[12px]">
+            <Info aria-hidden className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 truncate">{apagado ?? textoDelAviso(relojes)}</span>
+            <span aria-hidden className="shrink-0 text-gray-300">·</span>
+            <span className="inline-flex shrink-0 whitespace-nowrap [&>*]:!m-0">
+              <LineaDeFrescura {...props} forma="celular" soloHora className="md:!hidden" />
+              <LineaDeFrescura {...props} forma="computadora" className="!hidden md:!inline-flex" />
+            </span>
+          </div>
+        );
+      }
+      const linea = frescura;
       return (
         <>
           {conAviso && (
@@ -273,14 +315,7 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
               {faltaMigracion && datos?.avisoMigracion && <span className="block text-xs">{datos.avisoMigracion}</span>}
             </Aviso>
           )}
-          <LineaDeFrescura
-            actualizado={ultimo}
-            accion={TRAER_AHORA}
-            ocupado={ESPERANDO_A_LA_PC}
-            onActualizar={() => pedirATodos(puedenPedir.map((r) => r.dispositivo))}
-            actualizando={esperando && !relojes.every((r) => r.pedidoSinRespuesta)}
-            deshabilitado={puedenPedir.length === 0}
-          />
+          {frescuraEnLaBarra ? <EnLaBarra pestana={["asistencia", "reporte"]} filaDer={linea} /> : linea}
         </>
       );
     }

@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { COMPANIAS_DEPURADOR } from "@/lib/depurador/logic";
 import { textoRetencion } from "@/lib/depurador/historial-retencion";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
+import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
+import { FILTRO_5_PLANTILLA_HISTORIAL } from "@/lib/ui/revision-110-filtros";
 import {
   LIMPIAR_BUSQUEDA,
   PARAM_BUSCAR,
@@ -160,7 +163,19 @@ export default function HistorialView({ refreshKey = 0, limite }: HistorialViewP
         </Aviso>
       )}
 
-      {!limite && <div className="mb-3 flex flex-wrap items-center gap-2">
+      {/* 🔴 filtro-5 (revisión 110, aprobado 14-nov-2026): en el celular,
+          «Buscar marca o usuario» y «Todas las empresas ▾» en UNA línea. Busca
+          lo mismo de siempre (marca, empresa, usuario o fecha). */}
+      {!limite && FILTRO_5_PLANTILLA_HISTORIAL && (
+        <div className="mb-3 space-y-2 sm:hidden">
+          <LineaBuscarYCapsulas compacto busqueda={busqueda} onBuscar={setBusqueda} placeholder="Buscar marca">
+            <Capsula etiqueta="Empresa" compacta alinear="derecha" valor={empresaFiltro} onCambiar={setEmpresaFiltro}
+              opciones={[{ valor: "", etiqueta: "Todas las empresas" }, ...COMPANIAS_DEPURADOR.map((c) => ({ valor: c.label, etiqueta: c.label }))]} />
+          </LineaBuscarYCapsulas>
+          <p className="text-[12px] text-gray-500">El Excel se puede volver a descargar por {textoRetencion()}.</p>
+        </div>
+      )}
+      {!limite && <div className={`mb-3 flex-wrap items-center gap-2 ${FILTRO_5_PLANTILLA_HISTORIAL ? "hidden sm:flex" : "flex"}`}>
         <select
           value={empresaFiltro}
           aria-label="Empresa"
@@ -178,6 +193,8 @@ export default function HistorialView({ refreshKey = 0, limite }: HistorialViewP
           placeholder={PLACEHOLDER_DESCARGA}
           etiqueta="Buscar descarga por marca, empresa, usuario o fecha"
           conteo={conteo}
+          llena={BUSCADOR_IZQUIERDA_LLENA_2026_11}
+          className={BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "md:order-first" : ""}
         />
         {/* El plazo se DERIVA de la constante, nunca se escribe a mano: la fila con los totales queda igual. */}
         <span className="text-[12px] text-gray-500">El Excel se puede volver a descargar por {textoRetencion()}.</span>

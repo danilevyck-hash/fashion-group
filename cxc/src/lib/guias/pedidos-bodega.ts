@@ -251,6 +251,24 @@ export function lineaDePendientesCorta(rows: readonly Pick<PedidoBodega, "fecha"
   return pend.length === 1 ? `${n} · ${haceDiasCorto(masViejo, hoy)}` : `${n} · el más viejo, ${haceDiasCorto(masViejo, hoy)}`;
 }
 
+/**
+ * Revisión 110 · n.º 58: la línea de arriba habla de la pestaña ABIERTA, no
+ * siempre de las pendientes: «12 en preparación · el más viejo, 17 d».
+ * `singular`/`plural` son el nombre del estado en minúscula.
+ */
+export function lineaDeLaPestana(
+  rows: readonly Pick<PedidoBodega, "fecha" | "estado">[],
+  estado: string,
+  nombre: { singular: string; plural: string },
+  hoy: string,
+): string {
+  const del = rows.filter((r) => r.estado === estado);
+  if (del.length === 0) return `Sin pedidos ${nombre.plural}`;
+  const masViejo = del.reduce((m, r) => (r.fecha < m ? r.fecha : m), del[0].fecha);
+  const n = `${del.length} ${del.length === 1 ? nombre.singular : nombre.plural}`;
+  return del.length === 1 ? `${n} · ${haceDiasCorto(masViejo, hoy)}` : `${n} · el más viejo, ${haceDiasCorto(masViejo, hoy)}`;
+}
+
 /** Switch da «2026-10-05 12:03:11», hora de Panamá (UTC−5 fijo). */
 export function fechaSwitchAIso(f: string): string {
   const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/.exec(f.trim());

@@ -14,6 +14,7 @@ import type { WorkSheet } from "xlsx-js-style";
 import type { VentasResumen } from "@/components/ventas/types";
 import { MONTHS } from "./format";
 import { variacionPct } from "../variacion";
+import { nombreExcelVentas } from "@/lib/ventas/nombre-archivo";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -152,6 +153,6 @@ export async function exportResumenToExcel(data: VentasResumen, modo: ModoExcelR
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
   downloadWorkbook(
     workbookFromSheets([{ name: modo === "utilidad" ? "Utilidad" : "Ventas", ws }]),
-    `ventas-${modo === "utilidad" ? "utilidad-" : ""}${data.year}.xlsx`,
+    nombreExcelVentas(modo === "utilidad" ? ["Resumen", "Utilidad"] : ["Resumen"], `ventas-${modo === "utilidad" ? "utilidad-" : ""}${data.year}.xlsx`),
   );
 }

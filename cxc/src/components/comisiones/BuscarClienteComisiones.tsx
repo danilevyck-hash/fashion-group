@@ -4,13 +4,23 @@
 // Una caja arriba de la lista. Con texto, la lista se cambia por los documentos
 // del cliente en el período: a quién le contó cada uno, o por qué no.
 
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { BuscadorGris } from "@/components/filtros/FiltroA";
 import { Search, X } from "lucide-react";
 import { fmt, fmtDate } from "@/lib/format";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { facturaParaMostrar } from "@/lib/comisiones/factura-en-pantalla";
 import { separarRetenciones } from "@/lib/comisiones/buscar-cliente";
+import { COMISIONES_BUSCADOR_CORTO } from "@/lib/ui/revision-110-ventas";
+
+/**
+ * filtro-3 (revisión 110): en el celular, lo que va AL LADO del buscador
+ * («Todas las empresas ▾») y lo que va entre el buscador y la lista («Total a
+ * pagar $X · Actualizado h:mm ↻»). Lo pone `PortadaComisionesCelular`; sin
+ * proveedor, el buscador queda como siempre.
+ */
+export const RanurasBuscarCliente = createContext<{ alLado: ReactNode; antesDeLaLista: ReactNode } | null>(null);
 
 interface Fila {
   fecha: string;
@@ -99,6 +109,7 @@ export function BuscarClienteComisiones({ year, mes, empresa, children }: { year
   const [clientes, setClientes] = useState<Cliente[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const buscando = q.trim().length >= 2;
+  const ranuras = useContext(RanurasBuscarCliente);
 
   useEffect(() => {
     if (!buscando) { setClientes(null); setError(null); return; }
@@ -119,13 +130,23 @@ export function BuscarClienteComisiones({ year, mes, empresa, children }: { year
 
   return (
     <div>
+      {ranuras ? (
+        <>
+          <div data-filtro-3-buscar className="mb-2 flex items-center gap-2 px-4">
+            <BuscadorGris valor={q} onCambiar={setQ} placeholder="Buscar cliente" compacto className="min-w-0 flex-1" />
+            {ranuras.alLado}
+          </div>
+          {!buscando && ranuras.antesDeLaLista}
+        </>
+      ) : (
       <div className="relative mb-3 px-4 sm:px-0">
         <Search className="pointer-events-none absolute left-7 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 sm:left-3" />
         <input
           type="text"
           role="searchbox"
           aria-label="Buscar cliente"
-          placeholder="Buscar cliente por nombre o código"
+          // n.º 32 (revisión 110): busca por nombre o por código, dicho corto.
+          placeholder={COMISIONES_BUSCADOR_CORTO ? "Buscar cliente o código" : "Buscar cliente por nombre o código"}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="min-h-[44px] w-full rounded-lg border border-gray-200 bg-white pl-9 pr-10 text-[15px] text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-900"
@@ -137,6 +158,7 @@ export function BuscarClienteComisiones({ year, mes, empresa, children }: { year
           </button>
         )}
       </div>
+      )}
 
       {!buscando ? children : (
         <div className="px-4 sm:px-0" data-buscar-cliente-listo={clientes || error ? "" : undefined}>

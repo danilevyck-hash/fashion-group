@@ -145,7 +145,7 @@ describe("🔴 el desglose del celular", () => {
   it("«Enviar estado de cuenta» despliega las cuatro salidas y «Editar mensaje»", () => {
     abrir(FILAS);
     expect(screen.queryByText("Correo")).toBeNull();
-    fireEvent.click(screen.getByText("Enviar estado de cuenta"));
+    fireEvent.click(screen.getByRole("button", { name: "Estado de cuenta" }));
     for (const t of ["Correo", "WhatsApp", "Copiar mensaje", "Descargar PDF", "Editar mensaje ›"]) {
       expect(screen.getByText(t)).toBeTruthy();
     }
@@ -153,7 +153,7 @@ describe("🔴 el desglose del celular", () => {
 
   it("🔴 nunca dice «vencido»", () => {
     abrir(FILAS);
-    fireEvent.click(screen.getByText("Enviar estado de cuenta"));
+    fireEvent.click(screen.getByRole("button", { name: "Estado de cuenta" }));
     expect(document.body.textContent?.toLowerCase()).not.toContain("vencid");
     const src = fs.readFileSync(path.join(process.cwd(), "src/lib/cxc/desglose-celular-2026-11.ts"), "utf8");
     expect(src.toLowerCase()).not.toContain("vencid");
@@ -161,7 +161,8 @@ describe("🔴 el desglose del celular", () => {
 
   it("sin desglose la hoja es la de siempre (la computadora no cambia)", () => {
     abrir(null);
-    expect(screen.getByRole("heading").textContent).toBe("Enviar estado de cuenta");
+    // Revisión 110 (n.º 21): un solo nombre.
+    expect(screen.getByRole("heading").textContent).toBe("Estado de cuenta");
     expect(screen.getByText("Correo")).toBeTruthy();
     expect(screen.queryByText(/Desglose por empresa/)).toBeNull();
   });

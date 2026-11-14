@@ -6,6 +6,7 @@ import type { Guia, GuiaItem } from "./types";
 import { clientesSummary, destinosSummary } from "./constants";
 import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTable } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { BuscarEnLaBarra, CLASE_FILA_MENU, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
@@ -36,6 +37,12 @@ import { GUIAS_LISTA_APPLE_2026_10, enElPeriodo, resumenDeGuias, type PeriodoGui
 import { GUIAS_GRUPOS_FECHA_2026_10 } from "@/lib/guias/grupos-fecha-2026-10";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
+import {
+  GUIAS_FILA_SOLO_MENU,
+  GUIAS_SIN_PASTILLA_PENDIENTE,
+  GUIAS_PENDIENTE_EN_SU_COLUMNA,
+  GUIAS_PENDIENTE_ABRE_LA_GUIA,
+} from "@/lib/ui/revision-110-despachos";
 
 /**
  * 🔴 LOS AVISOS DE LA FILA, CALLADOS Y SIN MOVER NADA (19-sep-2026).
@@ -98,6 +105,12 @@ const COL_TRANSP = "w-28 xl:w-36 shrink-0";
 /** La columna del aviso: existe SIEMPRE, con o sin aviso (ver `PuntoDeAviso`). */
 const COL_AVISOS = "w-8 shrink-0";
 const COL_CHEVRON = "w-4 h-4 shrink-0";
+/**
+ * Revisión 110 · n.º 72: el distintivo «Pendiente» en un hueco de ancho FIJO
+ * que existe en TODAS las filas (y en el encabezado). Suelto, solo en la fila
+ * pendiente, le robaba ancho a las columnas elásticas y la fila se leía torcida.
+ */
+const COL_ESTADO = "w-[88px] shrink-0 flex justify-end";
 /** Las clases que ordenan la fila entera, compartidas con el encabezado. */
 const FILA_ESCRITORIO = "hidden lg:flex items-center gap-3 xl:gap-4";
 
@@ -209,6 +222,8 @@ export default function GuiasList({
   selectorPeriodo,
 }: GuiasListProps) {
   const barra = useHayBarraCelular();
+  // n.º 66 (celular): impresora y compartir salen de la fila y entran al «···».
+  const soloMenu = barra && GUIAS_FILA_SOLO_MENU;
   // 🔴 GUIAS_LISTA_APPLE_2026_10 (4-oct-2026, propuesta): resumen arriba, período,
   // y un toque abre el detalle. Sin período, todo como antes.
   const apple = GUIAS_LISTA_APPLE_2026_10 && !!periodo;
@@ -328,7 +343,24 @@ export default function GuiasList({
   const lineaResumen = resumen && guias.length > 0 && (
     <p data-resumen-guias className="mr-auto text-sm font-medium text-gray-900">
       {resumen.hoy}
-      {resumen.pendientes && <span className="text-amber-700"> · {resumen.pendientes}</span>}
+      {resumen.pendientes && (GUIAS_PENDIENTE_ABRE_LA_GUIA ? (
+        <>
+          {" · "}
+          {/* Nuevo (Daniel, 14-nov-2026): tocar la pendiente abre la guía; con
+              varias, baja a «Pendientes de despacho». Solo navega. */}
+          <button
+            type="button"
+            data-abrir-pendiente
+            onClick={() => {
+              if (guiasPendientes.length === 1) onDespachar(guiasPendientes[0].id);
+              else document.getElementById("guias-pendientes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            className="relative text-amber-700 underline-offset-2 hover:underline active:opacity-60 before:absolute before:-inset-y-3 before:inset-x-0 before:content-['']"
+          >
+            {resumen.pendientes}
+          </button>
+        </>
+      ) : <span className="text-amber-700"> · {resumen.pendientes}</span>)}
     </p>
   );
 
@@ -552,7 +584,7 @@ export default function GuiasList({
                 </button>
               </>
             ) : null}
-            accion={canCreate ? { rotulo: "Nueva guía", onClick: onNewGuia } : null}
+            accion={canCreate ? { rotulo: "Nueva guía", onClick: onNewGuia, sobreLaBarra: true } : null}
           />
         )}
         <div className={barra && !selectionMode ? "hidden" : undefined}>
@@ -652,7 +684,7 @@ export default function GuiasList({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por transportista, cliente, factura o N° de guía…"
-                className={`border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full transition max-w-sm ${barra && !selectionMode ? "hidden" : ""}`}
+                className={`border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full transition ${BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "md:w-auto md:min-w-[240px] md:flex-1" : "max-w-sm"} ${barra && !selectionMode ? "hidden" : ""}`}
               />
               {selectorPeriodo}
               {/* 🔴 EL FILTRO QUE SE VE Y SE PUEDE QUITAR (11-sep-2026).
@@ -919,7 +951,9 @@ export default function GuiasList({
                                   cambio, está siempre: si apareciera y
                                   desapareciera, las columnas se moverían en la
                                   única fila que importa. */}
-                              {!isDispatched && (
+                              {GUIAS_PENDIENTE_EN_SU_COLUMNA ? (
+                                <span className={COL_ESTADO}>{!isDispatched && <StatusBadge estado="pendiente" />}</span>
+                              ) : !isDispatched && (
                                 <span className="shrink-0">
                                   <StatusBadge estado="pendiente" />
                                 </span>
@@ -978,7 +1012,9 @@ export default function GuiasList({
                                     .filter(Boolean)
                                     .join(" · ")}
                                 </span>
-                                {!isDispatched && (
+                                {/* n.º 67: con el encabezado «Pendientes de despacho» y la
+                                    barra ámbar, la pastilla era la tercera vez. */}
+                                {!isDispatched && !(apple && GUIAS_SIN_PASTILLA_PENDIENTE) && (
                                   <span className="shrink-0"><StatusBadge estado="pendiente" /></span>
                                 )}
                               </div>
@@ -1021,7 +1057,7 @@ export default function GuiasList({
                                   Despachar
                                 </button>
                               )}
-                              <button
+                              {!soloMenu && <button
                                 type="button"
                                 aria-label={`Imprimir la guía ${fmtGuia(g.numero)}`}
                                 title="Imprimir"
@@ -1034,8 +1070,8 @@ export default function GuiasList({
                                   <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
                                   <rect x="6" y="14" width="12" height="8" />
                                 </svg>
-                              </button>
-                              <button
+                              </button>}
+                              {!soloMenu && <button
                                 type="button"
                                 aria-label={`Compartir la guía ${fmtGuia(g.numero)}`}
                                 title="Compartir"
@@ -1048,18 +1084,29 @@ export default function GuiasList({
                                   <path d="m8 8 4-4 4 4" />
                                   <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
                                 </svg>
-                              </button>
+                              </button>}
                               {/* El rótulo lleva el N° de la guía: hay un «···»
                                   por fila y "Más opciones" a secas no diría de
                                   cuál. */}
-                              {(canEdit || canDelete) && (
+                              {(soloMenu || canEdit || canDelete) && (
+                                // n.º 66: en el celular el papel se empieza a
+                                // preparar al APOYAR el dedo en el «···», igual
+                                // que con los botones sueltos.
+                                <span className="contents" onPointerDown={soloMenu ? () => prepararPapel(g) : undefined}>
                                 <OverflowMenu
                                   ariaLabel={`Más opciones de la guía ${fmtGuia(g.numero)}`}
                                   items={[
+                                    ...(soloMenu
+                                      ? [
+                                          { label: "Imprimir", onClick: () => { void imprimirEsta(g); } },
+                                          { label: "Compartir", onClick: () => { void compartirEsta(g); } },
+                                        ]
+                                      : []),
                                     ...(canEdit ? [{ label: "Editar", onClick: () => onEditar(g.id) }] : []),
                                     ...(canDelete ? [{ label: "Eliminar guía", onClick: () => onDelete(g.id), destructive: true }] : []),
                                   ]}
                                 />
+                                </span>
                               )}
                             </div>
                           )}
@@ -1322,6 +1369,7 @@ export default function GuiasList({
                         <span className={COL_BULTOS}>Bultos</span>
                         <span className={COL_TRANSP}>Transportista</span>
                         <span className={COL_AVISOS} aria-hidden />
+                        {GUIAS_PENDIENTE_EN_SU_COLUMNA && <span className={COL_ESTADO} aria-hidden />}
                         <span className={COL_CHEVRON} aria-hidden />
                       </span>
                       {/* El hueco de los botones de la fila (Imprimir ·
@@ -1332,7 +1380,7 @@ export default function GuiasList({
                     {/* 🔴 LO PENDIENTE, ARRIBA Y FUERA DE LOS GRUPOS. Es UNA
                         guía de 222 y es la única con algo que hacer. */}
                     {pendientes.length > 0 && (
-                      <div className="space-y-1 mb-3">
+                      <div id="guias-pendientes" className="space-y-1 mb-3 scroll-mt-24">
                         {apple && (
                           <p className="px-1 pt-1 text-xs font-medium uppercase tracking-wide text-gray-400">Pendientes de despacho</p>
                         )}

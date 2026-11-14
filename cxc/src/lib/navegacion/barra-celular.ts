@@ -289,6 +289,15 @@ export const VAR_ALTO_BARRA_FIJA = "--fg-alto-barra-fija";
 export const ATRIBUTO_BARRA_FIJA = "data-barra-fija-abajo";
 
 /**
+ * 🔴 LA ACCIÓN DE UNA LISTA PRINCIPAL CONVIVE CON LA BARRA DE ABAJO (14-nov-2026,
+ * `BARRA_EN_LISTAS_2026_11`). En Guías, Etiquetas, Reclamos, Aprobaciones,
+ * Préstamos, Colaboradores y Recordatorios la barra de pestañas ya no se
+ * esconde: el botón fijo («Nueva guía», «Nuevo reclamo»…) se sienta ENCIMA de
+ * ella (`globals.css`). En los formularios la barra se sigue escondiendo.
+ */
+export const ATRIBUTO_SOBRE_LA_BARRA = "data-sobre-tab-bar";
+
+/**
  * A qué altura del piso queda el botón flotante, en píxeles.
  *
  * 🔴 EL FLOTANTE SUBE; LOS BOTONES NEGROS FIJOS NO SE MUEVEN. Las portadas del

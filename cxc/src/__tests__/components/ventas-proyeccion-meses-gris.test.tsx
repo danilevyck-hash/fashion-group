@@ -20,6 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import { VENTAS_PIE_UNA_LINEA } from "@/lib/ui/revision-110-ventas";
 import { render, screen, within, cleanup, fireEvent } from "@testing-library/react";
 import { ResumenView } from "@/components/ventas/ResumenView";
 import { ResumenViewMobile } from "@/components/ventas/ResumenViewMobile";
@@ -192,7 +193,8 @@ describe("escritorio — oct, nov y dic se llenan en gris", () => {
     render(<ResumenView {...props} data={resumen()} isClosedYear={false} />);
     const pie = document.querySelector<HTMLElement>('[data-pie-matriz="escritorio"]');
     expect(pie).not.toBeNull();
-    expect(pie!.textContent).toContain(LEYENDA_MESES_PROYECTADOS);
+    // n.º 11 (revisión 110): una línea corta; la leyenda entera vive en el ⓘ.
+    expect(pie!.textContent).toContain(VENTAS_PIE_UNA_LINEA ? "en gris, proyección" : LEYENDA_MESES_PROYECTADOS);
   });
 });
 

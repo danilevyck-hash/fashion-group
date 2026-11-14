@@ -54,9 +54,10 @@ describe("los filtros no inventan números", () => {
     const r = porDescripcion(filtrarArticulos(ARTS, "", { departamento: "Tommy Jeans" }));
     expect(r).toEqual([expect.objectContaining({ descripcion: "Men-T-Shirts S/S", venta: 250, existencia: 0 })]);
   });
-  it("el 🔍 busca solo por código", () => {
+  it("el 🔍 busca por código o descripción (14-nov-2026, «Buscar código o descripción»)", () => {
     expect(filtrarArticulos(ARTS, "mw0mw4", {}).map(x => x.codigo)).toEqual(["MW0MW4C87"]);
-    expect(filtrarArticulos(ARTS, "polos", {})).toEqual([]);
+    expect(filtrarArticulos(ARTS, "polos", {}).map(x => x.codigo)).toEqual(["MW0MW4C87"]);
+    expect(filtrarArticulos(ARTS, "zzz-no-existe", {})).toEqual([]);
   });
   it("las opciones dependen de lo elegido", () => {
     expect(opcionesDe(ARTS, "descripcion", "", { genero: "Mujer" })).toEqual(["Women-Bags"]);
