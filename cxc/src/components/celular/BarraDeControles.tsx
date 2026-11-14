@@ -378,11 +378,14 @@ export function ChipSelector({
   valor,
   opciones,
   onCambiar,
+  soloValor = false,
 }: {
   rotulo: string;
   valor: string;
   opciones: readonly { valor: string; etiqueta: string }[];
   onCambiar: (v: string) => void;
+  /** Sin el «Rótulo:» delante, cuando la opción ya dice qué es («Todas las empresas ▾»). */
+  soloValor?: boolean;
 }) {
   const elegida = opciones.find((o) => o.valor === valor)?.etiqueta ?? valor;
   const puesto = opciones.length > 0 && valor !== opciones[0].valor;
@@ -393,7 +396,7 @@ export function ChipSelector({
     >
       <span className="min-w-0 truncate">
         {/* «Todas las empresas» ya dice qué filtra: sin «Empresa:» delante (14-nov-2026). */}
-        {TODAS_LAS_EMPRESAS_2026_11 && /^Todas las /.test(elegida) ? elegida : `${rotulo}: ${elegida}`}
+        {soloValor || (TODAS_LAS_EMPRESAS_2026_11 && /^Todas las /.test(elegida)) ? elegida : `${rotulo}: ${elegida}`}
       </span>
       <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2.25} aria-hidden />
       <select

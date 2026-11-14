@@ -23,6 +23,7 @@
 //   · El cliente se elige con `ClientePicker`, el único selector del sistema.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { CONFIG_DESTINOS_LIMPIA } from "@/lib/ui/revision-110-despachos";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ClientePicker from "@/components/ClientePicker";
 import DestinosListaConfig from "./DestinosListaConfig";
@@ -356,13 +357,14 @@ export default function GuiasConfiguracionView() {
               lugares que sugiere el campo dirección, sin dueño. Son dos cosas
               con permisos distintos y NO se fusionan: lo único que cambió son
               las palabras. */}
-          <h2 id="destinos-config-titulo" className="flex items-center gap-1 text-sm font-medium text-gray-900">
+          <h2 id="destinos-config-titulo" className={`flex items-center gap-1 text-sm font-medium text-gray-900${CONFIG_DESTINOS_LIMPIA ? " whitespace-nowrap" : ""}`}>
             {ROTULO_DONDE_ENTREGA_CADA_CLIENTE}
-            <Ayuda titulo="Información">
+            {/* n.º 71: sin ⓘ; la explicación vive una vez, en la línea de abajo. */}
+            {!CONFIG_DESTINOS_LIMPIA && <Ayuda titulo="Información">
               <p>Al hacer una guía, el destino marcado «{MARCA_SIEMPRE}» se completa automáticamente al seleccionar el cliente; los demás aparecen como botones. Sin ninguno marcado, el campo queda vacío.</p>
               <p>El campo Dirección sigue siendo libre: quien quiera puede escribir otra cosa.</p>
               <p>Quitar un destino no borra nada: queda guardado como historial.</p>
-            </Ayuda>
+            </Ayuda>}
           </h2>
           <button
             type="button"
@@ -379,7 +381,7 @@ export default function GuiasConfiguracionView() {
           type="search"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar cliente por nombre o código…"
+          placeholder={CONFIG_DESTINOS_LIMPIA ? "Buscar cliente por nombre o código" : "Buscar cliente por nombre o código…"}
           aria-label="Buscar cliente por nombre o código"
           className={`${CAMPO} mb-4`}
         />
@@ -584,7 +586,9 @@ function GrupoDeCliente({
       </div>
 
       {/* Qué hace el formulario con esta definición: se dice acá, no se adivina. */}
-      {n > 0 && (
+      {/* n.º 71: «se completa automáticamente…» ya lo dice arriba, una vez;
+          aquí queda solo lo que cambia por cliente (sin ninguno marcado). */}
+      {n > 0 && !(CONFIG_DESTINOS_LIMPIA && g.filas.some((f) => f.el_de_siempre)) && (
         <p className="px-3 pt-2 text-xs text-gray-500">
           {comoSeUsa(n, g.filas.some((f) => f.el_de_siempre))}
         </p>

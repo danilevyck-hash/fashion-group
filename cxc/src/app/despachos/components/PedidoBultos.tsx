@@ -45,7 +45,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, Printer } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
-import { ALTO_COLCHON_DE_ABAJO, useHayBarraCelular } from "@/components/celular/BarraDeControles";
+import { ALTO_COLCHON_DE_ABAJO, CLASE_TITULO_BARRA, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { descargarArchivo } from "@/lib/compartir-archivo";
 import { fmt } from "@/lib/format";
@@ -86,6 +86,7 @@ export default function PedidoBultos({
   // columna Bulto y sin la barra de abajo. `false` = el detalle de hoy,
   // intacto.
   ocultarBulto = false,
+  volverEnElTitulo = false,
   onVolver,
 }: {
   pedido: PedidoDelDetalle;
@@ -98,6 +99,11 @@ export default function PedidoBultos({
   /** 🔴 Verificado = congelado: el detalle ya no se toca (7-oct-2026). */
   verificado?: boolean;
   ocultarBulto?: boolean;
+  /**
+   * Revisión 110 · n.º 63 (celular): el regreso vive en el título, «‹ Pedidos»,
+   * y la fila «← Pedidos» de abajo se va. La página calla su «Pedidos ▾».
+   */
+  volverEnElTitulo?: boolean;
   onVolver: () => void;
 }) {
   // Con `ocultarBulto`, nadie pone nada en esta pantalla: es de solo mirar.
@@ -318,14 +324,21 @@ export default function PedidoBultos({
   const todasMarcadas = !!lineas && lineas.length > 0 && marcadas.size === lineas.length;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+    <div className={`mx-auto max-w-6xl px-4 sm:px-6 ${volverEnElTitulo ? "pb-6 pt-2" : "py-6"}`}>
+      {volverEnElTitulo && (
+        <div data-fila-del-avatar className="mb-2 flex min-h-11 items-center">
+          <button type="button" onClick={onVolver} className={`${CLASE_TITULO_BARRA} flex items-center gap-1 active:opacity-60`}>
+            <span aria-hidden>‹</span> Pedidos
+          </button>
+        </div>
+      )}
       {/* El título va en la misma línea que «← Volver» (docs/diseno.md). */}
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <button
             type="button"
             onClick={onVolver}
-            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+            className={`${volverEnElTitulo ? "hidden" : "inline-flex"} items-center gap-1 text-sm text-blue-600 hover:text-blue-800`}
           >
             <ArrowLeft size={15} strokeWidth={1.8} aria-hidden /> Pedidos
           </button>

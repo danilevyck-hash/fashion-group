@@ -57,3 +57,15 @@ export const FILTROS_ORIGEN: readonly { clave: FiltroOrigen; label: string }[] =
 export function pasaFiltroOrigen(origen: OrigenComprobante, filtro: FiltroOrigen): boolean {
   return filtro === "todos" || origen === filtro;
 }
+
+/**
+ * Revisión 110 · n.º 57: ¿todas las filas dirían LO MISMO en la columna
+ * «Origen»? (mismo origen y, si es del cliente, mismo ✓ de confirmado). Con
+ * cero o una fila no hay nada que comparar: la columna se calla igual.
+ */
+export function unSoloOrigen(
+  filas: readonly { origen: OrigenComprobante; confirmado_cliente_at?: string | null }[],
+): boolean {
+  const llave = (f: (typeof filas)[number]) => (f.origen === "link" ? `link:${!!f.confirmado_cliente_at}` : "mio");
+  return filas.every((f) => llave(f) === llave(filas[0]));
+}

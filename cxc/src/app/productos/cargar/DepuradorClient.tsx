@@ -1,5 +1,7 @@
 "use client";
 
+// n.º 87: en el celular no se suelta ni se hace clic: se toca.
+import { PLANTILLA_TOCA_PARA_ELEGIR } from "@/lib/ui/revision-110-despachos";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { saveAs } from "file-saver";
@@ -850,7 +852,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           <div className="text-base font-semibold text-gray-900">
             {!catalogo
               ? "Espera a que cargue el catálogo de descripciones…"
-              : fileName || "Suelta el archivo aquí o haz clic para buscar"}
+              : fileName || (PLANTILLA_TOCA_PARA_ELEGIR ? <><span className="sm:hidden">Toca para elegir el archivo</span><span className="hidden sm:inline">Suelta el archivo aquí o haz clic para buscar</span></> : "Suelta el archivo aquí o haz clic para buscar")}
           </div>
           <input
             ref={inputRef}

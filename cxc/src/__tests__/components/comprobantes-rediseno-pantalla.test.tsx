@@ -319,20 +319,21 @@ describe("4. 🔴 la columna «Vendedor»", () => {
   it("está en el encabezado, entre Cliente y Total", () => {
     const { container } = pintar([EN_SWITCH]);
     const ths = [...container.querySelectorAll("thead th")].map((t) => (t.textContent || "").trim());
-    expect(ths).toEqual(["", "Origen", "Cliente", "Vendedor", "Total", "Fecha", ""]);
+    // Revisión 110 · n.º 57: con un solo origen a la vista, «Origen» no se dibuja.
+    expect(ths).toEqual(["", "Cliente", "Vendedor", "Total", "Fecha", ""]);
   });
 
   it("dice QUIÉN armó cada pedido — el dato ya viajaba en la fila", () => {
     const { container } = pintar([EN_SWITCH, TRABADO]);
     abrirMeses(container);
-    expect([...filaDe(container, "PED-017").querySelectorAll("td")][3].textContent).toBe("Reynaldo Espinosa");
-    expect([...filaDe(container, "PED-004").querySelectorAll("td")][3].textContent).toBe("Daniel");
+    expect([...filaDe(container, "PED-017").querySelectorAll("td")][2].textContent).toBe("Reynaldo Espinosa");
+    expect([...filaDe(container, "PED-004").querySelectorAll("td")][2].textContent).toBe("Daniel");
   });
 
   it("sin vendedor se dice «—», no un blanco", () => {
     const { container } = pintar([BORRADOR]);
     tocarChip(container, "filtro-tipo-comprobante", "Borradores");
-    expect([...filaDe(container, "PED-018").querySelectorAll("td")][3].textContent).toBe("—");
+    expect([...filaDe(container, "PED-018").querySelectorAll("td")][2].textContent).toBe("—");
   });
 });
 

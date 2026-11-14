@@ -15,6 +15,8 @@ import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import { CONFIG_GUIAS_ROLES } from "@/lib/guias/destinos-config";
 import { puedeEtiquetar } from "@/lib/guias/etiquetas";
 import { ComisionesPeriodo } from "@/components/comisiones/ComisionesPeriodo";
+import { etiquetaPeriodo } from "@/lib/comisiones/periodo";
+import { GUIAS_MES_ENTERO, PEDIDO_REGRESO_EN_EL_TITULO } from "@/lib/ui/revision-110-despachos";
 import { GUIAS_LISTA_APPLE_2026_10, aniosConGuias, type PeriodoGuias } from "@/lib/guias/lista-apple-2026-10";
 import { mesEnCurso } from "@/lib/comisiones/mes-inicial";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -137,11 +139,15 @@ export default function GuiasPage() {
       panelDelAnchoDelBoton={barra}
       year={periodo.year}
       mes={periodo.mes}
+      // n.º 68: «Noviembre 2026», no «Nov 2026»: en el celular hay lugar de sobra.
+      rotulo={GUIAS_MES_ENTERO ? etiquetaPeriodo(periodo.year, periodo.mes) : undefined}
       availableYears={anios}
       onChange={(year, mes) => setPeriodo({ year, mes })}
     />
   );
 
+  // n.º 63: con un pedido abierto, su «‹ Pedidos» es el título; el «Pedidos ▾» se calla.
+  const [pedidoAbierto, setPedidoAbierto] = useState(false);
   const [guiasReadonly, setGuiasReadonly] = useState(false);
   useEffect(() => {
     if (sessionStorage.getItem("fg_guias_readonly") === "1") setGuiasReadonly(true);
@@ -252,7 +258,7 @@ export default function GuiasPage() {
       <div>
         <AppHeader module="Despachos" tituloEnLaPantalla={barra} />
         <ProveedorBarraCelular activo={barra} activa={vista}>
-        {barra && (
+        {barra && !(PEDIDO_REGRESO_EN_EL_TITULO && enPedidos && pedidoAbierto) && (
           <BarraDeControles
             titulo="Despachos"
             pestanas={pestanas.map(([value, label]) => ({ value, label }))}
@@ -291,6 +297,7 @@ export default function GuiasPage() {
             // 🔴 «Recibido» (o «Verificado» con bultos) lo marca la secretaria
             // y admin, nunca bodega.
             puedeRecibir={puedeRecibirPedidos(role)}
+            onDetalle={setPedidoAbierto}
           />
         ) : enConfig ? (
           <GuiasConfiguracionView />
