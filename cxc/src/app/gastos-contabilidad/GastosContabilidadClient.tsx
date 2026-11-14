@@ -30,7 +30,8 @@ import {
 } from "./components/tipos";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SelectorMes from "./components/SelectorMes";
-import ResumenEgresos from "./components/ResumenEgresos";
+import ResumenEgresos, { hayPausaEnElMes } from "./components/ResumenEgresos";
+import { GASTOS_PAUSA_UNA_VEZ_2026_11 } from "@/lib/ui/revision-110-marketing";
 import DetalleEgresos from "./components/DetalleEgresos";
 import SaldosBancoTab from "./components/saldos/SaldosBancoTab";
 import { Aviso } from "@/components/ui/Aviso";
@@ -143,6 +144,12 @@ function GastosContabilidadInner({ apple }: { apple: boolean }) {
   // así que se espera en vez de mostrar la lista y saltar al desglose.
   const esperandoDeepLink = Boolean(empresaParam) && !data && (isLoading || !error);
 
+  // n.º 94: la pausa es del módulo entero; se dice UNA vez, junto al mes.
+  const lineaPausa =
+    GASTOS_PAUSA_UNA_VEZ_2026_11 && egresos.data && hayPausaEnElMes(egresos.data.empresas) ? (
+      <span data-gastos-pausa className="text-xs leading-tight text-gray-500 sm:text-sm">Registro de gastos pausado</span>
+    ) : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader
@@ -157,7 +164,12 @@ function GastosContabilidadInner({ apple }: { apple: boolean }) {
             pestanas={[{ value: "gastos", label: "Gastos" }, { value: "saldos-banco", label: "Saldos de banco" }]}
             activa={tab}
             onPestana={setTab}
-            periodo={enGastos && !empresaParam ? <SelectorMes mes={mes} mesTope={hoyMes} onCambiar={setMesParam} compacto /> : undefined}
+            periodo={enGastos && !empresaParam ? (
+              <div className="flex min-w-0 items-center gap-2">
+                <SelectorMes mes={mes} mesTope={hoyMes} onCambiar={setMesParam} compacto />
+                {lineaPausa}
+              </div>
+            ) : undefined}
           />
         </ProveedorBarraCelular>
       )}
@@ -186,8 +198,9 @@ function GastosContabilidadInner({ apple }: { apple: boolean }) {
         ) : (
           <>
             {!barra && (
-            <div className="mb-4">
+            <div className={lineaPausa ? "mb-4 flex flex-wrap items-center gap-x-3 gap-y-1" : "mb-4"}>
               <SelectorMes mes={mes} mesTope={hoyMes} onCambiar={setMesParam} compacto={apple} />
+              {lineaPausa}
             </div>
             )}
 

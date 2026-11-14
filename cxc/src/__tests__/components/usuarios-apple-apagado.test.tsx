@@ -15,6 +15,12 @@ const interruptor = vi.hoisted(() => ({ prendido: false }));
 vi.mock("@/lib/usuarios-apple-2026-10", () => ({
   get USUARIOS_APPLE_2026_10() { return interruptor.prendido; },
 }));
+// Revisión 110 (14-nov-2026): el candado compara contra la pantalla de antes,
+// así que sus interruptores (n.º 100–102) también van APAGADOS acá.
+vi.mock("@/lib/ui/revision-110-marketing", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/ui/revision-110-marketing")>();
+  return { ...real, USUARIOS_EMPRESA_POR_NOMBRE_2026_11: false, USUARIOS_NUEVO_EN_EL_TITULO_2026_11: false };
+});
 vi.mock("next/navigation", () => ({
   usePathname: () => "/admin/usuarios",
   useSearchParams: () => new URLSearchParams(),

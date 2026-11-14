@@ -19,6 +19,7 @@ import type { ImpulsadoraConEstado } from "@/lib/marketing/types";
 import type { GastoDeLaLista, MarketingDelCobro } from "@/lib/marketing/zip-marca";
 import RegistrarPagoModal from "../RegistrarPagoModal";
 import { BOTON_SECUNDARIO } from "./PorCobrarNuevo";
+import { MKT_IMPULSADORAS_UNA_LINEA_2026_11 } from "@/lib/ui/revision-110-marketing";
 
 const MESES_A_LA_VISTA = 4;
 
@@ -90,6 +91,10 @@ export default function ImpulsadorasNuevo({
   const meses = mesesALaVista(hoyPanama());
 
   return (
+    <>
+    {MKT_IMPULSADORAS_UNA_LINEA_2026_11 && (
+      <p className="mb-2 text-sm text-gray-500">Cada impulsadora se cobra al 100 % a su marca.</p>
+    )}
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
       {lista.map((imp) => {
         const estados = meses.map((mes) => ({ mes, estado: estadoDelMes(datos.gastos, imp.id, mes) }));
@@ -103,11 +108,22 @@ export default function ImpulsadorasNuevo({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="font-medium text-gray-900">{imp.nombre}</div>
-                <div className="text-xs text-gray-500">
-                  {[marca, `${formatearMonto(imp.monto_mensual)} al mes`, pct !== null ? `se cobra ${pct} %` : null]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </div>
+                {MKT_IMPULSADORAS_UNA_LINEA_2026_11 ? (
+                  // n.º 90: UNA línea; si no cabe se corta la marca, nunca el monto.
+                  // El 100 % ya se dijo arriba de la lista: solo se repite si es otro.
+                  <div className="flex min-w-0 text-xs text-gray-500" data-linea-impulsadora>
+                    {marca && <span className="min-w-0 truncate">{marca}</span>}
+                    <span className="shrink-0 whitespace-pre">
+                      {lineaDelMonto(marca, formatearMonto(imp.monto_mensual), pct)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500">
+                    {[marca, `${formatearMonto(imp.monto_mensual)} al mes`, pct !== null ? `se cobra ${pct} %` : null]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                )}
               </div>
               <span
                 className={`rounded-full px-2 py-0.5 text-xs whitespace-nowrap ${
@@ -147,5 +163,16 @@ export default function ImpulsadorasNuevo({
         />
       )}
     </div>
+    </>
   );
+}
+
+/**
+ * n.º 90 · La parte de la línea que NUNCA se corta: « · $800.00 al mes», y el
+ * porcentaje solo cuando no es el 100 % que ya dice la frase de arriba.
+ */
+export function lineaDelMonto(marca: string, monto: string, pct: number | null): string {
+  const partes = [`${monto} al mes`];
+  if (pct !== null && pct !== 100) partes.push(`se cobra ${pct} %`);
+  return `${marca ? " · " : ""}${partes.join(" · ")}`;
 }

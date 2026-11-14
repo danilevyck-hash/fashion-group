@@ -28,6 +28,7 @@ import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import type { GastoDeLaLista, LineaDelCobro, MarketingDelCobro, ResumenDelCobro } from "@/lib/marketing/zip-marca";
 import { useDescargasPeriodo } from "../useDescargasPeriodo";
+import { MKT_COBROS_ANTERIORES_2026_11 } from "@/lib/ui/revision-110-marketing";
 
 const claveDeLinea = (l: Pick<LineaDelCobro, "tipo" | "documentoId">) => `${l.tipo}:${l.documentoId ?? ""}`;
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
@@ -122,14 +123,28 @@ function Portada({ datos, onAbrir }: { datos: MarketingDelCobro; onAbrir: (marca
           <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
             {datos.cerrados.map((c) => (
               <div key={`${c.periodoId}:${c.marcaCodigo}`} className="flex items-center gap-3 px-4 min-h-[44px] py-2 text-sm">
-                <span className="w-28 shrink-0 text-gray-500">{formatearFecha(c.cerradoEn) || "—"}</span>
-                <span className="flex-1 min-w-0 truncate text-gray-900">{c.marcaNombre}</span>
-                <span className="tabular-nums text-gray-900">{formatearMonto(c.total)}</span>
+                {MKT_COBROS_ANTERIORES_2026_11 ? (
+                  // n.º 89: la marca entera arriba y la fecha debajo.
+                  <span className="flex-1 min-w-0" data-cobro-anterior>
+                    <span className="block text-gray-900">{c.marcaNombre}</span>
+                    <span className="block text-xs text-gray-500">{formatearFecha(c.cerradoEn) || "—"}</span>
+                  </span>
+                ) : (
+                  <>
+                    <span className="w-28 shrink-0 text-gray-500">{formatearFecha(c.cerradoEn) || "—"}</span>
+                    <span className="flex-1 min-w-0 truncate text-gray-900">{c.marcaNombre}</span>
+                  </>
+                )}
+                <span className="shrink-0 tabular-nums text-gray-900">{formatearMonto(c.total)}</span>
                 <button
                   type="button"
                   disabled={bajando !== null}
                   onClick={() => bajarZipMarca(c.marcaCodigo, `${c.marcaNombre} · ${c.periodoNombre}`, c.periodoId)}
-                  className="text-blue-600 hover:text-blue-800 min-h-[44px] px-1 disabled:opacity-40"
+                  className={
+                    MKT_COBROS_ANTERIORES_2026_11
+                      ? "shrink-0 font-semibold text-blue-600 hover:text-blue-800 min-h-[44px] px-1 disabled:opacity-40"
+                      : "text-blue-600 hover:text-blue-800 min-h-[44px] px-1 disabled:opacity-40"
+                  }
                 >
                   ZIP
                 </button>

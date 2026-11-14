@@ -26,7 +26,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
-import NuevoGastoDrawer from "@/app/caja/components/NuevoGastoDrawer";
+import NuevoGastoDrawer, { camposQueFaltan } from "@/app/caja/components/NuevoGastoDrawer";
+
+// Revisión 110 (14-nov-2026), n.º 93: con el interruptor PRENDIDO los botones
+// nacen encendidos y lo que falta se dice al tocar Guardar. Este archivo sigue
+// cuidando el camino APAGADO; el último bloque lo prende.
+const r110 = vi.hoisted(() => ({ prendido: false }));
+vi.mock("@/lib/ui/revision-110-marketing", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/ui/revision-110-marketing")>();
+  return { ...real, get CAJA_AVISO_AL_GUARDAR_2026_11() { return r110.prendido; } };
+});
 
 const PERIODO = { id: "p-3", numero: 3, fondo_inicial: 200, fecha_apertura: "2026-09-02", fecha_cierre: null };
 
@@ -197,5 +206,31 @@ describe("🩸 LAS CUATRO REGLAS DE SUGERENCIA MUERTAS SE BORRARON", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guardar gasto" }));
     await waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0].categoria).toBe("Transporte");
+  });
+});
+
+describe("Revisión 110 · n.º 93 — el aviso sale al guardar, no antes", () => {
+  afterEach(() => { r110.prendido = false; });
+
+  it("al abrir no hay aviso y los dos botones están ENCENDIDOS", () => {
+    r110.prendido = true;
+    montar();
+    expect(screen.queryByText("Completa los campos obligatorios.")).toBeNull();
+    expect((screen.getByRole("button", { name: "Guardar gasto" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Guardar y nuevo" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("🔴 tocar Guardar con campos vacíos dice TODO lo que falta y NO guarda", async () => {
+    r110.prendido = true;
+    montar();
+    fireEvent.change(screen.getByLabelText("Observaciones"), { target: { value: "Comida" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar gasto" }));
+    expect(await screen.findByText("Falta: proveedor, subtotal.")).toBeTruthy();
+    expect(posts).toHaveLength(0);
+  });
+
+  it("camposQueFaltan: la misma regla que el botón de antes (proveedor, categoría, subtotal)", () => {
+    expect(camposQueFaltan({ proveedor: " ", categoria: "", subtotal: 0 })).toEqual(["proveedor", "categoría", "subtotal"]);
+    expect(camposQueFaltan({ proveedor: "Super 99", categoria: "Alimentación", subtotal: 1 })).toEqual([]);
   });
 });
