@@ -261,6 +261,17 @@ export function tituloDelDia(dia: string): string {
   return `${DIAS_SEMANA[diaSemana]} ${d} ${MESES_CORTOS[m - 1]}`;
 }
 
+/**
+ * La fecha de una factura al lado de su número: «12 nov», y con el año solo si
+ * no es el de `hoy` (YYYY-MM-DD en Panamá): «4 mar 2026». Puro.
+ */
+export function fechaDeLaFactura(fechaIso: string, hoy: string): string {
+  const dia = fechaPanamaDe(fechaIso);
+  const [y, m, d] = String(dia ?? "").split("-").map(Number);
+  if (!y || !m || m < 1 || m > 12 || !d) return "";
+  return `${d} ${MESES_CORTOS[m - 1]}${String(y) === hoy.slice(0, 4) ? "" : ` ${y}`}`;
+}
+
 /** ¿La factura es del día `hoy` (YYYY-MM-DD en Panamá)? Para mostrar la hora. */
 export function esDeHoy(fechaIso: string, hoy: string): boolean {
   return fechaPanamaDe(fechaIso) === hoy;

@@ -291,7 +291,7 @@ describe("🔴 2b. cada factura marcada lleva su NÚMERO DE ORDEN y se reordena 
     expect(resumen()).toMatch(/11-000000032bultos 1–5 de 15.*11-000000031bultos 6–15 de 15/);
     // El número de orden de la lista sigue al cambio.
     const orden = (sec: string) =>
-      screen.getAllByText(sec).map((el) => el.closest("label")?.querySelector("[data-orden]")?.textContent).find(Boolean);
+      document.querySelector(`[data-factura="${sec}"]`)?.closest("label")?.querySelector("[data-orden]")?.textContent;
     expect(orden("11-000000032")).toBe("1");
     expect(orden("11-000000031")).toBe("2");
     fireEvent.change(screen.getByLabelText("Destino del envío"), { target: { value: "David" } });
@@ -313,8 +313,8 @@ describe("🔴 2b. cada factura marcada lleva su NÚMERO DE ORDEN y se reordena 
     const opcion = await screen.findByText(NOVA.nombre, { selector: "[data-desplegable] *" });
     fireEvent.mouseDown(opcion.closest("button") ?? opcion);
     await asentar();
-    await screen.findByText("11-000000032");
-    expect(screen.queryByText("11-000000031")).toBeNull();
+    await waitFor(() => expect(document.querySelector('[data-factura="11-000000032"]')).toBeTruthy());
+    expect(document.querySelector('[data-factura="11-000000031"]')).toBeNull();
     expect(screen.getByText("1 factura de este cliente ya salió en una guía")).toBeTruthy();
   });
 });

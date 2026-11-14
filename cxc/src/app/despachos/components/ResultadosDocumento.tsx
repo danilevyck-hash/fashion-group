@@ -8,6 +8,9 @@
 import { useEffect, useState } from "react";
 import { facturaParaMostrar } from "@/lib/guias/numero-factura";
 import { fechaCorta } from "./etiquetas-ui";
+import { fechaDeLaFactura } from "@/lib/guias/atajos-facturas";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { ETIQUETAS_FACTURAS_LISTA_2026_11 } from "@/lib/guias/guias-2026-10";
 
 /** Lo que contesta `facturas-cliente?buscar=`: una fila por factura hallada. */
 export interface DocumentoHallado {
@@ -76,10 +79,11 @@ export default function ResultadosDocumento({
               {d.tipo === "pedido"
                 ? `Pedido ${facturaParaMostrar(d.pedido)} · Factura ${facturaParaMostrar(d.secuencial)}`
                 : `Factura ${facturaParaMostrar(d.secuencial)}${d.pedido ? ` · Pedido ${facturaParaMostrar(d.pedido)}` : ""}`}
+              {ETIQUETAS_FACTURAS_LISTA_2026_11 && <span className="font-normal text-gray-500">{` · ${fechaDeLaFactura(d.fecha, hoyPanama())}`}</span>}
             </span>
             <span className="block truncate text-xs text-gray-500">{d.cliente_nombre} · {d.empresa}</span>
           </span>
-          <span className="shrink-0 text-xs tabular-nums text-gray-400">{fechaCorta(d.fecha)}</span>
+          {!ETIQUETAS_FACTURAS_LISTA_2026_11 && <span className="shrink-0 text-xs tabular-nums text-gray-400">{fechaCorta(d.fecha)}</span>}
         </button>
       ))}
     </div>

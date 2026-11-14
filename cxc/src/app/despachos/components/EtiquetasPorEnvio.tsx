@@ -40,6 +40,7 @@ import {
   agruparPorDia,
   alternarDia,
   diaAbierto,
+  fechaDeLaFactura,
   resumenDelDia,
   tituloDelDia,
   type FacturaDelCliente as Factura,
@@ -78,7 +79,7 @@ import {
   type Envio,
 } from "@/lib/guias/etiquetas-por-envio";
 import { abrirPdfEnPestana } from "@/lib/guias/pdf-en-pestana";
-import { ETIQUETAS_2026_10, ETIQUETAS_BUSCADOR_UNICO_2026_11, ETIQUETAS_TRASLADO_2026_10 } from "@/lib/guias/guias-2026-10";
+import { ETIQUETAS_2026_10, ETIQUETAS_BUSCADOR_UNICO_2026_11, ETIQUETAS_FACTURAS_LISTA_2026_11, ETIQUETAS_TRASLADO_2026_10 } from "@/lib/guias/guias-2026-10";
 import ResultadosDocumento, { type DocumentoHallado } from "./ResultadosDocumento";
 import { TEXTO_TRASLADO } from "@/lib/guias/atajos-facturas";
 import { B2B_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
@@ -604,7 +605,12 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
   const empresaElegida = empresas.length === 1 ? empresas[0].key : empresaKey;
   const deLaEmpresa = visibles.filter((f) => f.empresa_key === empresaElegida);
   const atenuadasDeLaEmpresa = atenuadas.filter((f) => f.empresa_key === empresaElegida);
-  const { grupos, diasOcultos } = agruparPorDia([...deLaEmpresa, ...atenuadasDeLaEmpresa], diasVisibles);
+  // 🔴 FACTURAS EN UNA LISTA (`ETIQUETAS_FACTURAS_LISTA_2026_11`): un solo
+  // «día» sin encabezado con TODAS, la más reciente arriba; sin «Ver más días».
+  const { grupos, diasOcultos } = ETIQUETAS_FACTURAS_LISTA_2026_11
+    ? { grupos: [{ dia: "", facturas: agruparPorDia([...deLaEmpresa, ...atenuadasDeLaEmpresa], Infinity).grupos.flatMap((g) => g.facturas) }], diasOcultos: 0 }
+    : agruparPorDia([...deLaEmpresa, ...atenuadasDeLaEmpresa], diasVisibles);
+  const hoy = hoyPanama();
   // El pie cuenta solo lo de ESTA empresa que no se ve (antes contaba las de todas).
   const escondidasPie = ETIQUETAS_BUSCADOR_UNICO_2026_11
     ? (facturas ?? []).filter((f) => f.empresa_key === empresaElegida && !esAtenuada.has(f) && f.switch_factura_id != null && etiquetaDeLaFactura(etiquetas, f.empresa_key, f.switch_factura_id) !== null).length
@@ -613,6 +619,14 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
     ? (facturas ?? []).filter((f) => f.empresa_key === empresaElegida && !esAtenuada.has(f) && !visibles.includes(f)).length - escondidasPie
     : yaSalieron;
   const diaMasReciente = grupos[0]?.dia ?? null;
+  /** «Factura 3370 · 12 nov» con la lista plana; el número de Switch tal cual sin ella. */
+  const numeroConFecha = (f: Factura) =>
+    ETIQUETAS_FACTURAS_LISTA_2026_11 ? (
+      <>
+        Factura {facturaParaMostrar(f.secuencial)}
+        <span className="text-gray-500">{` · ${fechaDeLaFactura(f.fecha, hoy)}`}</span>
+      </>
+    ) : f.secuencial;
 
   const porClave = new Map(deLaEmpresa.map((f) => [claveFactura(f), f]));
   const enElEnvio = marcadas.filter((m) => porClave.has(m.clave));
@@ -1009,10 +1023,10 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
             {!cargando && deLaEmpresa.length + atenuadasDeLaEmpresa.length > 0 && (
               <div className="space-y-4">
                 {grupos.map(({ dia, facturas: fs }) => {
-                  const abierto = diaAbierto(dia, diaMasReciente, diasAlternados);
+                  const abierto = ETIQUETAS_FACTURAS_LISTA_2026_11 || diaAbierto(dia, diaMasReciente, diasAlternados);
                   return (
-                    <div key={dia}>
-                      <button
+                    <div key={dia || "lista"}>
+                      {!ETIQUETAS_FACTURAS_LISTA_2026_11 && <button
                         type="button"
                         data-dia={dia}
                         aria-expanded={abierto}
@@ -1024,7 +1038,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
                         </svg>
                         <span className="text-xs uppercase tracking-[0.05em] text-gray-400">{tituloDelDia(dia)}</span>
                         <span className="text-xs tabular-nums text-gray-400">{`· ${resumenDelDia(fs.length, 0, true)}`}</span>
-                      </button>
+                      </button>}
                       {abierto && (
                         <ul>
                           {fs.map((f) => {
@@ -1034,7 +1048,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
                               return (
                                 <li key={clave} data-atenuada={clave} className="flex min-h-[44px] flex-wrap items-center gap-3 border-t border-gray-100 py-1.5 text-sm text-gray-400 first:border-t-0">
                                   <input type="checkbox" disabled aria-label={`${f.secuencial} no se puede marcar`} className="h-4 w-4 shrink-0" />
-                                  <span className="shrink-0 tabular-nums">{f.secuencial}</span>
+                                  <span data-factura={f.secuencial} className="shrink-0 tabular-nums">{numeroConFecha(f)}</span>
                                   <span className="ml-auto text-xs">
                                     {et ? (
                                       <>
@@ -1077,7 +1091,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
                                       {orden}
                                     </span>
                                   )}
-                                  <span className="shrink-0 tabular-nums">{f.secuencial}</span>
+                                  <span data-factura={f.secuencial} className="shrink-0 tabular-nums">{numeroConFecha(f)}</span>
                                   {f.yaSalioPendiente && f.yaSalioEn != null && (
                                     <span data-guia-pendiente className="text-xs text-gray-500">En la guía {rotuloGuia(f.yaSalioEn)} · pendiente</span>
                                   )}
