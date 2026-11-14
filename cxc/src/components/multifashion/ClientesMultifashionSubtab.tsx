@@ -193,8 +193,10 @@ export const HUECO_LINEA_CLIENTES = "mf-linea-clientes";
 function LineaResumenClientes({ texto }: { texto: string }) {
   const [hueco, setHueco] = useState<HTMLElement | null>(null);
   useEffect(() => { setHueco(document.getElementById(HUECO_LINEA_CLIENTES)); }, []);
+  if (hueco && hueco.offsetParent !== null) {
+    return createPortal(<span data-elemento="resumen-clientes" className="tabular-nums">{texto} ·</span>, hueco);
+  }
   const linea = <span data-elemento="resumen-clientes" className="text-sm text-gray-500 tabular-nums">{texto}</span>;
-  if (hueco && hueco.offsetParent !== null) return createPortal(<>{linea}{" · "}</>, hueco);
   return <p className="-mb-2">{linea}</p>;
 }
 

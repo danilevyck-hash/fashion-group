@@ -88,6 +88,9 @@ export const COMISIONES_EXCLUSIONES_FILTROS = true;
 /** n.º 44 / 44b · Multifashion › Clientes: sin el número grande, resumen + ↻ en una línea, chips en una fila. */
 export const MF_CLIENTES_SIN_REPETIR = true;
 
+/** n.º 45 · Multifashion › Vendedoras: la línea dice qué cuenta y remite al total del Resumen. */
+export const MF_VENDEDORAS_REMITE_AL_RESUMEN = true;
+
 /** n.º 47 · Boston › Inicio: la antigüedad en tres columnas. */
 export const BOSTON_TRAMOS_EN_COLUMNAS = true;
 

@@ -150,7 +150,7 @@ export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false, chip
       <Card className="overflow-hidden p-0">
         {/* LOS TRES CHIPS. «Frecuentes» se retiró: el que compra seguido no
             necesita que lo busquen. Las TARJETAS de arriba no se tocaron. */}
-        <div data-elemento={conMonto ? "chips" : undefined} className={chipsEnUnaFila ? "flex flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-gray-100 px-3 py-2" : "flex flex-wrap items-center gap-1.5 border-b border-gray-100 px-3 py-2"}>
+        <div data-elemento={conMonto ? "chips" : undefined} className={chipsEnUnaFila ? "flex flex-nowrap items-center gap-1.5 border-b border-gray-100 px-2 py-2" : "flex flex-wrap items-center gap-1.5 border-b border-gray-100 px-3 py-2"}>
           {CHIPS.map((c) => (
             <button
               key={c}
@@ -159,7 +159,7 @@ export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false, chip
               aria-pressed={chip === c}
               className={cn(
                 "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition",
-                chipsEnUnaFila && "shrink-0 whitespace-nowrap",
+                chipsEnUnaFila && "min-w-0 shrink whitespace-nowrap !gap-1 !px-2.5",
                 chip === c
                   ? "border-gray-900 bg-gray-900 text-white"
                   : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900",

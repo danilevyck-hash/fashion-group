@@ -280,6 +280,7 @@ export function MultifashionShell({
   const frescuraCel = conFrescura ? (
     <LineaDeFrescura
       forma="celular"
+      soloHora={MF_CLIENTES_SIN_REPETIR && tab === "clientes"}
       tabla="facturas"
       empresas={["american_classic"]}
       opciones={[{ modulo: "facturas", empresa: "american_classic" }]}
@@ -442,13 +443,13 @@ export function MultifashionShell({
             </p>
           ) : subtituloCel && <p className="text-sm text-gray-500">{subtituloCel}</p>}
           {frescuraCel && (MF_CLIENTES_SIN_REPETIR && tab === "clientes" ? (
-            // n.º 44b (revisión 110): «77 frecuentes · 975 con descuento… ·
-            // Actualizado 10:01 am ↻» en UNA línea; la pestaña llena el hueco.
-            <span data-celular="subtitulo" className="-my-2.5 text-[13px] text-gray-500 [&_*]:!text-[13px]">
+            // n.º 44b (revisión 110): «77 frecuentes · 975 con descuento 5%
+            // pendiente · ↻ 10:01 am» en UNA línea de 12 px, sin partirse; la
+            // pestaña llena el hueco. La hora va corta («↻ h:mm»).
+            <span data-celular="subtitulo" className="-my-2.5 flex w-full min-w-0 items-center gap-1 whitespace-nowrap text-[11px] text-gray-500 [&_span]:!text-[11px]">
               <span id={HUECO_LINEA_CLIENTES} />
-              <span className="inline-flex whitespace-nowrap">{frescuraCel}</span>
-            </span>
-          ) : (
+              {frescuraCel}
+            </span>          ) : (
             <span data-celular="subtitulo" className="-my-2.5 whitespace-nowrap text-sm text-gray-500">{frescuraCel}</span>
           ))}
         </div>
