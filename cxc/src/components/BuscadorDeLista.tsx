@@ -32,6 +32,7 @@ export default function BuscadorDeLista({
   etiqueta,
   conteo = "",
   className = "",
+  llena = false,
 }: {
   valor: string;
   onCambiar: (v: string) => void;
@@ -41,15 +42,17 @@ export default function BuscadorDeLista({
   /** «12 de 42 colaboradores». Vacío = no se dibuja. */
   conteo?: string;
   className?: string;
+  /** Revisión 110 (regla del n.º 85): en la computadora llena el ancho de su fila. */
+  llena?: boolean;
 }) {
   return (
-    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${llena ? "min-w-[180px] flex-1 flex-nowrap" : ""} ${className}`}>
       <CampoBuscar
         value={valor}
         onChange={(e) => onCambiar(e.target.value)}
         placeholder={placeholder}
         aria-label={etiqueta ?? placeholder}
-        envoltorio="w-full max-w-xs sm:w-64"
+        envoltorio={llena ? "w-full min-w-0 flex-1" : "w-full max-w-xs sm:w-64"}
       />
       {conteo !== "" && (
         <span data-testid="conteo-busqueda" className="text-sm tabular-nums text-gray-500">

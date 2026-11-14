@@ -7,7 +7,7 @@
 // persona, "4,92 horas" no le dice nada a nadie.
 
 import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
-import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11, FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import type { OpcionEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { ASIS_CASILLA_44_R110, ASIS_HORAS_SIN_SEGUNDOS_R110, ASIS_SIN_FICHA_R110 } from "@/lib/ui/revision-110-asistencia";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -694,7 +694,7 @@ export default function ReporteTab({ empresa = "", opcionesEmpresa, onEmpresa }:
             )}
             {/* 🔴 Filtro «a» (14-nov-2026, filtro-a-6): buscador y empresa en UNA línea. */}
             {barra && FILTRO_A_2026_11 && (
-              <LineaBuscarYCapsulas className="w-full" busqueda={q} onBuscar={setQ} placeholder="Buscar">
+              <LineaBuscarYCapsulas className="w-full" busqueda={q} onBuscar={setQ} placeholder="Buscar colaborador">
                 {opcionesEmpresa && opcionesEmpresa.length > 1 && onEmpresa && (
                   <Capsula etiqueta="Empresa" alinear="derecha" valor={empresa}
                     opciones={opcionesEmpresa.map((o) => ({ valor: o.clave, etiqueta: o.etiqueta }))} onCambiar={onEmpresa} />
@@ -708,7 +708,7 @@ export default function ReporteTab({ empresa = "", opcionesEmpresa, onEmpresa }:
                 Ahora es el campo con borde y la lupa adentro, igual que en
                 Préstamos y Cuentas por Cobrar; en el celular baja a su propio
                 renglón. Sigue filtrando contra el SERVIDOR, como siempre. */}
-            <div className={barra ? "hidden" : "relative min-w-[180px] flex-1 sm:max-w-xs"}>
+            <div className={barra ? "hidden" : `relative min-w-[180px] flex-1 ${BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "" : "sm:max-w-xs"}`}>
               <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 type="search" value={q} onChange={(e) => setQ(e.target.value)}

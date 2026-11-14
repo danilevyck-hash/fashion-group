@@ -165,8 +165,9 @@ export function ListaSeguimientoClientes({ clientes, hoy, conMonto = false, chip
                   : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900",
               )}
             >
-              {ROTULO_CHIP[c]}
-              <span className={cn(" tabular-nums", chip === c ? "text-white/80" : "text-gray-400")}>
+              {/* En una fila: si no cabe, se corta el rótulo con «…», nunca el número. */}
+              {chipsEnUnaFila ? <span className="min-w-0 truncate">{ROTULO_CHIP[c]}</span> : ROTULO_CHIP[c]}
+              <span className={cn(" tabular-nums", chipsEnUnaFila && "shrink-0", chip === c ? "text-white/80" : "text-gray-400")}>
                 {conteos[c].toLocaleString()}
               </span>
             </button>

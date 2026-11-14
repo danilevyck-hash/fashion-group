@@ -36,3 +36,10 @@ export const ICONOS_DE_LINEA_2026_11 = true;
 
 /** Los buscadores dicen «Buscar» + lo que de verdad buscan (Inicio: «Buscar», sin «(⌘K)»). */
 export const BUSCAR_DICE_QUE_2026_11 = true;
+
+/** n.º 85 como REGLA GLOBAL (computadora): en toda fila con buscador y
+ *  botones, el buscador va a la IZQUIERDA llenando el ancho y los botones a la
+ *  derecha (Asistencia, Aprobaciones, Colaboradores, Cuentas por cobrar,
+ *  Boston, Comprobantes, Etiquetas, Guías, Multifashion › Productos,
+ *  Plantilla › Historial, Ventas › Clientes y Productos, Reclamos). */
+export const BUSCADOR_IZQUIERDA_LLENA_2026_11 = true;

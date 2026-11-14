@@ -1,5 +1,6 @@
 "use client";
 import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import type { OpcionEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { Aviso } from "@/components/ui/Aviso";
@@ -1258,6 +1259,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
                   placeholder={PLACEHOLDER_COLABORADOR}
                   etiqueta="Buscar colaborador por nombre o código"
                   conteo={textoDeConteo(visibles.length, porChip.length, busqueda)}
+                  llena={BUSCADOR_IZQUIERDA_LLENA_2026_11}
                 />
               )}
               {/* 🔴 6a — EL FILTRO ES UN CONTROL SEGMENTADO (29-sep-2026, audit

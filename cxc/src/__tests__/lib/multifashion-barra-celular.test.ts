@@ -136,7 +136,10 @@ describe("Multifashion › celular › «Últimos 12 meses»", () => {
     expect(renglon).toContain("flex flex-wrap"); // si no cabe, baja: nunca se corta
     expect(renglon).toContain('data-celular="hoy"');
     expect(renglon).toContain("{frescuraCel}");
-    expect(renglon).not.toMatch(/truncate|overflow-hidden/);
+    // La frescura nunca se corta. Lo único que puede cortarse con «…» es el
+    // resumen de Clientes (44b), en su hueco, y la frescura queda `shrink-0`.
+    expect(renglon.replace(/<span id=\{HUECO_LINEA_CLIENTES\} className="[^"]*" \/>/, "")).not.toMatch(/truncate|overflow-hidden/);
+    expect(renglon).toMatch(/<span className="shrink-0[^"]*">\{frescuraCel\}<\/span>/);
   });
 });
 

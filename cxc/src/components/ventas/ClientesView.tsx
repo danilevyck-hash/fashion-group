@@ -1,5 +1,6 @@
 "use client";
 
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -553,8 +554,7 @@ export function ClientesView({
    *  las filas de la vista Utilidad (una por cliente y empresa) de la empresa
    *  elegida, con la búsqueda puesta. */
   const filasUtilidadExcel = useMemo(() => {
-    if (!utilidadData) return [];
-    return utilidadData.rows.filter((r) =>
+    return (utilidadData?.rows ?? []).filter((r) =>
       (empresa === "todas" || r.empresaKey === empresa)
       && (!search.trim() || coincideBusqueda(search, [r.cliente, r.codigo ?? "", r.empresa])));
   }, [utilidadData, empresa, search]);
@@ -741,7 +741,7 @@ export function ClientesView({
           />
           )}
 
-          <div className="relative min-w-[180px] max-w-full flex-1 md:max-w-[320px]">
+          <div className={`relative min-w-[180px] max-w-full flex-1 ${BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "md:order-first" : "md:max-w-[320px]"}`}>
             {/* La lupa se centra con top-1/2 (antes top-2.5 asumía el h-9 del
                 Input; ahora el campo mide 44 y quedaría alta). */}
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />

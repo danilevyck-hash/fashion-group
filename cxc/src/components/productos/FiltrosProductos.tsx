@@ -23,7 +23,7 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { fmtPorcentaje } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 import { BuscadorConFiltros, type FiltroDeLaHoja } from "@/components/filtros/FiltroA";
-import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11, FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { OrdenarEnLaBarra, ThOrden, useOrdenTabla, type OrdenTablaApi } from "@/components/ui/OrdenTabla";
 import {
   coberturaDe,
@@ -268,7 +268,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
     </>
   );
   const buscarCodigo = (
-    <div className={cn("relative shrink-0", FILTRO_A_2026_11 ? "w-64" : "w-40")}>
+    <div className={cn("relative", BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "order-first min-w-[240px] flex-1" : cn("shrink-0", FILTRO_A_2026_11 ? "w-64" : "w-40"))}>
       <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
       <input
         type="search"

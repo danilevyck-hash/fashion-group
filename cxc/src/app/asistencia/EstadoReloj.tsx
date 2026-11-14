@@ -282,13 +282,26 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
       // 🔴 Revisión 14-nov-2026 (filtro-a-6): el aviso GRIS de los relojes y
       // «Actualizado 13 nov ↻» comparten UNA línea gris. Ámbar o rojo siguen
       // en su caja: esos sí piden atención.
-      if (FILTRO_A_2026_11 && !frescuraEnLaBarra && conAviso && tono === "info" && !avisoDeLaPastilla(relojes) && !faltaMigracion) {
+      // En el celular, «↻ 13 nov» (sin «Actualizado») para que todo quepa en
+      // UNA línea sin partirse; el aviso se corta con «…» solo como último recurso.
+      if (FILTRO_A_2026_11 && conAviso && tono === "info" && !avisoDeLaPastilla(relojes) && !faltaMigracion) {
+        const props = {
+          actualizado: ultimo,
+          accion: TRAER_AHORA,
+          ocupado: ESPERANDO_A_LA_PC,
+          onActualizar: () => pedirATodos(puedenPedir.map((r) => r.dispositivo)),
+          actualizando: esperando && !relojes.every((r) => r.pedidoSinRespuesta),
+          deshabilitado: puedenPedir.length === 0,
+        };
         return (
-          <div data-relojes-y-frescura className="flex w-full flex-wrap items-center gap-x-1 text-[12px] text-gray-500 [&_[data-frescura]]:!text-[12px]">
+          <div data-relojes-y-frescura className="flex w-full min-w-0 flex-nowrap items-center gap-x-1 whitespace-nowrap text-[12px] text-gray-500 [&_[data-frescura]]:!text-[12px] [&_[data-frescura]_span]:!text-[12px]">
             <Info aria-hidden className="h-3.5 w-3.5 shrink-0" />
-            <span>{apagado ?? textoDelAviso(relojes)}</span>
-            <span aria-hidden className="text-gray-300">·</span>
-            <span className="inline-flex whitespace-nowrap [&>*]:!m-0">{frescura}</span>
+            <span className="min-w-0 truncate">{apagado ?? textoDelAviso(relojes)}</span>
+            <span aria-hidden className="shrink-0 text-gray-300">·</span>
+            <span className="inline-flex shrink-0 whitespace-nowrap [&>*]:!m-0">
+              <LineaDeFrescura {...props} forma="celular" soloHora className="md:!hidden" />
+              <LineaDeFrescura {...props} forma="computadora" className="!hidden md:!inline-flex" />
+            </span>
           </div>
         );
       }

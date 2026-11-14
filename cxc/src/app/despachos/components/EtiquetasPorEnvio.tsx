@@ -25,6 +25,7 @@
 // (`EtiquetasView.tsx`), que no se tocó.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
@@ -270,7 +271,7 @@ export default function EtiquetasPorEnvio() {
             {ETIQUETAS_FILA_LIMPIA ? (
               // n.º 70: el buscador de la casa, con lupa, como el de Guías.
               <CampoBuscar
-                envoltorio="flex-1 min-w-[150px] sm:max-w-sm"
+                envoltorio={BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "flex-1 min-w-[150px]" : "flex-1 min-w-[150px] sm:max-w-sm"}
                 value={buscar}
                 onChange={(ev) => setBuscar(ev.target.value)}
                 placeholder="Buscar factura, cliente o destino"

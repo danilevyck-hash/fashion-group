@@ -40,6 +40,7 @@
 //    en el iPad las acciones quedaban fuera de la pantalla.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -541,7 +542,7 @@ export default function ComprobantesPanel({
     </button>
   ) : null;
   const buscadorV4 = (
-    <div className="relative sm:flex-1">
+    <div className={`relative sm:flex-1 ${BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "md:order-first" : ""}`}>
       <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>

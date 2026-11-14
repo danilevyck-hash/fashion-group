@@ -446,11 +446,13 @@ export function MultifashionShell({
           {frescuraCel && (MF_CLIENTES_SIN_REPETIR && tab === "clientes" ? (
             // n.º 44b (revisión 110): «77 frecuentes · 975 con descuento 5%
             // pendiente · ↻ 10:01 am» en UNA línea de 12 px, sin partirse; la
-            // pestaña llena el hueco. La hora va corta («↻ h:mm»).
-            <span data-celular="subtitulo" className="-my-2.5 flex w-full min-w-0 items-center gap-1 whitespace-nowrap text-[11px] text-gray-500 [&_span]:!text-[11px]">
-              <span id={HUECO_LINEA_CLIENTES} />
-              {frescuraCel}
-            </span>          ) : (
+            // pestaña llena el hueco. La hora va corta («↻ h:mm») y SIEMPRE se
+            // ve a la derecha: si un número crece, el texto se corta con «…».
+            <span data-celular="subtitulo" className="-my-2.5 flex w-full min-w-0 items-center gap-1 whitespace-nowrap text-[12px] text-gray-500">
+              <span id={HUECO_LINEA_CLIENTES} className="min-w-0 flex-1 truncate [&_span]:!text-[12px]" />
+              <span className="shrink-0 [&_span]:!text-[12px]">{frescuraCel}</span>
+            </span>
+          ) : (
             <span data-celular="subtitulo" className="-my-2.5 whitespace-nowrap text-sm text-gray-500">{frescuraCel}</span>
           ))}
         </div>

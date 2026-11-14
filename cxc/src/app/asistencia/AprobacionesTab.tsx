@@ -1,4 +1,5 @@
 "use client";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { ASIS_PENDIENTES_CON_UNIDAD_R110, colaColaboradores } from "@/lib/ui/revision-110-asistencia";
 import { Aviso } from "@/components/ui/Aviso";
 
@@ -397,11 +398,12 @@ export default function AprobacionesTab({ empresa = "" }: {
                 placeholder={PLACEHOLDER_COLABORADOR}
                 etiqueta="Buscar colaborador por nombre o código"
                 conteo={conteo}
+                llena={BUSCADOR_IZQUIERDA_LLENA_2026_11}
               />
             )}
           </>
         )}
-        <div className="flex-1" />
+        {!(BUSCADOR_IZQUIERDA_LLENA_2026_11 && vista === "colaborador") && <div className="flex-1" />}
         {/* 🔴 EXPORTAR NO ES APROBAR: se puede bajar aunque no se pueda decidir. */}
         <button
           type="button"

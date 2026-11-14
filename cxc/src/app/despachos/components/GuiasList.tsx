@@ -6,6 +6,7 @@ import type { Guia, GuiaItem } from "./types";
 import { clientesSummary, destinosSummary } from "./constants";
 import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTable } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { BuscarEnLaBarra, CLASE_FILA_MENU, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
@@ -683,7 +684,7 @@ export default function GuiasList({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por transportista, cliente, factura o N° de guía…"
-                className={`border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full transition max-w-sm ${barra && !selectionMode ? "hidden" : ""}`}
+                className={`border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full transition ${BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "md:w-auto md:min-w-[240px] md:flex-1" : "max-w-sm"} ${barra && !selectionMode ? "hidden" : ""}`}
               />
               {selectorPeriodo}
               {/* 🔴 EL FILTRO QUE SE VE Y SE PUEDE QUITAR (11-sep-2026).

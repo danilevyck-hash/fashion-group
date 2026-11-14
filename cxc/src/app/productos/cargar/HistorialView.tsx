@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { COMPANIAS_DEPURADOR } from "@/lib/depurador/logic";
 import { textoRetencion } from "@/lib/depurador/historial-retencion";
+import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import BuscadorDeLista, { VacioDeBusqueda } from "@/components/BuscadorDeLista";
 import {
   LIMPIAR_BUSQUEDA,
@@ -178,6 +179,8 @@ export default function HistorialView({ refreshKey = 0, limite }: HistorialViewP
           placeholder={PLACEHOLDER_DESCARGA}
           etiqueta="Buscar descarga por marca, empresa, usuario o fecha"
           conteo={conteo}
+          llena={BUSCADOR_IZQUIERDA_LLENA_2026_11}
+          className={BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "md:order-first" : ""}
         />
         {/* El plazo se DERIVA de la constante, nunca se escribe a mano: la fila con los totales queda igual. */}
         <span className="text-[12px] text-gray-500">El Excel se puede volver a descargar por {textoRetencion()}.</span>
