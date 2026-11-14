@@ -53,6 +53,7 @@ import { ROTULO_NO_SE_PAGA, ROTULO_VER_MENOS, rotuloVerNoSePagan } from "@/lib/c
 import { celdaVacia, desgloseDeCelda } from "@/lib/comisiones/matriz-celda";
 import type { ClienteSinComisionConEmpresa } from "./MarcaClientesSinComision";
 import { empresasDeLaFila, segundaLineaEmpresa, segundaLineaMatriz } from "@/lib/comisiones/apple-v2";
+import { COMISIONES_RESTA_CON_ROTULO } from "@/lib/ui/revision-110-ventas";
 
 /** Rojo para lo negativo, igual que la tabla. */
 const claseMonto = (n: number) => (n < 0 ? "text-red-600" : "text-gray-900");
@@ -351,7 +352,9 @@ function TarjetaVendedorMatriz({
                           para enterarse de que ahí dentro hay plata restada. */}
                       {desglose && (
                         <span className="block text-xs tabular-nums text-gray-500">
-                          {fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}
+                          {COMISIONES_RESTA_CON_ROTULO
+                          ? `Comisión ${fmtMoney(desglose.bruto)} · Descuento ${fmtMoney(desglose.descuento)}`
+                          : <>{fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}</>}
                         </span>
                       )}
                     </span>
@@ -603,7 +606,9 @@ function FilaVendedorV2({
                     <span className={`block text-sm tabular-nums ${claseMonto(fila.porEmpresa[k] ?? 0)}`}>{fmtMoney(fila.porEmpresa[k] ?? 0)}</span>
                     {desglose && (
                       <span className="block text-xs tabular-nums text-gray-500">
-                        {fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}
+                        {COMISIONES_RESTA_CON_ROTULO
+                          ? `Comisión ${fmtMoney(desglose.bruto)} · Descuento ${fmtMoney(desglose.descuento)}`
+                          : <>{fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}</>}
                       </span>
                     )}
                   </span>

@@ -69,6 +69,9 @@ import {
   reglasEnPalabras,
   type ReglaEnPalabras,
 } from "@/lib/comisiones/exclusiones-en-palabras";
+import { COMISIONES_EXCLUSIONES_FILTROS } from "@/lib/ui/revision-110-ventas";
+import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
+import { ChevronDown } from "lucide-react";
 
 interface ListaExclusiones {
   exclusiones: ExclusionActiva[];
@@ -325,7 +328,10 @@ export function ClientesQueNoComisionan({ onSaved, v2 = false }: { onSaved: (msg
     <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5" aria-labelledby="sin-comision-titulo">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 id="sin-comision-titulo" className="flex items-center gap-1 text-sm font-medium text-gray-900">
-          {ROTULO_CLIENTES_SIN_COMISION}
+          {COMISIONES_EXCLUSIONES_FILTROS ? (
+            // n.º 36: en el celular, «Exclusiones» en una línea.
+            <><span className="sm:hidden">Exclusiones</span><span className="hidden sm:inline">{ROTULO_CLIENTES_SIN_COMISION}</span></>
+          ) : ROTULO_CLIENTES_SIN_COMISION}
           <Ayuda titulo="Información">
             <p>Ese vendedor no cobra comisión por ese cliente en esa empresa. Cada renglón dice qué es lo que no comisiona: la venta, el cobro, o los dos.</p>
             <p>Si otro vendedor le vende o le cobra al mismo cliente, ese otro sí comisiona.</p>
@@ -465,33 +471,35 @@ export function ClientesQueNoComisionan({ onSaved, v2 = false }: { onSaved: (msg
           sirven cuando crezcan. Vienen con «todas» y «todos» puestos. */}
       {!loading && !error && reglas.length > 0 && (
         <div data-filtros-sin-comision className="mb-3 flex flex-wrap gap-2">
-          <label className="block">
+          <label className="flex items-center">
             <span className="sr-only">Filtrar por empresa</span>
             <select
               value={filtroEmpresa}
               onChange={(e) => setFiltroEmpresa(e.target.value)}
               aria-label="Filtrar por empresa"
-              className="min-h-[44px] rounded-md border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-black"
+              className={`min-h-[44px] rounded-md border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-black ${COMISIONES_EXCLUSIONES_FILTROS ? "appearance-none pr-8" : ""}`}
             >
-              <option value={TODAS}>{ROTULO_FILTRO_EMPRESA}</option>
+              <option value={TODAS}>{COMISIONES_EXCLUSIONES_FILTROS ? ROTULO_TODAS : ROTULO_FILTRO_EMPRESA}</option>
               {EMPRESAS_COMISIONAN.map((k) => (
                 <option key={k} value={k}>{nombreEmpresa(k)}</option>
               ))}
             </select>
+            {COMISIONES_EXCLUSIONES_FILTROS && <ChevronDown aria-hidden className="pointer-events-none -ml-7 h-4 w-4 text-gray-500" />}
           </label>
-          <label className="block">
+          <label className="flex items-center">
             <span className="sr-only">Vendedor</span>
             <select
               value={filtroVendedor}
               onChange={(e) => setFiltroVendedor(e.target.value)}
               aria-label="Filtrar por vendedor"
-              className="min-h-[44px] rounded-md border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-black"
+              className={`min-h-[44px] rounded-md border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-black ${COMISIONES_EXCLUSIONES_FILTROS ? "appearance-none pr-8" : ""}`}
             >
-              <option value={TODOS}>{ROTULO_FILTRO_VENDEDOR}</option>
+              <option value={TODOS}>{COMISIONES_EXCLUSIONES_FILTROS ? "Todos los vendedores" : ROTULO_FILTRO_VENDEDOR}</option>
               {vendedoresEnLista.map((v) => (
                 <option key={v} value={v}>{v}</option>
               ))}
             </select>
+            {COMISIONES_EXCLUSIONES_FILTROS && <ChevronDown aria-hidden className="pointer-events-none -ml-7 h-4 w-4 text-gray-500" />}
           </label>
         </div>
       )}

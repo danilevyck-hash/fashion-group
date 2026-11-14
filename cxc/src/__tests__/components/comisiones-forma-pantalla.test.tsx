@@ -13,6 +13,7 @@
 // cuidan el detalle de ANTES, que sigue detrás del interruptor (`v3={false}`).
 // El detalle nuevo lo cuida `__tests__/comisiones/comisiones-detalle-v3.test.tsx`.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { COMISIONES_RESTA_CON_ROTULO } from "@/lib/ui/revision-110-ventas";
 import { render, screen, within, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
@@ -116,7 +117,7 @@ describe("🔴 la celda de la matriz", () => {
     // ⚠️ El menos es TIPOGRÁFICO (−), diccionario § 0.
     expect(texto).toContain("−$1,513.08");
     // …y ahora la celda dice por qué.
-    expect(texto).toContain("$60.00 − $1,573.08");
+    expect(texto).toContain((COMISIONES_RESTA_CON_ROTULO ? "Comisión $60.00 · Descuento $1,573.08" : "$60.00 − $1,573.08"));
   });
 });
 
