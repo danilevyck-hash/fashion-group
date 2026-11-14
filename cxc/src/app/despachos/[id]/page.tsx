@@ -70,6 +70,8 @@ import { textoFaltantesDespachada } from "@/lib/guias/faltantes-despacho";
 import { GUIA_DETALLE_APPLE_2026_10 } from "@/lib/guias/guias-2026-10";
 import { GUIAS_LISTA_APPLE_2026_10 } from "@/lib/guias/lista-apple-2026-10";
 import { StatusBadge } from "@/components/ui";
+import { CLASE_TITULO_BARRA, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { GUIA_REGRESO_EN_EL_TITULO } from "@/lib/ui/revision-110-despachos";
 import { Aviso } from "@/components/ui/Aviso";
 import { ESCALA_PANTALLA_2026_10 } from "@/lib/navegacion/escala-pantalla";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, DOS_COLUMNAS, EN_LA_DERECHA, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
@@ -208,6 +210,9 @@ export default function GuiaPage() {
     },
     [id, router],
   );
+
+  // n.º 69 (celular): el título dice a dónde vuelves («‹ Guías de despacho»).
+  const regresoEnElTitulo = useBarraCelular() && GUIA_REGRESO_EN_EL_TITULO;
 
   if (!authChecked || !id) return null;
 
@@ -397,6 +402,7 @@ export default function GuiaPage() {
       <AppHeader
         module="Despachos"
         breadcrumbs={[{ label: g ? fmtGuia(g.numero) : "Guía" }]}
+        tituloEnLaPantalla={regresoEnElTitulo && !enEdicion}
       />
 
       {enEdicion ? (
@@ -442,12 +448,23 @@ export default function GuiaPage() {
         // dejaba un blanco grande a los costados.
         <div className={`${apple ? "max-w-6xl mx-auto px-4 sm:px-6 py-6" : "max-w-4xl mx-auto px-4 sm:px-6 py-6"}${escala}`}>
         <div className={apple && !ancho ? `max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}` : undefined}>
+          {regresoEnElTitulo && (
+            <div data-fila-del-avatar className="-mt-3 mb-2 flex min-h-11 items-center">
+              <button
+                type="button"
+                onClick={() => router.push("/despachos?vista=guias")}
+                className={`${CLASE_TITULO_BARRA} flex items-center gap-1 active:opacity-60`}
+              >
+                <span aria-hidden>‹</span> Guías de despacho
+              </button>
+            </div>
+          )}
           {/* Encabezado: ‹ Atrás · Guía GT-190 */}
           <div className="flex items-center gap-3 mb-5">
             <button
               type="button"
               onClick={() => router.push("/despachos?vista=guias")}
-              className="inline-flex items-center min-h-[44px] px-2 -ml-2 text-sm text-blue-700 hover:text-blue-900 transition"
+              className={`${regresoEnElTitulo ? "hidden" : "inline-flex"} items-center min-h-[44px] px-2 -ml-2 text-sm text-blue-700 hover:text-blue-900 transition`}
             >
               ‹ Atrás
             </button>

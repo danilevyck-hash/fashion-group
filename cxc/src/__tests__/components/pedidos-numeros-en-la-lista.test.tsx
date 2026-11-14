@@ -209,7 +209,8 @@ describe("5. 🔴 los números NO son columnas nuevas", () => {
   });
 
   it("los dos números viven DENTRO de la celda del cliente (crecen hacia abajo)", () => {
-    const { container } = pintar([EN_SWITCH]);
+    // Con los dos orígenes a la vista (n.º 57: con uno solo, «Origen» no se dibuja).
+    const { container } = pintar([EN_SWITCH, DEL_LINK]);
     const tds = [...fila(container, "Sporting Shoes").querySelectorAll("td")];
     expect(tds).toHaveLength(ENCABEZADOS.length);
     const celdaCliente = tds[2];

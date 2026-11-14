@@ -1,5 +1,7 @@
 "use client";
 
+import { useBarraCelular } from "@/components/celular/BarraDeControles";
+import { PLANTILLA_BUSCAR_CORTO } from "@/lib/ui/revision-110-despachos";
 import { useEffect, useMemo, useState } from "react";
 import { mutate } from "swr";
 import { norm } from "@/lib/depurador/logic";
@@ -28,6 +30,8 @@ interface DescRow {
 }
 
 export default function CatalogoDescripcionesAdmin() {
+  // n.º 88: en el celular el buscador va al lado de un botón y se cortaba; dice «Buscar» (sigue buscando marca y descripción).
+  const buscarCorto = useBarraCelular() && PLANTILLA_BUSCAR_CORTO;
   const [rows, setRows] = useState<DescRow[] | null>(null);
   const [fallo, setFallo] = useState(false);
   const [q, setQ] = useState("");
@@ -130,7 +134,7 @@ export default function CatalogoDescripcionesAdmin() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar marca o descripción…"
+              placeholder={buscarCorto ? "Buscar" : "Buscar marca o descripción…"}
               className="min-h-[44px] w-full max-w-xs rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
             />
             <span className="text-[13px] text-gray-500">

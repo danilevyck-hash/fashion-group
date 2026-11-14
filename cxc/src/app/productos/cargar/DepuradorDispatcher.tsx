@@ -1,5 +1,7 @@
 "use client";
 
+// n.º 87: en el celular no se suelta ni se hace clic: se toca.
+import { PLANTILLA_TOCA_PARA_ELEGIR } from "@/lib/ui/revision-110-despachos";
 import { useCallback, useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
 import DepuradorClient from "./DepuradorClient";
@@ -147,7 +149,7 @@ export default function DepuradorDispatcher({ onDownloaded, pie }: DispatcherPro
                 ? "Leyendo archivo…"
                 : TRES_DETALLES && nombreSoltado
                   ? nombreSoltado
-                  : "Suelta el archivo aquí o haz clic para buscar"}
+                  : PLANTILLA_TOCA_PARA_ELEGIR ? <><span className="sm:hidden">Toca para elegir el archivo</span><span className="hidden sm:inline">Suelta el archivo aquí o haz clic para buscar</span></> : "Suelta el archivo aquí o haz clic para buscar"}
             </div>
             {/* 🔴 Qué reconoció, ANTES de procesar. Lo que no reconoce no pasa. */}
             {TRES_DETALLES && !busy && rec && (

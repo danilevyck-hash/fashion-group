@@ -61,7 +61,8 @@ import {
   pasaLosDosFiltros,
   type VistaComprobante,
 } from "@/lib/catalogo/chips-comprobantes";
-import { pasaFiltroOrigen, type FiltroOrigen } from "@/lib/catalogo/origen-comprobante";
+import { pasaFiltroOrigen, unSoloOrigen, type FiltroOrigen } from "@/lib/catalogo/origen-comprobante";
+import { COMPROBANTES_ORIGEN_SOLO_SI_VARIA } from "@/lib/ui/revision-110-despachos";
 import {
   textoEliminarSeleccionados,
   textoPieDeComprobantes,
@@ -361,6 +362,9 @@ export default function ComprobantesPanel({
   // Agrupar por mes (el feed viene por fecha desc → los grupos salen del más
   // nuevo al más viejo).
   const grupos = agruparPorMes(visibles);
+  // n.º 57: si todos los comprobantes a la vista tienen el MISMO origen, la
+  // columna «Origen» lo repetiría en cada fila; el chip de arriba ya lo dice.
+  const sinOrigen = COMPROBANTES_ORIGEN_SOLO_SI_VARIA && unSoloOrigen(visibles);
   // 6-oct-2026: en la computadora cada encabezado ordena DENTRO de su mes; sin
   // tocar, lo más reciente arriba como siempre.
   const orden = useOrdenTabla<"origen" | "cliente" | "vendedor" | "total" | "fecha">("catalogo-comprobantes", {
@@ -497,6 +501,7 @@ export default function ComprobantesPanel({
 
   const propsDeFila = (pedido: FilaComprobante): PropsFila => ({
     pedido,
+    sinOrigen,
     marca,
     theme,
     esOrders: isOrdersRow(pedido),
@@ -669,7 +674,7 @@ export default function ComprobantesPanel({
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className={puedeAdministrar ? "w-8 pl-4 pr-1 py-3" : "w-0 p-0"}></th>
-                      <ThOrden col="origen" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Origen</ThOrden>
+                      {!sinOrigen && <ThOrden col="origen" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Origen</ThOrden>}
                       <ThOrden col="cliente" api={orden} className="text-left px-2 lg:px-4 py-3 font-medium text-gray-500">Cliente</ThOrden>
                       <ThOrden col="vendedor" api={orden} className="text-left px-4 py-3 font-medium text-gray-500">Vendedor</ThOrden>
                       {/* 🔴 BODEGA NO VE PLATA (7-oct-2026): el servidor ya le manda

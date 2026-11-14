@@ -5,6 +5,8 @@
 // archivo, marca las combinaciones referencia+curva que quiere y descarga un
 // Excel con una sección por combinación. NO toca el Depurador ni su lógica.
 
+// n.º 87: en el celular no se suelta ni se hace clic: se toca.
+import { PLANTILLA_TOCA_PARA_ELEGIR } from "@/lib/ui/revision-110-despachos";
 import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import { useMemo, useRef, useState } from "react";
 import { UploadCloud, Download, AlertTriangle, X } from "lucide-react";
@@ -169,7 +171,7 @@ export default function CurvasView() {
         >
           <UploadCloud className="mb-2 h-7 w-7 text-gray-500" strokeWidth={1.6} />
           <div className="text-base font-semibold text-gray-900">
-            {fileName || "Suelta el archivo aquí o haz clic para buscar"}
+            {fileName || (PLANTILLA_TOCA_PARA_ELEGIR ? <><span className="sm:hidden">Toca para elegir el archivo</span><span className="hidden sm:inline">Suelta el archivo aquí o haz clic para buscar</span></> : "Suelta el archivo aquí o haz clic para buscar")}
           </div>
           <input
             ref={inputRef}

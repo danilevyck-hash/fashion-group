@@ -7,13 +7,25 @@
 // «Actualizar» trae las 6 empresas una tras otra por `sync-now` (módulo
 // «pedidos»), como Ventas y CxC con «Todas».
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Check, Printer, Undo2 } from "lucide-react";
 import { ConfirmModal } from "@/components/ui";
 import { AJUSTES_APPLE_6_2026_10 as CIRCULO } from "@/lib/ajustes-apple-6-2026-10";
 import { ESTADOS_CELULAR_2026_11 as ESTADOS_CELULAR, PEDIDOS_CELULAR_2026_11 as PEDIDOS_CELULAR } from "@/lib/ui/celular-optimizar-2026-11";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
-import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, ChipSelector, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
+import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, ChipSelector, EnLaBarra, IconoBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
+import {
+  PEDIDOS_LINEA_DE_LA_PESTANA,
+  PEDIDOS_EMPRESA_SIN_PREFIJO,
+  PEDIDOS_IMPRESORA_EN_EL_TITULO,
+  PEDIDOS_FIRMA_EN_UNA_LINEA,
+  PEDIDO_REGRESO_EN_EL_TITULO,
+  PEDIDOS_BOTONES_44,
+  PEDIDOS_REFRESCO_AUTOMATICO,
+  PEDIDOS_REFRESCO_MS,
+  nombreConMayuscula,
+  horaSinPartir,
+} from "@/lib/ui/revision-110-despachos";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
@@ -61,6 +73,7 @@ import {
   haceDiasCorto,
   lineaDePendientes,
   lineaDePendientesCorta,
+  lineaDeLaPestana,
   tituloPedidosImpresos,
   vendedorEnPantalla,
   type EstadoPedido,
@@ -82,6 +95,24 @@ const CHIPS: { value: Filtro; label: string }[] = SIMPLE
       { value: "pendiente", label: "Pendientes" },
       { value: "preparado", label: "Preparados" },
     ];
+
+/** n.º 58: cómo se nombra cada pestaña en la línea de arriba («12 en preparación»). */
+const NOMBRE_DE_LA_PESTANA: Record<EstadoFlujoSimple, { singular: string; plural: string }> = {
+  pendiente: { singular: "pendiente", plural: "pendientes" },
+  en_preparacion: { singular: "en preparación", plural: "en preparación" },
+  preparado: { singular: "preparado", plural: "preparados" },
+  recibido: { singular: "recibido", plural: "recibidos" },
+};
+
+/** n.º 62: «Preparado · Julio · 4:00 p. m.» — el nombre con mayúscula y la hora sin partir. */
+function firmaParaLeer(t: string | null): string | null {
+  if (!t || !PEDIDOS_FIRMA_EN_UNA_LINEA) return t;
+  const partes = t.split(" · ");
+  if (partes.length >= 3) partes[1] = nombreConMayuscula(partes[1]);
+  return horaSinPartir(partes.join(" · "));
+}
+
+const ALTO_BOTON_FILA = PEDIDOS_BOTONES_44 ? "h-11 sm:h-9" : "h-9";
 
 const clave = (p: Pick<PedidoBodega, "empresa_key" | "pedido_switch_id">) => `${p.empresa_key}:${p.pedido_switch_id}`;
 
@@ -106,9 +137,12 @@ export default function PedidosView({
   puedeMarcar = true,
   /** 🔴 «Verificado» lo marca la secretaria (y admin), nunca bodega. */
   puedeRecibir = false,
+  onDetalle,
 }: {
   puedeMarcar?: boolean;
   puedeRecibir?: boolean;
+  /** Revisión 110 · n.º 63: avisa a la página si hay un pedido abierto (para callar el título «Pedidos ▾»). */
+  onDetalle?: (abierto: boolean) => void;
 }) {
   const barra = useHayBarraCelular();
   // El pedido abierto en el detalle con bultos; `null` = la lista.
@@ -137,7 +171,7 @@ export default function PedidosView({
    */
   const [porConfirmar, setPorConfirmar] = useState<{ pedido: PedidoBodega; destino: EstadoBultos } | null>(null);
 
-  async function cargar() {
+  async function cargar(fondo = false) {
     try {
       const r = await fetch("/api/guias/pedidos", { cache: "no-store" });
       if (!r.ok) throw new Error(String(r.status));
@@ -147,6 +181,9 @@ export default function PedidosView({
       if (d.empresas?.length) setSusEmpresas(d.empresas);
       setError(false);
     } catch {
+      // El refresco de fondo (n.º 65) falla en silencio: la lista se queda y
+      // el siguiente lo vuelve a intentar.
+      if (fondo) return;
       // Con la lista ya en pantalla (refresco al cambiar de pestaña), se deja
       // lo que hay y se avisa; solo la primera carga cae al aviso rojo.
       if (pedidos === null) setError(true);
@@ -154,6 +191,19 @@ export default function PedidosView({
     }
   }
   useEffect(() => { void cargar(); }, []);
+  // 🔴 Revisión 110 · n.º 65 (Daniel, 14-nov-2026): la lista se vuelve a leer
+  // SOLA cada 5 minutos mientras está abierta y a la vista. Lee la BASE
+  // (`GET /api/guias/pedidos`), NUNCA Switch: entrar a Despachos sigue sin
+  // llamar a Switch (7-oct-2026). El ↻ «Actualizar» se queda.
+  useEffect(() => {
+    if (!PEDIDOS_REFRESCO_AUTOMATICO) return;
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void cargar(true);
+    }, PEDIDOS_REFRESCO_MS);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { onDetalle?.(!!abierto); }, [abierto, onDetalle]);
 
   /**
    * Mueve el pedido al estado que se pide. Con bultos el flujo AVANZA
@@ -358,7 +408,8 @@ export default function PedidosView({
     c === "antiguedad" ? -Date.parse(p.fecha) : c === "cliente" ? p.cliente_nombre : vendedorEnPantalla(p.vendedor_nombre));
   // Con una sola empresa el chip no decide nada: no se dibuja (docs/diseno.md).
   const OPCIONES_EMPRESA = [
-    { valor: "todas", etiqueta: "Todas" },
+    // n.º 59 + regla n.º 1: el chip dice qué filtra, sin «Empresa:» delante.
+    { valor: "todas", etiqueta: PEDIDOS_EMPRESA_SIN_PREFIJO ? "Todas las empresas" : "Todas" },
     ...susEmpresas.map((k) => ({ valor: k, etiqueta: nombreCortoEmpresa(k) })),
   ];
   const hayQueElegirEmpresa = susEmpresas.length > 1;
@@ -413,7 +464,7 @@ export default function PedidosView({
         ))}
       </div>
       {/* Con `PEDIDOS_CELULAR_2026_11` la empresa del celular va en su propia fila. */}
-      {NUEVO && hayQueElegirEmpresa && !(barra && PEDIDOS_CELULAR) && <ChipSelector rotulo="Empresa" valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
+      {NUEVO && hayQueElegirEmpresa && !(barra && PEDIDOS_CELULAR) && <ChipSelector rotulo="Empresa" soloValor={PEDIDOS_EMPRESA_SIN_PREFIJO} valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
       {POR_EMPRESA && !barra && (
         <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={`${CLASE_BOTON_TEXTO} gap-1.5`}>
           <Printer size={15} strokeWidth={1.8} aria-hidden /> Imprimir
@@ -460,7 +511,7 @@ export default function PedidosView({
   const pedidosCelular = barra && PEDIDOS_CELULAR;
   const filaEmpresaCelular = pedidosCelular && NUEVO && hayQueElegirEmpresa ? (
     <div data-fila-empresa className="mb-2 flex">
-      <ChipSelector rotulo="Empresa" valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />
+      <ChipSelector rotulo="Empresa" soloValor={PEDIDOS_EMPRESA_SIN_PREFIJO} valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />
     </div>
   ) : null;
 
@@ -635,7 +686,7 @@ export default function PedidosView({
           <button
             type="button"
             onClick={() => setPorConfirmarSimple({ pedido: p, destino: "en_preparacion" })}
-            className="h-9 whitespace-nowrap rounded-md bg-black px-3 text-xs font-medium text-white transition active:scale-[0.97]"
+            className={`${ALTO_BOTON_FILA} whitespace-nowrap rounded-md bg-black px-3 text-xs font-medium text-white transition active:scale-[0.97]`}
           >
             Iniciar preparación
           </button>
@@ -654,7 +705,7 @@ export default function PedidosView({
           <button
             type="button"
             onClick={() => { setPorPreparar(p); setBultosTexto(""); setErrorBultos(null); }}
-            className="h-9 whitespace-nowrap rounded-md bg-black px-3 text-xs font-medium text-white transition active:scale-[0.97]"
+            className={`${ALTO_BOTON_FILA} whitespace-nowrap rounded-md bg-black px-3 text-xs font-medium text-white transition active:scale-[0.97]`}
           >
             Preparado
           </button>
@@ -697,7 +748,7 @@ export default function PedidosView({
           <button
             type="button"
             onClick={() => setPorConfirmarSimple({ pedido: p, destino: "recibido" })}
-            className="h-7 whitespace-nowrap rounded-full border border-gray-900 bg-gray-900 px-2.5 text-xs font-medium text-white transition active:scale-[0.97]"
+            className={`${PEDIDOS_BOTONES_44 ? "h-11 sm:h-7" : "h-7"} whitespace-nowrap rounded-full border border-gray-900 bg-gray-900 px-2.5 text-xs font-medium text-white transition active:scale-[0.97]`}
           >
             Recibir
           </button>
@@ -759,6 +810,7 @@ export default function PedidosView({
     );
   };
 
+  const firmaAparte = (p: PedidoBodega) => PEDIDOS_FIRMA_EN_UNA_LINEA && barra && !!ultimaFirmaFlujoSimple(firmasSimpleDe(p));
   const tablaSimple = (
     <div className="-mx-4 border-y border-gray-200 bg-white sm:mx-0 sm:rounded-lg sm:border-x">
       <table className="w-full text-left text-xs sm:text-sm">
@@ -778,7 +830,8 @@ export default function PedidosView({
               </th>
             </tr>
             {ordenarGrupo(g.pedidos).map((p) => (
-              <tr key={clave(p)}>
+              <Fragment key={clave(p)}>
+              <tr className={firmaAparte(p) ? "[&>td]:pb-1" : undefined}>
                 <td className="whitespace-nowrap py-2 pl-3 pr-1 text-gray-700 sm:px-3">
                   <button
                     type="button"
@@ -803,7 +856,7 @@ export default function PedidosView({
                       {p.secuencial}
                       {vendedorEnPantalla(p.vendedor_nombre) ? ` · ${vendedorEnPantalla(p.vendedor_nombre)}` : ""}
                     </span>
-                    <span className="block text-xs text-gray-500 sm:hidden">{ultimaFirmaFlujoSimple(firmasSimpleDe(p))}</span>
+                    {!PEDIDOS_FIRMA_EN_UNA_LINEA && <span className="block text-xs text-gray-500 sm:hidden">{ultimaFirmaFlujoSimple(firmasSimpleDe(p))}</span>}
                   </button>
                   {avisoEsperaMuestra(p)}
                 </td>
@@ -811,13 +864,24 @@ export default function PedidosView({
                   title={ultimaFirmaFlujoSimple(firmasSimpleDe(p)) ?? undefined}
                   className="hidden whitespace-nowrap px-3 py-2 text-xs text-gray-600 sm:table-cell"
                 >
-                  {ultimaFirmaFlujoSimple(firmasSimpleDe(p)) ?? <span className="text-gray-300">—</span>}
+                  {firmaParaLeer(ultimaFirmaFlujoSimple(firmasSimpleDe(p))) ?? <span className="text-gray-300">—</span>}
                 </td>
                 <td className="py-1.5 pl-0.5 pr-3 text-right sm:px-3">
                   {controlSimple(p)}
                   {avisoPreparadoViejo(p)}
                 </td>
               </tr>
+              {/* n.º 62 (celular): quién marcó, en SU renglón a todo el ancho —al
+                  lado de los botones no cabe en una línea— y sin partir «p. m.». */}
+              {firmaAparte(p) && (
+                <tr className="!border-t-0 sm:hidden">
+                  <td />
+                  <td colSpan={3} className="whitespace-nowrap px-1 pb-2 pt-0 text-xs text-gray-500">
+                    {firmaParaLeer(ultimaFirmaFlujoSimple(firmasSimpleDe(p)))}
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         ))}
@@ -1012,6 +1076,7 @@ export default function PedidosView({
         pedido={abierto}
         puedePoner={false}
         ocultarBulto
+        volverEnElTitulo={barra && PEDIDO_REGRESO_EN_EL_TITULO}
         onVolver={() => {
           setAbierto(null);
           void cargar();
@@ -1125,7 +1190,13 @@ export default function PedidosView({
         <EnLaBarra
           pestana="pedidos"
           filaIzq={pedidosCelular && ESTADOS_CELULAR === "una-linea" ? segmentadoCelular : pedidosCelular && dosPorDos ? null : chips}
-          menu={POR_EMPRESA ? (
+          // n.º 60: el «···» tenía UNA opción; la impresora (ícono de línea) va directo al título.
+          iconos={POR_EMPRESA && PEDIDOS_IMPRESORA_EN_EL_TITULO && !sinNadaQueImprimir ? (
+            <IconoBarra etiqueta="Imprimir" onClick={() => void imprimir()}>
+              <Printer size={22} strokeWidth={1.8} aria-hidden />
+            </IconoBarra>
+          ) : null}
+          menu={POR_EMPRESA && !PEDIDOS_IMPRESORA_EN_EL_TITULO ? (
             <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={CLASE_FILA_MENU}>
               <Printer size={18} strokeWidth={1.8} aria-hidden /> Imprimir
             </button>
@@ -1144,7 +1215,11 @@ export default function PedidosView({
           className={pedidosCelular ? "flex min-w-0 items-center justify-between gap-1.5" : CIRCULO ? "flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5" : undefined}
         >
           <p className={pedidosCelular ? "min-w-0 text-[13px] font-semibold leading-snug text-gray-900" : "text-base font-semibold text-gray-900"}>
-            {pedidos ? (CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy)) : " "}
+            {pedidos
+              ? SIMPLE && PEDIDOS_LINEA_DE_LA_PESTANA
+                ? lineaDeLaPestana(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple], hoy)
+                : CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy)
+              : " "}
           </p>
           <LineaDeFrescura
             className={pedidosCelular ? "shrink-0 !text-[12px]" : CIRCULO ? "!text-xs" : undefined}

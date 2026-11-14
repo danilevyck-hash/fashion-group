@@ -1,5 +1,7 @@
 "use client";
 
+import { useBarraCelular } from "@/components/celular/BarraDeControles";
+import { PLANTILLA_BUSCAR_CORTO } from "@/lib/ui/revision-110-despachos";
 import { useMemo, useState } from "react";
 import { mutate } from "swr";
 import {
@@ -77,6 +79,8 @@ export function rotuloConteo(n: number): string {
 }
 
 export default function ReglasView() {
+  // n.º 88: en el celular el buscador va al lado de un botón y se cortaba; dice «Buscar» (sigue buscando marca y descripción).
+  const buscarCorto = useBarraCelular() && PLANTILLA_BUSCAR_CORTO;
   const [q, setQ] = useState("");
   // Marcas abiertas a mano. Vacío = todas plegadas (el arranque).
   const [abiertas, setAbiertas] = useState<Set<string>>(new Set());
@@ -179,7 +183,7 @@ export default function ReglasView() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar marca o descripción…"
+            placeholder={buscarCorto ? "Buscar" : "Buscar marca o descripción…"}
             aria-label="Buscar marca o descripción"
             className="min-h-[44px] w-full max-w-xs rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
           />
