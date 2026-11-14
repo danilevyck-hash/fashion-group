@@ -13,3 +13,6 @@ export const PEDIDOS_CELULAR_2026_11 = true;
 
 /** `LineaDeFrescura` en el celular: el ↻ más grande, en un cuadro de 44 px. */
 export const FRESCURA_GIRO_GRANDE_2026_11 = true;
+
+/** Clientes (lista) en el celular: «Ordenar» en la línea de la frescura, no en una fila sola. */
+export const CLIENTES_ORDENAR_ARRIBA_2026_11 = true;

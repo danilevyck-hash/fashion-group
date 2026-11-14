@@ -28,6 +28,7 @@ import { rolesClientes } from "@/lib/clientes/roles";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { EmptyState, PullToRefresh, ScrollableTable, SkeletonTable } from "@/components/ui";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { CLIENTES_ORDENAR_ARRIBA_2026_11 as ORDENAR_ARRIBA } from "@/lib/ui/celular-optimizar-2026-11";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import { dinero } from "@/lib/clientes/ficha";
@@ -185,6 +186,18 @@ export default function ClientesListClient({
               opciones={[{ modulo: "clientes-master" }]}
               onSuccess={async () => { router.refresh(); await mutate(); }}
             />
+            {/* 14-nov-2026 (`CLIENTES_ORDENAR_ARRIBA_2026_11`): en el celular
+                «Ordenar» sube a la línea de la frescura, a la derecha, en vez
+                de ocupar una fila sola bajo los chips. */}
+            {ORDENAR_ARRIBA && (
+              <div className="ml-auto lg:hidden">
+                <OrdenarEnLaBarra api={ordenTabla} opciones={[
+              { col: "cliente", rotulo: "Cliente" },
+              { col: "compras", rotulo: `Compras ${anio}` },
+              { col: "debe", rotulo: "Saldo" },
+            ]} />
+              </div>
+            )}
           </div>
 
           <CampoBuscar
@@ -219,13 +232,15 @@ export default function ClientesListClient({
               );
             })}
           </div>
-          <div className="mt-2 flex justify-end lg:hidden">
-            <OrdenarEnLaBarra api={ordenTabla} opciones={[
+          {!ORDENAR_ARRIBA && (
+            <div className="mt-2 flex justify-end lg:hidden">
+              <OrdenarEnLaBarra api={ordenTabla} opciones={[
               { col: "cliente", rotulo: "Cliente" },
               { col: "compras", rotulo: `Compras ${anio}` },
               { col: "debe", rotulo: "Saldo" },
             ]} />
-          </div>
+            </div>
+          )}
 
           {/* 🔴 Apple (5-oct-2026): «150 clientes» arriba repetía el chip «Todos
               150». Se va; al buscar, «12 de 150» baja al pie. */}
