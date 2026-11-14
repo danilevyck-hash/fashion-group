@@ -31,9 +31,8 @@ import { matchReclamo } from "../search";
 import type { Contacto, Reclamo } from "../types";
 import { Visto, CtaFija, FilaCel } from "./piezas";
 import { tituloCelular, usaBarraCelular } from "@/lib/navegacion/barra-controles-celular";
-import { useState } from "react";
-import { Search } from "lucide-react";
-import { CLASE_TITULO_BARRA, IconoBarra } from "@/components/celular/BarraDeControles";
+import { CLASE_TITULO_BARRA } from "@/components/celular/BarraDeControles";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR } from "@/components/celular/CabeceraCompacta";
 import { RECLAMOS_APPLE_2026_10, lineaPendientes } from "@/lib/reclamos/apple-2026-10";
 
@@ -64,7 +63,6 @@ export default function PortadaCelular({
   const buscando = globalSearch.trim();
   // v3.2: la cabecera compacta vive detrás de la barra nueva.
   const compacta = usaBarraCelular(true);
-  const [abrirBuscar, setAbrirBuscar] = useState(false);
 
   const resultados = buscando
     ? reclamos.filter((r) => {
@@ -90,9 +88,6 @@ export default function PortadaCelular({
           {/* 1 · «Reclamos» · 🔍 */}
           <div data-fila-del-avatar className="flex h-11 min-w-0 items-center gap-1">
             <h1 className={`min-w-0 flex-1 truncate ${CLASE_TITULO_BARRA}`}>Reclamos</h1>
-            <IconoBarra etiqueta="Buscar factura, reclamo o estilo" onClick={() => setAbrirBuscar(true)}>
-              <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
-            </IconoBarra>
           </div>
           {/* 2 · el total a 36 px y UNA línea gris */}
           <span className={`${CLASE_TOTAL_CELULAR} pt-1`}>{montoCel(resumen.porCobrar.monto)}</span>
@@ -133,21 +128,15 @@ export default function PortadaCelular({
       </div>
       </>)}
 
-      {(!compacta || abrirBuscar || globalSearch !== "") && (
       <div className="px-4 pt-4">
-        <input
-          type="search"
+        <CampoBuscar
           inputMode="search"
           value={globalSearch}
           onChange={(e) => setGlobalSearch(e.target.value)}
           placeholder="Buscar factura, reclamo o estilo"
           aria-label="Buscar factura, reclamo o estilo"
-          className="w-full rounded-xl border border-transparent bg-control-celular px-4 py-3 text-[16px] text-gray-900 placeholder:text-gray-500 focus:border-gray-400 focus:outline-none"
-          autoFocus={compacta && abrirBuscar && globalSearch === ""}
-          onBlur={() => { if (globalSearch === "") setAbrirBuscar(false); }}
         />
       </div>
-      )}
 
       {buscando ? (
         <>

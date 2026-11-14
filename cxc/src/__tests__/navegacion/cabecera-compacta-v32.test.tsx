@@ -98,13 +98,14 @@ describe("el control segmentado delgado", () => {
 });
 
 describe("las tres pantallas usan la cabecera compacta, detrás del interruptor", () => {
-  it("Cuentas por cobrar: tres renglones; Boston baja al «···»; buscar tras la 🔍", () => {
+  it("Cuentas por cobrar: tres renglones; Boston baja al «···»; buscar siempre a la vista", () => {
     const s = leer("app/cxc/components/PanelCxcCelular.tsx");
     expect(s).toMatch(/const compacta = usaBarraCelular\(true\)/);
     expect(s).toMatch(/<SegmentadoCelular[\s\S]*?rojo: k === "overdue"[\s\S]*?\$\{chipCorto\(k\)\}/);
     expect(s).toMatch(/onElegir=\{\(k\) => setRiskFilter\(k\)\}/);
     expect(s).toMatch(/onBoston=\{compacta \? onBoston : null\}/);
-    expect(s).toMatch(/\(!compacta \|\| buscando \|\| search !== ""\)/);
+    expect(s).toContain("<CampoBuscar");
+    expect(s).not.toContain("setBuscando");
     // La rama de siempre sigue ahí, intacta.
     expect(s).toContain('text-[46px] font-light');
   });

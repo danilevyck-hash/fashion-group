@@ -94,8 +94,8 @@ export const CLASE_FILA_MENU =
 // El proveedor: dónde caen los controles de cada pestaña
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Ranura = "iconos" | "filaIzq" | "filaDer" | "menu";
-const RANURAS: Ranura[] = ["iconos", "filaIzq", "filaDer", "menu"];
+type Ranura = "iconos" | "filaIzq" | "filaDer" | "menu" | "buscar";
+const RANURAS: Ranura[] = ["iconos", "filaIzq", "filaDer", "menu", "buscar"];
 const vacias = <T,>(v: T) => Object.fromEntries(RANURAS.map((r) => [r, v])) as Record<Ranura, T>;
 
 interface ContextoBarra {
@@ -168,7 +168,7 @@ export function EnLaBarra({
   const ctx = useContext(Contexto);
   const claves = pestana == null ? null : typeof pestana === "string" ? [pestana] : pestana;
   const visible = !!ctx && (!claves || claves.includes(ctx.activa ?? ""));
-  const nodos: Record<Ranura, ReactNode> = { iconos, filaIzq, filaDer, menu };
+  const nodos: Record<Ranura, ReactNode> = { iconos, filaIzq, filaDer, menu, buscar: null };
   useContar("iconos", visible && hay(iconos), ctx?.contar);
   useContar("filaIzq", visible && hay(filaIzq), ctx?.contar);
   useContar("filaDer", visible && hay(filaDer), ctx?.contar);
@@ -224,6 +224,7 @@ export function BarraDeControles({
   const ponerIconos = useCallback((el: HTMLElement | null) => poner?.("iconos", el), [poner]);
   const ponerIzq = useCallback((el: HTMLElement | null) => poner?.("filaIzq", el), [poner]);
   const ponerDer = useCallback((el: HTMLElement | null) => poner?.("filaDer", el), [poner]);
+  const ponerBuscar = useCallback((el: HTMLElement | null) => poner?.("buscar", el), [poner]);
 
   const conPestanas = !!pestanas && pestanas.length > 1;
   const etiquetaActiva = conPestanas ? pestanas!.find((p) => p.value === activa)?.label ?? null : null;
@@ -261,6 +262,9 @@ export function BarraDeControles({
           </IconoBarra>
         )}
       </div>
+
+      {/* 1b · Buscar: el campo entero, siempre a la vista (nunca solo la lupa). */}
+      <div ref={ponerBuscar} data-renglon="buscar" className={(ctx?.cuentas.buscar ?? 0) > 0 ? "flex min-w-0" : "hidden"} />
 
       {/* 2 · El período, a todo el ancho. */}
       {hay(periodo) && (
@@ -431,8 +435,8 @@ export function IconoBarra({
 }
 
 /**
- * 🔍 Buscar: la lupa del renglón 1; al tocarla, el campo ocupa ESE renglón con
- * «Cancelar». Con texto escrito se queda abierto: lo que filtra se ve.
+ * 🔍 Buscar: el campo ENTERO, siempre a la vista, en su propio renglón debajo
+ * del título (14-nov-2026: nada de lupa sola que hay que tocar para abrir).
  */
 export function BuscarEnLaBarra({
   valor,
@@ -445,34 +449,20 @@ export function BuscarEnLaBarra({
   placeholder: string;
   etiqueta: string;
 }) {
-  const [abierto, setAbierto] = useState(false);
-  const campo = useRef<HTMLInputElement | null>(null);
-  const visible = abierto || valor !== "";
-  useEffect(() => {
-    if (abierto) campo.current?.focus();
-  }, [abierto]);
-  if (!visible) {
-    return (
-      <IconoBarra etiqueta={etiqueta} onClick={() => setAbierto(true)}>
-        <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
-      </IconoBarra>
-    );
-  }
-  return (
-    <div data-buscar-barra className="absolute inset-0 z-10 flex items-center gap-2 bg-white">
-      <CampoBuscar
-        ref={campo}
-        value={valor}
-        onChange={(e) => onCambiar(e.target.value)}
-        placeholder={placeholder}
-        aria-label={etiqueta}
-        envoltorio="flex-1"
-      />
-      <button type="button" onClick={() => { onCambiar(""); setAbierto(false); }} className="min-h-[44px] shrink-0 px-1 text-[15px] text-blue-600">
-        Cancelar
-      </button>
-    </div>
+  const ctx = useContext(Contexto);
+  useContar("buscar", true, ctx?.contar);
+  const campo = (
+    <CampoBuscar
+      data-buscar-barra
+      value={valor}
+      onChange={(e) => onCambiar(e.target.value)}
+      placeholder={placeholder}
+      aria-label={etiqueta}
+      envoltorio="flex-1"
+    />
   );
+  if (!ctx) return campo;
+  return ctx.ranuras.buscar ? createPortal(campo, ctx.ranuras.buscar) : null;
 }
 
 export interface OpcionDeDescarga {
