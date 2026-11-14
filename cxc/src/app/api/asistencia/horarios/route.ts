@@ -137,6 +137,8 @@ export async function GET(req: NextRequest) {
         guardado: !!g,
         sugerida: sug,
         diasMedidos: (salidas.get(cod) ?? []).length,
+        // Revisión 110 (filtro-6): la empresa de la ficha, solo para filtrar la pantalla.
+        empresa,
       };
     });
     // Por NOMBRE, no por código como texto: ordenando texto el 5 cae después

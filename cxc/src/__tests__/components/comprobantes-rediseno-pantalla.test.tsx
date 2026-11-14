@@ -412,7 +412,8 @@ describe("6-7. 🔴 ficha y tabla, y todo lo que se toca mide 44 px", () => {
         if (b.closest("th[data-th-orden]")) return false;
         return t !== "" && !/comprobantes?\)/.test(t);
       })
-      .filter((b) => !b.className.includes("min-h-[44px]"))
+      // Las cápsulas de filtro-1 (revisión 110) miden 36 y se tocan en 44 (franja `before:`).
+      .filter((b) => !b.className.includes("min-h-[44px]") && !b.className.includes("before:-inset-y-1"))
       .map((b) => (b.textContent || "").trim() || b.getAttribute("aria-label"));
     expect(chicos, `botones por debajo de 44 px: ${chicos.join(" · ")}`).toEqual([]);
   });

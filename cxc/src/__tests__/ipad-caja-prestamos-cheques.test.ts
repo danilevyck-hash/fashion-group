@@ -210,7 +210,8 @@ describe("Nada que se toque por debajo de 44 px", () => {
 
   it("Los chips de categoría llegan a 44 y se ENVUELVEN en vez de arrastrarse", () => {
     expect(gastos).toMatch(/inline-flex min-h-\[44px\] items-center gap-2 whitespace-nowrap px-3 rounded-full/);
-    expect(gastos).toMatch(/className="flex flex-wrap gap-2 pb-2 mb-3\.5"/);
+    // filtro-4 (revisión 110): en el celular los chips pasan a una cápsula; de `sm` arriba siguen envolviendo.
+    expect(gastos).toMatch(/flex-wrap gap-2 pb-2 mb-3\.5/);
     expect(gastos).not.toContain("snap-x snap-mandatory");
   });
 

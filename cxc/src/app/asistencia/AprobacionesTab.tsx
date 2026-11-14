@@ -44,6 +44,9 @@ import RangoFechas, { ultimoRango } from "@/components/ui/RangoFechas";
 // Asistencia no lo cambiaba acá, y al revés. Ahora es la misma clave de la
 // dirección y la misma memoria que las otras tres pestañas.
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
+import { Capsula } from "@/components/filtros/FiltroA";
+import { FILTRO_7_ASISTENCIA_APROBACIONES } from "@/lib/ui/revision-110-filtros";
+import type { OpcionEmpresa } from "@/lib/asistencia/empresa-para-todo";
 import { BuscarEnLaBarra, CLASE_FILA_MENU, CLASE_SEGMENTADO_BARRA, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { ASISTENCIA_PANTALLA_2026_09 } from "@/lib/asistencia/pantalla-2026-09";
 import { useUrlState } from "@/lib/hooks/useUrlState";
@@ -105,9 +108,12 @@ export const RECARGA_MS = 1500;
  *  1-oct-2026, Daniel: nombres normales de ERP («Sí a todo lo pendiente» → «Aprobar pendientes»). */
 export const ROTULO_SI_A_TODO = "Aprobar pendientes";
 
-export default function AprobacionesTab({ empresa = "" }: {
+export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpresa }: {
   /** El selector de arriba de las pestañas (10-sep-2026). «todas» o vacío = todas. */
   empresa?: string;
+  /** filtro-7 (revisión 110): la cápsula de empresa va al lado del buscador. */
+  opcionesEmpresa?: readonly OpcionEmpresa[];
+  onEmpresa?: (e: string) => void;
 } = {}) {
   const { toast } = useToast();
   const barra = useHayBarraCelular();
@@ -313,6 +319,12 @@ export default function AprobacionesTab({ empresa = "" }: {
   );
   // 🔴 Y el rótulo lo DICE, para que nadie apriete «todo» creyendo que es todo.
   const rotuloLote = rotuloDeLote(ROTULO_SI_A_TODO, porDecidirVistas.length, buscando);
+  // 🔴 filtro-7 (revisión 110, aprobado 14-nov-2026): «Buscar colaborador» y
+  // «Todas las empresas ▾» en UNA línea, arriba del período.
+  const capsulaEmpresa = FILTRO_7_ASISTENCIA_APROBACIONES && opcionesEmpresa && opcionesEmpresa.length > 1 && onEmpresa ? (
+    <Capsula etiqueta="Empresa" compacta alinear="derecha" valor={empresa}
+      opciones={opcionesEmpresa.map((o) => ({ valor: o.clave, etiqueta: o.etiqueta }))} onCambiar={onEmpresa} />
+  ) : null;
 
   return (
     <div className="py-4">
@@ -338,12 +350,14 @@ export default function AprobacionesTab({ empresa = "" }: {
                 <BuscarEnLaBarra
                   valor={busqueda}
                   onCambiar={setBusqueda}
-                  placeholder={PLACEHOLDER_COLABORADOR}
+                  placeholder={capsulaEmpresa ? "Colaborador" : PLACEHOLDER_COLABORADOR}
                   etiqueta="Buscar colaborador por nombre o código"
+                  alLado={capsulaEmpresa}
                 />
               )}
             </>
           }
+          filaDer={vista === "colaborador" ? undefined : capsulaEmpresa}
           filaIzq={
             <ControlSegmentado
               ancho="contenido"

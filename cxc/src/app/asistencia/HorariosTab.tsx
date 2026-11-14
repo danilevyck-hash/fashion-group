@@ -43,6 +43,8 @@ import {
 } from "@/lib/asistencia/horario-configurable";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { leerHora24 } from "@/lib/asistencia/hora-24";
+import { filtrarPorTexto } from "@/lib/buscar-en-lista";
+import { filtrarPorEmpresa } from "@/lib/asistencia/empresa-para-todo";
 
 interface Fila {
   codigo: string;
@@ -62,6 +64,8 @@ interface Fila {
   guardado: boolean;
   sugerida: string;
   diasMedidos: number;
+  /** La empresa de su ficha (para el filtro del celular). */
+  empresa?: string | null;
 }
 
 /** Lo que viaja al servidor. El almuerzo NO: lo pone él. */
@@ -90,7 +94,12 @@ const HORA = "min-h-[44px] w-[4.5rem] rounded-md border border-gray-200 px-2 tex
 const REJILLA_COMPLETA = "lg:grid lg:grid-cols-[11.5rem_18rem_11rem_11rem_5rem_minmax(0,1fr)] lg:gap-x-4";
 const REJILLA_SIN_MIGRACION = "lg:grid lg:grid-cols-[11.5rem_11rem_5rem_minmax(0,1fr)] lg:gap-x-4";
 
-export default function HorariosTab() {
+export default function HorariosTab({ busqueda = "", empresa = "" }: {
+  /** filtro-6 (revisión 110, celular): solo cambia qué se VE; nada se guarda distinto. */
+  busqueda?: string;
+  /** «todas» o vacío = todas. */
+  empresa?: string;
+} = {}) {
   const { toast } = useToast();
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [sinConfirmar, setSinConfirmar] = useState(0);
@@ -231,7 +240,7 @@ export default function HorariosTab() {
             <div>Almuerzo</div>
             <div></div>
           </div>
-          {filas.map((f) => (
+          {filtrarPorTexto(filtrarPorEmpresa(filas, empresa), busqueda, (f) => [f.nombre, f.codigo]).map((f) => (
             <div
               key={f.codigo}
               className={`border-b border-gray-100 px-3 py-3 last:border-0 lg:items-center lg:py-2 ${rejilla}`}

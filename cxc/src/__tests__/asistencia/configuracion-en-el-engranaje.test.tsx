@@ -121,7 +121,8 @@ describe("5a · Colaboradores queda solo con personas", () => {
     const src = leer("src/app/asistencia/AsistenciaClient.tsx");
     expect(src).toMatch(/useUrlState<string>\("config", ""/);
     expect(src).toMatch(/aria-label="Configuración"/);
-    expect(src).toMatch(/<ConfiguracionTab ajuste=\{config\} \/>/);
+    // filtro-6 (revisión 110): en el celular suma el buscador y la empresa de Horarios.
+    expect(src).toMatch(/<ConfiguracionTab ajuste=\{config\}[^>]*\/>/);
     // 6a: el anillo solo con teclado.
     expect(src).toMatch(/focus-visible:ring-2/);
   });

@@ -388,7 +388,9 @@ const firma = (b: Borrador) =>
 const bajaCompleta = (b: Borrador) =>
   (b.fechaSalida.trim() === "") === (b.motivoSalida.trim() === "");
 
-export default function ConfiguracionTab({ personaEnElCentro = false, empresa = "", ajuste, opcionesEmpresa, onEmpresa }: {
+export default function ConfiguracionTab({ personaEnElCentro = false, empresa = "", ajuste, opcionesEmpresa, onEmpresa, buscarHorario }: {
+  /** filtro-6 (revisión 110, celular): lo escrito en «Buscar colaborador» de ⚙ › Horarios. */
+  buscarHorario?: string;
   /** Filtro «a» (14-nov-2026): la cápsula de empresa va debajo del buscador. */
   opcionesEmpresa?: readonly OpcionEmpresa[];
   onEmpresa?: (e: string) => void;
@@ -1087,7 +1089,7 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   );
 
   // 🔴 5a — ⚙ Configuración › Horarios / Feriados: la MISMA pantalla, sola.
-  if (ajuste === "horarios") return <HorariosTab />;
+  if (ajuste === "horarios") return buscarHorario !== undefined ? <HorariosTab busqueda={buscarHorario} empresa={empresa} /> : <HorariosTab />;
   if (ajuste === "feriados") return <FeriadosTab />;
 
   return (

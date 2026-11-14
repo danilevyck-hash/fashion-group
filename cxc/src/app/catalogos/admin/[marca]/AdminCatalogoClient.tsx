@@ -37,6 +37,9 @@ import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import { CATALOGOS_APPLE_V2_2026_10, claseChipAdmin } from "@/lib/catalogo/catalogos-2026-10-v2";
 import { FiltroDesplegable } from "@/components/catalogo/CatalogoFilters";
 import SubirFotos from "./SubirFotos";
+import { BuscadorGris, Capsula } from "@/components/filtros/FiltroA";
+import { useBarraCelular } from "@/components/celular/BarraDeControles";
+import { FILTRO_2_CATALOGO_ADMIN } from "@/lib/ui/revision-110-filtros";
 import ProductoFila from "./ProductoFila";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { catalogoAdminRoles } from "@/lib/catalogo/roles";
@@ -100,6 +103,9 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   const [genero, setGenero] = useState("");
   const [bulto, setBulto] = useState("");
   const [toast, setToast] = useState<{ msg: string; tipo: "success" | "error" } | null>(null);
+  // 🔴 filtro-2 (revisión 110, aprobado 14-nov-2026): la pantalla entera del
+  // celular, más limpia. Las mismas funciones; la computadora no cambia.
+  const cel2 = useBarraCelular(FILTRO_2_CATALOGO_ADMIN);
   const showToast = useCallback((msg: string, tipo: "success" | "error" = "success") => {
     setToast({ msg, tipo });
     setTimeout(() => setToast(null), duracionToastMs(tipo));
@@ -303,8 +309,23 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
       )}
 
       <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* filtro-2 · 1: logo, «Administrar» y «Actualizado 9:41 am ↻» en UNA línea. */}
+        {cel2 && (
+          <div data-filtro-2-encabezado className="mb-4 flex items-center gap-3">
+            {theme.logos.admin()}
+            <h1 className="text-[22px] font-bold leading-tight text-gray-900">{theme.admin.titulo}</h1>
+            <span className="ml-auto shrink-0">
+              <LineaDeFrescura
+                forma="celular"
+                actualizado={syncData?.lastSync ?? null}
+                opciones={[{ modulo: theme.admin.syncModulo }]}
+                onSuccess={async () => { await Promise.all([mutateProducts(), mutateSyncStatus()]); }}
+              />
+            </span>
+          </div>
+        )}
         {/* Encabezado */}
-        <div className={enUnaFila ? "flex items-center justify-between gap-3 mb-4 flex-wrap" : "flex items-start justify-between gap-3 mb-6 flex-wrap"}>
+        <div className={cel2 ? "hidden" : enUnaFila ? "flex items-center justify-between gap-3 mb-4 flex-wrap" : "flex items-start justify-between gap-3 mb-6 flex-wrap"}>
           <div className="flex items-center gap-3">
             {theme.logos.admin()}
             <div className="flex flex-col md:flex-row md:items-baseline md:gap-3">
@@ -354,6 +375,54 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
           </div>
         ) : (
           <>
+            {cel2 ? (
+              <>
+                {/* filtro-2 · 2: las tres acciones en UN grupo, como Ajustes del iPhone. */}
+                <SubirFotos
+                  marca={marca}
+                  products={products}
+                  onFotoSubida={recargar}
+                  onZipListo={recargarTrasZip}
+                  showToast={showToast}
+                  plegable
+                  grupo={(
+                    <>
+                      {theme.admin.rutaCategorias && puedeEditarRubros(role) && (
+                        <a href={theme.admin.rutaCategorias} data-testid="enlace-categorias-reebok"
+                          className="flex min-h-[44px] items-center justify-between gap-3 px-4 py-2 text-[15px] text-gray-900 active:bg-gray-50">
+                          Categorías del catálogo
+                          <span aria-hidden="true" className="text-gray-300">›</span>
+                        </a>
+                      )}
+                      {sinFoto.length > 0 && (
+                        <button type="button" onClick={descargarExcelSinFoto}
+                          className="flex min-h-[44px] w-full items-center gap-2 px-4 py-2 text-left text-[15px] text-blue-600 active:bg-gray-50">
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Descargar Excel sin foto
+                        </button>
+                      )}
+                    </>
+                  )}
+                />
+                {/* filtro-2 · 3 y 4: buscador gris y las dos cápsulas («Todos los bultos» baja en Tommy). */}
+                <div data-filtro-2-filtros className="mb-3 space-y-2">
+                  <BuscadorGris valor={busqueda} onCambiar={setBusqueda} placeholder="Buscar código o nombre" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Capsula etiqueta="Vista" valor={ver} onCambiar={setVer}
+                      opciones={chips.map((c) => ({ valor: c.key, etiqueta: c.label, conteo: c.count }))} />
+                    <Capsula etiqueta="Género" valor={genero} onCambiar={setGenero}
+                      opciones={theme.filtros.genderOptions.map((o) => ({ valor: o.value, etiqueta: o.value === "" ? "Todos los géneros" : o.label }))} />
+                    {theme.admin.bultoEditable && (
+                      <Capsula etiqueta="Bulto" valor={bulto} onCambiar={setBulto}
+                        opciones={BULTO_FILTRO_OPCIONES.map((o) => ({ valor: o.value, etiqueta: o.value === "" ? "Todos los bultos" : o.label }))} />
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+            <>
             <SubirFotos
               marca={marca}
               products={products}
@@ -420,6 +489,8 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
               {filtrosDesplegables}
             </div>
             )}
+            </>
+            )}
 
             {/* Que los filtros no dejen una pantalla vacía sin explicación: es la
                 diferencia entre "no hay ninguno así" y "algo se rompió". */}
@@ -428,7 +499,7 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
                 {hayFiltros ? "Ningún producto con esos filtros." : "Ningún producto aquí."}
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className={cel2 ? "-mx-4 divide-y divide-gray-100 border-y border-gray-200 bg-white" : "space-y-2"}>
                 {lista.map((p) => (
                   <ProductoFila
                     key={p.id}
@@ -437,6 +508,7 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
                     onCambio={recargar}
                     tieneVariantes={tieneVariantes}
                     showToast={showToast}
+                    compacta={cel2}
                   />
                 ))}
               </div>
