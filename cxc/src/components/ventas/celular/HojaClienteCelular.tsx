@@ -41,6 +41,8 @@ import {
   colorDelTono,
 } from "./PiezasVentas";
 import { numeroSinNegrita } from "@/lib/navegacion/barra-controles-celular";
+import { fmtMargenPantalla, fmtMoneySigned, type UtilidadClienteRow } from "@/lib/ventas/utilidad-cliente";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 
 /** Lo que devuelve `GET /api/clientes/[codigo]/por-empresa-anual`. */
 export interface EmpresaDelClienteVista {
@@ -73,9 +75,12 @@ interface Props {
   /** La línea gris de la lista: «compró ayer», «3 meses sin comprar». */
   cuandoCompro: string | null;
   year: number;
+  /** Revisión 110: las filas de la vista Utilidad de este cliente, una por
+   *  empresa (solo con un año completo). Sin ellas no se dibuja la sección. */
+  utilidadPorEmpresa?: readonly UtilidadClienteRow[];
 }
 
-export function HojaClienteCelular({ abierta, onCerrar, codigo, nombre, cuandoCompro, year }: Props) {
+export function HojaClienteCelular({ abierta, onCerrar, codigo, nombre, cuandoCompro, year, utilidadPorEmpresa }: Props) {
   const [estado, setEstado] = useState<Estado>({ status: "cargando" });
   const [empresaAbierta, setEmpresaAbierta] = useState<string | null>(null);
 
@@ -192,6 +197,28 @@ export function HojaClienteCelular({ abierta, onCerrar, codigo, nombre, cuandoCo
           <p data-pie-cliente className="px-6 pt-3 text-[12.5px] text-gray-500">
             Mismos días en los dos años, hasta el {diaLargo(datos.corte)}
           </p>
+          {utilidadPorEmpresa && utilidadPorEmpresa.length > 0 && (
+            <>
+              <RotuloVentas>Utilidad por empresa</RotuloVentas>
+              <GrupoVentas className="mt-0">
+                {utilidadPorEmpresa.map((u) => (
+                  <div
+                    key={u.empresaKey}
+                    data-utilidad-empresa={u.empresaKey}
+                    className="flex min-h-[48px] items-center gap-3 border-t border-gray-100 px-4 py-2.5 first:border-t-0"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-[15px] text-gray-900">{nombreCortoEmpresa(u.empresaKey)}</span>
+                    <span className={`shrink-0 tabular-nums text-[14px] ${u.utilidad < 0 ? "text-red-600" : "text-gray-900"}`}>
+                      {fmtMoneySigned(u.utilidad)}
+                    </span>
+                    <span className="w-[56px] shrink-0 text-right tabular-nums text-[13px] text-gray-500">
+                      {fmtMargenPantalla(u.margen)}
+                    </span>
+                  </div>
+                ))}
+              </GrupoVentas>
+            </>
+          )}
         </>
       )}
     </PantallaQueSube>

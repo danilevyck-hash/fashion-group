@@ -22,6 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
+import { VENTAS_CLIENTES_UNA_LISTA } from "@/lib/ui/revision-110-ventas";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -223,9 +224,16 @@ describe("e · la línea de frescura", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("f · el control segmentado ofrece exactamente Ventas y Utilidad", () => {
-  it("dos opciones, y ninguna «Margen %»", () => {
+  // 🔴 Revisión 110 (rec-c, 14-nov-2026): UNA sola lista. Con
+  // `VENTAS_CLIENTES_UNA_LISTA` prendido el control Ventas | Utilidad ya no
+  // se dibuja; apagado, ofrece exactamente los dos.
+  it("sin control segmentado con la lista única; apagado, Ventas y Utilidad", () => {
     pintar();
     const grupos = [...document.querySelectorAll("[data-control-segmentado]")];
+    if (VENTAS_CLIENTES_UNA_LISTA) {
+      expect(grupos).toHaveLength(0);
+      return;
+    }
     expect(grupos.length).toBeGreaterThanOrEqual(1);
     for (const g of grupos) {
       const tabs = [...g.querySelectorAll('[role="tab"]')].map((t) => t.textContent?.trim());

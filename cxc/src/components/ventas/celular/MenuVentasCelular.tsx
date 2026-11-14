@@ -42,8 +42,11 @@ export function FrescuraVentasCel({
   onActualizado,
   forma = "celular",
   className,
+  soloHora,
 }: {
   onActualizado: () => void;
+  /** «↻ 10:01 am» al final de una línea de filtros (revisión 110). */
+  soloHora?: boolean;
   /** «computadora»: la barra de Resumen, Clientes y Productos (4-oct-2026). */
   forma?: "celular" | "computadora";
   className?: string;
@@ -53,6 +56,7 @@ export function FrescuraVentasCel({
     <LineaDeFrescura
       forma={forma}
       className={className}
+      soloHora={soloHora}
       tabla="facturas"
       empresas={empresasConFacturas()}
       opciones={SYNC_NOW_VENTAS_SECUENCIA}
@@ -74,6 +78,8 @@ interface Props {
   onActualizado: () => void;
   /** `true` mientras no haya nada que bajar. */
   apagada?: boolean;
+  /** Revisión 110: una opción más en «Descargar» (el Excel de utilidad por cliente). */
+  extra?: { rotulo: string; detalle?: string; onClick: () => void | Promise<void> } | null;
 }
 
 export function MenuVentasCelular({
@@ -83,6 +89,7 @@ export function MenuVentasCelular({
   onLasTres,
   onActualizado,
   apagada = false,
+  extra = null,
 }: Props) {
   const [menu, setMenu] = useState(false);
   const [descarga, setDescarga] = useState(false);
@@ -137,6 +144,9 @@ export function MenuVentasCelular({
             detalle: DETALLE_LAS_TRES,
             onClick: () => void onLasTres(),
           },
+          ...(extra
+            ? [{ clave: "utilidad", rotulo: extra.rotulo, detalle: extra.detalle, onClick: () => void extra.onClick() }]
+            : []),
         ]}
       />
     </>

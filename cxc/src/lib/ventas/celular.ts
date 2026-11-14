@@ -344,3 +344,22 @@ export const TITULO_HOJA_DESCARGA = "Descargar";
 export function subtituloDeLaPestana(pestana: string, periodo: string): string {
   return `${pestana} · ${periodo}`;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Revisión 110 (14-nov-2026)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** n.º 4 · «Última compra: hace 2 días» → «hace 2 días» (la lista no la corta). */
+export function ultimaCompraCorta(u: UltimaCompraEnPalabras | null): UltimaCompraEnPalabras | null {
+  if (!u) return null;
+  return { ...u, texto: u.texto.replace(/^Última compra:\s*/, "") };
+}
+
+/** n.º 104 · Un cliente sin código en Switch llega con «—»: no tiene ficha. */
+export function tieneCodigoDeCliente(id: string | null | undefined): boolean {
+  const t = (id ?? "").trim();
+  return t !== "" && t !== "—" && t !== "-";
+}
+
+/** Lo que dice el lugar del código cuando no hay. */
+export const SIN_CODIGO_EN_SWITCH = "Sin código en Switch";
