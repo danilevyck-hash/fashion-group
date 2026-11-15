@@ -450,6 +450,9 @@ const STORAGE_REPLICA_BUCKETS = [
   // La foto del recibo de caja menuda: la saca una persona y el papel ya se
   // tiró. No se puede volver a conseguir.
   "caja-recibos",
+  // Los videos de «Cómo se usa» (15-nov-2026): se graban a mano; si se pierden
+  // hay que volver a grabarlos.
+  "videos-ayuda",
 ];
 const STORAGE_PREFIX = "_storage";
 // Réplica off-site a Cloudflare R2 (src/lib/backup/r2.ts): el set completo pesa
