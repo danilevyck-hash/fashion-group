@@ -19,6 +19,9 @@ import { CAJA_NUEVO_GASTO_EN_PORTADA } from "@/lib/ui/uso-2026-11";
 import "../skin.css";
 import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
 import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeControles";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 
 export default function PeriodoDetailPage() {
   const router = useRouter();
@@ -30,6 +33,8 @@ export default function PeriodoDetailPage() {
   });
 
   const [showDeletedModal, setShowDeletedModal] = useState(false);
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("caja");
   // `GASTOS_APPLE_2026_10`: en el celular «Nuevo gasto» va fijo abajo.
   const apple = GASTOS_APPLE_2026_10;
   const celular = useBarraCelular(apple);
@@ -123,6 +128,7 @@ export default function PeriodoDetailPage() {
           onExportExcel={exportExcel}
           deletedCount={(current.deleted_gastos || []).length}
           onViewDeleted={() => setShowDeletedModal(true)}
+          onComoSeUsa={conVideos ? () => setVerVideos(true) : undefined}
         />
 
         <div className="max-w-6xl mx-auto px-5 sm:px-9 pt-6 pb-14">
@@ -168,7 +174,8 @@ export default function PeriodoDetailPage() {
         </div>
       </div>
 
-      {apple && celular && detailIsOpen && !drawerOpen && (
+      {conVideos && <VideosAyuda modulo="caja" open={verVideos} onClose={() => setVerVideos(false)} />}
+      {apple && celular && detailIsOpen && !drawerOpen && !verVideos && (
         <BarraAccionFija rotulo="Nuevo gasto" onClick={openGastoDrawer} />
       )}
       {detailIsOpen && (
