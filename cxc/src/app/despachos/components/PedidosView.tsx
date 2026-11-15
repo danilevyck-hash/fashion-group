@@ -37,6 +37,7 @@ import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe, hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import PedidoBultos, { type PedidoDelDetalle } from "./PedidoBultos";
+import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
 import {
   PEDIDOS_BULTOS_2026_10 as BULTOS,
@@ -1121,46 +1122,12 @@ export default function PedidosView({
     </button>
   );
 
-  // Una pantalla, una pregunta: el detalle REEMPLAZA la lista, no la tapa.
-  // 🔴 Flujo simplificado: el detalle es de SOLO MIRAR —sin columna Bulto, sin
-  // casillas, sin barra de abajo—, porque el número se anota desde la lista.
-  if (SIMPLE && abierto) {
-    return (
-      <PedidoBultos
-        pedido={abierto}
-        puedePoner={false}
-        ocultarBulto
-        volverEnElTitulo={barra && PEDIDO_REGRESO_EN_EL_TITULO}
-        onVolver={() => {
-          setAbierto(null);
-          void cargar();
-        }}
-      />
-    );
-  }
-  if (BULTOS && abierto) {
-    // 🔴 Verificado = congelado (7-oct-2026): las casillas del bulto no se
-    // dibujan y el servidor rechaza el PATCH con la misma regla.
-    const verificado = estadoLeido((pedidos ?? []).find((p) => clave(p) === clave(abierto))?.estado) === "verificado";
-    return (
-      <PedidoBultos
-        pedido={abierto}
-        puedePoner={puedeMarcar && !verificado}
-        verificado={verificado}
-        onVolver={() => {
-          setAbierto(null);
-          void cargar();
-        }}
-      />
-    );
-  }
-
   const confirmacion = porConfirmar && textoDeConfirmar(porConfirmar.pedido, porConfirmar.destino);
   const confirmacionSimple = porConfirmarSimple && textoDeConfirmarSimple(porConfirmarSimple.pedido, porConfirmarSimple.destino);
   const muestra = porMarcarMuestra;
-
-  return (
-    <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
+  // Las ventanas de confirmar son las MISMAS en la lista y en el pedido abierto (ux-04).
+  const ventanas = (
+    <>
       {/* 🔴 Cambiar de estado pide confirmar (7-oct-2026). La MISMA ventana del
           sistema (`ConfirmModal`), nunca una propia. */}
       {confirmacion && (
@@ -1268,6 +1235,69 @@ export default function PedidosView({
           )}
         </ConfirmModal>
       )}
+    </>
+  );
+
+  // ── ux-04 (15-nov-2026): el pedido abierto trae abajo el MISMO paso de la
+  // fila —las mismas ventanas, la misma regla de quién marca qué—, y el
+  // servidor decide igual (`puedeMoverFlujoSimple`).
+  const accionDelDetalle = (p: PedidoBodega | undefined) => {
+    if (!PEDIDO_CON_ACCION_EN_DETALLE || !p) return null;
+    const e = estadoFlujoSimpleLeido(p.estado);
+    const boton = (rotulo: string, onClick: () => void) => ({ rotulo, onClick });
+    const accion =
+      e === "pendiente" && puedeMarcar ? boton("Iniciar preparación", () => setPorConfirmarSimple({ pedido: p, destino: "en_preparacion" }))
+        : e === "en_preparacion" && puedeMarcar ? boton("Preparado", () => { setPorPreparar(p); setBultosTexto(""); setErrorBultos(null); })
+          : e === "preparado" && puedeRecibir ? boton("Recibir", () => setPorConfirmarSimple({ pedido: p, destino: "recibido" }))
+            : null;
+    return {
+      linea: `${ROTULO_ESTADO_FLUJO_SIMPLE[e]} · ${haceDias(p.fecha, hoy)}`,
+      accion,
+    };
+  };
+
+  // Una pantalla, una pregunta: el detalle REEMPLAZA la lista, no la tapa.
+  // 🔴 Flujo simplificado: el detalle es de SOLO MIRAR —sin columna Bulto, sin
+  // casillas, sin barra de abajo—, porque el número se anota desde la lista.
+  if (SIMPLE && abierto) {
+    return (
+      <>
+        {PEDIDO_CON_ACCION_EN_DETALLE && ventanas}
+        <PedidoBultos
+          pedido={abierto}
+          puedePoner={false}
+          ocultarBulto
+          volverEnElTitulo={barra && PEDIDO_REGRESO_EN_EL_TITULO}
+          paso={accionDelDetalle((pedidos ?? []).find((p) => clave(p) === clave(abierto)))}
+          onVolver={() => {
+            setAbierto(null);
+            void cargar();
+          }}
+        />
+      </>
+    );
+  }
+  if (BULTOS && abierto) {
+    // 🔴 Verificado = congelado (7-oct-2026): las casillas del bulto no se
+    // dibujan y el servidor rechaza el PATCH con la misma regla.
+    const verificado = estadoLeido((pedidos ?? []).find((p) => clave(p) === clave(abierto))?.estado) === "verificado";
+    return (
+      <PedidoBultos
+        pedido={abierto}
+        puedePoner={puedeMarcar && !verificado}
+        verificado={verificado}
+        onVolver={() => {
+          setAbierto(null);
+          void cargar();
+        }}
+      />
+    );
+  }
+
+
+  return (
+    <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
+      {ventanas}
       {barra && (
         <EnLaBarra
           pestana="pedidos"

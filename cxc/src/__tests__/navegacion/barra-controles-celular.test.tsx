@@ -307,7 +307,7 @@ describe("prendida", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("lo que se envía no cambia: la barra llama a la misma función", () => {
   const casos: Array<[string, string, RegExp]> = [
-    ["app/asistencia/AprobacionesTab.tsx", 'void decidir(pendientes, "si")', /onClick: \(\) => void decidir\(pendientes, "si"\)/],
+    ["app/asistencia/AprobacionesTab.tsx", "aprobarLote", /onClick: aprobarLote,/], // ux-01: el lote pasa por el aviso de 5 s
     ["app/asistencia/PrestamosTab.tsx", "void abrirNuevoPrestamo()", /onClick: \(\) => void abrirNuevoPrestamo\(\)/],
     ["app/asistencia/ConfiguracionTab.tsx", "RUTA_PERSONA_NUEVA", /router\.push\(RUTA_PERSONA_NUEVA\)/],
     ["app/despachos/components/GuiasList.tsx", "onNewGuia", /rotulo: "Nueva guía", onClick: onNewGuia/],

@@ -83,8 +83,8 @@ describe("🔴 ningún `<input type=\"date\">` suelto", () => {
       }
     };
     recorrer(raiz);
-    // GastoForm: su `TextInput type="date"` ya rinde CampoFecha.
-    expect(sueltos).toEqual(["app/asistencia/PlanillaTab.tsx:1", "app/caja/components/GastoForm.tsx:1"]);
+    // GastoForm: sus `TextInput type="date"` (el de antes y el de ux-03) ya rinden CampoFecha.
+    expect(sueltos).toEqual(["app/asistencia/PlanillaTab.tsx:1", "app/caja/components/GastoForm.tsx:2"]);
   });
 });
 

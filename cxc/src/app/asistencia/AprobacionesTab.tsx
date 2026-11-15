@@ -3,6 +3,9 @@ import { BUSCADOR_PRIMERO_APROBACIONES } from "@/lib/ui/revision-110-vivo";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { ASIS_PENDIENTES_CON_UNIDAD_R110, colaColaboradores } from "@/lib/ui/revision-110-asistencia";
 import { Aviso } from "@/components/ui/Aviso";
+import { APROBAR_LOTE_CON_DESHACER, avisoLoteAprobado, rotuloLoteConCuantos } from "@/lib/ui/uso-2026-11";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import UndoToast from "@/components/UndoToast";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * APROBACIONES — una sola lista de decisiones (10-sep-2026).
@@ -263,14 +266,17 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
    * UNA función para todas las formas de decidir: la persona, el día, la
    * persona en un día y «Sí a todo» mandan lo mismo con distinta lista.
    */
+  // ux-01: mientras corre el aviso de 5 s del lote, la recarga espera.
+  const loteEnEspera = useRef(false);
   const decidir = useCallback(
-    async (items: ToqueAprobacion[], decision: Decision) => {
+    async (items: ToqueAprobacion[], decision: Decision, previoFijo?: ReadonlyMap<string, Decision>) => {
       if (items.length === 0) return;
       // 🔴 OPTIMISTA: la pantalla cambia EN EL ACTO; el POST va detrás; si
-      // falla, se revierte y se dice.
+      // falla, se revierte y se dice. Con `previoFijo` la pantalla ya cambió
+      // (el lote con «Deshacer») y se revierte a lo de antes del lote.
       const claves = items.map((i) => claveDia(i.codigo, i.fecha));
-      let previo: ReadonlyMap<string, Decision> = new Map();
-      setDias((d) => { previo = previoDe(d ?? [], items); return aplicarAprobacionLocal(d ?? [], items, decision); });
+      let previo: ReadonlyMap<string, Decision> = previoFijo ?? new Map();
+      if (!previoFijo) setDias((d) => { previo = previoDe(d ?? [], items); return aplicarAprobacionLocal(d ?? [], items, decision); });
       setEnVuelo((v) => new Set([...v, ...claves]));
       try {
         // 🔴 Con empresa elegida, la ruta rechaza cualquier código de otra empresa.
@@ -290,7 +296,7 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
         setEnVuelo((v) => { const n = new Set(v); for (const k of claves) n.delete(k); return n; });
         // 🔴 EL SERVIDOR MANDA: una sola recarga, 1,5 s después del último toque.
         if (recarga.current) clearTimeout(recarga.current);
-        recarga.current = setTimeout(() => { recarga.current = null; void cargar(true); }, RECARGA_MS);
+        recarga.current = setTimeout(() => { recarga.current = null; if (!loteEnEspera.current) void cargar(true); }, RECARGA_MS);
       }
     },
     [cargar, toast, empresa],
@@ -321,7 +327,31 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
     [buscando, todoLoPendiente, porDecidirVistas],
   );
   // 🔴 Y el rótulo lo DICE, para que nadie apriete «todo» creyendo que es todo.
-  const rotuloLote = rotuloDeLote(ROTULO_SI_A_TODO, porDecidirVistas.length, buscando);
+  const rotuloLote = rotuloDeLote(
+    APROBAR_LOTE_CON_DESHACER ? rotuloLoteConCuantos(porDecidirVistas.length) : ROTULO_SI_A_TODO,
+    porDecidirVistas.length,
+    buscando,
+  );
+  // 🔴 ux-01 (15-nov-2026): el lote ya no se manda de un toque. La pantalla
+  // cambia en el acto, sale el aviso de 5 s con «Deshacer», y SOLO al pasar
+  // los 5 s viaja el POST de siempre (el servidor decide igual que antes).
+  const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
+  const aprobarLote = useCallback(() => {
+    if (!APROBAR_LOTE_CON_DESHACER) { void decidir(pendientes, "si"); return; }
+    const items = pendientes;
+    if (items.length === 0) return;
+    let previo: ReadonlyMap<string, Decision> = new Map();
+    scheduleAction({
+      id: `lote-${Date.now()}`,
+      message: avisoLoteAprobado(porDecidirVistas.length, hm(minutosVistos)),
+      onOptimistic: () => {
+        loteEnEspera.current = true;
+        setDias((d) => { previo = previoDe(d ?? [], items); return aplicarAprobacionLocal(d ?? [], items, "si"); });
+      },
+      onRevert: () => { loteEnEspera.current = false; setDias((d) => revertirAprobacionLocal(d ?? [], previo)); },
+      execute: async () => { loteEnEspera.current = false; await decidir(items, "si", previo); },
+    });
+  }, [decidir, pendientes, porDecidirVistas.length, minutosVistos, scheduleAction]);
   // 🔴 filtro-7 (revisión 110, aprobado 14-nov-2026): «Buscar colaborador» y
   // «Todas las empresas ▾» en UNA línea, arriba del período.
   const capsulaEmpresa = FILTRO_7_ASISTENCIA_APROBACIONES && opcionesEmpresa && opcionesEmpresa.length > 1 && onEmpresa ? (
@@ -381,7 +411,7 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
             rotulo: rotuloLote,
             sobreLaBarra: true,
             disabled: bloqueado || pendientes.length === 0,
-            onClick: () => void decidir(pendientes, "si"),
+            onClick: aprobarLote,
           }}
         />
       ) : (
@@ -433,7 +463,7 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
         <button
           type="button"
           disabled={bloqueado || pendientes.length === 0}
-          onClick={() => void decidir(pendientes, "si")}
+          onClick={aprobarLote}
           className="min-h-[44px] rounded-md bg-black px-5 text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-30"
         >
           {rotuloLote}
@@ -566,6 +596,9 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
 
       {!cargando && dias !== null && (
         <YaDecididas personas={decididas} onDecidir={decidir} enVuelo={enVuelo} bloqueado={bloqueado} />
+      )}
+      {pendingUndo && (
+        <UndoToast key={pendingUndo.id} message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />
       )}
     </div>
   );

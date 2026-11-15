@@ -1,4 +1,5 @@
 "use client";
+import { telefonoParaWhatsApp } from "@/lib/ui/uso-2026-11";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // «COBRAR» Y «VER LOS N DOCUMENTOS» DESDE LA FICHA DEL CLIENTE.
@@ -154,7 +155,7 @@ export default function CobrarEnFicha({
           })
         }
         onWhatsApp={() => {
-          const href = waHref(datos.celular || datos.telefono, cuerpo());
+          const href = waHref(telefonoParaWhatsApp(datos.celular, datos.telefono), cuerpo());
           if (!href) { avisar("Este cliente no tiene teléfono — cárgalo aquí abajo, en Contacto."); return; }
           window.open(href, "_blank");
           anotar("whatsapp");

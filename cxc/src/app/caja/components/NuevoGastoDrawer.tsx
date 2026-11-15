@@ -9,6 +9,7 @@ import { fmt } from "@/lib/format";
 import GastoForm, { normalizeStr } from "./GastoForm";
 import AvisoSaldoNegativo from "./AvisoSaldoNegativo";
 import AvisoAntesDeGuardar from "./AvisoAntesDeGuardar";
+import { CAJA_FORM_DOS_POR_FILA } from "@/lib/ui/uso-2026-11";
 import ZonaFotos from "./ZonaFotos";
 import { CAJA_AVISO_AL_GUARDAR_2026_11 } from "@/lib/ui/revision-110-marketing";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
@@ -299,7 +300,8 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
 
   const contenido = (
     <>
-      <div className="skin-caja px-5 py-5">
+      {/* ux-03: con el formulario abierto, la barra de pestañas no tapa «Guardar». */}
+      <div className="skin-caja px-5 py-5" data-sin-tab-bar={CAJA_FORM_DOS_POR_FILA ? "" : undefined}>
         {error && (
           <p data-caja-error className="text-sm mb-4 px-3 py-2 rounded-md" style={{ color: "var(--caja-danger-onSoft)", background: "var(--caja-danger-soft)", border: "1px solid var(--caja-danger-border)" }}>
             {error}

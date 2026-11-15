@@ -13,6 +13,8 @@ import { juegosQueCoinciden, type JuegoDespacho } from "@/lib/guias/juegos-despa
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { GUIA_DETALLE_APPLE_2026_10, GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import { useDespachadores } from "./useDespachadores";
+import { DESPACHADO_POR_EL_USUARIO, despachadorDelUsuario } from "@/lib/ui/uso-2026-11";
+import { useNombreVisible } from "@/lib/hooks/useNombreVisible";
 import { FORMULARIO_SIN_TAB_BAR } from "@/lib/ui/revision-110-ajustes";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,6 +138,23 @@ export default function DespachoForm({
   const canvas2Ref = useRef<HTMLCanvasElement>(null);
   // La lista del equipo; con el interruptor apagado el campo no existe aquí.
   const despachadores = useDespachadores(GUIA_NUEVA_2026_10);
+  // 🔴 ux-06 (15-nov-2026): «Despachado por» viene puesto con quien entró
+  // —Daniel: «los que despachan tienen su propio usuario, así ya sabes quién
+  // fue»—, UNA vez y solo si está vacío y la persona está en la lista. Se puede
+  // cambiar (alguien despacha desde el aparato de otro). Sin coincidencia queda
+  // vacío y se elige, como antes: nunca se adivina con el último del aparato.
+  const nombreVisible = useNombreVisible();
+  const yaPuesto = useRef(false);
+  useEffect(() => {
+    if (!DESPACHADO_POR_EL_USUARIO || !GUIA_NUEVA_2026_10 || yaPuesto.current || !setDespachadoPor) return;
+    if (despachadoPor) { yaPuesto.current = true; return; }
+    let login = "";
+    try { login = sessionStorage.getItem("fg_user_name") || ""; } catch { /* sin memoria */ }
+    const quien = despachadorDelUsuario(despachadores, nombreVisible, login);
+    if (!quien) return;
+    yaPuesto.current = true;
+    setDespachadoPor(quien);
+  }, [despachadores, nombreVisible, despachadoPor, setDespachadoPor]);
   // El selector aparece solo si se toca "Cambiar". Ver la cabecera.
   const [cambiandoModo, setCambiandoModo] = useState(false);
   /**

@@ -25,6 +25,7 @@ import { guiaYaDespachada, tipoDespachoEfectivo } from "@/lib/guias/modo-despach
 import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 import { bultosTecleados, correccionesDeBultos } from "@/lib/guias/bultos-correccion";
 import { entregadoPorElegido } from "@/lib/guias/despachado-por";
+import { DESPACHADO_POR_EL_USUARIO } from "@/lib/ui/uso-2026-11";
 import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import { limpiarBorradoresViejos } from "@/lib/borradores-viejos";
 import { barrerFirmasVencidas, borrarFirmas, guardarFirma, leerFirma } from "@/lib/guias/firmas-despacho";
@@ -109,7 +110,8 @@ export function useDespachoGuia(id: string | null) {
       setBReceptor(g.receptor_nombre || "");
       setBCedula(g.cedula || "");
       setBChofer(g.nombre_chofer || "");
-      setDespachadoPor(entregadoPorElegido(g.entregado_por) ? String(g.entregado_por).trim() : "");
+      // ux-06: sin dato guardado se conserva lo que el formulario ya puso (quien entró).
+      setDespachadoPor((antes) => (entregadoPorElegido(g.entregado_por) ? String(g.entregado_por).trim() : DESPACHADO_POR_EL_USUARIO ? antes : ""));
       // 🔴 EL MODO ARRANCA EN LO QUE SE ELIGIÓ AL CREAR LA GUÍA.
       // Acá vivía `(g.tipo_despacho as TipoDespacho) || "externo"`, que nunca
       // miraba `modo_entrega`. Y no era un `??` faltante: `tipo_despacho` tiene

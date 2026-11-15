@@ -1,4 +1,5 @@
 "use client";
+import { telefonoParaWhatsApp } from "@/lib/ui/uso-2026-11";
 
 import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
@@ -559,7 +560,7 @@ function AdminDashboardInner() {
   // WhatsApp al celular (o teléfono) del cliente con el estado de cuenta
   // prellenado. Los usuarios cobran por WhatsApp — mailto: solo no alcanza.
   function openWhatsApp(client: ConsolidatedClient) {
-    const href = waHref(client.celular || client.telefono, buildEmailBody(client));
+    const href = waHref(telefonoParaWhatsApp(client.celular, client.telefono), buildEmailBody(client));
     if (!href) { showToast("Este cliente no tiene teléfono — cárgalo en su ficha."); return; }
     window.open(href, "_blank");
     anotarEnvio(client, "whatsapp");
