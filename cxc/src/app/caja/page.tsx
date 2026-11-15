@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -13,6 +14,9 @@ import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
 import { CAJA_NUEVO_GASTO_EN_PORTADA } from "@/lib/ui/uso-2026-11";
 import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeControles";
 import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 
 export default function CajaPage() {
   const router = useRouter();
@@ -33,6 +37,9 @@ export default function CajaPage() {
   } = useCajaState({ authReady: authChecked });
 
   const celular = useBarraCelular(GASTOS_APPLE_2026_10);
+  // «Cómo se usa» vive en la PORTADA del módulo (regla en manifiesto.ts).
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("caja");
 
   if (!authChecked) return null;
 
@@ -76,13 +83,15 @@ export default function CajaPage() {
           role={role}
           onCreatePeriodo={createPeriodo}
           onNuevoGasto={celular ? undefined : nuevoGasto}
+          onComoSeUsa={conVideos ? () => setVerVideos(true) : undefined}
           onLoadDetail={(id) => router.push(`/caja/${id}`)}
           onPrintPeriodo={(id) => router.push(`/caja/${id}/imprimir`)}
           onClosePeriodo={requestClosePeriodo}
           onDeletePeriodo={requestDeletePeriodo}
         />
       </div>
-      {celular && nuevoGasto && !loading && (
+      {conVideos && <VideosAyuda modulo="caja" open={verVideos} onClose={() => setVerVideos(false)} />}
+      {celular && nuevoGasto && !loading && !verVideos && (
         <BarraAccionFija rotulo="Nuevo gasto" onClick={nuevoGasto} sobreLaBarra />
       )}
       <Modal

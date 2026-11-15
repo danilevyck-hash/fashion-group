@@ -20,6 +20,8 @@ interface Props {
   onCreatePeriodo: () => void;
   /** ux-02: «Nuevo gasto» en la portada (computadora); en el celular va fijo abajo. */
   onNuevoGasto?: () => void;
+  /** «Cómo se usa» en la portada del módulo (manifiesto de videos). */
+  onComoSeUsa?: () => void;
   onLoadDetail: (id: string) => void;
   onPrintPeriodo: (id: string) => void;
   onClosePeriodo: (id: string) => void;
@@ -114,6 +116,7 @@ export default function PeriodoList({
   role,
   onCreatePeriodo,
   onNuevoGasto,
+  onComoSeUsa,
   onLoadDetail,
   onPrintPeriodo,
   onClosePeriodo,
@@ -135,7 +138,7 @@ export default function PeriodoList({
     return (
       <ListaApple
         periodos={periodos} loading={loading} error={error} aviso={aviso}
-        hasOpenPeriod={hasOpenPeriod} onCreatePeriodo={onCreatePeriodo} onNuevoGasto={onNuevoGasto}
+        hasOpenPeriod={hasOpenPeriod} onCreatePeriodo={onCreatePeriodo} onNuevoGasto={onNuevoGasto} onComoSeUsa={onComoSeUsa}
         onLoadDetail={onLoadDetail} itemsDe={itemsDe} encabezado={encabezado}
       />
     );
@@ -448,7 +451,7 @@ export default function PeriodoList({
  * 🔴 Nunca se suman períodos entre sí: el número grande es UNO solo.
  */
 function ListaApple({
-  periodos, loading, error, aviso, hasOpenPeriod, onCreatePeriodo, onNuevoGasto, onLoadDetail, itemsDe, encabezado,
+  periodos, loading, error, aviso, hasOpenPeriod, onCreatePeriodo, onNuevoGasto, onComoSeUsa, onLoadDetail, itemsDe, encabezado,
 }: {
   encabezado: React.ReactNode;
   periodos: CajaPeriodo[];
@@ -459,6 +462,7 @@ function ListaApple({
   onCreatePeriodo: () => void;
   /** ux-02: «Nuevo gasto» en la portada (computadora); en el celular va fijo abajo. */
   onNuevoGasto?: () => void;
+  onComoSeUsa?: () => void;
   onLoadDetail: (id: string) => void;
   itemsDe: (p: CajaPeriodo) => OverflowMenuItem[];
 }) {
@@ -467,7 +471,7 @@ function ListaApple({
   return (
     <div data-caja-apple-lista className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
       {encabezado}
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-5 flex items-start justify-between gap-4 sm:items-end">
         <div className="min-w-0">
           {abierto && (
             <>
@@ -481,22 +485,26 @@ function ListaApple({
             </>
           )}
         </div>
-        {!hasOpenPeriod && (
-          <button
-            onClick={onCreatePeriodo}
-            className="inline-flex min-h-[44px] items-center rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
-          >
-            Nuevo período
-          </button>
-        )}
-        {hasOpenPeriod && onNuevoGasto && (
-          <button
-            onClick={onNuevoGasto}
-            className="inline-flex min-h-[44px] items-center rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
-          >
-            Nuevo gasto
-          </button>
-        )}
+        {/* Una acción principal; «Cómo se usa» va al «···» (docs/diseno.md). */}
+        <div className="flex shrink-0 items-center gap-1">
+          {!hasOpenPeriod && (
+            <button
+              onClick={onCreatePeriodo}
+              className="inline-flex min-h-[44px] items-center rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
+            >
+              Nuevo período
+            </button>
+          )}
+          {hasOpenPeriod && onNuevoGasto && (
+            <button
+              onClick={onNuevoGasto}
+              className="inline-flex min-h-[44px] items-center rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
+            >
+              Nuevo gasto
+            </button>
+          )}
+          {onComoSeUsa && <OverflowMenu items={[{ label: "Cómo se usa", onClick: onComoSeUsa }]} />}
+        </div>
       </div>
 
       {aviso && !error && <Aviso className="mb-4">{aviso}</Aviso>}
