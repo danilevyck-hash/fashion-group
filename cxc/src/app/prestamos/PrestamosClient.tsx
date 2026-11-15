@@ -293,6 +293,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           <select
             value={filterEmpresa}
             onChange={e => setFilterEmpresa(e.target.value)}
+            aria-label="Empresa"
             // El celular le daba a «Todas» el ancho del nombre de empresa más
             // largo y el buscador quedaba en «Buscar co». Ahora el select es
             // angosto y el buscador se lleva el resto.

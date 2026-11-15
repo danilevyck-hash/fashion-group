@@ -11,12 +11,9 @@
 //      la imagen no frenaba la propagación: el gesto natural hacía lo contrario
 //      de lo que uno espera.
 //
-// ⚠️ Y EL PELLIZCO DEL NAVEGADOR NO ERA OPCIÓN: `layout.tsx` declara
-// `maximumScale: 1`, que en iOS apaga el zoom de la página. Está ahí a propósito
-// (evita que iOS haga zoom solo al enfocar un input) y cambiarlo tocaría TODAS
-// las pantallas por un problema de una. Por eso el zoom vive dentro del visor.
-// Este test vigila las dos puntas: que el visor tenga zoom Y que nadie “arregle”
-// el problema quitando el maximumScale global.
+// ⚠️ En agosto el pellizco del navegador estaba apagado (`maximumScale: 1`), por
+// eso el zoom vive dentro del visor. Desde el 15-nov-2026 (accesibilidad) la
+// página entera se puede ampliar; el visor conserva su propio zoom.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
@@ -88,11 +85,13 @@ describe("🔴 pellizcar y arrastrar", () => {
   });
 });
 
-describe("⚠️ el arreglo NO fue quitar el zoom global", () => {
-  it("layout.tsx conserva maximumScale: 1", () => {
-    // Quitarlo haría que iOS haga zoom al enfocar cualquier input en TODA la
-    // app. Si alguien lo borra “para que se pueda hacer zoom”, este test avisa.
-    expect(layout).toContain("maximumScale: 1");
+describe("🔴 ampliar con dos dedos está permitido (accesibilidad, 15-nov-2026)", () => {
+  it("layout.tsx ya no bloquea el zoom (sin maximumScale ni userScalable)", () => {
+    // Daniel aprobó quitarlo: axe lo marcaba crítico en las 48 revisiones. El
+    // visor sigue con su propio zoom (touchAction none) y iOS no amplía al
+    // escribir porque los campos miden 16 px en el celular.
+    expect(layout).not.toMatch(/maximumScale|userScalable/);
+    expect(leer("src/app/globals.css")).toMatch(/input, select, textarea \{\s*font-size: 16px !important;/);
   });
 });
 

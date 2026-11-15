@@ -6,6 +6,8 @@
 // Todo en MINUTOS, nunca horas decimales: "295 minutos" se le discute a una
 // persona, "4,92 horas" no le dice nada a nadie.
 
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { NOMBRE_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { DISTINTIVO_BAJO_EL_NOMBRE } from "@/lib/ui/revision-110-vivo";
 import { DISTINTIVO_CON_ESPACIO } from "@/lib/ui/revision-110-vivo2";
@@ -1377,13 +1379,13 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
     );
     const TONO: Record<string, string> = {
       rojo: "text-red-700 font-semibold",
-      ambar: "text-amber-700",
+      ambar: ACCESIBILIDAD_2026_11 ? "text-amber-700 font-semibold" : "text-amber-700",
       gris: "text-gray-600",
       verde: "text-emerald-700",
     };
     return (
       <>
-        <tr onClick={onToggle}
+        <tr onClick={onToggle} {...clicConTeclado(onToggle, { fila: true })}
           className={`cursor-pointer border-b border-gray-100 transition active:bg-gray-50${
             esSinMarcas(p) ? " bg-gray-50/70" : ""
           }`}>
@@ -1441,7 +1443,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
     <>
       {/* 🔴 La fila de quien no marcó va en GRIS: se ve que no es una fila con
           números, sin sacarla de la lista ni del papel. */}
-      <tr onClick={onToggle}
+      <tr onClick={onToggle} {...clicConTeclado(onToggle, { fila: true })}
         className={`cursor-pointer border-b border-gray-100 transition hover:bg-gray-50${
           esSinMarcas(p) ? " bg-gray-50/70 text-gray-500" : ""
         }`}>

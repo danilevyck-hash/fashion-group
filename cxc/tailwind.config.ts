@@ -28,6 +28,18 @@ const config: Config = {
         400: '#6b7280',
         500: '#4b5563',
       },
+      // Accesibilidad (15-nov-2026): lo mismo con los colores de aviso. Ámbar,
+      // verde y rojo bajan UN paso, así el texto llega a 4.5:1 y la UI a 3:1
+      // sobre blanco y sobre el gris de las pistas. Global, sin interruptor.
+      //   amber-600   #d97706 (3.2:1) → #b45309 (5.0:1)
+      //   emerald-600 #059669 (3.8:1) → #047857 (5.5:1)
+      //   green-600   #16a34a (3.3:1) → #15803d (5.0:1)
+      //   red-500     #ef4444 (3.8:1) → #dc2626 (4.8:1)
+      //   red-600     #dc2626 (4.8:1, 4.3 sobre gris) → #b91c1c (6.5:1)
+      amber: { 600: '#b45309' },
+      emerald: { 600: '#047857' },
+      green: { 600: '#15803d' },
+      red: { 500: '#dc2626', 600: '#b91c1c' },
     },
     fontFamily: {
       display: ['var(--font-playfair)', 'Georgia', 'serif'],

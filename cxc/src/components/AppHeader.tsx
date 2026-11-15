@@ -56,6 +56,10 @@ import HojaMas from "@/components/estructura/HojaMas";
 import { useNombreVisible } from "@/lib/hooks/useNombreVisible";
 import { BARRA_CELULAR_2026_10, tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 import { CLASE_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
+
+/** Rótulo de la barra de pestañas: 12 px en negrita (accesibilidad, 15-nov-2026); antes 10 px. */
+const ROTULO_TAB = ACCESIBILIDAD_2026_11 ? "text-[12px] font-semibold" : "text-[10px] font-medium";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -431,7 +435,9 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           <p className={CATALOGOS_APPLE_2026_10_B.tituloCelularChico
             ? "flex items-start gap-2 text-[22px] font-semibold leading-[1.2] tracking-tight text-gray-950"
             : tituloCelular("flex items-start gap-2.5 text-[34px] font-semibold leading-[1.08] tracking-tight text-gray-950")}>
-            {moduleColor && (
+            {/* Accesibilidad (15-nov-2026): el punto de color se va — no decía nada
+                en palabras y quien no distingue verde de rojo no sabía qué era. */}
+            {moduleColor && !ACCESIBILIDAD_2026_11 && (
               <span
                 aria-hidden="true"
                 className={CATALOGOS_APPLE_2026_10_B.tituloCelularChico
@@ -641,6 +647,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
         <nav
           data-tab-bar
           data-vidrio-grueso={BARRA_SIN_MAS_2026_11 ? "" : undefined}
+          data-solido={ACCESIBILIDAD_2026_11 ? "" : undefined}
           aria-label="Módulos frecuentes"
           className="vidrio fixed z-30 flex items-stretch rounded-full px-1 sm:hidden"
           style={{ left: 12, right: 12, height: ALTO_TAB_BAR, bottom: `max(${MARGEN_TAB_BAR}px, env(safe-area-inset-bottom))` }}
@@ -648,7 +655,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           <button
             onClick={() => router.push(casa)}
             aria-current={enInicio && !drawerOpen ? "page" : undefined}
-            className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium transition active:scale-[0.97] ${enInicio && !drawerOpen ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
+            className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full ${ROTULO_TAB} transition active:scale-[0.97] ${enInicio && !drawerOpen ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
           >
             <House size={22} strokeWidth={enInicio && !drawerOpen ? 2 : 1.6} />
             <span>Inicio</span>
@@ -661,7 +668,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
                 key={m.key}
                 onClick={() => router.push(m.href)}
                 aria-current={aqui ? "page" : undefined}
-                className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium transition active:scale-[0.97] ${aqui ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
+                className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full ${ROTULO_TAB} transition active:scale-[0.97] ${aqui ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
               >
                 <Icon size={22} strokeWidth={aqui ? 2 : 1.6} />
                 <span className="max-w-full truncate px-0.5">{rotuloDePestana(m)}</span>
@@ -671,7 +678,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           {!BARRA_SIN_MAS_2026_11 && <button
             onClick={() => setDrawerOpen(true)}
             aria-label="Más módulos"
-            className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium transition active:scale-[0.97] ${drawerOpen ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
+            className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full ${ROTULO_TAB} transition active:scale-[0.97] ${drawerOpen ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
           >
             <MoreHorizontal size={22} strokeWidth={drawerOpen ? 2 : 1.6} />
             <span>Más</span>

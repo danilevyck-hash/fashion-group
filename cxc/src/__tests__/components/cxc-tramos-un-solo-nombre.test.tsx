@@ -45,6 +45,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi } from "vitest";
+
+// Esta prueba vigila la pantalla de ANTES de la accesibilidad (15-nov-2026):
+// con `ACCESIBILIDAD_2026_11` apagado tiene que quedar idéntica. Lo nuevo lo
+// vigila `accesibilidad-2026-11.test.tsx`.
+vi.mock("@/lib/ui/accesibilidad-2026-11", () => ({ ACCESIBILIDAD_2026_11: false }));
 import { readFileSync } from "fs";
 import path from "path";
 import { render, screen, cleanup } from "@testing-library/react";

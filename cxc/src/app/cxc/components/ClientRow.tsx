@@ -2,6 +2,7 @@
 
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { CLASE_CXC_COL_NOMBRE, CLASE_CXC_COL_TOTAL, CXC_NOMBRE_COMPLETO, CXC_UN_NOMBRE_ESTADO_DE_CUENTA } from "@/lib/ui/revision-110-cxc";
@@ -57,7 +58,7 @@ export default function ClientRow({
   const nombre = nombreDeCliente(client);
 
   return (
-    <div className={`border-l-4 ${risk.border} group`} data-tooltip={risk.tooltip}>
+    <div className={`border-l-4 ${risk.border} group`} data-tooltip={ACCESIBILIDAD_2026_11 ? undefined : risk.tooltip}>
       <div
         className={`grid grid-cols-12 gap-2 px-4 py-3 text-sm cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
         onClick={onToggle}

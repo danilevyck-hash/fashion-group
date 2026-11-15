@@ -186,7 +186,7 @@ describe("Vista General — el subtítulo del KPI envuelve, no se corta", () => 
     // Con truncate se perdía justo el "(parcial)" de
     // "▼ 20.3% vs julio 2025 (parcial)" — el aviso de que la comparación
     // está incompleta. Peor que una tarjeta 18px más alta.
-    expect(vistaGeneral).toContain('<div className="text-xs mt-1 tabular-nums min-h-[2rem] sm:min-h-0">');
+    expect(vistaGeneral).toContain('mt-1 tabular-nums min-h-[2rem] sm:min-h-0`}>{sub}</div>');
     expect(vistaGeneral).not.toContain('<div className="text-xs mt-1 tabular-nums truncate">');
   });
 
@@ -201,7 +201,7 @@ describe("Vista General — el subtítulo del KPI envuelve, no se corta", () => 
   });
 
   it("min-h reserva 2 líneas solo en mobile (desktop queda como estaba)", () => {
-    const i = vistaGeneral.indexOf('className="text-xs mt-1 tabular-nums min-h-[2rem]');
+    const i = vistaGeneral.indexOf('mt-1 tabular-nums min-h-[2rem]');
     expect(vistaGeneral.slice(i, i + 80)).toContain("sm:min-h-0");
   });
 });

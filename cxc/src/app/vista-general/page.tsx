@@ -1,5 +1,6 @@
 "use client";
 
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -357,7 +358,7 @@ function KpiCard({ href, label, value, valueClass, tags = [], sub }: {
   return (
     <Link href={href} className="group rounded-[14px] border border-gray-200 bg-white p-4 hover:border-gray-300 transition">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-medium text-gray-500">{label}</span>
+        <span className={`${ACCESIBILIDAD_2026_11 ? "text-sm" : "text-xs"} font-medium text-gray-500`}>{label}</span>
         {tags.map((t) => (
           <span key={t} className="text-[12px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">{t}</span>
         ))}
@@ -371,7 +372,7 @@ function KpiCard({ href, label, value, valueClass, tags = [], sub }: {
           🔴 Antes el subtítulo se cambiaba por «Ir a Ventas →» al pasar el
           mouse (7-oct-2026, quitado): en el celular, que es la mitad del
           tráfico, ese aviso nunca se veía — la tarjeta ya es un link completo. */}
-      <div className="text-xs mt-1 tabular-nums min-h-[2rem] sm:min-h-0">{sub}</div>
+      <div className={`${ACCESIBILIDAD_2026_11 ? "text-sm" : "text-xs"} mt-1 tabular-nums min-h-[2rem] sm:min-h-0`}>{sub}</div>
     </Link>
   );
 }
@@ -469,13 +470,13 @@ function AlertCard({ title, href, linkLabel, count, children }: { title: string;
   return (
     <div className="rounded-[14px] border border-gray-200 bg-white p-4 flex flex-col">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-semibold text-gray-700">{title}</h3>
+        <h3 className={`${ACCESIBILIDAD_2026_11 ? "text-sm" : "text-xs"} font-semibold text-gray-700`}>{title}</h3>
         {count > 0 && <span className="text-[12px] font-bold text-white bg-gray-900 rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center">{count}</span>}
       </div>
       <div className="flex-1">{children}</div>
       {/* "Ir a CXC →" medía 18px de alto. self-start + min-h-[44px] lo lleva a
           44 sin estirarlo a todo el ancho de la card. */}
-      <Link href={href} className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1 inline-flex min-h-[44px] min-w-[44px] items-center self-start">{linkLabel} →</Link>
+      <Link href={href} className={`${ACCESIBILIDAD_2026_11 ? "text-sm" : "text-xs"} text-blue-600 hover:text-blue-800 font-medium mt-1 inline-flex min-h-[44px] min-w-[44px] items-center self-start`}>{linkLabel} →</Link>
     </div>
   );
 }

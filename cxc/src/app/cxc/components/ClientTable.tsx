@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import ClientRow from "./ClientRow";
+import EncabezadoOrdenable from "./EncabezadoOrdenable";
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import ContactPanel from "./ContactPanel";
 import { AccordionContent } from "@/components/ui";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
@@ -133,6 +135,15 @@ export default function ClientTable({
       {/* Client table */}
       <div className="border border-gray-200 rounded-b-lg sm:rounded-t-none rounded-t-lg overflow-hidden">
         {/* Desktop header — hidden on mobile since mobile uses card layout */}
+        {ACCESIBILIDAD_2026_11 ? (
+          <EncabezadoOrdenable
+            sinSeleccion={sinSeleccion}
+            todosSeleccionados={todosSeleccionados}
+            onSeleccionarTodos={onSeleccionarTodos}
+            toggleSort={toggleSort}
+            sortArrow={sortArrow}
+          />
+        ) : (
         <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
           <div className={`${CLASE_CXC_COL_NOMBRE} flex items-center gap-1.5`}>
             {!sinSeleccion && (
@@ -161,6 +172,7 @@ export default function ClientTable({
             Total<span aria-hidden className="ml-1 inline-block w-2 text-xs leading-none">{sortArrow("total")}</span>
           </div>
         </div>
+        )}
 
         {filtered.length === 0 && (
           <div className="px-4 py-12 text-center">

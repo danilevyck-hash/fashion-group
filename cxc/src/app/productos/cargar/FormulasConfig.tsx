@@ -1,5 +1,6 @@
 "use client";
 
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { useBarraCelular } from "@/components/celular/BarraDeControles";
 import { PLANTILLA_BUSCAR_CORTO } from "@/lib/ui/revision-110-despachos";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -527,7 +528,7 @@ function MarcaCard({
   return (
     <div className="mb-1.5 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
       {/* Header — toda el área expande/colapsa (salvo los campos de la fórmula). */}
-      <div onClick={onToggle} title={compactFormula(row)} className="cursor-pointer select-none">
+      <div onClick={onToggle} {...clicConTeclado(onToggle, { fila: true })} title={compactFormula(row)} className="cursor-pointer select-none">
         {/* ── Móvil e iPad vertical (<lg): el nombre COMPLETO arriba, los campos con su etiqueta ── */}
         <div data-layout="tarjetas" className="px-3.5 py-3 lg:hidden">
           <div className="flex items-start justify-between gap-2">

@@ -11,6 +11,7 @@
 // cada chip dependen de lo ya elegido. Un chip sin opciones no se dibuja.
 // Los totales y la lista «Por descripción» salen de los códigos que quedan.
 
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { BUSCADOR_EN_LA_FILA } from "@/lib/ui/revision-110-ajustes";
 import { PRODUCTOS_RESUMEN_DOS_LINEAS } from "@/lib/ui/revision-110-vivo";
 import { useMemo, useRef, useState, type ReactNode } from "react";
@@ -627,7 +628,7 @@ function FilaDescripcion({ r, abierta, onAbrir, conInventario }: {
 }) {
   return (
     <>
-      <tr onClick={onAbrir} className={cn("cursor-pointer border-b border-gray-100 hover:bg-gray-50", abierta && "bg-gray-50")} aria-expanded={abierta}>
+      <tr onClick={onAbrir} {...clicConTeclado(onAbrir, { fila: true })} className={cn("cursor-pointer border-b border-gray-100 hover:bg-gray-50", abierta && "bg-gray-50")} aria-expanded={abierta}>
         <td className="px-3 py-2.5 text-gray-900">
           <span className="flex items-center gap-1.5">
             <ChevronRight className={cn("h-4 w-4 shrink-0 text-gray-400 transition-transform", abierta && "rotate-90")} />

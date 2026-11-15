@@ -4,6 +4,7 @@ import { CLAVE_SESION_DEL_NAVEGADOR } from "@/lib/sesion-entre-pestanas";
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { LOGIN_RETOQUES_2026_10 as RETOQUES } from "@/lib/login-retoques-2026-10";
 
 function ForgotPassword() {
@@ -180,8 +181,18 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
+    // Accesibilidad (15-nov-2026): región principal y título para el lector de pantalla.
+    ACCESIBILIDAD_2026_11 ? (
+      <main>
+        <h1 className="sr-only">Iniciar sesión en Fashion Group</h1>
+        <Suspense>
+          <LoginForm />
+        </Suspense>
+      </main>
+    ) : (
+      <Suspense>
+        <LoginForm />
+      </Suspense>
+    )
   );
 }
