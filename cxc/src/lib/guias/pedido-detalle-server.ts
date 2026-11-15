@@ -22,6 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerTodoPaginado, type RespuestaPaginada } from "@/lib/supabase-paginado";
 import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { createSwitchClient } from "@/lib/switch-api/client";
 import { anularEnvio, crearEnvio } from "./etiquetas-server";
@@ -375,17 +376,23 @@ export interface AsignacionDelPedido {
  */
 export async function leerAsignacion(empresas: readonly string[]): Promise<Map<string, AsignacionDelPedido>> {
   const clave = (f: { empresa_key: string; pedido_switch_id: number | string }) => `${f.empresa_key}:${f.pedido_switch_id}`;
+  // 🩸 14-nov-2026 (revisión 110 · 61): era UNA lectura con `.limit(50000)`, y
+  // `db-max-rows` = 1000 la cortaba EN SILENCIO — 1.000 de 8.113 líneas, y un
+  // pedido de 665 unidades decía «12 unidades». Ahora se pagina con orden
+  // estable por la llave primaria. Falla ABIERTA igual que antes.
+  type Fila = { empresa_key: string; pedido_switch_id: number; cantidad?: unknown; codigo_barra_id?: unknown };
+  const paginar = (tabla: string, cols: string, orden: string[]) =>
+    leerTodoPaginado<Fila>(tabla, (pedirCount, desde, hasta) => {
+      let q = supabaseServer
+        .from(tabla)
+        .select(cols, pedirCount ? { count: "exact" } : undefined)
+        .in("empresa_key", [...empresas]);
+      for (const c of orden) q = q.order(c);
+      return q.range(desde, hasta) as unknown as PromiseLike<RespuestaPaginada>;
+    }).then((data) => ({ data, error: null }), (e: unknown) => ({ data: null, error: e }));
   const [lin, bul] = await Promise.all([
-    supabaseServer
-      .from("pedidos_lineas")
-      .select("empresa_key, pedido_switch_id, cantidad")
-      .in("empresa_key", [...empresas])
-      .limit(50000),
-    supabaseServer
-      .from("pedidos_linea_bulto")
-      .select("empresa_key, pedido_switch_id, codigo_barra_id")
-      .in("empresa_key", [...empresas])
-      .limit(50000),
+    paginar("pedidos_lineas", "empresa_key, pedido_switch_id, codigo_barra_id, cantidad", ["empresa_key", "pedido_switch_id", "codigo_barra_id"]),
+    paginar("pedidos_linea_bulto", "empresa_key, pedido_switch_id, codigo_barra_id, bulto", ["empresa_key", "pedido_switch_id", "codigo_barra_id", "bulto"]),
   ]);
   const salida = new Map<string, AsignacionDelPedido>();
   if (lin.error || !lin.data) return salida;

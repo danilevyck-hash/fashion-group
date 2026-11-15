@@ -53,7 +53,8 @@ describe("la ruta y la pantalla", () => {
     expect(v).toContain("Buscar factura");
     expect(v).toContain("coincidencias.length > 1");
     // 13-nov-2026: los bultos del pedido Preparado vienen puestos (vacío si no hay).
-    expect(v).toContain('setMarcadas([{ clave, bultos: "pedidoBultos" in h && h.pedidoBultos ? String(h.pedidoBultos) : "", nota: "" }])');
+    // Revisión 110 · 61: por `bultosParaElCampo` (vacío si el pedido se partió en varias facturas).
+    expect(v).toContain('setMarcadas([{ clave, bultos: "pedidoBultos" in h ? bultosParaElCampo(h) : "", nota: "" }])');
   });
 });
 

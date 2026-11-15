@@ -9,7 +9,7 @@
 
 import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { Fragment, useEffect, useState } from "react";
-import { Check, Printer, Undo2 } from "lucide-react";
+import { Check, Pencil, Printer, Undo2 } from "lucide-react";
 import { ConfirmModal } from "@/components/ui";
 import { AJUSTES_APPLE_6_2026_10 as CIRCULO } from "@/lib/ajustes-apple-6-2026-10";
 import { ESTADOS_CELULAR_2026_11 as ESTADOS_CELULAR, PEDIDOS_CELULAR_2026_11 as PEDIDOS_CELULAR } from "@/lib/ui/celular-optimizar-2026-11";
@@ -35,6 +35,7 @@ import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe, hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import PedidoBultos, { type PedidoDelDetalle } from "./PedidoBultos";
+import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
 import {
   PEDIDOS_BULTOS_2026_10 as BULTOS,
   ESTADOS_BULTOS,
@@ -138,10 +139,13 @@ export default function PedidosView({
   puedeMarcar = true,
   /** 🔴 «Verificado» lo marca la secretaria (y admin), nunca bodega. */
   puedeRecibir = false,
+  puedeCambiarBultos = false,
   onDetalle,
 }: {
   puedeMarcar?: boolean;
   puedeRecibir?: boolean;
+  /** Revisión 110 · 61: bodega y admin cambian los bultos de un Preparado (el servidor decide igual). */
+  puedeCambiarBultos?: boolean;
   /** Revisión 110 · n.º 63: avisa a la página si hay un pedido abierto (para callar el título «Pedidos ▾»). */
   onDetalle?: (abierto: boolean) => void;
 }) {
@@ -335,6 +339,31 @@ export default function PedidosView({
     const p = porPreparar;
     setPorPreparar(null);
     void moverSimple(p, "preparado", v.valor);
+  }
+
+  // ── Revisión 110 · 61: cambiar SOLO los bultos de un Preparado ─────────
+  // La misma ventanita de «Preparado»; no mueve el estado ni la firma.
+  const [porCambiarBultos, setPorCambiarBultos] = useState<PedidoBodega | null>(null);
+  async function guardarBultos() {
+    const p = porCambiarBultos;
+    if (!p) return;
+    const v = validarCantidadBultos(bultosTexto);
+    if (!v.ok) { setErrorBultos(v.error ?? "Escribe cuántos bultos son"); return; }
+    setPorCambiarBultos(null);
+    const antes = p.bultos;
+    setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, bultos: v.valor! } : x)));
+    try {
+      const r = await fetch("/api/guias/pedidos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empresa_key: p.empresa_key, pedido_switch_id: p.pedido_switch_id, solo_bultos: true, bultos: v.valor }),
+      });
+      const d = (await r.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!r.ok) throw new Error(typeof d?.error === "string" ? d.error : String(r.status));
+    } catch (e) {
+      setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, bultos: antes } : x)));
+      toast(e instanceof Error && e.message.length < 90 ? e.message : "No se pudieron guardar los bultos. Intenta de nuevo.", "error");
+    }
   }
 
   // ── «En espera de muestra» (9-oct-2026) ─────────────────────────────────
@@ -728,7 +757,29 @@ export default function PedidosView({
     // 🔴 LAS UNIDADES (7-oct-2026, Daniel: «¿puedes poner la cantidad de
     // pieza?»). 🔴 12-nov-2026: los bultos ya no se anotan ni se muestran.
     // `p.piezas == null` = sin líneas todavía: se calla, no se inventa.
-    const chipBultos = (
+    // Revisión 110 · 61: «N bultos ✎» o «+ Bultos» se toca (bodega y admin;
+    // en Recibido, mientras no se facture) y las unidades van en gris al lado.
+    const editaBultos = BULTOS_EN_EL_PEDIDO && puedeCambiarBultos && (e === "preparado" || (e === "recibido" && p.facturado === false));
+    const chipBultos = BULTOS_EN_EL_PEDIDO ? (
+      <span className="inline-flex items-center gap-1.5">
+        {editaBultos ? (
+          <button
+            type="button"
+            data-cambiar-bultos
+            onClick={() => { setPorCambiarBultos(p); setBultosTexto(p.bultos ? String(p.bultos) : ""); setErrorBultos(null); }}
+            className={p.bultos
+              ? `${base} border-gray-300 bg-white text-gray-900 transition hover:border-gray-900 active:scale-[0.97]`
+              : `${base} border-blue-600 bg-white text-blue-700 transition hover:bg-blue-100 active:scale-[0.97]`}
+          >
+            {p.bultos ? <>{p.bultos} {p.bultos === 1 ? "bulto" : "bultos"}<Pencil size={11} aria-hidden className="ml-1 text-gray-400" /></> : "+ Bultos"}
+          </button>
+        ) : p.bultos ? (
+          <span className={`${base} border-gray-300 bg-white text-gray-700`}>{p.bultos} {p.bultos === 1 ? "bulto" : "bultos"}</span>
+        ) : null}
+        {p.piezas != null && <span className="whitespace-nowrap text-xs text-gray-500">{textoUnidades(p.piezas)}</span>}
+        {!editaBultos && !p.bultos && p.piezas == null && <span className="text-gray-400">—</span>}
+      </span>
+    ) : (
       <span className={`${base} border-gray-300 bg-white text-gray-700`}>
         {[p.bultos ? `${p.bultos} ${p.bultos === 1 ? "bulto" : "bultos"}` : null, p.piezas != null ? textoUnidades(p.piezas) : null].filter(Boolean).join(" · ") || "—"}
       </span>
@@ -1154,6 +1205,34 @@ export default function PedidosView({
               onChange={(ev) => { setBultosTexto(ev.target.value); setErrorBultos(null); }}
               onKeyDown={(ev) => { if (ev.key === "Enter") confirmarPreparado(); }}
               className="mt-1 block h-12 w-32 rounded-md border border-gray-300 px-3 text-center text-lg font-semibold tabular-nums focus:border-gray-900 focus:outline-none"
+            />
+          </label>
+          {errorBultos && <p className="mt-1 text-sm text-red-600">{errorBultos}</p>}
+        </ConfirmModal>
+      )}
+      {porCambiarBultos && (
+        <ConfirmModal
+          open
+          onClose={() => setPorCambiarBultos(null)}
+          onConfirm={() => void guardarBultos()}
+          title="Bultos del pedido"
+          message={`${porCambiarBultos.secuencial} · ${porCambiarBultos.cliente_nombre}${porCambiarBultos.piezas != null ? ` · ${textoUnidades(porCambiarBultos.piezas)}` : ""}`}
+          confirmLabel="Guardar bultos"
+        >
+          <label className="block text-sm text-gray-700">
+            Bultos
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={9999}
+              autoFocus
+              aria-label="Cantidad de bultos"
+              placeholder="Cantidad de bultos"
+              value={bultosTexto}
+              onChange={(ev) => { setBultosTexto(ev.target.value); setErrorBultos(null); }}
+              onKeyDown={(ev) => { if (ev.key === "Enter") void guardarBultos(); }}
+              className="mt-1 block h-12 w-full rounded-md border border-gray-300 px-3 text-lg font-semibold tabular-nums focus:border-gray-900 focus:outline-none"
             />
           </label>
           {errorBultos && <p className="mt-1 text-sm text-red-600">{errorBultos}</p>}

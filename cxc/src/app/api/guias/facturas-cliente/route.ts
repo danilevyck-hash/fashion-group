@@ -38,6 +38,7 @@ import { facturasPorNumero, facturasPorPedido } from "@/lib/guias/etiquetas-por-
 import { claveDeFactura } from "@/lib/guias/numero-factura";
 import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import { nombreParaMostrar } from "@/lib/clientes/nombre-display";
+import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
 
 export const dynamic = "force-dynamic";
 
@@ -283,7 +284,7 @@ async function buscarPorNumero(numero: string, conPedido = false): Promise<NextR
  */
 async function bultosDelPedido(
   filas: ReadonlyArray<{ empresa_key: string; pedido_referencia?: string | null }>,
-): Promise<(f: { empresa_key: string; pedido_referencia?: string | null }) => { pedidoBultos?: number; pedidoPreparadoPor?: string | null }> {
+): Promise<(f: { empresa_key: string; pedido_referencia?: string | null }) => { pedidoBultos?: number; pedidoPreparadoPor?: string | null; pedidoFacturas?: number }> {
   const idDe = pedidoDeReferencia;
   const ids = [...new Set(filas.map((f) => idDe(f.pedido_referencia)).filter((n): n is number => n != null))];
   const porClave = new Map<string, { bultos: number; preparado_por: string | null }>();
@@ -299,8 +300,29 @@ async function bultosDelPedido(
       if (r.bultos != null) porClave.set(`${r.empresa_key}|${r.pedido_switch_id}`, r);
     }
   }
+  // Revisión 110 · 61: ¿en cuántas facturas se partió el pedido? (0 casos el
+  // 14-nov-2026). Con más de una, Etiquetas deja el campo vacío y da el total.
+  // Falla ABIERTA a 1: sin lectura, se comporta como hasta hoy.
+  const facturasPorPedido = new Map<string, number>();
+  if (BULTOS_EN_EL_PEDIDO && porClave.size > 0) {
+    const { data, error } = await supabaseServer
+      .from("switch_facturas")
+      .select("empresa_key, pedido_referencia")
+      .eq("tipo_comprobante", TIPO_FACTURA)
+      .in("empresa_key", [...new Set([...porClave.keys()].map((k) => k.split("|")[0]))])
+      .in("pedido_referencia", [...new Set(filas.filter((f) => porClave.has(`${f.empresa_key}|${idDe(f.pedido_referencia)}`)).map((f) => String(f.pedido_referencia)))]);
+    if (error) console.error("[guias/facturas-cliente] facturas del pedido:", error.message);
+    for (const r of (data ?? []) as Array<{ empresa_key: string; pedido_referencia: string }>) {
+      const k = `${r.empresa_key}|${idDe(r.pedido_referencia)}`;
+      facturasPorPedido.set(k, (facturasPorPedido.get(k) ?? 0) + 1);
+    }
+  }
   return (f) => {
-    const r = porClave.get(`${f.empresa_key}|${idDe(f.pedido_referencia)}`);
-    return r ? { pedidoBultos: r.bultos, pedidoPreparadoPor: r.preparado_por } : {};
+    const k = `${f.empresa_key}|${idDe(f.pedido_referencia)}`;
+    const r = porClave.get(k);
+    if (!r) return {};
+    return BULTOS_EN_EL_PEDIDO
+      ? { pedidoBultos: r.bultos, pedidoPreparadoPor: r.preparado_por, pedidoFacturas: Math.max(1, facturasPorPedido.get(k) ?? 1) }
+      : { pedidoBultos: r.bultos, pedidoPreparadoPor: r.preparado_por };
   };
 }

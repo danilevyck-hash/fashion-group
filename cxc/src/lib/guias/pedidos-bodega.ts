@@ -162,6 +162,8 @@ export interface PedidoBodega {
   espera_muestra_desde?: string | null;
   espera_muestra_por?: string | null;
   espera_muestra_nota?: string | null;
+  /** Revisión 110 · 61: un Recibido con factura ya no deja cambiar los bultos. */
+  facturado?: boolean;
   /**
    * 🔴 Cuántos artículos le faltan por poner en un bulto, y cuántos tiene en
    * total (7-oct-2026): es lo que apaga «Verificar» y dice QUÉ falta. Los cuenta
