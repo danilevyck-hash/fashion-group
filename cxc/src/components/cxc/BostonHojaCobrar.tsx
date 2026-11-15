@@ -34,6 +34,7 @@ import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
 import { fmt } from "@/lib/format";
 import { waHref } from "@/lib/contact-links";
+import { telefonoParaWhatsApp, textoSinCelular } from "@/lib/ui/uso-2026-11";
 import type { EstadoCuenta } from "@/lib/cxc/estado-cuenta-tipos";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
@@ -148,7 +149,9 @@ export default function BostonHojaCobrar({
 
   if (!cliente) return null;
 
-  const tel = cliente.celular || cliente.telefono;
+  // ux-05: WhatsApp solo a un celular; un fijo deja la fila apagada y lo dice.
+  const tel = telefonoParaWhatsApp(cliente.celular, cliente.telefono);
+  const telCualquiera = cliente.celular || cliente.telefono;
   const tieneCorreo = !!preview?.destinatario;
 
   function abrirWhatsApp() {
@@ -251,7 +254,7 @@ export default function BostonHojaCobrar({
               >
                 <span className="block text-sm font-medium text-gray-900">WhatsApp</span>
                 <span className="block text-xs text-gray-500 mt-0.5 truncate">
-                  {tel || "Este cliente no tiene teléfono — cárgalo en Switch"}
+                  {tel || (telCualquiera ? textoSinCelular(telCualquiera) : "Este cliente no tiene teléfono — cárgalo en Switch")}
                 </span>
               </button>
             </li>

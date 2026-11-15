@@ -215,8 +215,9 @@ const tocar = async (rotulo: string) => {
 };
 
 describe("C · ir y volver no desarma nada", () => {
+  // ux-08b (15-nov-2026): con «Todas» ya no se dibuja «Generar»; se elige una empresa.
   it("🔴 la Planilla visitada se queda MONTADA y escondida al volver a Asistencia", async () => {
-    montar("tab=asistencia");
+    montar("tab=asistencia&empresa=vistana");
     await waitFor(() => expect(cuantos("/api/asistencia/reporte")).toBeGreaterThan(0));
 
     await tocar("Planilla");
@@ -235,7 +236,7 @@ describe("C · ir y volver no desarma nada", () => {
   });
 
   it("🔴 volver a Asistencia NO la vuelve a pedir: sigue montada con sus datos", async () => {
-    montar("tab=asistencia");
+    montar("tab=asistencia&empresa=vistana");
     await waitFor(() => expect(cuantos("/api/asistencia/reporte")).toBeGreaterThan(0));
     const antes = cuantos("/api/asistencia/reporte");
 
@@ -248,7 +249,7 @@ describe("C · ir y volver no desarma nada", () => {
   });
 
   it("🔴 la pestaña que nadie tocó no se monta: Préstamos no pide nada", async () => {
-    montar("tab=asistencia");
+    montar("tab=asistencia&empresa=vistana");
     await waitFor(() => expect(cuantos("/api/asistencia/reporte")).toBeGreaterThan(0));
     await tocar("Planilla");
     await screen.findByRole("button", { name: "Generar" });

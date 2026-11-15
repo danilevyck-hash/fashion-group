@@ -82,6 +82,15 @@ function Linea({ l }: { l: LineaAntesDeCerrar }) {
         <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 pl-4">
           {l.personas.map((p) => (
             <li key={p.codigo}>
+              {p.href.startsWith("#") ? (
+                <a
+                  href={p.href}
+                  onClick={(ev) => { ev.preventDefault(); irAFila(p.href); }}
+                  className="inline-flex min-h-[44px] items-center gap-1 font-medium tabular-nums underline underline-offset-2 hover:text-gray-900"
+                >
+                  {p.etiqueta} · {p.detalle}
+                </a>
+              ) : (
               <Link
                 href={p.href}
                 replace
@@ -90,6 +99,7 @@ function Linea({ l }: { l: LineaAntesDeCerrar }) {
               >
                 {p.etiqueta} · {p.detalle}
               </Link>
+              )}
             </li>
           ))}
         </ul>

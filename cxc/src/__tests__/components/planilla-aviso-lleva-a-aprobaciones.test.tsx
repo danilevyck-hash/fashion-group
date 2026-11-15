@@ -237,7 +237,8 @@ describe("🔴 PLANILLA: cada persona del aviso es un enlace a Aprobaciones", ()
     render(<ToastProvider><PlanillaTab /></ToastProvider>);
     generar();
     await screen.findByTestId("aviso-extra-sin-aprobar");
-    expect(screen.getByRole("button", { name: "Revisar" }).className).not.toContain("bg-black");
+    // ux-07 (15-nov-2026): arriba dice lo que hace, «Ver lo que falta».
+    expect(screen.getByRole("button", { name: "Ver lo que falta" }).className).not.toContain("bg-black");
     expect(screen.queryByRole("button", { name: "Cerrar quincena" })).toBeNull();
   });
 

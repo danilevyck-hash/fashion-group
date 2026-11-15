@@ -45,7 +45,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, Printer } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
-import { ALTO_COLCHON_DE_ABAJO, CLASE_TITULO_BARRA, useHayBarraCelular } from "@/components/celular/BarraDeControles";
+import { ALTO_COLCHON_DE_ABAJO, BarraAccionFija, CLASE_TITULO_BARRA, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { descargarArchivo } from "@/lib/compartir-archivo";
 import { fmt } from "@/lib/format";
@@ -87,8 +87,11 @@ export default function PedidoBultos({
   // intacto.
   ocultarBulto = false,
   volverEnElTitulo = false,
+  paso = null,
   onVolver,
 }: {
+  /** ux-04: el estado del pedido y su paso siguiente (el mismo de la fila); `null` = nada. */
+  paso?: { linea: string; accion: { rotulo: string; onClick: () => void } | null } | null;
   pedido: PedidoDelDetalle;
   /**
    * Bodega pone bultos; quien solo mira ve la columna, quieta. 🔴 El vendedor
@@ -494,6 +497,25 @@ export default function PedidoBultos({
           (docs/diseno.md: «lo que aporta va en UNA línea gris al final»). */}
       {verificado && lineas && lineas.length > 0 && (
         <p className="pt-2 text-xs text-gray-500">Pedido verificado · los bultos ya no se cambian</p>
+      )}
+
+      {/* ux-04 (15-nov-2026): el paso del pedido abajo, el mismo de la fila. */}
+      {paso && (
+        <div data-paso-del-pedido className="flex flex-wrap items-center justify-center gap-3 pt-6 sm:justify-end">
+          <p className="text-sm text-gray-500">{paso.linea}</p>
+          {paso.accion && !barraCelular && (
+            <button
+              type="button"
+              onClick={paso.accion.onClick}
+              className="min-h-[44px] rounded-md bg-black px-5 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
+            >
+              {paso.accion.rotulo}
+            </button>
+          )}
+        </div>
+      )}
+      {paso?.accion && barraCelular && (
+        <BarraAccionFija rotulo={paso.accion.rotulo} onClick={paso.accion.onClick} sobreLaBarra />
       )}
 
       {/* 🔴 EL COLCHÓN DEL FINAL (Daniel, 7-oct-2026: «no se ve lo de abajo»).

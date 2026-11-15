@@ -20,7 +20,9 @@ import { render, screen, waitFor, cleanup, within } from "@testing-library/react
 import { act } from "react";
 
 import { ToastProvider } from "@/components/ToastSystem";
-import AprobacionesTab, { ROTULO_SI_A_TODO } from "@/app/asistencia/AprobacionesTab";
+import AprobacionesTab from "@/app/asistencia/AprobacionesTab";
+// ux-01 (15-nov-2026): el botón dice cuántos aprueba.
+const ROTULO_SI_A_TODO = /^Aprobar (\d+ )?pendientes?$/;
 import { claveDia, type DiaAprobacion } from "@/lib/asistencia/aprobaciones";
 
 // 2-oct-2026: ASISTENCIA_APPLE_2026_10 se prendió (Daniel: "sí"). Esta prueba es
@@ -86,6 +88,17 @@ async function toca(el: Element | null | undefined) {
   await act(async () => { (el as HTMLElement).click(); });
 }
 
+/** ux-01: el lote sale con el aviso de 5 s; pasan los 5 s y recién ahí viaja. */
+async function tocaLote() {
+  vi.useFakeTimers();
+  try {
+    await toca(screen.getByRole("button", { name: ROTULO_SI_A_TODO }));
+    await act(async () => { vi.advanceTimersByTime(5000); });
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 const boton = (nombre: RegExp) => screen.getAllByRole("button").find((b) => nombre.test(b.getAttribute("aria-label") ?? ""));
 // 29-sep-2026 (6a): «Colaborador | Día» es el `ControlSegmentado` (role tab).
 const aDia = async () => toca(screen.getByRole("tab", { name: "Día" }));
@@ -148,11 +161,35 @@ describe("🔴 lo que mandan los botones", () => {
     expect(enviados[0].dias).toEqual([{ codigo: "11", fecha: "2026-08-24", minutos: 107 }]);
   });
 
-  it("«Aprobar pendientes»: las cuatro de una, con decision 'si'", async () => {
+  it("«Aprobar 4 pendientes»: las cuatro de una, con decision 'si', a los 5 s", async () => {
     await montar();
-    await toca(screen.getByRole("button", { name: ROTULO_SI_A_TODO }));
+    expect(screen.getByRole("button", { name: "Aprobar 4 pendientes" })).toBeTruthy();
+    await tocaLote();
     expect((enviados[0].dias as unknown[]).length).toBe(4);
     expect(enviados[0].decision).toBe("si");
+  });
+
+  it("ux-01: al tocarlo sale «4 aprobadas · 5:37 h» con «Deshacer», y Deshacer no manda NADA", async () => {
+    await montar();
+    vi.useFakeTimers();
+    try {
+      await toca(screen.getByRole("button", { name: ROTULO_SI_A_TODO }));
+      expect(screen.getByText("4 aprobadas · 5:37 h")).toBeTruthy();
+      expect(enviados).toHaveLength(0);
+      expect(screen.getByTestId("por-decidir").textContent).not.toContain("4 días");
+      await toca(screen.getByRole("button", { name: "Deshacer" }));
+      await act(async () => { vi.advanceTimersByTime(6000); });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(enviados).toHaveLength(0);
+    expect(screen.getByTestId("por-decidir").textContent).toBe("4colaboradores · 4 días · 5:37 h");
+  });
+
+  it("ux-01: «Sí» sin tocar va gris, como «No» (verde solo después de decidir)", async () => {
+    await montar();
+    const si = boton(/^Sí a KEVIN LUBO$/)!;
+    expect(si.className).not.toContain("emerald");
   });
 
   it("⛔ no existe «No a todo»", async () => {
@@ -235,7 +272,7 @@ describe("🔴 un toque de más no es irreversible: «cambiar» en Ya decididas"
 describe("🔴 lo que viaja es un PERMISO, nunca una plata", () => {
   it("el cuerpo lleva decisión y (código, fecha, minutos) — y ni un monto", async () => {
     await montar();
-    await toca(screen.getByRole("button", { name: ROTULO_SI_A_TODO }));
+    await tocaLote();
     const cuerpo = JSON.stringify(enviados[0]);
     for (const prohibido of ["monto", "rata", "neto", "salario", "$"]) {
       expect(cuerpo, `«${prohibido}» viajó`).not.toContain(prohibido);

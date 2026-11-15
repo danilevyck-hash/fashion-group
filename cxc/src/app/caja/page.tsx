@@ -10,6 +10,8 @@ import PeriodoList from "./components/PeriodoList";
 import CerrarPeriodoModal from "./components/CerrarPeriodoModal";
 import "./skin.css";
 import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
+import { CAJA_NUEVO_GASTO_EN_PORTADA } from "@/lib/ui/uso-2026-11";
+import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeControles";
 
 export default function CajaPage() {
   const router = useRouter();
@@ -29,9 +31,16 @@ export default function CajaPage() {
     requestDeletePeriodo, doDeletePeriodo,
   } = useCajaState({ authReady: authChecked });
 
+  const celular = useBarraCelular(GASTOS_APPLE_2026_10);
+
   if (!authChecked) return null;
 
   const hasOpenPeriod = periodos.some((p) => p.estado === "abierto");
+  // ux-02 (15-nov-2026): «Nuevo gasto» en la portada anota en el período ABIERTO.
+  const abierto = periodos.find((p) => p.estado === "abierto") ?? null;
+  const nuevoGasto = CAJA_NUEVO_GASTO_EN_PORTADA && abierto
+    ? () => router.push(`/caja/${abierto.id}?nuevo=1`)
+    : undefined;
 
   // Datos del período que se está por cerrar (para las cuatro líneas del
   // modal). La lista viene ordenada por numero DESC → el siguiente es el
@@ -65,12 +74,16 @@ export default function CajaPage() {
           hasOpenPeriod={hasOpenPeriod}
           role={role}
           onCreatePeriodo={createPeriodo}
+          onNuevoGasto={celular ? undefined : nuevoGasto}
           onLoadDetail={(id) => router.push(`/caja/${id}`)}
           onPrintPeriodo={(id) => router.push(`/caja/${id}/imprimir`)}
           onClosePeriodo={requestClosePeriodo}
           onDeletePeriodo={requestDeletePeriodo}
         />
       </div>
+      {celular && nuevoGasto && !loading && (
+        <BarraAccionFija rotulo="Nuevo gasto" onClick={nuevoGasto} sobreLaBarra />
+      )}
       <Modal
         open={showNewPeriodoModal}
         onClose={() => setShowNewPeriodoModal(false)}

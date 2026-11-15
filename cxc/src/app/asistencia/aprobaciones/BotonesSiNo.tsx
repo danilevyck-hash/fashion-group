@@ -13,6 +13,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import type { Decision } from "@/lib/asistencia/aprobaciones";
+import { APROBAR_LOTE_CON_DESHACER } from "@/lib/ui/uso-2026-11";
 import { textoTipoDia, type TipoDiaAprobable } from "@/lib/asistencia/sabado-trabajado";
 
 export function BotonesSiNo({
@@ -43,7 +44,8 @@ export function BotonesSiNo({
             ? valor === "si"
               ? "border-emerald-700 bg-emerald-700 text-white"
               : "border-gray-800 bg-gray-800 text-white"
-            : valor === "si"
+            // ux-01: «Sí» sin tocar va gris como «No»; verde solo después de decidir.
+            : valor === "si" && !APROBAR_LOTE_CON_DESHACER
               ? "border-emerald-600 text-emerald-700 hover:bg-emerald-50"
               : "border-gray-300 text-gray-600 hover:bg-gray-50"
         }`}

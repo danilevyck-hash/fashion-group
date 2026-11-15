@@ -18,6 +18,8 @@ interface Props {
   hasOpenPeriod: boolean;
   role: string | null;
   onCreatePeriodo: () => void;
+  /** ux-02: «Nuevo gasto» en la portada (computadora); en el celular va fijo abajo. */
+  onNuevoGasto?: () => void;
   onLoadDetail: (id: string) => void;
   onPrintPeriodo: (id: string) => void;
   onClosePeriodo: (id: string) => void;
@@ -111,6 +113,7 @@ export default function PeriodoList({
   hasOpenPeriod,
   role,
   onCreatePeriodo,
+  onNuevoGasto,
   onLoadDetail,
   onPrintPeriodo,
   onClosePeriodo,
@@ -132,7 +135,7 @@ export default function PeriodoList({
     return (
       <ListaApple
         periodos={periodos} loading={loading} error={error} aviso={aviso}
-        hasOpenPeriod={hasOpenPeriod} onCreatePeriodo={onCreatePeriodo}
+        hasOpenPeriod={hasOpenPeriod} onCreatePeriodo={onCreatePeriodo} onNuevoGasto={onNuevoGasto}
         onLoadDetail={onLoadDetail} itemsDe={itemsDe} encabezado={encabezado}
       />
     );
@@ -445,7 +448,7 @@ export default function PeriodoList({
  * 🔴 Nunca se suman períodos entre sí: el número grande es UNO solo.
  */
 function ListaApple({
-  periodos, loading, error, aviso, hasOpenPeriod, onCreatePeriodo, onLoadDetail, itemsDe, encabezado,
+  periodos, loading, error, aviso, hasOpenPeriod, onCreatePeriodo, onNuevoGasto, onLoadDetail, itemsDe, encabezado,
 }: {
   encabezado: React.ReactNode;
   periodos: CajaPeriodo[];
@@ -454,6 +457,8 @@ function ListaApple({
   aviso?: string | null;
   hasOpenPeriod: boolean;
   onCreatePeriodo: () => void;
+  /** ux-02: «Nuevo gasto» en la portada (computadora); en el celular va fijo abajo. */
+  onNuevoGasto?: () => void;
   onLoadDetail: (id: string) => void;
   itemsDe: (p: CajaPeriodo) => OverflowMenuItem[];
 }) {
@@ -482,6 +487,14 @@ function ListaApple({
             className="inline-flex min-h-[44px] items-center rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
           >
             Nuevo período
+          </button>
+        )}
+        {hasOpenPeriod && onNuevoGasto && (
+          <button
+            onClick={onNuevoGasto}
+            className="inline-flex min-h-[44px] items-center rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
+          >
+            Nuevo gasto
           </button>
         )}
       </div>

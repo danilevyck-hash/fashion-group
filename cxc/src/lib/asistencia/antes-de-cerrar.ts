@@ -33,6 +33,8 @@ import {
   type NetoNegativo,
 } from "./neto-no-negativo";
 import { PESTANA_PRESTAMOS } from "@/lib/prestamos-una-puerta";
+import type { DiaLibreDeCierre } from "./dia-libre-empresa";
+import { ANTES_DE_CERRAR_CLARO } from "@/lib/ui/uso-2026-11";
 import {
   contarDias,
   detalleDias,
@@ -136,6 +138,8 @@ export interface EntradaAntesDeCerrar {
    * nada cambia.
    */
   avisoDiasLibres?: string | null;
+  /** ux-07: quiénes pagan un día libre, para «ver quiénes» (con él, la línea va en gris y corta). */
+  diasLibres?: readonly DiaLibreDeCierre[];
   conSabado: number;
   rangoLibre: boolean;
   factorBase: number;
@@ -348,7 +352,23 @@ export function armarAntesDeCerrar(e: EntradaAntesDeCerrar): AntesDeCerrar {
   if (e.avisoVacacionesNoPagadas) info.push({ clave: "vacaciones", numero: null, texto: e.avisoVacacionesNoPagadas, enlace: null, tono: "plata" });
   // 🔴 La columna del extra en cero sin explicación se lee como un error del
   // cuadro. Acá se dice qué pasó: sus horas extra pagaron un día libre.
-  if (e.avisoDiasLibres) info.push({ clave: "dias-libres", numero: null, texto: e.avisoDiasLibres, enlace: null, tono: "plata" });
+  // 🔴 ux-07 (15-nov-2026): no frena nada, así que va en GRIS y en UNA línea;
+  // los nombres y los montos, detrás de «ver quiénes» (cada uno lleva a su fila).
+  if (ANTES_DE_CERRAR_CLARO && e.diasLibres && e.diasLibres.length > 0) {
+    info.push({
+      clave: "dias-libres",
+      numero: e.diasLibres.length,
+      texto: `${e.diasLibres.length === 1 ? "paga" : "pagan"} con sus horas extra un día libre de la empresa; lo que falta pasa a la próxima quincena`,
+      enlace: null,
+      tono: "info",
+      personas: e.diasLibres.map((d) => ({
+        codigo: d.codigo,
+        etiqueta: d.etiqueta,
+        href: `#planilla-fila-${encodeURIComponent(d.codigo)}`,
+        detalle: `pagó $${d.pagado.toFixed(2)} · le quedan $${d.queda.toFixed(2)}`,
+      })),
+    });
+  } else if (e.avisoDiasLibres) info.push({ clave: "dias-libres", numero: null, texto: e.avisoDiasLibres, enlace: null, tono: "plata" });
   if (e.conSabado > 0) {
     info.push({
       clave: "sabado",

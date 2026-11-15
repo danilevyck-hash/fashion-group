@@ -15,6 +15,7 @@
  * `armarAntesDeCerrar`.
  * ────────────────────────────────────────────────────────────────────────── */
 
+import type { DiaLibreDeCierre } from "./dia-libre-empresa";
 import { armarAntesDeCerrar, type AntesDeCerrar } from "./antes-de-cerrar";
 import { prestamosSinDescontar } from "./casilla-sin-descontar";
 import { cuotasRecortadas, netosNegativos } from "./neto-no-negativo";
@@ -43,6 +44,7 @@ export interface CuadroParaAvisos {
     avisoPrestamo?: string | null;
     avisoVacacionesNoPagadas?: string | null;
     avisoDiasLibres?: string | null;
+    diasLibres?: readonly DiaLibreDeCierre[];
     conSabado?: number;
     factorBase?: number;
     diasCalendario?: number;
@@ -94,6 +96,7 @@ export function antesDeCerrarDelCuadro(
     marcasImpares: marcasImparesDeLineas(data.lineas),
     avisoVacacionesNoPagadas: a.avisoVacacionesNoPagadas ?? null,
     avisoDiasLibres: a.avisoDiasLibres ?? null,
+    diasLibres: a.diasLibres ?? [],
     conSabado: a.conSabado ?? 0,
     rangoLibre: !!a.rangoLibre,
     factorBase: a.factorBase ?? 1,

@@ -14,7 +14,8 @@ import DeletedGastosModal from "../components/DeletedGastosModal";
 import NuevoGastoDrawer from "../components/NuevoGastoDrawer";
 import CerrarPeriodoModal from "../components/CerrarPeriodoModal";
 import { useEscapeClose, useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
+import { CAJA_NUEVO_GASTO_EN_PORTADA } from "@/lib/ui/uso-2026-11";
 import "../skin.css";
 import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
 import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeControles";
@@ -67,6 +68,17 @@ export default function PeriodoDetailPage() {
   // confirman). Los hooks van antes de cualquier return condicional.
   useEscapeClose(!!pendingDeleteGasto, cancelDeleteGasto);
   const deleteBackdrop = useBackdropDismiss(pendingDeleteGasto ? cancelDeleteGasto : undefined);
+
+  // ux-02: «Nuevo gasto» de la portada llega con `?nuevo=1` y abre el formulario
+  // UNA vez, solo si el período sigue abierto; el `?nuevo=1` se borra de la URL.
+  const nuevoDesdePortada = useRef(false);
+  useEffect(() => {
+    if (!CAJA_NUEVO_GASTO_EN_PORTADA || nuevoDesdePortada.current || !current || current.id !== periodoId) return;
+    if (new URLSearchParams(window.location.search).get("nuevo") !== "1") return;
+    nuevoDesdePortada.current = true;
+    window.history.replaceState(window.history.state, "", window.location.pathname);
+    if (current.estado === "abierto") openGastoDrawer();
+  }, [current, periodoId, openGastoDrawer]);
 
   if (!authChecked) return null;
 

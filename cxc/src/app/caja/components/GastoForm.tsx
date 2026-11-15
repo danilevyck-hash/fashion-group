@@ -4,6 +4,7 @@ import { ReactNode, useState, type CSSProperties } from "react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { motivoParaNoCrear, normalizarCategoria } from "@/lib/caja/categorias";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { CAJA_FORM_DOS_POR_FILA } from "@/lib/ui/uso-2026-11";
 
 // Estilo que iguala el look de los <select> nativos de Caja para los
 // SearchableSelect (responsable/categoría).
@@ -441,6 +442,249 @@ export default function GastoForm({
   // Live ITBMS amount derived from the percent + subtotal.
   const itbmsAmount = Math.round(subtotalNum * (parseFloat(gItbmsPct) / 100) * 100) / 100;
 
+  const campoCategoria = (
+    <Field label="Categoría" required>
+      {/* 🔴 EL «＋» CREA UNA CATEGORÍA PARA TODO EL EQUIPO (20-sep-2026).
+          Daniel: «si algún momento hay una categoría nueva, pon el más
+          para configurarla y que los que tengan el módulo las puedan
+          crear para siempre en todos los usuarios». No es una lista del
+          navegador: se guarda en la base, como los destinos de Guías. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <SearchableSelect
+            value={gCategoria}
+            onChange={(v) => { setCategoriaTouched(true); setGCategoria(v); }}
+            options={categorias.map((c) => ({ value: c, label: c }))}
+            placeholder={CAJA_FORM_DOS_POR_FILA ? "Buscar…" : "Buscar categoría…"}
+            ariaLabel="Categoría"
+            style={cajaInputStyle}
+            focusStyle={cajaInputFocusStyle}
+          />
+        </div>
+        <button
+          type="button"
+          aria-label="Crear categoría"
+          title="Crear categoría"
+          onClick={() => { setNuevaCatError(null); setCreandoCat((v) => !v); }}
+          className="inline-flex items-center justify-center shrink-0 rounded-md transition-colors"
+          style={{
+            width: 44, height: 44,
+            color: "var(--caja-fg-muted)",
+            border: "1px solid var(--caja-border-default)",
+            background: "#fff",
+            fontSize: 16,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--caja-accent)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--caja-fg-muted)"; }}
+        >
+          ＋
+        </button>
+      </div>
+      {creandoCat && (
+        <div className="mt-2">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="text"
+              autoFocus
+              aria-label="Nombre de la categoría nueva"
+              placeholder="Nombre de la categoría"
+              value={nuevaCat}
+              onChange={(e) => { setNuevaCat(e.target.value); setNuevaCatError(null); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void crearCategoria(); } }}
+              style={{ ...cajaInputStyle, flex: 1, minWidth: 0 }}
+            />
+            <button
+              type="button"
+              onClick={() => void crearCategoria()}
+              disabled={creandoCatEnCurso}
+              className="inline-flex items-center justify-center px-3 rounded-md text-sm font-medium shrink-0 transition-transform active:scale-[0.97] disabled:opacity-40"
+              style={{ height: 44, background: "var(--caja-accent)", color: "#fff" }}
+            >
+              {creandoCatEnCurso ? "Creando…" : "Crear"}
+            </button>
+          </div>
+          <p className="text-xs mt-1.5" style={{ color: "var(--caja-fg-muted)" }}>
+            Queda guardada para todos, no solo en esta computadora.
+          </p>
+          {nuevaCatError && (
+            <p className="text-xs mt-1" style={{ color: "var(--caja-danger-onSoft)" }}>
+              {nuevaCatError}
+            </p>
+          )}
+        </div>
+      )}
+    </Field>
+  );
+  const gestionCategorias = isOwner ? (
+      <div style={{ marginTop: 12 }}>
+        <button
+          onClick={() => {
+            setCatError(null);
+            setShowManageCat(!showManageCat);
+          }}
+          type="button"
+          className="inline-flex min-h-[44px] items-center gap-1.5 text-xs px-2 rounded transition-colors"
+          style={{
+            color: "var(--caja-fg-muted)",
+            border: "1px solid var(--caja-border-subtle)",
+            background: "#fff",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "var(--caja-fg-strong)";
+            e.currentTarget.style.borderColor = "var(--caja-border-default)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "var(--caja-fg-muted)";
+            e.currentTarget.style.borderColor = "var(--caja-border-subtle)";
+          }}
+          title="Quitar categorías"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          Quitar categorías
+        </button>
+        {showManageCat && (
+          <div
+            className="mt-3 p-3 rounded text-sm space-y-2"
+            style={{
+              background: "var(--caja-stone-50)",
+              border: "1px solid var(--caja-border-subtle)",
+            }}
+          >
+            {categorias.map((c) => (
+              <div key={c} className="flex items-center justify-between py-1">
+                <span style={{ color: "var(--caja-fg-default)" }}>{c}</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setCatError(null);
+                    const res = await fetch("/api/caja/categorias", {
+                      method: "DELETE",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ nombre: c }),
+                    });
+                    if (!res.ok) {
+                      const payload = await res.json().catch(() => null);
+                      setCatError(
+                        payload && typeof payload.error === "string"
+                          ? payload.error
+                          : "No se pudo eliminar la categoría.",
+                      );
+                      return;
+                    }
+                    setCategorias(categorias.filter((x) => x !== c));
+                  }}
+                  className="inline-flex h-11 w-11 items-center justify-center text-sm ml-3 -my-2 transition-colors"
+                  style={{ color: "var(--caja-fg-subtle)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--caja-danger)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--caja-fg-subtle)")}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            {/* Crear vive en el «＋» de al lado de la categoría, donde lo
+                ve todo el que tenga el módulo. Acá quedó lo que solo puede
+                el dueño: QUITAR. */}
+            {catError && (
+              <p
+                className="text-xs"
+                style={{ color: "var(--caja-danger-onSoft)" }}
+              >
+                {catError}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    ) : null;
+  // `alLado`: lo que va a la derecha del rótulo (ux-03 B: «＋ Agregar ITBMS»).
+  const subtotalCon = (alLado?: ReactNode) => (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: 12,
+            fontWeight: 500,
+            color: "var(--caja-fg-default)",
+          }}
+        >
+          Subtotal <span style={{ color: "var(--caja-danger)" }}>*</span>
+        </label>
+        {alLado}
+      </div>
+      <MoneyInputFlat
+        value={gSubtotal}
+        onChange={setGSubtotal}
+        placeholder="0.00"
+        ariaLabel="Subtotal"
+      />
+      {gSubtotal && subtotalNum <= 0 && (
+        <p
+          className="text-xs mt-1"
+          style={{ color: "var(--caja-danger-onSoft)" }}
+        >
+          El monto debe ser mayor a $0
+        </p>
+      )}
+    </div>
+  );
+
+  /* ux-03 · opción B (15-nov-2026, Daniel): el rótulo arriba como siempre, de a
+     dos por fila, el monto PRIMERO; factura y observaciones a la vista. Los
+     mismos campos y los mismos obligatorios: solo cambia el orden y el aire. */
+  if (CAJA_FORM_DOS_POR_FILA) {
+    const agregarItbms = itbmsAbierto ? null : (
+      <button
+        type="button"
+        onClick={() => setItbmsPedido(true)}
+        className="text-xs font-medium"
+        style={{ color: "var(--caja-accent)" }}
+      >
+        ＋ Agregar ITBMS
+      </button>
+    );
+    return (
+      <div className="space-y-4" data-form-dos-por-fila>
+        {subtotalCon(agregarItbms)}
+        {itbmsAbierto && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="ITBMS" hint={<>Al {gItbmsPct}%: <span className="caja-mono">${itbmsAmount.toFixed(2)}</span></>}>
+              <SelectInput value={gItbmsPct} onChange={setGItbmsPct}>
+                <option value="0">0%</option>
+                <option value="7">7%</option>
+              </SelectInput>
+            </Field>
+            <Field label="Total">
+              <MoneyInputFlat value={totalNum > 0 ? totalNum.toFixed(2) : ""} placeholder="0.00" readOnly highlight ariaLabel="Total" />
+            </Field>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-x-3 gap-y-4 [&>*]:min-w-0">
+          {/* «Nombre del proveedor» no cabía en media fila del teléfono: el rótulo ya dice qué es. */}
+          <Field label="Proveedor" required>
+            <TextInput value={gProveedor} onChange={setGProveedor} placeholder="Nombre" ariaLabel="Proveedor" />
+          </Field>
+          {campoCategoria}
+          <Field label="Nº de factura">
+            <TextInput value={gNroFactura} onChange={setGNroFactura} placeholder="Opcional" ariaLabel="Nº de factura" />
+          </Field>
+          <Field label="Observaciones">
+            <TextInput value={gDescripcion} onChange={handleDescripcionChange} placeholder="Opcional" ariaLabel="Observaciones" />
+          </Field>
+          <Field label="Fecha" required hint={notaFecha || undefined}>
+            <TextInput type="date" value={gFecha} onChange={setGFecha} ariaLabel="Fecha" />
+          </Field>
+          {zonaFotos && <Field label="Foto del recibo">{zonaFotos}</Field>}
+        </div>
+        {gestionCategorias}
+      </div>
+    );
+  }
+
   return (
     <div className={dosColumnas ? "lg:grid lg:grid-cols-2 lg:gap-x-10 lg:items-start" : undefined} data-dos-columnas={dosColumnas || undefined}>
       {/* Comprobante */}
@@ -521,168 +765,14 @@ export default function GastoForm({
           }}
           className="caja-grid-clasif"
         >
-          <Field label="Categoría" required>
-            {/* 🔴 EL «＋» CREA UNA CATEGORÍA PARA TODO EL EQUIPO (20-sep-2026).
-                Daniel: «si algún momento hay una categoría nueva, pon el más
-                para configurarla y que los que tengan el módulo las puedan
-                crear para siempre en todos los usuarios». No es una lista del
-                navegador: se guarda en la base, como los destinos de Guías. */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <SearchableSelect
-                  value={gCategoria}
-                  onChange={(v) => { setCategoriaTouched(true); setGCategoria(v); }}
-                  options={categorias.map((c) => ({ value: c, label: c }))}
-                  placeholder="Buscar categoría…"
-                  ariaLabel="Categoría"
-                  style={cajaInputStyle}
-                  focusStyle={cajaInputFocusStyle}
-                />
-              </div>
-              <button
-                type="button"
-                aria-label="Crear categoría"
-                title="Crear categoría"
-                onClick={() => { setNuevaCatError(null); setCreandoCat((v) => !v); }}
-                className="inline-flex items-center justify-center shrink-0 rounded-md transition-colors"
-                style={{
-                  width: 44, height: 44,
-                  color: "var(--caja-fg-muted)",
-                  border: "1px solid var(--caja-border-default)",
-                  background: "#fff",
-                  fontSize: 16,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--caja-accent)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--caja-fg-muted)"; }}
-              >
-                ＋
-              </button>
-            </div>
-            {creandoCat && (
-              <div className="mt-2">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    type="text"
-                    autoFocus
-                    aria-label="Nombre de la categoría nueva"
-                    placeholder="Nombre de la categoría"
-                    value={nuevaCat}
-                    onChange={(e) => { setNuevaCat(e.target.value); setNuevaCatError(null); }}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void crearCategoria(); } }}
-                    style={{ ...cajaInputStyle, flex: 1, minWidth: 0 }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void crearCategoria()}
-                    disabled={creandoCatEnCurso}
-                    className="inline-flex items-center justify-center px-3 rounded-md text-sm font-medium shrink-0 transition-transform active:scale-[0.97] disabled:opacity-40"
-                    style={{ height: 44, background: "var(--caja-accent)", color: "#fff" }}
-                  >
-                    {creandoCatEnCurso ? "Creando…" : "Crear"}
-                  </button>
-                </div>
-                <p className="text-xs mt-1.5" style={{ color: "var(--caja-fg-muted)" }}>
-                  Queda guardada para todos, no solo en esta computadora.
-                </p>
-                {nuevaCatError && (
-                  <p className="text-xs mt-1" style={{ color: "var(--caja-danger-onSoft)" }}>
-                    {nuevaCatError}
-                  </p>
-                )}
-              </div>
-            )}
-          </Field>
+          {campoCategoria}
           {zonaFotos && (
             <Field label="Foto del recibo">
               {zonaFotos}
             </Field>
           )}
         </div>
-        {isOwner && (
-          <div style={{ marginTop: 12 }}>
-            <button
-              onClick={() => {
-                setCatError(null);
-                setShowManageCat(!showManageCat);
-              }}
-              type="button"
-              className="inline-flex min-h-[44px] items-center gap-1.5 text-xs px-2 rounded transition-colors"
-              style={{
-                color: "var(--caja-fg-muted)",
-                border: "1px solid var(--caja-border-subtle)",
-                background: "#fff",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = "var(--caja-fg-strong)";
-                e.currentTarget.style.borderColor = "var(--caja-border-default)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = "var(--caja-fg-muted)";
-                e.currentTarget.style.borderColor = "var(--caja-border-subtle)";
-              }}
-              title="Quitar categorías"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-              Quitar categorías
-            </button>
-            {showManageCat && (
-              <div
-                className="mt-3 p-3 rounded text-sm space-y-2"
-                style={{
-                  background: "var(--caja-stone-50)",
-                  border: "1px solid var(--caja-border-subtle)",
-                }}
-              >
-                {categorias.map((c) => (
-                  <div key={c} className="flex items-center justify-between py-1">
-                    <span style={{ color: "var(--caja-fg-default)" }}>{c}</span>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setCatError(null);
-                        const res = await fetch("/api/caja/categorias", {
-                          method: "DELETE",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ nombre: c }),
-                        });
-                        if (!res.ok) {
-                          const payload = await res.json().catch(() => null);
-                          setCatError(
-                            payload && typeof payload.error === "string"
-                              ? payload.error
-                              : "No se pudo eliminar la categoría.",
-                          );
-                          return;
-                        }
-                        setCategorias(categorias.filter((x) => x !== c));
-                      }}
-                      className="inline-flex h-11 w-11 items-center justify-center text-sm ml-3 -my-2 transition-colors"
-                      style={{ color: "var(--caja-fg-subtle)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--caja-danger)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--caja-fg-subtle)")}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                {/* Crear vive en el «＋» de al lado de la categoría, donde lo
-                    ve todo el que tenga el módulo. Acá quedó lo que solo puede
-                    el dueño: QUITAR. */}
-                {catError && (
-                  <p
-                    className="text-xs"
-                    style={{ color: "var(--caja-danger-onSoft)" }}
-                  >
-                    {catError}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        {gestionCategorias}
       </Section>
 
       {/* Montos (USD) */}
@@ -695,35 +785,7 @@ export default function GastoForm({
           }}
           className="caja-grid-montos"
         >
-          {/* Subtotal */}
-          <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--caja-fg-default)",
-                marginBottom: 6,
-              }}
-            >
-              Subtotal <span style={{ color: "var(--caja-danger)" }}>*</span>
-            </label>
-            <MoneyInputFlat
-              value={gSubtotal}
-              onChange={setGSubtotal}
-              placeholder="0.00"
-              ariaLabel="Subtotal"
-            />
-            {gSubtotal && subtotalNum <= 0 && (
-              <p
-                className="text-xs mt-1"
-                style={{ color: "var(--caja-danger-onSoft)" }}
-              >
-                El monto debe ser mayor a $0
-              </p>
-            )}
-          </div>
-
+          {subtotalCon()}
           {itbmsAbierto ? (
             <>
               {/* ITBMS */}

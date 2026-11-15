@@ -1,4 +1,5 @@
 "use client";
+import { telefonoParaWhatsApp, textoSinCelular } from "@/lib/ui/uso-2026-11";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // «COBRAR» — UNA HOJA, CUATRO SALIDAS.
@@ -167,6 +168,9 @@ export default function HojaCobrar({
     ? `Estado de cuenta al ${fmtDate(datos.generadoEn.slice(0, 10))} · ${empresas} ${empresas === 1 ? "empresa" : "empresas"} · $${fmt(datos.total)}`
     : "Preparando el estado de cuenta…";
 
+  // ux-05: WhatsApp solo a un celular; un fijo deja la fila apagada y lo dice.
+  const telWa = telefonoParaWhatsApp(client.celular, client.telefono);
+  const telCualquiera = client.celular || client.telefono;
   const tieneCorreo = !!preview?.destinatario;
 
   // 🔴 SI EL TOTAL NO CUADRA CONTRA SWITCH, SE DICE ANTES DE MANDARLO
@@ -280,8 +284,10 @@ export default function HojaCobrar({
         />
         <FilaAccion
           titulo="WhatsApp"
-          detalle={client.celular || client.telefono || "Este cliente no tiene teléfono — cárgalo en su ficha"}
-          apagada={!client.celular && !client.telefono}
+          detalle={
+            telWa || (telCualquiera ? textoSinCelular(telCualquiera) : "Este cliente no tiene teléfono — cárgalo en su ficha")
+          }
+          apagada={!telWa}
           onClick={() => { onWhatsApp(client); onClose(); }}
         />
         <FilaAccion

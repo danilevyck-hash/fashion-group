@@ -539,8 +539,9 @@ describe("🔴 Aprobaciones › Colaborador: el botón DICE a cuántos afecta", 
   it("🔴 SIN BÚSQUEDA: el botón dice «Aprobar pendientes» y manda LAS DOS", async () => {
     const llamadas: Array<{ url: string; body: unknown }> = [];
     await abrirAprobaciones(llamadas);
-    fireEvent.click(screen.getByRole("button", { name: /Aprobar pendientes/ }));
-    await waitFor(() => expect(llamadas.some((l) => l.url.includes("/api/asistencia/aprobaciones"))).toBe(true));
+    // ux-01 (15-nov-2026): el botón dice cuántos, y el POST sale tras el aviso de 5 s con «Deshacer».
+    fireEvent.click(screen.getByRole("button", { name: /^Aprobar 2 pendientes$/ }));
+    await waitFor(() => expect(llamadas.some((l) => l.url.includes("/api/asistencia/aprobaciones"))).toBe(true), { timeout: 8000 });
     const post = llamadas.find((l) => l.url.includes("/api/asistencia/aprobaciones"))!;
     expect((post.body as { dias: Array<{ codigo: string }> }).dias.map((d) => d.codigo).sort()).toEqual(["16", "22"]);
   });

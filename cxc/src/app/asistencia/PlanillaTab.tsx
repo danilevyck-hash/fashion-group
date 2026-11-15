@@ -105,6 +105,8 @@ import { antesDeCerrarDelCuadro } from "@/lib/asistencia/antes-de-cerrar-del-cua
 // con personas · neto · qué falta · Cerrar. Nunca un total del grupo.
 import TableroCierre from "./TableroCierre";
 import { queHacerConRevisar, type PedidoDeRevisar } from "@/lib/asistencia/tablero-cierre";
+import { ANTES_DE_CERRAR_CLARO, TODAS_SIN_FRASE_NI_GENERAR } from "@/lib/ui/uso-2026-11";
+import type { DiaLibreDeCierre } from "@/lib/asistencia/dia-libre-empresa";
 import {
   TEXTO_SIN_DESCONTAR,
   TITULO_SIN_DESCONTAR,
@@ -280,6 +282,8 @@ interface Respuesta {
     /** 🔴 El día libre de la empresa: lo que sus horas extra le pagaron a la
      *  deuda y lo que queda (17-sep-2026). Ya redactado por el servidor. */
     avisoDiasLibres?: string | null;
+    /** ux-07: quiénes pagan un día libre (para «ver quiénes»). */
+    diasLibres?: DiaLibreDeCierre[];
     faltaMigracionDiaLibre?: string | null;
     /** Falta correr el SQL de los días laborables y el horario de afuera
      *  (18-sep-2026): todo se mide lunes a viernes, con un horario. */
@@ -1195,7 +1199,8 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           🔴 El tablero muestra ESTADO, nunca un total del grupo, y cada fila
           cierra SU empresa por su propia puerta.
           ══════════════════════════════════════════════════════════════════ */}
-      {sinEmpresa && (
+      {/* ux-08b (15-nov-2026): con «Todas» la frase se va; la tabla ya dice cómo va cada empresa. */}
+      {sinEmpresa && !TODAS_SIN_FRASE_NI_GENERAR && (
         <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
           Así va cada empresa. Para <b>armar y revisar</b> una planilla, elígela arriba:{" "}
           {TODAS_EN_EL_AVISO ? "con «Todas las empresas» no se paga nada." : "con «Todas» no se paga nada."}
@@ -1359,7 +1364,8 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
           </div>
         )}
 
-        {botonGenerar}
+        {/* ux-08b: con «Todas» «Generar» no se dibuja (salía gris y parecía roto); se arma con «Revisar» en la fila. */}
+        {!(sinEmpresa && TODAS_SIN_FRASE_NI_GENERAR) && botonGenerar}
 
         {/* 🔴 «Descargar ⌄» (Excel · PDF · Comprobantes) SOLO con la planilla ya
             generada: un botón apagado a la vista es una promesa que todavía no
@@ -1405,7 +1411,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
               onClick={() => document.querySelector('[data-testid="antes-de-cerrar"]')?.scrollIntoView?.({ block: "center", behavior: "smooth" })}
               className="ml-auto min-h-[44px] shrink-0 rounded-md border border-gray-300 px-4 text-sm font-medium text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
             >
-              Revisar
+              {ANTES_DE_CERRAR_CLARO ? "Ver lo que falta" : "Revisar"}
             </button>
           ) : (
             <button
