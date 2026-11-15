@@ -90,6 +90,8 @@ export interface FacturaDelCliente {
   /** 13-nov-2026 (propuesta): bultos que anotó bodega al marcar su pedido Preparado. */
   pedidoBultos?: number;
   pedidoPreparadoPor?: string | null;
+  /** Revisión 110 · 61: en cuántas facturas está su pedido (más de 1 = el campo queda vacío). */
+  pedidoFacturas?: number;
   /** ¿Ya se leyó el pedido del panel? `false` = la pantalla lo pide en segundo plano. */
   pedidoLeido?: boolean;
 }

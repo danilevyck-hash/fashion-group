@@ -25,6 +25,7 @@ export interface DocumentoHallado {
   pedido: string | null;
   pedidoLeido: boolean;
   pedidoBultos?: number;
+  pedidoFacturas?: number;
 }
 
 /** Con al menos 3 dígitos se busca: menos encuentra media base. */

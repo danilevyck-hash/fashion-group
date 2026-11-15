@@ -1,5 +1,6 @@
 "use client";
 
+import { ROLES_CAMBIAR_BULTOS } from "@/lib/ui/revision-110-61";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
@@ -297,6 +298,7 @@ export default function GuiasPage() {
             // 🔴 «Recibido» (o «Verificado» con bultos) lo marca la secretaria
             // y admin, nunca bodega.
             puedeRecibir={puedeRecibirPedidos(role)}
+            puedeCambiarBultos={!!role && (ROLES_CAMBIAR_BULTOS as readonly string[]).includes(role)}
             onDetalle={setPedidoAbierto}
           />
         ) : enConfig ? (

@@ -54,6 +54,13 @@ import {
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { aplicarAlias } from "@/lib/comisiones/alias";
 import { leerAliasOVacio } from "@/lib/comisiones/exclusiones-server";
+import { TIPO_FACTURA } from "@/lib/guias/atajos-facturas";
+import {
+  BULTOS_EN_EL_PEDIDO,
+  columnasSoloBultos,
+  puedeCambiarBultos,
+  referenciaDePedido,
+} from "@/lib/ui/revision-110-61";
 
 export const dynamic = "force-dynamic";
 
@@ -191,6 +198,11 @@ export async function GET(req: NextRequest) {
   if (est.error) return NextResponse.json({ error: "No se pudo leer el estado de bodega" }, { status: 500 });
 
   const marca = new Map((est.data ?? []).map((e) => [`${e.empresa_key}:${e.pedido_switch_id}`, e]));
+  const facturados = BULTOS_EN_EL_PEDIDO && PEDIDOS_FLUJO_SIMPLE_2026_10
+    ? await leerFacturados(
+        (ped.data ?? []).filter((p) => marca.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.estado === "recibido"),
+      )
+    : new Set<string>();
   let actualizado: string | null = null;
   const pedidos: PedidoBodega[] = (ped.data ?? []).map((p) => {
     if (!actualizado || p.synced_at > actualizado) actualizado = p.synced_at;
@@ -238,6 +250,7 @@ export async function GET(req: NextRequest) {
       espera_muestra_desde: m?.espera_muestra_desde ?? null,
       espera_muestra_por: m?.espera_muestra_por ?? null,
       espera_muestra_nota: m?.espera_muestra_nota ?? null,
+      ...(BULTOS_EN_EL_PEDIDO ? { facturado: facturados.has(`${p.empresa_key}:${p.pedido_switch_id}`) } : {}),
     };
   });
   return NextResponse.json({
@@ -245,6 +258,75 @@ export async function GET(req: NextRequest) {
     actualizado,
     ...(PEDIDOS_FLUJO_SIMPLE_2026_10 || PEDIDOS_BULTOS_2026_10 ? { empresas } : {}),
   });
+}
+
+/**
+ * Revisión 110 · 61: ¿qué pedidos Recibidos ya tienen factura en Switch? Por
+ * el N.° de pedido EXACTO de la factura y la MISMA empresa, nunca por nombre.
+ * 🔴 Falla CERRADA: sin lectura, se toman como facturados y no se ofrece
+ * cambiar sus bultos.
+ */
+async function leerFacturados(
+  pedidos: ReadonlyArray<{ empresa_key: string; pedido_switch_id: number }>,
+): Promise<Set<string>> {
+  const salida = new Set<string>();
+  if (pedidos.length === 0) return salida;
+  const { data, error } = await supabaseServer
+    .from("switch_facturas")
+    .select("empresa_key, pedido_referencia")
+    .eq("tipo_comprobante", TIPO_FACTURA)
+    .in("empresa_key", [...new Set(pedidos.map((p) => p.empresa_key))])
+    .in("pedido_referencia", [...new Set(pedidos.map((p) => referenciaDePedido(p.pedido_switch_id)))]);
+  const conFactura = new Set(((data ?? []) as Array<{ empresa_key: string; pedido_referencia: string }>).map((f) => `${f.empresa_key}:${f.pedido_referencia}`));
+  for (const p of pedidos) {
+    if (error || conFactura.has(`${p.empresa_key}:${referenciaDePedido(p.pedido_switch_id)}`)) salida.add(`${p.empresa_key}:${p.pedido_switch_id}`);
+  }
+  return salida;
+}
+
+/**
+ * Revisión 110 · 61: cambia SOLO el número de bultos de un pedido Preparado (o
+ * Recibido sin factura). Estado, firmas y `cambiado_*` NO se tocan; el rastro
+ * —quién, cuándo, antes y después— queda en `activity_logs`.
+ */
+async function patchSoloBultos(auth: SessionPayload, empresa: string, id: number, bultos: unknown): Promise<NextResponse> {
+  // Rol y número primero: no hace falta leer la base para rechazarlos.
+  const previa = puedeCambiarBultos(auth.role, "preparado", false, bultos);
+  if (!previa.ok) return NextResponse.json({ error: previa.error }, { status: previa.status });
+  const { data: pedido } = await supabaseServer
+    .from("switch_pedidos")
+    .select("empresa_key")
+    .eq("empresa_key", empresa)
+    .eq("pedido_switch_id", id)
+    .maybeSingle();
+  if (!pedido || !empresasQueVe(auth.userName, auth.role).includes(empresa)) {
+    return NextResponse.json({ error: "Ese pedido no existe" }, { status: 404 });
+  }
+  const previo = await leerEstadoPrevio(empresa, id);
+  const estado = previo?.estado ?? null;
+  const facturado = estado === "recibido" ? (await leerFacturados([{ empresa_key: empresa, pedido_switch_id: id }])).size > 0 : false;
+  const v = puedeCambiarBultos(auth.role, estado, facturado, bultos);
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: v.status });
+  // `.eq("estado", …)`: si alguien lo movió entretanto, no se escribe.
+  const { data: escritas, error } = await supabaseServer
+    .from("pedidos_bodega_estado")
+    .update(columnasSoloBultos(v.bultos))
+    .eq("empresa_key", empresa)
+    .eq("pedido_switch_id", id)
+    .eq("estado", estado as string)
+    .select("bultos");
+  if (error) return NextResponse.json({ error: "No se pudieron guardar los bultos" }, { status: 500 });
+  if (!escritas || escritas.length === 0) {
+    return NextResponse.json({ error: "El pedido cambió de estado. Vuelve a cargar la lista." }, { status: 409 });
+  }
+  await logActivity(
+    auth.role,
+    "cambiar_bultos",
+    "pedidos_bodega_estado",
+    { pedido: `${empresa}:${id}`, estado, antes: previo?.bultos ?? null, despues: v.bultos, por: auth.userName || auth.userId, en: new Date().toISOString() },
+    auth.userName,
+  );
+  return NextResponse.json({ ok: true, bultos: v.bultos });
 }
 
 /**
@@ -393,6 +475,12 @@ export async function PATCH(req: NextRequest) {
   const empresa = String(body?.empresa_key ?? "");
   const id = Number(body?.pedido_switch_id);
   const estado = body?.estado;
+  if (BULTOS_EN_EL_PEDIDO && PEDIDOS_FLUJO_SIMPLE_2026_10 && body?.solo_bultos === true) {
+    if (!(B2B_EMPRESA_KEYS as readonly string[]).includes(empresa) || !Number.isInteger(id)) {
+      return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+    }
+    return patchSoloBultos(auth, empresa, id, body.bultos);
+  }
   if (PEDIDOS_FLUJO_SIMPLE_2026_10 && typeof body?.muestra === "boolean") {
     if (!(B2B_EMPRESA_KEYS as readonly string[]).includes(empresa) || !Number.isInteger(id)) {
       return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });

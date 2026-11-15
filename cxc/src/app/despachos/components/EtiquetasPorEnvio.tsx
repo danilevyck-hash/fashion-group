@@ -25,6 +25,7 @@
 // (`EtiquetasView.tsx`), que no se tocó.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { BULTOS_EN_EL_PEDIDO, notaBultosDelPedido } from "@/lib/ui/revision-110-61";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -770,7 +771,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
     const clave = claveFactura(h);
     setEmpresaKey(h.empresa_key);
     // 🔴 13-nov-2026 (propuesta): los bultos del pedido Preparado vienen puestos.
-    setMarcadas([{ clave, bultos: "pedidoBultos" in h && h.pedidoBultos ? String(h.pedidoBultos) : "", nota: "" }]);
+    setMarcadas([{ clave, bultos: "pedidoBultos" in h ? bultosParaElCampo(h) : "", nota: "" }]);
     setPreElegida(clave);
     setCoincidencias([]);
     setNumeroFactura("");
@@ -793,7 +794,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
 
   function alternarFactura(clave: string) {
     setError(null);
-    setMarcadas((m) => (m.some((x) => x.clave === clave) ? m.filter((x) => x.clave !== clave) : [...m, { clave, bultos: porClave.get(clave)?.pedidoBultos ? String(porClave.get(clave)!.pedidoBultos) : "", nota: "" }]));
+    setMarcadas((m) => (m.some((x) => x.clave === clave) ? m.filter((x) => x.clave !== clave) : [...m, { clave, bultos: bultosParaElCampo(porClave.get(clave)), nota: "" }]));
   }
 
   /**
@@ -1157,7 +1158,11 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
                                       {rango && rango.hasta >= rango.desde && (
                                         <div className="mt-1 text-xs tabular-nums text-gray-500">Bultos {textoRango(rango)}</div>
                                       )}
-                                      {f.pedidoBultos != null && (
+                                      {f.pedidoBultos != null && BULTOS_EN_EL_PEDIDO && f.pedido ? (
+                                        <div data-bultos-del-pedido className="mt-1 max-w-[220px] text-xs text-gray-500">
+                                          {notaBultosDelPedido(f.pedido, f.pedidoBultos, f.pedidoFacturas ?? 1).nota}
+                                        </div>
+                                      ) : f.pedidoBultos != null && (
                                         <div data-bultos-del-pedido className="mt-1 max-w-[220px] text-xs text-gray-500">
                                           Preparado por {(f.pedidoPreparadoPor ?? "bodega").replace(/^./, (c) => c.toUpperCase())} · {f.pedidoBultos} {f.pedidoBultos === 1 ? "bulto" : "bultos"}
                                         </div>
@@ -1561,4 +1566,14 @@ function ModalReimprimirEnvio({ envio, onCerrar }: { envio: Envio; onCerrar: () 
       </div>
     </ModalOverlay>
   );
+}
+
+/**
+ * Revisión 110 · 61: el número del pedido va puesto en «Bultos»… salvo que el
+ * pedido esté en más de una factura: ahí queda vacío (la nota da el total).
+ */
+function bultosParaElCampo(h: { pedidoBultos?: number; pedidoFacturas?: number } | undefined): string {
+  if (!h?.pedidoBultos) return "";
+  if (BULTOS_EN_EL_PEDIDO && (h.pedidoFacturas ?? 1) > 1) return "";
+  return String(h.pedidoBultos);
 }
