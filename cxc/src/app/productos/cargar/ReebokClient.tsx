@@ -71,6 +71,8 @@ import { useNuevosEnSwitch } from "@/lib/hooks/useNuevosEnSwitch";
 import { CostoDelArchivo, FacturasDelArchivo, NuevosEnSwitch } from "./ResumenDelArchivo";
 import { workbookBlob, workbookBytes, filtroDesdeA1, XLSX_MIME } from "@/lib/excel-export";
 import { Aviso } from "@/components/ui/Aviso";
+import { useToastOpcional } from "@/components/ToastSystem";
+import { mensajeDelServidor } from "@/lib/depurador/error-al-guardar";
 
 type NameMode = "formula" | "fijo";
 interface NameEdit { divisor: number; extra: number; redondeo: Redondeo; precioFijo: number | null; modo: NameMode; dirty: boolean }
@@ -117,6 +119,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
   const fileRef = useRef<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const embedded = injectedFile !== undefined;
+  const toast = useToastOpcional();
 
   const [fileName, setFileName] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -565,7 +568,8 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
         // Vacío = hereda la fórmula de marca → borra la excepción si existía.
         if (r.savedRow?.id) {
           const res = await fetch(`/api/productos/cargar/rubro-formulas?id=${encodeURIComponent(r.savedRow.id)}`, { method: "DELETE" });
-          if (res.ok) reloadExc();
+          if (!res.ok) { toast(await mensajeDelServidor(res, `No se pudo quitar la excepción de «${name}». Vuelve a intentarlo.`), "error"); return; }
+          reloadExc();
         }
       } else {
         const payload = tieneFijo
@@ -574,10 +578,13 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
         const res = await fetch("/api/productos/cargar/rubro-formulas", {
           method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
         });
-        if (res.ok) reloadExc();
+        if (!res.ok) { toast(await mensajeDelServidor(res, `No se pudo guardar la excepción de «${name}». Vuelve a intentarlo.`), "error"); return; }
+        reloadExc();
       }
       setNameEdits((prev) => { const n = { ...prev }; delete n[name]; return n; });
       setFlashName(name); setTimeout(() => setFlashName((f) => (f === name ? null : f)), 1500);
+    } catch {
+      toast(`No se pudo guardar la excepción de «${name}». Revisa la conexión y vuelve a intentarlo.`, "error");
     } finally {
       setSavingName(null);
     }
@@ -601,7 +608,10 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ marca, empresa: REEBOK_EMPRESA, divisor: f.divisor, extra: f.extra, redondeo: f.redondeo }),
       });
-      if (res.ok) { setFlashF(which); setTimeout(() => setFlashF((x) => (x === which ? null : x)), 1500); }
+      if (!res.ok) { toast(await mensajeDelServidor(res, `No se pudo guardar la fórmula de ${marca}. Vuelve a intentarlo.`), "error"); return; }
+      setFlashF(which); setTimeout(() => setFlashF((x) => (x === which ? null : x)), 1500);
+    } catch {
+      toast(`No se pudo guardar la fórmula de ${marca}. Revisa la conexión y vuelve a intentarlo.`, "error");
     } finally {
       setSavingF(null);
     }
