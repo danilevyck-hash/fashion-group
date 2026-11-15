@@ -271,8 +271,9 @@ async function ejecutar(
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // Universo de roles con acceso a ALGÚN módulo (401/403 primero, como siempre);
-  // el permiso fino por módulo se valida más abajo con rolesSyncNow.
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor", "contabilidad"]);
+  // el permiso fino por módulo se valida más abajo con rolesSyncNow (bodega:
+  // solo Pedidos — sin ella aquí, su «Actualizar» de Pedidos salía 403).
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor", "contabilidad", "bodega"]);
   if (auth instanceof NextResponse) return auth;
 
   let body: { modulo?: unknown; empresa?: unknown };
