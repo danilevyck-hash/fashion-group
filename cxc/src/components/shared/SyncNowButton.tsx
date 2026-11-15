@@ -56,6 +56,8 @@ interface SyncNowButtonProps {
   /** Con 2+ opciones: true = un clic las dispara TODAS en secuencia (sin
    *  menú). false/omitido = menú para elegir una (comportamiento clásico). */
   secuencial?: boolean;
+  /** Con `secuencial`: las opciones A LA VEZ. Solo si cada una es una empresa DISTINTA. */
+  paralelo?: boolean;
   /** Gate de UI POR USO (default admin+secretaria). Cada vista decide quién VE
    *  su botón (ej. /proveedores agrega contabilidad; la ficha de cliente,
    *  vendedor) sin abrir los demás botones. El permiso real por módulo lo
@@ -109,6 +111,7 @@ export const CLASE_BOTON_LINEA =
 export default function SyncNowButton({
   opciones,
   secuencial,
+  paralelo,
   roles,
   engancharRunning,
   resumenExito,
@@ -213,30 +216,47 @@ export default function SyncNowButton({
     let actualizadas = 0;
     let omitidas = 0;
     let fallidas = 0;
+    // Un paso = una opción. Cuenta en las variables de arriba; nunca lanza.
+    let hechos = 0;
+    const paso = async (i: number) => {
+      const esEmpresa = !!opciones[i].empresa;
+      try {
+        if (engancharRunning) {
+          // Enganche por paso: un "running" ajeno no se salta — se espera a
+          // que termine (o se corre al liberarse el lock) antes de seguir.
+          const r = await syncConEnganche(opciones[i]);
+          if (r.tipo === "ok") {
+            if (esEmpresa) actualizadas++;
+          } else if (r.tipo === "fresco") {
+            if (esEmpresa) omitidas++;
+          } else fallidas++;
+        } else {
+          const { status, json } = await postSyncNow(opciones[i]);
+          if (status === 200 && json?.ok) {
+            if (esEmpresa) actualizadas++;
+          } else if (status === 409) {
+            if (esEmpresa) omitidas++;
+          } else fallidas++;
+        }
+      } catch {
+        fallidas++;
+      }
+    };
     try {
-      for (let i = 0; i < opciones.length; i++) {
-        setProgreso({ actual: i + 1, total: opciones.length });
-        const esEmpresa = !!opciones[i].empresa;
-        try {
-          if (engancharRunning) {
-            // Enganche por paso: un "running" ajeno no se salta — se espera a
-            // que termine (o se corre al liberarse el lock) antes de seguir.
-            const r = await syncConEnganche(opciones[i]);
-            if (r.tipo === "ok") {
-              if (esEmpresa) actualizadas++;
-            } else if (r.tipo === "fresco") {
-              if (esEmpresa) omitidas++;
-            } else fallidas++;
-          } else {
-            const { status, json } = await postSyncNow(opciones[i]);
-            if (status === 200 && json?.ok) {
-              if (esEmpresa) actualizadas++;
-            } else if (status === 409) {
-              if (esEmpresa) omitidas++;
-            } else fallidas++;
-          }
-        } catch {
-          fallidas++;
+      if (paralelo) {
+        // Cada opción es OTRA empresa = otro Switch con su propio usuario: la
+        // sesión única no se cruza entre ellas (velocidad-2026-11). El
+        // progreso cuenta las que ya terminaron.
+        setProgreso({ actual: 0, total: opciones.length });
+        await Promise.all(opciones.map(async (_o, i) => {
+          await paso(i);
+          hechos++;
+          setProgreso({ actual: hechos, total: opciones.length });
+        }));
+      } else {
+        for (let i = 0; i < opciones.length; i++) {
+          setProgreso({ actual: i + 1, total: opciones.length });
+          await paso(i);
         }
       }
       const partes: string[] = [];

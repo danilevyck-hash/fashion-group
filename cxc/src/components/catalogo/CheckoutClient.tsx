@@ -262,7 +262,9 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
       // Pedido guardado en DB (con o sin Switch ok) → limpiar carrito y token.
       limpiarCarrito(cfg.cartKey);
       try { sessionStorage.removeItem(`${marca}_checkout_token`); } catch { /* */ }
-      router.push(`${cfg.confirmBase}/${data.order_id}`);
+      // `enviando=1`: el envío a Switch sigue en segundo plano (velocidad-2026-11);
+      // la confirmación lo dice y espera el resultado.
+      router.push(`${cfg.confirmBase}/${data.order_id}${data?.switch?.enCola ? "?enviando=1" : ""}`);
     } catch {
       setError("Sin conexión — el carrito sigue guardado, intenta de nuevo.");
     } finally {

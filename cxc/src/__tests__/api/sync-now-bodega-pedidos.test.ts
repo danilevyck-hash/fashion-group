@@ -26,7 +26,7 @@ vi.mock("@/lib/supabase-server", () => {
   return { supabaseServer: { from: () => q, rpc: async () => ({ error: null }) } };
 });
 vi.mock("@/lib/telegram", () => ({ sendTelegramAlert: vi.fn(), shortError: (s: string) => s }));
-vi.mock("@/lib/switch-api/client", () => ({ logoutAllSwitchSessions: vi.fn(async () => {}) }));
+vi.mock("@/lib/switch-api/client", () => ({ logoutAllSwitchSessions: vi.fn(async () => {}), logoutSwitchSessions: vi.fn(async () => {}) }));
 vi.mock("@/lib/switch-api/sync-log", () => ({
   clearStaleRunning: vi.fn(async () => {}),
   isRunningLockConflict: () => false,

@@ -65,6 +65,27 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
 
   useEffect(() => { load(); }, [load]);
 
+  // 🔴 velocidad-2026-11: el checkout contesta antes de que Switch termine.
+  // Mientras no haya fila (o siga 'pendiente', con el POST en vuelo) se dice
+  // «Enviando a Switch…» y se vuelve a leer cada 2 s; a los 2 min se deja de
+  // esperar y la pantalla muestra lo que haya, como siempre.
+  const [esperandoEnvio, setEsperandoEnvio] = useState(false);
+  useEffect(() => {
+    try { setEsperandoEnvio(new URLSearchParams(window.location.search).get("enviando") === "1"); } catch { /* */ }
+  }, []);
+  const enCurso = envio?.estado === "pendiente" || (esperandoEnvio && envio === null);
+  const [vencido, setVencido] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setVencido(true), 120_000);
+    return () => clearTimeout(t);
+  }, []);
+  const enviando = enCurso && !vencido;
+  useEffect(() => {
+    if (!enviando) return;
+    const t = setTimeout(() => { void load(); }, 2_000);
+    return () => clearTimeout(t);
+  }, [enviando, envio, load]);
+
   async function reintentar(documento: DocumentoSwitch) {
     setRetrying(true);
     setRetryMsg(null);
@@ -93,7 +114,7 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
   // (estado error): decir "no se completó" sin intento previo confunde
   // (diagnóstico del piloto 4-jul).
   const sinIntento = envio === null;
-  const puedeReintentar = sinIntento || envio?.estado === "error";
+  const puedeReintentar = !enviando && (sinIntento || envio?.estado === "error");
   // Qué hay en Switch. Envío viejo o DDL pendiente = pedido, que es lo único
   // que este sistema sabía crear antes del 24-ago-2026.
   const documento = normalizarDocumento(envio?.documento);
@@ -110,8 +131,8 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
       ) : (
         <div className="space-y-4">
           {/* Estado principal */}
-          <div className={`rounded-lg border-2 p-6 text-center ${switchOk ? "border-emerald-300 bg-emerald-50" : ambiguo ? "border-amber-300 bg-amber-50" : sinIntento ? "border-gray-300 bg-gray-50" : "border-red-200 bg-red-50"}`}>
-            <div className="text-3xl">{switchOk ? "✓" : ambiguo ? (ICONOS_DE_LINEA_EN_TODO ? <AlertTriangle aria-hidden className="mx-auto h-8 w-8 text-amber-600" /> : "⚠️") : sinIntento ? "→" : "!"}</div>
+          <div className={`rounded-lg border-2 p-6 text-center ${switchOk ? "border-emerald-300 bg-emerald-50" : ambiguo ? "border-amber-300 bg-amber-50" : sinIntento || enviando ? "border-gray-300 bg-gray-50" : "border-red-200 bg-red-50"}`}>
+            <div className="text-3xl">{switchOk ? "✓" : ambiguo ? (ICONOS_DE_LINEA_EN_TODO ? <AlertTriangle aria-hidden className="mx-auto h-8 w-8 text-amber-600" /> : "⚠️") : sinIntento || enviando ? "→" : "!"}</div>
             {/* 🔴 EL TÍTULO DICE CUÁL DE LAS DOS FUE. Decía "Pedido TOM-027
                 guardado" en grande aunque lo mandado hubiera sido una
                 COTIZACIÓN, y el renglón chico de abajo la contradecía. El
@@ -132,6 +153,8 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
                 Switch no respondió al enviar — el pedido pudo o no haberse creado allá.
                 Revisa el panel de Switch antes de reintentar.
               </p>
+            ) : enviando ? (
+              <p className="mt-1 text-sm text-gray-600" role="status">Enviando a Switch…</p>
             ) : sinIntento ? (
               /* "Puedes enviarlo con el botón de abajo" se podó (12-ago-2026):
                  señalaba el único botón primario de la tarjeta, a 20 px. */

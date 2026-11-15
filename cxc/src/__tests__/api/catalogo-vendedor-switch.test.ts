@@ -61,6 +61,7 @@ const listVendedores = vi.fn(async () => ({
 vi.mock("@/lib/switch-api/client", () => ({
   createSwitchClient: () => ({ listVendedores }),
   logoutAllSwitchSessions: vi.fn(async () => {}),
+  logoutSwitchSessions: vi.fn(async () => {}),
 }));
 
 const enviarPedidoSwitch = vi.fn(async () => ({ kind: "ok", numeroInterno: "X-1", pedidoSwitchId: 1, verificado: true, warnings: [] }));

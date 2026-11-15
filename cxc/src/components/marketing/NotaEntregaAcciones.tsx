@@ -31,12 +31,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
-import {
-  buildComprobanteEntregaDoc,
-  nombreArchivoComprobante,
-  numeroComprobante,
-  type EntregaMueblePdfData,
-} from "@/lib/marketing/pdf-entrega-mueble";
+import type { EntregaMueblePdfData } from "@/lib/marketing/pdf-entrega-mueble";
+
+// velocidad-2026-11: la herramienta de PDF (~100 kB) baja junto con los DATOS,
+// al desplegarse — no al abrir la pantalla. El toque sigue sin `await`.
+type ModuloPdf = typeof import("@/lib/marketing/pdf-entrega-mueble");
 
 interface Props {
   entregaId: string;
@@ -45,6 +44,7 @@ interface Props {
 export default function NotaEntregaAcciones({ entregaId }: Props) {
   const { toast } = useToast();
   const [datos, setDatos] = useState<EntregaMueblePdfData | null>(null);
+  const [pdf, setPdf] = useState<ModuloPdf | null>(null);
   const [error, setError] = useState(false);
   const [compartiendo, setCompartiendo] = useState(false);
 
@@ -57,8 +57,14 @@ export default function NotaEntregaAcciones({ entregaId }: Props) {
           { cache: "no-store" },
         );
         if (!res.ok) throw new Error("no se pudo");
-        const data = (await res.json()) as EntregaMueblePdfData;
-        if (!cancelado) setDatos(data);
+        const [data, modulo] = await Promise.all([
+          res.json() as Promise<EntregaMueblePdfData>,
+          import("@/lib/marketing/pdf-entrega-mueble"),
+        ]);
+        if (!cancelado) {
+          setPdf(modulo);
+          setDatos(data);
+        }
       } catch {
         if (!cancelado) setError(true);
       }
@@ -70,26 +76,26 @@ export default function NotaEntregaAcciones({ entregaId }: Props) {
 
   /** Nombre del archivo, el mismo que usa el ZIP. */
   const nombreArchivo = useCallback(
-    (d: EntregaMueblePdfData) => `${nombreArchivoComprobante(d)}.pdf`,
-    [],
+    (d: EntregaMueblePdfData) => `${pdf ? pdf.nombreArchivoComprobante(d) : "nota-de-entrega"}.pdf`,
+    [pdf],
   );
 
   const compartir = async () => {
-    if (!datos) return;
+    if (!datos || !pdf) return;
     setCompartiendo(true);
     try {
       // Sin `await` entre el clic y `compartirArchivo`: el blob se arma acá.
       // CON bultos: esta es la nota de ENVÍO, el papel que viaja con la
       // mercancía (el comprobante para la marca sale del ZIP, sin bultos).
-      const blob = buildComprobanteEntregaDoc(datos, {
+      const blob = pdf.buildComprobanteEntregaDoc(datos, {
         incluirBultos: true,
       }).output("blob");
       const archivo = new File([blob], nombreArchivo(datos), {
         type: "application/pdf",
       });
       const r = await compartirArchivo(archivo, {
-        title: `Nota de entrega ${numeroComprobante(datos)}`,
-        text: `Nota de entrega ${numeroComprobante(datos)} — ${datos.cliente}`,
+        title: `Nota de entrega ${pdf.numeroComprobante(datos)}`,
+        text: `Nota de entrega ${pdf.numeroComprobante(datos)} — ${datos.cliente}`,
       });
       if (r === "descargado") {
         toast("Nota descargada — revisa tu carpeta de descargas", "success");
@@ -102,9 +108,9 @@ export default function NotaEntregaAcciones({ entregaId }: Props) {
   };
 
   const imprimir = () => {
-    if (!datos) return;
+    if (!datos || !pdf) return;
     try {
-      const doc = buildComprobanteEntregaDoc(datos, { incluirBultos: true });
+      const doc = pdf.buildComprobanteEntregaDoc(datos, { incluirBultos: true });
       // `autoPrint` deja el PDF pidiendo el diálogo de impresión al abrirse.
       doc.autoPrint();
       const url = doc.output("bloburl") as unknown as string;

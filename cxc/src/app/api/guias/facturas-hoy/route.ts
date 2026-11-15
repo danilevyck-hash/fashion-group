@@ -29,7 +29,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS, type EmpresaKey } from "@/lib/empresa-mapping";
 import { syncEmpresaFacturas } from "@/lib/switch-api/sync-empresa";
-import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
+import { logoutAllSwitchSessions, logoutSwitchSessions } from "@/lib/switch-api/client";
+import { FACTURAS_HOY_EN_PARALELO } from "@/lib/ui/velocidad-2026-11";
 import { isRunningLockConflict } from "@/lib/switch-api/sync-log";
 import { SYNC_NOW_COOLDOWN_MIN } from "@/lib/switch-api/sync-now";
 
@@ -69,41 +70,43 @@ export async function POST(req: NextRequest) {
   const hoy = hoyPanama();
   const resultados: ResultadoEmpresa[] = [];
 
+  // Una empresa: nunca lanza, devuelve su resultado.
+  const una = async (empresa: string): Promise<ResultadoEmpresa> => {
+    try {
+      if (await facturasFrescas(empresa)) return { empresa, resultado: "fresca" };
+      const r = await syncEmpresaFacturas(empresa as EmpresaKey, {
+        desde: hoy,
+        hasta: hoy,
+        triggeredBy: "manual",
+      });
+      return { empresa, resultado: "ok", escritas: (r?.inserted ?? 0) + (r?.updated ?? 0) };
+    } catch (err) {
+      // Fail-open: una empresa caída (o con un sync en curso) no frena a las
+      // demás ni a la pantalla — se despacha con lo que hay en la base.
+      if (isRunningLockConflict(err)) return { empresa, resultado: "en_curso" };
+      console.error(
+        `[guias/facturas-hoy] ${empresa}:`,
+        err instanceof Error ? err.message : String(err),
+      );
+      return { empresa, resultado: "error" };
+    }
+  };
+
   try {
-    // En SERIE, no en paralelo: 6 logins simultáneos del mismo usuario de API
-    // se tumbarían el token entre sí (sesión única por usuario).
-    for (const empresa of B2B_EMPRESA_KEYS) {
-      try {
-        if (await facturasFrescas(empresa)) {
-          resultados.push({ empresa, resultado: "fresca" });
-          continue;
-        }
-        const r = await syncEmpresaFacturas(empresa as EmpresaKey, {
-          desde: hoy,
-          hasta: hoy,
-          triggeredBy: "manual",
-        });
-        resultados.push({
-          empresa,
-          resultado: "ok",
-          escritas: (r?.inserted ?? 0) + (r?.updated ?? 0),
-        });
-      } catch (err) {
-        // Fail-open: una empresa caída (o con un sync en curso) no frena a las
-        // demás ni a la pantalla — se despacha con lo que hay en la base.
-        if (isRunningLockConflict(err)) {
-          resultados.push({ empresa, resultado: "en_curso" });
-        } else {
-          console.error(
-            `[guias/facturas-hoy] ${empresa}:`,
-            err instanceof Error ? err.message : String(err),
-          );
-          resultados.push({ empresa, resultado: "error" });
-        }
-      }
+    if (FACTURAS_HOY_EN_PARALELO) {
+      // 🔴 A LA VEZ (15-nov-2026, 25 s → lo que tarde la más lenta). La sesión
+      // única de Switch es por USUARIO de UNA instancia: cada empresa es su
+      // propio Switch (URL y usuario propios) y `client.ts` deduplica los
+      // logins POR EMPRESA. Seis empresas = seis tokens que no se tocan.
+      resultados.push(...(await Promise.all(B2B_EMPRESA_KEYS.map(una))));
+    } else {
+      for (const empresa of B2B_EMPRESA_KEYS) resultados.push(await una(empresa));
     }
   } finally {
-    await logoutAllSwitchSessions();
+    // Solo las sesiones de ESTA ruta: otra que comparta el proceso (Fluid)
+    // puede estar usando la suya.
+    if (FACTURAS_HOY_EN_PARALELO) await logoutSwitchSessions(B2B_EMPRESA_KEYS);
+    else await logoutAllSwitchSessions();
   }
 
   return NextResponse.json({ ok: true, hoy, resultados });

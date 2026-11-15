@@ -35,7 +35,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { logActivity } from "@/lib/log-activity";
 import { supabaseServer } from "@/lib/supabase-server";
-import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
+import { logoutAllSwitchSessions, logoutSwitchSessions } from "@/lib/switch-api/client";
+import { PEDIDOS_ACTUALIZAR_EN_PARALELO } from "@/lib/ui/velocidad-2026-11";
 import {
   syncEmpresaFacturas,
   syncEmpresaEstadoCuenta,
@@ -384,6 +385,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Higiene de sesión única (igual que los crons): cerrar las sesiones de
     // Switch que este proceso abrió — un token vivo ~60 min mataría el login
     // del próximo cron de la misma empresa (code 0006). No-op si no abrió.
-    if (cfg.tocaSwitch) await logoutAllSwitchSessions();
+    // Con una empresa, se cierra SOLO la suya: las otras pueden estar
+    // actualizándose a la vez en este mismo proceso (velocidad-2026-11).
+    if (cfg.tocaSwitch) {
+      if (PEDIDOS_ACTUALIZAR_EN_PARALELO && empresa) await logoutSwitchSessions([empresa]);
+      else await logoutAllSwitchSessions();
+    }
   }
 }

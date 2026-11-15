@@ -11,14 +11,9 @@
 // fotos, oculto_manual, precios, import). Así el cliente nunca ve catálogo
 // viejo — que es justo lo que rompió en #244 y #253.
 
-import { bultoEnRenglon, productoConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
-import { leerConColumnaOpcional } from "@/lib/catalogo/cols-opcionales";
-import { unstable_cache } from "next/cache";
-import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
-import { paquetePublico } from "@/lib/catalogo/publico-payload";
-import { catalogoTag, CATALOGO_PUBLICO_TTL_SEGUNDOS } from "@/lib/catalogo/cache";
-import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { getMarcaConfig } from "@/lib/catalogo/marcas";
+import { ErrorCatalogo, leerCatalogoPublico, type PayloadPublico } from "@/lib/catalogo/catalogo-publico-server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -30,9 +25,9 @@ export const revalidate = 0;
 // de Supabase no salgan del Data Cache— hoy lo garantizan dos cosas: los
 // clients de marca inyectan `cache: "no-store"` en cada fetch, y Next corre el
 // callback de `unstable_cache` ya forzado a `force-no-store`.
-
-/** Error cuyo `message` es EXACTAMENTE el texto que devuelve el endpoint. */
-class ErrorCatalogo extends Error {}
+//
+// La lectura vive en `lib/catalogo/catalogo-publico-server.ts` (la comparte la
+// página pública, que llega con los productos puestos).
 
 /** Nada de caché en browser/CDN: la caché vive en el server, donde SÍ se puede
  *  invalidar con certeza. */
@@ -41,113 +36,17 @@ const HEADERS_NO_STORE = {
   "CDN-Cache-Control": "no-store",
 };
 
-type PayloadPublico = ReturnType<typeof paquetePublico>;
-
-/** Lectura VIVA del catálogo — es lo que se cachea. Lanza en vez de devolver un
- *  payload a medias, así un fallo de Supabase nunca queda cacheado. */
-async function leerCatalogo(cfg: MarcaConfig): Promise<PayloadPublico> {
-  const supabase = await cfg.publicCatalog.db();
-  if (!supabase) throw new ErrorCatalogo("Not configured");
-
-  if (cfg.publicCatalog.conInventario) {
-    // ⚠️ PAGINADO (26-jul-2026): las dos lecturas se cortaban en 1.000 filas sin
-    // error. `inventory` es una fila POR PRODUCTO Y TALLA, así que es la primera
-    // en pasarse — y truncarla es el peor síntoma de todos: el producto sí
-    // aparece en la tienda pero sin ninguna talla, o sea **Agotado** a la vista
-    // del cliente. Encima el resultado se guarda en `unstable_cache`, así que la
-    // versión truncada quedaba servida hasta la próxima invalidación.
-    // El orden de NEGOCIO se conserva intacto y se le agrega `id` como
-    // desempate: paginar exige un orden único (con filas empatadas, PostgREST
-    // puede repetir o saltear entre páginas), pero cambiar la columna de orden
-    // cambiaría el orden en que el cliente ve los productos. Compuesto = las dos
-    // cosas.
-    // `bulto_pzas` (Tommy) puede no existir todavía — migración 20260806120000,
-    // que corre Daniel a mano. Sin este respaldo el catálogo PÚBLICO entero no
-    // carga hasta que la corra.
-    const products = await leerConColumnaOpcional(cfg.publicCatalog.cols, "bulto_pzas", (cols) =>
-      leerTodoPaginado<unknown>(
-      `${cfg.productsTable} (catálogo público ${cfg.marca})`,
-      (pedirCount, desde, hasta) =>
-        supabase
-          .from(cfg.productsTable)
-          .select(cols, pedirCount ? { count: "exact" } : {})
-          .eq("active", true)
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: true })
-          .range(desde, hasta),
-    ));
-
-    const inventory = await leerTodoPaginado<unknown>(
-      `inventory (catálogo público ${cfg.marca})`,
-      (pedirCount, desde, hasta) =>
-        supabase
-          .from("inventory")
-          .select("product_id,size,quantity", pedirCount ? { count: "exact" } : {})
-          .order("size")
-          .order("id", { ascending: true })
-          .range(desde, hasta),
-    );
-
-    // 🔴 LO QUE SALE AL NAVEGADOR SE RESUELVE ACÁ (7-sep-2026). `existencia` y
-    // `stock` se LEEN (hacen falta para el fallback cuando el sync todavía no
-    // escribió `disponibilidad`) pero NO viajan, y el inventario se acota a los
-    // productos de este mismo paquete — Reebok mandaba las 391 filas, 159 de
-    // ellas de productos apagados. Regla única en `lib/catalogo/publico-payload`.
-    return paquetePublico(
-      products as Record<string, unknown>[],
-      inventory as Record<string, unknown>[],
-    );
-  }
-
-  // Columnas explícitas (no select("*")): endpoint público — blinda contra
-  // fugas si se agregan columnas internas (ej. costo). Son exactamente los
-  // campos que consume la página pública (incl. stock e is_regalia).
-  // Paginado con el mismo criterio: orden de negocio (category, name) + `id`
-  // como desempate único para que la paginación no pierda ni repita filas.
-  const products = await leerConColumnaOpcional(cfg.publicCatalog.cols, "bulto_pzas", (cols) =>
-    leerTodoPaginado<unknown>(
-    `${cfg.productsTable} (catálogo público ${cfg.marca})`,
-    (pedirCount, desde, hasta) =>
-      supabase
-        .from(cfg.productsTable)
-        .select(cols, pedirCount ? { count: "exact" } : {})
-        .eq("active", true)
-        .order("category")
-        .order("name")
-        .order("id", { ascending: true })
-        .range(desde, hasta),
-  ));
-
-  return paquetePublico(products as Record<string, unknown>[]);
-}
-
-/** La misma lectura, cacheada bajo la tag de la marca. `marca` viaja como
- *  ARGUMENTO (no solo en keyParts) para que la key sea distinta por marca. */
-function leerCatalogoCacheado(cfg: MarcaConfig): Promise<PayloadPublico> {
-  return unstable_cache(
-    async (_marca: string) => leerCatalogo(cfg),
-    ["catalogo-publico"],
-    { tags: [catalogoTag(cfg.marca)], revalidate: CATALOGO_PUBLICO_TTL_SEGUNDOS },
-  )(cfg.marca);
-}
-
 export async function GET(_req: NextRequest, { params }: { params: { marca: string } }) {
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
   let payload: PayloadPublico;
   try {
-    payload = await leerCatalogoCacheado(cfg);
+    payload = await leerCatalogoPublico(cfg);
   } catch (err) {
     if (!(err instanceof ErrorCatalogo)) console.error(err);
     const msg = err instanceof ErrorCatalogo ? err.message : "Error al cargar productos";
     return NextResponse.json({ error: msg }, { status: 500 });
-  }
-
-  // Reebok: el bulto con que se pide HOY (ropa de 12), fuera del caché para
-  // que entre apenas exista la columna. Sin ella, el producto va como siempre.
-  if (cfg.marca === "reebok" && (await bultoEnRenglon(cfg))) {
-    payload = { ...payload, products: payload.products.map((p) => productoConBulto(p as { category?: string | null }, true)) } as PayloadPublico;
   }
 
   return NextResponse.json(payload, { headers: HEADERS_NO_STORE });

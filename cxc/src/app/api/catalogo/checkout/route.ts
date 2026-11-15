@@ -32,7 +32,9 @@ import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
 import { pedidoRoles } from "@/lib/catalogo/roles";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
-import { enviarPedidoSwitch, type EnvioItem } from "@/lib/catalogo/switch-envio";
+import { enviarPedidoSwitch, type EnvioItem, type EnvioParams } from "@/lib/catalogo/switch-envio";
+import { enviarEnSegundoPlano, entregarAWaitUntil } from "@/lib/catalogo/envio-en-segundo-plano";
+import { PEDIDO_A_SWITCH_EN_SEGUNDO_PLANO } from "@/lib/ui/velocidad-2026-11";
 import { normalizarDocumento } from "@/lib/catalogo/documento-switch";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 
@@ -49,7 +51,7 @@ interface CheckoutItem extends EnvioItem {
   category?: string | null;
 }
 
-async function handleCheckout(req: NextRequest): Promise<NextResponse> {
+async function handleCheckout(req: NextRequest, estado: { segundoPlano: boolean }): Promise<NextResponse> {
   const auth = requireRole(req, ROLES);
   if (auth instanceof NextResponse) return auth;
 
@@ -195,7 +197,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── 2) Envío a Switch (motor compartido) ──
-  const result = await enviarPedidoSwitch({
+  const params: EnvioParams = {
     empresaKey: cfg.empresaKey,
     enviosTable: cfg.enviosTable,
     db,
@@ -214,9 +216,21 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
     // pasa por el MISMO candado que un pedido. Sin cliente no sale ninguna de
     // las dos.
     documento,
-  });
-
+  };
   const base = { ok: true as const, order_id: orderId, order_number: orderNumber };
+
+  // 🔴 velocidad-2026-11: se contesta YA y el envío sigue en segundo plano,
+  // con el mismo motor y el mismo candado at-most-once. Diseño entero en
+  // `lib/catalogo/envio-en-segundo-plano.ts`. Sin `waitUntil` se espera como
+  // antes (nunca queda suelto).
+  if (PEDIDO_A_SWITCH_EN_SEGUNDO_PLANO) {
+    const envio = enviarEnSegundoPlano(params); // cierra su propia sesión
+    estado.segundoPlano = true;
+    if (!entregarAWaitUntil(envio)) await envio;
+    return NextResponse.json({ ...base, switch: { ok: null, enCola: true } });
+  }
+
+  const result = await enviarPedidoSwitch(params);
   switch (result.kind) {
     case "ok":
       return NextResponse.json({ ...base, switch: { ok: true, numeroInterno: result.numeroInterno, pedidoSwitchId: result.pedidoSwitchId, verificado: result.verificado, warnings: result.warnings, documento: result.documento } });
@@ -240,9 +254,12 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  // El envío en segundo plano cierra SU sesión al terminar: cerrarla aquí se
+  // la cortaría a medio camino. Un objeto POR REQUEST (Fluid comparte el módulo).
+  const estado = { segundoPlano: false };
   try {
-    return await handleCheckout(req);
+    return await handleCheckout(req, estado);
   } finally {
-    await logoutAllSwitchSessions();
+    if (!estado.segundoPlano) await logoutAllSwitchSessions();
   }
 }

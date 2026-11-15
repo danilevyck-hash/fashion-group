@@ -6,6 +6,8 @@ import { signSession, verifySession } from "@/lib/session-cookie";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { getLoginLock, registerLoginFailure, clearLoginAttempts } from "@/lib/login-rate-limit";
+import { LOGIN_UNA_PASADA } from "@/lib/ui/velocidad-2026-11";
+import { variantesDeContrasena } from "@/lib/login-variantes";
 
 const COOKIE_NAME = "cxc_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -74,8 +76,14 @@ export async function POST(req: NextRequest) {
           console.warn(`[auth] User "${user.name}" has non-bcrypt password — login skipped. Re-hash required.`);
           continue;
         }
-        const match = await bcrypt.compare(password, user.password)
-          || await bcrypt.compare(password.toLowerCase(), user.password);
+        // velocidad-2026-11: la segunda prueba (en minúsculas) solo cuando la
+        // contraseña TIENE mayúsculas; si no, es la misma prueba repetida y
+        // no puede dar otro resultado. Mitad de tiempo, mismo veredicto.
+        const variantes = LOGIN_UNA_PASADA ? variantesDeContrasena(password) : [password, password.toLowerCase()];
+        let match = false;
+        for (const v of variantes) {
+          if (await bcrypt.compare(v, user.password)) { match = true; break; }
+        }
         if (match) matches.push(user);
       }
 

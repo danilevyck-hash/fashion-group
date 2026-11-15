@@ -1095,6 +1095,23 @@ export interface SwitchCotizacionInfoData {
  *  Para el `finally` de cada cron: sin esto el token queda vivo ~60min y mata
  *  el login del próximo cron que toque la MISMA empresa (sesión única, code
  *  0006). NUNCA lanza — la higiene de sesión jamás debe romper un cron. */
+/**
+ * Cierra SOLO las sesiones de estas empresas (velocidad-2026-11). Con Fluid,
+ * varias rutas comparten el proceso y la caché de tokens: un
+ * `logoutAllSwitchSessions` al terminar una le cortaría el token a otra que
+ * sigue trabajando con OTRA empresa (las de «Actualizar» en paralelo).
+ */
+export async function logoutSwitchSessions(empresas: readonly string[]): Promise<void> {
+  const keys = [...tokenCache.keys()].filter((k) => empresas.includes(k));
+  await Promise.all(keys.map(async (key) => {
+    try {
+      await createSwitchClient(key).logout();
+    } catch {
+      // best-effort, igual que logoutAll.
+    }
+  }));
+}
+
 export async function logoutAllSwitchSessions(): Promise<void> {
   for (const key of [...tokenCache.keys()]) {
     try {

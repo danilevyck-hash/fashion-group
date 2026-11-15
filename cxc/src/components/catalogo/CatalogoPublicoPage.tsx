@@ -40,11 +40,12 @@ import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carr
 // cientos de fotos a ~10). Ver PR de la card unificada.
 const FOTOS_PRIORITARIAS = 10;
 
-export default function CatalogoPublicoPage({ marca }: { marca: MarcaUiKey }) {
-  return <Suspense><CatalogoPublico marca={marca} /></Suspense>;
+/** `inicial`: el paquete ya leído en el servidor (velocidad-2026-11). Sin él, se pide como antes. */
+export default function CatalogoPublicoPage({ marca, inicial }: { marca: MarcaUiKey; inicial?: unknown }) {
+  return <Suspense><CatalogoPublico marca={marca} inicial={inicial} /></Suspense>;
 }
 
-function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
+function CatalogoPublico({ marca, inicial }: { marca: MarcaUiKey; inicial?: unknown }) {
   const theme = getMarcaTheme(marca)!;
   const agrupado = theme.features.agrupacionPorModelo;
   const searchParams = useSearchParams();
@@ -55,8 +56,8 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   // el mini-carrito abierto y con el `env(safe-area-inset-bottom)` del iPhone.
   // Es el MISMO mecanismo que ya usa el catálogo del vendedor.
   const [altoBarra, setAltoBarra] = useState(0);
-  const [products, setProducts] = useState<CatalogoProducto[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<CatalogoProducto[]>(() => (inicial ? productosDelPaquete(marca, inicial) : []));
+  const [loading, setLoading] = useState(!inicial);
   const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
@@ -174,6 +175,8 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   const [reintento, setReintento] = useState(0);
 
   useEffect(() => {
+    // Los productos ya llegaron con la página: no se vuelven a pedir (solo al reintentar).
+    if (inicial && reintento === 0) return;
     async function load() {
       setLoading(true);
       setLoadError(false);
@@ -181,49 +184,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
         const res = await fetch(`${theme.api}/public`);
         if (!res.ok) throw new Error("fetch failed");
         const data = await res.json();
-        // En las 3 marcas `_stock` es DISPONIBILIDAD (lo vendible = saldo −
-        // apartado), no existencia: mostrarle al cliente saldo físico le
-        // ofrece mercancía ya apartada para otro. Regla única en
-        // lib/catalogos/disponible (cae a existencia si el sync todavía no
-        // escribió la columna, para no esconder producto por un dato faltante).
-        if (agrupado) {
-          const prods: JoybeesProduct[] = data.products || [];
-          setProducts(prods.filter(p => disponibleVendible(p) > 0 || p.is_regalia));
-        } else if (theme.features.inventarioPorTalla) {
-          const prods: CatalogoProducto[] = data.products || [];
-          const inv: { product_id: string; size: string; quantity: number }[] = data.inventory || [];
-          const stockMap: Record<string, number> = {};
-          const sizesMap: Record<string, Set<string>> = {};
-          inv.forEach(i => {
-            stockMap[i.product_id] = (stockMap[i.product_id] || 0) + i.quantity;
-            if (i.quantity > 0 && i.size) {
-              if (!sizesMap[i.product_id]) sizesMap[i.product_id] = new Set();
-              sizesMap[i.product_id].add(i.size);
-            }
-          });
-          // Reebok: `inventory.quantity` es EXISTENCIA (el sync escribe
-          // quantity: existencia bajo la talla "UNICA"), así que solo sirve de
-          // fallback y para las tallas; la disponibilidad correcta es la
-          // agregada de la fila del producto.
-          setProducts(
-            prods
-              .map(p => ({
-                ...p,
-                _stock: disponibleVendible(p, stockMap[p.id] ?? 0),
-                _sizes: [...(sizesMap[p.id] || [])],
-              }))
-              .filter(p => (p._stock || 0) > 0 || p.badge === "proximamente")
-          );
-        } else {
-          // Grid PLANA sin inventario por talla (Tommy): el stock vive en la
-          // fila del producto (patrón Joybees) — sin /inventory.
-          const prods: CatalogoProducto[] = data.products || [];
-          setProducts(
-            prods
-              .map(p => ({ ...p, _stock: disponibleVendible(p), _sizes: [] as string[] }))
-              .filter(p => (p._stock || 0) > 0 || p.badge === "proximamente")
-          );
-        }
+        setProducts(productosDelPaquete(marca, data));
       } catch {
         setProducts([]);
         setLoadError(true);
@@ -691,4 +652,58 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
       `}</style>
     </div>
   );
+}
+
+/**
+ * El paquete de `/api/catalogo/<marca>/public` → los productos que se dibujan.
+ * Lo usan la carga en el navegador y la que llega del servidor
+ * (velocidad-2026-11): una sola regla, el mismo resultado.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function productosDelPaquete(marca: MarcaUiKey, data: any): CatalogoProducto[] {
+  const theme = getMarcaTheme(marca)!;
+  const agrupado = theme.features.agrupacionPorModelo;
+  // En las 3 marcas `_stock` es DISPONIBILIDAD (lo vendible = saldo −
+  // apartado), no existencia: mostrarle al cliente saldo físico le
+  // ofrece mercancía ya apartada para otro. Regla única en
+  // lib/catalogos/disponible (cae a existencia si el sync todavía no
+  // escribió la columna, para no esconder producto por un dato faltante).
+  if (agrupado) {
+    const prods: JoybeesProduct[] = data.products || [];
+    return (prods.filter(p => disponibleVendible(p) > 0 || p.is_regalia));
+  } else if (theme.features.inventarioPorTalla) {
+    const prods: CatalogoProducto[] = data.products || [];
+    const inv: { product_id: string; size: string; quantity: number }[] = data.inventory || [];
+    const stockMap: Record<string, number> = {};
+    const sizesMap: Record<string, Set<string>> = {};
+    inv.forEach(i => {
+      stockMap[i.product_id] = (stockMap[i.product_id] || 0) + i.quantity;
+      if (i.quantity > 0 && i.size) {
+        if (!sizesMap[i.product_id]) sizesMap[i.product_id] = new Set();
+        sizesMap[i.product_id].add(i.size);
+      }
+    });
+    // Reebok: `inventory.quantity` es EXISTENCIA (el sync escribe
+    // quantity: existencia bajo la talla "UNICA"), así que solo sirve de
+    // fallback y para las tallas; la disponibilidad correcta es la
+    // agregada de la fila del producto.
+    return (
+      prods
+        .map(p => ({
+          ...p,
+          _stock: disponibleVendible(p, stockMap[p.id] ?? 0),
+          _sizes: [...(sizesMap[p.id] || [])],
+        }))
+        .filter(p => (p._stock || 0) > 0 || p.badge === "proximamente")
+    );
+  } else {
+    // Grid PLANA sin inventario por talla (Tommy): el stock vive en la
+    // fila del producto (patrón Joybees) — sin /inventory.
+    const prods: CatalogoProducto[] = data.products || [];
+    return (
+      prods
+        .map(p => ({ ...p, _stock: disponibleVendible(p), _sizes: [] as string[] }))
+        .filter(p => (p._stock || 0) > 0 || p.badge === "proximamente")
+    );
+  }
 }

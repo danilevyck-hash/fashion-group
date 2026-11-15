@@ -25,6 +25,8 @@ import {
 } from "@/lib/empresa-mapping";
 import { fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { leerProyeccionCierre, leerProyeccionCierreCacheada } from "@/lib/ventas/proyeccion-cache";
+import { PROYECCION_EN_CACHE } from "@/lib/ui/velocidad-2026-11";
 import {
   aplicarCorteCosto, corteMasNuevo, type CorteCosto,
 } from "@/lib/ventas/margen-mes-en-curso";
@@ -140,15 +142,9 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // arregla tres casos históricos donde el año base era un pedazo de año.
     // Cae a v7 mientras la migración 20261001120000 no haya corrido, y la v7
     // sigue cayendo a v6 como siempre.
-    rpcConFallbackDeVersion(
-      () => withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v8", { p_anio: year }), { label: "ventas_proyeccion_cierre_v8" }),
-      () => rpcConFallbackDeVersion(
-        () => withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v7", { p_anio: year }), { label: "ventas_proyeccion_cierre_v7" }),
-        () => withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }), { label: "ventas_proyeccion_cierre_v6" }),
-        { label: "ventas_proyeccion_cierre_v7" },
-      ),
-      { label: "ventas_proyeccion_cierre_v8" },
-    ),
+    // velocidad-2026-11: guardada hasta la próxima carga de facturas, misma
+    // cadena v8 → v7 → v6 (`lib/ventas/proyeccion-cache.ts`).
+    PROYECCION_EN_CACHE ? leerProyeccionCierreCacheada(year) : leerProyeccionCierre(year),
     // FASE 2.1b: MAX(synced_at) de switch_facturas — momento del último sync
     // que insertó data nueva. Alimenta el subtitle "Data actualizada al ..."
     // para mostrar frescura real (no la fecha de hoy). Graceful: si falla,
