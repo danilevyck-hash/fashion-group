@@ -57,6 +57,7 @@
 //     recalcula: la regla de la casa es que los números de Switch no se tocan.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { UNIDADES_CON_COMA } from "@/lib/ui/revision-110-vivo";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
 /**
@@ -409,9 +410,11 @@ export function todoAsignado(lineas: readonly Pick<LineaPedido, "bulto">[]): boo
  * `totalesDelPedido`, que es quien calcula `n`.
  */
 export function textoUnidades(n: number): string {
+  // Revisión 110 (vivo): «1,552» como el resto del sistema (en-US). 🩸 «es» daba «1552».
+  const loc = UNIDADES_CON_COMA ? "en-US" : "es";
   const texto = Number.isInteger(n)
-    ? n.toLocaleString("es")
-    : n.toLocaleString("es", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    ? n.toLocaleString(loc)
+    : n.toLocaleString(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${texto} ${n === 1 ? "unidad" : "unidades"}`;
 }
 

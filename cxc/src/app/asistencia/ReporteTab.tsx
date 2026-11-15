@@ -7,6 +7,7 @@
 // persona, "4,92 horas" no le dice nada a nadie.
 
 import { NOMBRE_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
+import { DISTINTIVO_BAJO_EL_NOMBRE } from "@/lib/ui/revision-110-vivo";
 import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11, FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import type { OpcionEmpresa } from "@/lib/asistencia/empresa-para-todo";
@@ -1447,6 +1448,13 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
             Sin nombre configurado se muestra el código —nunca un blanco— y se
             dice qué falta, porque un número suelto no se le reclama a nadie. */}
         <td className="px-3 py-2.5 text-gray-900">
+          {/* vivo-06: en el celular la celda no pasa del ancho de la pantalla; un
+              distintivo que no cabe al lado del nombre baja ENTERO debajo del
+              nombre (la sangría de las líneas siguientes = casilla + código). */}
+          <div
+            className={DISTINTIVO_BAJO_EL_NOMBRE ? "max-w-[calc(100vw-60px)] sm:max-w-none [&_*]:indent-0" : "contents"}
+            style={DISTINTIVO_BAJO_EL_NOMBRE ? { paddingLeft: `calc(1.5rem + ${anchoCodigo * 0.857}ch + 0.5rem)`, textIndent: `calc(-1.5rem - ${anchoCodigo * 0.857}ch - 0.5rem)` } : undefined}
+          >
           {/* Revisión 110 · ajustes (11): casilla, código y nombre van JUNTOS,
               sin partirse («301 Jenifer / Miranda» caía bajo la casilla); lo que
               no cabe son los distintivos, que bajan enteros a la línea de abajo. */}
@@ -1518,6 +1526,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
               {r.diasTrabajandoFuera} {r.diasTrabajandoFuera === 1 ? "día" : "días"} trabajando fuera
             </span>
           )}
+          </div>
         </td>
         {!ASISTENCIA_PANTALLA_2026_09 && (
           <td className="px-2 py-2.5 text-center tabular-nums text-gray-500">{p.salida}</td>

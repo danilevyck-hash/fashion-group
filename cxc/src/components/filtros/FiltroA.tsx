@@ -161,6 +161,8 @@ export interface BuscadorConFiltrosProps {
   /** «Restablecer»: vuelve todo a como abre la pantalla. */
   onRestablecer: () => void;
   className?: string;
+  /** vivo-12: al final de la línea de filtros puestos, a la derecha («Actualizado h:mm ↻»). */
+  alFinalDeLaLinea?: ReactNode;
 }
 
 export function BuscadorConFiltros(p: BuscadorConFiltrosProps) {
@@ -187,7 +189,7 @@ export function BuscadorConFiltros(p: BuscadorConFiltrosProps) {
         }
       />
       {hay && (
-        <div data-filtros-puestos className="mt-1 flex flex-wrap items-center gap-x-1 px-1 text-[13px] text-gray-500">
+        <div data-filtros-puestos className={`mt-1 flex ${p.alFinalDeLaLinea ? "flex-nowrap" : "flex-wrap"} items-center gap-x-1 px-1 text-[13px] text-gray-500`}>
           <span className="min-w-0 truncate">{puestos.map((x) => x.texto).join(" · ")}</span>
           <button
             type="button"
@@ -199,6 +201,7 @@ export function BuscadorConFiltros(p: BuscadorConFiltrosProps) {
               <X className="h-3 w-3" strokeWidth={2.5} />
             </span>
           </button>
+          {p.alFinalDeLaLinea && <span className="ml-auto shrink-0">{p.alFinalDeLaLinea}</span>}
         </div>
       )}
       <HojaFiltros

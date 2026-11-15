@@ -26,6 +26,7 @@
 // vieja (año, abril) — y eso lo arregla la RPC, no esta pantalla.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { COMPARACION_ENTERA } from "@/lib/ui/revision-110-vivo";
 import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -133,9 +134,9 @@ export function ResumenMinimo({ data, overview, year, mes, isClosedYear, grafico
             {conHoy.conHoy && ` · ${alDiaCompleto(data.dia_actual)}`}
           </p>
           <p className="mt-2 border-t border-gray-100 pt-2 text-xs">
-            <span className={cn(" font-medium tabular-nums", TONO[tonoDeltaRetail(dYoy)])}>{comparativos.yoy}</span>
+            <span className={cn(" font-medium tabular-nums", COMPARACION_ENTERA && "whitespace-nowrap", TONO[tonoDeltaRetail(dYoy)])}>{comparativos.yoy}</span>
             <span className="text-gray-400"> · </span>
-            <span className={cn(" font-medium tabular-nums", TONO[tonoDeltaRetail(dMom)])}>{comparativos.mom}</span>
+            <span className={cn(" font-medium tabular-nums", COMPARACION_ENTERA && "whitespace-nowrap", TONO[tonoDeltaRetail(dMom)])}>{comparativos.mom}</span>
           </p>
           {notaMes && <p data-linea-mayoreo className="mt-1.5 text-xs text-gray-400">{notaMes}</p>}
         </Card>

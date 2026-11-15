@@ -21,6 +21,7 @@ import { anotarDescarga } from "@/lib/ventas/descarga";
 import { textoCuadreProductos, type CuadreProductos } from "@/lib/ventas/una-sola-venta";
 import { type ArticuloVendido, type ChipFiltro, type TotalesFiltro } from "@/lib/productos/filtros";
 import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
+import { PRODUCTOS_BUSCADOR_ANCHO } from "@/lib/ui/revision-110-vivo";
 
 const CHIPS_VENTAS: ChipFiltro[] = [
   { campo: "departamento", etiqueta: "Departamento" },
@@ -75,9 +76,11 @@ export function ProductosFiltros({ desde, hasta, periodo, enBarra }: {
       error={error ? (error instanceof Error ? error.message : "error") : null}
       onReintentar={() => void mutate()}
       chips={CHIPS_VENTAS}
-      antes={<>{periodo}{chipEmpresa}</>}
+      antes={PRODUCTOS_BUSCADOR_ANCHO ? chipEmpresa : <>{periodo}{chipEmpresa}</>}
+      periodo={PRODUCTOS_BUSCADOR_ANCHO ? periodo : undefined}
       antesCelular={chipEmpresa}
-      despues={<FrescuraVentasCel forma="computadora" onActualizado={() => void mutate()} />}
+      despues={PRODUCTOS_BUSCADOR_ANCHO ? undefined : <FrescuraVentasCel forma="computadora" onActualizado={() => void mutate()} />}
+      frescuraResumen={PRODUCTOS_BUSCADOR_ANCHO ? <FrescuraVentasCel forma="celular" conHace onActualizado={() => void mutate()} /> : undefined}
       conInventario
       totalesSinFiltro={totalesSinFiltro}
       notaTotales={nota ? <> <Ayuda titulo="Información">{nota}</Ayuda></> : null}

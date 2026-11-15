@@ -47,6 +47,8 @@ import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
 // Este archivo cuida la pantalla de ANTES: la revisión del 14-nov-2026 va detrás
 // de su interruptor y se prueba en `navegacion/revision-110-fase1.test.ts`.
 vi.mock("@/lib/ui/revision-110-2026-11", async (orig) => ({ ...(await orig<object>()), ICONOS_DE_LINEA_2026_11: false }));
+// vivo-11: «al día 13» sin partir es de la pantalla nueva; apagado, la de antes byte por byte.
+vi.mock("@/lib/ui/revision-110-vivo", async (orig) => ({ ...(await orig<object>()), COMPARACION_ENTERA: false }));
 
 
 const HOY = "2026-09-23";

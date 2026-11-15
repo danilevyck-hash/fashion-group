@@ -46,6 +46,7 @@
 //    la misma que la tabla. Y donde hay descuento, la celda lo DICE.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { DESGLOSE_DEBAJO } from "@/lib/ui/revision-110-vivo";
 import { useState, type ReactNode } from "react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
@@ -341,8 +342,21 @@ function TarjetaVendedorMatriz({
                   <button
                     type="button"
                     onClick={() => onDetalle(k, fila.vendedor)}
-                    className="flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left active:bg-gray-100"
+                    className={`flex min-h-[44px] min-w-0 flex-1 ${DESGLOSE_DEBAJO ? "flex-col justify-center" : "items-center justify-between gap-2"} px-3 py-2 text-left active:bg-gray-100`}
                   >
+                    {DESGLOSE_DEBAJO ? (
+                      // vivo-07: el desglose va en su línea, debajo: el nombre de la
+                      // empresa ya no se encoge a nada cuando la fila es negativa.
+                      <>
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate text-xs text-gray-600">{nombreEmpresa(k)}</span>
+                          <span className={`shrink-0 text-sm tabular-nums ${claseMonto(val ?? 0)}`}>{fmtMoney(val ?? 0)}</span>
+                        </span>
+                        {desglose && <span className="block text-xs tabular-nums text-gray-500">{COMISIONES_RESTA_CON_ROTULO
+                          ? `Comisión ${fmtMoney(desglose.bruto)} · Descuento ${fmtMoney(desglose.descuento)}`
+                          : <>{fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}</>}</span>}
+                      </>
+                    ) : (<>
                     <span className="truncate text-xs text-gray-600">{nombreEmpresa(k)}</span>
                     <span className="shrink-0 text-right">
                       <span className={`block text-sm tabular-nums ${claseMonto(val ?? 0)}`}>
@@ -358,6 +372,7 @@ function TarjetaVendedorMatriz({
                         </span>
                       )}
                     </span>
+                    </>)}
                   </button>
                   {menuEmpresa && <span className="pr-1">{menuEmpresa(k, fila)}</span>}
                 </li>
@@ -599,8 +614,20 @@ function FilaVendedorV2({
                 <button
                   type="button"
                   onClick={() => onDetalle(k, fila.vendedor)}
-                  className="flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-6 pr-3 text-left active:bg-gray-100"
+                  className={`flex min-h-[44px] min-w-0 flex-1 ${DESGLOSE_DEBAJO ? "flex-col justify-center" : "items-center justify-between gap-2"} py-2 pl-6 pr-3 text-left active:bg-gray-100`}
                 >
+                  {DESGLOSE_DEBAJO ? (
+                    // vivo-07: «Fashion Shoes −$30.93» y, debajo, de dónde sale.
+                    <>
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm text-gray-700">{nombreEmpresa(k)}</span>
+                        <span className={`shrink-0 text-sm tabular-nums ${claseMonto(fila.porEmpresa[k] ?? 0)}`}>{fmtMoney(fila.porEmpresa[k] ?? 0)}</span>
+                      </span>
+                      {desglose && <span className="block text-xs tabular-nums text-gray-500">{COMISIONES_RESTA_CON_ROTULO
+                          ? `Comisión ${fmtMoney(desglose.bruto)} · Descuento ${fmtMoney(desglose.descuento)}`
+                          : <>{fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}</>}</span>}
+                    </>
+                  ) : (<>
                   <span className="truncate text-sm text-gray-700">{nombreEmpresa(k)}</span>
                   <span className="shrink-0 text-right">
                     <span className={`block text-sm tabular-nums ${claseMonto(fila.porEmpresa[k] ?? 0)}`}>{fmtMoney(fila.porEmpresa[k] ?? 0)}</span>
@@ -612,6 +639,7 @@ function FilaVendedorV2({
                       </span>
                     )}
                   </span>
+                  </>)}
                 </button>
                 {menuEmpresa && <span className="pr-1">{menuEmpresa(k, fila)}</span>}
               </li>

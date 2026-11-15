@@ -1,4 +1,5 @@
 "use client";
+import { BUSCADOR_PRIMERO_APROBACIONES } from "@/lib/ui/revision-110-vivo";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { ASIS_PENDIENTES_CON_UNIDAD_R110, colaColaboradores } from "@/lib/ui/revision-110-asistencia";
 import { Aviso } from "@/components/ui/Aviso";
@@ -413,6 +414,8 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
                 etiqueta="Buscar colaborador por nombre o código"
                 conteo={conteo}
                 llena={BUSCADOR_IZQUIERDA_LLENA_2026_11}
+                // vivo-09: a la izquierda, llenando lo que queda; lo demás a la derecha, en el mismo orden.
+                className={BUSCADOR_PRIMERO_APROBACIONES ? "order-first" : ""}
               />
             )}
           </>

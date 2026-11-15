@@ -39,6 +39,8 @@ interface Comun {
   /** Celular: «↻ 10:01 am», sin «Actualizado», para cerrar una línea de
    *  filtros (revisión 110, Ventas › Clientes). */
   soloHora?: boolean;
+  /** Celular con «hace N min» en vez de la hora (vivo-05: la línea del resumen en la computadora). */
+  conHace?: boolean;
 }
 
 type Fuente =
@@ -109,7 +111,7 @@ function Linea(props: LineaDeFrescuraProps & { iso: string | null }) {
     );
   }
 
-  const cuando = iso ? (forma === "celular" ? horaDeFrescura(iso, ahora) : haceCuantoFrescura(iso, ahora)) : null;
+  const cuando = iso ? (forma === "celular" && !props.conHace ? horaDeFrescura(iso, ahora) : haceCuantoFrescura(iso, ahora)) : null;
   const texto = cuando ? `Actualizado ${cuando}` : null;
   const accion = props.accion ?? "Actualizar";
   const ocupado = props.ocupado ?? TEXTO_ACTUALIZANDO;

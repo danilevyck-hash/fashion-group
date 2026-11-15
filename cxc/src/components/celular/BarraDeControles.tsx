@@ -43,6 +43,7 @@ import { BuscadorGris } from "@/components/filtros/FiltroA";
 import { ATRIBUTO_BARRA_FIJA, ATRIBUTO_SOBRE_LA_BARRA, CONSULTA_CELULAR } from "@/lib/navegacion/barra-celular";
 import { BARRA_EN_LISTAS_2026_11, TODAS_LAS_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { HIDRATACION_SIN_PORTAL } from "@/lib/ui/revision-110-ajustes";
+import { MONTAJE_ESTABLE } from "@/lib/ui/revision-110-vivo";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { CLASE_VIDRIO, RADIO_VIDRIO, VIDRIO_2026_10, conVidrio } from "@/lib/ui/vidrio";
 import {
@@ -131,6 +132,7 @@ export function ProveedorBarraCelular({ activo, activa, children }: { activo: bo
     setCuentas((s) => ({ ...s, [r]: Math.max(0, s[r] + d) }));
   }, []);
   const valor = useMemo(() => ({ activa, ranuras, ponerRanura, cuentas, contar }), [activa, ranuras, ponerRanura, cuentas, contar]);
+  if (MONTAJE_ESTABLE) return <Contexto.Provider value={activo ? valor : null}>{children}</Contexto.Provider>;
   if (!activo) return <>{children}</>;
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }

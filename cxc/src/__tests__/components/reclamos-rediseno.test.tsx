@@ -85,7 +85,7 @@ describe("la portada", () => {
     pintar();
     const grid = document.querySelector('[data-medir="reclamos-tarjetas"]')!;
     const nombres = Array.from(grid.querySelectorAll("p.text-sm.font-semibold")).map((p) => p.textContent);
-    expect(nombres).toEqual(["Fashion Wear", "Vistana", "Fashion Shoes", "Active Shoes"]);
+    expect(nombres).toEqual(["Fashion Wear", "Vistana International", "Fashion Shoes", "Active Shoes"]);
     expect(grid.textContent).toContain("Isaac Amar");
     expect(grid.textContent).toContain(`el más viejo lleva ${diasDesde("2025-02-01", hoyPanama())} días`);
     expect(grid.textContent).toContain("sin reclamar 1");

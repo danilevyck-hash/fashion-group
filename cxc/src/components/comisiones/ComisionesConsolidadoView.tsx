@@ -89,6 +89,7 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { MenuDescargaComision } from "./comisiones-detalle/MenuDescargaComision";
+import { FLECHA_AL_LADO } from "@/lib/ui/revision-110-vivo";
 import { useDescargaComision } from "./comisiones-detalle/useDescargaComision";
 import { descargarPdfTablaComisiones } from "@/lib/comisiones/pdf-tabla-comisiones";
 import { anotarDescargaComision } from "@/lib/comisiones/rastro";
@@ -439,6 +440,8 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
             {/* 🔴 LA FLECHITA VA PEGADA AL NÚMERO Y EN GRIS, y solo donde hay
                 algo que bajar. Tocar el número sigue abriendo el detalle: la
                 flecha para el clic para que los dos caminos convivan. */}
+            {/* vivo-08: la flecha y el monto en UNA línea, también en columnas angostas. */}
+            <span className={FLECHA_AL_LADO ? "whitespace-nowrap" : undefined}>
             {conFlecha && (
               <MenuDescargaComision
                 titulo={tituloDescarga(nombreVendedorEnPantalla(r.vendedor), nombreCortoEmpresa(k), mes)}
@@ -448,6 +451,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
               />
             )}
             {fmtMoney(val ?? 0)}
+            </span>
             {/* 🔴 El descuento SE VE acá: antes había que abrir el detalle para
                 saber que dentro de −$1,513.08 hay $1,573.08 restados. */}
             {desglose && (
@@ -463,6 +467,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
       <td className={`bg-gray-50 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${!r.se_paga ? "text-gray-400" : r.total < 0 ? "text-red-600" : "text-gray-900"}`}>
         {/* 🔴 LA FLECHA DEL TOTAL BAJA TODAS LAS EMPRESAS DE ESA PERSONA, en un
             solo archivo — una hoja por empresa, en el orden de las columnas. */}
+        <span className={FLECHA_AL_LADO ? "whitespace-nowrap" : undefined}>
         {conDescarga && hayQueDescargarTotal(r.porEmpresa, r.descuentoPorEmpresa, EMPRESAS) && (
           <MenuDescargaComision
             titulo={tituloDescarga(nombreVendedorEnPantalla(r.vendedor), null, mes)}
@@ -472,6 +477,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
           />
         )}
         {fmtMoney(r.total)}
+        </span>
       </td>
     </>
   );

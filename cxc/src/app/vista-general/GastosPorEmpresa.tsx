@@ -35,6 +35,7 @@
 // hay plata que salió, o que todavía no se cargó. Ver
 // `src/lib/egresos/gasto-mostrable.ts`.
 
+import { GASTOS_DEL_ALTO_DE_SU_LINEA } from "@/lib/ui/revision-110-vivo";
 import Link from "next/link";
 import {
   ETIQUETA_SIN_GASTO_EGRESOS,
@@ -89,7 +90,7 @@ export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; 
   // n.º 24 (revisión 110): mientras esté pausado, UNA línea y no 8 renglones iguales.
   if (VG_GASTOS_PAUSADO_UNA_LINEA && gastos.disponible && gastosPausados(gastos.porEmpresa)) {
     return (
-      <div data-panel="gastos" data-gastos-pausado className="rounded-[14px] border border-gray-200 bg-white px-4">
+      <div data-panel="gastos" data-gastos-pausado className={`rounded-[14px] border border-gray-200 bg-white px-4${GASTOS_DEL_ALTO_DE_SU_LINEA ? " self-start" : ""}`}>
         <Link
           href={`/gastos-contabilidad?mes=${mes}`}
           className="flex min-h-[52px] items-center gap-2 text-sm"
