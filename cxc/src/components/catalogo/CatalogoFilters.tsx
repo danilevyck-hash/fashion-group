@@ -395,6 +395,9 @@ interface CatalogoFiltersProps {
   unaFila?: boolean;
   /** Filtro «a»: «Actualizado 2:41 pm ↻» del celular, al lado de la cantidad. */
   frescuraCelular?: ReactNode;
+  /** catalogo-mas-04: «Actualizado h:mm pm ↻» de la computadora. Con él, la
+   *  cantidad sale del buscador y va con la hora al final de la fila de filtros. */
+  frescuraComputadora?: ReactNode;
 }
 
 /**
@@ -508,6 +511,7 @@ function CatalogoFiltrosDeHoy({
   genderOptions, categoryOptions,
   apple = false,
   unaFila = false,
+  frescuraComputadora,
 }: CatalogoFiltersProps) {
   const theme = getMarcaTheme(marca)!;
   const f = theme.filtros;
@@ -766,7 +770,7 @@ function CatalogoFiltrosDeHoy({
         {/* Línea 1: el buscador, con la cantidad adentro. Línea 2: los filtros
             y el orden, en UNA fila (celular y computadora). */}
         <div className="relative">
-          {buscador("Buscar nombre o código", searchInput ? "9.5rem" : "7rem",
+          {frescuraComputadora ? buscador("Buscar nombre o código", searchInput ? "2.75rem" : "1rem") : buscador("Buscar nombre o código", searchInput ? "9.5rem" : "7rem",
               <span data-cantidad className={`pointer-events-none absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-xs text-gray-400 ${searchInput ? "right-11" : "right-3.5"}`}>
                 {filteredCount} {filteredCount === 1 ? "producto" : "productos"}
               </span>)}
@@ -785,6 +789,13 @@ function CatalogoFiltrosDeHoy({
             <span className="absolute inset-0 opacity-0 [&>select]:h-full [&>select]:w-full">{selectOrden}</span>
           </div>
           {hasActiveFilters && <span className="shrink-0 whitespace-nowrap">{botonLimpiar}</span>}
+          {frescuraComputadora && (
+            <span data-cantidad className="ml-auto inline-flex shrink-0 items-center gap-x-1.5 whitespace-nowrap text-sm text-gray-500">
+              <span>{filteredCount} {filteredCount === 1 ? "producto" : "productos"}</span>
+              <span aria-hidden="true" className="text-gray-300">·</span>
+              <span className="inline-flex [&>*]:!m-0">{frescuraComputadora}</span>
+            </span>
+          )}
         </div>
       </div>
     );

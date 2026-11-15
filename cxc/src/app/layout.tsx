@@ -17,6 +17,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import InstallPrompt from "@/components/InstallPrompt";
 import SWUpdater from "@/components/SWUpdater";
 import RegistroDeVisitas from "@/components/RegistroDeVisitas";
+import PantallaAnterior from "@/components/PantallaAnterior";
 import SWRProvider from "@/components/SWRProvider";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import PageTransition from "@/components/PageTransition";
@@ -90,6 +91,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {/* No dibuja nada: anota en silencio qué módulo se abrió, como mucho
                 una vez cada 10 min por pestaña. Ver src/lib/visitas/registro.ts. */}
             <RegistroDeVisitas />
+            <PantallaAnterior />
           </OnlineProvider>
         </SWRProvider>
         </SemillaSesionProvider>

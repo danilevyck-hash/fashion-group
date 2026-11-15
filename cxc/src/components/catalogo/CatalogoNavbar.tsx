@@ -15,7 +15,9 @@
 // Pedidos", que es el camino que ya existía.
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { subirA } from "@/lib/navegacion/pantalla-anterior";
+import { ATRAS_A_CATALOGOS_2026_11, COMPROBANTES_CELULAR_2026_11 } from "@/lib/catalogo/reebok-catalogo-2026-11";
 import { useEffect, useRef, useState } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { hayCaminoDeMigas } from "@/lib/catalogo/camino-de-migas";
@@ -23,12 +25,17 @@ import { usePublicarAlturaEncabezado } from "@/lib/hooks/usePublicarAlturaEncabe
 import { CATALOGOS_APPLE_2026_10, ID_ACCIONES_EN_LA_BARRA } from "@/lib/catalogo/catalogos-2026-10";
 import { barraDeSubruta } from "@/lib/catalogo/catalogos-2026-10-b";
 import LogoEnLaBarra from "./LogoEnLaBarra";
+import { PANEL_COMPROBANTES } from "@/lib/catalogo/numeros-pedido";
 import RutaArriba from "@/app/catalogo/[marca]/pedidos/RutaArriba";
+
+/** La lista de las cuatro marcas (el hub de Catálogos). */
+const HUB_DE_MARCAS = "/catalogos/marcas";
 
 export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
   const [role, setRole] = useState("");
   const pathname = usePathname();
+  const router = useRouter();
 
   // El catálogo con sesión NO lleva `AppHeader`: su encabezado pegajoso es esta
   // navbar, así que es ella la que publica el alto para las barras de adentro
@@ -61,7 +68,29 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
         : "max-w-7xl mx-auto px-4 h-14 flex items-center gap-3 sm:gap-4 border-b border-gray-100"}>
         {subruta?.tipo === "migas" ? (
           <>
-            <RutaArriba marca={marca} enLaBarra />
+            {COMPROBANTES_CELULAR_2026_11 ? (
+              <>
+                {/* catalogo-mas-03 (15-nov-2026): en el celular el camino no
+                    cabía («cio › Catálogos › Marcas…»); queda «‹ Reebok» y el
+                    título, como Confirmar pedido. La computadora sigue con el
+                    camino entero. */}
+                <div className="flex min-w-0 flex-1 items-center gap-3 sm:hidden">
+                  <a
+                    href={theme.catalogoHref}
+                    onClick={(e) => { e.preventDefault(); subirA(router, theme.catalogoHref); }}
+                    className={`${theme.navbar.inicioLink} inline-flex min-h-[44px] shrink-0 items-center gap-1`}
+                  >
+                    <span aria-hidden="true" className="text-lg leading-none">‹</span>{theme.label}
+                  </a>
+                  <h1 className="min-w-0 truncate text-base font-semibold text-gray-900">{PANEL_COMPROBANTES}</h1>
+                </div>
+                <div className="hidden min-w-0 flex-1 sm:flex">
+                  <RutaArriba marca={marca} enLaBarra />
+                </div>
+              </>
+            ) : (
+              <RutaArriba marca={marca} enLaBarra />
+            )}
             {/* Aquí Comprobantes monta «Descargar Excel» (v4). */}
             <div id={ID_ACCIONES_EN_LA_BARRA} className="ml-auto flex shrink-0 items-center" />
           </>
@@ -70,9 +99,21 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
             <Link href={subruta.href} className={`${theme.navbar.inicioLink} shrink-0`}>← {subruta.label}</Link>
             {subruta.titulo && <span aria-hidden="true" className="min-w-0 truncate text-base font-semibold text-gray-900">{subruta.titulo}</span>}
           </>
-        ) : showInicio && (
+        ) : showInicio && (ATRAS_A_CATALOGOS_2026_11 ? (
+          /* catalogo-mas-01 (15-nov-2026): sube UN nivel, a las cuatro marcas;
+             el Inicio sigue a un toque en la barra de abajo. Si se llegó desde
+             ahí, vuelve (`history.back`); si no, reemplaza — el historial
+             queda espejo de Inicio › Catálogos › Marca. */
+          <a
+            href={HUB_DE_MARCAS}
+            onClick={(e) => { e.preventDefault(); subirA(router, HUB_DE_MARCAS); }}
+            className={`${theme.navbar.inicioLink} inline-flex min-h-[44px] items-center gap-1`}
+          >
+            <span aria-hidden="true" className="text-lg leading-none">‹</span>Catálogos
+          </a>
+        ) : (
           <Link href="/home" className={theme.navbar.inicioLink}>← Inicio</Link>
-        )}
+        ))}
         {/* Logo de marca: opcional. Las marcas cuya identidad ya vive completa
             en el header grande (theme.logos.navbar === null) no lo repiten
             aquí — su navbar queda solo con "← Inicio". */}
