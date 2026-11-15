@@ -74,11 +74,39 @@ const MAX_PAGINAS = 1000;
  * directorio de clientes, 6 páginas) para no multiplicar la carga de un cron
  * sobre una tabla grande — la base es Micro.
  */
+/** Lecturas COMPLETAS extra si el COUNT no cuadra (ver `leerTodoPaginado`). */
+export const REINTENTOS_SI_NO_CUADRA = 2;
+
+class LecturaNoCuadra extends Error {}
+
+/**
+ * 🩸 Nov-2026: una marca del reloj que entra ENTRE el COUNT y la última página
+ * dejaba una fila de más (13.449 leídas vs 13.448 contadas) y Justificaciones u
+ * Horarios no cargaban. Si el COUNT no cuadra, la lectura ENTERA se repite
+ * (COUNT nuevo + todas las páginas): la carrera dura milisegundos y la segunda
+ * vuelta cuadra. Nunca se devuelve una lectura que no cuadre: si tras los
+ * reintentos sigue sin cuadrar, el error de siempre.
+ */
 export async function leerTodoPaginado<T>(
   etiqueta: string,
   ejecutar: EjecutarPagina,
   pagina: number = PAGINA_POSTGREST,
   simultaneas: number = 1,
+): Promise<T[]> {
+  for (let intento = 0; ; intento += 1) {
+    try {
+      return await leerUnaVez<T>(etiqueta, ejecutar, pagina, simultaneas);
+    } catch (e) {
+      if (!(e instanceof LecturaNoCuadra) || intento >= REINTENTOS_SI_NO_CUADRA) throw e;
+    }
+  }
+}
+
+async function leerUnaVez<T>(
+  etiqueta: string,
+  ejecutar: EjecutarPagina,
+  pagina: number,
+  simultaneas: number,
 ): Promise<T[]> {
   const filas: T[] = [];
   let esperadas: number | null = null;
@@ -116,7 +144,7 @@ export async function leerTodoPaginado<T>(
     );
   }
   if (filas.length !== esperadas) {
-    throw new Error(
+    throw new LecturaNoCuadra(
       `${etiqueta}: lectura incompleta — ${filas.length} filas leídas vs ${esperadas} contadas (¿falta un .order() estable?)`,
     );
   }

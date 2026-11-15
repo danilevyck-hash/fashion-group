@@ -62,6 +62,34 @@ describe("leerTodoPaginado", () => {
     );
   });
 
+  it("una marca que entra a mitad de la lectura: se relee entera y cuadra (nov-2026)", async () => {
+    // Vuelta 1: COUNT 1.000 pero la página trae 1.001 (entró una marca).
+    // Vuelta 2: COUNT nuevo 1.001, cuadra. Antes: «13.449 leídas vs 13.448».
+    let vuelta = 0;
+    rango.mockImplementation(async (pedirCount: boolean, desde: number) => {
+      if (pedirCount) vuelta += 1;
+      if (vuelta === 1) {
+        return desde === 0
+          ? { data: filas(1000), error: null, count: 999 }
+          : { data: [], error: null, count: null };
+      }
+      return desde === 0
+        ? { data: filas(1000), error: null, count: 1001 }
+        : { data: filas(1, 1000), error: null, count: null };
+    });
+    const out = await leerTodoPaginado<{ id: number }>("asistencia_marcaciones", (c, d, h) => rango(c, d, h));
+    expect(out).toHaveLength(1001);
+    expect(vuelta).toBe(2);
+  });
+
+  it("si nunca cuadra, tras los reintentos corta con el error de siempre (no devuelve a medias)", async () => {
+    rango.mockImplementation(async (_c: boolean, desde: number) =>
+      desde === 0 ? { data: filas(1000), error: null, count: 1511 } : { data: [], error: null, count: null },
+    );
+    await expect(leerTodoPaginado("t", (c, d, h) => rango(c, d, h))).rejects.toThrow(/lectura incompleta/);
+    expect(rango.mock.calls.filter((c) => c[0] === true)).toHaveLength(3); // 1 + 2 reintentos
+  });
+
   it("CORTA si no hay COUNT: sin él no se puede garantizar nada", async () => {
     rango.mockResolvedValue({ data: filas(5), error: null, count: null });
     await expect(leerTodoPaginado("t", (c, d, h) => rango(c, d, h))).rejects.toThrow(/COUNT exacto/i);

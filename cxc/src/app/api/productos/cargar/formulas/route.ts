@@ -91,17 +91,39 @@ export async function PUT(req: NextRequest) {
     .limit(1)
     .maybeSingle();
 
-  if (findErr) {
-    return NextResponse.json({ error: "No se pudo guardar la fórmula." }, { status: 500 });
-  }
+  if (findErr) return fallaAlGuardar("buscar", marca, fields, findErr);
 
   if (existing?.id) {
     const { error } = await supabaseServer.from("marca_formulas").update(fields).eq("id", existing.id);
-    if (error) return NextResponse.json({ error: "No se pudo guardar la fórmula." }, { status: 500 });
+    if (error) return fallaAlGuardar("actualizar", marca, fields, error);
   } else {
     const { error } = await supabaseServer.from("marca_formulas").insert(fields);
-    if (error) return NextResponse.json({ error: "No se pudo guardar la fórmula." }, { status: 500 });
+    if (error) return fallaAlGuardar("insertar", marca, fields, error);
   }
 
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * 🩸 9-nov-2026: «No se pudo guardar la fórmula» sin rastro de por qué. Ahora
+ * el motivo queda en el registro del servidor y la pantalla dice qué hacer.
+ */
+function fallaAlGuardar(
+  paso: string,
+  marca: string,
+  fields: { divisor: number; extra: number; redondeo: string },
+  error: { message: string; code?: string; details?: string | null },
+): NextResponse {
+  console.error(
+    `[formulas] no se pudo ${paso} «${marca}» (divisor ${fields.divisor}, extra ${fields.extra}, redondeo ${fields.redondeo}):`,
+    error.code ?? "", error.message, error.details ?? "",
+  );
+  // 23514 = la base rechazó un valor (CHECK); 23505 = la marca ya existe.
+  const mensaje =
+    error.code === "23514"
+      ? `No se pudo guardar la fórmula de «${marca}»: la base no acepta esos valores (redondeo «${fields.redondeo}»). Prueba con otro redondeo y avísale al administrador.`
+      : error.code === "23505"
+        ? `Ya existe una fórmula para «${marca}». Recarga la página y edítala ahí.`
+        : `No se pudo guardar la fórmula de «${marca}». Vuelve a intentarlo; si se repite, avísale al administrador.`;
+  return NextResponse.json({ error: mensaje }, { status: 500 });
 }
