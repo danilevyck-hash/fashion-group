@@ -169,7 +169,7 @@ describe('🔴 "Todas las empresas" NO vuelve a restar lo ya restado', () => {
     // ahí dentro hay plata restada — había que abrir el detalle para enterarse.
     // Lo que este caso cuida —que la vista NO vuelva a restar— se sostiene en el
     // número grande, que sigue siendo el que mandó el servidor.
-    expect(texto).toContain((COMISIONES_RESTA_CON_ROTULO ? "Comisión $2,859.65 · Descuento $1,573.08" : "$2,859.65 − $1,573.08"));
+    expect(texto).toContain((COMISIONES_RESTA_CON_ROTULO ? "Comisión $2,859.65Descuento $1,573.08" /* vivo2-02: cada rótulo en su línea */ : "$2,859.65 − $1,573.08"));
   });
 });
 

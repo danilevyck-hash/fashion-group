@@ -90,6 +90,10 @@ import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { MenuDescargaComision } from "./comisiones-detalle/MenuDescargaComision";
 import { FLECHA_AL_LADO } from "@/lib/ui/revision-110-vivo";
+import { DESGLOSE_EN_DOS_LINEAS, FLECHA_EN_EL_MARGEN } from "@/lib/ui/revision-110-vivo2";
+
+/** vivo2-02: las seis columnas de empresa con 8 px a cada lado también en xl (eran 12): la tabla cabe y «Total» no se sale. */
+const PAD_X = FLECHA_EN_EL_MARGEN ? "" : " xl:px-3";
 import { useDescargaComision } from "./comisiones-detalle/useDescargaComision";
 import { descargarPdfTablaComisiones } from "@/lib/comisiones/pdf-tabla-comisiones";
 import { anotarDescargaComision } from "@/lib/comisiones/rastro";
@@ -420,7 +424,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
         // 🔴 UNA sola forma de decir «nada»: el guion. Sin número o en cero es
         // lo mismo para quien mira — salvo que adentro haya un descuento.
         if (celdaVacia(val, desc)) {
-          return <td key={k} className="px-2 py-2.5 text-right tabular-nums text-gray-300 xl:px-3">—</td>;
+          return <td key={k} className={`px-2 py-2.5 text-right tabular-nums text-gray-300${PAD_X}`}>—</td>;
         }
         const desglose = desgloseDeCelda(val, desc);
         const abierta = detalle?.empresa === k && detalle?.vendedor === claveDetalle(r.vendedor);
@@ -430,7 +434,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
             key={k}
             onClick={conDetalle ? (e) => { e.stopPropagation(); detalleDe(k, r.vendedor); } : undefined}
             aria-current={abierta ? "true" : undefined}
-            className={`px-2 py-2.5 text-right tabular-nums transition xl:px-3 ${
+            className={`px-2 py-2.5 text-right tabular-nums transition${PAD_X} ${
               conDetalle ? "cursor-pointer hover:bg-gray-100 hover:underline" : ""
             } ${abierta ? "bg-gray-900/5 ring-1 ring-inset ring-gray-900/20" : ""} ${
               r.se_paga ? moneyClass(val ?? 0) : "text-gray-400"
@@ -443,12 +447,14 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
             {/* vivo-08: la flecha y el monto en UNA línea, también en columnas angostas. */}
             <span className={FLECHA_AL_LADO ? "whitespace-nowrap" : undefined}>
             {conFlecha && (
+              <span className={FLECHA_EN_EL_MARGEN ? "-ml-2 inline-flex" : "contents"}>
               <MenuDescargaComision
                 titulo={tituloDescarga(nombreVendedorEnPantalla(r.vendedor), nombreCortoEmpresa(k), mes)}
                 mensajeError={MENSAJE_ERROR}
                 onPdf={() => descargarPdf([{ key: k, nombre: nombreCortoEmpresa(k) }], claveDetalle(r.vendedor))}
                 onExcel={() => descargarExcel([{ key: k, nombre: nombreCortoEmpresa(k) }], claveDetalle(r.vendedor))}
               />
+              </span>
             )}
             {fmtMoney(val ?? 0)}
             </span>
@@ -456,7 +462,13 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
                 saber que dentro de −$1,513.08 hay $1,573.08 restados. */}
             {desglose && (
               <span className="block text-xs font-normal text-gray-500">
-                {COMISIONES_RESTA_CON_ROTULO
+                {/* vivo2-02: cada rótulo en su línea, pegado a su monto. */}
+                {DESGLOSE_EN_DOS_LINEAS && COMISIONES_RESTA_CON_ROTULO ? (
+                  <>
+                    <span className="block xl:whitespace-nowrap">Comisión {fmtMoney(desglose.bruto)}</span>
+                    <span className="block xl:whitespace-nowrap">Descuento {fmtMoney(desglose.descuento)}</span>
+                  </>
+                ) : COMISIONES_RESTA_CON_ROTULO
                           ? `Comisión ${fmtMoney(desglose.bruto)} · Descuento ${fmtMoney(desglose.descuento)}`
                           : <>{fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}</>}
               </span>
@@ -469,12 +481,14 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
             solo archivo — una hoja por empresa, en el orden de las columnas. */}
         <span className={FLECHA_AL_LADO ? "whitespace-nowrap" : undefined}>
         {conDescarga && hayQueDescargarTotal(r.porEmpresa, r.descuentoPorEmpresa, EMPRESAS) && (
+          <span className={FLECHA_EN_EL_MARGEN ? "-ml-2 inline-flex" : "contents"}>
           <MenuDescargaComision
             titulo={tituloDescarga(nombreVendedorEnPantalla(r.vendedor), null, mes)}
             mensajeError={MENSAJE_ERROR}
             onPdf={() => descargarPdf(empresasDeLaFila(r), claveDetalle(r.vendedor))}
             onExcel={() => descargarExcel(empresasDeLaFila(r), claveDetalle(r.vendedor))}
           />
+          </span>
         )}
         {fmtMoney(r.total)}
         </span>
@@ -594,7 +608,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
                 <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                   <ThOrden col="vendedor" api={orden} className="px-3 py-2 font-medium xl:px-4">Vendedor</ThOrden>
                   {EMPRESAS.map((k) => (
-                    <ThOrden key={k} col={k} api={orden} derecha className="px-2 py-2 font-medium xl:whitespace-nowrap xl:px-3">{nombreCortoEmpresa(k)}</ThOrden>
+                    <ThOrden key={k} col={k} api={orden} derecha className={`px-2 py-2 font-medium xl:whitespace-nowrap${PAD_X}`}>{nombreCortoEmpresa(k)}</ThOrden>
                   ))}
                   <ThOrden col="total" api={orden} derecha className="bg-gray-100 px-3 py-2 font-semibold text-gray-700 xl:px-4">Total</ThOrden>
                 </tr>
@@ -625,7 +639,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
                   <td className="px-3 py-2.5 xl:px-4">{haySinPago ? "Total a pagar" : "Total"}</td>
                   {EMPRESAS.map((k) => {
                     const t = colTotal(k);
-                    return <td key={k} className={`px-2 py-2.5 text-right tabular-nums xl:px-3 ${t < 0 ? "text-red-600" : ""}`}>{fmtMoney(t)}</td>;
+                    return <td key={k} className={`px-2 py-2.5 text-right tabular-nums${PAD_X} ${t < 0 ? "text-red-600" : ""}`}>{fmtMoney(t)}</td>;
                   })}
                   <td className={`bg-gray-100 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${grandTotal < 0 ? "text-red-600" : "text-gray-900"}`}>{fmtMoney(grandTotal)}</td>
                 </tr>

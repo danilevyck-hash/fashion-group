@@ -1,6 +1,9 @@
 "use client";
 
 import { IconoResultado } from "@/components/IconoResultado";
+import { fmtDate } from "@/lib/format";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { BUSQUEDA_VENTAS_EMPRESA_Y_FECHA } from "@/lib/ui/revision-110-vivo2";
 import { Zap } from "lucide-react";
 import { BUSCAR_DICE_QUE_2026_11, ICONOS_DE_LINEA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -122,21 +125,6 @@ function fmtMoney(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function fmtDate(d: string) {
-  if (!d) return "";
-  try {
-    return new Date(d + "T12:00:00")
-      .toLocaleDateString("es-PA", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-      .replace(".", "");
-  } catch {
-    return d;
-  }
-}
-
 function flatten(r: SearchResults): FlatItem[] {
   const items: FlatItem[] = [];
   for (const c of r.cxc) {
@@ -203,7 +191,10 @@ function flatten(r: SearchResults): FlatItem[] {
     items.push({
       module: "Ventas",
       label: v.cliente,
-      sub: `$${fmtMoney(v.total)} — ${v.empresa}${v.last_fecha ? ` — ${fmtDate(v.last_fecha)}` : ""}`,
+      // vivo2-05: «$271,799.09 · Vistana International · 13 nov 2026»; sin fecha, nada.
+      sub: BUSQUEDA_VENTAS_EMPRESA_Y_FECHA
+        ? [`$${fmtMoney(v.total)}`, EMPRESA_KEY_TO_NAME[v.empresa] ?? v.empresa, fmtDate(v.last_fecha)].filter(Boolean).join(" · ")
+        : `$${fmtMoney(v.total)} — ${v.empresa}${v.last_fecha ? ` — ${fmtDate(v.last_fecha)}` : ""}`,
       // 🩸 `?search=` no lo leía NADIE: el resultado caía en la pestaña
       // Resumen. El deep link vivo es `?tab=clientes&cliente=<CÓDIGO>`, que
       // Ventas › Clientes lee al montar, preselecciona y resalta. Sin código

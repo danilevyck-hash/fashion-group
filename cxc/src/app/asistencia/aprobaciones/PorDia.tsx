@@ -15,6 +15,7 @@ import { claveDia } from "@/lib/asistencia/aprobaciones";
 import { hm, toquesDeDia } from "@/lib/asistencia/aprobaciones-vistas";
 import { BotonesSiNo, ChipTipo, Flecha } from "./BotonesSiNo";
 import type { PropsVista } from "./PorColaborador";
+import { DIA_SIN_ENCIMARSE } from "@/lib/ui/revision-110-vivo2";
 
 export default function PorDia({
   dias, onDecidir, enVuelo, bloqueado, abiertos, onAbrir, personaResaltada, refResaltada,
@@ -37,21 +38,29 @@ export default function PorDia({
                 type="button"
                 onClick={() => onAbrir(d.fecha)}
                 aria-expanded={abierta}
-                className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 text-left"
+                // vivo2-06c: «dom 1 nov ⌄» en una línea y la cuenta en la de abajo
+                // (en la computadora, al lado). 🩸 El día se encogía a nada y la ⌄
+                // quedaba encima de «4colaboradores».
+                className={DIA_SIN_ENCIMARSE ? "flex min-h-[44px] min-w-0 flex-1 flex-wrap items-center gap-x-2 py-1 text-left sm:gap-x-3" : "flex min-h-[44px] min-w-0 flex-1 items-center gap-2 text-left"}
               >
-                <span className="text-sm text-gray-600">
+                <span className={DIA_SIN_ENCIMARSE ? "whitespace-nowrap text-sm text-gray-600" : "text-sm text-gray-600"}>
                   <b className="font-semibold text-gray-900">{d.etiqueta.slice(0, d.etiqueta.lastIndexOf(" "))}</b>
                   {d.etiqueta.slice(d.etiqueta.lastIndexOf(" "))}
                 </span>
                 <Flecha abierta={abierta} />
+                {DIA_SIN_ENCIMARSE && (
+                  <span className="basis-full whitespace-nowrap text-[13px] text-gray-500 sm:basis-auto sm:text-sm sm:text-gray-600">
+                    {d.gente.length} {d.gente.length === 1 ? "colaborador" : "colaboradores"} · {hm(d.minutos)} h
+                  </span>
+                )}
               </button>
-              <span className="text-sm text-gray-600">
+              {!DIA_SIN_ENCIMARSE && <span className="text-sm text-gray-600">
                 {/* 12a (29-sep-2026, audit aprobado por Daniel): decía «3 · 1:47 h» y
                     el 3 no se entendía. `gente` trae UNA entrada por colaborador
                     en ese día (`armarDiasAprobacion`). Dice «colaboradores», no
                     «personas»: es la palabra del módulo (10-sep-2026). */}
                 {d.gente.length} {d.gente.length === 1 ? "colaborador" : "colaboradores"} · {hm(d.minutos)} h
-              </span>
+              </span>}
               <BotonesSiNo
                 decision={null}
                 etiqueta={d.etiqueta}

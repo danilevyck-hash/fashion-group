@@ -11,10 +11,20 @@ export function fmtCompact(n: number | undefined | null): string {
   return `${sign}$${abs.toFixed(0)}`;
 }
 
-export function fmtDate(d: string): string {
+/**
+ * «5 abr 2026». Acepta «2026-04-05» y también una marca de tiempo completa
+ * («2026-04-05T05:00:00+00:00», lo que PostgREST devuelve de un `timestamptz`):
+ * se toma el DÍA escrito, sin pasar por la zona del navegador.
+ * 🩸 Antes le pegaba «T12:00:00» a la marca de tiempo y salía «Invalid Date»
+ * (búsqueda global › Ventas, `switch_facturas.fecha`). Sin fecha válida: "".
+ */
+export function fmtDate(d: string | null | undefined): string {
   if (!d) return "";
+  const dia = /^\d{4}-\d{2}-\d{2}/.exec(String(d))?.[0];
+  if (!dia) return "";
   try {
-    const date = new Date(d + "T12:00:00");
+    const date = new Date(dia + "T12:00:00");
+    if (Number.isNaN(date.getTime())) return "";
     return date
       .toLocaleDateString("es-PA", {
         day: "numeric",

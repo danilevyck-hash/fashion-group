@@ -47,6 +47,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { DESGLOSE_DEBAJO } from "@/lib/ui/revision-110-vivo";
+import { DESGLOSE_EN_DOS_LINEAS } from "@/lib/ui/revision-110-vivo2";
 import { useState, type ReactNode } from "react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
@@ -352,7 +353,9 @@ function TarjetaVendedorMatriz({
                           <span className="truncate text-xs text-gray-600">{nombreEmpresa(k)}</span>
                           <span className={`shrink-0 text-sm tabular-nums ${claseMonto(val ?? 0)}`}>{fmtMoney(val ?? 0)}</span>
                         </span>
-                        {desglose && <span className="block text-xs tabular-nums text-gray-500">{COMISIONES_RESTA_CON_ROTULO
+                        {desglose && <span className="block text-xs tabular-nums text-gray-500">{DESGLOSE_EN_DOS_LINEAS && COMISIONES_RESTA_CON_ROTULO
+                          ? <><span className="block whitespace-nowrap">Comisión {fmtMoney(desglose.bruto)}</span><span className="block whitespace-nowrap">Descuento {fmtMoney(desglose.descuento)}</span></>
+                          : COMISIONES_RESTA_CON_ROTULO
                           ? `Comisión ${fmtMoney(desglose.bruto)} · Descuento ${fmtMoney(desglose.descuento)}`
                           : <>{fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}</>}</span>}
                       </>
@@ -623,7 +626,9 @@ function FilaVendedorV2({
                         <span className="truncate text-sm text-gray-700">{nombreEmpresa(k)}</span>
                         <span className={`shrink-0 text-sm tabular-nums ${claseMonto(fila.porEmpresa[k] ?? 0)}`}>{fmtMoney(fila.porEmpresa[k] ?? 0)}</span>
                       </span>
-                      {desglose && <span className="block text-xs tabular-nums text-gray-500">{COMISIONES_RESTA_CON_ROTULO
+                      {desglose && <span className="block text-xs tabular-nums text-gray-500">{DESGLOSE_EN_DOS_LINEAS && COMISIONES_RESTA_CON_ROTULO
+                          ? <><span className="block whitespace-nowrap">Comisión {fmtMoney(desglose.bruto)}</span><span className="block whitespace-nowrap">Descuento {fmtMoney(desglose.descuento)}</span></>
+                          : COMISIONES_RESTA_CON_ROTULO
                           ? `Comisión ${fmtMoney(desglose.bruto)} · Descuento ${fmtMoney(desglose.descuento)}`
                           : <>{fmtMoney(desglose.bruto)} − {fmtMoney(desglose.descuento)}</>}</span>}
                     </>

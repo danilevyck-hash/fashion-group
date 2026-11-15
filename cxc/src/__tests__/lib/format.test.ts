@@ -39,6 +39,22 @@ describe("fmtDate()", () => {
     const result = fmtDate("not-a-date");
     expect(typeof result).toBe("string");
   });
+
+  // vivo2-05: la búsqueda global › Ventas decía «Invalid Date». `switch_facturas.fecha`
+  // es `timestamptz` y PostgREST la manda con hora; se le pegaba «T12:00:00» encima.
+  it("una marca de tiempo completa sale con su día, nunca «Invalid Date»", () => {
+    expect(fmtDate("2026-04-05T05:00:00+00:00")).toBe(fmtDate("2026-04-05"));
+    expect(fmtDate("2026-11-13T00:00:00")).toBe(fmtDate("2026-11-13"));
+    expect(fmtDate("2026-04-05")).toMatch(/^5 abr\.? 2026$/);
+  });
+
+  it("sin fecha válida no escribe nada", () => {
+    for (const d of ["not-a-date", null, undefined, "2026-13-45"]) {
+      expect(fmtDate(d)).not.toMatch(/Invalid/);
+    }
+    expect(fmtDate("not-a-date")).toBe("");
+    expect(fmtDate(null)).toBe("");
+  });
 });
 
 describe("fmtGuia()", () => {
