@@ -1,5 +1,6 @@
 "use client";
 
+import { ABR_MEDIDA_EN_PANTALLA } from "@/lib/ui/revision-110-vivo";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { ChevronRight } from "lucide-react";
@@ -1400,6 +1401,7 @@ function sumSlice(arr: (number | null)[], n: number): number {
  * Solo mueve la vista: ningún número cambia.
  */
 function alFinalSinCortar(cont: HTMLElement): void {
+  if (ABR_MEDIDA_EN_PANTALLA) return alFinalSinCortarEnPantalla(cont);
   const tabla = cont.querySelector<HTMLElement>("table");
   const empresa = cont.querySelector<HTMLElement>("thead th");
   if (!tabla || !empresa) return;
@@ -1413,6 +1415,67 @@ function alFinalSinCortar(cont: HTMLElement): void {
     const cortada = meses.find((th) => th.offsetLeft < borde - 1 && th.offsetLeft + th.offsetWidth > borde + 1);
     if (!cortada || max <= 0) break;
     relleno += cortada.offsetLeft + cortada.offsetWidth - borde;
+    tabla.style.setProperty("--relleno-ultimo-mes", `${Math.ceil(relleno)}px`);
+  }
+  cont.scrollLeft = cont.scrollWidth;
+}
+
+/**
+ * vivo-03: medida EN PANTALLA (`getBoundingClientRect`) después de deslizar al
+ * final. 🩸 `offsetLeft` de un `th` se mide contra la TABLA (su `offsetParent`),
+ * no contra la caja que se desliza: el borde salía corrido y ABR quedaba debajo
+ * de «Empresa». Si la columna cortada se ve más de lo que se tapa, los meses de
+ * ahí a la derecha ceden ese pedazo de su aire izquierdo (cada uno ≤ 6 px) y
+ * queda ENTERA; si se tapa más, se esconde entera como antes. Solo mueve la
+ * vista y el aire: ningún número cambia.
+ */
+function alFinalSinCortarEnPantalla(cont: HTMLElement): void {
+  const tabla = cont.querySelector<HTMLElement>("table");
+  const empresa = cont.querySelector<HTMLElement>("thead th");
+  if (!tabla || !empresa) return;
+  tabla.querySelectorAll<HTMLElement>("[data-apretada]").forEach((c) => {
+    c.style.paddingLeft = "";
+    c.removeAttribute("data-apretada");
+  });
+  tabla.setAttribute("data-relleno", "");
+  tabla.style.setProperty("--relleno-ultimo-mes", "0px");
+  // Desde 1280 px la raíz lleva `zoom`: las medidas en pantalla vienen en px
+  // de PANTALLA y el aire se escribe en px de CSS. Se pasan con esta escala.
+  const escala = empresa.offsetWidth > 0 ? empresa.getBoundingClientRect().width / empresa.offsetWidth : 1;
+  const cortadaAhora = () => {
+    cont.scrollLeft = cont.scrollWidth;
+    if (cont.scrollWidth <= cont.clientWidth) return null;
+    const borde = empresa.getBoundingClientRect().right;
+    for (const th of Array.from(cont.querySelectorAll<HTMLElement>("th[data-mes-col]"))) {
+      const r = th.getBoundingClientRect();
+      if (r.left < borde - 1 && r.right > borde + 1) return { th, tapado: (borde - r.left) / escala, visto: (r.right - borde) / escala };
+    }
+    return null;
+  };
+  const c = cortadaAhora();
+  if (!c) return;
+  const meses = cont.querySelectorAll("th[data-mes-col]").length;
+  const desde = Number(c.th.dataset.mesCol);
+  const cuantas = meses - desde;
+  const porColumna = c.tapado / cuantas;
+  if (c.visto >= c.tapado && porColumna <= 6) {
+    // Las celdas de esa columna en adelante (la 1.ª es «Empresa»): nth-child 1-based.
+    tabla.querySelectorAll<HTMLElement>("tr").forEach((tr) => {
+      for (let k = desde; k < meses; k++) {
+        const celda = tr.children[k + 1] as HTMLElement | undefined;
+        if (!celda) continue;
+        celda.style.paddingLeft = `calc(0.375rem - ${porColumna.toFixed(2)}px)`;
+        celda.setAttribute("data-apretada", "");
+      }
+    });
+    if (!cortadaAhora()) return;
+  }
+  // Se tapa más de lo que se ve: el último mes gana aire y la cortada se esconde entera.
+  let relleno = 0;
+  for (let i = 0; i < 4; i++) {
+    const otra = cortadaAhora();
+    if (!otra) break;
+    relleno += otra.visto;
     tabla.style.setProperty("--relleno-ultimo-mes", `${Math.ceil(relleno)}px`);
   }
   cont.scrollLeft = cont.scrollWidth;

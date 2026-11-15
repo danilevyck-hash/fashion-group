@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Home } from "lucide-react";
 import { RAIL_CABE_ENTERO } from "@/lib/ui/revision-110-ajustes";
+import { RAIL_ALTO_CON_ESCALA } from "@/lib/ui/revision-110-vivo";
 import FGLogo from "@/components/FGLogo";
 import { plegadoPorPantalla, useSidebarCollapsed, writeSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
 import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
@@ -46,9 +47,13 @@ export default function BarraLateral2026() {
   // la ventana (filas de 44 px que bajan hasta 32 px); si ni así caben, la
   // lista se desliza. Ningún ícono queda medio cortado al pie.
   const ajustar = RAIL_CABE_ENTERO && collapsed;
+  // vivo-13: desde 1280 px la raíz lleva `zoom` (`--escala-pantalla`, globals.css)
+  // y `100dvh` se dibuja MÁS ALTO que la ventana (900 → 964 px): Usuarios quedaba
+  // abajo, fuera de la pantalla. El alto se divide por esa escala.
+  const altoVentana = RAIL_ALTO_CON_ESCALA ? "(100dvh / var(--escala-pantalla, 1))" : "100dvh";
   const filasRail = 1 + grupos.reduce((n, g) => n + g.modulos.length, 0);
   const estiloRail = ajustar
-    ? ({ "--fila-rail": `clamp(32px, calc((100dvh - 57px - 16px - ${grupos.length * 13}px) / ${filasRail}), 44px)` } as CSSProperties)
+    ? ({ "--fila-rail": `clamp(32px, calc((${altoVentana} - 57px - 16px - ${grupos.length * 13}px) / ${filasRail}), 44px)` } as CSSProperties)
     : undefined;
   const fila = (activo: boolean) =>
     `flex ${ajustar ? "min-h-[var(--fila-rail)]" : "min-h-[44px]"} w-full items-center border-l-2 text-sm transition-colors ${
@@ -58,6 +63,7 @@ export default function BarraLateral2026() {
   return (
     <aside
       data-barra-lateral-2026
+      style={RAIL_ALTO_CON_ESCALA ? { height: "calc(100dvh / var(--escala-pantalla, 1))" } : undefined}
       className={`hidden md:flex fixed left-0 top-0 h-screen ${collapsed ? "w-16" : "w-56"} bg-white border-r border-gray-200 flex-col z-20 transition-[width] duration-200 ease-out`}
     >
       <div className={`h-[57px] border-b border-gray-200 flex items-center justify-between ${collapsed ? "px-1.5" : "px-5"}`}>

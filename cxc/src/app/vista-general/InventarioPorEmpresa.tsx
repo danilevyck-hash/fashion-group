@@ -25,6 +25,7 @@
 
 import { AlertTriangle } from "lucide-react";
 import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
+import { AVISO_SE_PARTE } from "@/lib/ui/revision-110-vivo";
 import Link from "next/link";
 import { money, moneyK } from "./formato";
 import { fmtFrescura } from "@/lib/ventas/referencia-info";
@@ -92,9 +93,19 @@ export function textoFrescura(medidoEn: string | null, viejo: boolean): string {
 export function FrescuraConIcono({ medidoEn, viejo }: { medidoEn: string | null; viejo: boolean }) {
   const texto = textoFrescura(medidoEn, viejo);
   if (!ICONOS_DE_LINEA_EN_TODO || !texto.startsWith("⚠ ")) return <>{texto}</>;
+  const icono = <AlertTriangle aria-hidden className="mr-1 inline h-3.5 w-3.5 -translate-y-px align-middle" strokeWidth={2} />;
+  if (AVISO_SE_PARTE && medidoEn) {
+    // vivo-02: se parte entre palabras; el ícono va con «sin» y la fecha entera.
+    return (
+      <>
+        <span className="whitespace-nowrap">{icono}sin</span> actualizar desde el{" "}
+        <span className="whitespace-nowrap">{fmtFrescura(medidoEn)}</span>
+      </>
+    );
+  }
   return (
     <span className="whitespace-nowrap">
-      <AlertTriangle aria-hidden className="mr-1 inline h-3.5 w-3.5 -translate-y-px align-middle" strokeWidth={2} />
+      {icono}
       {texto.slice(2)}
     </span>
   );

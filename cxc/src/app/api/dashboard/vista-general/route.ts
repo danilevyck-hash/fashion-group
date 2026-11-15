@@ -16,6 +16,8 @@ import {
 } from "@/lib/egresos/gasto-mostrable";
 import { leerInventarioValorizado, type LecturaInventario } from "@/lib/inventario/leer";
 import { ESTADO_PAGADO } from "@/lib/reclamos/pendientes";
+import { diasDesde } from "@/lib/reclamos/dias";
+import { DIAS_COMO_RECLAMOS } from "@/lib/ui/revision-110-vivo";
 
 export const dynamic = "force-dynamic";
 
@@ -126,7 +128,7 @@ interface AgingRow {
   d91_120: number | null; d121_180: number | null; d181_270: number | null; d271_365: number | null; mas_365: number | null;
 }
 interface CxpRow { empresa_key: string; nombre: string | null; saldo_total: number | null; aging: Array<{ saldo: number; title: string }> | null; }
-interface ReclamoRow { id: string; nro_reclamo: string | null; empresa: string | null; estado: string | null; fecha_reclamo: string | null; }
+interface ReclamoRow { id: string; nro_reclamo: string | null; empresa: string | null; estado: string | null; fecha_reclamo: string | null; fecha_factura?: string | null; }
 // Fila del RPC ventas_dashboard_summary: por empresa × mes (subtotal/utilidad/costo).
 interface SummaryRow { empresa: string; mes: number; total_subtotal: number | string | null; total_utilidad: number | string | null; total_costo: number | string | null; }
 // Fila de ventas_rollup_mensual_mv (año anterior, para YoY y fallback de rentabilidad).
@@ -209,7 +211,7 @@ export async function GET(req: NextRequest) {
     supabaseServer.from("switch_proveedor_estadocuenta")
       .select("empresa_key,nombre,saldo_total,aging"),
     supabaseServer.from("reclamos")
-      .select("id,nro_reclamo,empresa,estado,fecha_reclamo")
+      .select(DIAS_COMO_RECLAMOS ? "id,nro_reclamo,empresa,estado,fecha_reclamo,fecha_factura" : "id,nro_reclamo,empresa,estado,fecha_reclamo")
       .eq("deleted", false).neq("estado", ESTADO_PAGADO)
       .order("fecha_reclamo", { ascending: true }),
     // Año ANTERIOR completo desde la MV: YoY del mes seleccionado.
@@ -515,12 +517,19 @@ export async function GET(req: NextRequest) {
   // ── Reclamos sin pagar antiguos ──
   const reclamoRows = (reclamosRes.data as ReclamoRow[] | null) ?? [];
   const hoy = Date.now();
+  // vivo-14: los días los cuenta la MISMA función que Reclamos (`diasDesde`),
+  // desde la fecha de FACTURA y con el «hoy» de Panamá. 🩸 Antes: `Date.now()`
+  // (UTC; de 7 p. m. en adelante ya es mañana) → un día de más que en Reclamos.
+  const hoyPa = hoyPanama();
   const reclamosAntiguos = reclamoRows
     .map((r) => {
-      const dias = r.fecha_reclamo ? Math.floor((hoy - new Date(r.fecha_reclamo).getTime()) / 86400_000) : 0;
+      const dias = DIAS_COMO_RECLAMOS
+        ? diasDesde(r.fecha_factura ?? r.fecha_reclamo, hoyPa) ?? 0
+        : r.fecha_reclamo ? Math.floor((hoy - new Date(r.fecha_reclamo).getTime()) / 86400_000) : 0;
       return { id: r.id, nro: r.nro_reclamo || "—", empresa: r.empresa || "—", estado: r.estado || "—", dias };
     })
     .filter((r) => r.dias >= RECLAMO_ANTIGUO_DIAS)
+    .sort((a, b) => (DIAS_COMO_RECLAMOS ? b.dias - a.dias : 0))
     .slice(0, 8);
   const reclamos = { antiguos: reclamosAntiguos, total: reclamoRows.length };
 

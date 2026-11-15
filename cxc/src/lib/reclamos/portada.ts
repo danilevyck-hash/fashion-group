@@ -17,6 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { RECLAMOS_NOMBRE_COMPLETO } from "@/lib/ui/revision-110-vivo";
 import { EMPRESAS_CON_RECLAMOS } from "./empresas-con-reclamos";
 import { empresaKeyDeReclamo } from "./empresas";
 import { esPendiente, soloPendientes } from "./pendientes";
@@ -97,7 +98,8 @@ export function tarjetasPorEmpresa(
     const key = empresaKeyDeReclamo(empresa);
     return {
       empresa,
-      nombreCorto: key ? nombreCortoEmpresa(key) : empresa,
+      // vivo-16: «Vistana International», como en el resto del sistema (no «Vistana»).
+      nombreCorto: RECLAMOS_NOMBRE_COMPLETO || !key ? empresa : nombreCortoEmpresa(key),
       contacto: (c?.nombre_contacto || c?.nombre || "").trim() || null,
       masViejoDias: dias.length ? Math.max(...dias) : null,
       monto: pend.reduce((s, r) => s + totalDe(r), 0),

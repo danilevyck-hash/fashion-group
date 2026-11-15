@@ -779,16 +779,17 @@ describe("🔴 6 · el envío de Etiquetas que nace al recibir", () => {
 describe("🔴 las piezas del pedido, en texto", () => {
   it("dice «unidades», nunca «piezas» como rótulo", () => {
     expect(textoUnidades(1)).toBe("1 unidad");
-    expect(textoUnidades(12345)).toBe("12.345 unidades");
+    expect(textoUnidades(12345)).toBe("12,345 unidades");
     expect(textoUnidades(12345)).not.toMatch(/pieza/i);
   });
 
-  it("los miles separan con punto, como `clientes/lista.ts` (mismo `toLocaleString(\"es\")`)", () => {
-    expect(textoUnidades(12345)).toBe("12.345 unidades");
+  it("los miles separan con coma, como el resto del sistema — también los de cuatro cifras (vivo: «1,552», no «1552»)", () => {
+    expect(textoUnidades(12345)).toBe("12,345 unidades");
+    expect(textoUnidades(1552)).toBe("1,552 unidades");
   });
 
   it("una fracción (línea rara de Switch) se ve con dos decimales", () => {
-    expect(textoUnidades(4.5)).toBe("4,50 unidades");
+    expect(textoUnidades(4.5)).toBe("4.50 unidades");
   });
 
   it("cero no se calla: dice «0 unidades», no se inventa un guion aquí", () => {
@@ -799,7 +800,7 @@ describe("🔴 las piezas del pedido, en texto", () => {
     const L = (cantidad: number) => ({ cantidad, total: null });
     // Una línea en cero (cancelada, o una promoción a $0) no infla la cuenta.
     const { unidades } = totalesDelPedido([L(10_000), L(2_240), L(0)]);
-    expect(textoUnidades(unidades)).toBe("12.240 unidades");
+    expect(textoUnidades(unidades)).toBe("12,240 unidades");
   });
 });
 

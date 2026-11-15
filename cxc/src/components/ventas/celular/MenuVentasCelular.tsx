@@ -43,20 +43,24 @@ export function FrescuraVentasCel({
   forma = "celular",
   className,
   soloHora,
+  conHace,
 }: {
   onActualizado: () => void;
   /** «↻ 10:01 am» al final de una línea de filtros (revisión 110). */
   soloHora?: boolean;
+  /** «Actualizado hace N min ↻» (vivo-05, al final del resumen en la computadora). */
+  conHace?: boolean;
   /** «computadora»: la barra de Resumen, Clientes y Productos (4-oct-2026). */
   forma?: "celular" | "computadora";
   className?: string;
 }) {
-  if (!FRESCURA_VISIBLE_2026_10 && forma === "celular") return null;
+  if (!FRESCURA_VISIBLE_2026_10 && forma === "celular" && !conHace) return null;
   return (
     <LineaDeFrescura
       forma={forma}
       className={className}
       soloHora={soloHora}
+      conHace={conHace}
       tabla="facturas"
       empresas={empresasConFacturas()}
       opciones={SYNC_NOW_VENTAS_SECUENCIA}

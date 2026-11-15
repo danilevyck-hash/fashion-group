@@ -109,6 +109,8 @@
 // ancestro con overflow, y hay un candado (`__tests__/desplegables-flotan`) que
 // pone el build rojo si alguien escribe uno nuevo.
 
+import { ArrowUpDown } from "lucide-react";
+import { ORDEN_ICONO_DE_LINEA } from "@/lib/ui/revision-110-vivo";
 import { BuscadorConFiltros, RenglonInterruptor, SeccionHoja, type FiltroDeLaHoja, type FiltroPuesto } from "@/components/filtros/FiltroA";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useRef, useState, type ReactNode } from "react";
@@ -779,7 +781,7 @@ function CatalogoFiltrosDeHoy({
               chipActive={f.chipActive} chipInactive={f.chipInactive} chip />
           )}
           <div title={textoOrdenCorto(sortBy)} className={`${CHIP_V4} gap-1 ${ordenado ? f.chipActive : f.chipInactive}`}>
-            <span aria-hidden="true" className="pointer-events-none">↕<span className="ml-1">{textoOrdenCorto(sortBy)}</span></span>
+            <span aria-hidden="true" className="pointer-events-none inline-flex items-center">{ORDEN_ICONO_DE_LINEA ? <ArrowUpDown className="h-3.5 w-3.5" strokeWidth={1.75} /> : "↕"}<span className="ml-1">{textoOrdenCorto(sortBy)}</span></span>
             <span className="absolute inset-0 opacity-0 [&>select]:h-full [&>select]:w-full">{selectOrden}</span>
           </div>
           {hasActiveFilters && <span className="shrink-0 whitespace-nowrap">{botonLimpiar}</span>}
@@ -801,7 +803,7 @@ function CatalogoFiltrosDeHoy({
         <span className={c.limpiar}>{botonLimpiar}</span>
         <div className={c.orden}>
           <span aria-hidden="true" className={`${c.ordenChip} items-center gap-1 min-h-[44px] px-3 rounded-full text-xs font-medium whitespace-nowrap ${sortBy !== "relevancia" ? f.chipActive : f.chipInactive}`}>
-            ↕ {textoOrdenCorto(sortBy)}
+            {ORDEN_ICONO_DE_LINEA ? <ArrowUpDown className="h-3.5 w-3.5" strokeWidth={1.75} /> : "↕"} {textoOrdenCorto(sortBy)}
           </span>
           <span className={c.ordenSelect}>{selectOrden}</span>
         </div>

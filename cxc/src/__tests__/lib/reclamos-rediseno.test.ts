@@ -196,9 +196,9 @@ describe("🔴 la portada: tres números, tarjetas por plata, el contacto real",
     expect(t.find((x) => x.empresa === "Fashion Wear")!.sinReclamar).toBe(1);
     expect(t.find((x) => x.empresa === "Vistana International")!.sinReclamar).toBe(0);
   });
-  it("nombre CORTO de empresa (diccionario § 0)", () => {
+  it("vivo-16: la portada dice «Vistana International», como el resto del sistema", () => {
     const t = tarjetasPorEmpresa(reclamos, contactos, HOY);
-    expect(t.find((x) => x.empresa === "Vistana International")!.nombreCorto).toBe("Vistana");
+    expect(t.find((x) => x.empresa === "Vistana International")!.nombreCorto).toBe("Vistana International");
   });
 });
 

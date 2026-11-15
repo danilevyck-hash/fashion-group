@@ -12,6 +12,7 @@
 // Los totales y la lista «Por descripción» salen de los códigos que quedan.
 
 import { BUSCADOR_EN_LA_FILA } from "@/lib/ui/revision-110-ajustes";
+import { PRODUCTOS_RESUMEN_DOS_LINEAS } from "@/lib/ui/revision-110-vivo";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
@@ -23,7 +24,7 @@ import { BuscarEnLaBarra, EnLaBarra } from "@/components/celular/BarraDeControle
 import { fmtMoney } from "@/lib/ventas/format";
 import { fmtPorcentaje } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
-import { BuscadorConFiltros, type FiltroDeLaHoja } from "@/components/filtros/FiltroA";
+import { BuscadorConFiltros, filtrosPuestos, type FiltroDeLaHoja } from "@/components/filtros/FiltroA";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11, FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { OrdenarEnLaBarra, ThOrden, useOrdenTabla, type OrdenTablaApi } from "@/components/ui/OrdenTabla";
 import {
@@ -166,6 +167,10 @@ export interface PantallaProductosProps {
   onRestablecerAntes?: () => void;
   /** «Actualizado 10:01 am ↻» del celular, al final de la línea del resumen. */
   frescuraCelular?: ReactNode;
+  /** vivo-05 (computadora): el período va a la DERECHA del buscador, que llena el ancho. */
+  periodo?: ReactNode;
+  /** vivo-05 (computadora): «Actualizado hace N min ↻» al final de la línea del resumen. */
+  frescuraResumen?: ReactNode;
   /** Con una descripción elegida, cuánto vende cada valor de este campo
    *  («Women-Sandals → Fashion Shoes $X · Vistana $Y»). Ventas: «empresa». */
   desglosePor?: string;
@@ -313,6 +318,9 @@ export function PantallaProductos(p: PantallaProductosProps) {
       onCambiar: (v: string) => elegir(chip.campo, v),
     })),
   ];
+  // vivo-12: con filtros puestos, la frescura cierra SU línea («Fashion Wear ✕ … Actualizado h:mm ↻»);
+  // sin ninguno, cierra la primera línea del resumen. Nunca queda sola.
+  const frescuraEnPuestos = PRODUCTOS_RESUMEN_DOS_LINEAS && filtroA && !!p.frescuraCelular && filtrosPuestos(filtrosHoja).length > 0;
   const buscadorA = (
     <BuscadorConFiltros
       className="sm:hidden"
@@ -327,6 +335,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
         onCambiar: v => orden.poner(v === "venta" ? null : { col: v as ColOrden, dir: v === "descripcion" ? "asc" : "desc" }),
       }}
       filtros={filtrosHoja}
+      alFinalDeLaLinea={frescuraEnPuestos ? p.frescuraCelular : undefined}
       onRestablecer={() => {
         setElegidos({}); setCodigo(""); orden.poner(null); setVisibles(TANDA); setAbierta(null);
         p.onRestablecerAntes?.();
@@ -342,7 +351,20 @@ export function PantallaProductos(p: PantallaProductosProps) {
           {p.enBarra && descargar && <EnLaBarra pestana="productos" menu={descargar} />}
         </>
       )}
-      {filtroA ? (
+      {filtroA && p.periodo ? (
+        // vivo-05: buscador a todo el ancho con el período a la derecha; los filtros abajo.
+        <div data-filtros-productos className="hidden flex-col gap-2 py-1 sm:flex">
+          <div className="flex items-center gap-2">
+            {buscarCodigo}
+            {p.periodo}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {p.antes}
+            {chipsNodo}
+            {(p.despues || descargar) && <span className="ml-auto flex items-center gap-2">{p.despues}{descargar}</span>}
+          </div>
+        </div>
+      ) : filtroA ? (
         <div data-filtros-productos className="hidden flex-wrap items-center gap-2 py-1 sm:flex">
           {p.antes}
           {chipsNodo}
@@ -393,6 +415,17 @@ export function PantallaProductos(p: PantallaProductosProps) {
       {!p.error && (
         <div className={cn("space-y-3", p.cargando && "opacity-60 transition-opacity")}>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            {PRODUCTOS_RESUMEN_DOS_LINEAS ? (
+              <ResumenTotales
+                sin90={modo === "sin90"}
+                existenciaTotal={existenciaTotal}
+                articulos={filtrados.length}
+                totales={totales}
+                nota={!filtro ? p.notaTotales : null}
+                frescuraCelular={filtroA && !frescuraEnPuestos ? p.frescuraCelular : null}
+                frescuraComputadora={p.frescuraResumen}
+              />
+            ) : (
             <p data-totales-productos className="text-sm text-gray-600">
               {modo === "sin90" ? (
                 <>Stock <b className="tabular-nums text-gray-900">{fmtU(existenciaTotal)}</b> u en <b className="tabular-nums text-gray-900">{fmtU(filtrados.length)}</b> artículos</>
@@ -409,6 +442,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
                 <span className="whitespace-nowrap sm:hidden"><span className="mx-1.5 text-gray-300">·</span>{p.frescuraCelular}</span>
               )}
             </p>
+            )}
             {atencion}
           </div>
           {desglose && (
@@ -435,6 +469,48 @@ export function PantallaProductos(p: PantallaProductosProps) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── El resumen (vivo-05 · vivo-12) ──────────────────────────────────────────
+
+const Sep = () => <span className="mx-1.5 text-gray-300">·</span>;
+/** Un rótulo y su número nunca se separan («Margen 28%», «Utilidad $22,684.40»). */
+const Par = ({ r, v, antes }: { r?: string; v: string; antes?: boolean }) => (
+  <span className="whitespace-nowrap">
+    {antes ? <><b className="tabular-nums text-gray-900">{v}</b> {r}</> : <>{r} <b className="tabular-nums text-gray-900">{v}</b></>}
+  </span>
+);
+
+function ResumenTotales(p: {
+  sin90: boolean; existenciaTotal: number; articulos: number; totales: TotalesFiltro;
+  nota: ReactNode; frescuraCelular: ReactNode; frescuraComputadora: ReactNode;
+}) {
+  const t = p.totales;
+  const linea1 = p.sin90
+    ? <>Stock <Par v={fmtU(p.existenciaTotal)} r="u" antes /> en <Par v={fmtU(p.articulos)} r="artículos" antes /></>
+    : <><Par v={fmtU(t.unidades)} r="unidades" antes /><Sep /><Par r="Venta" v={fmtMoney(t.venta)} /></>;
+  const linea2 = p.sin90 ? null : <><Par r="Utilidad" v={fmtMoney(t.utilidad)} /><Sep /><Par r="Margen" v={fmtPorcentaje(t.margen)} /></>;
+  return (
+    <div data-totales-productos className="min-w-0 text-sm text-gray-600 sm:flex-1">
+      {/* Celular: dos líneas; la frescura cierra la primera (la de la izquierda se parte, ella no). */}
+      <div className="sm:hidden">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="min-w-0">{linea1}{!linea2 && p.nota}</span>
+          {p.frescuraCelular && <span className="shrink-0 whitespace-nowrap">{p.frescuraCelular}</span>}
+        </div>
+        {linea2 && <div>{linea2}{p.nota}</div>}
+      </div>
+      {/* Computadora: una línea, y la frescura al final, pegada al último dato. */}
+      <p className="hidden sm:block">
+        {p.sin90 ? linea1 : <><Par v={fmtU(t.unidades)} r="unidades" antes /><Sep /><Par r="Venta" v={fmtMoney(t.venta)} /><Sep /><Par r="Utilidad" v={fmtMoney(t.utilidad)} /><Sep /></>}
+        {/* Lo último va pegado a la frescura: «Actualizado» nunca baja solo. */}
+        <span className="whitespace-nowrap">
+          {!p.sin90 && <Par r="Margen" v={fmtPorcentaje(t.margen)} />}{p.nota}
+          {p.frescuraComputadora && <span className="ml-3 inline-flex align-middle">{p.frescuraComputadora}</span>}
+        </span>
+      </p>
     </div>
   );
 }
