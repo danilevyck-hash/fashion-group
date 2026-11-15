@@ -21,6 +21,7 @@
 // Además el bloque ocupa 30px de alto contra los 44px de la columna del precio:
 // la card NO crece por el stock.
 
+import { STOCK_SIN_PUNTO_AL_INICIO } from "@/lib/ui/revision-110-vivo2";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { MOSTRAR_EXISTENCIA } from "@/lib/catalogo/stock-en-la-tarjeta";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
@@ -65,6 +66,13 @@ export default function CatalogoStockLine({ marca, disponibilidad, existencia, t
   // La línea única es del CELULAR y del bloque de la derecha (sin talla): con
   // talla el bloque ya vive a lo ancho debajo de los botones y no se toca.
   const enUnaLinea = CATALOGO_ORDEN_CELULAR && !talla;
+  // vivo2-06b: cada dato lleva su «·» delante, en una caja de 12 px; la fila se
+  // corre 12 px a la izquierda y el que abre cada renglón queda fuera del borde
+  // (recortado). Así el punto solo se ve ENTRE dos datos del mismo renglón.
+  const sinPuntoAlInicio = enUnaLinea && STOCK_SIN_PUNTO_AL_INICIO;
+  const punto = sinPuntoAlInicio
+    ? "before:inline-block before:w-3 before:text-center before:content-['·'] sm:before:content-none "
+    : "before:mr-1.5 before:content-['·'] sm:before:content-none ";
   return (
     /* Sin border-t ni separador: el stock ya no es una franja aparte, es la
        columna derecha del renglón del precio (Daniel, 25-jul-2026).
@@ -75,19 +83,21 @@ export default function CatalogoStockLine({ marca, disponibilidad, existencia, t
     <div className={talla
       ? "text-[11px] leading-[15px] tabular-nums"
       : enUnaLinea
-        ? "shrink-0 flex flex-wrap items-center gap-x-1.5 text-[11px] leading-[15px] tabular-nums sm:block xl:text-right"
+        ? sinPuntoAlInicio
+          ? "-ml-3 shrink-0 flex flex-wrap items-center text-[11px] leading-[15px] tabular-nums [clip-path:inset(0_0_0_0.75rem)] sm:ml-0 sm:block sm:[clip-path:none] xl:text-right"
+          : "shrink-0 flex flex-wrap items-center gap-x-1.5 text-[11px] leading-[15px] tabular-nums sm:block xl:text-right"
         : "shrink-0 text-[11px] leading-[15px] tabular-nums xl:text-right"}>
       {/* 🔴 El «Bulto de N» del celular. Va PRIMERO, como en la pantalla de
           hoy, y desaparece de `sm` para arriba: ahí lo sigue dibujando la card
           bajo el precio, donde siempre estuvo. */}
       {enUnaLinea && bulto && (
-        <div className={`whitespace-nowrap sm:hidden ${s.soft}`}>Bulto de {bulto}</div>
+        <div className={`whitespace-nowrap sm:hidden ${sinPuntoAlInicio ? punto : ""}${s.soft}`}>Bulto de {bulto}</div>
       )}
       {/* 🔑 El punto medio que separa los datos en el celular es CSS (`before:`),
           nunca un nodo de texto: así lo que se lee de la tarjeta sigue diciendo
           «Disponibilidad 1» y «Existencia 1», sin un «·» pegado a la palabra. */}
       <div className={`font-semibold whitespace-nowrap ${
-        enUnaLinea && bulto ? "before:mr-1.5 before:content-['·'] sm:before:content-none " : ""
+        sinPuntoAlInicio || (enUnaLinea && bulto) ? punto : ""
       }${agotado ? s.agotado : s.strong}`}>
         Disponibilidad {disponibilidad ?? "—"}
         {talla && <span className={`font-normal ${s.soft}`}> · {talla}</span>}
@@ -99,7 +109,7 @@ export default function CatalogoStockLine({ marca, disponibilidad, existencia, t
           decide Daniel, no el código. Ver `stock-en-la-tarjeta.ts`. */}
       {MOSTRAR_EXISTENCIA && (
         <div className={`whitespace-nowrap ${
-          enUnaLinea ? "before:mr-1.5 before:content-['·'] sm:before:content-none " : ""
+          enUnaLinea ? punto : ""
         }${s.soft}`}>
           Existencia {existencia ?? "—"}
         </div>

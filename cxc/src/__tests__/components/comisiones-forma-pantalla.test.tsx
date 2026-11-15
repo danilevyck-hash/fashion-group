@@ -117,7 +117,7 @@ describe("🔴 la celda de la matriz", () => {
     // ⚠️ El menos es TIPOGRÁFICO (−), diccionario § 0.
     expect(texto).toContain("−$1,513.08");
     // …y ahora la celda dice por qué.
-    expect(texto).toContain((COMISIONES_RESTA_CON_ROTULO ? "Comisión $60.00 · Descuento $1,573.08" : "$60.00 − $1,573.08"));
+    expect(texto).toContain((COMISIONES_RESTA_CON_ROTULO ? "Comisión $60.00Descuento $1,573.08" /* vivo2-02: cada rótulo en su línea */ : "$60.00 − $1,573.08"));
   });
 });
 

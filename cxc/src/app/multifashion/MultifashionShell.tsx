@@ -65,6 +65,8 @@ import { CALENDARIO_SIMPLE_2026_10 } from "@/lib/ui/calendario-simple";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
 import { Aviso } from "@/components/ui/Aviso";
+import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
+import { MULTIFASHION_BARRA_PEGAJOSA } from "@/lib/ui/revision-110-vivo2";
 import { BarraDeControles, useBarraCelular } from "@/components/celular/BarraDeControles";
 
 // Fetcher puro del overview por año. SWR lo cachea por año → volver a un año ya
@@ -385,7 +387,11 @@ export function MultifashionShell({
     )}
     <main className={`mx-auto w-full max-w-[1280px] px-4 md:px-7 md:py-6 ${barra ? "pb-5 pt-0" : "py-5"}`}>
       {/* Bloque 1 de 3: título + período. */}
-      <header className={`relative z-20 mb-4 flex-wrap items-center justify-between gap-3 ${
+      {/* vivo2-04: era `relative z-20` SIN pegarse: al bajar pasaba por debajo
+          del encabezado (z-10) pero se pintaba ENCIMA de él. Ahora se pega
+          debajo, por la única puerta (`CLASE_BARRA_PEGAJOSA`, z 9), con fondo
+          para que la página no se vea pasar por detrás. */}
+      <header className={`${MULTIFASHION_BARRA_PEGAJOSA ? `${CLASE_BARRA_PEGAJOSA} -mx-4 -mt-2 bg-white px-4 py-2 md:-mx-7 md:px-7` : "relative z-20"} mb-4 flex-wrap items-center justify-between gap-3 ${
         MULTIFASHION_CELULAR ? "hidden sm:flex" : "flex"
       }`}>
         <div className="flex min-w-0 items-center gap-3">

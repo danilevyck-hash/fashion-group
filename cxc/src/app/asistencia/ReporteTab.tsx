@@ -8,6 +8,7 @@
 
 import { NOMBRE_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { DISTINTIVO_BAJO_EL_NOMBRE } from "@/lib/ui/revision-110-vivo";
+import { DISTINTIVO_CON_ESPACIO } from "@/lib/ui/revision-110-vivo2";
 import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11, FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import type { OpcionEmpresa } from "@/lib/asistencia/empresa-para-todo";
@@ -1452,7 +1453,8 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
               distintivo que no cabe al lado del nombre baja ENTERO debajo del
               nombre (la sangría de las líneas siguientes = casilla + código). */}
           <div
-            className={DISTINTIVO_BAJO_EL_NOMBRE ? "max-w-[calc(100vw-60px)] sm:max-w-none [&_*]:indent-0" : "contents"}
+            // vivo2-01: la celda mide el ancho real de la tarjeta (16 + 12 a cada lado = 56 px): «8 Briceida Montero 16:30 1 día corregido» cabe al lado y lo largo baja.
+            className={DISTINTIVO_BAJO_EL_NOMBRE ? `${DISTINTIVO_CON_ESPACIO ? "w-[calc(100vw-56px)] sm:w-auto" : "max-w-[calc(100vw-60px)]"} sm:max-w-none [&_*]:indent-0` : "contents"}
             style={DISTINTIVO_BAJO_EL_NOMBRE ? { paddingLeft: `calc(1.5rem + ${anchoCodigo * 0.857}ch + 0.5rem)`, textIndent: `calc(-1.5rem - ${anchoCodigo * 0.857}ch - 0.5rem)` } : undefined}
           >
           {/* Revisión 110 · ajustes (11): casilla, código y nombre van JUNTOS,
@@ -1481,6 +1483,9 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
           {ASIS_SIN_FICHA_R110 && ASISTENCIA_PANTALLA_2026_09 && !p.nombre ? `Código ${persona}` : persona}
           {burbujaSalida}
           </span>
+          {/* vivo2-01: un espacio de ancho cero: el ÚNICO punto donde la línea se puede partir
+              antes de un distintivo («17:00» + «2 días…» son dígito con dígito). */}
+          {DISTINTIVO_CON_ESPACIO && "\u200B"}
           {!ASISTENCIA_PANTALLA_2026_09 && (p.nombre ? (
             <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
           ) : (
@@ -1505,6 +1510,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
             </span>
           )}
           {/* 🔴 Dice por qué esta fila sigue acá con el filtro prendido. */}
+          {DISTINTIVO_CON_ESPACIO && "\u200B"}
           {anclada && (
             <span title={TITULO_ANCLADA}
               className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
@@ -1513,6 +1519,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
           )}
           {/* 🔴 Se ve SIN abrir nada: los minutos de esta fila ya salen de una
               hora que alguien escribió a mano. */}
+          {DISTINTIVO_CON_ESPACIO && "\u200B"}
           {r.diasCorregidos > 0 && (
             <span className="ml-1.5 whitespace-nowrap rounded bg-blue-50 px-1.5 py-0.5 text-xs font-semibold text-blue-700">
               {r.diasCorregidos} {r.diasCorregidos === 1 ? "día corregido" : "días corregidos"}
@@ -1521,6 +1528,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
           {/* 🔴 Se ve SIN abrir nada. Sin este chip, quien trabajó todo el mes
               fuera de la oficina aparece con «0 días trabajados» y ninguna
               explicación: idéntico a alguien que simplemente no vino. */}
+          {DISTINTIVO_CON_ESPACIO && "\u200B"}
           {r.diasTrabajandoFuera > 0 && (
             <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold text-gray-700">
               {r.diasTrabajandoFuera} {r.diasTrabajandoFuera === 1 ? "día" : "días"} trabajando fuera
