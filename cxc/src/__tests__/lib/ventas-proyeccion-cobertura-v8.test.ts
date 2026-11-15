@@ -42,6 +42,8 @@ const leer = (rel: string) => readFileSync(path.join(RAIZ, rel), "utf8");
 const v8 = leer(MIG_V8);
 const v7 = leer(MIG_V7);
 const queries = leer("src/lib/ventas/queries.ts");
+// velocidad-2026-11: la cadena v8 → v7 → v6 se mudó a `proyeccion-cache.ts` (la guarda hasta la próxima carga).
+const proyeccion = leer("src/lib/ventas/proyeccion-cache.ts");
 
 function cuerpo(sql: string, fn: string): string {
   const re = new RegExp(`CREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION\\s+${fn}\\s*\\([\\s\\S]*?\\$\\$([\\s\\S]*?)\\$\\$;`, "i");
@@ -159,21 +161,21 @@ describe("la FORMA del año pasado llega al navegador, y del año correcto", () 
 
 describe("el código llama a la v8 y cae solo si todavía no corrió", () => {
   it("pide la v8", () => {
-    expect(queries).toContain("ventas_proyeccion_cierre_v8");
+    expect(proyeccion).toContain("ventas_proyeccion_cierre_v8");
   });
 
   it("cae a la v7, y la v7 sigue cayendo a la v6", () => {
     // Las tres LLAMADAS, no las tres menciones: nombrarlas en un comentario no
     // es tenerlas en la cadena.
-    expect(queries).toMatch(/\.rpc\("ventas_proyeccion_cierre_v7"/);
-    expect(queries).toMatch(/\.rpc\("ventas_proyeccion_cierre_v6"/);
+    expect(proyeccion).toMatch(/\.rpc\("ventas_proyeccion_cierre_v7"/);
+    expect(proyeccion).toMatch(/\.rpc\("ventas_proyeccion_cierre_v6"/);
     // Las dos caídas encadenadas, no una sola.
-    expect(queries.match(/rpcConFallbackDeVersion/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(proyeccion.match(/rpcConFallbackDeVersion/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
-  it("queries.ts sigue siendo el ÚNICO que invoca la proyección", () => {
+  it("proyeccion-cache.ts sigue siendo el ÚNICO que invoca la proyección", () => {
     // Dos llamadores = dos números para la misma pregunta. Lo verifica también
     // `ventas-proyeccion-v7.test.ts`; acá se repite para la v8.
-    expect(queries).toMatch(/\.rpc\("ventas_proyeccion_cierre_v8"/);
+    expect(proyeccion).toMatch(/\.rpc\("ventas_proyeccion_cierre_v8"/);
   });
 });

@@ -76,8 +76,9 @@ import FotosSection from "../../components/FotosSection";
 import BarraDePeriodos from "../../components/BarraDePeriodos";
 import { useMarcasCatalogo } from "../../components/useMarcaPeriodos";
 import FichaTiendaAcciones, { type AccionDeFila } from "./FichaTiendaAcciones";
-import { descargarExcelDeLaTienda } from "./excel-de-la-tienda";
 import { CHIP_ACTIVO, MARKETING_APPLE_2026_10, montoDelChip } from "@/lib/marketing/marketing-2026-10";
+
+const cargarExcelDeLaTienda = () => import("./excel-de-la-tienda");
 
 interface Datos {
   codigo: string | null;
@@ -290,15 +291,17 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
             )}
             <button
               type="button"
-              onClick={() =>
-                datos &&
+              onClick={async () => {
+                if (!datos) return;
+                // velocidad-2026-11: la herramienta de Excel baja al tocar, no al abrir la ficha.
+                const { descargarExcelDeLaTienda } = await cargarExcelDeLaTienda();
                 descargarExcelDeLaTienda(
                   titulo,
                   codigoVisible,
                   delPeriodo,
                   chipsPeriodo.find((c) => c.clave === periodo)?.rotulo,
-                )
-              }
+                );
+              }}
               disabled={!datos || delPeriodo.length === 0}
               className="rounded-md border border-gray-300 bg-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm text-gray-800 hover:border-gray-500 active:scale-[0.97] transition disabled:opacity-40"
             >

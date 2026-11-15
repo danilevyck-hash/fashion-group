@@ -66,7 +66,8 @@ const LINEAS = src("src/components/catalogo/LineasPedidoEditables.tsx");
 const CARD_PLANA = src("src/components/catalogo/CatalogoProductCard.tsx");
 const CARD_AGRUPADA = src("src/components/catalogo/CatalogoGroupedCard.tsx");
 const UI = src("src/components/ui.tsx");
-const RUTA_PUBLIC = src("src/app/api/catalogo/[marca]/public/route.ts");
+// velocidad-2026-11: la lectura se mudó al módulo que comparte con la página pública.
+const RUTA_PUBLIC = src("src/lib/catalogo/catalogo-publico-server.ts");
 const RUTA_PRODUCTS = src("src/app/api/catalogo/[marca]/products/route.ts");
 
 // ═════════════════════════════════════════════════════════════════════════════

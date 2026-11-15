@@ -9,8 +9,10 @@ export default function LogoEnLaBarra({ marca }: { marca: MarcaUiKey }) {
   if (marca === "tommy") {
     return (
       <span className="flex items-center gap-2.5">
-        <img src="/tommy/tommy-flag.png" alt="" className="hidden sm:block w-9 h-6 object-contain shrink-0" />
-        <img src="/tommy/tommy-horizontal.png" alt="TOMMY HILFIGER" className="h-3 sm:h-4 w-auto" />
+        <img src="/tommy/tommy-flag.png" alt="" width={1241} height={827} className="hidden sm:block w-9 h-6 object-contain shrink-0" />
+        {/* width/height reales: el navegador guarda el ancho ANTES de que llegue la
+            foto y el sello no salta de línea (CLS 0,24 → velocidad-2026-11). */}
+        <img src="/tommy/tommy-horizontal.png" alt="TOMMY HILFIGER" width={900} height={52} className="h-3 sm:h-4 w-auto" />
       </span>
     );
   }

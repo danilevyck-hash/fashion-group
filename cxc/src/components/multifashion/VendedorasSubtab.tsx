@@ -41,7 +41,7 @@
 //    bono JUNTOS—; el canal lo dice la base por CÓDIGO, nunca el nombre.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { Info, Users } from "lucide-react";
@@ -84,13 +84,11 @@ import { desgloseCanales } from "@/lib/multifashion/canales";
 import { notaComparacionVendedoras, rotuloDeltaVendedoras, type ChipVendedoras } from "@/lib/multifashion/vendedoras-rotulo";
 import { etiquetaPeriodo, type CortePeriodo, type Periodo } from "@/lib/multifashion/periodo";
 import { RETAIL_AL_FRENTE, mesCerrado } from "@/lib/multifashion/retail-al-frente";
-import { libroVendedoras, nombreArchivoVendedoras } from "@/lib/multifashion/vendedoras-excel";
 import { MULTIFASHION_CELULAR, montoCorto } from "@/lib/multifashion/celular";
 import { VendedorasCelular } from "./celular/VendedorasCelular";
 import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
 import { AtencionMultifashion, useMetaQueNoLlega } from "./PiezasApple";
 import { Aviso } from "@/components/ui/Aviso";
-import { workbookBlob } from "@/lib/excel-export";
 import { saveAs } from "file-saver";
 import { MF_VENDEDORAS_REMITE_AL_RESUMEN } from "@/lib/ui/revision-110-ventas";
 import { useVentaHoy } from "@/lib/multifashion/venta-hoy-cliente";
@@ -349,8 +347,16 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
   const esUnMes = rpcPeriodo === "mes";
   const excelDisponible = RETAIL_AL_FRENTE && esUnMes && corte != null && mesCerrado(year, rpcMes, corte);
   const periodoExcel = etiquetaPeriodo({ tipo: "mes", anio: year, mes: rpcMes });
-  const bajarExcel = () => {
+  // velocidad-2026-11: la herramienta de Excel (~300 kB) baja al tocar
+  // «Descargar», no al abrir Multifashion. Se pide de antemano cuando el botón
+  // aparece, así el toque no espera red.
+  const cargarExcel = () => Promise.all([import("@/lib/multifashion/vendedoras-excel"), import("@/lib/excel-export")]);
+  useEffect(() => {
+    if (excelDisponible) void cargarExcel().catch(() => { /* se reintenta al tocar */ });
+  }, [excelDisponible]);
+  const bajarExcel = async () => {
     if (!resp) return;
+    const [{ libroVendedoras, nombreArchivoVendedoras }, { workbookBlob }] = await cargarExcel();
     const wb = libroVendedoras({
       filas: sortedVendedoras, periodo: periodoExcel, rotuloDelta: rotuloDelta.columna, bonos: bonosDelChip,
       deltas: anioPasado ? deltasAnio : undefined,

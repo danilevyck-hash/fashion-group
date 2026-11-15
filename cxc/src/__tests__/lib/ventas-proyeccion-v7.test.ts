@@ -24,7 +24,8 @@ const sql = readFileSync(
   path.join(RAIZ, "supabase/migrations/20260726120000_ventas_proyeccion_cierre_v7.sql"),
   "utf8",
 );
-const queries = readFileSync(path.join(RAIZ, "src/lib/ventas/queries.ts"), "utf8");
+// velocidad-2026-11: la cadena de la proyección vive en `proyeccion-cache.ts` (queries.ts la llama).
+const queries = readFileSync(path.join(RAIZ, "src/lib/ventas/proyeccion-cache.ts"), "utf8");
 
 /** Lee `nombre CONSTANT <tipo> := <valor>;` del DECLARE de la función. */
 function constanteSql(nombre: string): number {
@@ -246,9 +247,9 @@ describe("una sola versión de la proyección para todo el sistema", () => {
     expect(queries).toContain("ventas_proyeccion_cierre_v6");
   });
 
-  it("queries.ts es el ÚNICO lugar del código que invoca la proyección", () => {
+  it("proyeccion-cache.ts es el ÚNICO lugar del código que invoca la proyección", () => {
     // El candado real: dos llamadores = dos números para la misma pregunta.
-    expect(archivosQueInvocanLaProyeccion()).toEqual(["src/lib/ventas/queries.ts"]);
+    expect(archivosQueInvocanLaProyeccion()).toEqual(["src/lib/ventas/proyeccion-cache.ts"]);
   });
 });
 

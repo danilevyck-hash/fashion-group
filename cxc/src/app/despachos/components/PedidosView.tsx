@@ -4,8 +4,8 @@
 // pantalla: «¿qué pedidos me faltan por preparar?». Lista del más viejo al más
 // nuevo; un toque cambia Pendiente ↔ Preparado. 🔴 Sin enlace a Etiquetas ni
 // a Guías (Daniel, 5-oct-2026). Solo LEE lo que trajo el cron de madrugada:
-// «Actualizar» trae las 6 empresas una tras otra por `sync-now` (módulo
-// «pedidos»), como Ventas y CxC con «Todas».
+// «Actualizar» trae las 6 empresas por `sync-now` (módulo «pedidos»), A LA VEZ
+// desde el 15-nov-2026 (`PEDIDOS_ACTUALIZAR_EN_PARALELO`).
 
 import { NBSP, TEXTOS_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
@@ -15,6 +15,7 @@ import { ConfirmModal } from "@/components/ui";
 import { AJUSTES_APPLE_6_2026_10 as CIRCULO } from "@/lib/ajustes-apple-6-2026-10";
 import { ESTADOS_CELULAR_2026_11 as ESTADOS_CELULAR, PEDIDOS_CELULAR_2026_11 as PEDIDOS_CELULAR } from "@/lib/ui/celular-optimizar-2026-11";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { PEDIDOS_ACTUALIZAR_EN_PARALELO } from "@/lib/ui/velocidad-2026-11";
 import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, ChipSelector, EnLaBarra, IconoBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import {
   PEDIDOS_LINEA_DE_LA_PESTANA,
@@ -1309,6 +1310,7 @@ export default function PedidosView({
             actualizado={actualizado}
             opciones={susEmpresas.map((empresa) => ({ modulo: "pedidos", empresa, label: nombreCortoEmpresa(empresa) }))}
             secuencial
+            paralelo={PEDIDOS_ACTUALIZAR_EN_PARALELO}
             engancharRunning
             roles={[...PEDIDOS_BODEGA_ROLES]}
             onSuccess={cargar}

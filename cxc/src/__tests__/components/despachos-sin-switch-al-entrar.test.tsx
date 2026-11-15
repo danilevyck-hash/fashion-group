@@ -31,7 +31,7 @@ const { sync, estado } = vi.hoisted(() => ({
   estado: { frescas: false },
 }));
 vi.mock("@/lib/switch-api/sync-empresa", () => ({ syncEmpresaFacturas: sync }));
-vi.mock("@/lib/switch-api/client", () => ({ logoutAllSwitchSessions: vi.fn(async () => {}) }));
+vi.mock("@/lib/switch-api/client", () => ({ logoutAllSwitchSessions: vi.fn(async () => {}), logoutSwitchSessions: vi.fn(async () => {}) }));
 vi.mock("@/lib/supabase-server", () => {
   const q = {
     select: () => q, eq: () => q, gte: () => q,

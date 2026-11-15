@@ -51,6 +51,7 @@ type Toque =
   | {
       opciones: SyncNowOpcion[];
       secuencial?: boolean;
+      paralelo?: boolean;
       engancharRunning?: boolean;
       resumenExito?: string;
       roles?: string[];
@@ -156,6 +157,7 @@ function Linea(props: LineaDeFrescuraProps & { iso: string | null }) {
         variante="linea"
         opciones={props.opciones}
         secuencial={props.secuencial}
+        paralelo={props.paralelo}
         engancharRunning={props.engancharRunning}
         resumenExito={props.resumenExito}
         roles={props.roles}

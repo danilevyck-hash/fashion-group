@@ -201,7 +201,7 @@ describe("🔴 respaldo pre-migración (la columna puede no existir todavía)", 
   });
 
   it("el catálogo PÚBLICO no se cae sin la columna", () => {
-    const pub = leer("src/app/api/catalogo/[marca]/public/route.ts");
+    const pub = leer("src/lib/catalogo/catalogo-publico-server.ts"); // velocidad-2026-11: la lectura vive aquí
     expect((pub.match(/leerConColumnaOpcional\(cfg\.publicCatalog\.cols, "bulto_pzas"/g) ?? []).length).toBe(2);
   });
 
