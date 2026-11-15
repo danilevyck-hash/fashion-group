@@ -69,6 +69,7 @@ const COLS_PRODUCTO = ["nombre", "precio", "comprado", "entregado", "disponible"
 type ColProducto = (typeof COLS_PRODUCTO)[number];
 const TH_MOB = "font-medium px-3 py-2";
 import { MARKETING_APPLE_2026_10 } from "@/lib/marketing/marketing-2026-10";
+import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
 
 /** 🔴 MARKETING_APPLE_2026_10: el resumen usa la misma letra que Productos. */
 const MONO = MARKETING_APPLE_2026_10 ? "" : "tabular-nums ";
@@ -1175,7 +1176,7 @@ export default function MobiliarioPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Precio</label>
-                  <input
+                  <input {...TECLADO_DECIMAL}
                     type="number"
                     step="0.01"
                     min={0}

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { Colaborador } from "@/lib/prestamos-lista-server";
+import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
 
 /**
  * LA FICHA: las dos cuotas y —esto es lo nuevo— **la persona**.
@@ -71,11 +72,11 @@ export default function EditEmpleadoModal({
           </div>
           <div>
             <label className="text-xs text-gray-400 uppercase">Cuota de préstamo ($ por quincena)</label>
-            <input type="number" step="0.01" min="0" value={fCuotaPrestamo} onChange={e => onChangeCuotaPrestamo(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            <input {...TECLADO_DECIMAL} type="number" step="0.01" min="0" value={fCuotaPrestamo} onChange={e => onChangeCuotaPrestamo(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
           </div>
           <div>
             <label className="text-xs text-gray-400 uppercase">Cuota de terceros ($ por quincena)</label>
-            <input type="number" step="0.01" min="0" value={fCuotaTerceros} onChange={e => onChangeCuotaTerceros(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            <input {...TECLADO_DECIMAL} type="number" step="0.01" min="0" value={fCuotaTerceros} onChange={e => onChangeCuotaTerceros(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
             <p className="mt-1 text-xs text-gray-500">
               Se descuenta solo al cerrar la quincena, hasta pagarlo.
             </p>
@@ -86,7 +87,7 @@ export default function EditEmpleadoModal({
                 Volvió el 14-sep-2026: Daniel decidió que el daño se registra
                 como un préstamo —monto y cuota— y desde ahí baja solo. */}
             <label className="text-xs text-gray-400 uppercase">Cuota de daño ($ por quincena)</label>
-            <input type="number" step="0.01" min="0" value={fCuotaDano} onChange={e => onChangeCuotaDano(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            <input {...TECLADO_DECIMAL} type="number" step="0.01" min="0" value={fCuotaDano} onChange={e => onChangeCuotaDano(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
             <p className="mt-1 text-xs text-gray-500">
               Se descuenta solo al cerrar la quincena, hasta pagarlo. Un 0 apaga la cuota y no borra la deuda.
             </p>

@@ -73,6 +73,7 @@ import { workbookBlob, workbookBytes, filtroDesdeA1, XLSX_MIME } from "@/lib/exc
 import { Aviso } from "@/components/ui/Aviso";
 import { useToastOpcional } from "@/components/ToastSystem";
 import { mensajeDelServidor } from "@/lib/depurador/error-al-guardar";
+import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
 
 type NameMode = "formula" | "fijo";
 interface NameEdit { divisor: number; extra: number; redondeo: Redondeo; precioFijo: number | null; modo: NameMode; dirty: boolean }
@@ -1133,12 +1134,12 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                           <option value="fijo">Precio fijo</option>
                         </select>
                         {r.modo === "fijo" ? (
-                          <input type="number" step="0.01" value={r.precioFijo ?? ""} placeholder="$" aria-label={`Precio fijo ${name}`}
+                          <input {...TECLADO_DECIMAL} type="number" step="0.01" value={r.precioFijo ?? ""} placeholder="$" aria-label={`Precio fijo ${name}`}
                             onChange={(e) => patchName(name, { precioFijo: e.target.value === "" ? null : Number(e.target.value) })}
                             className={`${miniInputCls} w-full border-amber-300 text-left`} />
                         ) : (
                           <div>
-                            <input type="number" step="0.01" value={r.divisor || ""} placeholder="—" aria-label={`Divisor ${name}`}
+                            <input {...TECLADO_DECIMAL} type="number" step="0.01" value={r.divisor || ""} placeholder="—" aria-label={`Divisor ${name}`}
                               aria-invalid={nameMsg !== null}
                               onChange={(e) => patchName(name, { divisor: Number(e.target.value) || 0 })}
                               className={nameMsg !== null
@@ -1431,7 +1432,7 @@ function FormulaRow({ label, f, onChange, onSave, saving, flashed, divisorMsg }:
       <div className="flex flex-wrap items-center gap-2">
         <span className="w-20 text-[13px] font-semibold text-gray-900">{label}</span>
         <label className="text-[11px] text-gray-500">÷</label>
-        <input
+        <input {...TECLADO_DECIMAL}
           type="number" step="0.01" value={f.divisor || ""}
           aria-invalid={divisorMsg !== null}
           onChange={(e) => onChange({ ...f, divisor: Number(e.target.value) || 0 })}

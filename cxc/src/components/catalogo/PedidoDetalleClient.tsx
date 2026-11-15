@@ -58,6 +58,7 @@ import {
 } from "@/lib/catalogo/cliente-elegido";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
+import { TECLADO_DECIMAL, TECLADO_ENTERO } from "@/lib/ui/iphone-2026-11";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string;
   /** Precio de lista del catálogo (`<marca>_products.price`, sincronizado de
@@ -1037,7 +1038,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
                   {canEdit ? (
                     <label className="inline-flex items-center gap-1.5">
-                      <input type="number" min={1} step={1} value={item.quantity} aria-label="Bultos"
+                      <input {...TECLADO_ENTERO} type="number" min={1} step={1} value={item.quantity} aria-label="Bultos"
                         onChange={e => updateItem(idx, "quantity", parseInt(e.target.value) || 1)}
                         className={theme.pedido.qtyInputClass} />
                       <span className="text-xs text-gray-400">bultos</span>
@@ -1049,7 +1050,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   {canEdit ? (
                     <label className="inline-flex items-center gap-1">
                       <span className="text-xs text-gray-400">$</span>
-                      <input type="number" step={1} min={0} value={item.unit_price} aria-label="Precio"
+                      <input {...TECLADO_DECIMAL} type="number" step={1} min={0} value={item.unit_price} aria-label="Precio"
                         onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
                         className="w-16 min-h-[44px] text-right border-b border-gray-200 text-base outline-none focus:border-black tabular-nums" />
                       <span className="text-xs text-gray-400">c/u</span>
@@ -1149,7 +1150,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   </td>
                   <td className="py-2 text-center">
                     {canEdit ? (
-                      <input type="number" min={1} step={1} value={item.quantity}
+                      <input {...TECLADO_ENTERO} type="number" min={1} step={1} value={item.quantity}
                         onChange={e => updateItem(idx, "quantity", parseInt(e.target.value) || 1)}
                         className={theme.pedido.qtyInputClass} />
                     ) : (
@@ -1168,7 +1169,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                            letra en teléfono. A `text-sm py-0.5` medía ~22 px —la
                            mitad del mínimo táctil— y iOS hacía zoom solo al
                            tocarla, justo en la casilla del PRECIO. */
-                        <input type="number" step={1} min={0} value={item.unit_price}
+                        <input {...TECLADO_DECIMAL} type="number" step={1} min={0} value={item.unit_price}
                           onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
                           className="w-14 min-h-[44px] text-right border-b border-gray-200 text-base md:text-sm outline-none focus:border-black tabular-nums" />
                       ) : (

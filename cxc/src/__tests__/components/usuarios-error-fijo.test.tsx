@@ -25,7 +25,7 @@ async function abrirNuevo() {
   await screen.findAllByText(/jorman/i);
   fireEvent.click(screen.getAllByRole("button", { name: /Nuevo usuario/ })[0]);
 }
-const guardar = () => act(async () => { fireEvent.click(screen.getByRole("button", { name: "Guardar" })); });
+const guardar = () => act(async () => { fireEvent.click(screen.getAllByRole("button", { name: "Guardar" })[0]); });
 const pasan = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 
 beforeEach(() => {

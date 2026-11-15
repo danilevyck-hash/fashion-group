@@ -20,6 +20,7 @@ import { evaluarTopePrestamo, textoAvisoTope } from "@/lib/prestamos-tope";
 import { queFaltaParaRegistrar, textoFaltaRegistrar } from "@/lib/prestamos-registrar";
 import { MOV_TIPOS } from "./types";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
 
 /**
  * REGISTRAR UN MOVIMIENTO — tres conceptos, y las preguntas justas.
@@ -197,13 +198,13 @@ export default function NuevoMovimientoModal({
 
         <div>
           <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
-          <input type="number" step="0.01" min="0.01" value={monto} onChange={e => setMonto(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+          <input {...TECLADO_DECIMAL} type="number" step="0.01" min="0.01" value={monto} onChange={e => setMonto(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
         </div>
 
         {preguntaCuota && (
           <div>
             <label className="text-xs text-gray-400 uppercase">Cuota por quincena ($) *</label>
-            <input type="number" step="0.01" min="0.01" value={cuota} onChange={e => setCuota(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+            <input {...TECLADO_DECIMAL} type="number" step="0.01" min="0.01" value={cuota} onChange={e => setCuota(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
             <p className="mt-1 text-xs text-gray-400">Se descuenta sola en cada planilla hasta pagarlo. Queda guardada en la ficha.</p>
           </div>
         )}

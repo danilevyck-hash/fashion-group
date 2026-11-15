@@ -52,6 +52,7 @@ import {
 import { unirEnHumano } from "@/lib/guias/falta-para-despachar";
 import { useSoloCobrable } from "@/lib/marketing/solo-cobrable-contexto";
 import { SeCobraAlEditar } from "@/app/marketing/components/RegistroDelCargo";
+import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
 
 export interface FacturaFormValues {
   numeroFactura: string;
@@ -724,7 +725,7 @@ export function FacturaForm({
         <label htmlFor="factura-subtotal" className="block text-sm text-gray-600 mb-1">
           Subtotal{asterisco}
         </label>
-        <input
+        <input {...TECLADO_DECIMAL}
           id="factura-subtotal"
           type="number"
           min={0}
@@ -999,7 +1000,7 @@ export function FacturaForm({
               >
                 Subtotal<span className="text-red-500 ml-0.5">*</span>
               </label>
-              <input
+              <input {...TECLADO_DECIMAL}
                 id="factura-subtotal"
                 type="number"
                 min={0}

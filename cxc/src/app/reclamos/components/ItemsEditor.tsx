@@ -5,6 +5,7 @@ import { RItem } from "./types";
 import { TALLAS, GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem } from "./constants";
 import { filaRepetida } from "@/lib/reclamos/lineas-factura";
 import { AIRE_ENTRE_COLUMNAS } from "@/lib/reclamos/tabla-renglones";
+import { TECLADO_DECIMAL, TECLADO_ENTERO } from "@/lib/ui/iphone-2026-11";
 
 interface Props {
   items: RItem[];
@@ -85,8 +86,8 @@ export default function ItemsEditor({ items, setItems, titulo = "Líneas del rec
                     {GENEROS.map((g) => <option key={g} value={g}>{generoLabel(g)}</option>)}
                   </select>
                 </td>
-                <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} aria-label="Cantidad" className="w-full min-w-[44px] border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none text-right" /></td>
-                <td className="py-2 pr-1"><input type="number" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} aria-label="Precio unitario" className="w-full min-w-[44px] border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none text-right" /></td>
+                <td className="py-2 pr-1"><input {...TECLADO_ENTERO} type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} aria-label="Cantidad" className="w-full min-w-[44px] border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none text-right" /></td>
+                <td className="py-2 pr-1"><input {...TECLADO_DECIMAL} type="number" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} aria-label="Precio unitario" className="w-full min-w-[44px] border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none text-right" /></td>
                 <td className="py-2 pr-1">
                   <select value={item.motivo} onChange={(e) => updateItem(idx, "motivo", e.target.value)} aria-label="Motivo" className="w-full border-b border-gray-200 min-h-[44px] xl:min-h-0 py-1 text-sm outline-none bg-transparent">
                     <option value="">--</option>

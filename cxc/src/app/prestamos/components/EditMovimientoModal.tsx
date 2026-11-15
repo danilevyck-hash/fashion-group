@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { CONCEPTO_PAGO, ORIGENES_PAGO, etiquetaConcepto } from "@/lib/prestamos-conceptos";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
 
 interface Props {
   show: boolean;
@@ -58,7 +59,7 @@ export default function EditMovimientoModal({
           </div>
           <div>
             <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
-            <input type="number" step="0.01" min="0.01" value={emMonto} onChange={e => onChangeMonto(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+            <input {...TECLADO_DECIMAL} type="number" step="0.01" min="0.01" value={emMonto} onChange={e => onChangeMonto(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
           </div>
           {emConcepto === CONCEPTO_PAGO && (
             <div>

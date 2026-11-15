@@ -21,6 +21,7 @@ import IconButton from "@/components/IconButton";
 import { getDefaultModulesForRole, grupoDeModulo } from "@/lib/modules";
 import { modulosOfrecibles, moduloOfrecible } from "@/lib/modulos-ofrecibles";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
+import { USUARIO_GUARDAR_ARRIBA_2026_11 } from "@/lib/ui/iphone-2026-11";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import { USUARIOS_APPLE_2026_10 } from "@/lib/usuarios-apple-2026-10";
@@ -501,7 +502,9 @@ function UsuariosPageInner() {
             >
               {/* La ✕ es OBLIGATORIA: en iPhone no hay tecla Escape y el
                   backdrop era la única salida del modal. 44x44. */}
-              <div className="px-6 pt-6 pb-2 flex items-start justify-between gap-3">
+              <div className={USUARIO_GUARDAR_ARRIBA_2026_11
+                ? "px-6 pt-6 pb-2 flex items-start justify-between gap-3 max-md:sticky max-md:top-0 max-md:z-10 max-md:bg-white max-md:pt-4 max-md:pb-3"
+                : "px-6 pt-6 pb-2 flex items-start justify-between gap-3"}>
                 <h2
                   id="usuario-modal-title"
                   className="text-gray-900 leading-tight"
@@ -509,6 +512,17 @@ function UsuariosPageInner() {
                 >
                   {editUserId ? "Editar usuario" : "Nuevo usuario"}
                 </h2>
+                {/* ios2-02: en el celular «Guardar» va aquí, junto a la ✕, para que el teclado nunca lo tape. */}
+                {USUARIO_GUARDAR_ARRIBA_2026_11 && (
+                  <button
+                    type="button"
+                    onClick={saveUser}
+                    disabled={savingUser}
+                    className="md:hidden ml-auto -mt-1 inline-flex min-h-[44px] items-center justify-center px-5 bg-black text-white text-sm font-medium rounded-md active:scale-[0.97] transition disabled:opacity-50"
+                  >
+                    {savingUser ? "Guardando..." : "Guardar"}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={cerrarUserModal}
@@ -710,7 +724,7 @@ function UsuariosPageInner() {
               {/* iPhone: Cancelar medía 91×37 y Guardar 94×37 — los dos por
                   debajo de los 44 de alto. min-h + inline-flex centrado; el
                   padding horizontal y el copy no cambian. */}
-              <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+              <div className={`px-6 py-4 border-t border-gray-100 justify-end gap-2 ${USUARIO_GUARDAR_ARRIBA_2026_11 ? "hidden md:flex" : "flex"}`}>
                 <button
                   onClick={() => setShowUserModal(false)}
                   className="inline-flex min-h-[44px] items-center justify-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition"

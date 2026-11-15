@@ -23,6 +23,7 @@ import CampoFecha from "@/components/ui/CampoFecha";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
 import { FILTRO_4_CAJA_PERIODO } from "@/lib/ui/revision-110-filtros";
+import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
 
 // 🔴 6-oct-2026: tocar un encabezado ordena; sin tocar, el más nuevo arriba
 // (como siempre). La fecha arranca de la más nueva, como un número.
@@ -465,7 +466,7 @@ export default function GastoTable({
                         {showFiscal && (
                           <>
                             <td className="py-2 pr-1 px-4">
-                              <input
+                              <input {...TECLADO_DECIMAL}
                                 type="number"
                                 step="0.01"
                                 value={editGasto.subtotal ?? ""}
@@ -475,7 +476,7 @@ export default function GastoTable({
                               />
                             </td>
                             <td className="py-2 pr-1 px-4">
-                              <input
+                              <input {...TECLADO_DECIMAL}
                                 type="number"
                                 step="0.01"
                                 value={editGasto.itbms ?? ""}

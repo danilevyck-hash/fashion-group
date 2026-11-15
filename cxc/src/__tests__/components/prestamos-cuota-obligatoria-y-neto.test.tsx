@@ -177,7 +177,7 @@ describe("A. 🔴 sin cuota no se guarda, y el botón dice qué falta", () => {
   it("el rótulo lleva asterisco y la casilla no admite menos de un centavo", () => {
     const modal = sinComentarios("src/app/prestamos/components/NuevoMovimientoModal.tsx");
     expect(modal).toContain("Cuota por quincena ($) *");
-    expect(modal).toMatch(/<input type="number" step="0\.01" min="0\.01" value=\{cuota\}/);
+    expect(modal).toMatch(/<input (?:\{\.\.\.TECLADO_DECIMAL\} )?type="number" step="0\.01" min="0\.01" value=\{cuota\}/);
     // La decisión de «listo» sale del módulo puro, no de una condición a mano.
     expect(modal).toMatch(/const faltantes = queFaltaParaRegistrar\(\{ fecha, monto, cuota, pideCuota: preguntaCuota, esPago, origen \}\);/);
     expect(modal).toMatch(/const listo = faltantes\.length === 0 && !guardando;/);
