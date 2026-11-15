@@ -164,7 +164,10 @@ function elegirPeriodo() {
 
 /** Toca el ⓘ cuyo nombre accesible es `titulo`. */
 function abrirAyuda(titulo: string) {
-  fireEvent.click(screen.getByRole("button", { name: titulo }));
+  // 15-nov-2026 (`PLANILLA_AYUDA_JUNTO_A_GENERAR_2026_11`): el ⓘ del neto se
+  // dibuja dos veces —celular y computadora, cada uno escondido por CSS en la
+  // otra—. jsdom no aplica CSS: basta tocar el primero.
+  fireEvent.click(screen.getAllByRole("button", { name: titulo })[0]);
 }
 
 /**

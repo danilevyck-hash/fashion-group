@@ -45,7 +45,7 @@ import {
 import { useColchonDelFlotante } from "@/lib/navegacion/useColchonDelFlotante";
 import { ALTO_TAB_BAR, MARGEN_TAB_BAR, TAB_BAR_2026_10, barraFijaDe, pestanasDelRol, rotuloDePestana } from "@/lib/navegacion/tab-bar";
 import { BARRA_SIN_MAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
-import { House, MoreHorizontal } from "lucide-react";
+import { ChevronLeft, House, MoreHorizontal } from "lucide-react";
 import { useBarraCelular } from "@/lib/navegacion/useBarraCelular";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import type { ModuleGroup } from "@/lib/modules";
@@ -111,9 +111,15 @@ interface AppHeaderProps {
    * lo ve el cliente sin sesión. Candado `catalogo-boton-menu-celular`.
    */
   soloMenuDelCelular?: boolean;
+  /**
+   * El título del celular hace de «Atrás» (15-nov-2026, `celopt-restos-2026-11`):
+   * quien lo pasa convierte el título en «‹ Módulo» (44 px de alto) y esconde su
+   * propia fila de volver en el celular. Sin él, lo de antes.
+   */
+  volverEnElCelular?: () => void;
 }
 
-export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acciones, grupo, tituloEnLaPantalla, soloMenuDelCelular }: AppHeaderProps) {
+export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acciones, grupo, tituloEnLaPantalla, soloMenuDelCelular, volverEnElCelular }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -435,6 +441,17 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           <p className={CATALOGOS_APPLE_2026_10_B.tituloCelularChico
             ? "flex items-start gap-2 text-[22px] font-semibold leading-[1.2] tracking-tight text-gray-950"
             : tituloCelular("flex items-start gap-2.5 text-[34px] font-semibold leading-[1.08] tracking-tight text-gray-950")}>
+            {volverEnElCelular ? (
+              <button
+                type="button"
+                onClick={volverEnElCelular}
+                aria-label={`Volver a ${module}`}
+                className="-my-[9px] -ml-1.5 flex min-h-[44px] min-w-0 items-center gap-0.5 pr-2 text-left active:opacity-60"
+              >
+                <ChevronLeft aria-hidden="true" className="h-6 w-6 flex-shrink-0" strokeWidth={2.4} style={moduleColor ? { color: moduleColor.hex } : undefined} />
+                <span className="min-w-0 break-words">{module}</span>
+              </button>
+            ) : (<>
             {/* Accesibilidad (15-nov-2026): el punto de color se va — no decía nada
                 en palabras y quien no distingue verde de rojo no sabía qué era. */}
             {moduleColor && !ACCESIBILIDAD_2026_11 && (
@@ -447,6 +464,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
               />
             )}
             <span className="min-w-0 break-words">{module}</span>
+            </>)}
           </p>
         </div>
       )}

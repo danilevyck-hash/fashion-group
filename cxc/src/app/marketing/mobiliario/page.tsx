@@ -33,6 +33,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
+import { MOBILIARIO_UN_ENCABEZADO_2026_11 } from "@/lib/ui/celopt-restos-2026-11";
 import { ROLES_MARKETING, puedeEscribirMarketing } from "@/lib/marketing/roles";
 import { MARKETING_TIENDAS_Y_MARCAS, type FilaTienda } from "@/lib/marketing/tiendas-y-marcas";
 import { hrefDeTienda } from "@/lib/marketing/vista-tienda";
@@ -541,6 +542,7 @@ export default function MobiliarioPage() {
 
   // 🔑 UN SOLO ÁRBOL: o el celular o la computadora, nunca los dos.
   const enCelular = useEsCelular();
+  const [productoAbierto, setProductoAbierto] = useState(false);
 
   if (!authChecked) return null;
 
@@ -548,7 +550,11 @@ export default function MobiliarioPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader module="Marketing" breadcrumbs={breadcrumbs} />
+      <AppHeader
+        module="Marketing"
+        breadcrumbs={breadcrumbs}
+        volverEnElCelular={MOBILIARIO_UN_ENCABEZADO_2026_11 && enCelular && !productoAbierto ? () => router.push("/marketing") : undefined}
+      />
       {/* 🔴 EN EL CELULAR, UNA FILA POR PRODUCTO (24-sep-2026, 7b). Recibe los
           MISMOS productos, las MISMAS métricas y el MISMO resumen por tienda:
           acá no se calcula un solo número nuevo. 🔑 Un solo árbol: o el celular
@@ -568,6 +574,7 @@ export default function MobiliarioPage() {
           onBorrar={setDeleteProd}
           onNuevo={abrirNuevoProducto}
           onExcel={() => descargarExcel()}
+          onProductoAbierto={setProductoAbierto}
           hrefDeTienda={hrefDeTienda}
           nombreDeTienda={(f) =>
             (f.tiendaCodigo && MARKETING_TIENDAS_Y_MARCAS

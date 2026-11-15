@@ -19,6 +19,7 @@ export interface ReclamosInitialData {
   detail: Reclamo | null;
 }
 import { EMPRESAS_MAP, emptyItem, reclamoTaxes, calcSub } from "./components/constants";
+import { empresaReclamoDesdeTexto } from "@/lib/reclamos/empresas";
 import EmpresaSelector from "./components/EmpresaSelector";
 import EmpresaList from "./components/EmpresaList";
 import ReclamoForm from "./components/ReclamoForm";
@@ -74,7 +75,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   // búsqueda de la página de empresa viven en la URL, adentro de EmpresaList.
   const [activeEmpresa, setActiveEmpresa] = useState<string | null>(() => {
     const urlEmpresa = searchParams.get("empresa");
-    return urlEmpresa ? decodeURIComponent(urlEmpresa) : null;
+    return urlEmpresa ? empresaReclamoDesdeTexto(decodeURIComponent(urlEmpresa)) : null;
   });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -205,7 +206,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       const v = (params.get("view") as RView) || "list";
       const id = params.get("id") || "";
       const emp = params.get("empresa");
-      setActiveEmpresa(emp ? decodeURIComponent(emp) : null);
+      setActiveEmpresa(emp ? empresaReclamoDesdeTexto(decodeURIComponent(emp)) : null);
       _setView(v);
       if (v === "detail" && id) { setEditMode(false); loadDetail(id); }
       else if (v === "list") setCurrent(null);

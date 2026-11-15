@@ -53,6 +53,7 @@
 //      el contexto
 //   6. Click "Guardar" final sí debe redirigir al listado
 
+import { NUEVA_GUIA_SIN_FILA_ATRAS_2026_11 } from "@/lib/ui/celopt-restos-2026-11";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
@@ -1010,7 +1011,8 @@ export default function GuiaForm({
       {/* 🔴 2-oct-2026 (`ESCALA_PANTALLA_2026_10`, v3): el formulario de 820 px va CENTRADO en
           su caja, como el detalle de guía; la barra de «Guardar guía» vive adentro y lo sigue. */}
       <div className={ancho || escala ? undefined : `max-w-[820px]${ESCALA_PANTALLA_2026_10 ? " mx-auto" : ""}`}>
-        <button type="button" onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">{etiquetaVolver}</button>
+        {/* 15-nov-2026: en el celular, en Nueva guía, el título «‹ Despachos» ya vuelve: sin fila sola. */}
+        <button type="button" onClick={onCancel} className={`${NUEVA_GUIA_SIN_FILA_ATRAS_2026_11 && editingId == null ? "hidden sm:inline-flex" : "inline-flex"} text-sm text-gray-400 hover:text-black transition items-center min-h-[44px] px-2 -mx-2`}>{etiquetaVolver}</button>
         <div className="flex items-baseline gap-2.5">
           <h1 className="text-[26px] font-semibold tracking-tight">Nueva guía</h1>
           <span className="text-sm text-gray-400 tabular-nums">GT-{String(formNumero).padStart(3, "0")}</span>
