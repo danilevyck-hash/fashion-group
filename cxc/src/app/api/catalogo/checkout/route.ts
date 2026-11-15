@@ -18,6 +18,7 @@
 // de los dos → 422 SIN_VENDEDOR, con el mismo texto de siempre.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { bultoEnRenglon, sellarBultoReebok } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import {
   buscarVendedor,
@@ -59,7 +60,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
 
   const clienteId = Number(body?.cliente?.id);
   const clienteNombre = typeof body?.cliente?.nombre === "string" ? body.cliente.nombre.trim() : "";
-  const items: CheckoutItem[] = Array.isArray(body?.items) ? body.items : [];
+  let items: CheckoutItem[] = Array.isArray(body?.items) ? body.items : [];
   const idempotencyKey = typeof body?.idempotency_key === "string" ? body.idempotency_key : null;
   // Qué se crea en Switch: 'pedido' (lo de siempre) o 'cotizacion'. Lo eligió
   // la persona un toque antes de mandar; un body sin el campo sigue creando un
@@ -132,6 +133,15 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
     cfg.productsTable,
     items.map((i) => i.product_id),
   );
+  // Reebok: cada renglón lleva ESCRITO su bulto (regla de hoy, sobre la
+  // categoría de la base; lo que mande el navegador no cuenta). Sin la
+  // columna, el campo se quita y todo sale como siempre.
+  if (cfg.marca === "reebok") {
+    items = sellarBultoReebok(items, {
+      vivo: await bultoEnRenglon(cfg),
+      categoria: (pid) => categoryByProduct.get(pid),
+    });
+  }
   const resumen = resumirDesdeItems(items, {
     bultoSize: cfg.bultoSize,
     categoryByProduct,
@@ -155,6 +165,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
       quantity: Number(i.quantity),
       unit_price: Number(i.unit_price),
       is_preorder: i.is_preorder === true,
+      ...(cfg.marca === "reebok" && i.bulto_pzas != null ? { bulto_pzas: i.bulto_pzas } : {}),
     })),
   });
   if (rpcErr || !created) {

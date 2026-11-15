@@ -863,7 +863,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
               {plural(faltanCategorias.categorias.length, "viene", "vienen")} bien en el archivo, pero el
               catálogo todavía no {plural(faltanCategorias.categorias.length, "la", "las")} conoce: esos{" "}
               {faltanCategorias.productos} productos saldrían sin categoría, y sin categoría el bulto se
-              cobra de 6 y no de 12.
+              cobra de 6, no de 12 como el calzado y la ropa.
               <AgregarlasAlCatalogo categorias={faltanCategorias.categorias} />
             </div>
           )}

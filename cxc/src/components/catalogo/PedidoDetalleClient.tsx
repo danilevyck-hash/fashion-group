@@ -792,6 +792,8 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         items: items.map(i => ({
           sku: i.sku || "", name: i.name, quantity: i.quantity, unit_price: Number(i.unit_price),
           image_url: i.image_url || "", category: i.category || theme.pdfFallbackCategory,
+          // Reebok: el bulto escrito en el renglón manda (ropa de 12 desde el 15-nov-2026).
+          ...(marca === "reebok" ? { bulto_pzas: i.bulto_pzas ?? null } : {}),
         })),
         bultoSize: (c, bultoPzas) => theme.bulto(c || theme.pdfFallbackCategory, bultoPzas),
         // La MISMA palabra adentro del papel y en el nombre del archivo: dos

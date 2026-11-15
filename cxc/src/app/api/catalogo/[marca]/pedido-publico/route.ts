@@ -1,3 +1,4 @@
+import { bultoEnRenglon, sellarBultoReebok } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import { randomInt } from "crypto";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
@@ -73,6 +74,17 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     }
     if (priced.adjusted) {
       console.warn(`${cfg.marca} pedido-publico: precios del cliente difieren de la DB (${parsed.cliente_nombre}) — se usaron los de la DB`);
+    }
+
+    // Reebok: el bulto con que el cliente pide HOY queda escrito en cada
+    // renglón del link (solo si la columna ya existe; si no, como siempre).
+    if (cfg.marca === "reebok" && (await bultoEnRenglon(cfg))) {
+      const items = sellarBultoReebok(priced.items as { product_id: string; category?: string; quantity: number; unit_price: number }[], {
+        vivo: true,
+        categoria: (pid) => priceMap.get(pid)?.category,
+      });
+      priced.items = items as typeof priced.items;
+      priced.total = Math.round(cfg.calcTotal(items) * 100) / 100;
     }
 
     const short_id = generateShortId();

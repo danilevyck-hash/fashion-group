@@ -3,6 +3,7 @@
 // por categoría+SKU; Joybees es una sola tabla (sin preventa). El header y los
 // colores del correo vienen de cfg.sendOrder (branding heredado por marca).
 
+import { bultoEnRenglon, colsConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
@@ -44,7 +45,10 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
 
   if (body.orderId) {
     const db = await cfg.db();
-    const itemCols = `product_id, sku, name, quantity, unit_price, image_url${cfg.itemsHasPreorder ? ", is_preorder" : ""}`;
+    const itemCols = colsConBulto(
+      `product_id, sku, name, quantity, unit_price, image_url${cfg.itemsHasPreorder ? ", is_preorder" : ""}`,
+      await bultoEnRenglon(cfg),
+    );
     const { data: order, error } = await db
       .from(cfg.ordersTable)
       .select(`client_name, order_number, comment, created_at, ${cfg.itemsRelation}(${itemCols})`)
@@ -57,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     orderNumber = String(orderRow.order_number ?? "");
     comment = (orderRow.comment as string | null) ?? null;
     createdAt = String(orderRow.created_at ?? createdAt);
-    const rawItems = (orderRow[cfg.itemsRelation] || []) as { product_id: string; sku: string; name: string; quantity: number; unit_price: number; image_url?: string; is_preorder?: boolean }[];
+    const rawItems = (orderRow[cfg.itemsRelation] || []) as { product_id: string; sku: string; name: string; quantity: number; unit_price: number; image_url?: string; is_preorder?: boolean; bulto_pzas?: number | null }[];
     // Categoría + piezas por bulto SIEMPRE, no solo si la marca tiene
     // `categoryLookup`: Tommy lo tiene en null y sus items llegaban pelados al
     // correo y al PDF, o sea con el bulto por default (bug de TOM-003).
@@ -74,7 +78,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
         sku: i.sku || "", name: i.name || "", quantity: i.quantity, unit_price: i.unit_price,
         image_url: i.image_url || "", is_preorder: i.is_preorder === true,
         category: categoryByProduct.get(i.product_id) || cfg.fallbackCategory || undefined,
-        bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
+        bulto_pzas: i.bulto_pzas ?? bultoPzasByProduct.get(i.product_id) ?? null,
       }));
     }
     documentoLabel = (await palabraDelEnvioActivo(db, cfg.enviosTable, body.orderId)) ?? undefined;

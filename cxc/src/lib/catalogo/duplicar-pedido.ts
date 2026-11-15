@@ -28,6 +28,7 @@
 // con mensaje claro en vez de crear un duplicado sin trazabilidad.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { bultoEnRenglon, colsConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { getSession } from "@/lib/require-auth";
@@ -60,6 +61,7 @@ interface ItemRow {
   quantity: number;
   unit_price: number;
   is_preorder?: boolean | null;
+  bulto_pzas?: number | null;
 }
 
 interface OriginalRow {
@@ -130,7 +132,13 @@ export async function handleDuplicarPedido(
   }
 
   // ── Pedido original (cliente + items). ──
-  const itemCols = `product_id, sku, name, image_url, quantity, unit_price${cfg.itemsHasPreorder ? ", is_preorder" : ""}`;
+  // Reebok: el bulto escrito viaja TAL CUAL al reemplazo (NULL incluido): un
+  // pedido corregido no cambia de bulto por haberse corregido.
+  const conBulto = await bultoEnRenglon(cfg);
+  const itemCols = colsConBulto(
+    `product_id, sku, name, image_url, quantity, unit_price${cfg.itemsHasPreorder ? ", is_preorder" : ""}`,
+    conBulto,
+  );
   const cols = `id, order_number, client_name, vendor_name, client_email, comment, cliente_switch_id, vendedor_switch_id, ${cfg.itemsRelation}(${itemCols})`;
   const leido = await db.from(cfg.ordersTable).select(cols).eq("id", orderId).single();
   if (leido.error || !leido.data) return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -162,7 +170,7 @@ export async function handleDuplicarPedido(
       quantity: i.quantity || 1,
       unit_price: Number(i.unit_price) || 0,
       category: categoryMap.get(i.product_id) || cfg.fallbackCategory || undefined,
-      bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
+      bulto_pzas: i.bulto_pzas ?? bultoPzasByProduct.get(i.product_id) ?? null,
     })),
   );
 
@@ -197,6 +205,7 @@ export async function handleDuplicarPedido(
       quantity: i.quantity || 1,
       unit_price: Number(i.unit_price) || 0,
       ...(cfg.itemsHasPreorder ? { is_preorder: i.is_preorder === true } : {}),
+      ...(conBulto && i.bulto_pzas != null ? { bulto_pzas: i.bulto_pzas } : {}),
     })),
   });
   if (rpcErr || !created) {

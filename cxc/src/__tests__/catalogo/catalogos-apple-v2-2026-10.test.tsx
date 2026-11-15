@@ -113,7 +113,10 @@ describe("3 · «Confirmar pedido» prendido", () => {
     const datos = document.querySelector('[data-medir="datos-del-pedido"]')!;
     const lineas = document.querySelector('[data-medir="lineas-pedido"]')!;
     expect(datos.compareDocumentPosition(lineas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText("2 productos · 36 u")).toBeTruthy();
+    // reebok-cat-04 (15-nov-2026): la barra dice bultos, como la del catálogo;
+    // las piezas van en cada renglón («A1 · bulto de 12 · 24 u»).
+    expect(screen.getByText("2 productos · 3 bultos")).toBeTruthy();
+    expect(screen.getByText(/A1 · bulto de 12 · 24 u/)).toBeTruthy();
     cleanup();
     montar(false, null);
     const lineas2 = document.querySelector('[data-medir="lineas-pedido"]')!;

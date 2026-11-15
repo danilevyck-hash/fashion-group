@@ -2,6 +2,8 @@
 // Switch (#236). is_preorder solo existe en Reebok (Joybees no maneja
 // pre-orden) — el payload lo incluye solo cuando la config lo dice.
 
+import { bultoEnRenglon, colsConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
+import { bultoReebokNuevo } from "@/lib/reebok-bulto";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
@@ -23,10 +25,10 @@ import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 async function recalcularTotal(cfg: MarcaConfig, db: any, orderId: string): Promise<void> {
   const { data: filas, error } = await db
     .from(cfg.itemsRelation)
-    .select("product_id, quantity, unit_price")
+    .select(colsConBulto("product_id, quantity, unit_price", await bultoEnRenglon(cfg)))
     .eq("order_id", orderId);
   if (error || !filas) return;
-  const items = filas as { product_id: string; quantity: number; unit_price: number }[];
+  const items = filas as { product_id: string; quantity: number; unit_price: number; bulto_pzas?: number | null }[];
   const ids = items.map((i) => i.product_id);
   const categoryMap = cfg.categoryLookup ? await cfg.categoryLookup(ids) : new Map<string, string>();
   const { bultoPzasByProduct } = await leerCategoriaYBulto(db as never, cfg.productsTable, ids);
@@ -35,7 +37,7 @@ async function recalcularTotal(cfg: MarcaConfig, db: any, orderId: string): Prom
       quantity: i.quantity || 1,
       unit_price: Number(i.unit_price) || 0,
       category: categoryMap.get(i.product_id) || cfg.fallbackCategory || undefined,
-      bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
+      bulto_pzas: i.bulto_pzas ?? bultoPzasByProduct.get(i.product_id) ?? null,
     })),
   );
   await db
@@ -65,8 +67,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
       .eq("order_id", params.id).eq("product_id", product_id);
     if (error) return NextResponse.json({ error: "Error al eliminar" }, { status: 500 });
   } else {
+    // Reebok: un producto que ENTRA al pedido lleva escrito el bulto de hoy;
+    // uno que ya estaba conserva el suyo (el upsert no toca la columna).
+    let bultoNuevo: { bulto_pzas?: number } = {};
+    if (await bultoEnRenglon(cfg)) {
+      const { data: ya, error: errYa } = await db.from(itemsTable).select("bulto_pzas")
+        .eq("order_id", params.id).eq("product_id", product_id).maybeSingle();
+      if (errYa) return NextResponse.json({ error: "Error al guardar" }, { status: 500 });
+      if (!ya) {
+        const cats = cfg.categoryLookup ? await cfg.categoryLookup([product_id]) : new Map<string, string>();
+        bultoNuevo = { bulto_pzas: bultoReebokNuevo(cats.get(product_id)) };
+      }
+    }
     const { error } = await db.from(itemsTable)
       .upsert({
+        ...bultoNuevo,
         order_id: params.id, product_id, sku: sku || null, name: name || null,
         image_url: image_url || null, quantity, unit_price: Number(unit_price) || 0,
         ...(cfg.itemsHasPreorder ? { is_preorder: is_preorder === true } : {}),

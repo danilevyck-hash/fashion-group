@@ -379,7 +379,7 @@ export interface Clasificacion {
  * La clasificación FINAL de un artículo: lo que el sync tiene que escribir.
  *
  * 💸 🔴 **UN "NO SÉ" NUNCA PISA UNA CLASIFICACIÓN QUE YA EXISTE, Y ESO ES PLATA.**
- * El bulto sale de la categoría (`reebok-bulto.ts`: calzado 12, todo lo demás 6)
+ * El bulto sale de la categoría (`reebok-bulto.ts`: calzado y ropa 12, lo demás 6)
  * y el total del pedido se cobra por bulto (`reebok-order-total.ts`). Si Switch
  * renombrara mañana el rubro `SHOES`, un mapa ingenuo mandaría 288 zapatillas al
  * cajón neutro y **el sistema empezaría a cobrar 6 pares donde vende 12: la

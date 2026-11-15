@@ -16,6 +16,7 @@
 // `active` con la regla ÚNICA de visibilidad; DELETE (solo Reebok) = soft.
 
 import { NextRequest, NextResponse } from "next/server";
+import { bultoEnRenglon, productoConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { normalizarBultoPzas, BULTO_TOMMY_MAX } from "@/lib/tommy-bulto";
 import { sinColumna } from "@/lib/catalogo/cols-opcionales";
 import { requireAdminOSecretaria } from "@/lib/api-auth";
@@ -108,6 +109,11 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     if (error) {
       console.error(error);
       return NextResponse.json({ error: "Error interno" }, { status: 500 });
+    }
+    // Reebok: el bulto con que se pide HOY (ropa de 12, reebok-cat-05). Solo
+    // con la columna del renglón; sin ella, el producto va como siempre.
+    if (cfg.marca === "reebok" && Array.isArray(data) && (await bultoEnRenglon(cfg))) {
+      return NextResponse.json((data as { category?: string | null }[]).map((p) => productoConBulto(p, true)));
     }
     return NextResponse.json(data);
   }

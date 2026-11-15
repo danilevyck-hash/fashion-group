@@ -30,6 +30,7 @@ import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
 import CatalogoSyncNow from "@/components/shared/CatalogoSyncNow";
+import { ACTUALIZADO_EN_FILTROS_2026_11 } from "@/lib/catalogo/reebok-catalogo-2026-11";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { CATALOGOS_APPLE_2026_10, ID_ACCIONES_EN_LA_BARRA, CLASES_MENU_MAS } from "@/lib/catalogo/catalogos-2026-10";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
@@ -747,10 +748,13 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   useEffect(() => {
     if (CATALOGOS_APPLE_2026_10) setBarraAcciones(document.getElementById(ID_ACCIONES_EN_LA_BARRA));
   }, []);
+  // catalogo-mas-04: la hora va en la fila de filtros (solo existe con el
+  // buscador en una fila); entonces sale de la barra de arriba.
+  const frescuraEnFiltros = CATALOGOS_APPLE_2026_10 && CATALOGOS_APPLE_2026_10_B.buscadorEnUnaFila && ACTUALIZADO_EN_FILTROS_2026_11;
   const accionesEnLaBarra = (
     <>
       <div data-medir="acciones-catalogo" className={CLASES_MENU_MAS.computadora}>
-        <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} forma="computadora" />
+        {!frescuraEnFiltros && <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} forma="computadora" />}
         {pedidosBtn}
         {(theme.vendorShare.enHeader || filteredCount > 0) && shareMenu}
       </div>
@@ -853,6 +857,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           categoryOptions={categoryOptions}
           apple={CATALOGOS_APPLE_2026_10}
           unaFila={CATALOGOS_APPLE_2026_10_B.buscadorEnUnaFila}
+          frescuraComputadora={frescuraEnFiltros ? <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} forma="celular" /> : undefined}
           frescuraCelular={CATALOGOS_APPLE_2026_10 && FILTRO_A_2026_11 ? <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} forma="celular" /> : undefined}
         />
 

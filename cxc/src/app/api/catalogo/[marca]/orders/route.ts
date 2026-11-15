@@ -46,6 +46,7 @@
 // Reebok además resuelve category por producto (bulto 6/12) y maneja
 // is_preorder; Joybees es bulto 12 fijo sin preventa.
 
+import { bultoEnRenglon, colsConBulto, sellarBultoReebok } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import { resumirDesdeItems, type ContextoLineas, type ItemCrudo } from "@/lib/catalogo/lineas-pedido";
 import { contextoDeLineas, totalDeLaLista } from "@/lib/catalogo/totales-lista";
@@ -100,10 +101,12 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const extraOrigen = cfg.ordersSelectExtra.includes("origen_short_id") ? "" : ", origen_short_id";
   const colsBase = `id, order_number, client_name, vendor_name, client_email, comment, total, created_at, updated_at, idempotency_key, status${cfg.ordersSelectExtra}`;
   let data: Record<string, unknown>[] | null = null;
+  // Reebok: el bulto escrito en cada renglón (si la columna ya existe).
+  const colsItem = colsConBulto("id, product_id, quantity, unit_price", await bultoEnRenglon(cfg));
   for (const extra of [extraOrigen, ""]) {
     const res = await db
       .from(cfg.ordersTable)
-      .select(`${colsBase}${extra}, ${cfg.itemsRelation}(id, product_id, quantity, unit_price)`)
+      .select(`${colsBase}${extra}, ${cfg.itemsRelation}(${colsItem})`)
       // 🩸 EL FILTRO DE VIDA. Sin él la lista trae los 67 pedidos borrados de
       // las 4 marcas y los conteos dicen 110 donde hay 44 — el error que este
       // repo ya cometió una vez con este mismo dato. No es por marca: es
@@ -304,6 +307,8 @@ interface IncomingItem {
   unit_price: number;
   category?: string;
   is_preorder?: boolean;
+  /** Reebok: lo escribe el SERVIDOR (`sellarBultoReebok`), nunca el navegador. */
+  bulto_pzas?: number | null;
 }
 
 /**
@@ -335,7 +340,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   if (!client_name) return NextResponse.json({ error: "client_name required" }, { status: 400 });
   if (!items || !Array.isArray(items) || items.length === 0) return NextResponse.json({ error: "El pedido debe tener al menos un producto" }, { status: 400 });
 
-  const typedItems = items as IncomingItem[];
+  let typedItems = items as IncomingItem[];
   // `<marca>_order_items.product_id` es NOT NULL sin default y las RPC lo
   // insertan SIN COALESCE, a diferencia de `quantity`/`unit_price`. Un item sin
   // product_id abortaba la transacción entera (pedido + items) con un 23502 que
@@ -396,6 +401,13 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     }
   }
 
+  // Reebok: cada renglón nuevo lleva escrito su bulto (regla de hoy, sobre la
+  // categoría de la BASE). Sin la columna se guarda como siempre.
+  if (cfg.marca === "reebok") {
+    const vivo = await bultoEnRenglon(cfg);
+    const cats = vivo && cfg.categoryLookup ? await cfg.categoryLookup(typedItems.map((i) => i.product_id)) : new Map<string, string>();
+    typedItems = sellarBultoReebok(typedItems, { vivo, categoria: (pid) => cats.get(pid) });
+  }
   const resumenPed = await resumenDePedido(cfg, dbPedido as never, typedItems);
   const total = resumenPed.total;
 
@@ -418,6 +430,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
       quantity: i.quantity || 1,
       unit_price: Number(i.unit_price) || 0,
       ...(cfg.itemsHasPreorder ? { is_preorder: i.is_preorder === true } : {}),
+      ...(cfg.marca === "reebok" && i.bulto_pzas != null ? { bulto_pzas: i.bulto_pzas } : {}),
     })),
   });
   if (error || !result) return NextResponse.json({ error: "Error interno" }, { status: 500 });

@@ -113,6 +113,18 @@ export function textoEnSwitch(p: NumerosDePedido): string {
 }
 
 /**
+ * La forma CORTA, para la ficha del celular (catalogo-mas-03, 15-nov-2026):
+ * «Switch 16-000000564» para un pedido; la cotización sigue diciendo que lo es
+ * («Cotización en Switch 16-…»). Lo demás, igual que `textoEnSwitch`.
+ */
+export function textoEnSwitchCorto(p: NumerosDePedido): string {
+  if (!estaEnSwitch(p) || SIN_NUMERO_REAL(p.switchNumero)) return textoEnSwitch(p);
+  const doc = normalizarDocumento(p.switchDocumento);
+  const num = p.switchNumero!.trim();
+  return doc === "pedido" ? `Switch ${num}` : `${etiquetaDocumento(doc)} en Switch ${num}`;
+}
+
+/**
  * Lo que el buscador tiene que encontrar en una fila. Daniel busca con el número
  * que tiene a mano — el de la casa o el que le dice el ERP —, así que los dos
  * entran junto al cliente.

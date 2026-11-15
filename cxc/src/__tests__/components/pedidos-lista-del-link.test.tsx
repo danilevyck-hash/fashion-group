@@ -225,7 +225,7 @@ describe("🔴 el pedido del LINK se ve en la lista", () => {
   it("🔴 y su fila dice que NO se ha mandado a Switch (no un guion)", async () => {
     const { container } = await pintar();
     expect(filaDe(container, "ab12cd34").textContent).toContain("Pendiente de envío");
-    expect(filaDe(container, "PED-022").textContent).toMatch(/Pedido en Switch: 16-000000507/);
+    expect(filaDe(container, "PED-022").textContent).toMatch(/(Pedido en Switch: |Switch )16-000000507/); // la ficha corta del celular dice «Switch 16-…» (catalogo-mas-03)
   });
 });
 

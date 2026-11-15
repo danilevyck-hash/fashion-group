@@ -1,3 +1,4 @@
+import { bultoEnRenglon, conservarBultoReebok } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
@@ -13,6 +14,7 @@ interface PublicItem {
   unit_price?: number;
   category?: string;
   is_preorder?: boolean;
+  bulto_pzas?: number | null;
 }
 
 /**
@@ -71,7 +73,10 @@ export async function POST(
     return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
   }
 
-  const items = (Array.isArray(pub.items) ? pub.items : []) as PublicItem[];
+  let items = (Array.isArray(pub.items) ? pub.items : []) as PublicItem[];
+  // Reebok: cada renglón conserva el bulto con que el cliente lo pidió (el
+  // pedido del link viejo, sin bulto escrito, sigue con la regla vieja).
+  if (cfg.marca === "reebok") items = conservarBultoReebok(items, await bultoEnRenglon(cfg));
 
   let total: number;
   if (cfg.categoryLookup) {
@@ -81,6 +86,7 @@ export async function POST(
         quantity: Number(i.quantity) || 0,
         unit_price: Number(i.unit_price) || 0,
         category: (i.product_id && categoryMap.get(i.product_id)) || i.category || cfg.fallbackCategory || undefined,
+        bulto_pzas: i.bulto_pzas ?? null,
       })),
     );
   } else {

@@ -106,7 +106,8 @@ describe("🔴 las dos flechas se fueron de la pantalla de Comprobantes", () => 
       RUTA.actual = ruta;
       sessionStorage.setItem("cxc_role", "admin");
       render(<CatalogoNavbar marca="reebok" />);
-      expect(screen.queryByText("← Inicio"), `${ruta} se quedó sin salida`).not.toBeNull();
+      // catalogo-mas-01 (15-nov-2026): en el catálogo la salida es «‹ Catálogos».
+      expect(screen.queryByText("← Inicio") ?? screen.queryByRole("link", { name: "Catálogos" }), `${ruta} se quedó sin salida`).not.toBeNull();
     }
   });
 

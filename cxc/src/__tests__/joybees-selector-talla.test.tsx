@@ -240,7 +240,8 @@ describe("un modelo de UNA sola talla se ve como hoy", () => {
     expect(container.querySelector("button.w-full")!.textContent).toBe("Agregar");
     const t = texto(container);
     expect(t).toContain("Disponibilidad 168");
-    expect(t).toContain("Existencia 168");
+    // reebok-cat-01 (15-nov-2026): igual a Disponibilidad, no se repite.
+    expect(t).not.toContain("Existencia 168");
     // Sin talla al lado del número: es el bloque histórico, no el nuevo.
     expect(t).not.toContain("· Kids");
   });

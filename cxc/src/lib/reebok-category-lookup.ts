@@ -6,8 +6,10 @@ import { reebokServer } from "@/lib/reebok-supabase-server";
  *
  * Para items cuyo product_id no esté en `products` (producto borrado o sku
  * sin match), no habrá entry en el Map. Los consumidores deben aplicar un
- * fallback seguro (apparel=6) en vez de asumir footwear=12, para evitar
- * inflar el cobro al cliente.
+ * fallback seguro de 6 en vez de asumir 12, para no inflar el cobro: un
+ * renglón VIEJO (sin bulto escrito) lee el fallback `apparel` con la regla de
+ * entonces (6), y uno NUEVO sin categoría conocida se escribe de 6
+ * (`bultoReebokNuevo`). La ropa con categoría va de 12 desde el 15-nov-2026.
  */
 export async function fetchReebokCategoryMap(
   productIds: (string | null | undefined)[],

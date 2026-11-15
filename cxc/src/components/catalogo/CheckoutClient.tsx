@@ -58,6 +58,26 @@ import {
 } from "@/lib/catalogo/cliente-elegido";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { Aviso } from "@/components/ui/Aviso";
+import { PRECIO_CAPSULA_2026_11, listaSiCambio } from "@/lib/catalogo/reebok-catalogo-2026-11";
+
+/** catalogo-mas-02b: el precio como cápsula gris, igual que «− N bultos +».
+ *  Cambiado: el monto en azul y «Lista $X» tachado debajo. */
+function CapsulaPrecio({ precio, lista, onTocar }: { precio: number; lista: number | null; onTocar: () => void }) {
+  return (
+    <span className="inline-flex flex-col items-center">
+      <button
+        type="button"
+        onClick={onTocar}
+        title="Tocar para cambiar el precio"
+        className="inline-flex h-11 items-center gap-1 rounded-lg bg-gray-100 px-3 text-sm tabular-nums active:scale-[0.97] transition"
+      >
+        <span data-precio-cambiado={lista !== null ? "si" : undefined} className={lista !== null ? "font-medium text-blue-600" : "font-medium text-gray-900"}>${fmt(precio)}</span>
+        <span className="text-gray-400">/u</span>
+      </button>
+      {lista !== null && <span className="mt-0.5 text-[11px] leading-none tabular-nums text-gray-400 line-through">Lista ${fmt(lista)}</span>}
+    </span>
+  );
+}
 
 export interface CheckoutCartItem {
   product_id: string;
@@ -70,6 +90,10 @@ export interface CheckoutCartItem {
   /** Tommy: piezas por bulto del estilo (copiadas del producto). Vacío = 12. */
   bulto_pzas?: number | null;
   is_preorder?: boolean;
+  /** El precio con que entró al carrito; se anota al cambiarlo la PRIMERA vez
+   *  (catalogo-mas-02b). Solo pantalla: viaja en el carrito pero el servidor
+   *  arma cada renglón campo por campo y lo ignora. */
+  precio_lista?: number;
 }
 
 // Config por marca vía MARCA_THEME (PR-2): label, rutas, storage keys del
@@ -98,8 +122,11 @@ function brandCfg(theme: MarcaTheme): BrandCfg {
 /** `tituloEnLaBarra`: el título y «← Catálogo» ya los dibuja la barra de
  *  arriba (lo decide la página, no este archivo); aquí queda el `<h1>` solo
  *  para el lector de pantalla. Nada del pedido depende de esto. */
-export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAgrupada = false, v2 = false }: {
+export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAgrupada = false, v2 = false, vendedorInicial }: {
   marca: MarcaUiKey;
+  /** El vendedor del login ya resuelto en el servidor (reebok-cat-03).
+   *  `undefined` = no se sabe: se pregunta desde el navegador, como antes. */
+  vendedorInicial?: { id: number; nombre: string | null } | null;
   tituloEnLaBarra?: boolean;
   /** El interruptor V2 de Catálogos: lo decide la página (este archivo no importa
    *  el diseño). Solo mueve «Datos del pedido» y pasa los avisos a `<Aviso>`. */
@@ -118,10 +145,10 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
   // envío. Ver la cabecera del archivo: el default puesto costó $53.124.
   const [cliente, setCliente] = useState<ClienteSwitchOpcion | undefined>(undefined);
   const [clientePickerOpen, setClientePickerOpen] = useState(false);
-  const [vendedor, setVendedor] = useState<{ id: number; nombre: string | null } | null | undefined>(undefined);
+  const [vendedor, setVendedor] = useState<{ id: number; nombre: string | null } | null | undefined>(vendedorInicial);
   // El que mapea tu login: es el DEFAULT y el que se rotula "tu vendedor".
   // Se guarda aparte de `vendedor` para poder decir cuándo se cambió.
-  const [vendedorDelLogin, setVendedorDelLogin] = useState<{ id: number; nombre: string | null } | null>(null);
+  const [vendedorDelLogin, setVendedorDelLogin] = useState<{ id: number; nombre: string | null } | null>(vendedorInicial ?? null);
   const [vendedorPickerOpen, setVendedorPickerOpen] = useState(false);
   const [sending, setSending] = useState(false);
   // Línea con el precio en edición (tap sobre el precio → input numérico).
@@ -143,6 +170,8 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
 
   // ── Vendedor: el del login viene PUESTO (default), cambiarlo es opcional ──
   useEffect(() => {
+    // Ya vino puesto desde el servidor: no se vuelve a preguntar.
+    if (vendedorInicial !== undefined) return;
     const empresa = theme.empresaKey;
     fetch(`/api/catalogo/mi-vendedor?empresa=${empresa}`)
       .then((r) => (r.ok ? r.json() : { vendedor: null }))
@@ -184,7 +213,7 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
   const commitPrice = (productId: string) => {
     const v = Math.round((parseFloat(priceDraft) || 0) * 100) / 100;
     setEditingPrice(null);
-    if (v > 0) persistCart(cart.map((i) => (i.product_id === productId ? { ...i, unit_price: v } : i)));
+    if (v > 0) persistCart(cart.map((i) => (i.product_id === productId ? { ...i, precio_lista: i.precio_lista ?? i.unit_price, unit_price: v } : i)));
   };
 
   // ── Enviar a Switch: las dos salidas, DIRECTO ──
@@ -290,6 +319,12 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
                   />
                   /u
                 </span>
+              ) : PRECIO_CAPSULA_2026_11 ? (
+                <CapsulaPrecio
+                  precio={l.unit_price}
+                  lista={listaSiCambio(l.unit_price, cart.find((i) => i.product_id === l.product_id)?.precio_lista)}
+                  onTocar={() => { setEditingPrice(l.product_id); setPriceDraft(String(l.unit_price)); }}
+                />
               ) : (
                 <button
                   onClick={() => { setEditingPrice(l.product_id); setPriceDraft(String(l.unit_price)); }}

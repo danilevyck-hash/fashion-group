@@ -25,6 +25,7 @@ import { STOCK_SIN_PUNTO_AL_INICIO } from "@/lib/ui/revision-110-vivo2";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { MOSTRAR_EXISTENCIA } from "@/lib/catalogo/stock-en-la-tarjeta";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
+import { EXISTENCIA_SOLO_SI_DIFIERE_2026_11 } from "@/lib/catalogo/reebok-catalogo-2026-11";
 
 interface CatalogoStockLineProps {
   marca: MarcaUiKey;
@@ -107,7 +108,9 @@ export default function CatalogoStockLine({ marca, disponibilidad, existencia, t
           el teléfono son dos renglones de una tarjeta que ya es alta. Arranca
           PRENDIDO —la pantalla no cambió— porque cuál de los dos se queda lo
           decide Daniel, no el código. Ver `stock-en-la-tarjeta.ts`. */}
-      {MOSTRAR_EXISTENCIA && (
+      {/* 🔴 15-nov-2026 (reebok-cat-01): si dice lo mismo que Disponibilidad,
+          no se repite. Distinta = hay mercancía apartada, y ahí sí aporta. */}
+      {MOSTRAR_EXISTENCIA && !(EXISTENCIA_SOLO_SI_DIFIERE_2026_11 && existencia === disponibilidad && existencia != null) && (
         <div className={`whitespace-nowrap ${
           enUnaLinea ? punto : ""
         }${s.soft}`}>

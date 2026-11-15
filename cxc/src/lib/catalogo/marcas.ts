@@ -295,7 +295,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     mainDb: mainServerDb,
     publicosDb: mainServerDb, // quirk heredado: publicos de Reebok en el principal
     publicosInsertClient,
-    bultoSize: (c) => reebokBulto(c || "apparel"),
+    bultoSize: (c, bultoPzas) => reebokBulto(c || "apparel", bultoPzas),
     calcTotal: calculateReebokOrderTotal,
     categoryLookup: async (ids) =>
       (await import("@/lib/reebok-category-lookup")).fetchReebokCategoryMap(ids),

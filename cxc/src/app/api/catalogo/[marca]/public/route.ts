@@ -11,6 +11,7 @@
 // fotos, oculto_manual, precios, import). Así el cliente nunca ve catálogo
 // viejo — que es justo lo que rompió en #244 y #253.
 
+import { bultoEnRenglon, productoConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import { leerConColumnaOpcional } from "@/lib/catalogo/cols-opcionales";
 import { unstable_cache } from "next/cache";
@@ -141,6 +142,12 @@ export async function GET(_req: NextRequest, { params }: { params: { marca: stri
     if (!(err instanceof ErrorCatalogo)) console.error(err);
     const msg = err instanceof ErrorCatalogo ? err.message : "Error al cargar productos";
     return NextResponse.json({ error: msg }, { status: 500 });
+  }
+
+  // Reebok: el bulto con que se pide HOY (ropa de 12), fuera del caché para
+  // que entre apenas exista la columna. Sin ella, el producto va como siempre.
+  if (cfg.marca === "reebok" && (await bultoEnRenglon(cfg))) {
+    payload = { ...payload, products: payload.products.map((p) => productoConBulto(p as { category?: string | null }, true)) } as PayloadPublico;
   }
 
   return NextResponse.json(payload, { headers: HEADERS_NO_STORE });

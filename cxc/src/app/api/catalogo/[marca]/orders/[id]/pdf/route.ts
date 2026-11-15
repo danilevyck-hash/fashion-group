@@ -3,6 +3,7 @@
 // comparte por WhatsApp/mail con el share nativo. Lo usa el botón "Ver PDF"
 // de la confirmación del checkout.
 
+import { bultoEnRenglon, colsConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
@@ -33,7 +34,10 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   if (auth instanceof NextResponse) return auth;
 
   const db = await cfg.db();
-  const itemCols = `product_id, sku, name, quantity, unit_price, image_url${cfg.itemsHasPreorder ? ", is_preorder" : ""}`;
+  const itemCols = colsConBulto(
+    `product_id, sku, name, quantity, unit_price, image_url${cfg.itemsHasPreorder ? ", is_preorder" : ""}`,
+    await bultoEnRenglon(cfg),
+  );
   const { data: order, error } = await db
     .from(cfg.ordersTable)
     .select(`order_number, client_name, created_at, ${cfg.itemsRelation}(${itemCols})`)
@@ -57,7 +61,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     image_url: String(i.image_url ?? ""),
     is_preorder: i.is_preorder === true,
     category: categoryMap.get(String(i.product_id)) || cfg.pdfFallbackCategory,
-    bulto_pzas: bultoPzasByProduct.get(String(i.product_id)) ?? null,
+    bulto_pzas: (i.bulto_pzas as number | null | undefined) ?? bultoPzasByProduct.get(String(i.product_id)) ?? null,
   }));
 
   // 🔴 QUÉ PALABRA VA EN EL PAPEL. Este PDF es el del botón "Ver PDF" de la

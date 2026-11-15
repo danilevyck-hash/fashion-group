@@ -27,6 +27,7 @@ import {
 import {
   estaEnSwitch,
   textoEnSwitch,
+  textoEnSwitchCorto,
   textoNumeroPedido,
   tieneNumeroPropio,
   type NumerosDePedido,
@@ -35,6 +36,7 @@ import type { FilaComprobante } from "@/lib/catalogo/fila-comprobante";
 import AccionesComprobante from "./AccionesComprobante";
 import { BLANCO_CASILLA, CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
+import { COMPROBANTES_CELULAR_2026_11 } from "@/lib/catalogo/reebok-catalogo-2026-11";
 
 /** La etiqueta de origen. Los DOS nombres viven en `origen-comprobante.ts`. */
 export function OrigenBadge({
@@ -246,6 +248,44 @@ export function FilaTabla(p: PropsFila) {
   );
 }
 
+/**
+ * catalogo-mas-03 (15-nov-2026): la ficha del celular en TRES líneas —
+ * cliente y monto (arriba, en la ficha) · número y fecha · Switch y vendedor.
+ * «Del vendedor» ya no se pinta (el filtro lo dice); «Del cliente» SÍ, solo en
+ * ese. Los avisos de «sin mandar» conservan su tono, en la línea de Switch.
+ */
+function LineasCortas(p: PropsFila) {
+  const datos = datosNumeros(p.pedido, p.esOrders);
+  const enSwitch = estaEnSwitch(datos);
+  const trabado = esSinMandar(datos);
+  const borradorQuedado = !trabado && !enSwitch && p.esOrders;
+  const dias = diasSinLlegarASwitch(p.pedido.created_at, p.hoy);
+  const tono = tonoSinLlegar(trabado, dias);
+  const vendor = (p.pedido.vendor ?? "").trim();
+  return (
+    <>
+      <div className="mt-0.5 flex min-w-0 items-center gap-x-1.5 text-xs leading-snug text-gray-500">
+        <span className={tieneNumeroPropio(datos) ? "tabular-nums text-gray-600" : "text-gray-400"}>
+          {textoNumeroPedido(datos)} · {p.fmtDate(p.pedido.created_at)}
+        </span>
+        {p.pedido.origen === "link" && (
+          <OrigenBadge marca={p.marca} origen="link" confirmadoCliente={!!p.pedido.confirmado_cliente_at} />
+        )}
+      </div>
+      <div className="mt-0.5 truncate text-xs leading-snug text-gray-500">
+        {trabado ? (
+          <span data-medir="sin-mandar" data-tono={tono} className={CLASES_TONO[tono]}>{textoSinMandar(p.pedido.created_at, p.hoy)}</span>
+        ) : borradorQuedado ? (
+          <span data-medir="sin-llegar" data-tono={tono} className={CLASES_TONO[tono]}>{textoNoLlegoASwitch(p.pedido.created_at, p.hoy)}</span>
+        ) : (
+          <span className="tabular-nums">{textoEnSwitchCorto(datos)}</span>
+        )}
+        {vendor && <> · {nombreVendedorEnPantalla(vendor)}</>}
+      </div>
+    </>
+  );
+}
+
 /** La FICHA — por debajo de `lg`. Nada se arrastra de costado. */
 export function FichaFila(p: PropsFila) {
   return (
@@ -289,6 +329,10 @@ export function FichaFila(p: PropsFila) {
               </span>
             )}
           </div>
+          {COMPROBANTES_CELULAR_2026_11 ? (
+            <LineasCortas {...p} />
+          ) : (
+          <>
           <NumerosPedido pedido={p.pedido} esOrders={p.esOrders} hoy={p.hoy} />
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
             <OrigenBadge marca={p.marca} origen={p.pedido.origen} confirmadoCliente={!!p.pedido.confirmado_cliente_at} />
@@ -296,6 +340,8 @@ export function FichaFila(p: PropsFila) {
             <span className="text-gray-300" aria-hidden="true">·</span>
             <span className="whitespace-nowrap">{p.fmtDate(p.pedido.created_at)}</span>
           </div>
+          </>
+          )}
         </div>
         <div className="shrink-0">
           <AccionesComprobante

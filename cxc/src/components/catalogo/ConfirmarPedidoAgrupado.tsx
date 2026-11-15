@@ -18,6 +18,7 @@
 
 import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
 import { BARRA_EN_LISTAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { UNIDADES_EN_BULTOS_2026_11 } from "@/lib/catalogo/reebok-catalogo-2026-11";
 import { useRef, useState, type ReactNode } from "react";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { fmt } from "@/lib/format";
@@ -51,6 +52,11 @@ interface Props {
   /** Interruptor V2 de Catálogos (lo decide la página): «Datos del pedido»
    *  arriba de los productos y «3 productos · 36 u» bajo el total. */
   v2?: boolean;
+}
+
+/** Plural correcto: «1 bulto» · «2 bultos». */
+function textoBultos(n: number): string {
+  return `${n} ${n === 1 ? "bulto" : "bultos"}`;
 }
 
 /** Plural correcto: «1 producto» · «2 productos». */
@@ -117,7 +123,7 @@ export default function ConfirmarPedidoAgrupado(p: Props) {
                     <span className="shrink-0 text-[15px] font-semibold tabular-nums">${fmt(l.subtotal)}</span>
                   </div>
                   <p className="text-xs text-gray-400 tabular-nums">
-                    {l.sku} · bulto de {l.bulto}
+                    {l.sku} · bulto de {l.bulto}{UNIDADES_EN_BULTOS_2026_11 && ` · ${l.piezas} u`}
                     {l.is_preorder && <span className="ml-2 font-medium text-amber-700">Preventa</span>}
                   </p>
                 </div>
@@ -157,7 +163,11 @@ export default function ConfirmarPedidoAgrupado(p: Props) {
                 <>
                   {/* v3.3: el número sin negrita y UNA línea gris. */}
                   <div className="text-lg font-medium tabular-nums leading-tight text-gray-900">${fmt(p.total)}</div>
-                  <div className="whitespace-nowrap text-xs text-gray-500 tabular-nums">{textoProductos(p.lineas.length)} · {p.totalPiezas} u</div>
+                  <div className="whitespace-nowrap text-xs text-gray-500 tabular-nums">{UNIDADES_EN_BULTOS_2026_11
+                    /* reebok-cat-04: bultos, como la barra del catálogo; las piezas
+                       ya se ven en cada renglón. */
+                    ? `${textoProductos(p.lineas.length)} · ${textoBultos(p.lineas.reduce((s, l) => s + l.quantity, 0))}`
+                    : `${textoProductos(p.lineas.length)} · ${p.totalPiezas} u`}</div>
                 </>
               ) : (
                 <>
