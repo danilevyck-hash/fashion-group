@@ -32,6 +32,7 @@ import { limpiarBorradoresViejos } from "@/lib/borradores-viejos";
 import { ALL_COMPANIES } from "@/lib/companies";
 import { LS_CHEQUE_VENDEDORES, VENDEDORES_POR_DEFECTO } from "@/lib/cheques-vendedores";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
 
 export interface ChequeFormValues {
   cliente: string;
@@ -324,7 +325,7 @@ export default function ChequeFormModal({
             </Campo>
 
             <Campo label="Monto" requerido error={err("monto", v.monto)}>
-              <input
+              <input {...TECLADO_DECIMAL}
                 type="number"
                 step="0.01"
                 aria-label="Monto"

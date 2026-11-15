@@ -42,6 +42,7 @@ import {
 import { Ayuda } from "@/components/shared/Ayuda";
 import { workbookBlob, workbookBytes, filtroDesdeA1 } from "@/lib/excel-export";
 import { Aviso } from "@/components/ui/Aviso";
+import { TECLADO_DECIMAL, TECLADO_ENTERO } from "@/lib/ui/iphone-2026-11";
 
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
 
@@ -542,7 +543,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
           </div>
           <div>
             <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wide text-gray-500">Año</label>
-            <input
+            <input {...TECLADO_ENTERO}
               type="number" min={2020} max={2099} value={anio}
               onChange={(e) => { setAnio(e.target.value); reprocess({ anio: e.target.value }); }}
               className={inputCls}
@@ -691,7 +692,7 @@ export default function FacturasTiendaClient({ onDownloaded, injectedFile, onRes
                             : <span className="rounded bg-amber-50 px-2 py-0.5 text-[12px] font-semibold text-amber-700">Sin guardar</span>}
                         </td>
                         <td className="border-b border-gray-100 px-2.5 py-2 align-top">
-                          <input
+                          <input {...TECLADO_DECIMAL}
                             type="number" step="0.01" value={f.divisor || ""}
                             aria-label={`Divisor ${label}`}
                             aria-invalid={divisorMsg !== null}

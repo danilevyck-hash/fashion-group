@@ -12,6 +12,7 @@ import "./skin.css";
 import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
 import { CAJA_NUEVO_GASTO_EN_PORTADA } from "@/lib/ui/uso-2026-11";
 import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
 
 export default function CajaPage() {
   const router = useRouter();
@@ -94,7 +95,7 @@ export default function CajaPage() {
             {/* $200 viene sugerido: es el fondo de los 3 períodos de la
                 historia. Se puede cambiar. */}
             <label className="text-xs text-gray-400 uppercase">Fondo inicial ($)</label>
-            <input
+            <input {...TECLADO_DECIMAL}
               type="number"
               min="0.01"
               step="0.01"

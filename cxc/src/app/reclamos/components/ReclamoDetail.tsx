@@ -25,6 +25,7 @@ import OverflowMenu from "@/components/ui/OverflowMenu";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import CampoFecha from "@/components/ui/CampoFecha";
 import { RECLAMOS_APPLE_2026_10, cobradoEntero, diasEnRojo } from "@/lib/reclamos/apple-2026-10";
+import { TECLADO_DECIMAL, TECLADO_ENTERO } from "@/lib/ui/iphone-2026-11";
 
 interface Props {
   current: Reclamo;
@@ -502,8 +503,8 @@ export default function ReclamoDetail({
                             {GENEROS.map((g) => <option key={g} value={g}>{generoLabel(g)}</option>)}
                           </select>
                         </td>
-                        <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
-                        <td className="py-2 pr-1"><input type="number" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
+                        <td className="py-2 pr-1"><input {...TECLADO_ENTERO} type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
+                        <td className="py-2 pr-1"><input {...TECLADO_DECIMAL} type="number" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
                         <td className="py-2 pr-1">
                           <select value={item.motivo} onChange={(e) => updateEditItem(idx, "motivo", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent">
                             <option value="">--</option>

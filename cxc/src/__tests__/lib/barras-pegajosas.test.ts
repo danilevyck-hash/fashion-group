@@ -82,6 +82,7 @@ const NO_SON_BARRAS_DE_PAGINA: { archivo: string; motivo: string }[] = [
   // lista porque el archivo se retiró (pieza C del rediseño de Marketing).
   { archivo: "app/productos/cargar/ReebokClient.tsx", motivo: "thead de la vista previa" },
   { archivo: "app/productos/cargar/HistorialView.tsx", motivo: "thead del historial" },
+  { archivo: "app/admin/usuarios/page.tsx", motivo: "cabecera del modal «Nuevo usuario» en el celular (ios2-02): se pega a SU caja con scroll" },
   { archivo: "app/productos/cargar/DepuradorClient.tsx", motivo: "thead de la vista previa" },
   { archivo: "app/productos/cargar/FacturasTiendaClient.tsx", motivo: "thead de la vista previa" },
   { archivo: "app/prestamos/components/MovimientoTable.tsx", motivo: "thead de movimientos" },

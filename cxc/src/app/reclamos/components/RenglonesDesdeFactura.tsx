@@ -5,6 +5,7 @@ import { fmt } from "@/lib/format";
 import { RItem } from "./types";
 import { GENEROS, generoLabel, DEFAULT_MOTIVOS } from "./constants";
 import { buscarLineas, itemDesdeLinea, ROTULOS_LINEAS, type LineaFactura } from "@/lib/reclamos/lineas-factura";
+import { TECLADO_ENTERO } from "@/lib/ui/iphone-2026-11";
 
 interface Props {
   lineas: LineaFactura[];
@@ -101,7 +102,7 @@ export default function RenglonesDesdeFactura({ lineas, seleccion, setSeleccion 
                     {it ? <input type="text" value={it.talla} onChange={(e) => cambiar(idx, "talla", e.target.value)} placeholder="Talla" aria-label="Talla" className={`${campo} w-24`} /> : <span className="text-gray-400">{l.talla || "—"}</span>}
                   </td>
                   <td className="py-1 pr-3 text-right">
-                    {it ? <input type="number" min={0} value={it.cantidad} onChange={(e) => cambiar(idx, "cantidad", parseInt(e.target.value) || 0)} aria-label="Cantidad reclamada" className={`${campo} w-20 text-right`} /> : <span className="text-gray-300">—</span>}
+                    {it ? <input {...TECLADO_ENTERO} type="number" min={0} value={it.cantidad} onChange={(e) => cambiar(idx, "cantidad", parseInt(e.target.value) || 0)} aria-label="Cantidad reclamada" className={`${campo} w-20 text-right`} /> : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="py-1 pr-3">
                     {it ? (

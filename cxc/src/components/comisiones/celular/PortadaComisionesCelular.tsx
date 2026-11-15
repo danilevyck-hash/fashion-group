@@ -70,6 +70,10 @@ import { Capsula } from "@/components/filtros/FiltroA";
 import { RanurasBuscarCliente } from "../BuscarClienteComisiones";
 import { COMISIONES_BUSCAR_CLIENTE } from "@/lib/comisiones/buscar-cliente";
 import { FILTRO_3_COMISIONES } from "@/lib/ui/revision-110-filtros";
+import { COMISIONES_FLECHAS_44_2026_11 } from "@/lib/ui/iphone-2026-11";
+
+/** ios2-03: la flecha del mes, botón de 44 × 44 del mismo estilo que el calendario de al lado. */
+const FLECHA_MES_44 = "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-[20px] text-blue-600 active:opacity-60";
 
 interface OpcionVista {
   valor: string;
@@ -295,7 +299,7 @@ export function PortadaComisionesCelular({
               type="button"
               aria-label={anterior ? `Ir a ${mesEnPalabras(anterior)}` : "Mes anterior"}
               onClick={() => irA(anterior)}
-              className={`flex min-h-[36px] items-center justify-center text-[18px] text-blue-600 active:opacity-60 ${simple ? "min-w-[24px]" : "min-w-[32px]"}`}
+              className={COMISIONES_FLECHAS_44_2026_11 ? FLECHA_MES_44 : `flex min-h-[36px] items-center justify-center text-[18px] text-blue-600 active:opacity-60 ${simple ? "min-w-[24px]" : "min-w-[32px]"}`}
             >
               ‹
             </button>
@@ -326,7 +330,7 @@ export function PortadaComisionesCelular({
                 type="button"
                 aria-label={`Ir a ${mesEnPalabras(siguiente)}`}
                 onClick={() => irA(siguiente)}
-                className={`flex min-h-[36px] items-center justify-center text-[18px] text-blue-600 active:opacity-60 ${simple ? "min-w-[24px]" : "min-w-[32px]"}`}
+                className={COMISIONES_FLECHAS_44_2026_11 ? FLECHA_MES_44 : `flex min-h-[36px] items-center justify-center text-[18px] text-blue-600 active:opacity-60 ${simple ? "min-w-[24px]" : "min-w-[32px]"}`}
               >
                 ›
               </button>

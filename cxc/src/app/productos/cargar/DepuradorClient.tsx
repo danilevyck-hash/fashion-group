@@ -53,6 +53,7 @@ import { TRES_DETALLES } from "@/lib/depurador/tres-detalles";
 import { useNuevosEnSwitch } from "@/lib/hooks/useNuevosEnSwitch";
 import { CostoDelArchivo, FacturasDelArchivo, NuevosEnSwitch } from "./ResumenDelArchivo";
 import { Aviso } from "@/components/ui/Aviso";
+import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
 
 const DIVISOR_HINTS = [0.70, 0.73, 0.75, 0.63];
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
@@ -903,7 +904,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           </select>
         </Field>
         <Field label="Factor costo CIF" note="Costo FOB × este factor = CIF.">
-          <input
+          <input {...TECLADO_DECIMAL}
             type="number" step="0.01" value={factor} aria-label="Factor costo CIF"
             onChange={(e) => { setFactor(e.target.value); reprocesarLuego({ factor: e.target.value }); }}
             onBlur={reprocesarAlSalir}
@@ -1100,7 +1101,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="w-36">
                     <label className={priceLabelCls}>Divisor</label>
-                    <input
+                    <input {...TECLADO_DECIMAL}
                       type="number" step="0.01" value={draftDivisor} aria-label="Divisor"
                       aria-invalid={draftDivisorMsg !== null}
                       onChange={(e) => setDraftDivisor(e.target.value)}
@@ -1178,7 +1179,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                                 : <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Sin guardar</span>}
                             </td>
                             <td className="border-b border-gray-100 px-2.5 py-2 align-top">
-                              <input
+                              <input {...TECLADO_DECIMAL}
                                 type="number" step="0.01" value={f.divisor || ""}
                                 aria-label={`Divisor ${label}`}
                                 aria-invalid={divisorMsg !== null}
