@@ -17,6 +17,8 @@ const interruptor = vi.hoisted(() => ({ prendido: false, query: "" }));
 vi.mock("@/lib/login-retoques-2026-10", () => ({
   get LOGIN_RETOQUES_2026_10() { return interruptor.prendido; },
 }));
+// La foto es la pantalla de antes: también con la accesibilidad apagada (15-nov-2026).
+vi.mock("@/lib/ui/accesibilidad-2026-11", () => ({ ACCESIBILIDAD_2026_11: false }));
 const ROUTER = vi.hoisted(() => ({ push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {} }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ROUTER,

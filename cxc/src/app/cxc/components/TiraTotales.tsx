@@ -37,6 +37,7 @@
 
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { AGING, AGING_ORDER, tramoLabel, type AgingKey } from "@/lib/cxc-aging";
 import { rotuloSinPagar, rotuloClientes, DIAS_SIN_PAGAR_UMBRAL } from "@/lib/cxc/sin-pagar";
 
@@ -112,15 +113,15 @@ export default function TiraTotales({
                 : "border border-transparent hover:bg-white hover:border-gray-300"
             }`}
           >
-            <span className="text-xs font-semibold text-red-700">
+            <span className={`${ACCESIBILIDAD_2026_11 ? "text-sm" : "text-xs"} font-semibold text-red-700`}>
               {rotuloSinPagar(sinPagar.cuantos)}
             </span>
-            <span className="text-xs tabular-nums font-semibold text-red-700">
+            <span className={`${ACCESIBILIDAD_2026_11 ? "text-sm" : "text-xs"} tabular-nums font-semibold text-red-700`}>
               ${fmt(sinPagar.monto)}
             </span>
           </button>
         ) : (
-          <span className="text-xs text-gray-500 px-2">{rotuloClientes(roleClients.length)}</span>
+          <span className={`${ACCESIBILIDAD_2026_11 ? "text-sm" : "text-xs"} text-gray-500 px-2`}>{rotuloClientes(roleClients.length)}</span>
         )}
       </div>
 
@@ -142,10 +143,14 @@ export default function TiraTotales({
               activo ? `border-2 ${BORDE_ACTIVO[k]} ${FONDO_ACTIVO[k]}` : "border border-transparent hover:bg-white hover:border-gray-300"
             }`}
           >
+            {ACCESIBILIDAD_2026_11 ? (
+              <span className="text-sm text-gray-600">{AGING[k].label}</span>
+            ) : (
             <span className="flex items-center gap-1 text-[11px] uppercase tracking-wide text-gray-500">
               <span className={`inline-block w-1.5 h-1.5 rounded-full ${AGING[k].dot}`} />
               {AGING[k].colLabel}
             </span>
+            )}
             <span className={`text-sm font-semibold tabular-nums ${AGING[k].text}`}>
               ${fmt(valores[k])}
             </span>
@@ -163,7 +168,7 @@ export default function TiraTotales({
           riskFilter === "all" ? `border-2 ${BORDE_ACTIVO.all} ${FONDO_ACTIVO.all}` : "border border-transparent hover:bg-white hover:border-gray-300"
         }`}
       >
-        <span className="text-[11px] uppercase tracking-wide text-gray-500">
+        <span className={ACCESIBILIDAD_2026_11 ? "text-sm text-gray-600" : "text-[11px] uppercase tracking-wide text-gray-500"}>
           Total · {roleClients.length}
         </span>
         <span className="text-sm font-semibold tabular-nums text-gray-900">${fmt(totalCxc)}</span>

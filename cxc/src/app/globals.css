@@ -11,9 +11,9 @@
   --fg-text-secondary: #6b7280;
   --fg-text-muted: #9ca3af;
   --fg-accent: #111827;
-  --fg-green: #059669;
-  --fg-yellow: #d97706;
-  --fg-red: #dc2626;
+  --fg-green: #047857;
+  --fg-yellow: #b45309;
+  --fg-red: #b91c1c;
 
   /* Alto del encabezado pegajoso de la pantalla. Lo MIDE y lo publica quien
      dibuja el encabezado (AppHeader en la app, CatalogoNavbar en el catálogo
@@ -129,7 +129,8 @@ html[data-r110-ajustes] input[type="search"]:placeholder-shown::-webkit-search-c
 [data-tooltip] {
   position: relative;
 }
-[data-tooltip]:hover::after {
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
   content: attr(data-tooltip);
   position: absolute;
   bottom: calc(100% + 6px);
@@ -524,6 +525,15 @@ html[data-vidrio="v2"] [data-tab-bar][data-vidrio-grueso] {
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   backdrop-filter: blur(24px) saturate(180%);
 }
+/* 🔴 ACCESIBILIDAD (15-nov-2026, `ACCESIBILIDAD_2026_11`): la barra de pestañas
+   con fondo SÓLIDO. Aun con el 92 %, el renglón de abajo se mezclaba con los
+   rótulos; ahora la lista termina encima y no se ve a través. */
+[data-tab-bar][data-solido] {
+  background-color: #fff !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html[data-vidrio="v2"] .vidrio {
     background-color: rgb(255 255 255 / 0.95);
@@ -550,4 +560,39 @@ html[data-cifras="sistema"] .font-mono {
 }
 html[data-cifras="sistema"] .skin-caja {
   --caja-font-mono: var(--caja-font-sans);
+}
+
+/* ── ACCESIBILIDAD (15-nov-2026) — globales, sin interruptor ────────────────
+   1. EL FOCO DEL TECLADO SE VE. Unos 53 elementos tenían `outline-none` sin
+      anillo de reemplazo: con Tab no se sabía dónde se estaba. Si el elemento
+      ya trae su anillo (`focus:ring` / `focus-visible:ring`), se respeta. */
+:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+[class*="outline-none"]:not([class*="focus:ring"]):not([class*="focus-visible:ring"]):focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px;
+}
+
+/* 2. «REDUCIR MOVIMIENTO» DEL TELÉFONO SE RESPETA. 126 animaciones en 72
+      archivos y solo dos componentes lo miraban. Con la opción prendida, todo
+      cambia en el acto: nada se desliza, rebota ni parpadea. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 3. EL PISO DE LA LETRA (`ACCESIBILIDAD_2026_11`, por `data-a11y` en <html>).
+      Los tamaños fijos de 9 a 11,5 px (≈200 rótulos en 54 archivos) suben a
+      12 px de una vez, sin tocar cada pantalla. Los datos y montos de CxC,
+      Vista general y la barra de pestañas van a 14 px en su propio archivo. */
+html[data-a11y] :is(.text-\[9px\], .text-\[9\.5px\], .text-\[10px\], .text-\[10\.5px\], .text-\[11px\], .text-\[11\.5px\]) {
+  font-size: 12px;
 }

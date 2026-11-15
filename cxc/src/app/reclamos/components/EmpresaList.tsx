@@ -1,5 +1,6 @@
 "use client";
 
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
@@ -388,7 +389,7 @@ export default function EmpresaList({
               const total = totalDe(r);
               const d = diasDesde(r.fecha_factura, hoy);
               return (
-                <div key={r.id} onClick={() => (selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id))} className="border border-gray-200 rounded-lg p-4 active:bg-gray-50 transition cursor-pointer">
+                <div key={r.id} {...clicConTeclado(() => (selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id)), { fila: true })} onClick={() => (selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id))} className="border border-gray-200 rounded-lg p-4 active:bg-gray-50 transition cursor-pointer">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-start gap-2 min-w-0">
                       {selectionMode && <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} className="accent-black mt-1" />}
@@ -429,7 +430,7 @@ export default function EmpresaList({
                   {visibles.map((r) => {
                     const total = totalDe(r);
                     return (
-                      <tr key={r.id} onClick={() => (selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id))} className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
+                      <tr key={r.id} {...clicConTeclado(() => (selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id)), { fila: true })} onClick={() => (selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id))} className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
                         {selectionMode && <td className="py-3"><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} className="accent-black" /></td>}
                         <td className="py-3 font-medium">
                           <span className="inline-flex items-center gap-1.5">{r.nro_reclamo}<FotoBadge count={r.reclamo_fotos?.length ?? 0} /></span>

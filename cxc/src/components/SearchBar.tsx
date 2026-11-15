@@ -1,5 +1,6 @@
 "use client";
 
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { IconoResultado } from "@/components/IconoResultado";
 import { fmtDate } from "@/lib/format";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
@@ -520,7 +521,7 @@ export default function SearchBar({ compact, fullScreen, onClose, alineado }: {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
         </svg>
-        <span className="text-xs text-gray-300 hidden sm:inline border border-gray-200 rounded px-1">⌘K</span>
+        <span className={`text-xs ${ACCESIBILIDAD_2026_11 ? "text-gray-500 border-gray-300" : "text-gray-300 border-gray-200"} hidden sm:inline border rounded px-1`}>⌘K</span>
       </button>
     );
   }

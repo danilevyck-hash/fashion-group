@@ -1,5 +1,6 @@
 "use client";
 
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { useRef, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
@@ -616,7 +617,7 @@ export default function ReclamoDetail({
         {fotos.length > 0 && (
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 mb-3" style={{ scrollSnapType: "x mandatory" }}>
             {fotos.filter((f) => !!f.url).map((f) => (
-              <div key={f.id} className="relative flex-shrink-0 cursor-pointer" style={{ scrollSnapAlign: "start" }} onClick={() => setLightboxSrc(f.url)}>
+              <div key={f.id} className="relative flex-shrink-0 cursor-pointer" style={{ scrollSnapAlign: "start" }} {...clicConTeclado(() => setLightboxSrc(f.url), { fila: true })} onClick={() => setLightboxSrc(f.url)}>
                 <img src={f.url} alt="" className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border border-gray-200" />
                 <button aria-label="Eliminar foto" title="Eliminar foto" onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-7 h-7 bg-black text-white rounded-full text-xs flex items-center justify-center after:absolute after:-inset-2 after:rounded-full after:content-['']">×</button>
               </div>

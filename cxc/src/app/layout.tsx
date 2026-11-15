@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { VIDRIO_V2_2026_10 } from "@/lib/ui/vidrio";
 import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 import { GeistMono } from "geist/font/mono";
@@ -50,7 +51,9 @@ export const viewport: Viewport = {
   themeColor: "#0a0a0a",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // Accesibilidad (15-nov-2026): sin tope de escala — se puede ampliar con dos
+  // dedos. iOS no amplía al escribir porque los campos miden 16 px en el
+  // celular (globals.css). Candado: catalogo-visor-foto.test.ts.
   viewportFit: "cover",
 };
 
@@ -61,7 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // nombre; nunca el token. Detalle en `lib/sesion-semilla.ts`.
   const semilla = leerSemillaDeSesion();
   return (
-    <html lang="es" suppressHydrationWarning data-vidrio={VIDRIO_V2_2026_10 ? "v2" : undefined} data-cifras={AJUSTES_APPLE_6_2026_10 ? "sistema" : undefined} data-r110-ajustes={PLACEHOLDER_ENTERO ? "" : undefined}>
+    <html lang="es" suppressHydrationWarning data-vidrio={VIDRIO_V2_2026_10 ? "v2" : undefined} data-cifras={AJUSTES_APPLE_6_2026_10 ? "sistema" : undefined} data-r110-ajustes={PLACEHOLDER_ENTERO ? "" : undefined} data-a11y={ACCESIBILIDAD_2026_11 ? "" : undefined}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

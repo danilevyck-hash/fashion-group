@@ -13,11 +13,10 @@
 //      la imagen no frenaba la propagación, así que el gesto natural —tocar lo
 //      que querés ver— hacía justo lo contrario.
 //
-// ⚠️ Y EL PELLIZCO DEL NAVEGADOR NO ERA OPCIÓN: `layout.tsx` declara
-// `maximumScale: 1`, que en iOS desactiva el zoom de la página entera. Está ahí
-// a propósito (evita que iOS haga zoom solo al enfocar un input) y cambiarlo
-// afectaría TODAS las pantallas de la app por un problema de una. Por eso el
-// zoom se implementa acá adentro, con transform, y el resto no se toca.
+// ⚠️ En agosto el pellizco del navegador estaba apagado (`maximumScale: 1` en
+// `layout.tsx`); por eso el zoom se implementa aquí adentro, con transform.
+// Desde el 15-nov-2026 la página entera se puede ampliar y el visor conserva
+// el suyo (touchAction none).
 //
 // Gestos:
 //   · un toque en la foto  → acerca/aleja, centrado en DONDE tocaste

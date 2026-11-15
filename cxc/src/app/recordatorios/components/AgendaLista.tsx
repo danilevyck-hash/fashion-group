@@ -29,6 +29,7 @@
  * se enteraría hasta verla en producción.
  */
 
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { Bell } from "lucide-react";
 import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { Fragment } from "react";
@@ -81,7 +82,7 @@ function FilaCheque({
       data-cheque-fila={c.id}
       className={`border border-gray-200 rounded-lg ${bordeCheque(ve)} ${ve === "depositado" ? "opacity-60" : ""}`}
     >
-      <div className="px-4 py-3 cursor-pointer" onClick={() => onAbrir(c.id)}>
+      <div className="px-4 py-3 cursor-pointer" {...clicConTeclado(() => onAbrir(c.id))} onClick={() => onAbrir(c.id)}>
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 min-w-0">
             <span

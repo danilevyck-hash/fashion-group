@@ -24,6 +24,7 @@ import BarraLateral2026 from "@/components/estructura/BarraLateral2026";
 import { CONTENIDO_ANCHO_2026_10, CLASE_CONTENIDO_ANCHO } from "@/lib/navegacion/contenido-ancho";
 import { ESCALA_PANTALLA_2026_10, CLASE_ESCALA_PANTALLA } from "@/lib/navegacion/escala-pantalla";
 import { aPxDeEstilo } from "@/lib/ui/escala-raiz";
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 
 // Cómo se llama cada rol: UN solo lugar, `lib/roles-etiquetas.ts` (11-sep-2026).
 
@@ -425,18 +426,61 @@ function SidebarHoy() {
   );
 }
 
+/** Accesibilidad (15-nov-2026): el marco común es la región PRINCIPAL del
+ *  lector de pantalla (`role="main"`) — salvo que la pantalla ya traiga su
+ *  propio `<main>` (Ventas, Clientes, Marketing…), porque dos regiones
+ *  principales, una dentro de la otra, es otro error. Y si la pantalla no tiene
+ *  un `<h1>` a la vista del lector (algunas lo esconden con `hidden` al prender
+ *  su barra nueva), el marco pone uno invisible con el nombre del módulo. Se
+ *  mira al montar y cada vez que el contenido cambia. */
+function useMarcoAccesible(activo: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [propio, setPropio] = useState({ main: true, h1: true });
+  useEffect(() => {
+    const el = ref.current;
+    if (!activo || !el) return;
+    const mirar = () => {
+      const main = !!el.querySelector("main, [role=main]");
+      const h1 = Array.from(el.querySelectorAll("h1")).some((h) => !h.hasAttribute("data-h1-del-marco") && h.getClientRects().length > 0);
+      setPropio((p) => (p.main === main && p.h1 === h1 ? p : { main, h1 }));
+    };
+    mirar();
+    const obs = new MutationObserver(mirar);
+    obs.observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden"] });
+    return () => obs.disconnect();
+  }, [activo]);
+  return { ref, role: propio.main ? undefined : ("main" as const), faltaH1: !propio.h1 };
+}
+
+/** El nombre del módulo de la ruta (el href más largo que calza). */
+function nombreDelModulo(pathname: string): string {
+  let nombre = "Fashion Group";
+  let largo = -1;
+  for (const m of ALL_MODULES) {
+    if ((pathname === m.href || pathname.startsWith(m.href + "/")) && m.href.length > largo) {
+      nombre = m.label;
+      largo = m.href.length;
+    }
+  }
+  return nombre;
+}
+
 /** Wrapper del main content: deja espacio para el Sidebar en desktop. */
 export function SidebarAwareMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "";
   const collapsed = useSidebarCollapsed();
   const isPublic = sinBarraLateral(pathname);
+  const marco = useMarcoAccesible(!isPublic);
   if (isPublic) return <div>{children}</div>;
   return (
     <div
+      ref={marco.ref}
+      role={marco.role}
       className={`transition-[margin] duration-200 ease-out ${
         collapsed ? "md:ml-16" : "md:ml-56"
       }${CONTENIDO_ANCHO_2026_10 ? ` ${CLASE_CONTENIDO_ANCHO}` : ""}${ESCALA_PANTALLA_2026_10 ? ` ${CLASE_ESCALA_PANTALLA}` : ""}`}
     >
+      {ACCESIBILIDAD_2026_11 && marco.faltaH1 && <h1 data-h1-del-marco className="sr-only">{nombreDelModulo(pathname)}</h1>}
       {children}
     </div>
   );

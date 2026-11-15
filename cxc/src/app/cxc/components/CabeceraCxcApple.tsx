@@ -14,6 +14,7 @@ import { fmt } from "@/lib/format";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { opcionesActualizarCxc, saldoMas90 } from "@/lib/cxc/apple-2026-10";
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 
 interface Props {
   clientes: ConsolidatedClient[];
@@ -36,7 +37,11 @@ export default function CabeceraCxcApple({ clientes, companyFilter, onSuccess }:
       <div>
         <p className="text-[34px] font-normal leading-none tracking-tight tabular-nums text-gray-800">${fmt(total)}</p>
         <p className="pt-2 text-sm text-gray-500">
-          <span className="text-red-600 tabular-nums">+90 días ${fmt(mas90)}</span>
+          {ACCESIBILIDAD_2026_11 ? (
+            <span className="text-[15px] font-semibold text-red-700 tabular-nums">+90 días: ${fmt(mas90)}</span>
+          ) : (
+            <span className="text-red-600 tabular-nums">+90 días ${fmt(mas90)}</span>
+          )}
           {" · "}
           {clientes.length} {clientes.length === 1 ? "cliente" : "clientes"}
         </p>

@@ -98,7 +98,9 @@ export default function MarketingNuevo({ role, marcas }: { role: string; marcas:
           </div>
         )}
         <h1 className={barra ? "sr-only" : "text-2xl font-semibold text-gray-900 sm:sr-only"}>Marketing</h1>
-        <div className={barra ? "hidden" : "flex items-center gap-1 border-b border-gray-200"} role="tablist">
+        <div className={barra ? "hidden" : "flex items-center gap-1 border-b border-gray-200"}>
+          {/* Accesibilidad (15-nov-2026): el «···» queda fuera de la lista de pestañas. */}
+          <div className="contents" role="tablist">
           {PESTANAS.map((p) => (
             <button
               key={p.id}
@@ -113,6 +115,7 @@ export default function MarketingNuevo({ role, marcas }: { role: string; marcas:
               {p.rotulo}
             </button>
           ))}
+          </div>
           <div className={`border-b-2 -mb-px ${tab === "proveedores" ? "border-gray-900" : "border-transparent"}`}>
             <OverflowMenu
               ariaLabel="Más secciones"

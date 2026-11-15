@@ -1,5 +1,6 @@
 "use client";
 
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { useRef, useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
 import { RItem, LocalFoto } from "./types";
@@ -224,7 +225,7 @@ export default function ReclamoForm({
                 const src = f.uploaded?.url || f.previewUrl;
                 return (
                   <div key={f.localId} className="relative">
-                    <img src={src} alt="" onClick={() => setLightboxSrc(src)} className={`w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg border cursor-pointer ${f.status === "error" ? "border-red-400" : "border-gray-200"}`} />
+                    <img src={src} alt="" {...clicConTeclado(() => setLightboxSrc(src), { nombre: "Ver foto en grande" })} onClick={() => setLightboxSrc(src)} className={`w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg border cursor-pointer ${f.status === "error" ? "border-red-400" : "border-gray-200"}`} />
                     {f.status === "uploading" && (
                       <div className="absolute inset-0 rounded-lg bg-white/70 flex items-center justify-center">
                         <span className="w-5 h-5 border-2 border-gray-300 border-t-black rounded-full animate-spin" />

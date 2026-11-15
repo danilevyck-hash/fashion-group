@@ -1,5 +1,6 @@
 "use client";
 
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
@@ -265,7 +266,7 @@ function ResultadosDeBusqueda({ reclamos, globalSearch, setGlobalSearch, onLoadD
                     </tr></thead>
                     <tbody>
                       {results.map(({ r, via }) => (
-                        <tr key={r.id} onClick={() => onLoadDetail(r.id, r.empresa)} className="border-b border-gray-200 hover:bg-gray-50/80 transition cursor-pointer">
+                        <tr key={r.id} {...clicConTeclado(() => onLoadDetail(r.id, r.empresa), { fila: true })} onClick={() => onLoadDetail(r.id, r.empresa)} className="border-b border-gray-200 hover:bg-gray-50/80 transition cursor-pointer">
                           <td className="py-3 font-medium">
                             {r.nro_reclamo}
                             {matchHint(r, via) && <span className="block font-normal text-xs text-gray-400 mt-0.5">{matchHint(r, via)}</span>}

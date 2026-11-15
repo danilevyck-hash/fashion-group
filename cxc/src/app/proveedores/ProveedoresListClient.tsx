@@ -1,5 +1,7 @@
 "use client";
 
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
@@ -374,7 +376,8 @@ function FilaEmpresa({
     <tbody className="border-b border-gray-200">
       <tr
         onClick={onAlternar}
-        aria-expanded={abierta}
+        {...clicConTeclado(onAlternar, { fila: true })}
+        aria-expanded={ACCESIBILIDAD_2026_11 ? undefined : abierta}
         className={`cursor-pointer transition hover:bg-gray-50 ${abierta ? "bg-gray-50" : ""}`}
       >
         <td className="py-3 px-1.5 xl:px-3 font-medium">

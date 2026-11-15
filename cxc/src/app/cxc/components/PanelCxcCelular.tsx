@@ -22,6 +22,7 @@
 // con `CXC_CELULAR` en `false`, y conserva todos sus candados.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { useEffect, useMemo, useState } from "react";
 import type { ConsolidatedClient } from "@/lib/types";
@@ -249,7 +250,7 @@ export default function PanelCxcCelular({
           {apple ? (
             <span data-linea-cxc-apple className={CLASE_LINEA_TOTAL}>
               {riskFilter === "all"
-                ? <span className="text-red-600">+90 días {montoExacto(mas90)}</span>
+                ? <span className={ACCESIBILIDAD_2026_11 ? "text-[15px] font-semibold text-red-700" : "text-red-600"}>{ACCESIBILIDAD_2026_11 ? "+90 días: " : "+90 días "}{montoExacto(mas90)}</span>
                 : subtituloCompacto({ cuantos: lista.length, risk: riskFilter, unaEmpresa: empresaElegida })}
               {" · "}
               {enBoston ? (
@@ -518,7 +519,7 @@ function SeccionClientes({
 }) {
   return (
     <section data-seccion-cxc={titulo}>
-      <h2 className="px-8 pt-5 pb-1.5 text-xs font-medium uppercase tracking-wide text-gray-400">{titulo}</h2>
+      <h2 className={ACCESIBILIDAD_2026_11 ? "px-8 pt-5 pb-1.5 text-sm font-semibold text-gray-600" : "px-8 pt-5 pb-1.5 text-xs font-medium uppercase tracking-wide text-gray-400"}>{titulo}</h2>
       <ul data-lista="cxc-celular" className="mx-4 overflow-hidden rounded-2xl bg-white">
         {clientes.map((c) => (
           <FilaCliente key={c.nombre_normalized} client={c} dias={diasSinPagarDe(c)} onAbrir={() => onCobrar(c)} />

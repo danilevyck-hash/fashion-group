@@ -13,6 +13,7 @@
 // ese tramo. Los tramos de Boston (d0_90 / d91_120 / d121_plus) se mapean a los
 // nombres del módulo (current / watch / overdue) — son los MISMOS cortes.
 
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { fmt } from "@/lib/format";
@@ -397,19 +398,19 @@ export default function BostonTab() {
           donde no compite con la plata. ─────────────────────────────────── */}
       <div data-vista="tabla" className="hidden lg:block rounded-b-xl border border-gray-200 bg-white overflow-hidden">
         <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
-          <div className="col-span-4 cursor-pointer hover:text-gray-900 transition" onClick={() => tocarTitulo("name")}>
+          <div className="col-span-4 cursor-pointer hover:text-gray-900 transition" {...clicConTeclado(() => tocarTitulo("name"))} onClick={() => tocarTitulo("name")}>
             Cliente{flecha("name")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => tocarTitulo("current")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" {...clicConTeclado(() => tocarTitulo("current"))} onClick={() => tocarTitulo("current")}>
             {AGING.current.colLabel}{flecha("current")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => tocarTitulo("watch")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" {...clicConTeclado(() => tocarTitulo("watch"))} onClick={() => tocarTitulo("watch")}>
             {AGING.watch.colLabel}{flecha("watch")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => tocarTitulo("overdue")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" {...clicConTeclado(() => tocarTitulo("overdue"))} onClick={() => tocarTitulo("overdue")}>
             {AGING.overdue.colLabel}{flecha("overdue")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => tocarTitulo("total")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" {...clicConTeclado(() => tocarTitulo("total"))} onClick={() => tocarTitulo("total")}>
             Total{flecha("total")}
           </div>
         </div>
