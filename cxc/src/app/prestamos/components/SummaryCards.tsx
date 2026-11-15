@@ -1,5 +1,6 @@
 "use client";
 
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { fmt } from "@/lib/format";
 import { PRESTAMOS_LINEAS_ENTERAS_R110 } from "@/lib/ui/revision-110-asistencia";
 import { progressColor, progressColorText } from "./types";
@@ -86,7 +87,7 @@ export default function SummaryCards({
           <span className="shrink-0 text-xs px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium">✓ Deducida esta quincena</span>
         )}
         {quincenaEstado === "pendiente" && (
-          <span className="shrink-0 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium">⚠ Deducción pendiente</span>
+          <span className="shrink-0 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium">{ICONOS_DE_LINEA_EN_TODO ? "" : "⚠ "}Deducción pendiente</span>
         )}
       </div>
 

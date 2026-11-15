@@ -1,5 +1,6 @@
 "use client";
 
+import { BORDES_ALINEADOS, GUIAS_COLUMNAS_ANCHAS } from "@/lib/ui/revision-110-ajustes";
 import { useRef, useState } from "react";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
@@ -101,7 +102,7 @@ const COL_FECHA = "w-20 shrink-0";
 const COL_CLIENTE = "flex-[3_1_0] min-w-0";
 const COL_DESTINO = "flex-[2_1_0] min-w-0";
 const COL_BULTOS = "w-20 xl:w-24 shrink-0 text-right";
-const COL_TRANSP = "w-28 xl:w-36 shrink-0";
+const COL_TRANSP = GUIAS_COLUMNAS_ANCHAS ? "w-28 xl:w-32 shrink-0" : "w-28 xl:w-36 shrink-0";
 /** La columna del aviso: existe SIEMPRE, con o sin aviso (ver `PuntoDeAviso`). */
 const COL_AVISOS = "w-8 shrink-0";
 const COL_CHEVRON = "w-4 h-4 shrink-0";
@@ -112,7 +113,7 @@ const COL_CHEVRON = "w-4 h-4 shrink-0";
  */
 const COL_ESTADO = "w-[88px] shrink-0 flex justify-end";
 /** Las clases que ordenan la fila entera, compartidas con el encabezado. */
-const FILA_ESCRITORIO = "hidden lg:flex items-center gap-3 xl:gap-4";
+const FILA_ESCRITORIO = GUIAS_COLUMNAS_ANCHAS ? "hidden lg:flex items-center gap-3" : "hidden lg:flex items-center gap-3 xl:gap-4";
 
 interface GuiasListProps {
   guias: Guia[];
@@ -814,7 +815,13 @@ export default function GuiasList({
                       // Bodega» → «Completada» (y «Rechazada» se retiró el
                       // 5-sep-2026, 0 de 242 guías). Código muerto, borrado.
                       const statusBorderClass = isDispatched
-                        ? "border-l-4 border-l-transparent"
+                        ? (BORDES_ALINEADOS
+                        // Revisión 110 · ajustes (5): el hueco TRANSPARENTE dejaba el
+                        // borde visible 4 px adentro del de la pendiente. Ahora el
+                        // borde va al mismo filo y 1 px de borde + 3 px de aire = los
+                        // 4 px del ámbar: el texto tampoco se corre.
+                        ? "pl-[3px]"
+                        : "border-l-4 border-l-transparent")
                         : "border-l-4 border-l-amber-400";
 
                       const cardContent = (
@@ -940,11 +947,18 @@ export default function GuiasList({
                                   con aviso empuje sus columnas y quede
                                   desalineada de las demás. Vacía, es un hueco
                                   en blanco. */}
+                              {/* Revisión 110 · ajustes (9): con GUIAS_COLUMNAS_ANCHAS el
+                                  punto del aviso vive en el hueco de «Pendiente»
+                                  (nunca salen los dos juntos en una despachada)
+                                  y su columna aparte se va: cliente y destino
+                                  ganan ese ancho. */}
+                              {!(GUIAS_COLUMNAS_ANCHAS && GUIAS_PENDIENTE_EN_SU_COLUMNA) && (
                               <span className={`${COL_AVISOS} inline-flex items-center justify-center gap-1`}>
                                 {avisosDeLaFila(g).map((a) => (
                                   <PuntoDeAviso key={a} texto={a} />
                                 ))}
                               </span>
+                              )}
                               {/* 🔴 SOLO SE PINTA LO QUE ESPERA. El chip verde
                                   «despachada» salía en 221 de 222 filas: un color
                                   que sale siempre deja de avisar. El hueco, en
@@ -952,7 +966,12 @@ export default function GuiasList({
                                   desapareciera, las columnas se moverían en la
                                   única fila que importa. */}
                               {GUIAS_PENDIENTE_EN_SU_COLUMNA ? (
-                                <span className={COL_ESTADO}>{!isDispatched && <StatusBadge estado="pendiente" />}</span>
+                                <span className={`${COL_ESTADO} items-center gap-1`}>
+                                  {GUIAS_COLUMNAS_ANCHAS && avisosDeLaFila(g).map((a) => (
+                                    <PuntoDeAviso key={a} texto={a} />
+                                  ))}
+                                  {!isDispatched && <StatusBadge estado="pendiente" />}
+                                </span>
                               ) : !isDispatched && (
                                 <span className="shrink-0">
                                   <StatusBadge estado="pendiente" />
@@ -1368,7 +1387,7 @@ export default function GuiasList({
                         <span className={COL_DESTINO}>Destino</span>
                         <span className={COL_BULTOS}>Bultos</span>
                         <span className={COL_TRANSP}>Transportista</span>
-                        <span className={COL_AVISOS} aria-hidden />
+                        {!(GUIAS_COLUMNAS_ANCHAS && GUIAS_PENDIENTE_EN_SU_COLUMNA) && <span className={COL_AVISOS} aria-hidden />}
                         {GUIAS_PENDIENTE_EN_SU_COLUMNA && <span className={COL_ESTADO} aria-hidden />}
                         <span className={COL_CHEVRON} aria-hidden />
                       </span>
@@ -1392,7 +1411,7 @@ export default function GuiasList({
                     <div className="space-y-0">
                       {_gg.map((group) => (
                         <TimeGroupHeader key={group.key} label={group.label} count={group.items.length} color={group.color} bgColor={group.bgColor} separado={GUIAS_GRUPOS_FECHA_2026_10}>
-                          <div className="space-y-1 p-1">{group.items.map(_rc)}</div>
+                          <div className={`space-y-1 ${BORDES_ALINEADOS ? "py-1" : "p-1"}`}>{group.items.map(_rc)}</div>
                         </TimeGroupHeader>
                       ))}
                     </div>

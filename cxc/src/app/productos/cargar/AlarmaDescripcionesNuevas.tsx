@@ -1,5 +1,6 @@
 "use client";
 
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { AlertTriangle } from "lucide-react";
 import { ICONOS_DE_LINEA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useEffect, useState } from "react";
@@ -146,7 +147,7 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
                 </div>
                 {o.motivo && (
                   <div className="mt-0.5 text-[12px] text-amber-800">
-                    ⚠ {o.motivo}
+                    {ICONOS_DE_LINEA_EN_TODO ? <AlertTriangle aria-hidden className="mr-1 inline h-3.5 w-3.5 align-[-2px]" /> : "⚠ "}{o.motivo}
                     {o.gemela && <b className="ml-1 font-semibold text-gray-900">{o.gemela}</b>}
                   </div>
                 )}

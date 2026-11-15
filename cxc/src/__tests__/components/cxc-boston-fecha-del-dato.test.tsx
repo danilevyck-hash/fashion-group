@@ -108,7 +108,7 @@ describe("con el dato VIEJO, la pestaña lo dice", () => {
   it("aparece el aviso y NOMBRA a Confecciones Boston", async () => {
     montar(CONGELADA_ISO, true);
     const aviso = await screen.findByRole("status");
-    expect(aviso.textContent).toContain("⚠️");
+    // Revisión 110 · ajustes (6): el ⚠️ es un ícono de línea (sin texto); el aviso sigue siendo ámbar y nombrando.
     expect(aviso.textContent).toContain("Confecciones Boston");
     expect(aviso.textContent).toMatch(/sin actualizar desde/i);
   });

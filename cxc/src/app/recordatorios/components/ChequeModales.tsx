@@ -13,6 +13,8 @@
  * Los DEPOSITADOS no se borran: son data histórica.
  */
 
+import { Bell } from "lucide-react";
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import type { ReactNode, RefObject } from "react";
 import { ConfirmDeleteModal, ConfirmModal, Modal, StatusBadge } from "@/components/ui";
 import { fmt, fmtDate } from "@/lib/format";
@@ -256,7 +258,7 @@ export function ModalDelDia({
             >
               <span className="flex items-start gap-2">
                 <span aria-hidden className="flex-shrink-0 mt-0.5">
-                  🔔
+                  {ICONOS_DE_LINEA_EN_TODO ? <Bell aria-hidden className="h-4 w-4" /> : "🔔"}
                 </span>
                 <span className="block text-sm font-medium text-blue-900 break-words">
                   {rec.texto}

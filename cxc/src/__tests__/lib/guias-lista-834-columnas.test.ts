@@ -59,7 +59,7 @@ describe("🔴 el corte tarjeta/fila está en `lg:`, no en `md:`", () => {
   it("la fila de escritorio empieza en lg y la tarjeta manda por debajo", () => {
     // El corte vive en `FILA_ESCRITORIO`, la MISMA constante que usan la fila
     // y su encabezado: no hay dos cortes que puedan separarse.
-    expect(COLUMNAS).toContain('const FILA_ESCRITORIO = "hidden lg:flex');
+    expect(COLUMNAS).toMatch(/const FILA_ESCRITORIO = [^;]*"hidden lg:flex/);
     expect(FILA).toContain("FILA_ESCRITORIO");
     expect(LISTA).toContain('<div className="lg:hidden px-4 py-3"');
   });

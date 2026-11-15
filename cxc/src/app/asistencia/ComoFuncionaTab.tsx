@@ -121,7 +121,7 @@ export default function ComoFuncionaTab() {
               contradice a la pantalla es peor que no tener cartel. */}
           <li>· Las <b>vacaciones</b> se pagan: esos días entran en el sueldo de la quincena y no descuentan nada. Solo se descuentan si al cargarlas se contestó que <b>el colaborador ya había cobrado esos días antes</b>, y en ese caso la planilla dice a quién y cuánto no le pagó.</li>
           <li>· El <b>ISR, el préstamo, los terceros, la mercancía y los otros servicios</b> no salen de ningún sistema: se escriben a mano en la planilla. Los cuatro primeros se restan; <b>«otros servicios» se SUMA</b>, porque es un pago extra y no un descuento.</li>
-          <li>· 🔴 A quien le falte el salario, la jornada o la ficha <b>no se le calcula nada</b>: sale listado con lo que le falta y queda <b>fuera del total</b>. Nunca en $0.</li>
+          <li>· A quien le falte el salario, la jornada o la ficha <b>no se le calcula nada</b>: sale listado con lo que le falta y queda <b>fuera del total</b>. Nunca en $0.</li>
         </ul>
       </div>
 

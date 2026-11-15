@@ -23,6 +23,7 @@ import PageTransition from "@/components/PageTransition";
 import { SemillaSesionProvider } from "@/lib/sesion-semilla-provider";
 import { leerSemillaDeSesion } from "@/lib/sesion-semilla-servidor";
 import { SIN_AVISO_INSTALAR_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { PLACEHOLDER_ENTERO } from "@/lib/ui/revision-110-ajustes";
 import "./globals.css";
 
 // Geist Mono via el package oficial de Vercel (`geist`). Next 14.2.3 todavía
@@ -59,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // nombre; nunca el token. Detalle en `lib/sesion-semilla.ts`.
   const semilla = leerSemillaDeSesion();
   return (
-    <html lang="es" suppressHydrationWarning data-vidrio={VIDRIO_V2_2026_10 ? "v2" : undefined} data-cifras={AJUSTES_APPLE_6_2026_10 ? "sistema" : undefined}>
+    <html lang="es" suppressHydrationWarning data-vidrio={VIDRIO_V2_2026_10 ? "v2" : undefined} data-cifras={AJUSTES_APPLE_6_2026_10 ? "sistema" : undefined} data-r110-ajustes={PLACEHOLDER_ENTERO ? "" : undefined}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

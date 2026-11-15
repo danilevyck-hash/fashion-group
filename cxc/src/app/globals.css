@@ -55,6 +55,15 @@
   body:has([data-barra-fija-abajo]:not([data-aviso-instalar]):not([data-sobre-tab-bar])) [data-tab-bar] {
     display: none;
   }
+  /* Revisión 110 · ajustes (2): un formulario sin botón fijo (la guía pendiente
+     con sus firmas) también esconde la barra: `data-sin-tab-bar`. */
+  body.fg-con-tabbar:has([data-sin-tab-bar]) {
+    --fg-alto-tab-bar: 0px;
+    padding-bottom: 16px;
+  }
+  body:has([data-sin-tab-bar]) [data-tab-bar] {
+    display: none;
+  }
   /* 🔴 LISTAS PRINCIPALES (14-nov-2026, `BARRA_EN_LISTAS_2026_11`): la barra de
      pestañas se queda, y la acción fija («Nueva guía», «Nuevo reclamo»…) se
      sienta encima de ella. La lista deja lugar para las dos. */
@@ -95,6 +104,13 @@ body {
 
 input, button, select, textarea {
   font-family: inherit;
+}
+
+/* Revisión 110 · ajustes (1): vacío, la ✕ de un buscador no ocupa lugar. Safari
+   le guardaba ~22 px y cortaba el texto guía a mitad de palabra. Con texto
+   escrito la ✕ vuelve. Interruptor: PLACEHOLDER_ENTERO. */
+html[data-r110-ajustes] input[type="search"]:placeholder-shown::-webkit-search-cancel-button {
+  display: none;
 }
 
 /* 🔴 UN SOLO CAMPO QUE SE VE (nov-2026). El borde de un campo era gray-200

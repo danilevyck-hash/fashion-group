@@ -19,6 +19,11 @@ vi.mock("@/lib/guias/guias-2026-10", async (orig) => ({
   ...(await orig<typeof import("@/lib/guias/guias-2026-10")>()),
   get GUIA_DETALLE_APPLE_2026_10() { return flags.detalle; },
 }));
+// Los ajustes de la revisión 110 (14-nov-2026) también apagados: la foto es la de antes.
+vi.mock("@/lib/ui/revision-110-ajustes", async (orig) => {
+  const real = (await orig()) as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(real).map(([k, v]) => [k, v === true ? false : v]));
+});
 vi.mock("@/lib/hooks/useAuth", () => ({ useAuth: () => ({ authChecked: true, role: flags.rol }) }));
 vi.mock("@/components/AppHeader", () => ({ default: () => <div /> }));
 vi.mock("next/navigation", () => ({

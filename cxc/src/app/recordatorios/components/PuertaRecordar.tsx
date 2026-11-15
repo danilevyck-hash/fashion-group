@@ -26,6 +26,7 @@
  * siendo el botón del formulario, con sus campos obligatorios de siempre.
  */
 
+import IconoMotivo from "./IconoMotivo";
 import { ModalOverlay } from "@/components/ui";
 import { useFormGuard } from "@/lib/hooks/useModalDismiss";
 import { MOTIVOS_EN_ORDEN, type Motivo } from "@/lib/recordatorios/motivos";
@@ -75,7 +76,7 @@ export default function PuertaRecordar({ open, onCerrar, onElegir }: Props) {
               className="w-full text-left border border-gray-200 rounded-lg px-4 py-3 min-h-[44px] flex items-start gap-3 hover:border-black hover:bg-gray-50 active:scale-[0.99] transition"
             >
               <span aria-hidden className="text-lg leading-none mt-0.5">
-                {f.icono}
+                <IconoMotivo motivo={f.motivo} className="h-5 w-5" />
               </span>
               <span className="min-w-0">
                 <span className="block text-sm font-medium">{f.label}</span>

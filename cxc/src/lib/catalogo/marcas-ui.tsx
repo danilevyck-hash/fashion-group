@@ -14,6 +14,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import type { ReactNode } from "react";
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { RUTA_CATEGORIAS_REEBOK } from "@/lib/catalogos/reebok-rubros";
 import { getBultoSize as reebokBulto } from "@/lib/reebok-bulto";
 import { getBultoSize as joybeesBulto } from "@/lib/joybees-bulto";
@@ -1103,7 +1104,12 @@ const JOYBEES: MarcaTheme = {
     sectionRule: "flex-1 h-px bg-[#404041]/10",
     sectionCount: "text-xs text-[#404041]/25 tabular-nums",
     emptyIconWrap: "w-16 h-16 rounded-full bg-[#FFE443]/20 flex items-center justify-center mx-auto mb-4 text-2xl",
-    emptyIcon: <>🐝</>,
+    // Revisión 110 · ajustes (6): ícono de línea, como las otras tres marcas.
+    emptyIcon: ICONOS_DE_LINEA_EN_TODO ? (
+      <svg className="w-8 h-8 text-[#404041]/30" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ) : <>🐝</>,
     emptyText: "text-[#404041]/40 text-sm font-medium",
     emptyClear: "mt-3 text-sm text-[#404041] hover:text-black font-medium transition",
     scrollTopBtn:
@@ -1141,8 +1147,12 @@ const JOYBEES: MarcaTheme = {
     imageIntrinsic: { ancho: 400, alto: 400 },
     imageFit: "w-full h-full object-contain",
     placeholder: (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className="text-4xl">🐝</div>
+      <div className="w-full h-full flex items-center justify-center text-gray-300">
+        {ICONOS_DE_LINEA_EN_TODO ? (
+          <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        ) : <div className="text-4xl">🐝</div>}
       </div>
     ),
     name: "text-sm font-semibold text-[#404041] leading-5 h-5 truncate",

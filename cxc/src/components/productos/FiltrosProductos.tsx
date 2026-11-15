@@ -11,6 +11,7 @@
 // cada chip dependen de lo ya elegido. Un chip sin opciones no se dibuja.
 // Los totales y la lista «Por descripción» salen de los códigos que quedan.
 
+import { BUSCADOR_EN_LA_FILA } from "@/lib/ui/revision-110-ajustes";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
@@ -268,7 +269,7 @@ export function PantallaProductos(p: PantallaProductosProps) {
     </>
   );
   const buscarCodigo = (
-    <div className={cn("relative", BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "order-first min-w-[240px] flex-1" : cn("shrink-0", FILTRO_A_2026_11 ? "w-64" : "w-40"))}>
+    <div className={cn("relative", BUSCADOR_IZQUIERDA_LLENA_2026_11 ? cn("order-first flex-1", BUSCADOR_EN_LA_FILA ? "min-w-[160px]" : "min-w-[240px]") : cn("shrink-0", FILTRO_A_2026_11 ? "w-64" : "w-40"))}>
       <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
       <input
         type="search"
@@ -346,9 +347,22 @@ export function PantallaProductos(p: PantallaProductosProps) {
           {p.antes}
           {chipsNodo}
           {buscarCodigo}
-          {p.despues && <span className="flex-1" />}
-          {p.despues}
-          {descargar}
+          {BUSCADOR_EN_LA_FILA ? (
+            // Revisión 110 · ajustes (10): los filtros caben en UNA fila (ninguno
+            // cae solo abajo) y «Actualizar · Descargar» van en la suya, a la derecha.
+            (p.despues || descargar) && (
+              <div className="flex basis-full items-center justify-end gap-2">
+                {p.despues}
+                {descargar}
+              </div>
+            )
+          ) : (
+            <>
+              {p.despues && <span className="flex-1" />}
+              {p.despues}
+              {descargar}
+            </>
+          )}
         </div>
       ) : p.enBarra ? (
         <EnLaBarra

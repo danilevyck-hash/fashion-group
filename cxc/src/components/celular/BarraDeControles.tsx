@@ -31,6 +31,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -41,6 +42,7 @@ import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { BuscadorGris } from "@/components/filtros/FiltroA";
 import { ATRIBUTO_BARRA_FIJA, ATRIBUTO_SOBRE_LA_BARRA, CONSULTA_CELULAR } from "@/lib/navegacion/barra-celular";
 import { BARRA_EN_LISTAS_2026_11, TODAS_LAS_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { HIDRATACION_SIN_PORTAL } from "@/lib/ui/revision-110-ajustes";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { CLASE_VIDRIO, RADIO_VIDRIO, VIDRIO_2026_10, conVidrio } from "@/lib/ui/vidrio";
 import {
@@ -142,6 +144,18 @@ function useContar(r: Ranura, prendido: boolean, contar?: ContextoBarra["contar"
 }
 
 const hay = (n: ReactNode) => n != null && n !== false;
+
+/**
+ * Revisión 110 · ajustes (3): ¿ya se puede abrir un portal a `<body>`? En el
+ * servidor Y durante la hidratación, no: el servidor dibujó `null` y un portal
+ * en su lugar descuadraba lo que sigue (🩸 errores #418/#422 en /clientes, el
+ * «Ordenar» de al lado). Apenas hidrata, sí.
+ */
+const sinSuscripcion = () => () => {};
+function usePuedePortal(): boolean {
+  const hidratado = useSyncExternalStore(sinSuscripcion, () => true, () => false);
+  return HIDRATACION_SIN_PORTAL ? hidratado : typeof document !== "undefined";
+}
 
 /**
  * Lo que una pestaña manda a la barra:
@@ -570,7 +584,8 @@ export function HojaMenu({
     return () => document.removeEventListener("keydown", alTeclear);
   }, [abierta, onCerrar]);
 
-  if (typeof document === "undefined") return null;
+  const puedePortal = usePuedePortal();
+  if (!puedePortal) return null;
   return createPortal(
     <div
       role="dialog"
@@ -611,7 +626,8 @@ export function HojaMenu({
 export const ALTO_COLCHON_DE_ABAJO = "calc(var(--fg-alto-barra-fija, 0px) + 76px)";
 
 function ColchonDeAbajo() {
-  if (typeof document === "undefined") return null;
+  const puedePortal = usePuedePortal();
+  if (!puedePortal) return null;
   return createPortal(<div aria-hidden data-colchon-abajo style={{ height: ALTO_COLCHON_DE_ABAJO }} />, document.body);
 }
 
@@ -634,9 +650,10 @@ export interface AccionPrincipal {
 export function BarraAccionFija({ rotulo, onClick, disabled, sobreLaBarra }: AccionPrincipal) {
   const cajon = useRef<HTMLDivElement | null>(null);
   usePublicarAltoBarraFija(cajon);
+  const puedePortal = usePuedePortal();
   // 🔑 Al final de `<body>`: un `transform` de un contenedor (el «tirar para
   // actualizar») le rompería el `fixed`.
-  if (typeof document === "undefined") return null;
+  if (!puedePortal) return null;
   return createPortal(
     <div
       ref={cajon}

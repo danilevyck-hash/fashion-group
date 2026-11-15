@@ -29,12 +29,15 @@
  * se enteraría hasta verla en producción.
  */
 
+import { Bell } from "lucide-react";
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { Fragment } from "react";
 import { StatusBadge } from "@/components/ui";
 import { fmt, fmtDate } from "@/lib/format";
 import { getCompanyDisplay } from "@/lib/companies";
 import { ETIQUETA_REPETICION } from "@/lib/recordatorios/recordatorio";
-import { iconoDeItem, motivoDeItem } from "@/lib/recordatorios/motivos";
+import { motivoDeItem } from "@/lib/recordatorios/motivos";
+import IconoMotivo from "./IconoMotivo";
 import type { GrupoDeAgenda, ItemAgenda } from "@/lib/recordatorios/agenda";
 
 interface Props {
@@ -86,7 +89,7 @@ function FilaCheque({
               className="shrink-0"
               data-motivo-icono={motivoDeItem(item)}
             >
-              {iconoDeItem(item)}
+              <IconoMotivo motivo={motivoDeItem(item)} />
             </span>
             <span className="text-sm font-medium truncate" data-cheque-campo="cliente">
               {c.cliente}
@@ -165,7 +168,7 @@ function FilaRecordatorio({
             className="shrink-0 mt-0.5"
             data-motivo-icono={motivoDeItem(item)}
           >
-            {iconoDeItem(item)}
+            <IconoMotivo motivo={motivoDeItem(item)} />
           </span>
           <span className="text-sm font-medium break-words" data-recordatorio-campo="texto">
             {r.texto}
@@ -242,7 +245,7 @@ export default function AgendaLista({
     return (
       <div className="flex flex-col items-center py-16 text-center">
         <span aria-hidden className="text-3xl mb-3">
-          🔔
+          {ICONOS_DE_LINEA_EN_TODO ? <Bell aria-hidden className="h-8 w-8 text-gray-400" strokeWidth={1.5} /> : "🔔"}
         </span>
         <p className="text-sm text-gray-500">Sin pendientes</p>
       </div>

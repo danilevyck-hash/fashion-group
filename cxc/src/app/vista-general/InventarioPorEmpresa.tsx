@@ -23,6 +23,8 @@
 //    corre 04:30-04:50 UTC = 11:30-11:50 pm Panamá). La fecha va SIEMPRE al
 //    lado del número, y si pasó de 26 h el aviso se pone en ámbar.
 
+import { AlertTriangle } from "lucide-react";
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import Link from "next/link";
 import { money, moneyK } from "./formato";
 import { fmtFrescura } from "@/lib/ventas/referencia-info";
@@ -83,6 +85,21 @@ export function textoFrescura(medidoEn: string | null, viejo: boolean): string {
   return `${viejo ? "⚠ sin actualizar desde el " : "al "}${fmtFrescura(medidoEn)}`;
 }
 
+/**
+ * Revisión 110 · ajustes (6): la misma frase, con el aviso como ícono de línea
+ * (nunca el emoji «⚠»), igual que el resto del sistema.
+ */
+export function FrescuraConIcono({ medidoEn, viejo }: { medidoEn: string | null; viejo: boolean }) {
+  const texto = textoFrescura(medidoEn, viejo);
+  if (!ICONOS_DE_LINEA_EN_TODO || !texto.startsWith("⚠ ")) return <>{texto}</>;
+  return (
+    <span className="whitespace-nowrap">
+      <AlertTriangle aria-hidden className="mr-1 inline h-3.5 w-3.5 -translate-y-px align-middle" strokeWidth={2} />
+      {texto.slice(2)}
+    </span>
+  );
+}
+
 /** El valor AL COSTO para la tarjeta chica del tablero. */
 export function InventarioKpiValue({ inv }: { inv: InventarioData | null }): string {
   if (!inv || !inv.disponible) return "—";
@@ -113,7 +130,7 @@ export default function InventarioPorEmpresa({ inv }: { inv: InventarioData | nu
           data-col="frescura"
           className={`text-xs tabular-nums ${inv.viejo ? "text-amber-600 font-medium" : "text-gray-400"}`}
         >
-          {textoFrescura(inv.medidoEn, inv.viejo)}
+          <FrescuraConIcono medidoEn={inv.medidoEn} viejo={inv.viejo} />
         </span>
       </div>
       {/* La bajada dice CUÁL de los dos números es plata. Sin ella, los $4,06M

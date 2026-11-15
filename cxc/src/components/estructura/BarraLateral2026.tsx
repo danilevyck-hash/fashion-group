@@ -9,10 +9,11 @@
 // derecha). Los módulos salen del ROL (`gruposDelCajon`, la MISMA lista del
 // menú del celular), nunca de una lista escrita aquí.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Home } from "lucide-react";
+import { RAIL_CABE_ENTERO } from "@/lib/ui/revision-110-ajustes";
 import FGLogo from "@/components/FGLogo";
 import { plegadoPorPantalla, useSidebarCollapsed, writeSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
 import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
@@ -41,8 +42,16 @@ export default function BarraLateral2026() {
 
   const grupos = gruposDelCajon(userRole, fgModules);
   const aqui = moduloDeLaRuta(pathname);
+  // Revisión 110 · ajustes (15): plegada, todos los íconos CABEN en el alto de
+  // la ventana (filas de 44 px que bajan hasta 32 px); si ni así caben, la
+  // lista se desliza. Ningún ícono queda medio cortado al pie.
+  const ajustar = RAIL_CABE_ENTERO && collapsed;
+  const filasRail = 1 + grupos.reduce((n, g) => n + g.modulos.length, 0);
+  const estiloRail = ajustar
+    ? ({ "--fila-rail": `clamp(32px, calc((100dvh - 57px - 16px - ${grupos.length * 13}px) / ${filasRail}), 44px)` } as CSSProperties)
+    : undefined;
   const fila = (activo: boolean) =>
-    `flex min-h-[44px] w-full items-center border-l-2 text-sm transition-colors ${
+    `flex ${ajustar ? "min-h-[var(--fila-rail)]" : "min-h-[44px]"} w-full items-center border-l-2 text-sm transition-colors ${
       collapsed ? "justify-center px-0" : "gap-3 px-5"
     } ${activo ? "border-l-blue-500 bg-gray-50 font-medium text-gray-950" : "border-l-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900"}`;
 
@@ -69,7 +78,7 @@ export default function BarraLateral2026() {
         </button>}
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="flex-1 overflow-y-auto py-2" style={estiloRail}>
         <Link href="/home" title={collapsed ? "Inicio" : undefined} className={fila(pathname === "/home")}>
           <Home size={16} strokeWidth={1.5} className="flex-shrink-0" />
           {!collapsed && <span className="truncate">Inicio</span>}

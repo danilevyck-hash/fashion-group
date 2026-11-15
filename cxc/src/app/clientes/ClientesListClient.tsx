@@ -37,6 +37,7 @@ import { OrdenarEnLaBarra, ThOrden, useOrdenTabla } from "@/components/ui/OrdenT
 import { ChevronDown } from "lucide-react";
 import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, HojaMenu } from "@/components/celular/BarraDeControles";
 import { CLIENTES_LISTA_DESPLEGABLES as LISTA_DESPLEGABLES } from "@/lib/ui/revision-110-cxc";
+import { CORREO_ENTERO, FRESCURA_SIN_DESBORDE } from "@/lib/ui/revision-110-ajustes";
 import {
   contarChips,
   contarClientes,
@@ -194,7 +195,7 @@ export default function ClientesListClient({
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
-              <div data-bloque="vistas" className="mt-3 flex min-w-0 items-center gap-2">
+              <div data-bloque="vistas" className={`mt-3 flex min-w-0 items-center ${FRESCURA_SIN_DESBORDE ? "gap-1" : "gap-2"}`}>
                 <MenuDeVistas chips={chips} elegido={chip} onElegir={(id) => setChipUrl(id)} />
                 <div className="lg:hidden">
                   <OrdenarEnLaBarra api={ordenTabla} opciones={[
@@ -527,7 +528,10 @@ function Contacto({
         <a
           href={mHref ?? undefined}
           onClick={(e) => e.stopPropagation()}
-          className={`max-w-[14rem] truncate text-blue-600 hover:underline ${grande}`}
+          // Revisión 110 · ajustes (16): en la tabla el correo tiene más lugar y,
+          // si aun así no cabe, se lee entero al pasar el mouse.
+          title={CORREO_ENTERO ? c.correo : undefined}
+          className={`${CORREO_ENTERO && !tocable ? "max-w-[22rem]" : "max-w-[14rem]"} truncate text-blue-600 hover:underline ${grande}`}
         >
           {c.correo}
         </a>

@@ -13,6 +13,7 @@ import { juegosQueCoinciden, type JuegoDespacho } from "@/lib/guias/juegos-despa
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { GUIA_DETALLE_APPLE_2026_10, GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import { useDespachadores } from "./useDespachadores";
+import { FORMULARIO_SIN_TAB_BAR } from "@/lib/ui/revision-110-ajustes";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EL DESPACHO — ahora vive en la PÁGINA de la guía, no dentro de la lista.
@@ -214,7 +215,9 @@ export default function DespachoForm({
   const mostrarJuegos = buscandoJuego && sugerenciasJuego.length > 0;
 
   return (
-    <div className="space-y-4">
+    // Revisión 110 · ajustes (2): un formulario con firmas, sin la barra de
+    // pestañas encima (como los demás formularios).
+    <div className="space-y-4" data-sin-tab-bar={FORMULARIO_SIN_TAB_BAR ? "" : undefined}>
       {/* Cómo sale la mercancía — se MUESTRA lo que ya se eligió al crearla. */}
       {mostrarModo && v2 && !cambiandoModo && (
         /* 🔴 9-oct-2026: una línea, no una tarjeta. Ya se eligió al crear la

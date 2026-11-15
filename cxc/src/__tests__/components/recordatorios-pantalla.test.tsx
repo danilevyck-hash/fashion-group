@@ -668,7 +668,8 @@ describe("🔴 CADA FILA DICE SU MOTIVO CON UN ICONO", () => {
     expect(deLaNota, "la fila de la nota quedó sin icono de motivo").toBeTruthy();
     expect(delCheque.getAttribute("data-motivo-icono")).toBe("cheque");
     expect(deLaNota.getAttribute("data-motivo-icono")).toBe("nota");
-    expect(delCheque.textContent).not.toBe(deLaNota.textContent);
+    // Con íconos de línea no hay texto: se compara el dibujo.
+    expect(delCheque.innerHTML).not.toBe(deLaNota.innerHTML);
   });
 });
 

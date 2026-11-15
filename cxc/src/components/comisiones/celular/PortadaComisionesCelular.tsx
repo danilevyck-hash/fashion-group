@@ -25,6 +25,7 @@
 // Excel del mes · PDF de un vendedor. Los dos papeles son los MISMOS de antes.
 // ============================================================================
 
+import { BORDES_ALINEADOS } from "@/lib/ui/revision-110-ajustes";
 import { useState, type ReactNode } from "react";
 import { Settings } from "lucide-react";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
@@ -211,7 +212,7 @@ export function PortadaComisionesCelular({
         opciones={opciones.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta }))} />
     ),
     antesDeLaLista: resumen || frescura ? (
-      <div data-filtro-3-total className="flex items-center justify-between gap-2 px-4 pb-1 text-[13px] text-gray-500">
+      <div data-filtro-3-total className={`flex items-center justify-between gap-2 pb-1 text-[13px] text-gray-500 ${BORDES_ALINEADOS ? "" : "px-4"}`}>
         {resumen ? (
           <span className="whitespace-nowrap">
             {ROTULO_TOTAL_V2}{" "}
@@ -369,7 +370,9 @@ export function PortadaComisionesCelular({
         <AvisoRechazosSwitch texto={avisoMontos} />
       </div>
 
-      <div className="px-2 pt-1">{children}</div>
+      {/* Revisión 110 · ajustes (5): con el buscador, la lista, el buscador y
+          el total empiezan en el MISMO borde que el título (16 px). */}
+      <div className={`${f3 && BORDES_ALINEADOS ? "px-4" : "px-2"} pt-1`}>{children}</div>
 
       {/* El «···»: Descargar y Actualizar ahora, nada más. */}
       <HojaMenuCel abierta={menu} onCerrar={() => setMenu(false)} data-menu-comisiones>

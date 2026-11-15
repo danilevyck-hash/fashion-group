@@ -12,6 +12,8 @@
 // cuando el envío falló o todavía no salió — y ahí «Enviar» es lo que la
 // persona vino a hacer.
 
+import { AlertTriangle } from "lucide-react";
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
@@ -109,7 +111,7 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
         <div className="space-y-4">
           {/* Estado principal */}
           <div className={`rounded-lg border-2 p-6 text-center ${switchOk ? "border-emerald-300 bg-emerald-50" : ambiguo ? "border-amber-300 bg-amber-50" : sinIntento ? "border-gray-300 bg-gray-50" : "border-red-200 bg-red-50"}`}>
-            <div className="text-3xl">{switchOk ? "✓" : ambiguo ? "⚠️" : sinIntento ? "→" : "!"}</div>
+            <div className="text-3xl">{switchOk ? "✓" : ambiguo ? (ICONOS_DE_LINEA_EN_TODO ? <AlertTriangle aria-hidden className="mx-auto h-8 w-8 text-amber-600" /> : "⚠️") : sinIntento ? "→" : "!"}</div>
             {/* 🔴 EL TÍTULO DICE CUÁL DE LAS DOS FUE. Decía "Pedido TOM-027
                 guardado" en grande aunque lo mandado hubiera sido una
                 COTIZACIÓN, y el renglón chico de abajo la contradecía. El

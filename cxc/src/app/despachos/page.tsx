@@ -1,5 +1,6 @@
 "use client";
 
+import { PESTANAS_A_LA_IZQUIERDA } from "@/lib/ui/revision-110-ajustes";
 import { ROLES_CAMBIAR_BULTOS } from "@/lib/ui/revision-110-61";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -272,7 +273,9 @@ export default function GuiasPage() {
             (admin y secretaria): para bodega y vendedor la pantalla es
             exactamente la de siempre, sin una fila extra. */}
         {!barra && pestanas.length > 1 && (
-          <div className="max-w-3xl mx-auto px-4 pt-3">
+          // Revisión 110 · ajustes (9): el mismo ancho y borde que el contenido
+          // (max-w-6xl, px-6), no una columna angosta centrada.
+          <div className={PESTANAS_A_LA_IZQUIERDA ? "max-w-6xl mx-auto px-4 sm:px-6 pt-3" : "max-w-3xl mx-auto px-4 pt-3"}>
             <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto">
               {pestanas.map(([v, label]) => (
                 <button

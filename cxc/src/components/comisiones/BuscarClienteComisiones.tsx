@@ -4,6 +4,7 @@
 // Una caja arriba de la lista. Con texto, la lista se cambia por los documentos
 // del cliente en el período: a quién le contó cada uno, o por qué no.
 
+import { BORDES_ALINEADOS } from "@/lib/ui/revision-110-ajustes";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { BuscadorGris } from "@/components/filtros/FiltroA";
 import { Search, X } from "lucide-react";
@@ -132,7 +133,7 @@ export function BuscarClienteComisiones({ year, mes, empresa, children }: { year
     <div>
       {ranuras ? (
         <>
-          <div data-filtro-3-buscar className="mb-2 flex items-center gap-2 px-4">
+          <div data-filtro-3-buscar className={`mb-2 flex items-center gap-2 ${BORDES_ALINEADOS ? "" : "px-4"}`}>
             <BuscadorGris valor={q} onCambiar={setQ} placeholder="Buscar cliente" compacto className="min-w-0 flex-1" />
             {ranuras.alLado}
           </div>
@@ -161,7 +162,7 @@ export function BuscarClienteComisiones({ year, mes, empresa, children }: { year
       )}
 
       {!buscando ? children : (
-        <div className="px-4 sm:px-0" data-buscar-cliente-listo={clientes || error ? "" : undefined}>
+        <div className={ranuras && BORDES_ALINEADOS ? undefined : "px-4 sm:px-0"} data-buscar-cliente-listo={clientes || error ? "" : undefined}>
           {error && <p className="text-sm text-red-600">{error}</p>}
           {!clientes && !error && <div className="h-40 animate-pulse rounded-lg bg-gray-100" aria-hidden />}
           {clientes?.length === 0 && <p className="py-8 text-center text-sm text-gray-500">Sin clientes con ese nombre o código</p>}

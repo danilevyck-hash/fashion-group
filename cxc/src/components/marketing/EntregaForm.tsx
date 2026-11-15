@@ -36,6 +36,8 @@
 //   Los bultos son OPCIONALES: en blanco = "no se anotó", nunca 0.
 // ============================================================================
 
+import { AlertTriangle } from "lucide-react";
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { useEffect, useMemo, useState } from "react";
 import BloqueDatosDelGasto from "@/app/marketing/components/BloqueDatosDelGasto";
 import {
@@ -1087,7 +1089,7 @@ export default function EntregaForm({
                   sistema lo muestra en vez de esconderlo. */}
               {warningsStock.length > 0 && (
                 <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
-                  ⚠ Vas a entregar más unidades de las que hay en el inventario:{" "}
+                  {ICONOS_DE_LINEA_EN_TODO ? <AlertTriangle aria-hidden className="mr-1 inline h-3.5 w-3.5 align-[-2px]" /> : "⚠ "}Vas a entregar más unidades de las que hay en el inventario:{" "}
                   {warningsStock
                     .map(
                       (w) =>

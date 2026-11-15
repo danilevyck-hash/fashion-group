@@ -12,6 +12,7 @@
 // con «No recuperable» y «Reemplazar» el PDF).
 // ============================================================================
 
+import { BUSCADOR_EN_LA_FILA } from "@/lib/ui/revision-110-ajustes";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
@@ -207,14 +208,15 @@ export default function GastosNuevo({
           onRestablecer={() => { quitarFiltros(); setBusqueda(""); }}
         />
       )}
-      <div className={`${FILTRO_A_2026_11 ? "hidden md:flex" : "grid grid-cols-2 md:flex"} md:flex-wrap md:items-end gap-x-3 gap-y-2 md:[&>*]:w-48`}>
+      <div className={`${FILTRO_A_2026_11 ? "hidden md:flex" : "grid grid-cols-2 md:flex"} ${BUSCADOR_EN_LA_FILA && FILTRO_A_2026_11 ? "md:flex-nowrap md:[&>*]:w-36 md:[&>*]:shrink-0" : "md:flex-wrap md:[&>*]:w-48"} md:items-end gap-x-3 gap-y-2`}>
         {FILTRO_A_2026_11 && (
           <CampoBuscar
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar proveedor o factura"
             aria-label="Buscar proveedor o factura"
-            envoltorio="md:!w-72"
+            // Revisión 110 · ajustes (10): a la izquierda, llenando la fila; «Estado» ya no cae solo abajo.
+            envoltorio={BUSCADOR_EN_LA_FILA ? "md:!w-auto md:!flex-1 md:!shrink md:min-w-0" : "md:!w-72"}
           />
         )}
         <Filtro id="filtro-marca" rotulo="Marca" todas="Todas" valor={marca} onChange={setMarca} opciones={opcionesMarca.map((m) => [m, m] as const)} />

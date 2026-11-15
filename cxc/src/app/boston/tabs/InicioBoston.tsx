@@ -16,7 +16,7 @@ import SyncStatus from "@/components/shared/SyncStatus";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 import type { TabBoston } from "@/lib/boston/rol";
-import { BOSTON_SIN_DE_BOSTON, BOSTON_TRAMOS_EN_COLUMNAS } from "@/lib/ui/revision-110-ventas";
+import { BOSTON_CXC_ABRE_BOSTON, BOSTON_SIN_DE_BOSTON, BOSTON_TRAMOS_EN_COLUMNAS } from "@/lib/ui/revision-110-ventas";
 
 // 🔴 La lista se DERIVA de `empresasCarteraAparte()` (= estadoCuenta:true +
 // cxc:false, o sea SOLO Boston) en vez de escribirse a mano, que es la misma
@@ -45,11 +45,14 @@ function Tarjeta({
   titulo,
   valor,
   pie,
+  enlace,
   onIr,
 }: {
   titulo: string;
   valor: string;
   pie: string;
+  /** La línea azul que dice a dónde lleva la tarjeta (n.º 105). */
+  enlace?: string;
   onIr: () => void;
 }) {
   return (
@@ -62,6 +65,7 @@ function Tarjeta({
       <span className="block text-xs uppercase tracking-wide text-gray-500">{titulo}</span>
       <span className="block mt-1 text-2xl font-semibold tabular-nums text-gray-900">{valor}</span>
       {pie && <span className="block mt-0.5 text-xs text-gray-500">{pie}</span>}
+      {enlace && <span className="block mt-1 text-xs text-blue-600">{enlace}</span>}
     </button>
   );
 }
@@ -94,6 +98,7 @@ export default function InicioBoston({ onIr }: { onIr: (t: TabBoston) => void })
           titulo="Cuentas por cobrar"
           valor={isLoading ? "—" : `$${fmt(c?.total ?? 0)}`}
           pie={isLoading ? "cargando…" : `${c?.clientes ?? 0} clientes`}
+          enlace={BOSTON_CXC_ABRE_BOSTON ? "Abre Confecciones Boston ›" : undefined}
           onIr={() => onIr("cxc")}
         />
         <Tarjeta

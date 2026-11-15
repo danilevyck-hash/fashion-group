@@ -171,8 +171,9 @@ describe("🔴 4 · el borde de color solo cuando hay algo que decir", () => {
     const { container } = pintar([guia()]);
     const clases = tarjetaDe(filas(container)[0]).className;
     expect(clases).not.toContain("border-l-emerald");
-    // El hueco de 4 px se conserva para que las filas no bailen.
-    expect(clases).toContain("border-l-4");
+    // El hueco de 4 px se conserva para que las filas no bailen (revisión 110 ·
+    // ajustes: 1 px de borde + 3 px de aire, con el borde al mismo filo).
+    expect(clases.includes("border-l-4") || clases.includes("pl-[3px]")).toBe(true);
   });
 
   it("la que todavía espera SÍ se pinta de ámbar", () => {

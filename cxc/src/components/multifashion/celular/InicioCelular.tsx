@@ -36,6 +36,7 @@ import { MULTIFASHION_GRAFICA_2026_10 } from "@/lib/multifashion/grafica-mes";
 import { GraficaDelMes } from "../GraficaDelMes";
 import { lineaMayoreo } from "@/lib/multifashion/retail-al-frente";
 import { lineasDelHistorico, type HistoricoVentas } from "@/lib/multifashion/historico";
+import { TEXTOS_SIN_PARTIR, pegarPorcentaje } from "@/lib/ui/revision-110-ajustes";
 
 export const TONO_CLASE: Record<TonoCelular, string> = {
   sube: "text-emerald-700",
@@ -267,7 +268,7 @@ function HistoricoCelular() {
   if (lineas.length === 0) return null;
   return (
     <p data-celular="historico" className="mt-2 text-sm text-gray-500 tabular-nums">
-      {lineas.map((l) => <span key={l} className="block">{l}</span>)}
+      {lineas.map((l) => <span key={l} className="block">{TEXTOS_SIN_PARTIR ? pegarPorcentaje(l) : l}</span>)}
     </p>
   );
 }

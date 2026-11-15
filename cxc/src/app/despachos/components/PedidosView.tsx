@@ -7,8 +7,9 @@
 // «Actualizar» trae las 6 empresas una tras otra por `sync-now` (módulo
 // «pedidos»), como Ventas y CxC con «Todas».
 
+import { NBSP, TEXTOS_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Check, Pencil, Printer, Undo2 } from "lucide-react";
 import { ConfirmModal } from "@/components/ui";
 import { AJUSTES_APPLE_6_2026_10 as CIRCULO } from "@/lib/ajustes-apple-6-2026-10";
@@ -1296,10 +1297,12 @@ export default function PedidosView({
         >
           <p className={pedidosCelular ? "min-w-0 text-[13px] font-semibold leading-snug text-gray-900" : "text-base font-semibold text-gray-900"}>
             {pedidos
-              ? SIMPLE && PEDIDOS_LINEA_DE_LA_PESTANA
+              ? partesSinPartir(SIMPLE && PEDIDOS_LINEA_DE_LA_PESTANA
                 ? lineaDeLaPestana(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple], hoy)
-                : CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy)
-              : " "}
+                : CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy))
+              // Revisión 110 · ajustes (13): mientras carga, la línea guarda su
+              // alto (un espacio que no se colapsa) y nada de abajo salta.
+              : TEXTOS_SIN_PARTIR ? NBSP : " "}
           </p>
           <LineaDeFrescura
             className={pedidosCelular ? "shrink-0 !text-[12px]" : CIRCULO ? "!text-xs" : undefined}
@@ -1370,4 +1373,15 @@ export default function PedidosView({
       )}
     </div>
   );
+}
+
+/**
+ * Revisión 110 · ajustes (4): «12 en preparación · el más viejo, 17 d». Se
+ * puede partir en el «·», nunca adentro de un tramo («el más viejo, 17 d»).
+ */
+function partesSinPartir(texto: string): ReactNode {
+  if (!TEXTOS_SIN_PARTIR) return texto;
+  return texto.split(" · ").map((parte, i) => (
+    <span key={i}>{i > 0 && " · "}<span className="whitespace-nowrap">{parte}</span></span>
+  ));
 }
