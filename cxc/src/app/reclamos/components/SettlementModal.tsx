@@ -1,5 +1,7 @@
 "use client";
 
+import { Paperclip } from "lucide-react";
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
@@ -177,7 +179,7 @@ export default function SettlementModal({
               onClick={() => fileRef.current?.click()}
               className="mt-2 w-full rounded-md border border-amber-300 bg-white px-3 min-h-[44px] text-sm text-gray-700 hover:border-amber-400 transition"
             >
-              {file ? `📎 ${file.name}` : "Adjuntar foto o PDF"}
+              {file ? (ICONOS_DE_LINEA_EN_TODO ? <span className="inline-flex min-w-0 items-center gap-1"><Paperclip aria-hidden className="h-4 w-4 shrink-0" /><span className="truncate">{file.name}</span></span> : `📎 ${file.name}`) : "Adjuntar foto o PDF"}
             </button>
           </div>
         )}

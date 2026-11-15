@@ -29,6 +29,7 @@
  *     que ya fuerza la empresa para David y recorta por el alcance.
  * ────────────────────────────────────────────────────────────────────────── */
 
+import { TEXTOS_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { ASIS_PENDIENTES_DOS_RENGLONES_R110, pendientesEnDosRenglones } from "@/lib/ui/revision-110-asistencia";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
@@ -202,6 +203,9 @@ export default function TableroCierre({
 
   if (!elegido) return null;
 
+  // Revisión 110 · ajustes (4): solo para mirar, la columna del botón va vacía;
+  // sin ella «Fashion Wear» cabe en una línea.
+  const sinUltima = TEXTOS_SIN_PARTIR && soloInforma;
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-3">
@@ -219,13 +223,13 @@ export default function TableroCierre({
               <th className="px-2 py-2.5 text-right font-medium"><span className="sm:hidden">Colab.</span><span className="hidden sm:inline">Colaboradores</span></th>
               <th className="px-2 py-2.5 text-right font-medium">Neto</th>
               <th className="px-2 py-2.5 text-left font-medium">Pendientes</th>
-              <th className="px-2 py-2.5 text-right font-medium"></th>
+              {!sinUltima && <th className="px-2 py-2.5 text-right font-medium"></th>}
             </tr>
           </thead>
           <tbody>
             {filas.map((f) => (
               <tr key={f.empresa} className="border-b border-gray-100 last:border-0">
-                <td className="px-3 py-2.5 text-gray-900">{f.etiqueta}</td>
+                <td className={`px-3 py-2.5 text-gray-900 ${TEXTOS_SIN_PARTIR ? "whitespace-nowrap" : ""}`}>{f.etiqueta}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums text-gray-700">
                   {f.personas || <span className="text-gray-300">—</span>}
                 </td>
@@ -247,7 +251,7 @@ export default function TableroCierre({
                     return dos ? <><span className="block whitespace-nowrap">{dos[0]}</span><span className="block whitespace-nowrap tabular-nums">{dos[1]}</span></> : texto;
                   })()}
                 </td>
-                <td className="px-2 py-2.5 text-right">
+                {!sinUltima && <td className="px-2 py-2.5 text-right">
                   {/* 🔴 13a (29-sep-2026, audit aprobado por Daniel): el «Cerrar»
                       NEGRO salía aunque faltaran cosas, y al tocarlo el servidor
                       lo frenaba (409). Ahora: con pendientes, «Revisar» con borde,
@@ -276,7 +280,7 @@ export default function TableroCierre({
                       </button>
                     )
                   )}
-                </td>
+                </td>}
               </tr>
             ))}
           </tbody>

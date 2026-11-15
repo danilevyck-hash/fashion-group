@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { VENTAS_PIE_UNA_LINEA, VENTAS_TABLA_AL_MES_EN_CURSO } from "@/lib/ui/revision-110-ventas";
+import { TABLA_SIN_COLUMNA_CORTADA } from "@/lib/ui/revision-110-ajustes";
 import { variacionPct } from "@/lib/variacion";
 import { ResumenViewMobile } from "./ResumenViewMobile";
 import { NumeroDelResumen } from "./NumeroDelResumen";
@@ -217,6 +218,18 @@ export function ResumenView({
   useEffect(() => {
     const cont = deslizarRef.current;
     if (!VENTAS_TABLA_AL_MES_EN_CURSO || !cont) return;
+    if (TABLA_SIN_COLUMNA_CORTADA) {
+      // Revisión 110 · ajustes (7): abre al FINAL (… NOV · DIC │ TOTAL), con
+      // el mes proyectado entero y su encabezado, y sin ninguna columna medio
+      // tapada por «Empresa» a la izquierda.
+      const acomodar = () => alFinalSinCortar(cont);
+      acomodar();
+      const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(acomodar);
+      const tabla = cont.querySelector("table");
+      if (ro && tabla) ro.observe(tabla);
+      if (ro) ro.observe(cont);
+      return () => ro?.disconnect();
+    }
     const th = cont.querySelector<HTMLElement>(`th[data-mes-col="${mesVisible - 1}"]`);
     const fija = cont.querySelector<HTMLElement>('th[data-col-fija="total"]');
     if (!th || !fija) return;
@@ -531,7 +544,10 @@ export function ResumenView({
       {/* Heatmap table */}
       <Card className="overflow-hidden p-0">
         <div ref={deslizarRef} className="overflow-x-auto">
-          <table className="w-full border-collapse" style={{ minWidth: 1100 }}>
+          {TABLA_SIN_COLUMNA_CORTADA && (
+            <style>{`[data-tabla-resumen][data-relleno] tr > :nth-child(${cols.length + 1}) { padding-right: calc(0.375rem + var(--relleno-ultimo-mes, 0px)) !important; }`}</style>
+          )}
+          <table data-tabla-resumen className="w-full border-collapse" style={{ minWidth: 1100 }}>
             {/* Cabecera fija al scrollear (sticky top). Las esquinas Empresa,
                 Total y Proyección quedan sticky en ambos ejes (left/right +
                 top) sobre el resto. */}
@@ -1374,4 +1390,30 @@ function sumYtd(arr: (number | null)[]): number {
 // del módulo se calcula así (ver queries.ts → sumSlice/upTo).
 function sumSlice(arr: (number | null)[], n: number): number {
   return arr.slice(0, n).reduce<number>((s, v) => s + (v ?? 0), 0);
+}
+
+/**
+ * Revisión 110 · ajustes (7): la tabla del Resumen abre deslizada al final y la
+ * primera columna que se ve después de «Empresa» queda ENTERA. Si al final una
+ * columna quedaba medio tapada por «Empresa», el último mes gana ese pedazo de
+ * aire a su derecha y la vista corre justo hasta el borde de esa columna.
+ * Solo mueve la vista: ningún número cambia.
+ */
+function alFinalSinCortar(cont: HTMLElement): void {
+  const tabla = cont.querySelector<HTMLElement>("table");
+  const empresa = cont.querySelector<HTMLElement>("thead th");
+  if (!tabla || !empresa) return;
+  tabla.style.setProperty("--relleno-ultimo-mes", "0px");
+  tabla.setAttribute("data-relleno", "");
+  let relleno = 0;
+  for (let i = 0; i < 3; i++) {
+    const max = cont.scrollWidth - cont.clientWidth;
+    const borde = max + empresa.offsetWidth;
+    const meses = Array.from(cont.querySelectorAll<HTMLElement>("th[data-mes-col]"));
+    const cortada = meses.find((th) => th.offsetLeft < borde - 1 && th.offsetLeft + th.offsetWidth > borde + 1);
+    if (!cortada || max <= 0) break;
+    relleno += cortada.offsetLeft + cortada.offsetWidth - borde;
+    tabla.style.setProperty("--relleno-ultimo-mes", `${Math.ceil(relleno)}px`);
+  }
+  cont.scrollLeft = cont.scrollWidth;
 }

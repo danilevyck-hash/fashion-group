@@ -6,6 +6,7 @@
 // Todo en MINUTOS, nunca horas decimales: "295 minutos" se le discute a una
 // persona, "4,92 horas" no le dice nada a nadie.
 
+import { NOMBRE_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11, FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import type { OpcionEmpresa } from "@/lib/asistencia/empresa-para-todo";
@@ -1446,6 +1447,10 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
             Sin nombre configurado se muestra el código —nunca un blanco— y se
             dice qué falta, porque un número suelto no se le reclama a nadie. */}
         <td className="px-3 py-2.5 text-gray-900">
+          {/* Revisión 110 · ajustes (11): casilla, código y nombre van JUNTOS,
+              sin partirse («301 Jenifer / Miranda» caía bajo la casilla); lo que
+              no cabe son los distintivos, que bajan enteros a la línea de abajo. */}
+          <span className={NOMBRE_SIN_PARTIR ? "whitespace-nowrap" : undefined}>
           {/* 🔴 LA CASILLA VA DENTRO DE «Colaborador», no en una columna nueva:
               la tabla tiene once y agregar una doceava la aprieta en el iPad.
               `stopPropagation` porque tocar la fila la despliega — marcar y
@@ -1467,6 +1472,7 @@ function FilaPersona({ p, abierta, soloDiasARevisar, rango, onVerDiasARevisar, o
           {codigoIzquierda}
           {ASIS_SIN_FICHA_R110 && ASISTENCIA_PANTALLA_2026_09 && !p.nombre ? `Código ${persona}` : persona}
           {burbujaSalida}
+          </span>
           {!ASISTENCIA_PANTALLA_2026_09 && (p.nombre ? (
             <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
           ) : (

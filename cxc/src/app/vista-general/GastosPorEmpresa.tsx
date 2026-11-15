@@ -42,6 +42,7 @@ import {
 } from "@/lib/egresos/gasto-mostrable";
 import { money } from "./formato";
 import { VG_GASTOS_PAUSADO_UNA_LINEA } from "@/lib/ui/revision-110-ventas";
+import { PAUSA_CUENTA_CARGA_MANUAL } from "@/lib/ui/revision-110-ajustes";
 
 export interface GastoEmpresaRow {
   key: string;
@@ -74,6 +75,13 @@ export function pillGasto(g: GastoEmpresaRow): { label: string; cls: string } | 
  *  número y todas dicen el motivo de la pausa. */
 const MOTIVOS_DE_PAUSA: ReadonlySet<string> = new Set(["sin_movimientos", "sin_datos"]);
 export function gastosPausados(filas: readonly { gasto: number | null; motivo: string | null }[]): boolean {
+  if (PAUSA_CUENTA_CARGA_MANUAL) {
+    // Revisión 110 · ajustes (8): Boston es «Carga manual» y nunca trae número
+    // solo; con ella adentro el panel seguía en 8 renglones (en la computadora).
+    // Pausado = ninguna trae número, y todas las demás dicen la pausa.
+    const conPausa = filas.filter((f) => !!f.motivo && MOTIVOS_DE_PAUSA.has(f.motivo));
+    return conPausa.length > 0 && filas.every((f) => f.gasto === null && !!f.motivo && (MOTIVOS_DE_PAUSA.has(f.motivo) || f.motivo === "no_automatico"));
+  }
   return filas.length > 0 && filas.every((f) => f.gasto === null && !!f.motivo && MOTIVOS_DE_PAUSA.has(f.motivo));
 }
 

@@ -14,6 +14,7 @@
  * arreglo viajaron con su código.
  */
 
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { Bell } from "lucide-react";
 import { ICONOS_DE_LINEA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useRef, useState } from "react";
@@ -58,7 +59,7 @@ function RecordatorioCalendarioPill({
     >
       <span className="flex items-center gap-1 min-w-0 w-full">
         <span aria-hidden className="flex-shrink-0">
-          🔔
+          {ICONOS_DE_LINEA_EN_TODO ? <Bell aria-hidden className="h-3.5 w-3.5" /> : "🔔"}
         </span>
         {/* `min-w-0 break-words`: sin eso el texto no envuelve DENTRO de su
             caja y `line-clamp` lo recorta de costado — 6 a 17 px que no se
@@ -367,7 +368,7 @@ export default function CalendarioMes({
                       className="w-full text-left flex items-start gap-2 rounded bg-blue-50 border border-blue-200 px-2 py-2 min-h-[44px]"
                     >
                       <span aria-hidden className="flex-shrink-0 mt-0.5">
-                        🔔
+                        {ICONOS_DE_LINEA_EN_TODO ? <Bell aria-hidden className="h-3.5 w-3.5" /> : "🔔"}
                       </span>
                       <span className="min-w-0">
                         <span className="block text-sm text-blue-900 break-words">{rec.texto}</span>

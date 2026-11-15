@@ -14,6 +14,7 @@
 // es la pantalla que vivía en `/saldos-banco`, mudada entera; esa dirección
 // redirige acá (next.config.js).
 
+import { TEXTOS_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { Suspense, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -167,7 +168,7 @@ function GastosContabilidadInner({ apple }: { apple: boolean }) {
             periodo={enGastos && !empresaParam ? (
               <div className="flex min-w-0 items-center gap-2">
                 <SelectorMes mes={mes} mesTope={hoyMes} onCambiar={setMesParam} compacto />
-                {lineaPausa}
+                {!TEXTOS_SIN_PARTIR && lineaPausa}
               </div>
             ) : undefined}
           />
@@ -197,6 +198,11 @@ function GastosContabilidadInner({ apple }: { apple: boolean }) {
           empresaEgresos ? <DetalleEgresos empresa={empresaEgresos} onVolver={volver} apple={apple} /> : null
         ) : (
           <>
+            {/* Revisión 110 · ajustes (4): en el celular la pausa va en su propia
+                línea, entera, debajo del mes (al lado del mes se partía en dos). */}
+            {barra && TEXTOS_SIN_PARTIR && lineaPausa && (
+              <p className="-mt-2 mb-3 whitespace-nowrap">{lineaPausa}</p>
+            )}
             {!barra && (
             <div className={lineaPausa ? "mb-4 flex flex-wrap items-center gap-x-3 gap-y-1" : "mb-4"}>
               <SelectorMes mes={mes} mesTope={hoyMes} onCambiar={setMesParam} compacto={apple} />

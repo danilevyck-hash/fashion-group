@@ -1,4 +1,5 @@
 "use client";
+import { TODAS_EN_EL_AVISO } from "@/lib/ui/revision-110-ajustes";
 import { Aviso } from "@/components/ui/Aviso";
 
 // LA PLANILLA QUINCENAL — el cuadro que la contable armaba a mano en Excel.
@@ -1197,7 +1198,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
       {sinEmpresa && (
         <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-700">
           Así va cada empresa. Para <b>armar y revisar</b> una planilla, elígela arriba:
-          con «Todas» no se paga nada.
+          {TODAS_EN_EL_AVISO ? "con «Todas las empresas» no se paga nada." : "con «Todas» no se paga nada."}
         </p>
       )}
       {/* ── Elegir qué se va a pagar ── */}

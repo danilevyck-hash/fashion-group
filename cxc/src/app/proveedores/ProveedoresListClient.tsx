@@ -23,6 +23,7 @@ import { Aviso } from "@/components/ui/Aviso";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import type { TramoKey } from "@/lib/proveedores/tramos";
 import { PROVEEDORES_APPLE_2026_10, lineaCartera, nombreProveedorEnPantalla } from "@/lib/proveedores/apple-2026-10";
+import { TEXTOS_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { capitalizarNombre } from "@/lib/cxc/estado-cuenta-switch";
 import TramosApple, { tonoApple } from "./TramosApple";
 
@@ -184,7 +185,11 @@ function ProveedoresList({ apple }: { apple: boolean }) {
                       {textoDeMonto(total.saldo.por_pagar, fmt)}
                     </p>
                     <p className="pt-2 text-sm text-gray-500 tabular-nums">
-                      {lineaCartera(cartera.proveedores_con_saldo, total.saldo, fmt)}
+                      {TEXTOS_SIN_PARTIR
+                        ? lineaCartera(cartera.proveedores_con_saldo, total.saldo, fmt).split(" · ").map((parte, i) => (
+                            <span key={parte}>{i > 0 && " · "}<span className="whitespace-nowrap">{parte}</span></span>
+                          ))
+                        : lineaCartera(cartera.proveedores_con_saldo, total.saldo, fmt)}
                     </p>
                   </>
                 )}
@@ -625,7 +630,9 @@ function TarjetaEmpresaApple({
           <span className="block text-sm font-medium text-gray-900">{empresa.nombre}</span>
           <span className="mt-0.5 block text-sm text-gray-500 tabular-nums">
             {n === 0 ? "Sin proveedores con saldo" : `${n} ${n === 1 ? "proveedor" : "proveedores"}`}
-            {viejo !== 0 && ` · +1 año ${textoDeMonto(viejo, fmt)}`}
+            {viejo !== 0 && (TEXTOS_SIN_PARTIR
+              ? <> · <span className="whitespace-nowrap">+1 año {textoDeMonto(viejo, fmt)}</span></>
+              : ` · +1 año ${textoDeMonto(viejo, fmt)}`)}
           </span>
         </span>
         <span className={`shrink-0 text-sm tabular-nums ${tonoApple(empresa.saldo.por_pagar)}`}>

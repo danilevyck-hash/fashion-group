@@ -16,6 +16,7 @@
 // Cuando todas las empresas están al día, el warning se omite.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { useEffect, useRef } from "react";
 import { Calendar } from "lucide-react";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
@@ -85,7 +86,7 @@ function buildWarning(
     if (!s.last_synced_at) return `${label} sin datos`;
     return `${label} sin actualizar desde ${fmtShortDate(s.last_synced_at)}`;
   });
-  return `⚠️ ${parts.join(" · ")}`;
+  return ICONOS_DE_LINEA_EN_TODO ? parts.join(" · ") : `⚠️ ${parts.join(" · ")}`;
 }
 
 // La lectura de `/api/sync-status` (fetch compartido en vuelo, foco y sondeo)

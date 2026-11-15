@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, type InputHTMLAttributes } from "react";
+import { forwardRef, useRef, type InputHTMLAttributes } from "react";
+import { usePlaceholderQueCabe } from "@/lib/ui/placeholder-que-cabe";
 import { Search } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -95,11 +96,19 @@ export const CLASE_CAMPO_BUSCAR =
 export const CampoBuscar = forwardRef<
   HTMLInputElement,
   InputHTMLAttributes<HTMLInputElement> & { envoltorio?: string }
->(function CampoBuscar({ envoltorio = "w-full", className = "", type = "search", ...props }, ref) {
+>(function CampoBuscar({ envoltorio = "w-full", className = "", type = "search", placeholder, ...props }, ref) {
+  // Revisión 110 · ajustes (1): el texto guía nunca se corta a mitad de palabra.
+  const propio = useRef<HTMLInputElement | null>(null);
+  const textoGuia = usePlaceholderQueCabe(propio, placeholder);
+  const ponerRef = (el: HTMLInputElement | null) => {
+    propio.current = el;
+    if (typeof ref === "function") ref(el);
+    else if (ref) ref.current = el;
+  };
   return (
     <div className={`relative min-w-0 ${envoltorio}`}>
       <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-      <input ref={ref} type={type} {...props} className={`${CLASE_CAMPO_BUSCAR} ${className}`} />
+      <input ref={ponerRef} type={type} placeholder={textoGuia} {...props} className={`${CLASE_CAMPO_BUSCAR} ${className}`} />
     </div>
   );
 });

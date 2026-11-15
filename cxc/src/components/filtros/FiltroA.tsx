@@ -27,6 +27,7 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { vidrioSobre } from "@/lib/ui/vidrio";
 import { cn } from "@/lib/utils";
+import { usePlaceholderQueCabe } from "@/lib/ui/placeholder-que-cabe";
 
 export interface OpcionA {
   valor: string;
@@ -126,14 +127,17 @@ export function BuscadorGris({
   derecha?: ReactNode;
   className?: string;
 }) {
+  const campo = useRef<HTMLInputElement>(null);
+  const textoGuia = usePlaceholderQueCabe(campo, placeholder);
   return (
     <div data-buscador-gris className={cn("relative min-w-0", className)}>
       <Search aria-hidden className={cn("pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500", compacto && "left-2.5")} />
       <input
+        ref={campo}
         type="search"
         value={valor}
         onChange={(e) => onCambiar(e.target.value)}
-        placeholder={placeholder}
+        placeholder={textoGuia}
         aria-label={placeholder}
         className={cn(CAMPO_GRIS, derecha ? "pr-12" : "pr-3", compacto && "pl-8 pr-2 placeholder:text-[14px]")}
       />

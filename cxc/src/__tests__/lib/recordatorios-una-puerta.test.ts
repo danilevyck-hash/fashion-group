@@ -226,9 +226,12 @@ describe("🔴 5 · UNA SOLA LISTA — no se vuelve a partir en dos", () => {
 
   it("🔴 cada fila lleva el icono de SU motivo, sacado del registro", () => {
     const lista = leer(LISTA);
-    expect(lista).toContain("iconoDeItem(item)");
+    // Revisión 110 · ajustes (6): el ícono de línea sale de `IconoMotivo`, que
+    // tiene uno por motivo (`Record<Motivo, …>`: sin él no compila).
+    const marca = lista.includes("iconoDeItem(item)") ? "iconoDeItem(item)" : "<IconoMotivo motivo={motivoDeItem(item)} />";
+    expect(lista).toContain(marca);
     // Escrito a mano, un motivo nuevo saldría sin marca y nadie se enteraría.
-    expect(lista.split("iconoDeItem(item)").length - 1).toBe(MOTIVOS.length);
+    expect(lista.split(marca).length - 1).toBe(MOTIVOS.length);
   });
 
   it("🔴 y NINGÚN total sumado en la agenda", () => {

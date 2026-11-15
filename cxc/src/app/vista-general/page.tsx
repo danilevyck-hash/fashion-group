@@ -17,10 +17,11 @@ import GastosPorEmpresa, { type GastosData } from "./GastosPorEmpresa";
 import InventarioPorEmpresa, {
   InventarioKpiValue,
   piezas,
-  textoFrescura,
+  FrescuraConIcono,
   type InventarioData,
 } from "./InventarioPorEmpresa";
 import { moneyK, pct } from "./formato";
+import { TEXTOS_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { capitalizarNombre, esGritado } from "@/lib/nombre-en-pantalla";
 import {
   VG_ALERTAS_EMPRESA_ABAJO,
@@ -238,7 +239,9 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
             <span className={ventas.parcial ? "text-gray-400" : ventas.yoyPct >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
               {/* Mes en curso: el año pasado va recortado a los MISMOS DÍAS
                   ("vs 1–3 sep 2025"), no el mes entero (3-sep-2026). */}
-              {ventas.yoyPct >= 0 ? "▲" : "▼"} {pct(Math.abs(ventas.yoyPct))} vs {ventas.parcial && ventas.prevHasta ? `1–${fechaCorta(ventas.prevHasta)} ${ventas.prevHasta.slice(0, 4)}` : mesPrevAnio}{ventas.parcial && !ventas.prevHasta ? " (parcial)" : ""}
+              {ventas.yoyPct >= 0 ? "▲" : "▼"} {pct(Math.abs(ventas.yoyPct))}{" "}
+              {/* Revisión 110 · ajustes (4): «vs 1–14 nov 2025» no se parte. */}
+              <span className={TEXTOS_SIN_PARTIR ? "whitespace-nowrap" : undefined}>vs {ventas.parcial && ventas.prevHasta ? `1–${fechaCorta(ventas.prevHasta)} ${ventas.prevHasta.slice(0, 4)}` : mesPrevAnio}{ventas.parcial && !ventas.prevHasta ? " (parcial)" : ""}</span>
             </span>
           )
         }
@@ -303,7 +306,7 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
             <span className="text-gray-400">Todavía no está conectado</span>
           ) : (
             <span className={inventario.viejo ? "text-amber-600 font-medium" : "text-gray-400"}>
-              {piezas(inventario.totalUnidades)} unidades · {textoFrescura(inventario.medidoEn, inventario.viejo)}
+              {piezas(inventario.totalUnidades)} unidades · <FrescuraConIcono medidoEn={inventario.medidoEn} viejo={inventario.viejo} />
             </span>
           )
         }

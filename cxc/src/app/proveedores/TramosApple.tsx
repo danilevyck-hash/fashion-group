@@ -21,7 +21,7 @@ export default function TramosApple({ tramos, className = "" }: { tramos: Tramos
         {TRAMOS.map((t) => (
           <div key={t.key} className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
             <dt className="text-gray-500">{t.label}</dt>
-            <dd className={`tabular-nums ${tonoApple(tramos[t.key])} ${peso(t.key, tramos[t.key])}`}>{textoDeMonto(tramos[t.key], fmt)}</dd>
+            <dd className={`whitespace-nowrap tabular-nums ${tonoApple(tramos[t.key])} ${peso(t.key, tramos[t.key])}`}>{textoDeMonto(tramos[t.key], fmt)}</dd>
           </div>
         ))}
       </dl>
@@ -29,7 +29,7 @@ export default function TramosApple({ tramos, className = "" }: { tramos: Tramos
         {TRAMOS.map((t) => (
           <div key={t.key}>
             <div className="text-xs text-gray-400">{t.label}</div>
-            <div className={`mt-0.5 text-sm tabular-nums ${tonoApple(tramos[t.key])} ${peso(t.key, tramos[t.key])}`}>{textoDeMonto(tramos[t.key], fmt)}</div>
+            <div className={`mt-0.5 whitespace-nowrap text-sm tabular-nums ${tonoApple(tramos[t.key])} ${peso(t.key, tramos[t.key])}`}>{textoDeMonto(tramos[t.key], fmt)}</div>
           </div>
         ))}
       </div>

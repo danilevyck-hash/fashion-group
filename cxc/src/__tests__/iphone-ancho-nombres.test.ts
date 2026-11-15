@@ -150,7 +150,8 @@ describe("Préstamos — los chips bajan a la línea 2 en mobile y iPad", () => 
     expect(prestamos).toContain('<div className="flex shrink-0 items-center gap-1.5 lg:hidden">{badges}{chipQuincena}</div>');
     // Los dos estados se siguen leyendo: el color solo no los distingue.
     expect(prestamos).toContain("✓ Deducida");
-    expect(prestamos).toContain("⚠ Pendiente");
+    // Revisión 110 · ajustes (6): con ICONOS_DE_LINEA_EN_TODO el chip dice solo «Pendiente».
+    expect(prestamos.includes("⚠ Pendiente") || prestamos.includes('ICONOS_DE_LINEA_EN_TODO ? "" : "⚠ "}Pendiente')).toBe(true);
   });
 
   it("los badges de estado se declaran UNA vez y se renderizan en ambos layouts", () => {

@@ -22,6 +22,8 @@
 // «Facturas del cliente»— y la fila vacía con la que nacía la guía.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { Pencil } from "lucide-react";
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { useEffect, useState, type ReactNode } from "react";
 import type { GuiaItem } from "./types";
 import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
@@ -202,7 +204,7 @@ export default function DetalleDeEnvio({
                         onClick={() => setEditando(abierto ? null : (item.uid ?? null))}
                         className={BOTON_ICONO}
                       >
-                        ✎
+                        {ICONOS_DE_LINEA_EN_TODO ? <Pencil aria-hidden className="h-4 w-4" /> : "✎"}
                       </button>
                       <button
                         type="button"

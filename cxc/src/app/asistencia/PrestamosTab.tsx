@@ -37,6 +37,7 @@
 // (`cerrarPlanillaRoles()`); acá solo se dibujan o no los botones y el enlace a
 // los movimientos, para no ofrecer algo que va a contestar 403.
 
+import { BUSCADOR_EN_LA_FILA } from "@/lib/ui/revision-110-ajustes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -448,6 +449,9 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
       )
       : <span className={clase}>{capitalizarNombre(f.nombre)}</span>;
 
+  // Revisión 110 · ajustes (10): en la computadora el buscador va a la
+  // izquierda llenando el ancho y los botones a la derecha, en UNA fila.
+  const filaUnica = BUSCADOR_EN_LA_FILA && PRESTAMOS_APPLE_2026_10 && !barra;
   return (
     <div className="space-y-4">
       {PRESTAMOS_APPLE_2026_10 ? (
@@ -460,7 +464,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
               Próximo descuento <span className="font-medium tabular-nums text-gray-900">{money(totalProximoDescuento(visibles))}</span>
             </p>
           </div>
-          {botonNuevo}
+          {!filaUnica && botonNuevo}
         </div>
       ) : (
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -478,8 +482,8 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
           audit visual aprobado por Daniel): 🩸 era una línea subrayada al lado
           de campos con caja. Mismo filtro y mismo conteo de `buscar-en-lista`;
           solo cambia el dibujo, y solo en esta pestaña. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <div className={barra ? "hidden" : "relative w-full max-w-xs sm:w-64"}>
+      <div className={filaUnica ? "flex items-center gap-3" : "flex flex-wrap items-center gap-x-3 gap-y-1"}>
+        <div className={barra ? "hidden" : filaUnica ? "relative min-w-0 flex-1" : "relative w-full max-w-xs sm:w-64"}>
           <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="search"
@@ -491,8 +495,9 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
           />
         </div>
         {conteo !== "" && (
-          <span data-testid="conteo-busqueda" className="text-sm tabular-nums text-gray-500">{conteo}</span>
+          <span data-testid="conteo-busqueda" className="shrink-0 text-sm tabular-nums text-gray-500">{conteo}</span>
         )}
+        {filaUnica && <div className="shrink-0">{botonNuevo}</div>}
       </div>
 
       {sinResultados && (

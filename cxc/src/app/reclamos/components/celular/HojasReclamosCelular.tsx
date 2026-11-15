@@ -20,6 +20,8 @@
 // payloads de la computadora.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { Paperclip } from "lucide-react";
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { useRef, useState, type ReactNode } from "react";
 import { ModalOverlay } from "@/components/ui";
 import { fmt, fmtDate } from "@/lib/format";
@@ -212,7 +214,7 @@ export function HojaCobrar({
             <button type="button" onClick={() => fileRef.current?.click()} className={`${FILA} text-[17px] active:bg-gray-50`}>
               <span className="text-gray-500">Comprobante *</span>
               <span className={file ? "truncate text-gray-900" : "text-blue-600"}>
-                {file ? `📎 ${file.name}` : "Tomar foto"}
+                {file ? (ICONOS_DE_LINEA_EN_TODO ? <span className="inline-flex min-w-0 items-center gap-1"><Paperclip aria-hidden className="h-4 w-4 shrink-0" /><span className="truncate">{file.name}</span></span> : `📎 ${file.name}`) : "Tomar foto"}
               </span>
             </button>
           </li>

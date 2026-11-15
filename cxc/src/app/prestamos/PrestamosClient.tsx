@@ -1,6 +1,7 @@
 "use client";
 
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
+import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { TODAS_LAS_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
@@ -329,7 +330,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
                     const chipQuincena = !emp.trabaja || cuota <= 0 ? null
                       : deducida ? <span className="shrink-0 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">✓ Deducida</span>
-                      : pendienteDed ? <span className="shrink-0 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Pendiente</span>
+                      : pendienteDed ? <span className="shrink-0 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">{ICONOS_DE_LINEA_EN_TODO ? "" : "⚠ "}Pendiente</span>
                       : null;
 
                     return (
