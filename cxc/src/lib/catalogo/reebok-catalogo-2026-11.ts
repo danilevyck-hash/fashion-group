@@ -33,3 +33,14 @@ export const COMPROBANTES_CELULAR_2026_11 = true;
  *  línea de los filtros, a la derecha; sale de la barra de arriba y del
  *  buscador. La hora, nunca «hace N h». */
 export const ACTUALIZADO_EN_FILTROS_2026_11 = true;
+
+/** catalogo-mas-02b · El precio de «Confirmar pedido» como cápsula gris igual
+ *  al stepper, sin lápiz; cambiado, en azul y con «Lista $X» tachado debajo. */
+export const PRECIO_CAPSULA_2026_11 = true;
+
+/** El precio de lista a mostrar tachado, o `null` si el precio NO se cambió
+ *  (o no se sabe cuál era: el carrito viejo no lo trae, y ahí no se inventa). */
+export function listaSiCambio(unitPrice: number, precioLista: number | null | undefined): number | null {
+  if (typeof precioLista !== "number" || !(precioLista > 0)) return null;
+  return Math.round(unitPrice * 100) === Math.round(precioLista * 100) ? null : precioLista;
+}
