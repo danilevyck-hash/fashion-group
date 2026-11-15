@@ -31,6 +31,7 @@ import TransportistasConfig from "./TransportistasConfig";
 import DespachadoresConfig from "./DespachadoresConfig";
 import { Toast } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { CASILLA_SIEMPRE_GRANDE_2026_11 as CASILLA_GRANDE } from "@/lib/ui/celopt-restos-2026-11";
 import {
   ACCION_PONER_SIEMPRE,
   AYUDA_DONDE_ENTREGA_CADA_CLIENTE,
@@ -650,8 +651,10 @@ function GrupoDeCliente({
                     poder DESMARCARSE: marcar una apaga la de los demás
                     destinos del cliente (lo garantiza el servidor), pero
                     dejar al cliente sin ninguna es una decisión válida. */}
+                {/* 15-nov-2026 (`CASILLA_SIEMPRE_GRANDE_2026_11`): la casilla se dibuja a
+                    22 px y la zona que se toca mide al menos 44 × 44 px. */}
                 <label
-                  className={`inline-flex items-center gap-1.5 text-xs min-h-[44px] md:[@media(pointer:fine)]:min-h-0 px-1.5 cursor-pointer select-none ${
+                  className={`inline-flex items-center ${CASILLA_GRANDE ? "gap-2.5 min-w-[44px]" : "gap-1.5"} text-xs min-h-[44px] md:[@media(pointer:fine)]:min-h-0 px-1.5 cursor-pointer select-none ${
                     f.el_de_siempre ? "font-medium text-gray-900" : "text-gray-500"
                   }`}
                 >
@@ -661,7 +664,7 @@ function GrupoDeCliente({
                     disabled={marcandoId !== null}
                     onChange={() => onMarcarSiempre(f, !f.el_de_siempre)}
                     aria-label={`${f.el_de_siempre ? MARCA_SIEMPRE : ACCION_PONER_SIEMPRE}: «${f.destino}» de ${g.nombre ?? g.codigo}`}
-                    className="w-4 h-4 accent-black"
+                    className={CASILLA_GRANDE ? "w-[22px] h-[22px] sm:w-4 sm:h-4 flex-shrink-0 accent-black" : "w-4 h-4 accent-black"}
                   />
                   {f.el_de_siempre ? MARCA_SIEMPRE : ACCION_PONER_SIEMPRE}
                 </label>

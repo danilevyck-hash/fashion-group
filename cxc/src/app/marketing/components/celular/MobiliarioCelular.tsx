@@ -32,7 +32,8 @@
 // por tienda llegan armados de la página, que no cambió una cuenta.
 // ============================================================================
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { MOBILIARIO_UN_ENCABEZADO_2026_11 } from "@/lib/ui/celopt-restos-2026-11";
 import { useRouter } from "next/navigation";
 import { SwipeableRow } from "@/components/ui";
 import { formatearMonto } from "@/lib/marketing/normalizar";
@@ -59,6 +60,8 @@ export interface FilaResumenTienda {
 }
 
 interface Props {
+  /** Avisa si hay un producto abierto: con él, el título de arriba no hace de «Atrás». */
+  onProductoAbierto?: (abierto: boolean) => void;
   productos: ReadonlyArray<MkInventarioProducto>;
   /** Cuántas piezas se entregaron de cada producto. */
   entregadoPorProducto: ReadonlyMap<string, number>;
@@ -104,15 +107,28 @@ export default function MobiliarioCelular({
   onExcel,
   hrefDeTienda,
   nombreDeTienda,
+  onProductoAbierto,
 }: Props) {
   const router = useRouter();
   const [abierto, setAbierto] = useState<MkInventarioProducto | null>(null);
   const [fotoGrande, setFotoGrande] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const [todasLasTiendas, setTodasLasTiendas] = useState(false);
+  useEffect(() => { onProductoAbierto?.(abierto != null); }, [abierto, onProductoAbierto]);
 
   const piezasEnBodega = productos.reduce((s, p) => s + Number(p.stock_total), 0);
   const tiendas = todasLasTiendas ? resumenFilas : resumenFilas.slice(0, TIENDAS_A_LA_VISTA);
+
+  const botonMenu = (
+    <button
+      type="button"
+      onClick={() => setMenu(true)}
+      aria-label="Más opciones"
+      className="grid h-11 w-11 place-items-center rounded-full text-[22px] leading-none text-blue-600 active:opacity-60"
+    >
+      ···
+    </button>
+  );
 
   if (abierto) {
     const entregado = entregadoPorProducto.get(abierto.id) ?? 0;
@@ -167,6 +183,9 @@ export default function MobiliarioCelular({
 
   return (
     <PantallaCelular>
+      {/* 15-nov-2026 (`MOBILIARIO_UN_ENCABEZADO_2026_11`): el título de arriba ya dice
+          «‹ Marketing» y vuelve; el «···» sube a la línea de «Mobiliario». */}
+      {!MOBILIARIO_UN_ENCABEZADO_2026_11 && (
       <div className="flex items-center justify-between px-2 pt-1">
         <button
           type="button"
@@ -175,17 +194,12 @@ export default function MobiliarioCelular({
         >
           ‹ Marketing
         </button>
-        <button
-          type="button"
-          onClick={() => setMenu(true)}
-          aria-label="Más opciones"
-          className="grid h-11 w-11 place-items-center rounded-full text-[22px] leading-none text-blue-600 active:opacity-60"
-        >
-          ···
-        </button>
+        {botonMenu}
       </div>
+      )}
 
       <TituloCelular
+        accion={MOBILIARIO_UN_ENCABEZADO_2026_11 ? botonMenu : undefined}
         titulo="Mobiliario"
         detalle={`${plural(productos.length, "producto", "productos")} · ${plural(metricas.tiendas, "tienda con muebles", "tiendas con muebles")}`}
       />

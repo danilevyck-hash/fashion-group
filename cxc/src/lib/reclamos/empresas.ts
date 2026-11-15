@@ -26,6 +26,8 @@
 // el correo que ve el proveedor. Lo que cambia es quién MANDA en la unión.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { EMPRESA_KEY_TO_NOMBRE_CORTO } from "@/lib/empresa-mapping";
+
 export interface EmpresaReclamo {
   /** `empresa_key` de la base — el lado de `switch_proveedor_estadocuenta`. */
   empresa_key: string;
@@ -97,4 +99,23 @@ export function datosDeEmpresa(empresa: string | null | undefined): EmpresaRecla
 /** `empresa_key` de la empresa de un reclamo (que guarda el NOMBRE, no la key). */
 export function empresaKeyDeReclamo(empresa: string | null | undefined): string | null {
   return datosDeEmpresa(empresa)?.empresa_key ?? null;
+}
+
+const sinMarcas = (t: string) =>
+  t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[_\s]+/g, " ").trim();
+
+/**
+ * La empresa de reclamos que corresponde a lo que vino escrito (15-nov-2026).
+ *
+ * La búsqueda global manda «reclamos de vistana» como `?empresa=vistana`, tal
+ * como se tecleó; la pantalla solo conocía «Vistana International» y salía
+ * vacía, con $0.00. Acepta el nombre, la clave (`fashion_wear`), el nombre corto
+ * («Vistana») sin mayúsculas ni tildes. Lo que no reconoce vuelve igual.
+ */
+export function empresaReclamoDesdeTexto(texto: string): string {
+  if (EMPRESAS_MAP[texto]) return texto;
+  const t = sinMarcas(texto);
+  const hallada = Object.entries(EMPRESAS_MAP).find(([nombre, info]) =>
+    [nombre, info.empresa_key, EMPRESA_KEY_TO_NOMBRE_CORTO[info.empresa_key] ?? ""].some((a) => a && sinMarcas(a) === t));
+  return hallada ? hallada[0] : texto;
 }

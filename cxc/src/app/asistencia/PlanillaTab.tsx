@@ -44,6 +44,7 @@ import { createPortal } from "react-dom";
 import { CalendarDays } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
+import { PLANILLA_AYUDA_JUNTO_A_GENERAR_2026_11 as AYUDA_JUNTO_A_GENERAR } from "@/lib/ui/celopt-restos-2026-11";
 // 🔴 «Corte del reloj · lee del 14 al 28 sep» — la regla es PURA y vive ahí.
 import { lineaCorteDelReloj } from "@/lib/asistencia/corte-del-reloj";
 import {
@@ -1166,6 +1167,20 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
   const decidir = data?.lineas.filter((l) => grupoDeLinea(l) === "decidir") ?? [];
   const pendientes = data?.lineas.filter((l) => grupoDeLinea(l) === "falta") ?? [];
 
+  // Sin «Generar» (con «Todas») el ⓘ no tiene a quién acompañar: queda abajo, como antes.
+  const ayudaArriba = AYUDA_JUNTO_A_GENERAR && !(sinEmpresa && TODAS_SIN_FRASE_NI_GENERAR);
+  const ayudaNeto = (
+    <Ayuda titulo="Cómo se calcula el neto" etiqueta="Cómo se calcula el neto">
+      <p>{FORMULA_NETO}</p>
+      <p className="mt-1.5">
+        Los recargos, los porcentajes de seguro y la hora de corte se cambian en{" "}
+        <b>{PESTANA_FICHAS}</b>. El ISR y los otros servicios se escriben a mano aquí: no salen
+        de ningún sistema. El préstamo, los terceros y la mercancía entran solos con la cuota
+        de Préstamos, y también se pueden escribir a mano (0 = esta quincena no se descuenta).
+      </p>
+    </Ayuda>
+  );
+
   /**
    * 🔴 UN SOLO BOTÓN, y cambia de nombre según lo que va a hacer: «Generar» la
    * primera vez y cuando lo elegido no es lo que está en pantalla; «Regenerar»
@@ -1366,6 +1381,7 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
 
         {/* ux-08b: con «Todas» «Generar» no se dibuja (salía gris y parecía roto); se arma con «Revisar» en la fila. */}
         {!(sinEmpresa && TODAS_SIN_FRASE_NI_GENERAR) && botonGenerar}
+        {ayudaArriba && <span className="-ml-1 sm:hidden">{ayudaNeto}</span>}
 
         {/* 🔴 «Descargar ⌄» (Excel · PDF · Comprobantes) SOLO con la planilla ya
             generada: un botón apagado a la vista es una promesa que todavía no
@@ -1982,17 +1998,9 @@ export default function PlanillaTab({ empresa: empresaElegidaArriba }: {
         onCancel={() => { if (!trabajandoCierre) setBorrando(false); }}
       />
 
-      <div className="-ml-2">
-        <Ayuda titulo="Cómo se calcula el neto" etiqueta="Cómo se calcula el neto">
-          <p>{FORMULA_NETO}</p>
-          <p className="mt-1.5">
-            Los recargos, los porcentajes de seguro y la hora de corte se cambian en{" "}
-            <b>{PESTANA_FICHAS}</b>. El ISR y los otros servicios se escriben a mano aquí: no salen
-            de ningún sistema. El préstamo, los terceros y la mercancía entran solos con la cuota
-            de Préstamos, y también se pueden escribir a mano (0 = esta quincena no se descuenta).
-          </p>
-        </Ayuda>
-      </div>
+      {/* 15-nov-2026 (`PLANILLA_AYUDA_JUNTO_A_GENERAR_2026_11`): en el celular
+          el ⓘ sube al lado de «Generar» en vez de una fila sola al final. */}
+      <div className={ayudaArriba ? "-ml-2 hidden sm:block" : "-ml-2"}>{ayudaNeto}</div>
     </div>
   );
 }

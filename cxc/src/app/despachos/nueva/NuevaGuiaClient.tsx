@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { NUEVA_GUIA_SIN_FILA_ATRAS_2026_11 } from "@/lib/ui/celopt-restos-2026-11";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
 import { useCallback, useRef } from "react";
@@ -50,6 +51,7 @@ export default function NuevaGuiaClient() {
       <AppHeader
         module="Despachos"
         breadcrumbs={[{ label: "Nueva guía" }]}
+        volverEnElCelular={NUEVA_GUIA_SIN_FILA_ATRAS_2026_11 ? () => router.push("/despachos?vista=guias") : undefined}
       />
       <GuiaForm
         editingId={null}
