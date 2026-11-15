@@ -9,6 +9,7 @@
 // PUT: candado post-envío a Switch (#236) solo para cambios de CONTENIDO;
 // reemplazo de items atómico vía RPC. DELETE: soft-delete visual.
 
+import { bultoEnRenglon, colsConBulto, sellarBultoReebok } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import { leerCategoriaYBulto, leerPreciosLista } from "@/lib/catalogo/bulto-productos";
 import { getSession } from "@/lib/require-auth";
@@ -63,7 +64,10 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   if (!VIEW_ROLES.includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
 
   const db = await cfg.db();
-  const itemCols = `id, order_id, product_id, sku, name, image_url, quantity, unit_price, created_at${cfg.itemsHasPreorder ? ", is_preorder" : ""}`;
+  const itemCols = colsConBulto(
+    `id, order_id, product_id, sku, name, image_url, quantity, unit_price, created_at${cfg.itemsHasPreorder ? ", is_preorder" : ""}`,
+    await bultoEnRenglon(cfg),
+  );
   // origen_short_id se necesita en las 3 marcas para cruzar la foto de stock
   // del pedido del link; en Reebok ya viene en ordersSelectExtra. Si alguna
   // marca no tuviera la columna se reintenta sin ella (tolerante).
@@ -85,7 +89,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   if (!data) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 
   const row = data;
-  const items = (row[cfg.itemsRelation] || []) as { product_id: string; quantity: number; unit_price: number }[];
+  const items = (row[cfg.itemsRelation] || []) as { product_id: string; quantity: number; unit_price: number; bulto_pzas?: number | null }[];
 
   // Reebok: pedidos viejos pueden tener total inflado en la columna (bulto 12 a
   // ciegas) — items enriquecidos con category y total recalculado con bulto
@@ -112,7 +116,9 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const enrichedItems = items.map((i) => ({
     ...i,
     category: categoryByProduct.get(i.product_id) || cfg.fallbackCategory || undefined,
-    bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
+    // El bulto ESCRITO en el renglón (Reebok, desde el 15-nov-2026) manda;
+    // sin él, el del producto (Tommy/Calvin) o la regla de la marca.
+    bulto_pzas: i.bulto_pzas ?? bultoPzasByProduct.get(i.product_id) ?? null,
     precio_lista: precioListaByProduct.get(i.product_id) ?? null,
   }));
   let itemsOut: Record<string, unknown>[] = enrichedItems as unknown as Record<string, unknown>[];
@@ -197,8 +203,28 @@ export async function PUT(req: NextRequest, { params }: { params: { marca: strin
       unit_price: number;
       category?: string;
       is_preorder?: boolean;
+      bulto_pzas?: number | null;
     };
-    const typedItems = items as IncomingItem[];
+    let typedItems = items as IncomingItem[];
+
+    // Reebok: el renglón que YA estaba conserva su bulto escrito (NULL = la
+    // regla vieja); el producto que se agrega ahora lleva la regla de hoy.
+    if (cfg.marca === "reebok") {
+      const vivo = await bultoEnRenglon(cfg);
+      const previos = new Map<string, number | null>();
+      const cats = vivo && cfg.categoryLookup ? await cfg.categoryLookup(typedItems.map((i) => i.product_id)) : new Map<string, string>();
+      if (vivo) {
+        const { data: actuales, error: errActuales } = await db
+          .from(cfg.itemsRelation)
+          .select("product_id, bulto_pzas")
+          .eq("order_id", params.id);
+        if (errActuales) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+        for (const a of (actuales ?? []) as { product_id: string; bulto_pzas: number | null }[]) {
+          previos.set(String(a.product_id), a.bulto_pzas ?? null);
+        }
+      }
+      typedItems = sellarBultoReebok(typedItems, { vivo, categoria: (pid) => cats.get(pid), previos });
+    }
 
     // Mismo criterio que al LEER: categoría y piezas por bulto SIEMPRE, no solo
     // cuando la marca tiene `categoryLookup`. Editar un pedido de Tommy con la
@@ -217,7 +243,7 @@ export async function PUT(req: NextRequest, { params }: { params: { marca: strin
         quantity: i.quantity || 1,
         unit_price: Number(i.unit_price) || 0,
         category: catEdicion.get(i.product_id) || i.category || cfg.fallbackCategory || undefined,
-        bulto_pzas: bultoEdicion.get(i.product_id) ?? null,
+        bulto_pzas: (cfg.marca === "reebok" ? i.bulto_pzas : null) ?? bultoEdicion.get(i.product_id) ?? null,
       })),
     );
 
@@ -235,6 +261,7 @@ export async function PUT(req: NextRequest, { params }: { params: { marca: strin
         quantity: i.quantity || 1,
         unit_price: Number(i.unit_price) || 0,
         ...(cfg.itemsHasPreorder ? { is_preorder: i.is_preorder === true } : {}),
+        ...(cfg.marca === "reebok" && i.bulto_pzas != null ? { bulto_pzas: i.bulto_pzas } : {}),
       })),
     });
     if (rpcErr) return NextResponse.json({ error: "Error interno" }, { status: 500 });

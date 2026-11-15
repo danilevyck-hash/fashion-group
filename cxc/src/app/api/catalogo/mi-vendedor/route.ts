@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { EMPRESAS_CATALOGO } from "@/lib/catalogo/marcas";
 import { requireRole } from "@/lib/requireRole";
-import { supabaseServer } from "@/lib/supabase-server";
+import { leerMiVendedor, ROLES_MI_VENDEDOR } from "@/lib/catalogo/mi-vendedor";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 // lib/catalogo/marcas.ts). Ver el porqué en EMPRESAS_CATALOGO.
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  const auth = requireRole(req, ROLES_MI_VENDEDOR);
   if (auth instanceof NextResponse) return auth;
 
   const empresa = req.nextUrl.searchParams.get("empresa") || "";
@@ -26,17 +26,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ vendedor: null });
   }
 
-  const { data, error } = await supabaseServer
-    .from("fg_user_switch_vendedor")
-    .select("vendedor_id, vendedor_nombre")
-    .eq("user_id", auth.userId)
-    .eq("empresa_key", empresa)
-    .maybeSingle();
-  if (error) {
-    // Tabla ausente (DDL pendiente) u otro error → sin mapeo, el checkout avisa.
-    return NextResponse.json({ vendedor: null });
-  }
-  return NextResponse.json({
-    vendedor: data ? { id: data.vendedor_id, nombre: data.vendedor_nombre } : null,
-  });
+  const vendedor = await leerMiVendedor(auth.userId, empresa);
+  return NextResponse.json({ vendedor: vendedor ?? null });
 }

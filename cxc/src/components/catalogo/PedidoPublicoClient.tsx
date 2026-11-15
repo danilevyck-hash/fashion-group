@@ -133,6 +133,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
           image_url: i.image_url || "",
           ...(theme.features.preorder ? { is_preorder: i.is_preorder === true } : {}),
           category: i.category || "footwear",
+          ...(marca === "reebok" ? { bulto_pzas: i.bulto_pzas ?? null } : {}),
         })),
         bultoSize: (c, bultoPzas) => theme.bulto(c || "footwear", bultoPzas),
         filename: `Pedido-${theme.label}-${new Date().toISOString().slice(0, 10)}.pdf`,

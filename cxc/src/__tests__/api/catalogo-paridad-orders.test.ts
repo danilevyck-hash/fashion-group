@@ -47,6 +47,15 @@ vi.mock("@/lib/reebok-category-lookup", () => ({
   fetchReebokCategoryMap: vi.fn(async () => categoryMap),
 }));
 
+// Reebok · el bulto escrito en el renglón (15-nov-2026). Por defecto la
+// columna NO existe: estas pruebas fijan lo de siempre (falla abierta). La
+// prueba de la ropa de 12 la prende.
+let columnaBulto = false;
+vi.mock("@/lib/catalogo/bulto-renglon-reebok", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/catalogo/bulto-renglon-reebok")>();
+  return { ...real, bultoEnRenglon: vi.fn(async (cfg: { marca: string }) => cfg.marca === "reebok" && columnaBulto) };
+});
+
 // PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
 // inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
 import type { NextRequest } from "next/server";
@@ -248,6 +257,33 @@ describe("POST /orders — crear con numeración RPC e idempotencia", () => {
       );
       expect(res.status).toBe(400);
       expect((await res.json()).error).toContain("mayor a cero");
+    }
+  });
+
+  it("reebok con la columna: la ropa NUEVA sale de 12 y el bulto viaja escrito a la RPC (15-nov-2026)", async () => {
+    columnaBulto = true;
+    try {
+      categoryMap = new Map([
+        [P1, "footwear"],
+        [P2, "apparel"],
+      ]);
+      reebokDb.queueRpc({ data: { order_id: OID, order_number: "PED-102", already_created: false } });
+      reebokDb.queue("reebok_orders", { data: { id: OID, order_number: "PED-102" } });
+      const res = await rListPost(
+        makeReq("/x", {
+          method: "POST",
+          // El navegador manda 3: no cuenta, el bulto sale de la categoría.
+          body: { client_name: "Cliente X", items: [items[0], { ...items[1], bulto_pzas: 3 }], idempotency_key: "k2" },
+          role: "secretaria",
+        }),
+      );
+      expect(res.status).toBe(200);
+      const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+      expect(args.p_total).toBe(300); // 2×12×10 + 1×12×5
+      const pItems = args.p_items as Array<Record<string, unknown>>;
+      expect(pItems.map((i) => i.bulto_pzas)).toEqual([12, 12]);
+    } finally {
+      columnaBulto = false;
     }
   });
 

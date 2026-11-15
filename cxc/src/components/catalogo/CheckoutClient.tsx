@@ -98,8 +98,11 @@ function brandCfg(theme: MarcaTheme): BrandCfg {
 /** `tituloEnLaBarra`: el título y «← Catálogo» ya los dibuja la barra de
  *  arriba (lo decide la página, no este archivo); aquí queda el `<h1>` solo
  *  para el lector de pantalla. Nada del pedido depende de esto. */
-export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAgrupada = false, v2 = false }: {
+export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAgrupada = false, v2 = false, vendedorInicial }: {
   marca: MarcaUiKey;
+  /** El vendedor del login ya resuelto en el servidor (reebok-cat-03).
+   *  `undefined` = no se sabe: se pregunta desde el navegador, como antes. */
+  vendedorInicial?: { id: number; nombre: string | null } | null;
   tituloEnLaBarra?: boolean;
   /** El interruptor V2 de Catálogos: lo decide la página (este archivo no importa
    *  el diseño). Solo mueve «Datos del pedido» y pasa los avisos a `<Aviso>`. */
@@ -118,10 +121,10 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
   // envío. Ver la cabecera del archivo: el default puesto costó $53.124.
   const [cliente, setCliente] = useState<ClienteSwitchOpcion | undefined>(undefined);
   const [clientePickerOpen, setClientePickerOpen] = useState(false);
-  const [vendedor, setVendedor] = useState<{ id: number; nombre: string | null } | null | undefined>(undefined);
+  const [vendedor, setVendedor] = useState<{ id: number; nombre: string | null } | null | undefined>(vendedorInicial);
   // El que mapea tu login: es el DEFAULT y el que se rotula "tu vendedor".
   // Se guarda aparte de `vendedor` para poder decir cuándo se cambió.
-  const [vendedorDelLogin, setVendedorDelLogin] = useState<{ id: number; nombre: string | null } | null>(null);
+  const [vendedorDelLogin, setVendedorDelLogin] = useState<{ id: number; nombre: string | null } | null>(vendedorInicial ?? null);
   const [vendedorPickerOpen, setVendedorPickerOpen] = useState(false);
   const [sending, setSending] = useState(false);
   // Línea con el precio en edición (tap sobre el precio → input numérico).
@@ -143,6 +146,8 @@ export default function CheckoutClient({ marca, tituloEnLaBarra = false, listaAg
 
   // ── Vendedor: el del login viene PUESTO (default), cambiarlo es opcional ──
   useEffect(() => {
+    // Ya vino puesto desde el servidor: no se vuelve a preguntar.
+    if (vendedorInicial !== undefined) return;
     const empresa = theme.empresaKey;
     fetch(`/api/catalogo/mi-vendedor?empresa=${empresa}`)
       .then((r) => (r.ok ? r.json() : { vendedor: null }))

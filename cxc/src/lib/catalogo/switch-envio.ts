@@ -101,6 +101,8 @@ export interface EnvioItem {
   quantity: number; // BULTOS
   unit_price: number;
   is_preorder?: boolean | null;
+  /** Reebok: el bulto escrito en el renglón (desde el 15-nov-2026). Manda si viene. */
+  bulto_pzas?: number | null;
 }
 
 export interface EnvioParams {

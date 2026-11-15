@@ -663,7 +663,7 @@ const REEBOK: MarcaTheme = {
   publicClientNameKey: "reebok_public_client_name",
   checkoutTokenKey: "reebok_checkout_token",
 
-  bulto: (c) => reebokBulto(c || "apparel"),
+  bulto: (c, bultoPzas) => reebokBulto(c || "apparel", bultoPzas),
   calcTotal: calculateReebokOrderTotal,
   sortOrderItems: sortReebokOrderItems,
   pdfFallbackCategory: "apparel",

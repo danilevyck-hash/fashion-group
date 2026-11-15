@@ -6,6 +6,7 @@
 
 import { ATRIBUTO_BARRA_FIJA, ATRIBUTO_SOBRE_LA_BARRA } from "@/lib/navegacion/barra-celular";
 import { BARRA_EN_LISTAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { BARRA_PEDIDO_SOLA_2026_11 } from "@/lib/catalogo/reebok-catalogo-2026-11";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
@@ -184,9 +185,16 @@ export default function CatalogoStickyCartBar({
 
   return (
     <>
+    {/* 🔴 15-nov-2026 (reebok-cat-02): armar un pedido es un formulario — con
+        productos adentro, la barra de pestañas se esconde (globals.css) y
+        queda solo esta. Con el pedido vacío esta barra no existe y vuelve. */}
     <div
       ref={barraRef}
-      {...(BARRA_EN_LISTAS_2026_11 ? { [ATRIBUTO_BARRA_FIJA]: "", [ATRIBUTO_SOBRE_LA_BARRA]: "" } : {})}
+      {...(BARRA_EN_LISTAS_2026_11
+        ? BARRA_PEDIDO_SOLA_2026_11
+          ? { [ATRIBUTO_BARRA_FIJA]: "" }
+          : { [ATRIBUTO_BARRA_FIJA]: "", [ATRIBUTO_SOBRE_LA_BARRA]: "" }
+        : {})}
       className="fixed bottom-0 left-0 right-0 z-40"
       style={{ animation: "slideUp 0.25s ease-out" }}
     >
@@ -312,10 +320,18 @@ export default function CatalogoStickyCartBar({
               aria-expanded={miniCartOpen}
               className="flex min-h-[48px] min-w-0 items-center gap-1.5 text-left"
             >
+              {BARRA_PEDIDO_SOLA_2026_11 ? (
+                /* Una sola línea: «$120 · 1 producto · 2 bultos». */
+                <span className="min-w-0 truncate tabular-nums leading-tight">
+                  <span className="text-lg font-medium text-gray-900">${formatTotal(cartTotal)}</span>
+                  <span className="text-sm text-gray-500"> · {v2.linea}</span>
+                </span>
+              ) : (
               <span className="min-w-0">
                 <span className="block text-lg font-medium tabular-nums leading-tight text-gray-900">${formatTotal(cartTotal)}</span>
                 <span className="block truncate text-xs text-gray-500 tabular-nums">{v2.linea}</span>
               </span>
+              )}
               <span aria-hidden="true" className={`text-gray-400 transition ${miniCartOpen ? "rotate-90" : "-rotate-90"}`}>›</span>
             </button>
             <button

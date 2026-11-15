@@ -14,6 +14,7 @@
 //      pedido de Joybees/Tommy/Calvin sin vendedor quedaba 422 y NO se podía
 //      mandar desde el admin.
 
+import { bultoEnRenglon, colsConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import { leerCategoriaYBulto } from "./bulto-productos";
 import { requireRole } from "@/lib/requireRole";
@@ -44,7 +45,10 @@ interface OrderRow {
 async function fetchOrder(marca: string, orderId: string): Promise<OrderRow | null> {
   const cfg = MARCAS_CONFIG[marca];
   const db = await cfg.db();
-  const itemCols = `product_id, sku, name, quantity, unit_price${marca === "reebok" ? ", is_preorder" : ""}`;
+  const itemCols = colsConBulto(
+    `product_id, sku, name, quantity, unit_price${marca === "reebok" ? ", is_preorder" : ""}`,
+    await bultoEnRenglon(cfg),
+  );
   // Historia (jul-2026): `cliente_switch_id`/`vendedor_switch_id` podían no
   // existir (DDL 20260705120000 pendiente) y se releía SIN esas columnas, en
   // "modo legacy", ante cualquier error que mencionara una columna. Tolerancia

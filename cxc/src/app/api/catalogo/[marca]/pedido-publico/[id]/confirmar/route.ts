@@ -1,3 +1,4 @@
+import { bultoEnRenglon, conservarBultoReebok } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
@@ -238,7 +239,7 @@ async function handleConfirmar(
       // eso se pasa el item entero y no solo la categoría.
       getBulto: (item) =>
         cfg.marca === "reebok"
-          ? cfg.bultoSize(item.category || "footwear")
+          ? cfg.bultoSize(item.category || "footwear", item.bulto_pzas)
           : cfg.bultoSize(item.category, item.bulto_pzas),
 
       // TOLERANTE a migraciones pendientes: primero se intenta con la foto de
@@ -272,13 +273,17 @@ async function handleConfirmar(
       // Misma maquinaria que el convertir del admin: total con helpers JS +
       // RPC atómica idempotente.
       async convertir(pedido) {
-        const resumenLink = await resumenParaConvertir(cfg, db as never, pedido.items);
+        // Reebok: cada renglón conserva el bulto con que el cliente lo pidió.
+        const itemsLink = cfg.marca === "reebok"
+          ? conservarBultoReebok(pedido.items, await bultoEnRenglon(cfg))
+          : pedido.items;
+        const resumenLink = await resumenParaConvertir(cfg, db as never, itemsLink);
         const total = resumenLink.total;
 
         const { data, error } = await publicosDb.rpc(cfg.convertRpc, {
           p_short_id: pedido.short_id,
           p_total: total,
-          p_items: pedido.items,
+          p_items: itemsLink,
         });
         if (error) throw error;
         const numero = (data as { order_number?: string })?.order_number;
