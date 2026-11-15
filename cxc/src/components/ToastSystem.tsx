@@ -91,3 +91,8 @@ export function useToast() {
   if (!ctx) throw new Error('useToast must be used within ToastProvider')
   return ctx
 }
+
+/** Como `useToast`, pero sin provider no revienta: devuelve un aviso que no hace nada. */
+export function useToastOpcional(): ToastContextType['toast'] {
+  return useContext(ToastContext)?.toast ?? (() => {})
+}

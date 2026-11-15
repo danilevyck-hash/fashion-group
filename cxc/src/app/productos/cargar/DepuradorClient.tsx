@@ -1,6 +1,8 @@
 "use client";
 
 // n.º 87: en el celular no se suelta ni se hace clic: se toca.
+import { useToastOpcional } from "@/components/ToastSystem";
+import { mensajeDelServidor } from "@/lib/depurador/error-al-guardar";
 import { PLANTILLA_TOCA_PARA_ELEGIR } from "@/lib/ui/revision-110-despachos";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
@@ -99,6 +101,7 @@ interface DepuradorClientProps {
 
 export default function DepuradorClient({ onDownloaded, injectedFile, onReset }: DepuradorClientProps) {
   const embedded = injectedFile !== undefined;
+  const toast = useToastOpcional();
   const fileRef = useRef<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -571,10 +574,11 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           redondeo: f.redondeo,
         }),
       });
-      if (res.ok) {
-        const d = await fetch("/api/productos/cargar/formulas").then((r) => r.json()).catch(() => null);
-        if (d?.rows) setSavedFormulas(d.rows);
-      }
+      if (!res.ok) { toast(await mensajeDelServidor(res, `No se pudo guardar la fórmula de «${f.marca}». Vuelve a intentarlo.`), "error"); return; }
+      const d = await fetch("/api/productos/cargar/formulas").then((r) => r.json()).catch(() => null);
+      if (d?.rows) setSavedFormulas(d.rows);
+    } catch {
+      toast(`No se pudo guardar la fórmula de «${f.marca}». Revisa la conexión y vuelve a intentarlo.`, "error");
     } finally {
       setSavingMarca(null);
     }
