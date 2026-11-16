@@ -4,7 +4,7 @@
 //   1. El historial muestra la hora CORREGIDA y no muestra la marca quitada.
 //   2. Cada persona ve SOLO lo suyo: el código sale de la sesión, no de la URL.
 //   3. A quién avisar: feriado, día libre, ya marcó, anti-duplicado.
-//   4. El interruptor nace apagado.
+//   4. El interruptor: prendido el 16-nov-2026 («prende marcación»).
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Correccion, MarcacionConId } from "@/lib/asistencia/correcciones";
@@ -216,18 +216,22 @@ describe("3b · la ruta que manda los avisos", () => {
   it("con el interruptor APAGADO y el secreto bueno: 200, sin leer ni mandar nada", async () => {
     process.env.CRON_SECRET = "secreto-de-prueba";
     delete process.env.VAPID_PUBLIC_KEY;
+    vi.resetModules();
+    vi.doMock("@/lib/ui/marcacion-historial-avisos-2026-11", () => ({ MARCACION_HISTORIAL_Y_AVISOS_2026_11: false }));
     const { POST } = await import("@/app/api/recordatorios-marcacion/route");
     const { NextRequest } = await import("next/server");
     // `supabaseServer` está mockeado como `{}`: cualquier lectura reventaría con 500.
     const res = await POST(new NextRequest("http://x/api/recordatorios-marcacion", { method: "POST", headers: { authorization: "Bearer secreto-de-prueba" } }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, avisos: 0, apagado: true });
+    vi.doUnmock("@/lib/ui/marcacion-historial-avisos-2026-11");
+    vi.resetModules();
   });
 });
 
 describe("4 · el interruptor", () => {
-  it("nace apagado: la pantalla de marcar queda como hoy", async () => {
+  it("prendido el 16-nov-2026: Daniel, «prende marcación»", async () => {
     const { MARCACION_HISTORIAL_Y_AVISOS_2026_11 } = await import("@/lib/ui/marcacion-historial-avisos-2026-11");
-    expect(MARCACION_HISTORIAL_Y_AVISOS_2026_11).toBe(false);
+    expect(MARCACION_HISTORIAL_Y_AVISOS_2026_11).toBe(true);
   });
 });
