@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   }
 
   const todos: VideoAyuda[] = completo ? [completo, ...lista] : lista;
-  const rutas = todos.flatMap((v) => [v.video, v.miniatura]);
+  const rutas = todos.flatMap((v) => [v.video, v.miniatura, ...(v.compartir ? [v.compartir] : [])]);
   const { data, error } = await supabaseServer.storage
     .from(BUCKET_VIDEOS_AYUDA)
     .createSignedUrls(rutas, SEGUNDOS_URL_FIRMADA);
@@ -54,6 +54,8 @@ export async function GET(req: NextRequest) {
     segundos: v.segundos,
     url: url.get(v.video) ?? null,
     miniatura: url.get(v.miniatura) ?? null,
+    // Lo que se comparte: el mismo video, o su versión liviana (el completo).
+    compartir: url.get(v.compartir ?? v.video) ?? null,
     ...(v.vertical ? { vertical: true } : {}),
   });
 

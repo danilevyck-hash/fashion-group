@@ -14,6 +14,7 @@ import { GET } from "@/app/api/videos-ayuda/route";
 import { VIDEOS_AYUDA, videosDelModulo, duracion, tituloEnLista, tieneVideos, VIDEOS_DEL_INICIO } from "@/lib/videos-ayuda/manifiesto";
 import { ALL_MODULE_KEYS, ALL_MODULES } from "@/lib/modules";
 import { videosDeLaRuta } from "@/components/estructura/BotonComoSeUsa";
+import { nombreDelArchivo } from "@/components/VideosAyuda";
 
 const req = (modulo: string) =>
   new NextRequest(`http://x/api/videos-ayuda?modulo=${modulo}`, { headers: { cookie: "cxc_session=x" } });
@@ -232,5 +233,28 @@ describe("GET /api/videos-ayuda", () => {
     expect(j.lista[0].url).toBe("https://firmada/caja/00-que-es-caja-menuda.mp4");
     expect(j.completo.miniatura).toBe("https://firmada/caja/00-completo.jpg");
     expect(signed.mock.calls[0][1]).toBe(3600);
+  });
+
+  it("Compartir: el clip viaja tal cual; el completo, en su versión liviana (< 28 MB)", async () => {
+    sesion.mockReturnValue({ role: "secretaria" });
+    const j = await (await GET(req("caja"))).json();
+    expect(j.lista[0].compartir).toBe("https://firmada/caja/00-que-es-caja-menuda.mp4");
+    expect(j.completo.compartir).toBe("https://firmada/caja/00-completo-liviano.mp4");
+  });
+});
+
+describe("Compartir un video", () => {
+  it("pasa por la única puerta (`compartir-archivo.ts`) y queda anotado", () => {
+    const src = fs.readFileSync(path.join(process.cwd(), "src/components/VideosAyuda.tsx"), "utf8");
+    expect(src).toMatch(/from "@\/lib\/compartir-archivo"/);
+    expect(src).toMatch(/aparatoDeQuienMira\(\)/);
+    expect(src).not.toMatch(/navigator\.share|createObjectURL/);
+    expect(src).toMatch(/logActivityClient\(\{ action: "compartir_video"/);
+  });
+
+  it("el archivo se llama «Módulo - título.mp4», sin signos que rompan el nombre", () => {
+    expect(nombreDelArchivo("Caja menuda", "Registrar un gasto")).toBe("Caja menuda - Registrar un gasto.mp4");
+    expect(nombreDelArchivo("Gastos", "¿Qué es Gastos?")).toBe("Gastos - Qué es Gastos.mp4");
+    expect(nombreDelArchivo("Despachos", "Etiquetas / bultos")).toBe("Despachos - Etiquetas bultos.mp4");
   });
 });

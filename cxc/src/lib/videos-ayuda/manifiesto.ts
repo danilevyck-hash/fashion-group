@@ -31,6 +31,9 @@ export interface VideoAyuda {
   completo?: boolean;
   /** Serie grabada en formato de teléfono (9:16): el panel no la mete en 16:9. */
   vertical?: boolean;
+  /** El archivo que viaja al COMPARTIR, si no es `video`: el completo va en su
+   *  versión liviana (< 28 MB, para WhatsApp). */
+  compartir?: string;
 }
 
 /** Un renglón: la carpeta del bucket es la key del módulo (`modules.ts`). */
@@ -42,7 +45,7 @@ const fila = (modulo: string, { vertical = false, carpeta = modulo } = {}) =>
     segundos,
     video: `${carpeta}/${archivo}.mp4`,
     miniatura: `${carpeta}/${archivo}.jpg`,
-    ...(completo ? { completo } : {}),
+    ...(completo ? { completo, compartir: `${carpeta}/00-completo-liviano.mp4` } : {}),
     ...(esVertical ? { vertical: true } : {}),
   });
 const caja = fila("caja");

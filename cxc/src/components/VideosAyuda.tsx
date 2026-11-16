@@ -12,6 +12,9 @@ import { BottomSheet, EnElCuerpo } from "@/components/ui";
 import { Aviso } from "@/components/ui/Aviso";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { duracion, tituloEnLista } from "@/lib/videos-ayuda/manifiesto";
+import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import { logActivityClient } from "@/lib/logActivityClient";
 
 interface VideoFirmado {
   orden: number;
@@ -21,6 +24,8 @@ interface VideoFirmado {
   miniatura: string | null;
   /** Serie de teléfono (9:16). */
   vertical?: boolean;
+  /** El ARCHIVO que se comparte (el completo, en su versión liviana). */
+  compartir?: string | null;
 }
 interface Respuesta {
   modulo: string;
@@ -67,6 +72,37 @@ const IconoCerrar = () => (
   </svg>
 );
 
+/** «Caja menuda - Registrar un gasto.mp4», sin los signos que un sistema de archivos no acepta. */
+export function nombreDelArchivo(modulo: string, titulo: string): string {
+  return `${modulo} - ${titulo}`.replace(/[\\/:*?"<>|¿]/g, "").replace(/\s+/g, " ").trim() + ".mp4";
+}
+
+/**
+ * 🔴 EL ARCHIVO SE ARMA ANTES DEL TOQUE (como el PDF de Despachos): iOS no abre
+ * la hoja de compartir si el toque espera una descarga. Se baja al elegir el
+ * video y el botón dice «Preparando…» hasta que está.
+ */
+function useArchivoParaCompartir(modulo: string | null, video: VideoFirmado | null) {
+  const [estado, setEstado] = useState<{ para: VideoFirmado; archivo: File | null; fallo: boolean } | null>(null);
+  const [intento, setIntento] = useState(0);
+  useEffect(() => {
+    const url = video?.compartir ?? video?.url;
+    if (!modulo || !video || !url) return;
+    const ctl = new AbortController();
+    setEstado({ para: video, archivo: null, fallo: false });
+    fetch(url, { signal: ctl.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.blob();
+      })
+      .then((b) => setEstado({ para: video, archivo: new File([b], nombreDelArchivo(modulo, video.titulo), { type: "video/mp4" }), fallo: false }))
+      .catch(() => !ctl.signal.aborted && setEstado({ para: video, archivo: null, fallo: true }));
+    return () => ctl.abort();
+  }, [modulo, video, intento]);
+  const actual = estado?.para === video ? estado : null;
+  return { archivo: actual?.archivo ?? null, fallo: !!actual?.fallo, reintentar: () => setIntento((n) => n + 1) };
+}
+
 function useEsComputadora(): boolean {
   const [pc, setPc] = useState(false);
   useEffect(() => {
@@ -82,6 +118,7 @@ function useEsComputadora(): boolean {
 }
 
 function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void }) {
+  // `modulo` es la key (`guias`); el nombre del archivo lleva el rótulo («Despachos»).
   const [datos, setDatos] = useState<Respuesta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actual, setActual] = useState<VideoFirmado | null>(null);
@@ -90,6 +127,17 @@ function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void })
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => setVelocidad(leerVelocidad()), []);
+  const { archivo, fallo, reintentar } = useArchivoParaCompartir(datos?.modulo ?? null, actual);
+  const enComputadora = aparatoDeQuienMira() === "computadora";
+
+  // En el celular, la hoja de compartir (WhatsApp); en la computadora, se descarga.
+  const compartir = async () => {
+    if (!archivo || !actual) return;
+    const resultado = enComputadora ? (descargarArchivo(archivo), "descargado") : await compartirArchivo(archivo, { title: archivo.name });
+    if (resultado !== "cancelado") {
+      logActivityClient({ action: "compartir_video", module: modulo, details: { titulo: actual.titulo, resultado } });
+    }
+  };
 
   useEffect(() => {
     let vivo = true;
@@ -175,10 +223,21 @@ function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void })
                 : "aspect-video w-full rounded-lg border border-gray-200 bg-black"
             }
           />
-          <p className="text-sm text-gray-900">
-            <span className="font-medium">{actual.titulo}</span>
-            <span className="text-gray-500"> · {duracion(actual.segundos)}</span>
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="min-w-0 text-sm text-gray-900">
+              <span className="font-medium">{actual.titulo}</span>
+              <span className="text-gray-500"> · {duracion(actual.segundos)}</span>
+            </p>
+            <button
+              type="button"
+              data-compartir-video
+              onClick={fallo ? reintentar : compartir}
+              disabled={!archivo && !fallo}
+              className="inline-flex min-h-[44px] shrink-0 items-center rounded-md border border-gray-200 px-3 text-sm text-gray-900 transition hover:border-gray-400 active:scale-[0.97] disabled:text-gray-400"
+            >
+              {fallo ? "Reintentar" : !archivo ? "Preparando…" : enComputadora ? "Descargar" : "Compartir"}
+            </button>
+          </div>
           <div className="-my-1 flex items-center gap-0.5" role="group" aria-label="Velocidad">
             <span className="mr-1 text-xs text-gray-500">Velocidad</span>
             {VELOCIDADES.map((v) => (
