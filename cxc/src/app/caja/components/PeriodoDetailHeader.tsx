@@ -27,8 +27,6 @@ interface Props {
   onNuevoGasto?: () => void;
   /** Apple: cuántos recibos tiene, para la línea gris. */
   recibos?: number;
-  /** `VIDEOS_AYUDA_2026_11`: «Cómo se usa», al final del «···». */
-  onComoSeUsa?: () => void;
 }
 
 function StatusPill({ open, fechaCierre }: { open: boolean; fechaCierre: string | null }) {
@@ -164,7 +162,6 @@ export default function PeriodoDetailHeader({
   apple = false,
   onNuevoGasto,
   recibos = 0,
-  onComoSeUsa,
 }: Props) {
   const isOpen = current.estado === "abierto";
   const fondoInicial = current.fondo_inicial;
@@ -196,7 +193,6 @@ export default function PeriodoDetailHeader({
       ? [{ label: `Ver gastos eliminados (${deletedCount})`, onClick: onViewDeleted }]
       : []),
   ];
-  const ayuda: OverflowMenuItem[] = onComoSeUsa ? [{ label: "Cómo se usa", onClick: onComoSeUsa }] : [];
 
   // 🔴 «COMO LO HARÍA APPLE» (6-oct-2026, `GASTOS_APPLE_2026_10`): «‹ Períodos»
   // en la línea del título; el SALDO grande con una línea gris (fondo, gastado,
@@ -207,7 +203,6 @@ export default function PeriodoDetailHeader({
     const items: OverflowMenuItem[] = [
       ...menuItems,
       ...(isOpen && onClosePeriodo ? [{ label: "Cerrar período", onClick: onClosePeriodo }] : []),
-      ...ayuda,
     ];
     const neg = saldoEsNegativo(saldo);
     return (
@@ -369,9 +364,9 @@ export default function PeriodoDetailHeader({
       </div>
 
       {/* Overflow menu placement (mobile + extras) */}
-      {menuItems.length + ayuda.length > 0 && (
+      {menuItems.length > 0 && (
         <div className="max-w-6xl mx-auto px-5 sm:px-9 mt-3 flex justify-end">
-          <OverflowMenu items={[...menuItems, ...ayuda]} />
+          <OverflowMenu items={menuItems} />
         </div>
       )}
 

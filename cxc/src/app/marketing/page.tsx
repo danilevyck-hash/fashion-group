@@ -38,9 +38,6 @@ import { ROLES_MARKETING } from "@/lib/marketing/roles";
 import { destinoDeVistaVieja } from "@/lib/marketing/tiendas-y-marcas";
 import { useRedirigirProyectoViejo } from "./components/useProyectoViejo";
 import { useEsCelular } from "./components/celular/useEsCelular";
-import VideosAyuda from "@/components/VideosAyuda";
-import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
-import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 
 // 🔴 MARKETING NUEVO (8-oct-2026, todos los roles de Marketing). Lazy.
 const MarketingNuevo = dynamic(() => import("./components/nuevo/MarketingNuevo"), { ssr: false });
@@ -91,9 +88,6 @@ function MarketingPage() {
   // (`TituloCelular`): «Marketing», «Marcas», la tienda, la marca… El layout no
   // agrega otro (24-sep-2026).
   const celular = useEsCelular();
-  // «Cómo se usa» vive en la PORTADA del módulo (regla en manifiesto.ts).
-  const [verVideos, setVerVideos] = useState(false);
-  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("marketing");
 
   const proyectoParam = searchParams.get("proyecto");
   const vistaRaw = searchParams.get("vista");
@@ -127,9 +121,8 @@ function MarketingPage() {
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Marketing" breadcrumbs={[]} tituloEnLaPantalla={celular} />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <MarketingNuevo role={role} marcas={marcas} onComoSeUsa={conVideos ? () => setVerVideos(true) : undefined} />
+        <MarketingNuevo role={role} marcas={marcas} />
       </main>
-      {conVideos && <VideosAyuda modulo="marketing" open={verVideos} onClose={() => setVerVideos(false)} />}
     </div>
   );
 }

@@ -27,7 +27,7 @@ import { puedeEscribirMarketing } from "@/lib/marketing/roles";
 import { HREF_MOBILIARIO } from "@/lib/marketing/tiendas-y-marcas";
 import { PESTANA_ACTIVA, PESTANA_INACTIVA } from "@/lib/marketing/marketing-2026-10";
 import { SoloCobrableContexto } from "@/lib/marketing/solo-cobrable-contexto";
-import { BarraDeControles, CLASE_FILA_MENU, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
 import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import RegistrarGastoModal from "../RegistrarGastoModal";
 import PortadaProveedores from "../PortadaProveedores";
@@ -42,16 +42,7 @@ const PESTANAS: ReadonlyArray<{ id: Pestana; rotulo: string }> = [
   { id: "impulsadoras", rotulo: "Impulsadoras" },
 ];
 
-export default function MarketingNuevo({
-  role,
-  marcas,
-  onComoSeUsa,
-}: {
-  role: string;
-  marcas: MkMarca[];
-  /** «Cómo se usa» al final del «···» (videos del módulo). */
-  onComoSeUsa?: () => void;
-}) {
+export default function MarketingNuevo({ role, marcas }: { role: string; marcas: MkMarca[] }) {
   const router = useRouter();
   const [tabRaw, setTab] = useUrlState<Pestana>("tab", "por-cobrar");
   const tab: Pestana = (["por-cobrar", "gastos", "impulsadoras", "proveedores"] as const).includes(tabRaw)
@@ -102,11 +93,6 @@ export default function MarketingNuevo({
                 ]}
                 activa={tab}
                 onPestana={(v) => (v === "mobiliario" ? router.push(HREF_MOBILIARIO) : setTab(v as Pestana))}
-                menu={onComoSeUsa ? (
-                  <button type="button" onClick={onComoSeUsa} className={CLASE_FILA_MENU}>
-                    Cómo se usa
-                  </button>
-                ) : null}
               />
             </ProveedorBarraCelular>
           </div>
@@ -137,7 +123,6 @@ export default function MarketingNuevo({
               items={[
                 { label: "Mobiliario", onClick: () => router.push(HREF_MOBILIARIO) },
                 { label: "Proveedores", onClick: () => setTab("proveedores") },
-                ...(onComoSeUsa ? [{ label: "Cómo se usa", onClick: onComoSeUsa }] : []),
               ]}
             />
           </div>

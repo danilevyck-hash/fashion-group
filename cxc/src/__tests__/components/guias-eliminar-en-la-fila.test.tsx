@@ -55,8 +55,6 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/components/AppHeader", () => ({ default: () => null }));
-// Este candado cuenta los «···» de las FILAS: el de «Cómo se usa» (portada) queda fuera.
-vi.mock("@/lib/ui/videos-ayuda-2026-11", () => ({ VIDEOS_AYUDA_2026_11: false }));
 
 // El interruptor de los atajos, controlable por test: el CONTROL de abajo
 // necesita probar que con GUIAS_ATAJOS_NUEVOS apagado la lista vuelve a ser

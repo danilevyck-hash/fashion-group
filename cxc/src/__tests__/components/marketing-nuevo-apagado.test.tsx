@@ -9,7 +9,7 @@
 // · La secretaria registra y cierra (Daniel).
 // · El Marketing de antes se borró el 8-oct-2026: la portada ES el nuevo.
 // ============================================================================
-import { describe, it, expect, vi, afterEach, beforeEach, beforeAll } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, cleanup, act, waitFor, screen, fireEvent } from "@testing-library/react";
 import { NextRequest } from "next/server";
 
@@ -67,13 +67,6 @@ beforeEach(() => {
   }) as typeof fetch;
 });
 afterEach(cleanup);
-// 🩸 15-nov-2026: la pantalla nueva se carga aparte (next/dynamic) y el PRIMER
-// caso pagaba esa carga en frío dentro de su `waitFor` de 5 s; con la Mac
-// ocupada no alcanzaba. Se carga una vez aquí: los casos miden la pantalla,
-// no la primera compilación del módulo.
-beforeAll(async () => {
-  await import("@/app/marketing/components/nuevo/MarketingNuevo");
-});
 
 async function dibujarNuevo(role: string) {
   estado.role = role;

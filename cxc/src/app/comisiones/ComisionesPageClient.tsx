@@ -1,14 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useBarraCelular } from "@/components/celular/BarraDeControles";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { ComisionesView } from "@/components/comisiones/ComisionesView";
-import VideosAyuda from "@/components/VideosAyuda";
-import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
-import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 
 export function ComisionesPageClient({
   availableYears,
@@ -33,15 +29,11 @@ export function ComisionesPageClient({
   // que sobraba era el «Comisiones» del encabezado, dicho DOS veces, y el
   // margen que dejaba la portada como una tarjeta dentro de otra.
   const barra = useBarraCelular();
-  // «Cómo se usa» vive en la PORTADA del módulo (regla en manifiesto.ts).
-  const [verVideos, setVerVideos] = useState(false);
-  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("comisiones");
   if (!authChecked) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Comisiones" tituloEnLaPantalla={barra} />
-      {conVideos && <VideosAyuda modulo="comisiones" open={verVideos} onClose={() => setVerVideos(false)} />}
       {/* Sin título grande: "Comisiones" ya lo dicen el header sticky (móvil) y
           el breadcrumb (escritorio) — repetirlo costaba 44px de la primera
           pantalla del iPhone. Mismo criterio que el encabezado de CXC. */}
@@ -58,7 +50,6 @@ export function ComisionesPageClient({
           avisoMontos={avisoMontos}
           conConfiguracion
           vistaPedida={vistaPedida}
-          onComoSeUsa={conVideos ? () => setVerVideos(true) : undefined}
         />
         </div>
       </main>
