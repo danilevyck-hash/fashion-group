@@ -197,7 +197,7 @@ describe("Multifashion › celular › el número del mes con la venta de hoy", 
     expect(inicio).toContain("{montoCorto(conHoy.numero)}");
     const grafica = fs.readFileSync(path.join(process.cwd(), "src/components/multifashion/GraficaDelMes.tsx"), "utf8");
     // La gráfica recibe los MISMOS días: el promedio no ve la venta de hoy.
-    expect(grafica).toContain("graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados })");
+    expect(grafica).toContain("graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados, vsAnioPasado: comparar })");
     // Con la venta de hoy, la barra destacada es la de HOY y el último día completo vuelve al gris.
     expect(grafica).toContain('d.estado === "hoy" && altoHoy != null ? BARRA_HOY_EN_CURSO');
     expect(grafica).toContain('d.estado === "ultimo" && altoHoy != null ? BARRA.venta : BARRA[d.estado]');

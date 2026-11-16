@@ -19,7 +19,7 @@ import path from "path";
 import {
   MULTIFASHION_GRAFICA_2026_10, etiquetaEnCelular, graficaDelMes, lineaDeLaGrafica,
 } from "@/lib/multifashion/grafica-mes";
-import { diasSinVenta } from "@/lib/multifashion/resumen-minimo";
+import { CIERRES_CIVICOS, diasSinVenta, esDiaHabilTienda } from "@/lib/multifashion/resumen-minimo";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
 
@@ -35,6 +35,25 @@ describe("el interruptor", () => {
   it("prendido (Daniel lo aprobó) y es OTRO que el del rediseño", () => {
     expect(MULTIFASHION_GRAFICA_2026_10).toBe(true);
     expect(leer("src/lib/multifashion/grafica-mes.ts")).not.toMatch(/MULTIFASHION_APPLE_2026_10/);
+  });
+});
+
+describe("el cierre cívico (16-nov-2026)", () => {
+  // El 4-nov la tienda cierra (Día de los Símbolos Patrios) y NO es feriado legal:
+  // no está en `asistencia_feriados` y la gráfica no debe preguntar «¿la tienda abrió?».
+  it("el 4-nov no es día hábil de la tienda, caiga el día que caiga", () => {
+    expect(CIERRES_CIVICOS.has("11-04")).toBe(true);
+    expect(esDiaHabilTienda(2026, 11, 4)).toBe(false); // miércoles
+    expect(esDiaHabilTienda(2025, 11, 4)).toBe(false); // martes
+    expect(esDiaHabilTienda(2026, 11, 5)).toBe(true);
+    expect(esDiaHabilTienda(2026, 11, 8)).toBe(false); // domingo
+  });
+
+  it("un 4-nov en $0 no sale en el aviso de «sin venta»", () => {
+    const dias = [3, 4, 5].map((dia) => ({ dia, ventas: dia === 4 ? 0 : 500, n_tickets: dia === 4 ? 0 : 5 }));
+    const r = diasSinVenta({ dias, isMesActual: false, diaActual: 30, year: 2026, mes: 11, feriados: ["2026-11-03"] });
+    expect(r.dias).toEqual([]);
+    expect(r.texto).toBeNull();
   });
 });
 

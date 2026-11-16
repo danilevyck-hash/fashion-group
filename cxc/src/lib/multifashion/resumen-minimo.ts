@@ -144,8 +144,16 @@ export interface EntradaDiasSinVenta {
   feriados: readonly string[] | null;
 }
 
-/** Día hábil de la tienda: lunes a sábado. El domingo no cuenta. */
+/**
+ * Días cívicos en que la tienda cierra y NO son feriado legal (no van en
+ * `asistencia_feriados`, que es de la planilla). `MM-DD`, fecha fija.
+ * 11-04 = Día de los Símbolos Patrios (Daniel, 16-nov-2026).
+ */
+export const CIERRES_CIVICOS: ReadonlySet<string> = new Set(["11-04"]);
+
+/** Día hábil de la tienda: lunes a sábado, menos los cierres cívicos. El domingo no cuenta. */
 export function esDiaHabilTienda(year: number, mes: number, dia: number): boolean {
+  if (CIERRES_CIVICOS.has(`${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`)) return false;
   return new Date(Date.UTC(year, mes - 1, dia)).getUTCDay() !== 0;
 }
 
