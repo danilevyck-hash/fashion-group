@@ -1,4 +1,4 @@
--- requiere la migración de pg_cron del otro agente (instala pg_cron + pg_net y
+-- requiere la migración de pg_cron del otro agente: 20270118130000_pg_cron_pg_net_vault.sql (instala pg_cron + pg_net y
 -- carga el secreto `cron_secret` en Supabase Vault). Esta NO instala nada.
 --
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -8,14 +8,14 @@
 -- con `pg_cron` + `pg_net`, con el secreto `cron_secret` de Vault (nunca en el
 -- repo). Sin el secreto la llamada sale sin llave y la ruta contesta 401: no
 -- avisa a nadie y no rompe nada.
--- Para apagarlo: select cron.unschedule('marcacion-recordatorios');
+-- Para apagarlo: select cron.unschedule('fg-recordatorios-marcacion');
 --
 -- No toca ninguna fila de negocio: UNA fila en cron.job.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Con el mismo nombre, cron.schedule reemplaza la programación anterior.
 SELECT cron.schedule(
-  'marcacion-recordatorios',
+  'fg-recordatorios-marcacion',
   '*/5 * * * *',
   $$
   SELECT net.http_post(
