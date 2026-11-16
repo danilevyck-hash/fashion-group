@@ -11,6 +11,12 @@
  * 🔑 Cambiar un video = volver a subir el archivo a la MISMA ruta: este archivo
  * no se toca (salvo que cambie la duración).
  *
+ * 🔑 FORMATO (15-nov-2026): la versión de COMPUTADORA (16:9) es la que abre en
+ * todo aparato. Donde quedó la vieja de teléfono (9:16), sus renglones llevan
+ * `formato: "celular"` y el panel ofrece «Ver en formato celular»: es una LISTA
+ * aparte por módulo (Ventas tiene 12 clips en 16:9 y 11 en la de teléfono), no
+ * una variante por clip. Sin `formato` = el mismo renglón en las dos.
+ *
  * `segundos` = los del archivo, redondeados hacia abajo (como los cuenta el reproductor).
  * `orden` 0 = «Introducción»; del 1 en adelante se muestran numerados.
  * `completo` = el video entero, el de «Ver todo»; no entra a la lista.
@@ -20,6 +26,9 @@
 export const BUCKET_VIDEOS_AYUDA = "videos-ayuda";
 /** Key de los videos de `/home`: no es un módulo de `modules.ts` (ver la ruta). */
 export const VIDEOS_DEL_INICIO = "inicio";
+
+export type FormatoVideos = "computadora" | "celular";
+export const FORMATOS: readonly FormatoVideos[] = ["computadora", "celular"];
 
 export interface VideoAyuda {
   modulo: string;
@@ -34,10 +43,12 @@ export interface VideoAyuda {
   /** El archivo que viaja al COMPARTIR, si no es `video`: el completo va en su
    *  versión liviana (< 28 MB, para WhatsApp). */
   compartir?: string;
+  /** Solo en esa versión del módulo; sin él, en las dos (ver arriba). */
+  formato?: FormatoVideos;
 }
 
 /** Un renglón: la carpeta del bucket es la key del módulo (`modules.ts`). */
-const fila = (modulo: string, { vertical = false, carpeta = modulo } = {}) =>
+const fila = (modulo: string, { vertical = false, carpeta = modulo, formato }: { vertical?: boolean; carpeta?: string; formato?: FormatoVideos } = {}) =>
   (orden: number, titulo: string, segundos: number, archivo: string, completo = false, esVertical = vertical): VideoAyuda => ({
     modulo,
     orden,
@@ -47,6 +58,7 @@ const fila = (modulo: string, { vertical = false, carpeta = modulo } = {}) =>
     miniatura: `${carpeta}/${archivo}.jpg`,
     ...(completo ? { completo, compartir: `${carpeta}/00-completo-liviano.mp4` } : {}),
     ...(esVertical ? { vertical: true } : {}),
+    ...(formato ? { formato } : {}),
   });
 const caja = fila("caja");
 const cxc = fila("cxc");
@@ -54,16 +66,23 @@ const reclamos = fila("reclamos");
 const marketing = fila("marketing");
 const recordatorios = fila("cheques"); // Recordatorios: su key sigue siendo `cheques`.
 const prestamos = fila("prestamos");
-const catalogos = fila("catalogos", { vertical: true }); // serie de teléfono (9:16)
-const asistencia = fila("asistencia"); // mixta: el 01 es de teléfono
+const catalogos = fila("catalogos", { carpeta: "catalogos-16x9", formato: "computadora" }); // 16:9, la que abre
+const catalogosCel = fila("catalogos", { vertical: true, formato: "celular" }); // la de teléfono (9:16), a un toque
+const asistencia = fila("asistencia"); // el 01 se regrabó en 16:9; su versión de teléfono queda a un toque
+const asistencia169 = fila("asistencia", { carpeta: "asistencia-16x9", formato: "computadora" });
+const asistenciaCel = fila("asistencia", { formato: "celular" });
 const comisiones = fila("comisiones");
 const clientes = fila("directorio"); // Clientes: la key del módulo es `directorio`
-const proveedores = fila("proveedores", { vertical: true }); // toda la serie en formato celular
-const ventas = fila("ventas", { vertical: true }); // toda la serie en formato celular
+const proveedores = fila("proveedores", { carpeta: "proveedores-16x9", formato: "computadora" }); // 16:9, la que abre
+const proveedoresCel = fila("proveedores", { vertical: true, formato: "celular" }); // la de teléfono (9:16), a un toque
+const ventas = fila("ventas", { carpeta: "ventas-16x9", formato: "computadora" }); // 16:9, la que abre
+const ventasCel = fila("ventas", { vertical: true, formato: "celular" }); // la de teléfono (9:16), a un toque
 const multifashion = fila("multifashion");
 const boston = fila("boston");
-const referencia = fila("referencia", { vertical: true }); // Consulta de artículos: serie de celular
-const usuarios = fila("usuarios", { vertical: true }); // serie de celular
+const referencia = fila("referencia", { carpeta: "referencia-16x9", formato: "computadora" }); // 16:9, la que abre
+const referenciaCel = fila("referencia", { vertical: true, formato: "celular" }); // la de teléfono (9:16), a un toque
+const usuarios = fila("usuarios", { carpeta: "usuarios-16x9", formato: "computadora" }); // 16:9, la que abre
+const usuariosCel = fila("usuarios", { vertical: true, formato: "celular" }); // la de teléfono (9:16), a un toque
 const gastos = fila("gastos-contabilidad");
 const plantilla = fila("cargar"); // Plantilla Switch: la key del módulo es `cargar`
 const vistaGeneral = fila("vista-general");
@@ -156,9 +175,9 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   prestamos(10, "La quincena y los movimientos", 60, "10-la-quincena"),
   prestamos(11, "Buscar, filtrar y descargar", 49, "11-buscar-filtrar-y-descargar"),
 
-  catalogos(0, "Catálogos completo", 535, "00-completo", true),
+  catalogos(0, "Catálogos completo", 534, "00-completo", true),
   catalogos(0, "Introducción", 53, "00-que-es-catalogos"),
-  catalogos(1, "Ver el catálogo y buscar", 61, "01-ver-y-buscar"),
+  catalogos(1, "Ver el catálogo y buscar", 59, "01-ver-y-buscar"),
   catalogos(2, "Armar un pedido", 50, "02-armar-pedido"),
   catalogos(3, "Cliente, vendedor y precio", 58, "03-cliente-vendedor-precio"),
   catalogos(4, "Pedido o cotización", 46, "04-pedido-o-cotizacion"),
@@ -167,9 +186,21 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   catalogos(7, "El enlace para el cliente", 48, "07-enlace-para-el-cliente"),
   catalogos(8, "Completar el pedido del cliente", 51, "08-completar-pedido-del-cliente"),
   catalogos(9, "Administrar el catálogo", 54, "09-administrar"),
+  catalogosCel(0, "Catálogos completo", 535, "00-completo", true),
+  catalogosCel(0, "Introducción", 53, "00-que-es-catalogos"),
+  catalogosCel(1, "Ver el catálogo y buscar", 61, "01-ver-y-buscar"),
+  catalogosCel(2, "Armar un pedido", 50, "02-armar-pedido"),
+  catalogosCel(3, "Cliente, vendedor y precio", 58, "03-cliente-vendedor-precio"),
+  catalogosCel(4, "Pedido o cotización", 46, "04-pedido-o-cotizacion"),
+  catalogosCel(5, "Comprobantes", 49, "05-comprobantes"),
+  catalogosCel(6, "Abrir un comprobante", 47, "06-abrir-comprobante"),
+  catalogosCel(7, "El enlace para el cliente", 48, "07-enlace-para-el-cliente"),
+  catalogosCel(8, "Completar el pedido del cliente", 51, "08-completar-pedido-del-cliente"),
+  catalogosCel(9, "Administrar el catálogo", 54, "09-administrar"),
   asistencia(0, "Asistencia y planilla completo", 598, "00-completo", true),
   asistencia(0, "Introducción", 53, "00-que-es-asistencia"),
-  asistencia(1, "Marcar desde el teléfono", 61, "01-marcar-desde-el-telefono", false, true),
+  asistencia169(1, "Marcar desde el teléfono", 61, "01-marcar-desde-el-telefono"),
+  asistenciaCel(1, "Marcar desde el teléfono", 61, "01-marcar-desde-el-telefono", false, true),
   asistencia(2, "Revisar la quincena", 63, "02-revisar-la-quincena"),
   asistencia(3, "Corregir una marca", 53, "03-corregir-una-marca"),
   asistencia(4, "Justificar una ausencia", 53, "04-justificar-una-ausencia"),
@@ -218,25 +249,45 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   clientes(6, "Empresa por empresa", 42, "06-detalle-y-pagos"),
   clientes(7, "Completar los datos", 51, "07-completar-datos"),
   clientes(8, "Estado de cuenta y enlaces", 50, "08-estado-de-cuenta-y-enlaces"),
-  proveedores(0, "Proveedores completo", 323, "00-completo", true),
+  proveedores(0, "Proveedores completo", 329, "00-completo", true),
   proveedores(0, "Introducción", 58, "00-que-es-proveedores"),
-  proveedores(1, "Leer la pantalla", 51, "01-leer-la-pantalla"),
-  proveedores(2, "Abrir una empresa", 63, "02-abrir-una-empresa"),
-  proveedores(3, "La ficha del proveedor", 54, "03-ficha-del-proveedor"),
-  proveedores(4, "Actualizar desde Switch", 43, "04-actualizar"),
+  proveedores(1, "Leer la pantalla", 54, "01-leer-la-pantalla"),
+  proveedores(2, "Abrir una empresa", 64, "02-abrir-una-empresa"),
+  proveedores(3, "La ficha del proveedor", 55, "03-ficha-del-proveedor"),
+  proveedores(4, "Actualizar desde Switch", 42, "04-actualizar"),
   proveedores(5, "Descargar en Excel", 42, "05-descargar-excel"),
-  ventas(0, "Ventas completo", 546, "00-completo", true),
+  proveedoresCel(0, "Proveedores completo", 323, "00-completo", true),
+  proveedoresCel(0, "Introducción", 58, "00-que-es-proveedores"),
+  proveedoresCel(1, "Leer la pantalla", 51, "01-leer-la-pantalla"),
+  proveedoresCel(2, "Abrir una empresa", 63, "02-abrir-una-empresa"),
+  proveedoresCel(3, "La ficha del proveedor", 54, "03-ficha-del-proveedor"),
+  proveedoresCel(4, "Actualizar desde Switch", 43, "04-actualizar"),
+  proveedoresCel(5, "Descargar en Excel", 42, "05-descargar-excel"),
+  ventas(0, "Ventas completo", 580, "00-completo", true),
   ventas(0, "Introducción", 54, "00-que-es-ventas"),
-  ventas(1, "Leer el Resumen", 51, "01-leer-el-resumen"),
+  ventas(1, "Leer el Resumen", 56, "01-leer-el-resumen"),
   ventas(2, "Cambiar el período", 47, "02-cambiar-el-periodo"),
   ventas(3, "Rango de fechas", 46, "03-rango-de-fechas"),
-  ventas(4, "Utilidad e histórico", 51, "04-utilidad-y-meses"),
-  ventas(5, "Clientes: la lista", 51, "05-clientes-la-lista"),
-  ventas(6, "Buscar y filtrar clientes", 42, "06-buscar-y-filtrar-clientes"),
-  ventas(7, "La ficha del cliente", 46, "07-ficha-del-cliente"),
-  ventas(8, "Productos: qué se vendió", 54, "08-productos"),
-  ventas(9, "Filtrar productos", 45, "09-filtrar-productos"),
-  ventas(10, "Descargar y actualizar", 41, "10-descargar-y-actualizar"),
+  ventas(4, "Utilidad e histórico", 50, "04-utilidad-y-meses"),
+  ventas(5, "Clientes: la lista", 48, "05-clientes-la-lista"),
+  ventas(6, "Buscar y filtrar clientes", 43, "06-buscar-y-filtrar-clientes"),
+  ventas(7, "Utilidad por cliente", 46, "07-utilidad-por-cliente"),
+  ventas(8, "Un cliente", 38, "08-un-cliente"),
+  ventas(9, "Productos: qué se vendió", 52, "09-productos"),
+  ventas(10, "Filtrar productos", 44, "10-filtrar-productos"),
+  ventas(11, "Descargar y actualizar", 37, "11-descargar-y-actualizar"),
+  ventasCel(0, "Ventas completo", 546, "00-completo", true),
+  ventasCel(0, "Introducción", 54, "00-que-es-ventas"),
+  ventasCel(1, "Leer el Resumen", 51, "01-leer-el-resumen"),
+  ventasCel(2, "Cambiar el período", 47, "02-cambiar-el-periodo"),
+  ventasCel(3, "Rango de fechas", 46, "03-rango-de-fechas"),
+  ventasCel(4, "Utilidad e histórico", 51, "04-utilidad-y-meses"),
+  ventasCel(5, "Clientes: la lista", 51, "05-clientes-la-lista"),
+  ventasCel(6, "Buscar y filtrar clientes", 42, "06-buscar-y-filtrar-clientes"),
+  ventasCel(7, "La ficha del cliente", 46, "07-ficha-del-cliente"),
+  ventasCel(8, "Productos: qué se vendió", 54, "08-productos"),
+  ventasCel(9, "Filtrar productos", 45, "09-filtrar-productos"),
+  ventasCel(10, "Descargar y actualizar", 41, "10-descargar-y-actualizar"),
   multifashion(0, "Multifashion completo", 547, "00-completo", true),
   multifashion(0, "Introducción", 55, "00-que-es-multifashion"),
   multifashion(1, "Leer el Resumen", 53, "01-leer-el-resumen"),
@@ -254,17 +305,26 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   boston(2, "Antigüedad de saldos", 43, "02-antiguedad-de-saldos"),
   boston(3, "Ventas mes a mes", 55, "03-ventas-mes-a-mes"),
   boston(4, "Las tarjetas son puertas", 47, "04-las-tarjetas-son-puertas"),
-  referencia(0, "Consulta de artículos completo", 388, "00-completo", true),
+  referencia(0, "Consulta de artículos completo", 387, "00-completo", true),
   referencia(0, "Introducción", 44, "00-que-es-consulta"),
   referencia(1, "Buscar un modelo", 41, "01-buscar-un-modelo"),
   referencia(2, "Existencias", 49, "02-existencias"),
   referencia(3, "Últimas recepciones", 41, "03-ultimas-recepciones"),
   referencia(4, "Precio, costo y detalle", 55, "04-precio-costo-y-detalle"),
-  referencia(5, "Los colores", 41, "05-los-colores"),
+  referencia(5, "Los colores", 40, "05-los-colores"),
   referencia(6, "Un color o varios códigos", 51, "06-un-color-o-varios"),
   referencia(7, "Actualizar y descargar", 48, "07-actualizar-y-excel"),
-  usuarios(0, "Usuarios completo", 524, "00-completo", true),
-  usuarios(0, "Introducción", 53, "00-que-es-usuarios"),
+  referenciaCel(0, "Consulta de artículos completo", 388, "00-completo", true),
+  referenciaCel(0, "Introducción", 44, "00-que-es-consulta"),
+  referenciaCel(1, "Buscar un modelo", 41, "01-buscar-un-modelo"),
+  referenciaCel(2, "Existencias", 49, "02-existencias"),
+  referenciaCel(3, "Últimas recepciones", 41, "03-ultimas-recepciones"),
+  referenciaCel(4, "Precio, costo y detalle", 55, "04-precio-costo-y-detalle"),
+  referenciaCel(5, "Los colores", 41, "05-los-colores"),
+  referenciaCel(6, "Un color o varios códigos", 51, "06-un-color-o-varios"),
+  referenciaCel(7, "Actualizar y descargar", 48, "07-actualizar-y-excel"),
+  usuarios(0, "Usuarios completo", 520, "00-completo", true),
+  usuarios(0, "Introducción", 52, "00-que-es-usuarios"),
   usuarios(1, "Leer la lista", 47, "01-leer-la-lista"),
   usuarios(2, "Crear un usuario", 52, "02-nuevo-usuario"),
   usuarios(3, "Rol, empresa y permisos", 60, "03-rol-y-permisos"),
@@ -272,8 +332,19 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   usuarios(5, "Contraseña y vendedor en Switch", 44, "05-editar-clave-y-vendedor"),
   usuarios(6, "Desactivar y dar de baja", 49, "06-desactivar-y-baja"),
   usuarios(7, "Sesiones activas", 48, "07-sesiones-activas"),
-  usuarios(8, "Novedades", 45, "08-novedades"),
-  usuarios(9, "Actividad", 47, "09-actividad"),
+  usuarios(8, "Novedades", 43, "08-novedades"),
+  usuarios(9, "Actividad", 46, "09-actividad"),
+  usuariosCel(0, "Usuarios completo", 524, "00-completo", true),
+  usuariosCel(0, "Introducción", 53, "00-que-es-usuarios"),
+  usuariosCel(1, "Leer la lista", 47, "01-leer-la-lista"),
+  usuariosCel(2, "Crear un usuario", 52, "02-nuevo-usuario"),
+  usuariosCel(3, "Rol, empresa y permisos", 60, "03-rol-y-permisos"),
+  usuariosCel(4, "Alguien que marca asistencia", 62, "04-marca-asistencia"),
+  usuariosCel(5, "Contraseña y vendedor en Switch", 44, "05-editar-clave-y-vendedor"),
+  usuariosCel(6, "Desactivar y dar de baja", 49, "06-desactivar-y-baja"),
+  usuariosCel(7, "Sesiones activas", 48, "07-sesiones-activas"),
+  usuariosCel(8, "Novedades", 45, "08-novedades"),
+  usuariosCel(9, "Actividad", 47, "09-actividad"),
   gastos(0, "Gastos completo", 428, "00-completo", true),
   gastos(0, "Introducción", 49, "00-que-es-gastos"),
   gastos(1, "Leer la lista", 46, "01-leer-la-lista"),
@@ -317,8 +388,11 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */
-export function videosDelModulo(modulo: string): { lista: VideoAyuda[]; completo: VideoAyuda | null } {
-  const del = VIDEOS_AYUDA.filter((v) => v.modulo === modulo);
+export function videosDelModulo(
+  modulo: string,
+  formato: FormatoVideos = "computadora",
+): { lista: VideoAyuda[]; completo: VideoAyuda | null } {
+  const del = VIDEOS_AYUDA.filter((v) => v.modulo === modulo && (!v.formato || v.formato === formato));
   return {
     lista: del.filter((v) => !v.completo).sort((a, b) => a.orden - b.orden),
     completo: del.find((v) => v.completo) ?? null,
@@ -326,6 +400,10 @@ export function videosDelModulo(modulo: string): { lista: VideoAyuda[]; completo
 }
 
 export const tieneVideos = (modulo: string): boolean => VIDEOS_AYUDA.some((v) => v.modulo === modulo && !v.completo);
+
+/** ¿Le quedó una versión de teléfono? Ahí el panel ofrece cambiar de formato. */
+export const tieneFormatoCelular = (modulo: string): boolean =>
+  VIDEOS_AYUDA.some((v) => v.modulo === modulo && v.formato === "celular");
 
 /** 0:57 · 9:28 */
 export function duracion(segundos: number): string {

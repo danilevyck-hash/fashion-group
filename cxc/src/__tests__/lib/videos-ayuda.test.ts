@@ -18,16 +18,25 @@ import { nombreDelArchivo } from "@/components/VideosAyuda";
 
 const req = (modulo: string) =>
   new NextRequest(`http://x/api/videos-ayuda?modulo=${modulo}`, { headers: { cookie: "cxc_session=x" } });
+const reqCel = (modulo: string) =>
+  new NextRequest(`http://x/api/videos-ayuda?modulo=${modulo}&formato=celular`, { headers: { cookie: "cxc_session=x" } });
+const sinVertical = (r: { lista: { vertical?: boolean }[]; completo: { vertical?: boolean } | null }) =>
+  !r.lista.some((v) => v.vertical) && !r.completo?.vertical;
 
 describe("videos de ayuda — el manifiesto", () => {
   it("cada video es de un módulo que existe, con rutas únicas en su carpeta", () => {
     for (const m of new Set(VIDEOS_AYUDA.map((v) => v.modulo))) {
-      const rutas = VIDEOS_AYUDA.filter((v) => v.modulo === m).flatMap((v) => [v.video, v.miniatura]);
-      expect(new Set(rutas).size).toBe(rutas.length);
+      // Por FORMATO: la versión de computadora y la de teléfono son dos listas.
+      for (const f of ["computadora", "celular"] as const) {
+        const rutas = VIDEOS_AYUDA.filter((v) => v.modulo === m && (!v.formato || v.formato === f)).flatMap((v) => [v.video, v.miniatura]);
+        expect(new Set(rutas).size).toBe(rutas.length);
+      }
     }
     for (const v of VIDEOS_AYUDA) {
       // El Inicio no es un módulo y reusa los archivos de la Vista general.
-      const carpeta = v.modulo === VIDEOS_DEL_INICIO ? "vista-general" : v.modulo;
+      // La versión 16:9 de una serie regrabada vive en `<key>-16x9/`.
+      const base = v.modulo === VIDEOS_DEL_INICIO ? "vista-general" : v.modulo;
+      const carpeta = v.formato === "computadora" ? `${base}-16x9` : base;
       if (v.modulo !== VIDEOS_DEL_INICIO) expect(ALL_MODULE_KEYS).toContain(v.modulo);
       expect(v.video.startsWith(`${carpeta}/`) && v.video.endsWith(".mp4")).toBe(true);
       expect(v.miniatura.startsWith(`${carpeta}/`) && v.miniatura.endsWith(".jpg")).toBe(true);
@@ -124,30 +133,56 @@ describe("GET /api/videos-ayuda", () => {
     expect((await GET(req("prestamos"))).status).toBe(403);
   });
 
-  it("la serie de teléfono (Catálogos) viaja marcada vertical; la de Caja no", async () => {
-    sesion.mockReturnValue({ role: "bodega" });
-    const cat = await (await GET(req("catalogos"))).json();
-    expect(cat.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
-    sesion.mockReturnValue({ role: "secretaria" });
-    const caja = await (await GET(req("caja"))).json();
-    expect(caja.lista.some((v: { vertical?: boolean }) => v.vertical)).toBe(false);
-  });
-
-  it("Proveedores es serie de teléfono entera (lista y completo), y contabilidad la abre", async () => {
-    sesion.mockReturnValue({ role: "contabilidad" });
-    const r = await (await GET(req("proveedores"))).json();
-    expect(r.lista).toHaveLength(6);
-    expect(r.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
-    expect(r.completo.vertical).toBe(true);
-  });
-
-  it("Ventas es serie de teléfono y solo admin la abre", async () => {
+  it("🔴 abre en formato COMPUTADORA (16:9) en todo módulo; la de teléfono va a un toque donde quedó", async () => {
     sesion.mockReturnValue({ role: "admin" });
-    const r = await (await GET(req("ventas"))).json();
-    expect(r.lista).toHaveLength(11);
-    expect(r.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
+    const CON_CELULAR = ["catalogos", "proveedores", "ventas", "referencia", "usuarios", "asistencia"];
+    for (const m of new Set(VIDEOS_AYUDA.map((v) => v.modulo))) {
+      const r = await (await GET(req(m))).json();
+      expect(sinVertical(r), m).toBe(true);
+      expect(r.formato).toBe("computadora");
+      expect(r.conFormatoCelular, m).toBe(CON_CELULAR.includes(m));
+    }
+    const caja = await (await GET(reqCel("caja"))).json();
+    expect(caja.lista).toHaveLength(11); // sin versión de teléfono: la misma lista
+  });
+
+  it("la de teléfono es una LISTA aparte por módulo: Ventas 12 clips en 16:9 y 11 en celular", async () => {
+    sesion.mockReturnValue({ role: "admin" });
+    const pc = await (await GET(req("ventas"))).json();
+    const cel = await (await GET(reqCel("ventas"))).json();
+    expect(pc.lista).toHaveLength(12);
+    expect(pc.lista[7].titulo).toBe("Utilidad por cliente");
+    expect(pc.completo.url).toContain("ventas-16x9/00-completo.mp4");
+    expect(cel.lista).toHaveLength(11);
+    expect(cel.formato).toBe("celular");
+    expect(cel.lista.every((v: { vertical?: boolean; url: string }) => v.vertical && !v.url.includes("-16x9/"))).toBe(true);
+  });
+
+  it("el liviano de Compartir sale del completo 16:9; el de teléfono conserva el suyo", async () => {
+    sesion.mockReturnValue({ role: "admin" });
+    for (const m of ["catalogos", "proveedores", "ventas", "referencia", "usuarios"]) {
+      expect((await (await GET(req(m))).json()).completo.compartir).toBe(`https://firmada/${m}-16x9/00-completo-liviano.mp4`);
+      expect((await (await GET(reqCel(m))).json()).completo.compartir).toBe(`https://firmada/${m}/00-completo-liviano.mp4`);
+    }
+  });
+
+  it("un formato desconocido cae a computadora", async () => {
+    sesion.mockReturnValue({ role: "admin" });
+    const r = await (await GET(new NextRequest("http://x/api/videos-ayuda?modulo=ventas&formato=raro", { headers: { cookie: "cxc_session=x" } }))).json();
+    expect(r.formato).toBe("computadora");
+    expect(r.lista).toHaveLength(12);
+  });
+
+  it("Proveedores: contabilidad la abre; 6 clips en las dos versiones", async () => {
+    sesion.mockReturnValue({ role: "contabilidad" });
+    expect((await (await GET(req("proveedores"))).json()).lista).toHaveLength(6);
+    expect((await (await GET(reqCel("proveedores"))).json()).lista).toHaveLength(6);
+  });
+
+  it("Ventas: solo admin la abre", async () => {
     sesion.mockReturnValue({ role: "secretaria" });
     expect((await GET(req("ventas"))).status).toBe(403);
+    expect((await GET(reqCel("ventas"))).status).toBe(403);
   });
 
   it("Multifashion la abre gerente_acs (su único módulo)", async () => {
@@ -165,20 +200,16 @@ describe("GET /api/videos-ayuda", () => {
     expect((await GET(req("boston"))).status).toBe(403);
   });
 
-  it("Consulta de artículos: serie de teléfono; bodega la abre, secretaria no", async () => {
+  it("Consulta de artículos: bodega la abre, secretaria no", async () => {
     sesion.mockReturnValue({ role: "bodega" });
-    const r = await (await GET(req("referencia"))).json();
-    expect(r.lista).toHaveLength(8);
-    expect(r.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
+    expect((await (await GET(req("referencia"))).json()).lista).toHaveLength(8);
     sesion.mockReturnValue({ role: "secretaria" });
     expect((await GET(req("referencia"))).status).toBe(403);
   });
 
-  it("Usuarios: serie de teléfono, solo admin", async () => {
+  it("Usuarios: solo admin, 10 clips", async () => {
     sesion.mockReturnValue({ role: "admin" });
-    const r = await (await GET(req("usuarios"))).json();
-    expect(r.lista).toHaveLength(10);
-    expect(r.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
+    expect((await (await GET(req("usuarios"))).json()).lista).toHaveLength(10);
     sesion.mockReturnValue({ role: "secretaria" });
     expect((await GET(req("usuarios"))).status).toBe(403);
   });
@@ -212,10 +243,14 @@ describe("GET /api/videos-ayuda", () => {
     expect((await GET(req("gastos-contabilidad"))).status).toBe(403);
   });
 
-  it("Asistencia es mixta: solo el 01 (marcar desde el teléfono) va vertical", async () => {
+  it("Asistencia: el 01 abre en 16:9; en formato celular vuelve el 01 de teléfono y el resto igual", async () => {
     sesion.mockReturnValue({ role: "contabilidad" });
     const a = await (await GET(req("asistencia"))).json();
-    expect(a.lista.filter((v: { vertical?: boolean }) => v.vertical).map((v: { titulo: string }) => v.titulo)).toEqual(["Marcar desde el teléfono"]);
+    expect(a.lista[1].url).toBe("https://firmada/asistencia-16x9/01-marcar-desde-el-telefono.mp4");
+    const c = await (await GET(reqCel("asistencia"))).json();
+    expect(c.lista.filter((v: { vertical?: boolean }) => v.vertical).map((v: { titulo: string }) => v.titulo)).toEqual(["Marcar desde el teléfono"]);
+    expect(c.lista).toHaveLength(a.lista.length);
+    expect(c.completo.url).toBe(a.completo.url); // el completo de Asistencia es uno solo
   });
 
   it("un módulo sin videos: 404", async () => {
