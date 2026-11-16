@@ -20,6 +20,7 @@
 
 import { esDiaHabilTienda } from "@/lib/multifashion/resumen-minimo";
 import { deltaCorto, lineaDelDia, montoCorto } from "@/lib/multifashion/celular";
+import { variacionPct } from "@/lib/variacion";
 
 /** `false` = la gráfica de antes. Nació apagado, separado del rediseño; PRENDIDO el 9-oct-2026 (Daniel aprobó). */
 export const MULTIFASHION_GRAFICA_2026_10 = true;
@@ -137,7 +138,7 @@ export function lineaDeLaGrafica(g: Grafica, year: number, mes: number, tocado: 
     if (cerrados.some((x) => x.ventasAA != null)) {
       const v = cerrados.reduce((s, x) => s + x.ventas, 0);
       const aa = cerrados.reduce((s, x) => s + (x.ventasAA ?? 0), 0);
-      const delta = aa > 0 ? deltaCorto(v / aa - 1)?.texto.replace(/ /g, "\u00a0") : null;
+      const delta = deltaCorto(variacionPct(v, aa))?.texto.replace(/ /g, "\u00a0") ?? null;
       return `1–${cerrados.length} ${MES_CORTO_GRAFICA[mes - 1]} ${montoCorto(v)} · ${year - 1} ${montoCorto(aa)}${delta ? ` ${delta}` : ""}`;
     }
     if (g.promedio == null) return null;
@@ -150,7 +151,8 @@ export function lineaDeLaGrafica(g: Grafica, year: number, mes: number, tocado: 
   const linea = lineaDelDia({ anio: year, mes, dia: d.dia, ventas: d.ventas, tickets: d.tickets });
   const fecha = linea.split(" · ")[0];
   // «vs año pasado»: la misma fecha del año pasado al final («· 2025 $1,658 ▲ 3 %»).
-  const delta = d.ventasAA != null && d.ventasAA > 0 && d.ventas > 0 ? deltaCorto(d.ventas / d.ventasAA - 1)?.texto.replace(/ /g, "\u00a0") : null;
+  // El % sale de UN solo lugar (`variacionPct`: base mínima $100, nunca «0 %» por un null).
+  const delta = d.ventas > 0 ? deltaCorto(variacionPct(d.ventas, d.ventasAA))?.texto.replace(/ /g, "\u00a0") : null;
   const aa = d.ventasAA == null ? "" : ` · ${year - 1} ${d.ventasAA > 0 ? montoCorto(d.ventasAA) : "sin ventas"}${delta ? ` ${delta}` : ""}`;
   if (d.estado === "sin-venta") return `${fecha} · sin ventas y no es feriado${aa}`;
   if (d.estado === "cerrado") return `${fecha} · sin ventas${d.feriado ? " · feriado" : ""}${aa}`;
