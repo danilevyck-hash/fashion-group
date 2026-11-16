@@ -119,6 +119,15 @@ describe("fetchJsonWithRetry", () => {
 });
 
 describe("describeFetchError", () => {
+  it("un 400 conserva el `error` del servidor (lo que hay que decirle a la persona)", async () => {
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ error: "La búsqueda es demasiado amplia: hay 9 modelos" }), {
+        status: 400,
+      })) as unknown as typeof fetch;
+    const err = await fetchJsonWithRetry("/x", { fetchImpl }).catch((e) => e);
+    expect(describeFetchError(err)).toBe("La búsqueda es demasiado amplia: hay 9 modelos");
+  });
+
   it("describe HttpError con su status", () => {
     expect(describeFetchError(new HttpError(503))).toBe("HTTP 503");
   });

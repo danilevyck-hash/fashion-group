@@ -1658,3 +1658,7 @@ La pregunta de la pantalla: **«¿cuánto hay de este artículo y cómo se vende
 ⚠️ **PASA SOLO LA VENTA. El cobro NO se pudo ligar a la factura, y no se inventó**: `/apireporte/recibos` manda 14 campos (medido 22-sep-2026) y ninguno dice qué factura pagó el recibo —ni número de recibo ni documento aplicado—; `switch_recibos` no tiene llave natural (se reemplaza el mes entero) y el estado de cuenta muestra débito/crédito por documento pero no el cruce. Ligar por cliente + monto + fecha sería adivinar plata. El cobro sigue siendo de quien REGISTRÓ el recibo (v6). Si Switch algún día manda el documento aplicado, se agrega.
 
 Candado: `src/__tests__/lib/comision-factura-vendedor-v10.test.ts` (interruptor apagado · DDL · v10 = v9 salvo el cambio · conducta real con pglite · ruta solo admin y soft delete · barrido sin DELETE).
+
+## 16-nov-2026 — Consulta de artículos: una palabra ya no se toma por código
+
+🩸 Buscar «polo» contestaba «No se encontró el código POLO» (2.143 artículos lo llevan en la descripción): toda palabra de 3+ letras pasaba por código y el salto a descripción nunca corría. Ahora, si ningún código trae nada, busca por descripción (sin coincidencias, el «no encontré» de siempre); si pasa el tope (20.000 renglones de venta o 100 modelos) dice cuántos hay y pide afinar, sin recortar en silencio, y la pantalla muestra ese texto en vez de «HTTP 400» (`fetch-retry.ts`). Candado: `src/__tests__/api/ventas-referencia-busqueda.test.ts` › «16-nov-2026».
