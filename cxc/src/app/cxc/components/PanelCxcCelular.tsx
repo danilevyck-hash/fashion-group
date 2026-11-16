@@ -106,6 +106,8 @@ export interface PanelCxcCelularProps {
   avisoMontos?: string | null;
   /** `null` = este rol no puede ver la cartera de Boston. */
   onBoston: (() => void) | null;
+  /** «Cómo se usa» en el «···» (videos del módulo). */
+  onComoSeUsa?: (() => void) | null;
   /** `CXC_APPLE_2026_10` (4-oct-2026). Solo cuenta con la barra v3.3. */
   apple?: boolean;
   /**
@@ -139,6 +141,7 @@ export default function PanelCxcCelular({
   onSyncedNow,
   avisoMontos,
   onBoston,
+  onComoSeUsa,
   apple: appleProp = CXC_APPLE_2026_10,
   cartera = "grupo",
   onGrupo = null,
@@ -230,7 +233,7 @@ export default function PanelCxcCelular({
               {puedeElegirEmpresa && <ChevronDown className="h-5 w-5 shrink-0 text-gray-400" aria-hidden />}
             </button>
             {/* Sin nada que ofrecer no se dibuja el «···» (`diseno.md`). */}
-            {(canExport || (onBoston && !titulo2026)) && (
+            {(canExport || !!onComoSeUsa || (onBoston && !titulo2026)) && (
             <IconoBarra etiqueta="Más opciones" onClick={() => setHoja("mas")}>
               <MoreHorizontal className="h-5 w-5" strokeWidth={2} aria-hidden />
             </IconoBarra>
@@ -304,7 +307,7 @@ export default function PanelCxcCelular({
             Boston
           </button>
         )}
-        {canExport && (
+        {(canExport || !!onComoSeUsa) && (
         <button
           type="button"
           onClick={() => setHoja("mas")}
@@ -499,6 +502,7 @@ export default function PanelCxcCelular({
           onDescargar={(clave, formato) => { setHoja(null); onDescargar(clave, formato); }}
           onCerrar={() => setHoja(null)}
           onBoston={compacta && !titulo2026 ? onBoston : null}
+          onComoSeUsa={onComoSeUsa}
         />
       )}
     </div>

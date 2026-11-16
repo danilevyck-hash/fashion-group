@@ -13,6 +13,9 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Toast, SkeletonTable, EmptyState, AnimatedNumber } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { PRESTAMOS_CELULAR_2026_11 as CELULAR } from "@/lib/ui/celular-optimizar-2026-11";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
@@ -68,6 +71,9 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const { authChecked } = useAuth({ moduleKey: "prestamos", allowedRoles: [...PRESTAMOS_ROLES] });
   const [datos, setDatos] = useState<DatosPrestamos>(initialData);
   const [loading, setLoading] = useState(false);
+  // «Cómo se usa» vive en la PORTADA del módulo (regla en manifiesto.ts).
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("prestamos");
   const [toast, setToast] = useState<string | null>(null);
 
   const [filterEmpresa, setFilterEmpresa] = useLastUsed("prestamos_empresa", "all");
@@ -239,6 +245,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   return (
     <div className="min-h-screen bg-white">
       <AppHeader module="Préstamos" />
+      {conVideos && <VideosAyuda modulo="prestamos" open={verVideos} onClose={() => setVerVideos(false)} />}
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <h1 className="sr-only">Préstamos</h1>
@@ -275,6 +282,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             align="left"
             items={[
               { label: exportando ? "Descargando…" : "Descargar historial", onClick: () => setPreguntaExcel(true), disabled: exportando },
+              ...(conVideos ? [{ label: "Cómo se usa", onClick: () => setVerVideos(true) }] : []),
             ]}
           />
 

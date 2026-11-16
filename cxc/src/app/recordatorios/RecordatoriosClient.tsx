@@ -36,15 +36,12 @@
  * ── 🔴 UNA SOLA PUERTA, UNA SOLA LISTA (22-sep-2026) ─────────────────────────
  *
  * Daniel, textual: ***«cheque es un motivo de recordatorio»***.
- *
  * Hasta hoy la pantalla eran DOS cosas pegadas que no se conocían: el botón
  * negro **«Nuevo Cheque»** arriba a la derecha (tabla `cheques`) y la caja
  * **«¿Qué te recuerdo?»**, que se llevaba todo el ancho y NUEVE botones (tabla
  * `recordatorios`). Medido: la caja se usó **2 veces en 17 días**; los cheques
  * son **19 filas**. El orden de la pantalla estaba al revés de su uso.
- *
  * Ahora:
- *
  *   1. **UN botón: «＋ Recordar»** (`PuertaRecordar`). Se elige el MOTIVO y se
  *      abre el formulario de ese motivo. Los motivos de hoy son DOS —Cheque y
  *      Nota— y salen de `lib/recordatorios/motivos.ts`, que es también quien
@@ -52,12 +49,10 @@
  *   2. **La LISTA arriba**, y el renglón de escribir **abajo y más chico** (sus
  *      opciones aparecen recién cuando hay algo escrito o el campo tiene el
  *      foco). Es un atajo para una nota, no la cara del módulo.
- *
  * 🔴 **NADA SE FUSIONÓ EN LA BASE.** `cheques` y `recordatorios` siguen tal
  * cual, con sus columnas y sus filas. Lo que se unificó es la PANTALLA y la
  * PUERTA; el motivo decide en cuál se escribe. No hay columna nueva ni
  * migración.
- *
  * Lo que NO cambió: los 19 cheques y sus datos, quién entra al módulo (admin y
  * secretaria), marcar depositado con el botón de siempre, el calendario, el
  * buscador como única puerta a lo depositado, y el aviso de las 9:00.
@@ -66,7 +61,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
-import { BarraAccionFija, BarraDeControles, BuscarEnLaBarra, CLASE_SEGMENTADO_BARRA, EnLaBarra, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
+import { BarraAccionFija, BarraDeControles, BuscarEnLaBarra, CLASE_FILA_MENU, CLASE_SEGMENTADO_BARRA, EnLaBarra, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import {
   SkeletonTable,
@@ -140,6 +139,8 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
   const isOnline = useOnline();
   const barra = useBarraCelular();
   const hoy = initialData.hoy;
+  const [verVideos, setVerVideos] = useState(false); // «Cómo se usa» (key `cheques`)
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("cheques");
 
   const [cheques, setCheques] = useState<Cheque[]>(initialData.cheques);
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>(initialData.recordatorios);
@@ -517,6 +518,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
       ＋ Nuevo
     </button>
   );
+  const masOpciones = conVideos ? <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} /> : null;
 
   return (
     <PullToRefresh
@@ -526,13 +528,14 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
     >
       <div>
         <AppHeader module="Recordatorios" tituloEnLaPantalla={barra} />
+        {conVideos && <VideosAyuda modulo="cheques" open={verVideos} onClose={() => setVerVideos(false)} />}
         {/* 🔴 LA BARRA DEL CELULAR (2-oct-2026, `BARRA_CELULAR_2026_10`): «Lista |
             Calendario» pasa a ser el selector del título, el buscador va a todo
             el ancho y «＋ Nuevo» fijo abajo (abre la MISMA puerta). */}
         {barra && (
           <>
             <ProveedorBarraCelular activo>
-              <BarraDeControles titulo="Recordatorios" />
+              <BarraDeControles titulo="Recordatorios" menu={conVideos ? <button type="button" onClick={() => setVerVideos(true)} className={CLASE_FILA_MENU}>Cómo se usa</button> : null} />
               <EnLaBarra
                 iconos={viewMode === "lista" ? (
                   <BuscarEnLaBarra valor={search} onCambiar={setSearch} placeholder="Buscar cheque o cliente…" etiqueta="Buscar" />
@@ -586,6 +589,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
                   </button>
                 ))}
               </div>
+              {masOpciones}
               {botonNuevo}
             </div>
           ) : null}
@@ -594,11 +598,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
           <div className={barra ? "hidden" : undefined}>
           <div className="flex items-center justify-end mb-5">
             <div className="flex flex-wrap items-center gap-3">
-              {/* 🔴 El botón de Excel se retiró el 5-sep-2026 (Daniel: «se va»).
-                  Los datos siguen en la base; lo que se fue es la descarga. */}
-              {/* 🔴 UNA SOLA PUERTA (22-sep-2026). Acá había «Nuevo Cheque», y
-                  la caja de escribir vivía aparte más abajo: dos puertas que no
-                  se conocían. Daniel: «cheque es un motivo de recordatorio». */}
+              {/* Sin Excel y UNA SOLA PUERTA: el porqué, en el encabezado del archivo. */}
               {botonNuevo}
             </div>
           </div>

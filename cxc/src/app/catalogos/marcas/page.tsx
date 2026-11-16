@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { Toast } from "@/components/ui";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import type { ContadoresDelHub, ContadoresMarca } from "@/lib/catalogo/contadores";
@@ -147,6 +151,9 @@ export default function CatalogosMarcasPage() {
   // `undefined` = todavía cargando · `null` = no se pudo · objeto = los números.
   const [counters, setCounters] = useState<ContadoresDelHub | null | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
+  // «Cómo se usa» vive en la PORTADA del módulo (regla en manifiesto.ts).
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("catalogos");
 
   useEffect(() => {
     if (!authChecked) return;
@@ -200,6 +207,7 @@ export default function CatalogosMarcasPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Catálogos" breadcrumbs={[{ label: "Marcas" }]} />
+      {conVideos && <VideosAyuda modulo="catalogos" open={verVideos} onClose={() => setVerVideos(false)} />}
       {/* max-w-7xl (6-sep-2026): era `max-w-3xl` (768 px), el más angosto de
           los tres del módulo —el catálogo usa 7xl (1.280) y administrar 5xl
           (1.024)— y el que menos lo necesitaba: en escritorio quedaban cuatro
@@ -230,6 +238,7 @@ export default function CatalogosMarcasPage() {
             </div>
             <div className="truncate tabular-nums text-xs text-gray-500" data-testid="link-catalogos-todos">{URL_CATALOGOS_PUBLICOS}</div>
           </div>
+          <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={copiarLinkDeTodos}
@@ -238,6 +247,8 @@ export default function CatalogosMarcasPage() {
           >
             Copiar enlace
           </button>
+          {conVideos && <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">

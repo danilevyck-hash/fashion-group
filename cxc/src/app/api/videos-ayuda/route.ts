@@ -2,12 +2,15 @@
  * GET /api/videos-ayuda?modulo=caja — los videos de «Cómo se usa» (15-nov-2026).
  *
  * 🔴 EL BUCKET ES PRIVADO: cada video y su miniatura salen por URL FIRMADA
- * que vence en una hora, y solo para quien puede abrir ese módulo (los roles
- * de `modules.ts`; admin siempre). Nunca `getPublicUrl`.
+ * que vence en una hora, y solo para quien puede abrir ese módulo: la MISMA
+ * regla de la pantalla (`tieneAccesoAlModulo`: admin, los roles de
+ * `modules.ts` o el módulo en la sesión firmada — así David ve los de `/cxc`).
+ * Nunca `getPublicUrl`.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { requireRole } from "@/lib/requireRole";
+import { verifySession } from "@/lib/session-cookie";
+import { tieneAccesoAlModulo } from "@/lib/auth-check";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ALL_MODULES } from "@/lib/modules";
 import { BUCKET_VIDEOS_AYUDA, videosDelModulo, type VideoAyuda } from "@/lib/videos-ayuda/manifiesto";
@@ -24,8 +27,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Este módulo no tiene videos." }, { status: 404 });
   }
 
-  const auth = requireRole(req, modulo.roles);
-  if (auth instanceof NextResponse) return auth;
+  const sesion = verifySession(req.cookies.get("cxc_session")?.value);
+  if (!sesion) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  if (!tieneAccesoAlModulo(sesion.role, sesion.modules, modulo.key, modulo.roles)) {
+    return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+  }
 
   const todos: VideoAyuda[] = completo ? [completo, ...lista] : lista;
   const rutas = todos.flatMap((v) => [v.video, v.miniatura]);
@@ -46,6 +52,7 @@ export async function GET(req: NextRequest) {
     segundos: v.segundos,
     url: url.get(v.video) ?? null,
     miniatura: url.get(v.miniatura) ?? null,
+    ...(v.vertical ? { vertical: true } : {}),
   });
 
   return NextResponse.json(

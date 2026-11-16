@@ -13,6 +13,10 @@ import { COMPANIES, B2B_COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import AppHeader from "@/components/AppHeader";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { Toast, PullToRefresh } from "@/components/ui";
 import BostonTab from "@/components/cxc/BostonTab";
 import CarteraBoston from "./components/CarteraBoston";
@@ -348,6 +352,10 @@ function AdminDashboardInner() {
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   const [showExport, setShowExport] = useState(false);
+  // «Cómo se usa» vive en la PORTADA del módulo (regla en manifiesto.ts).
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("cxc");
+  const comoSeUsa = conVideos ? () => setVerVideos(true) : null;
 
   // 🩸 Acá vivían los favoritos ⭐ del CXC: el estado, su copia en
   // `localStorage`, la carga desde `/api/cxc/favorites`, el toggle optimista y
@@ -530,7 +538,8 @@ function AdminDashboardInner() {
     return (
       <div>
         <AppHeader module="Cuentas por cobrar" tituloEnLaPantalla={CXC_BOSTON_COMO_GRUPO_CELULAR && CXC_CELULAR} />
-        <CarteraBoston />
+        <CarteraBoston onComoSeUsa={comoSeUsa} />
+        {conVideos && <VideosAyuda modulo="cxc" open={verVideos} onClose={() => setVerVideos(false)} />}
       </div>
     );
   }
@@ -735,6 +744,7 @@ function AdminDashboardInner() {
           (`PanelCxcCelular`): el layout no pone otro título. En Boston no —esa
           pantalla no trae título propio— y ahí sí lo pone el layout. */}
       <AppHeader module="Cuentas por cobrar" tituloEnLaPantalla={CXC_CELULAR && (tab === "grupo" || CXC_BOSTON_COMO_GRUPO_CELULAR)} />
+      {conVideos && <VideosAyuda modulo="cxc" open={verVideos} onClose={() => setVerVideos(false)} />}
 
       {/* 🔴 EN EL CELULAR LAS PESTAÑAS SE VAN DE LA CARTERA DEL GRUPO
           (24-sep-2026): Boston es un botón arriba a la derecha de la lista, y
@@ -752,6 +762,7 @@ function AdminDashboardInner() {
           <CarteraBoston
             onGrupo={(empresa) => { setTab("grupo"); setCompanyFilter(empresa); }}
             empresasDelGrupo={empresaRestriction ? [] : cxcCompanies}
+            onComoSeUsa={comoSeUsa}
           />
         ) : (
           <div className="max-w-6xl mx-auto px-4 py-4 pb-16">
@@ -780,6 +791,7 @@ function AdminDashboardInner() {
           onSyncedNow={() => loadData()}
           avisoMontos={avisoMontos}
           onBoston={pestanasCxc(userRole).some((p) => p.key === "boston") ? () => setTab("boston") : null}
+          onComoSeUsa={comoSeUsa}
         />
       ) : (
       <PanelCxcMobile
@@ -891,6 +903,7 @@ function AdminDashboardInner() {
               </>)}
             </div>
           )}
+          {comoSeUsa && <OverflowMenu items={[{ label: "Cómo se usa", onClick: comoSeUsa }]} />}
           {/* 🔴 4-oct-2026: con `CXC_APPLE_2026_10` apagado, la misma línea de
               frescura (con él, va en `CabeceraCxcApple`). */}
           {!CXC_APPLE_2026_10 && (

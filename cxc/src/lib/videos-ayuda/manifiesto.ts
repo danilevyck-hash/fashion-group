@@ -30,17 +30,30 @@ export interface VideoAyuda {
   video: string;
   miniatura: string;
   completo?: boolean;
+  /** Serie grabada en formato de teléfono (9:16): el panel no la mete en 16:9. */
+  vertical?: boolean;
 }
 
-const caja = (orden: number, titulo: string, segundos: number, archivo: string, completo = false): VideoAyuda => ({
-  modulo: "caja",
-  orden,
-  titulo,
-  segundos,
-  video: `caja/${archivo}.mp4`,
-  miniatura: `caja/${archivo}.jpg`,
-  ...(completo ? { completo } : {}),
-});
+/** Un renglón: la carpeta del bucket es la key del módulo (`modules.ts`). */
+const fila = (modulo: string, { vertical = false } = {}) =>
+  (orden: number, titulo: string, segundos: number, archivo: string, completo = false, esVertical = vertical): VideoAyuda => ({
+    modulo,
+    orden,
+    titulo,
+    segundos,
+    video: `${modulo}/${archivo}.mp4`,
+    miniatura: `${modulo}/${archivo}.jpg`,
+    ...(completo ? { completo } : {}),
+    ...(esVertical ? { vertical: true } : {}),
+  });
+const caja = fila("caja");
+const cxc = fila("cxc");
+const reclamos = fila("reclamos");
+const marketing = fila("marketing");
+const recordatorios = fila("cheques"); // Recordatorios: su key sigue siendo `cheques`.
+const prestamos = fila("prestamos");
+const catalogos = fila("catalogos", { vertical: true }); // serie de teléfono (9:16)
+const asistencia = fila("asistencia"); // mixta: el 01 es de teléfono
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
   caja(0, "Caja menuda completa", 568, "00-completo", true),
@@ -55,6 +68,99 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   caja(8, "Imprimir y descargar Excel", 42, "08-imprimir-y-excel"),
   caja(9, "Cerrar el período", 77, "09-cerrar-periodo"),
   caja(10, "Abrir el período siguiente", 47, "10-periodo-siguiente"),
+
+  cxc(0, "Cuentas por cobrar completo", 565, "00-completo", true),
+  cxc(0, "Introducción", 61, "00-que-es-cuentas-por-cobrar"),
+  cxc(1, "Leer la lista", 62, "01-leer-la-lista"),
+  cxc(2, "Buscar y filtrar", 49, "02-buscar-y-filtrar"),
+  cxc(3, "El detalle de un cliente", 39, "03-detalle-del-cliente"),
+  cxc(4, "El estado de cuenta", 49, "04-estado-de-cuenta"),
+  cxc(5, "Enviar por correo", 52, "05-enviar-por-correo"),
+  cxc(6, "WhatsApp y copiar mensaje", 47, "06-whatsapp-y-copiar"),
+  cxc(7, "Descargar el PDF", 47, "07-descargar-pdf"),
+  cxc(8, "Editar el mensaje", 39, "08-editar-mensaje"),
+  cxc(9, "Enviar a varios", 48, "09-enviar-a-varios"),
+  cxc(10, "Descargar y actualizar", 54, "10-descargar-y-actualizar"),
+
+  reclamos(0, "Reclamos completo", 572, "00-completo", true),
+  reclamos(0, "Introducción", 60, "00-que-es-reclamos"),
+  reclamos(1, "La lista de una empresa", 50, "01-lista-de-una-empresa"),
+  reclamos(2, "Crear un reclamo: la factura", 48, "02-crear-la-factura"),
+  reclamos(3, "Crear un reclamo: qué reclamas", 52, "03-crear-que-reclamas"),
+  reclamos(4, "El reclamo por dentro", 69, "04-el-reclamo-por-dentro"),
+  reclamos(5, "Enviar al proveedor", 57, "05-enviar-al-proveedor"),
+  reclamos(6, "Descargar en Excel o PDF", 51, "06-descargar-excel-y-pdf"),
+  reclamos(7, "Marcar como cobrado", 56, "07-marcar-como-cobrado"),
+  reclamos(8, "Editar un reclamo", 39, "08-editar-un-reclamo"),
+  reclamos(9, "Buscar un reclamo", 36, "09-buscar-un-reclamo"),
+  reclamos(10, "Eliminar y deshacer", 33, "10-eliminar-y-deshacer"),
+
+  marketing(0, "Marketing completo", 688, "00-completo", true),
+  marketing(0, "Introducción", 54, "00-que-es-marketing"),
+  marketing(1, "Por cobrar", 49, "01-por-cobrar"),
+  marketing(2, "Registrar una factura", 63, "02-registrar-factura"),
+  marketing(3, "Cuánto se le cobra a la marca", 59, "03-cuanto-se-cobra"),
+  marketing(4, "Pago de impulsadora", 60, "04-pago-impulsadora"),
+  marketing(5, "Entrega de mobiliario", 61, "05-entrega-mobiliario"),
+  marketing(6, "El inventario de mobiliario", 40, "06-inventario-mobiliario"),
+  marketing(7, "La lista de gastos", 47, "07-lista-de-gastos"),
+  marketing(8, "Corregir un gasto", 43, "08-corregir-gasto"),
+  marketing(9, "Fotos de la tienda", 43, "09-fotos-de-la-tienda"),
+  marketing(10, "El cobro y el ZIP", 56, "10-cobro-y-zip"),
+  marketing(11, "Cerrar el cobro", 58, "11-cerrar-cobro"),
+  marketing(12, "Proveedores", 38, "12-proveedores"),
+
+  recordatorios(0, "Recordatorios completo", 582, "00-completo", true),
+  recordatorios(0, "Introducción", 45, "00-que-es-recordatorios"),
+  recordatorios(1, "Leer la lista", 47, "01-la-lista"),
+  recordatorios(2, "Registrar un cheque", 49, "02-registrar-cheque"),
+  recordatorios(3, "Crear una nota", 50, "03-crear-nota"),
+  recordatorios(4, "Notas que se repiten", 47, "04-notas-que-se-repiten"),
+  recordatorios(5, "Confirmar un depósito", 33, "05-confirmar-deposito"),
+  recordatorios(6, "Cheque devuelto", 42, "06-cheque-devuelto"),
+  recordatorios(7, "Ver y corregir un cheque", 43, "07-ver-y-corregir-cheque"),
+  recordatorios(8, "Corregir o eliminar una nota", 36, "08-corregir-o-eliminar-nota"),
+  recordatorios(9, "Buscar un cheque", 37, "09-buscar"),
+  recordatorios(10, "Ver el calendario", 42, "10-calendario"),
+  recordatorios(11, "Solo el administrador", 49, "11-solo-administrador"),
+  recordatorios(12, "El aviso de las 9:00", 45, "12-el-aviso-de-las-nueve"),
+
+  prestamos(0, "Préstamos completo", 672, "00-completo", true),
+  prestamos(0, "Introducción", 63, "00-que-es-prestamos"),
+  prestamos(1, "Leer la lista de saldos", 63, "01-leer-la-lista"),
+  prestamos(2, "Registrar un préstamo", 55, "02-nuevo-prestamo"),
+  prestamos(3, "Daño de mercancía y descuento a terceros", 52, "03-dano-y-terceros"),
+  prestamos(4, "El tope de un sueldo", 58, "04-el-tope"),
+  prestamos(5, "Registrar un abono", 54, "05-registrar-abono"),
+  prestamos(6, "La ficha del colaborador", 60, "06-la-ficha"),
+  prestamos(7, "Cambiar la cuota", 42, "07-cambiar-la-cuota"),
+  prestamos(8, "Unir un préstamo a su colaborador", 47, "08-unir-al-colaborador"),
+  prestamos(9, "Corregir o eliminar un movimiento", 46, "09-corregir-o-eliminar"),
+  prestamos(10, "La quincena y los movimientos", 60, "10-la-quincena"),
+  prestamos(11, "Buscar, filtrar y descargar", 49, "11-buscar-filtrar-y-descargar"),
+
+  catalogos(0, "Catálogos completo", 535, "00-completo", true),
+  catalogos(0, "Introducción", 53, "00-que-es-catalogos"),
+  catalogos(1, "Ver el catálogo y buscar", 61, "01-ver-y-buscar"),
+  catalogos(2, "Armar un pedido", 50, "02-armar-pedido"),
+  catalogos(3, "Cliente, vendedor y precio", 58, "03-cliente-vendedor-precio"),
+  catalogos(4, "Pedido o cotización", 46, "04-pedido-o-cotizacion"),
+  catalogos(5, "Comprobantes", 49, "05-comprobantes"),
+  catalogos(6, "Abrir un comprobante", 47, "06-abrir-comprobante"),
+  catalogos(7, "El enlace para el cliente", 48, "07-enlace-para-el-cliente"),
+  catalogos(8, "Completar el pedido del cliente", 51, "08-completar-pedido-del-cliente"),
+  catalogos(9, "Administrar el catálogo", 54, "09-administrar"),
+  asistencia(0, "Asistencia y planilla completo", 598, "00-completo", true),
+  asistencia(0, "Introducción", 53, "00-que-es-asistencia"),
+  asistencia(1, "Marcar desde el teléfono", 61, "01-marcar-desde-el-telefono", false, true),
+  asistencia(2, "Revisar la quincena", 63, "02-revisar-la-quincena"),
+  asistencia(3, "Corregir una marca", 53, "03-corregir-una-marca"),
+  asistencia(4, "Justificar una ausencia", 53, "04-justificar-una-ausencia"),
+  asistencia(5, "Aprobar horas extra", 59, "05-aprobar-horas-extra"),
+  asistencia(6, "La ficha del colaborador", 59, "06-ficha-del-colaborador"),
+  asistencia(7, "Cerrar la quincena", 62, "07-cerrar-la-quincena"),
+  asistencia(8, "La planilla y los comprobantes", 59, "08-la-planilla-y-comprobantes"),
+  asistencia(9, "Horarios, feriados y reglas", 56, "09-horarios-y-feriados"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */
