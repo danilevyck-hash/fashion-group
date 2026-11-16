@@ -66,12 +66,15 @@ import {
   type HeartbeatRow,
 } from "@/lib/cron-telemetry";
 
-const VERCEL: { crons: Array<{ path: string; schedule: string }> } = JSON.parse(
-  fs.readFileSync(path.resolve(__dirname, "../../../vercel.json"), "utf8"),
-);
+// Desde el 16-nov-2026 el cronograma programado es vercel.json ∪ los jobs de
+// pg_cron (fixtures/cronograma-programado.ts): la biyección es registro ↔ la
+// UNIÓN de los dos relojes, no registro ↔ vercel.json. Lo que se mudó a pg_cron
+// sigue en el registro con `origen: "pg_cron"`; cron-calendario.test.ts fija
+// que no esté en los dos relojes a la vez.
+import { CRONS_PROGRAMADOS, VERCEL_CRONS, PG_CRON_JOBS } from "../fixtures/cronograma-programado";
 
 /**
- * Nombre de heartbeat que registra una entrada de vercel.json. El route de
+ * Nombre de heartbeat que registra una entrada del cronograma. El route de
  * backup usa `?grupo=` para elegir su nombre ("backup-switch"/"backup-storage");
  * el resto usa el basename del path. `switch-sync` registra además un heartbeat
  * por slot, pero eso ya lo cubre cron-calendario.test.ts.
@@ -83,7 +86,7 @@ function cronNameDe(rutaCompleta: string): string {
   return base === "backup" && grupo ? `backup-${grupo}` : base;
 }
 
-const CRONS_EN_VERCEL = [...new Set(VERCEL.crons.map((c) => cronNameDe(c.path)))].sort();
+const CRONS_EN_VERCEL = [...new Set(CRONS_PROGRAMADOS.map((c) => cronNameDe(c.path)))].sort();
 
 /** Un instante sin ninguna recuperación por delante (última pasada de la
  *  reconciliación 18:00, última entrada extra 23:30) → nada se silencia por
@@ -170,7 +173,16 @@ describe("B. un cron VIVO sigue alertando", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("C. el registro y vercel.json son biyectivos", () => {
+describe("C. el registro y el cronograma (vercel.json ∪ pg_cron) son biyectivos", () => {
+  it("el cronograma tiene los dos relojes, y ninguna ruta+hora está en los dos", () => {
+    expect(VERCEL_CRONS.length).toBeGreaterThan(0);
+    expect(PG_CRON_JOBS.length).toBeGreaterThan(0);
+    const llave = (c: { path: string; schedule: string }) => `${c.schedule} ${c.path}`;
+    const enVercel = new Set(VERCEL_CRONS.map(llave));
+    const dobles = PG_CRON_JOBS.map(llave).filter((k) => enVercel.has(k));
+    expect(dobles, `corrida doble (Vercel y pg_cron a la vez): ${dobles.join(" · ")}`).toEqual([]);
+  });
+
   // Los vigías EXTERNOS (HEARTBEATS_EXTERNOS) quedan fuera de la biyección a
   // propósito: los dispara cron-job.org desde afuera, así que no tienen ni pueden
   // tener entrada en vercel.json. Sí están en el registro porque SÍ se vigilan —
@@ -180,7 +192,7 @@ describe("C. el registro y vercel.json son biyectivos", () => {
     (c) => !(HEARTBEATS_EXTERNOS as readonly string[]).includes(c),
   );
 
-  it("cada cron de vercel.json está en el registro (si no, nadie lo vigila)", () => {
+  it("cada cron del cronograma está en el registro (si no, nadie lo vigila)", () => {
     const huerfanos = CRONS_EN_VERCEL.filter((c) => !CRONS_CONOCIDOS.has(c));
     expect(
       huerfanos,
@@ -189,11 +201,11 @@ describe("C. el registro y vercel.json son biyectivos", () => {
     ).toEqual([]);
   });
 
-  it("cada cron del registro sigue teniendo entrada en vercel.json", () => {
+  it("cada cron del registro sigue teniendo entrada en el cronograma", () => {
     const fantasmas = REGISTRO_PROGRAMADO.filter((c) => !CRONS_EN_VERCEL.includes(c)).sort();
     expect(
       fantasmas,
-      `el registro vigila crons que ya no están en vercel.json: ${fantasmas.join(", ")}\n` +
+      `el registro vigila crons que ya no están en vercel.json ni en pg_cron: ${fantasmas.join(", ")}\n` +
         `Si el retiro es a propósito, sacalos del registro (y borrá su fila de cron_heartbeats).\n` +
         `Si NO lo es, alguien borró una entrada de vercel.json por accidente — restaurala.`,
     ).toEqual([]);

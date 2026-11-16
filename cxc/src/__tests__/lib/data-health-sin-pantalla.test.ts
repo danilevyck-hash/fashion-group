@@ -176,7 +176,11 @@ describe("🔴 la medición no se tocó", () => {
     // 22:00 de Panamá, antes del resumen de la noche (ahora 22:15).
     // ⚠️ 13-nov-2026: suben a 95 — `despachos-correo` (tallas de los despachos
     // de ASW desde el correo), nacido apagado.
-    expect(vercel.crons).toHaveLength(95);
+    // ⚠️ 16-nov-2026: BAJAN a 80 — las 15 de `switch-sync tipo=facturas` se
+    // mudaron a pg_cron (migración 20270118130100) con los mismos minutos UTC;
+    // el cronograma completo es vercel.json ∪ pg_cron (fixtures/cronograma-
+    // programado.ts) y ahí siguen siendo 95. Ver `cron-calendario.test.ts`.
+    expect(vercel.crons).toHaveLength(80);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el
