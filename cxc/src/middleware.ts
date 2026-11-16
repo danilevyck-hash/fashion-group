@@ -38,6 +38,9 @@ const PUBLIC_PREFIXES = [
   // deliberadamente distinta de CRON_SECRET, porque vive en una PC de la
   // oficina y si se filtrara solo debe permitir escribir marcaciones.
   "/api/asistencia/ingest",
+  // Los recordatorios de Marcación (16-nov-2026): los dispara la BASE cada 5
+  // minutos (`pg_cron` + `pg_net`), sin cookie. Fail-closed con CRON_SECRET.
+  "/api/recordatorios-marcacion",
   // 🔴 `/api/catalogo/reebok/products` y `/api/catalogo/reebok/inventory`
   // SALIERON de esta lista el 7-sep-2026: eran el catálogo INTERNO de Reebok
   // legible sin sesión, la única marca de las cuatro con esa puerta. Las dos

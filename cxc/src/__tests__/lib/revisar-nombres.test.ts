@@ -38,6 +38,10 @@ const TECHOS: Record<string, number> = {
   "src/app/reclamos/components/ReclamoDetail.tsx": 2,
   "src/app/marketing/components/CerrarPeriodoModal.tsx": 2,
   "src/app/marcacion/PantallaDeAntes.tsx": 2,
+  // «Mis marcaciones» es el título que Daniel APROBÓ en el mockup HOY vs
+  // RECOMENDACIÓN de Marcación (16-nov-2026): es la hoja de la colaboradora con
+  // SUS horas. Excepción anotada, no un texto que se coló.
+  "src/app/marcacion/MisMarcaciones.tsx": 1,
   "src/app/asistencia/PlanillaTab.tsx": 2,
   "src/lib/novedades/dibujos.ts": 1,
   "src/lib/guias/etiquetas.ts": 1,

@@ -71,6 +71,9 @@ import { achicarEnElTelefono } from "@/lib/marcacion/selfie-telefono";
 import { CAMPO_APARATO, selloDeEsteAparato } from "@/lib/marcacion/sello-del-aparato";
 import PantallaUnToque from "./PantallaUnToque";
 import PantallaDeAntes from "./PantallaDeAntes";
+import MisMarcaciones from "./MisMarcaciones";
+import Recordatorios from "./Recordatorios";
+import { MARCACION_HISTORIAL_Y_AVISOS_2026_11 } from "@/lib/ui/marcacion-historial-avisos-2026-11";
 import {
   AVISO_UBICACION_NEGADA,
   botonUnToque,
@@ -615,6 +618,7 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
   // ── Pintura ────────────────────────────────────────────────────────────────
 
   const sinCodigo = estado !== null && !estado.codigo;
+  const [hojaAbierta, setHojaAbierta] = useState<"historial" | "recordatorios" | null>(null);
 
   return (
     <div className="min-h-screen bg-white">
@@ -644,7 +648,7 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
       />
 
       <main
-        className={`mx-auto w-full max-w-md px-4 pt-6 ${MARCACION_UN_TOQUE ? `${CLASES_AIRE_PARA_EL_BOTON}${MARCACION_BOTON_PEGADO_R110 ? ` sm:pb-16 ${CAJON_PEGADO_EN_COMPUTADORA_R110}` : ""}` : "pb-16"}`}
+        className={`mx-auto w-full max-w-md px-4 pt-6 ${MARCACION_UN_TOQUE ? `${MARCACION_HISTORIAL_Y_AVISOS_2026_11 ? "pb-64" : CLASES_AIRE_PARA_EL_BOTON}${MARCACION_BOTON_PEGADO_R110 ? ` sm:pb-16 ${CAJON_PEGADO_EN_COMPUTADORA_R110}` : ""}` : "pb-16"}`}
       >
         {/* 🔴 MIENTRAS NO HAY DATO SE DIBUJA EL ESQUELETO, NUNCA UN BLANCO.
             Esto solo se ve cuando el servidor no pudo armar el estado (ver
@@ -699,7 +703,36 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
             boton={boton}
             marcando={enviando || tipoEnCurso !== null}
             onTocarBoton={tocarBoton}
+            debajoDelBoton={
+              MARCACION_HISTORIAL_Y_AVISOS_2026_11 ? (
+                <div data-historial-y-avisos className="mt-3 divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200">
+                  {(
+                    [
+                      ["historial", "Mis marcaciones"],
+                      ["recordatorios", "Recordatorios"],
+                    ] as const
+                  ).map(([cual, rotulo]) => (
+                    <button
+                      key={cual}
+                      type="button"
+                      onClick={() => setHojaAbierta(cual)}
+                      className="flex min-h-[44px] w-full items-center justify-between px-4 text-left text-[16px] active:bg-gray-50"
+                    >
+                      {rotulo}
+                      <span aria-hidden="true" className="text-[18px] text-gray-400">›</span>
+                    </button>
+                  ))}
+                </div>
+              ) : undefined
+            }
           />
+        )}
+
+        {MARCACION_HISTORIAL_Y_AVISOS_2026_11 && estado?.codigo && (
+          <>
+            <MisMarcaciones open={hojaAbierta === "historial"} onClose={() => setHojaAbierta(null)} />
+            <Recordatorios open={hojaAbierta === "recordatorios"} onClose={() => setHojaAbierta(null)} />
+          </>
         )}
 
         {/* ── LA PANTALLA DE ANTES, entera, con el interruptor apagado ────

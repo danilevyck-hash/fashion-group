@@ -24,7 +24,7 @@
 // tal cual; lo único que varía es el color. Hay candado.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { cuentaRegresiva, rotuloDeshacer, type QueSeDeshace } from "@/lib/marcacion/deshacer";
 import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
@@ -85,6 +85,8 @@ export interface PantallaUnToqueProps {
   /** La marca está viajando: el botón se apaga en el MISMO lugar. */
   marcando: boolean;
   onTocarBoton: () => void;
+  /** Lo que va debajo del botón («Mis marcaciones ›», «Recordatorios ›»), o nada. */
+  debajoDelBoton?: ReactNode;
 }
 
 export default function PantallaUnToque({
@@ -105,6 +107,7 @@ export default function PantallaUnToque({
   boton,
   marcando,
   onTocarBoton,
+  debajoDelBoton,
 }: PantallaUnToqueProps) {
   const apagado = marcando || boton.apagado;
   // 🔴 El cajón del botón dice cuánto mide. A quien SOLO marca no se le dibuja
@@ -261,6 +264,7 @@ export default function PantallaUnToque({
           >
             {marcando ? TEXTO_MARCANDO : boton.texto}
           </button>
+          {debajoDelBoton}
         </div>
       </div>
     </>
