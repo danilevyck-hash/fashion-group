@@ -524,6 +524,7 @@ Punto único: `src/lib/alertas/canal.ts` (`enviarNegocio` / `enviarNegocioPrivad
 
 - **Regla:** el stack del historial es ESPEJO del breadcrumb (Inicio › Grupo › Módulo › Detalle): el Back no conoce la jerarquía, así que la jerarquía vive en el historial. **Drill-down → `push`**; **filtro / tab / sort del MISMO nivel → `replace`** (`useUrlState(key, default, { history })`, `"replace"` por omisión).
 - 📄 **En el celular (24-sep-2026)**: una pestaña es una pantalla, ☰ abre el menú entero, ya no hay barra de arriba — verbatim en [docs/postmortems/diseno-y-ux.md](docs/postmortems/diseno-y-ux.md) › «Lo que decía CLAUDE.md hasta el 8-oct-2026».
+- 🔴 **El gesto de volver cierra lo que se abrió (16-nov-2026, `ATRAS_CIERRA_2026_11`)**: detalle de pedido, «Nuevo envío», hojas del celular (`HojaCel`, `BottomSheet`), cliente de Por cobrar y Ventas y detalle del vendedor suman una entrada con `useAtrasCierra` (el patrón de Caja); las pestañas de Despachos hacen push en el celular y «‹ Volver» usa `subirA()`. Candado `atras-cierra`. 📄 Postmortem › «El gesto de volver».
 - **SPAs de un solo route**: el patrón de referencia es **Reclamos** (`reclamos/ReclamosClient.tsx`), que reconstruye el estado desde la URL.
 ## Teclado (lo único que corre)
 

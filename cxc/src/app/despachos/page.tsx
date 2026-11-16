@@ -23,6 +23,9 @@ import { GUIAS_LISTA_APPLE_2026_10, aniosConGuias, type PeriodoGuias } from "@/l
 import { mesEnCurso } from "@/lib/comisiones/mes-inicial";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
+import { modoDeHistorial } from "@/lib/hooks/useUrlState";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import { puedeMarcarPedidos, puedeRecibirPedidos, puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
 import { PEDIDOS_FLUJO_SIMPLE_2026_10 } from "@/lib/guias/pedidos-flujo-simple";
 
@@ -179,13 +182,28 @@ export default function GuiasPage() {
   const hayConfig =
     GUIAS_ATAJOS_NUEVOS && !!role && (CONFIG_GUIAS_ROLES as readonly string[]).includes(role);
   const hayEtiquetas = puedeEtiquetar(role);
+  /** La pestaña que dice la dirección (al entrar y al volver con el gesto). */
+  function vistaDeLaUrl(): Vista | null {
+    const v = new URLSearchParams(window.location.search).get("vista");
+    if (v === "config" || v === "etiquetas") return v;
+    if (hayPedidos && v !== "guias" && !hayFiltroPendientes()) return "pedidos";
+    return null;
+  }
   useEffect(() => {
     if (!authChecked) return;
-    const v = new URLSearchParams(window.location.search).get("vista");
-    if (v === "config" || v === "etiquetas") setVista(v);
-    else if (hayPedidos && v !== "guias" && !hayFiltroPendientes()) setVista("pedidos");
+    const v = vistaDeLaUrl();
+    if (v) setVista(v);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
+  // 🔴 En el celular cada pestaña es una pantalla (`ATRAS_CIERRA_2026_11`):
+  // el gesto de volver regresa a la pestaña de antes.
+  useEffect(() => {
+    if (!ATRAS_CIERRA_2026_11 || !authChecked) return;
+    const alVolver = () => setVista(vistaDeLaUrl() ?? "guias");
+    window.addEventListener("popstate", alVolver);
+    return () => window.removeEventListener("popstate", alVolver);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecked, hayPedidos]);
   /** `?pendientes=1` (⌘K › «Ir a guías pendientes») es un enlace a la lista de guías. */
   function hayFiltroPendientes() {
     return new URLSearchParams(window.location.search).get("pendientes") === "1";
@@ -196,7 +214,10 @@ export default function GuiasPage() {
     if (v === "guias" && !hayPedidos) params.delete("vista");
     else params.set("vista", v);
     const qs = params.toString();
-    window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    const otra = url !== window.location.pathname + window.location.search;
+    if (ATRAS_CIERRA_2026_11 && otra && modoDeHistorial("vista", undefined, aparatoDeQuienMira()) === "push") window.history.pushState(null, "", url);
+    else window.history.replaceState(null, "", url);
   }
   const enConfig = hayConfig && vista === "config";
   const enEtiquetas = hayEtiquetas && vista === "etiquetas";

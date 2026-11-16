@@ -15,6 +15,7 @@ import NuevoGastoDrawer from "../components/NuevoGastoDrawer";
 import CerrarPeriodoModal from "../components/CerrarPeriodoModal";
 import { useEscapeClose, useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
 import { useState, useCallback, useRef } from "react";
+import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { CAJA_NUEVO_GASTO_EN_PORTADA } from "@/lib/ui/uso-2026-11";
 import "../skin.css";
 import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
@@ -34,20 +35,12 @@ export default function PeriodoDetailPage() {
   const apple = GASTOS_APPLE_2026_10;
   const celular = useBarraCelular(apple);
 
-  // Drawer de nuevo gasto inline. El back del navegador lo cierra (pushState al
-  // abrir; popstate listener cierra; cerrar explícito hace history.back()).
+  // Drawer de nuevo gasto inline. El back del navegador lo cierra: el patrón
+  // vive en `useAtrasCierra` (siempre activo aquí, como estaba).
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const openGastoDrawer = useCallback(() => {
-    window.history.pushState({ cajaGastoDrawer: true }, "");
-    setDrawerOpen(true);
-  }, []);
-  const closeGastoDrawer = useCallback(() => { window.history.back(); }, []);
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const onPop = () => setDrawerOpen(false);
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [drawerOpen]);
+  const openGastoDrawer = useCallback(() => setDrawerOpen(true), []);
+  const volverDelDrawer = useAtrasCierra(drawerOpen, () => setDrawerOpen(false), true);
+  const closeGastoDrawer = useCallback(() => volverDelDrawer(), [volverDelDrawer]);
 
   const {
     current, error, aviso,

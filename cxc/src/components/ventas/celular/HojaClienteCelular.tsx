@@ -43,6 +43,7 @@ import {
 import { numeroSinNegrita } from "@/lib/navegacion/barra-controles-celular";
 import { fmtMargenPantalla, fmtMoneySigned, type UtilidadClienteRow } from "@/lib/ventas/utilidad-cliente";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 
 /** Lo que devuelve `GET /api/clientes/[codigo]/por-empresa-anual`. */
 export interface EmpresaDelClienteVista {
@@ -115,6 +116,9 @@ export function HojaClienteCelular({ abierta, onCerrar, codigo, nombre, cuandoCo
 
   const datos = estado.status === "listo" ? estado.datos : null;
   const abierta2 = datos?.empresas.find((e) => e.empresaKey === empresaAbierta) ?? null;
+  // 🔴 El gesto de volver cierra el mes a mes y, después, la hoja del cliente.
+  const volverDelCliente = useAtrasCierra(abierta, onCerrar);
+  const volverDeLaEmpresa = useAtrasCierra(abierta && !!abierta2, () => setEmpresaAbierta(null));
 
   // Al tocar una empresa, la pantalla del mes a mes se pone encima.
   if (abierta && abierta2) {
@@ -125,7 +129,7 @@ export function HojaClienteCelular({ abierta, onCerrar, codigo, nombre, cuandoCo
         codigo={codigo}
         year={datos!.year}
         corte={datos!.corte}
-        onVolver={() => setEmpresaAbierta(null)}
+        onVolver={() => volverDeLaEmpresa()}
       />
     );
   }
@@ -133,7 +137,7 @@ export function HojaClienteCelular({ abierta, onCerrar, codigo, nombre, cuandoCo
   const pct = datos ? porcentajeDelCliente(variacionPct(datos.total, datos.totalPrevio)) : null;
 
   return (
-    <PantallaQueSube abierta={abierta} onCerrar={onCerrar} volverA="Clientes">
+    <PantallaQueSube abierta={abierta} onCerrar={() => volverDelCliente()} volverA="Clientes">
       <TituloVentas titulo={nombre} detalle={[codigo, cuandoCompro].filter(Boolean).join(" · ")} />
 
       {estado.status === "cargando" && (

@@ -81,3 +81,22 @@ porqué, las mediciones y las citas.
 - 🔴 **EN EL CELULAR, UNA PESTAÑA ES UNA PANTALLA (24-sep-2026)**: `useUrlState` decide por el dedo (`aparatoDeQuienMira`): `CLAVES_DE_PANTALLA` (`tab · subtab · vista · ver · modo · mfCel`) hacen `push` en el celular y `replace` en la computadora; filtros siguen en `replace`. Candado `url-state-pestana-es-pantalla`.
 - 🔴 **EN EL CELULAR, ☰ ABRE EL MENÚ ENTERO, A PANTALLA COMPLETA (24-sep-2026)**: los TRES grupos como secciones con TODOS los módulos del ROL —ícono en su color, el de aquí marcado— y un buscador que solo acorta ESA lista (`coincideBusqueda`, **nunca por parecido**). **2 toques a cualquiera.** 🔴 Los CUATRO sin acento ya tienen tono, **fuera de `getModuleKeyFromPath`**. `MODO_DEL_CAJON` en `cajon-por-grupos.ts`. Candados `menu-pantalla-completa` · `cajon-hoja-abajo`.
 - 🔴 **Y EN EL CELULAR YA NO HAY BARRA DE ARRIBA (24-sep-2026)**: la franja de 46 px se fue entera (respaldo: `SIN_BARRA_ARRIBA=false`; campana y lupa siguen afuera del celular). 🔴 **El nombre del módulo es el TÍTULO grande de la página** (34 px, con el punto del acento, se va con el dedo) y se dice **UNA sola vez**: la portada que ya lo dibuja pasa `tituloEnLaPantalla` (Reclamos · CxC · Asistencia · Multifashion · Marketing); es un `<p>`, nunca un segundo `<h1>`. 🔴 **Las tres rayas son un botón redondo de 56 px abajo a la derecha** que abre el MISMO menú entero, con colchón de **76 px** en las listas; **sube encima de los botones negros fijos** —la barra publica su alto en `--fg-alto-barra-fija` y el botón negro no se mueve—. 🔴 **`--fg-altura-encabezado` queda en 0** y las pegajosas se pegan arriba del todo; a quien **solo marca** no se le dibuja ni título ni botón. En la computadora nada cambia. `lib/navegacion/barra-celular.ts`. Candado `sin-barra-arriba`.
+
+---
+
+## El gesto de volver (16-nov-2026, `ATRAS_CIERRA_2026_11`)
+
+**Qué pasaba.** En el celular, el detalle de un pedido (Despachos › Pedidos) y las hojas que suben desde abajo no se sumaban al historial del navegador: el gesto de volver de iOS sacaba al usuario del módulo. Daniel lo reportó con el pedido. Caja menuda ya lo hacía bien (`pushState` al abrir, `popstate` cierra, «Cerrar» hace `history.back()`).
+
+**Qué se hizo (aprobado por Daniel: «Si»).**
+- `src/lib/hooks/useAtrasCierra.ts`: el patrón de Caja en un solo lugar. Abrir suma una entrada; volver la cierra; «Cerrar» vuelve UNA sola vez aunque se toque dos veces y puede correr algo después de cerrar (`volver(despues)`).
+- 🔑 Si se cierra por otro camino (guardar, elegir, navegar con `router.push` + cerrar en el mismo toque, como el menú ☰) o el componente se desmonta con la entrada arriba, **no se llama a `history.back()`**: chocaría con la navegación en curso y la anularía. La entrada se marca muerta y, si alguien vuelve a caer en ella, se salta sola. Límite conocido: sentado encima de una entrada muerta (cerrada sin volver y sin navegar), el siguiente gesto de volver no mueve nada una vez.
+- `HojaCel`: con historial, una opción primero vuelve y después corre (un cambio de dirección, como la empresa de Ventas › Clientes, ya no se pierde con el `back()`).
+- Conectado en: Despachos › Pedidos › detalle · Etiquetas › Nuevo envío · `HojaCel` y `BottomSheet` (solo en el celular, por el dedo) · Por cobrar › cliente (`HojaCobrar`; el enlace a la ficha cierra sin tocar el historial, `onCerrarAlSalir`) · Ventas › Clientes › hoja del cliente y su mes a mes · Comisiones › detalle del vendedor en el celular (por empresa y consolidado) · Caja menuda (siempre activo, como estaba).
+- Pestañas de Despachos: en el celular hacen `pushState` (`modoDeHistorial("vista", …)`, como Asistencia) y el gesto de volver regresa a la pestaña anterior.
+- «‹ Volver» (`TituloQueVuelve`): `subirA()` en vez de un `<Link>` que empujaba otra entrada.
+- No cambia ningún dato. Los modales de confirmación de la computadora no se tocaron.
+
+**Verificado** en local con datos falsos (Supabase falso, nunca producción), viewport de iPhone 13: abrir el pedido → volver = Pedidos; «‹ Pedidos» = Pedidos; Pedidos → Etiquetas → Nuevo envío → volver cierra el envío → volver = Pedidos; «Cómo se usa» (hoja) → volver la cierra sin salir de Despachos.
+
+Candado: `src/__tests__/lib/atras-cierra.test.tsx`.

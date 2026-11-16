@@ -8,6 +8,9 @@ import { sinBarraLateral } from "@/lib/catalogo/rutas-publicas";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useBackdropDismiss, useEscapeClose, useFormGuard } from "@/lib/hooks/useModalDismiss";
 import { duracionToastMs } from "@/lib/ui/toast-duracion";
+import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 
 export { Avatar } from "./ui/Avatar";
@@ -1012,6 +1015,10 @@ export function BottomSheet({
   // "half" = ~50vh, "full" = ~5vh from top
   const [mode, setMode] = useState<"half" | "full">("half");
   const [visible, setVisible] = useState(false);
+  // 🔴 Solo en el celular: abrir suma una entrada al historial y el gesto de
+  // volver la cierra. El fondo, arrastrar y Escape vuelven por el historial.
+  const volver = useAtrasCierra(open, onClose, ATRAS_CIERRA_2026_11 && open && aparatoDeQuienMira() === "celular");
+  const cerrarHoja = useCallback(() => volver(), [volver]);
 
   // Animate in on open
   useEffect(() => {
@@ -1028,10 +1035,10 @@ export function BottomSheet({
   // Escape key
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") cerrarHoja(); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [open, onClose]);
+  }, [open, cerrarHoja]);
 
   // Lock body scroll mientras el sheet está abierto. El hook compartido usa el
   // patrón iOS robusto (position:fixed + restaurar scrollY) y un contador de
@@ -1081,7 +1088,7 @@ export function BottomSheet({
 
     // Dismiss threshold: 100px down
     if (dy > 100) {
-      onClose();
+      cerrarHoja();
       setTranslateY(0);
       return;
     }
@@ -1102,7 +1109,7 @@ export function BottomSheet({
 
     // Snap back
     setTranslateY(0);
-  }, [mode, onClose]);
+  }, [mode, cerrarHoja]);
 
   if (!open) return null;
 
@@ -1125,7 +1132,7 @@ export function BottomSheet({
       {/* Backdrop */}
       <div
         className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}
-        onClick={onClose}
+        onClick={cerrarHoja}
       />
       {/* Sheet */}
       <div
