@@ -29,7 +29,17 @@ import { USUARIO_GUARDAR_ARRIBA_2026_11 } from "@/lib/ui/iphone-2026-11";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import { USUARIOS_APPLE_2026_10 } from "@/lib/usuarios-apple-2026-10";
-import { SYSTEM_ROLE_KEYS } from "@/lib/modules";
+import { SYSTEM_ROLE_KEYS, SYSTEM_ROLES } from "@/lib/modules";
+
+/** Rótulo largo del selector «Rol»; el rol que no está aquí sale con su nombre de SYSTEM_ROLES. */
+const DETALLE_DEL_ROL: Record<string, string> = {
+  admin: "Administrador — acceso total",
+  secretaria: "Secretaria — operaciones diarias",
+  vendedor: "Vendedor — catálogo y cuentas por cobrar",
+  contabilidad: "Contabilidad — préstamos y ventas",
+  bodega: "Bodega — despacho de guías",
+  marcacion: "Marcación — solo marca desde el teléfono",
+};
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import MarcaAsistencia, { MARCA_APAGADA, cuerpoDeColaborador, faltaEnMarca, type EstadoMarca } from "./MarcaAsistencia";
 import CampoFecha from "@/components/ui/CampoFecha";
@@ -609,12 +619,12 @@ function UsuariosPageInner() {
                     }}
                     className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm focus:outline-none focus:border-gray-900 transition"
                   >
-                    <option value="admin">Administrador — acceso total</option>
-                    <option value="secretaria">Secretaria — operaciones diarias</option>
-                    <option value="vendedor">Vendedor — catálogo y cuentas por cobrar</option>
-                    <option value="contabilidad">Contabilidad — préstamos y ventas</option>
-                    <option value="bodega">Bodega — despacho de guías</option>
-                    <option value="marcacion">Marcación — solo marca desde el teléfono</option>
+                    {/* 🔴 Las opciones salen de SYSTEM_ROLES: si falta un rol, el
+                        <select> nativo muestra la primera opción y editar a un
+                        gerente lo enseñaba como «Administrador». */}
+                    {SYSTEM_ROLES.map(r => (
+                      <option key={r.key} value={r.key}>{DETALLE_DEL_ROL[r.key] ?? r.label}</option>
+                    ))}
                   </select>
                   {editUserId === currentUserId && uRole !== "admin" && (
                     /* 🔴 EXCEPCIÓN a <Aviso> (Daniel, 2-oct-2026: «lo empeoraste»). Es
