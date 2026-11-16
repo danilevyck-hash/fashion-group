@@ -212,6 +212,17 @@ describe("3b · la ruta que manda los avisos", () => {
     const mala = await POST(new NextRequest("http://x/api/recordatorios-marcacion", { method: "POST", headers: { authorization: "Bearer otro" } }));
     expect(mala.status).toBe(401);
   });
+
+  it("con el interruptor APAGADO y el secreto bueno: 200, sin leer ni mandar nada", async () => {
+    process.env.CRON_SECRET = "secreto-de-prueba";
+    delete process.env.VAPID_PUBLIC_KEY;
+    const { POST } = await import("@/app/api/recordatorios-marcacion/route");
+    const { NextRequest } = await import("next/server");
+    // `supabaseServer` está mockeado como `{}`: cualquier lectura reventaría con 500.
+    const res = await POST(new NextRequest("http://x/api/recordatorios-marcacion", { method: "POST", headers: { authorization: "Bearer secreto-de-prueba" } }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, avisos: 0, apagado: true });
+  });
 });
 
 describe("4 · el interruptor", () => {

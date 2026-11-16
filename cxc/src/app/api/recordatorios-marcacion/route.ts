@@ -28,6 +28,7 @@ import {
   TITULO_AVISO,
   type MarcaDelDia,
 } from "@/lib/marcacion/recordatorios";
+import { MARCACION_HISTORIAL_Y_AVISOS_2026_11 } from "@/lib/ui/marcacion-historial-avisos-2026-11";
 import { TABLA_AVISOS, TABLA_RECORDATORIOS, TABLA_SUSCRIPCIONES } from "@/lib/marcacion/recordatorios-server";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,10 @@ export async function POST(req: NextRequest) {
   const secreto = process.env.CRON_SECRET;
   const llega = req.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
   if (!secreto || llega !== secreto) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
+  // 🔴 Con el interruptor apagado la base igual llama cada 5 minutos: se
+  // contesta 200 sin leer ni mandar nada.
+  if (!MARCACION_HISTORIAL_Y_AVISOS_2026_11) return NextResponse.json({ ok: true, avisos: 0, apagado: true });
 
   const pub = process.env.VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
