@@ -40,7 +40,7 @@ describe("videos de ayuda — el manifiesto", () => {
     expect(tituloEnLista(lista[0])).toBe("Introducción");
     expect(tituloEnLista(lista[2])).toBe("2. Registrar un gasto");
     expect(tieneVideos("caja")).toBe(true);
-    expect(tieneVideos("cargar")).toBe(false);
+    expect(tieneVideos("no-existe")).toBe(false);
   });
 
   it("duración m:ss", () => {
@@ -175,6 +175,15 @@ describe("GET /api/videos-ayuda", () => {
     expect(vg.completo).not.toBeNull();
   });
 
+  it("Plantilla Switch: la secretaria la abre, bodega no", async () => {
+    sesion.mockReturnValue({ role: "secretaria" });
+    const r = await (await GET(req("cargar"))).json();
+    expect(r.lista).toHaveLength(11);
+    expect(r.completo).not.toBeNull();
+    sesion.mockReturnValue({ role: "bodega" });
+    expect((await GET(req("cargar"))).status).toBe(403);
+  });
+
   it("Gastos: contabilidad lo abre, secretaria no", async () => {
     sesion.mockReturnValue({ role: "contabilidad" });
     const r = await (await GET(req("gastos-contabilidad"))).json();
@@ -191,7 +200,7 @@ describe("GET /api/videos-ayuda", () => {
 
   it("un módulo sin videos: 404", async () => {
     sesion.mockReturnValue({ role: "admin" });
-    expect((await GET(req("cargar"))).status).toBe(404);
+    expect((await GET(req("no-existe"))).status).toBe(404);
   });
 
   it("la secretaria recibe la lista con URLs firmadas", async () => {

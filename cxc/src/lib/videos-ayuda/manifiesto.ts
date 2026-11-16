@@ -65,6 +65,7 @@ const boston = fila("boston");
 const referencia = fila("referencia", { vertical: true }); // Consulta de artículos: serie de celular
 const usuarios = fila("usuarios", { vertical: true }); // serie de celular
 const gastos = fila("gastos-contabilidad");
+const plantilla = fila("cargar"); // Plantilla Switch: la key del módulo es `cargar`
 const vistaGeneral = fila("vista-general");
 // Inicio (`/home`) no es un módulo: lo ve TODO rol con sesión, así que lleva solo
 // los clips del Inicio (00–05) y sin el completo, que enseña la Vista general (admin).
@@ -283,6 +284,18 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   gastos(6, "Saldos de banco", 47, "06-saldos-de-banco"),
   gastos(7, "Cargar un saldo", 45, "07-cargar-un-saldo"),
   gastos(8, "Corregir un saldo", 54, "08-corregir-un-saldo"),
+  plantilla(0, "Plantilla Switch completo", 709, "00-completo", true),
+  plantilla(0, "Introducción", 55, "00-que-es"),
+  plantilla(1, "Subir el archivo del proveedor", 73, "01-subir"),
+  plantilla(2, "Descripciones nuevas y avisos", 74, "02-descripciones-avisos"),
+  plantilla(3, "Calcular los precios", 73, "03-precios"),
+  plantilla(4, "Temporada y descargar la plantilla", 62, "04-descargar"),
+  plantilla(5, "Reebok", 78, "05-reebok"),
+  plantilla(6, "Facturas de tienda", 64, "06-tienda"),
+  plantilla(7, "El historial de descargas", 47, "07-historial"),
+  plantilla(8, "Tallas por pedido", 57, "08-tallas-pedido"),
+  plantilla(9, "Detalle por bulto desde un Excel", 45, "09-detalle-bulto"),
+  plantilla(10, "Configuración", 62, "10-configuracion"),
   vistaGeneral(0, "Inicio y Vista general completo", 561, "00-completo", true),
   vistaGeneral(0, "Introducción", 44, "00-que-es"),
   vistaGeneral(1, "El Inicio", 48, "01-el-inicio"),
