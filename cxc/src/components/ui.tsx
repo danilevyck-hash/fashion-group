@@ -1000,10 +1000,13 @@ export function BottomSheet({
   open,
   onClose,
   children,
+  abreCompleta = false,
 }: {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  /** Abre ya extendida (como «Mis marcaciones»), no a media pantalla. */
+  abreCompleta?: boolean;
 }) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
@@ -1023,14 +1026,14 @@ export function BottomSheet({
   // Animate in on open
   useEffect(() => {
     if (open) {
-      setMode("half");
+      setMode(abreCompleta ? "full" : "half");
       setTranslateY(0);
       // Small delay so the initial render happens off-screen, then animate in
       requestAnimationFrame(() => setVisible(true));
     } else {
       setVisible(false);
     }
-  }, [open]);
+  }, [open, abreCompleta]);
 
   // Escape key
   useEffect(() => {

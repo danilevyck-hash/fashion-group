@@ -52,7 +52,7 @@ export default function MisMarcaciones({ open, onClose }: { open: boolean; onClo
   );
 
   return (
-    <BottomSheet open={open} onClose={onClose}>
+    <BottomSheet open={open} onClose={onClose} abreCompleta>
       <div className="flex items-center justify-between px-1 pb-2">
         <h2 className="text-[17px] font-semibold">Mis marcaciones</h2>
         <button type="button" onClick={onClose} className="min-h-[44px] px-2 text-[16px] text-blue-600">
