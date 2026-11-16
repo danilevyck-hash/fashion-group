@@ -194,7 +194,7 @@ Contémosla para agosto 2026, que es el último mes cerrado.
 | Lo que NO puedes hacer | ver los 12 meses de un vendedor juntos. Para saber cuánto lleva Reynaldo en el año hay que abrir **9 meses, uno por uno**, y sumarlos a mano |
 
 **Más corto: 15 → 4.** Tres cosas, ninguna cambia un número:
-1. Abrir en **el último mes cerrado** (agosto) en vez del mes en curso → −2 toques y se acaba el total negativo.
+1. Abrir en **el último mes cerrado** (agosto) en vez del mes en curso → −2 toques y se acaba el total negativo. *(🔄 Se hizo el 6-sep-2026 y se revirtió el 4-oct-2026: hoy Comisiones abre en el MES EN CURSO de Panamá, y se queda así.)*
 2. Poner el descuento **en la celda**, como «$2,993.23 − $1,573.08» o al menos una marca, en vez de solo en el modal → la mitad de los modales dejan de hacer falta.
 3. Una columna **«2026»** al final de la matriz con el acumulado del año → mata los 9 meses de ida y vuelta.
 

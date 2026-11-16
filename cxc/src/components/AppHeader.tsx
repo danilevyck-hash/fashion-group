@@ -50,6 +50,7 @@ import { useBarraCelular } from "@/lib/navegacion/useBarraCelular";
 import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
 import type { ModuleGroup } from "@/lib/modules";
 import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
+import BotonComoSeUsa from "@/components/estructura/BotonComoSeUsa";
 import MenuDelUsuario from "@/components/estructura/MenuDelUsuario";
 import AvatarDelUsuario from "@/components/estructura/AvatarDelUsuario";
 import HojaMas from "@/components/estructura/HojaMas";
@@ -360,6 +361,8 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
             <SearchBar compact />
           </div>
           {!soloMarca && !apple && <div className="hidden sm:block"><NotificationCenter /></div>}
+          {/* «Cómo se usa»: el «?» junto al usuario (en el celular lo pinta el avatar flotante). */}
+          <div className="hidden sm:block"><BotonComoSeUsa /></div>
           {apple && <div className="hidden sm:block"><MenuDelUsuario nombre={userName} rol={userRole} /></div>}
           {/* Desktop: user info */}
           {userName && !apple && (

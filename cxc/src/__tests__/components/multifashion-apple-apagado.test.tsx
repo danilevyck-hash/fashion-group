@@ -172,17 +172,12 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const montar = (ui: React.ReactElement) =>
   render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>{ui}</SWRConfig>);
 /** El HTML cuando ya llegó todo: igual en dos vueltas seguidas (los renglones
- *  del celular piden su dato aparte y llegan después) y SIN ningún cuadro de
- *  «cargando» (`animate-pulse`). 🩸 15-nov-2026: la gráfica de «Ventas diarias»
- *  se carga aparte (next/dynamic); con la Mac ocupada, dos vueltas salían
- *  iguales con el cuadro gris todavía puesto y la foto fallaba. Ninguna foto
- *  guardada tiene ese cuadro, así que esperar a que se vaya no afloja nada. */
+ *  del celular piden su dato aparte y llegan después). */
 async function quieto(c: HTMLElement): Promise<string> {
   let antes = "";
-  const tope = performance.now() + 10_000; // `Date` está falso en esta prueba
-  while (performance.now() < tope) {
+  for (let i = 0; i < 50; i++) {
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    if (c.innerHTML === antes && !c.querySelector(".animate-pulse")) return antes;
+    if (c.innerHTML === antes) return antes;
     antes = c.innerHTML;
   }
   return antes;

@@ -158,8 +158,6 @@ interface ComisionesViewProps {
   vistaPedida?: string | null;
   /** 🔴 `COMISIONES_APPLE_V2_2026_10` (6-oct-2026, apagado). Las pruebas lo fuerzan. */
   v2?: boolean;
-  /** «Cómo se usa» (videos): solo el módulo /comisiones lo pasa. */
-  onComoSeUsa?: () => void;
 }
 
 export function ComisionesView({
@@ -169,7 +167,6 @@ export function ComisionesView({
   conMultifashion = false,
   vistaPedida = null,
   v2 = COMISIONES_APPLE_V2_2026_10,
-  onComoSeUsa,
 }: ComisionesViewProps) {
   // Panamá, no el reloj del navegador. Y el período de arranque es el ÚLTIMO
   // MES CERRADO (ver el encabezado): la cuenta vive en el módulo puro.
@@ -375,7 +372,6 @@ export function ComisionesView({
         avisoMontos={avisoMontos}
         v2={v2}
         resumen={resumenVisible}
-        onComoSeUsa={onComoSeUsa}
       >
         {cuerpo}
       </PortadaComisionesCelular>
@@ -409,7 +405,6 @@ export function ComisionesView({
         empresasFrescura={EMPRESAS}
         onActualizado={() => setRefreshKey((k) => k + 1)}
         avisoMontos={avisoMontos}
-        onComoSeUsa={onComoSeUsa}
       >
         {cuerpo}
       </ComisionesComputadoraV2>

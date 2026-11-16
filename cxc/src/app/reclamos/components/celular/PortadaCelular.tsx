@@ -20,7 +20,6 @@
 // visto verde en vez de una columna «Estado».
 // ─────────────────────────────────────────────────────────────────────────────
 
-import OverflowMenu from "@/components/ui/OverflowMenu";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { resumenPortada, tarjetasPorEmpresa } from "@/lib/reclamos/portada";
@@ -47,15 +46,13 @@ interface Props {
   onNewReclamo: () => void;
   onSelectEmpresa: (empresa: string) => void;
   onLoadDetail: (id: string, empresa: string) => void;
-  /** «Cómo se usa» en el «···» (videos del módulo). */
-  onComoSeUsa?: () => void;
   /** `RECLAMOS_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
   apple?: boolean;
 }
 
 export default function PortadaCelular({
   reclamos, loading, contactos, globalSearch, setGlobalSearch,
-  onNewReclamo, onSelectEmpresa, onLoadDetail, onComoSeUsa,
+  onNewReclamo, onSelectEmpresa, onLoadDetail,
   apple = RECLAMOS_APPLE_2026_10,
 }: Props) {
   const hoy = hoyPanama();
@@ -91,7 +88,6 @@ export default function PortadaCelular({
           {/* 1 · «Reclamos» · 🔍 */}
           <div data-fila-del-avatar className="flex h-11 min-w-0 items-center gap-1">
             <h1 className={`min-w-0 flex-1 truncate ${CLASE_TITULO_BARRA}`}>Reclamos</h1>
-            {onComoSeUsa && <OverflowMenu items={[{ label: "Cómo se usa", onClick: onComoSeUsa }]} />}
           </div>
           {/* 2 · el total a 36 px y UNA línea gris */}
           <span className={`${CLASE_TOTAL_CELULAR} pt-1`}>{montoCel(resumen.porCobrar.monto)}</span>

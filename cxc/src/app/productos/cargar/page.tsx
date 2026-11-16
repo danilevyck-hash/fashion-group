@@ -12,11 +12,7 @@ import FormulasConfig from "./FormulasConfig";
 import ReglasView from "./ReglasView";
 import CurvasView from "./CurvasView";
 import CatalogoDescripcionesAdmin from "./CatalogoDescripcionesAdmin";
-import { BarraDeControles, CLASE_FILA_MENU, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
-import OverflowMenu from "@/components/ui/OverflowMenu";
-import VideosAyuda from "@/components/VideosAyuda";
-import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
-import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
+import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
 import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import { PESTANAS, VISTAS_POR_TAB, resolverTab, type Tab, type Vista } from "./pestanas";
 import { CARGAS_RECIENTES, PLANTILLA_APPLE_2026_10, navegacion } from "@/lib/depurador/plantilla-apple-2026-10";
@@ -113,9 +109,6 @@ function CargarInner() {
   const esAdmin = role === "admin";
   const { tab, vista, redirigido } = resolverTab(tabRaw, vistaRaw, esAdmin);
   const [refreshKey, setRefreshKey] = useState(0);
-  // «Cómo se usa» en la PORTADA del módulo; la key es `cargar`.
-  const [verVideos, setVerVideos] = useState(false);
-  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("cargar");
   // Celular: el título es el selector de sección (sin enlaces azules ni «← Plantilla»).
   const barra = useBarraCelular(SECCION_EN_EL_TITULO_2026_11);
 
@@ -183,7 +176,6 @@ function CargarInner() {
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Plantilla Switch" tituloEnLaPantalla={barra} />
-      {conVideos && <VideosAyuda modulo="cargar" open={verVideos} onClose={() => setVerVideos(false)} />}
       <ProveedorBarraCelular activo={barra} activa={tab}>
         {barra && (
           <BarraDeControles
@@ -191,17 +183,11 @@ function CargarInner() {
             pestanas={PESTANAS.map((p) => ({ value: p.id, label: p.label }))}
             activa={tab}
             onPestana={(t) => irA(t as Tab, VISTAS_POR_TAB[t as Tab][0].id)}
-            menu={conVideos ? <button type="button" onClick={() => setVerVideos(true)} className={CLASE_FILA_MENU}>Cómo se usa</button> : null}
           />
         )}
       </ProveedorBarraCelular>
 
       <div className="mx-auto max-w-5xl px-4 pt-4">
-        {conVideos && !barra && (
-          <div className="-mb-2 flex justify-end">
-            <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />
-          </div>
-        )}
         {/* ── 🩸 Las pestañas, MEDIDAS (30-jul-2026, build de producción) ──
             Hasta `lg`, un DESPLEGABLE; de `lg` para arriba, la fila de
             píldoras. El corte es `lg` (1024) y está MEDIDO, no elegido. Con 3

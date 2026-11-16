@@ -5,10 +5,6 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import AppHeader from "@/components/AppHeader";
-import OverflowMenu from "@/components/ui/OverflowMenu";
-import VideosAyuda from "@/components/VideosAyuda";
-import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
-import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -142,8 +138,6 @@ export default function VistaGeneralPage() {
 
 function VistaGeneralInner() {
   const { authChecked } = useAuth({ moduleKey: "vista-general", allowedRoles: ["admin"] });
-  const [verVideos, setVerVideos] = useState(false);
-  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("vista-general");
   const hoy = mesActual();
   const [mesUrl, setMesUrl] = useUrlState("mes", hoy);
   // Sanea el param: inválido o futuro → mes actual
@@ -161,7 +155,6 @@ function VistaGeneralInner() {
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Vista general" />
-      {conVideos && <VideosAyuda modulo="vista-general" open={verVideos} onClose={() => setVerVideos(false)} />}
       <div className={`max-w-5xl mx-auto px-4 ${VG_PERIODO_SIN_AIRE ? "pt-2 pb-8 md:py-6" : "py-8"}`}>
         {/* Encabezado + navegación de mes */}
         <div className={VG_PERIODO_SIN_AIRE ? "mb-3 md:mb-5" : "mb-8"}>
@@ -189,11 +182,6 @@ function VistaGeneralInner() {
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
-            {conVideos && (
-              <div className="ml-auto">
-                <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />
-              </div>
-            )}
           </div>
         </div>
 

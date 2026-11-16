@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 import { CambiarContrasenaModal } from "@/components/CambiarContrasena";
 import { CLASE_FILA_MENU, HojaMenu } from "@/components/celular/BarraDeControles";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
+import BotonComoSeUsa from "@/components/estructura/BotonComoSeUsa";
 import { OPCIONES_DEL_USUARIO } from "@/lib/navegacion/estructura-2026-10";
 
 /** La clase que avisa a la fila del título que el avatar está arriba a la derecha. */
@@ -88,6 +89,8 @@ export default function AvatarDelUsuario({
   return (
     <>
       {flotante ? (typeof document === "undefined" ? null : createPortal(boton, document.body)) : boton}
+      {/* «Cómo se usa»: el «?» a la izquierda del avatar, en el mismo renglón. */}
+      {flotante && <BotonComoSeUsa flotante />}
       <HojaMenu abierta={abierta} onCerrar={cerrar} etiqueta="Tu cuenta">
         <div data-hoja-avatar className="flex items-center gap-3 px-1">
           <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg font-semibold text-gray-700">

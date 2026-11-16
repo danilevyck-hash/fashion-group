@@ -113,3 +113,11 @@ export const HUB_APPLE = {
   enlace:
     "inline-flex min-h-[44px] items-center text-sm font-medium underline-offset-4 opacity-80 hover:underline hover:opacity-100",
 } as const;
+
+/**
+ * Portada de Catálogos en lista (aprobada por Daniel el 15-nov-2026): las 4
+ * marcas caben en una pantalla del celular, una fila por marca que abre su
+ * catálogo, y debajo sus acciones de texto. El enlace de los 4 catálogos baja
+ * al pie y «Cómo se usa» pasa al «?» del encabezado. `false` = las tarjetas.
+ */
+export const HUB_LISTA_2026_11 = true;

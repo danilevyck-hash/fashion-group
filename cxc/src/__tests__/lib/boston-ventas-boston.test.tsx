@@ -367,7 +367,7 @@ describe("🔴 2b · las rutas: David lee la de Boston y NO la del grupo; admin 
     const pagina = sinComentarios(leer("src/app/cxc/page.tsx"));
     expect(pagina).toMatch(/carteraDelRolEnCxc\(\s*userRole\s*\)/);
     expect(pagina).toMatch(/useAdminData\(\s*authChecked\s*&&\s*!esCarteraBoston\s*\)/);
-    expect(pagina).toMatch(/<CarteraBoston[\s/]/); // con o sin `onComoSeUsa`
+    expect(pagina).toContain("<CarteraBoston />");
     // El `allowedRoles` de la pantalla NO nombra a David: entra por la key.
     expect(pagina).toContain('allowedRoles: ["admin", "secretaria", "vendedor"]');
   });

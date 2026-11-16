@@ -5,10 +5,6 @@ import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import OverflowMenu from "@/components/ui/OverflowMenu";
-import VideosAyuda from "@/components/VideosAyuda";
-import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
-import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/components/ui";
@@ -99,9 +95,6 @@ function ProveedoresList({ apple }: { apple: boolean }) {
   const [avisoMontos, setAvisoMontos] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [exportando, setExportando] = useState(false);
-  // «Cómo se usa» en la PORTADA del módulo (videos en formato celular).
-  const [verVideos, setVerVideos] = useState(false);
-  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("proveedores");
   const [falloLectura, setFalloLectura] = useState(false);
   // Qué empresa está abierta. Vive en la URL (?empresa=) para que el enlace se
   // pueda compartir y sobreviva al refresco; es un cambio del MISMO nivel, así
@@ -171,7 +164,6 @@ function ProveedoresList({ apple }: { apple: boolean }) {
   return (
     <div className="min-h-screen bg-white">
       <AppHeader module="Proveedores" />
-      {conVideos && <VideosAyuda modulo="proveedores" open={verVideos} onClose={() => setVerVideos(false)} />}
       <PullToRefresh onRefresh={() => fetchList()}>
         <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
           {/* ── 🔴 ARRIBA, UNA SOLA LÍNEA: CUÁNDO ES EL DATO Y QUÉ SE PUEDE
@@ -219,7 +211,6 @@ function ProveedoresList({ apple }: { apple: boolean }) {
                 >
                   {exportando ? "Preparando…" : "Descargar Excel"}
                 </button>
-                {conVideos && <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />}
               </div>
             </div>
           )}
@@ -244,7 +235,6 @@ function ProveedoresList({ apple }: { apple: boolean }) {
               >
                 {exportando ? "Preparando…" : "Descargar Excel"}
               </button>
-              {conVideos && <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />}
             </div>
           </div>
           )}

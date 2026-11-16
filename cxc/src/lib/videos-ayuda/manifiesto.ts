@@ -1,16 +1,13 @@
 /* ─────────────────────────────────────────────────────────────────────────────
  * LOS VIDEOS DE AYUDA, por módulo (15-nov-2026).
  *
- * 🔴 «Cómo se usa» vive en la PRIMERA pantalla que abre el módulo (su portada,
- * el `href` de `lib/modules.ts`, p. ej. `/caja`), en el «···» junto a la acción
- * principal. Si el módulo tiene pantallas de detalle, también puede ir en su
- * «···», pero NUNCA solo ahí (Daniel, 15-nov-2026: entraba a Caja menuda y no
- * encontraba los videos). Candado en `videos-ayuda.test.ts`.
+ * 🔴 «Cómo se usa» es el «?» del ENCABEZADO, junto al usuario (Daniel,
+ * 15-nov-2026: «Confío»): el mismo lugar en todo módulo con videos, celular y
+ * computadora (`components/estructura/BotonComoSeUsa.tsx`). Ningún «···» lo lleva.
+ * Candados en `videos-ayuda.test.ts`.
  * 🔑 Agregar un módulo = subir sus archivos al bucket PRIVADO `videos-ayuda`
- * (carpeta = la key del módulo), sumar sus renglones aquí y montar en
- * `src/app/<href>/page.tsx` (la portada) el mismo patrón de `/caja/page.tsx`:
- * `conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("<key>")`, «Cómo se usa» en
- * el «···» y `<VideosAyuda modulo="<key>" … />`. Sin la portada, las pruebas salen rojas.
+ * (carpeta = la key del módulo) y sumar sus renglones aquí. Nada más: el «?»
+ * saca el módulo de la dirección.
  * 🔑 Cambiar un video = volver a subir el archivo a la MISMA ruta: este archivo
  * no se toca (salvo que cambie la duración).
  *
@@ -34,6 +31,9 @@ export interface VideoAyuda {
   completo?: boolean;
   /** Serie grabada en formato de teléfono (9:16): el panel no la mete en 16:9. */
   vertical?: boolean;
+  /** El archivo que viaja al COMPARTIR, si no es `video`: el completo va en su
+   *  versión liviana (< 28 MB, para WhatsApp). */
+  compartir?: string;
 }
 
 /** Un renglón: la carpeta del bucket es la key del módulo (`modules.ts`). */
@@ -45,7 +45,7 @@ const fila = (modulo: string, { vertical = false, carpeta = modulo } = {}) =>
     segundos,
     video: `${carpeta}/${archivo}.mp4`,
     miniatura: `${carpeta}/${archivo}.jpg`,
-    ...(completo ? { completo } : {}),
+    ...(completo ? { completo, compartir: `${carpeta}/00-completo-liviano.mp4` } : {}),
     ...(esVertical ? { vertical: true } : {}),
   });
 const caja = fila("caja");

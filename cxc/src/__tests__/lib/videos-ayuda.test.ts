@@ -13,6 +13,8 @@ import { NextRequest } from "next/server";
 import { GET } from "@/app/api/videos-ayuda/route";
 import { VIDEOS_AYUDA, videosDelModulo, duracion, tituloEnLista, tieneVideos, VIDEOS_DEL_INICIO } from "@/lib/videos-ayuda/manifiesto";
 import { ALL_MODULE_KEYS, ALL_MODULES } from "@/lib/modules";
+import { videosDeLaRuta } from "@/components/estructura/BotonComoSeUsa";
+import { nombreDelArchivo } from "@/components/VideosAyuda";
 
 const req = (modulo: string) =>
   new NextRequest(`http://x/api/videos-ayuda?modulo=${modulo}`, { headers: { cookie: "cxc_session=x" } });
@@ -48,25 +50,46 @@ describe("videos de ayuda — el manifiesto", () => {
     expect(duracion(568)).toBe("9:28");
   });
 
-  it("la caja abre el panel solo detrás del interruptor y de que haya videos", () => {
-    const src = fs.readFileSync(path.join(process.cwd(), "src/app/caja/[periodoId]/page.tsx"), "utf8");
-    expect(src).toMatch(/VIDEOS_AYUDA_2026_11 && tieneVideos\("caja"\)/);
-  });
-
-  it("«Cómo se usa» vive en la PORTADA de cada módulo con videos (la primera pantalla que abre)", () => {
+  it("el «?» del encabezado encuentra los videos de cada módulo desde su portada", () => {
     for (const modulo of new Set(VIDEOS_AYUDA.map((v) => v.modulo))) {
-      if (modulo === VIDEOS_DEL_INICIO) continue; // `/home`: su prueba aparte
-      const href = ALL_MODULES.find((m) => m.key === modulo)!.href;
-      // La portada es `page.tsx` o el componente de su carpeta que dibuja
-      // (`./ReclamosClient`, …): una página de servidor no puede tener el estado.
-      const dir = path.join(process.cwd(), `src/app${href}`);
+      if (modulo === VIDEOS_DEL_INICIO) continue;
+      const m = ALL_MODULES.find((x) => x.key === modulo)!;
+      expect(videosDeLaRuta(m.href), m.href).toBe(modulo);
+      expect(videosDeLaRuta(`${m.href}/algo`), `${m.href}/algo`).toBe(modulo);
+      // La portada dibuja el encabezado común, que es donde vive el «?».
+      const dir = path.join(process.cwd(), `src/app${m.href}`);
       const pagina = fs.readFileSync(path.join(dir, "page.tsx"), "utf8");
       const propios = [...pagina.matchAll(/from "\.\/([\w-]+)"/g)]
-        .map((m) => path.join(dir, `${m[1]}.tsx`))
+        .map((x) => path.join(dir, `${x[1]}.tsx`))
         .filter((f) => fs.existsSync(f));
       const src = [pagina, ...propios.map((f) => fs.readFileSync(f, "utf8"))].join("\n");
-      expect(src, `${href}/page.tsx`).toMatch(new RegExp(`VIDEOS_AYUDA_2026_11 && tieneVideos\\("${modulo}"\\)`));
-      expect(src, `${href}/page.tsx`).toMatch(new RegExp(`<VideosAyuda modulo="${modulo}"`));
+      expect(src, `${m.href}/page.tsx`).toMatch(/<AppHeader\b/);
+    }
+    expect(videosDeLaRuta("/home")).toBe(VIDEOS_DEL_INICIO);
+    expect(videosDeLaRuta("/no-existe")).toBeNull();
+  });
+
+  it("el «?» vive en el encabezado: computadora (AppHeader), celular (avatar flotante) e Inicio", () => {
+    const leer = (f: string) => fs.readFileSync(path.join(process.cwd(), f), "utf8");
+    expect(leer("src/components/AppHeader.tsx")).toMatch(/<BotonComoSeUsa \/>/);
+    expect(leer("src/components/estructura/AvatarDelUsuario.tsx")).toMatch(/<BotonComoSeUsa flotante \/>/);
+    expect(leer("src/app/home/page.tsx")).toMatch(/<BotonComoSeUsa \/>/);
+    const boton = leer("src/components/estructura/BotonComoSeUsa.tsx");
+    expect(boton).toMatch(/aria-label="Cómo se usa"/);
+    expect(boton).toMatch(/h-11 w-11/); // 44 px para el dedo
+  });
+
+  it("ningún «···» lleva «Cómo se usa», y el panel solo lo abre el «?»", () => {
+    const archivos = (dir: string): string[] =>
+      fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? archivos(path.join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [path.join(dir, e.name)] : [],
+      );
+    for (const f of archivos(path.join(process.cwd(), "src")).filter((f) => !f.includes("__tests__"))) {
+      const src = fs.readFileSync(f, "utf8");
+      expect(src, f).not.toMatch(/label: "Cómo se usa"/);
+      // El título del propio panel («Cómo se usa») sí va.
+      if (!f.endsWith("VideosAyuda.tsx")) expect(src, f).not.toMatch(/>\s*Cómo se usa\s*</);
+      if (!f.endsWith("BotonComoSeUsa.tsx")) expect(src, f).not.toMatch(/<VideosAyuda\b/);
     }
   });
 });
@@ -161,9 +184,6 @@ describe("GET /api/videos-ayuda", () => {
   });
 
   it("Inicio: toda sesión ve SOLO los clips del Inicio, sin el completo; la Vista general sigue de admin", async () => {
-    const home = fs.readFileSync(path.join(process.cwd(), "src/app/home/page.tsx"), "utf8");
-    expect(home).toMatch(/VIDEOS_AYUDA_2026_11 && tieneVideos\(VIDEOS_DEL_INICIO\)/);
-    expect(home).toMatch(/<VideosAyuda modulo=\{VIDEOS_DEL_INICIO\}/);
     sesion.mockReturnValue({ role: "bodega" });
     const r = await (await GET(req("inicio"))).json();
     expect(r.lista.map((v: { orden: number }) => v.orden)).toEqual([0, 1, 2, 3, 4, 5]);
@@ -213,5 +233,28 @@ describe("GET /api/videos-ayuda", () => {
     expect(j.lista[0].url).toBe("https://firmada/caja/00-que-es-caja-menuda.mp4");
     expect(j.completo.miniatura).toBe("https://firmada/caja/00-completo.jpg");
     expect(signed.mock.calls[0][1]).toBe(3600);
+  });
+
+  it("Compartir: el clip viaja tal cual; el completo, en su versión liviana (< 28 MB)", async () => {
+    sesion.mockReturnValue({ role: "secretaria" });
+    const j = await (await GET(req("caja"))).json();
+    expect(j.lista[0].compartir).toBe("https://firmada/caja/00-que-es-caja-menuda.mp4");
+    expect(j.completo.compartir).toBe("https://firmada/caja/00-completo-liviano.mp4");
+  });
+});
+
+describe("Compartir un video", () => {
+  it("pasa por la única puerta (`compartir-archivo.ts`) y queda anotado", () => {
+    const src = fs.readFileSync(path.join(process.cwd(), "src/components/VideosAyuda.tsx"), "utf8");
+    expect(src).toMatch(/from "@\/lib\/compartir-archivo"/);
+    expect(src).toMatch(/aparatoDeQuienMira\(\)/);
+    expect(src).not.toMatch(/navigator\.share|createObjectURL/);
+    expect(src).toMatch(/logActivityClient\(\{ action: "compartir_video"/);
+  });
+
+  it("el archivo se llama «Módulo - título.mp4», sin signos que rompan el nombre", () => {
+    expect(nombreDelArchivo("Caja menuda", "Registrar un gasto")).toBe("Caja menuda - Registrar un gasto.mp4");
+    expect(nombreDelArchivo("Gastos", "¿Qué es Gastos?")).toBe("Gastos - Qué es Gastos.mp4");
+    expect(nombreDelArchivo("Despachos", "Etiquetas / bultos")).toBe("Despachos - Etiquetas bultos.mp4");
   });
 });

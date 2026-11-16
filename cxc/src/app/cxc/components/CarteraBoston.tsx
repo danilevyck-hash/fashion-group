@@ -77,7 +77,6 @@ import ClientTable from "./ClientTable";
 import MenuDescargar from "./MenuDescargar";
 import PanelCxcMobile from "./PanelCxcMobile";
 import PanelCxcCelular from "./PanelCxcCelular";
-import OverflowMenu from "@/components/ui/OverflowMenu";
 import type { Company } from "@/lib/companies";
 import { SkeletonRow } from "./Skeleton";
 import { useDescargasCartera } from "../hooks/useDescargasCartera";
@@ -147,13 +146,10 @@ function DetalleBoston({
 export default function CarteraBoston({
   onGrupo = null,
   empresasDelGrupo = [],
-  onComoSeUsa = null,
 }: {
   /** n.º 13: volver a la cartera del grupo desde el título del celular. `null` = este rol solo ve Boston. */
   onGrupo?: ((empresa: string) => void) | null;
   empresasDelGrupo?: Company[];
-  /** «Cómo se usa» (videos del módulo); `null` = sin la opción. */
-  onComoSeUsa?: (() => void) | null;
 } = {}) {
   const { data, error, isLoading, mutate } = useSWR("/api/cxc/boston", fetcher, {
     dedupingInterval: 60_000,
@@ -301,7 +297,6 @@ export default function CarteraBoston({
             onSyncedNow={() => void mutate()}
             avisoMontos={data?.avisoMontos ?? null}
             onBoston={null}
-            onComoSeUsa={onComoSeUsa}
             cartera="boston"
             onGrupo={onGrupo}
             empresasDelGrupo={empresasDelGrupo}
@@ -370,7 +365,6 @@ export default function CarteraBoston({
                   </div>
                 </>)}
               </div>
-              {onComoSeUsa && <OverflowMenu items={[{ label: "Cómo se usa", onClick: onComoSeUsa }]} />}
             </div>
           </div>
 

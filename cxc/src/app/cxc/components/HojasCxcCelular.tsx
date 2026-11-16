@@ -189,15 +189,12 @@ export function HojaMasOpciones({
   onDescargar,
   onCerrar,
   onBoston,
-  onComoSeUsa,
 }: {
   canExport: boolean;
   onDescargar: (clave: ClaveDescarga, formato: FormatoDescarga) => void;
   onCerrar: () => void;
   /** v3.2: con la cabecera compacta, «Boston» baja aquí para que el título se lea entero. */
   onBoston?: (() => void) | null;
-  /** «Cómo se usa»: los videos del módulo (`VideosAyuda`). */
-  onComoSeUsa?: (() => void) | null;
 }) {
   return (
     <Hoja titulo="Más" onCerrar={onCerrar}>
@@ -217,17 +214,6 @@ export function HojaMasOpciones({
       {canExport && (
         <div className="py-1">
           <MenuDescargar onDescargar={onDescargar} />
-        </div>
-      )}
-      {onComoSeUsa && (
-        <div className="border-t border-gray-100 py-1">
-          <button
-            type="button"
-            onClick={() => { onCerrar(); onComoSeUsa(); }}
-            className="flex min-h-[44px] w-full items-center px-5 text-left text-[16px] text-gray-900 active:bg-gray-100"
-          >
-            Cómo se usa
-          </button>
         </div>
       )}
     </Hoja>

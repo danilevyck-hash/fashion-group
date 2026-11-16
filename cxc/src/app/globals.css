@@ -84,6 +84,10 @@
   body.fg-con-avatar [data-fila-del-avatar] {
     margin-right: 44px;
   }
+  /* Y el «?» de «Cómo se usa» a su izquierda (`BotonComoSeUsa`). */
+  body.fg-con-avatar.fg-con-ayuda [data-fila-del-avatar] {
+    margin-right: 88px;
+  }
 }
 
 .fg-barra-pegajosa {

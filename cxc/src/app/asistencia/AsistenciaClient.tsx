@@ -72,10 +72,6 @@ import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Settings } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
-import OverflowMenu from "@/components/ui/OverflowMenu";
-import VideosAyuda from "@/components/VideosAyuda";
-import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
-import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { modoDeHistorial, useUrlState } from "@/lib/hooks/useUrlState";
 import ReporteTab from "./ReporteTab";
 import PlanillaTab from "./PlanillaTab";
@@ -203,9 +199,6 @@ function AsistenciaInner() {
   const [tabEnUrl, setTab] = useUrlState<Tab>("tab", SIN_TAB_EN_URL);
   const tabRaw: Tab = tabEnUrl || pestanaPorDefecto(PERSONA_EN_EL_CENTRO);
   const [ayuda, setAyuda] = useState(false);
-  // «Cómo se usa» vive en la PORTADA del módulo (regla en manifiesto.ts).
-  const [verVideos, setVerVideos] = useState(false);
-  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("asistencia");
   /** filtro-6: el buscador de Configuración › Horarios (solo pantalla, no se guarda). */
   const [buscarHorario, setBuscarHorario] = useState("");
   // 🔑 DOS lectores de la MISMA llave: abrir ⚙ es una pantalla (en el celular
@@ -386,7 +379,6 @@ function AsistenciaInner() {
           `PortadaCelular`; adentro de una pestaña no hay ninguno y lo pone el
           layout (24-sep-2026). */}
       <AppHeader module="Asistencia y planilla" tituloEnLaPantalla={enLaPortada || barra} />
-      {conVideos && <VideosAyuda modulo="asistencia" open={verVideos} onClose={() => setVerVideos(false)} />}
       {/* filtro-6: con ⚙ abierta, la barra es de Configuración (no de la pestaña escondida). */}
       <ProveedorBarraCelular activo={barra} activa={FILTRO_6_ASISTENCIA_CONFIG && config && !ayuda ? "configuracion" : tab}>
       <div className="mx-auto max-w-6xl px-4 py-6">
@@ -449,11 +441,6 @@ function AsistenciaInner() {
                   <button type="button" onClick={() => { if (config) cambiarConfig(""); setAyuda(true); }} className={CLASE_FILA_MENU}>
                     Cómo funciona
                   </button>
-                  {conVideos && (
-                    <button type="button" onClick={() => setVerVideos(true)} className={CLASE_FILA_MENU}>
-                      Cómo se usa
-                    </button>
-                  )}
                 </>
               }
             />
@@ -563,11 +550,6 @@ function AsistenciaInner() {
           >
             ?
           </button>
-          {conVideos && (
-            <div className="mb-1 shrink-0">
-              <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />
-            </div>
-          )}
         </div>
         )}
 

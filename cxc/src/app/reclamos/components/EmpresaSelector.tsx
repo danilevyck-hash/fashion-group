@@ -1,6 +1,5 @@
 "use client";
 
-import OverflowMenu from "@/components/ui/OverflowMenu";
 import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import AppHeader from "@/components/AppHeader";
@@ -28,8 +27,6 @@ interface Props {
   onNewReclamo: () => void;
   onSelectEmpresa: (empresa: string) => void;
   onLoadDetail: (id: string, empresa: string) => void;
-  /** «Cómo se usa» en el «···» (videos del módulo). */
-  onComoSeUsa?: () => void;
   /** El celular dibuja su propio encabezado: el contenedor lo pone UNA vez. */
   sinEncabezado?: boolean;
   /** `RECLAMOS_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
@@ -55,7 +52,7 @@ interface Props {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function EmpresaSelector({
   role, reclamos, loading, contactos, globalSearch, setGlobalSearch,
-  onNewReclamo, onSelectEmpresa, onLoadDetail, onComoSeUsa, sinEncabezado,
+  onNewReclamo, onSelectEmpresa, onLoadDetail, sinEncabezado,
   apple = RECLAMOS_APPLE_2026_10,
 }: Props) {
   const hoy = hoyPanama();
@@ -153,7 +150,6 @@ export default function EmpresaSelector({
           {apple ? botonNuevo("ml-auto shrink-0") : (
           <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo reclamo</button>
           )}
-          {onComoSeUsa && <OverflowMenu items={[{ label: "Cómo se usa", onClick: onComoSeUsa }]} />}
         </div>
 
         {!apple && (role === "admin" || role === "secretaria") && (

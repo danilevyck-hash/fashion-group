@@ -4,17 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
-import OverflowMenu from "@/components/ui/OverflowMenu";
-import VideosAyuda from "@/components/VideosAyuda";
-import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
-import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { Toast } from "@/components/ui";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import type { ContadoresDelHub, ContadoresMarca } from "@/lib/catalogo/contadores";
 import { CATALOGO_ADMIN_ROLES, COMPROBANTES_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
 import { URL_CATALOGOS_PUBLICOS } from "@/lib/catalogo/url-catalogos-publicos";
 import { CATALOGO_ORDEN_CELULAR, clasesBotonesDeLaMarca } from "@/lib/catalogo/orden-celular";
-import { CATALOGOS_APPLE_2026_10, HUB_APPLE } from "@/lib/catalogo/catalogos-2026-10";
+import { CATALOGOS_APPLE_2026_10, HUB_APPLE, HUB_LISTA_2026_11 } from "@/lib/catalogo/catalogos-2026-10";
 
 // Catálogos en UNA pantalla: una tarjeta por marca con sus acciones adentro
 // (Ver catálogo · Comprobantes · Administrar · Copiar enlace) + contadores en
@@ -151,9 +147,6 @@ export default function CatalogosMarcasPage() {
   // `undefined` = todavía cargando · `null` = no se pudo · objeto = los números.
   const [counters, setCounters] = useState<ContadoresDelHub | null | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
-  // «Cómo se usa» vive en la PORTADA del módulo (regla en manifiesto.ts).
-  const [verVideos, setVerVideos] = useState(false);
-  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("catalogos");
 
   useEffect(() => {
     if (!authChecked) return;
@@ -207,14 +200,13 @@ export default function CatalogosMarcasPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Catálogos" breadcrumbs={[{ label: "Marcas" }]} />
-      {conVideos && <VideosAyuda modulo="catalogos" open={verVideos} onClose={() => setVerVideos(false)} />}
       {/* max-w-7xl (6-sep-2026): era `max-w-3xl` (768 px), el más angosto de
           los tres del módulo —el catálogo usa 7xl (1.280) y administrar 5xl
           (1.024)— y el que menos lo necesitaba: en escritorio quedaban cuatro
           tarjetas chicas con media pantalla en blanco. Con las 4 marcas, la
           grilla llega a 4 columnas en `xl` para que la fila se llene en vez de
           estirar cada tarjeta. */}
-      <div className="max-w-7xl mx-auto px-4 py-10">
+      <div className={`max-w-7xl mx-auto px-4 ${HUB_LISTA_2026_11 ? "py-4 sm:py-8" : "py-10"}`}>
         {/* El h1 VISIBLE decía "Catálogos" justo debajo de la barra que ya dice
             "Catálogos" — en escritorio el breadcrumb ("Catálogos › Marcas") y en
             celular el chip sticky del AppHeader. Es la MISMA repetición que el
@@ -231,6 +223,54 @@ export default function CatalogosMarcasPage() {
             se va del celular porque la dirección ya lo dice — en la computadora
             se queda tal cual. ⚠️ El botón sigue diciendo «Copiar link» en las
             dos: el rótulo no se toca, lo que se va es el renglón del título. */}
+        {HUB_LISTA_2026_11 ? (
+          <>
+            <ul data-marcas className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {BRANDS.map((b) => {
+                const c: ContadoresMarca | null | undefined =
+                  counters === undefined ? undefined : (counters?.[b.key] ?? null);
+                const theme = getMarcaTheme(b.key)!;
+                const hub = theme.hub;
+                return (
+                  <li key={b.key} className="rounded-lg border border-gray-200 bg-white">
+                    <Link href={b.catalogoHref} aria-label={`Ver catálogo ${b.name}`} className="flex min-h-[64px] items-center gap-3 px-4 pt-3 active:opacity-60">
+                      <span aria-hidden="true" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md border text-lg font-extrabold ${hub.card} ${hub.name}`}>{b.name[0]}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[17px] font-semibold text-gray-900">{b.name}</span>
+                        <span className="block text-sm tabular-nums text-gray-500">
+                          {c === undefined ? "Cargando…" : c === null ? "Contadores no disponibles" : (
+                            <>
+                              {c.tarjetas} producto{c.tarjetas === 1 ? "" : "s"} a la venta
+                              {c.tarjetasSinFoto > 0 && <>{" · "}<span className="font-medium text-amber-700">{c.tarjetasSinFoto} sin foto</span></>}
+                            </>
+                          )}
+                        </span>
+                      </span>
+                      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-gray-400"><path d="M9 6l6 6-6 6" /></svg>
+                    </Link>
+                    <div className="mt-3 flex divide-x divide-gray-100 border-t border-gray-100">
+                      {puedeVerComprobantes && (
+                        <Link href={theme.pedidosHref} className="flex min-h-[44px] flex-1 items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-800">Comprobantes</Link>
+                      )}
+                      {puedeAdministrar && (
+                        <Link href={b.adminHref} className="flex min-h-[44px] flex-1 items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-800">Administrar</Link>
+                      )}
+                      <button type="button" onClick={() => copiarEnlace(b.key)} className="flex min-h-[44px] flex-1 items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-800">Copiar enlace</button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <div data-enlace-publico className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-gray-900">Enlace público · {BRANDS.length} catálogos</div>
+                <div className="hidden truncate text-xs text-gray-500 sm:block" data-testid="link-catalogos-todos">{URL_CATALOGOS_PUBLICOS}</div>
+              </div>
+              <button type="button" onClick={copiarLinkDeTodos} aria-label="Copiar enlace de los 4 catálogos"
+                className="inline-flex min-h-[44px] shrink-0 items-center text-sm font-medium text-blue-600 hover:text-blue-800">Copiar enlace</button>
+            </div>
+          </>
+        ) : (<>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
           <div className="min-w-0">
             <div className={`text-sm font-semibold text-gray-900 ${CATALOGO_ORDEN_CELULAR ? "hidden sm:block" : ""}`}>
@@ -238,7 +278,6 @@ export default function CatalogosMarcasPage() {
             </div>
             <div className="truncate tabular-nums text-xs text-gray-500" data-testid="link-catalogos-todos">{URL_CATALOGOS_PUBLICOS}</div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={copiarLinkDeTodos}
@@ -247,8 +286,6 @@ export default function CatalogosMarcasPage() {
           >
             Copiar enlace
           </button>
-          {conVideos && <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />}
-          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
@@ -399,6 +436,7 @@ export default function CatalogosMarcasPage() {
             );
           })}
         </div>
+        </>)}
       </div>
       {/* `onDismiss` es lo que lo cierra solo (11-sep-2026): sin él, «Link
           copiado» se quedaba pegado hasta cambiar de pantalla. */}

@@ -25,6 +25,13 @@ import { render, screen, cleanup, within } from "@testing-library/react";
 import CatalogosMarcasPage from "@/app/catalogos/marcas/page";
 import type { MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
+// Este candado fija la portada en TARJETAS (`HUB_LISTA_2026_11` apagado); la
+// portada en lista tiene el suyo: `catalogo-hub-lista.test.tsx`.
+vi.mock("@/lib/catalogo/catalogos-2026-10", async (orig) => ({
+  ...(await orig<typeof import("@/lib/catalogo/catalogos-2026-10")>()),
+  HUB_LISTA_2026_11: false,
+}));
+
 const ROUTER = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() };
 vi.mock("next/navigation", () => ({
   useRouter: () => ROUTER,

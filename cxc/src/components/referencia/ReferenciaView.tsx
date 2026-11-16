@@ -56,8 +56,7 @@ import { REFERENCIA_APPLE_2026_10 } from "@/lib/ventas/referencia-apple-2026-10"
 
 // ─── Vista ───────────────────────────────────────────────────────────────────
 
-/** `onComoSeUsa`: «Cómo se usa» (videos de ayuda) al final del «···»; sin él no sale. */
-export function ReferenciaView({ onComoSeUsa }: { onComoSeUsa?: () => void } = {}) {
+export function ReferenciaView() {
   const [texto, setTexto] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -177,7 +176,6 @@ export function ReferenciaView({ onComoSeUsa }: { onComoSeUsa?: () => void } = {
         void exportComprasToExcel(articulosOrdenados, resp!.hoyMes, { margen: mostrarMargen }),
       disabled: !hayResultados,
     },
-    ...(onComoSeUsa ? [{ label: "Cómo se usa", onClick: onComoSeUsa }] : []),
   ];
 
   // El bloque de resultados es el MISMO con el interruptor prendido o

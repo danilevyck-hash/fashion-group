@@ -78,6 +78,13 @@ import { MARCAS_UI, getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas
 import { signSession } from "@/lib/session-cookie";
 import { requireRole } from "@/lib/requireRole";
 
+// Este candado fija la portada en TARJETAS (`HUB_LISTA_2026_11` apagado); la
+// portada en lista tiene el suyo: `catalogo-hub-lista.test.tsx`.
+vi.mock("@/lib/catalogo/catalogos-2026-10", async (orig) => ({
+  ...(await orig<typeof import("@/lib/catalogo/catalogos-2026-10")>()),
+  HUB_LISTA_2026_11: false,
+}));
+
 const ROUTER = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() };
 vi.mock("next/navigation", () => ({
   useRouter: () => ROUTER,
