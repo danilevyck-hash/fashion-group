@@ -107,12 +107,12 @@ export default function Recordatorios({ open, onClose }: { open: boolean; onClos
         {lista && (
           <ul className="mt-4 divide-y divide-gray-100 rounded-xl border border-gray-200">
             {lista.map((r, i) => (
-              <li key={r.marca} className="flex min-h-[56px] items-center gap-3 px-4 py-2">
+              <li key={r.marca} className="flex min-h-[56px] items-center gap-2 px-3 py-2">
                 <div className="min-w-0 flex-1 text-[16px]">
                   {ROTULOS_RECORDATORIO[r.marca]}
                   {!r.hora && <span className="block text-[13px] text-gray-500">{TEXTO_SELECCIONA_TU_HORA}</span>}
                 </div>
-                <label className="relative min-h-[44px] rounded-lg bg-gray-100 px-3 text-[15px] tabular-nums leading-[44px]">
+                <label className="relative min-h-[44px] w-[100px] flex-none rounded-lg bg-gray-100 text-center text-[15px] tabular-nums leading-[44px]">
                   <span className={r.hora ? "text-gray-900" : "text-blue-600"}>{r.hora ? enDoceHoras(r.hora) : "Seleccionar"}</span>
                   <input
                     type="time"
