@@ -170,7 +170,7 @@ describe("/referencia sigue siendo la pantalla viva", () => {
   it("la pantalla REUSA ReferenciaView (no una copia)", () => {
     const client = read(path.join(src, clientRel));
     expect(client).toContain('from "@/components/referencia/ReferenciaView"');
-    expect(client).toContain("<ReferenciaView />");
+    expect(client).toMatch(/<ReferenciaView[\s/]/);
   });
 
   it("el módulo del menú sigue en su grupo con los 3 roles", () => {

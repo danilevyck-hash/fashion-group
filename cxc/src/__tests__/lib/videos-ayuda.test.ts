@@ -36,7 +36,7 @@ describe("videos de ayuda — el manifiesto", () => {
     expect(tituloEnLista(lista[0])).toBe("Introducción");
     expect(tituloEnLista(lista[2])).toBe("2. Registrar un gasto");
     expect(tieneVideos("caja")).toBe(true);
-    expect(tieneVideos("ventas")).toBe(false);
+    expect(tieneVideos("cargar")).toBe(false);
   });
 
   it("duración m:ss", () => {
@@ -113,6 +113,39 @@ describe("GET /api/videos-ayuda", () => {
     expect(r.completo.vertical).toBe(true);
   });
 
+  it("Ventas es serie de teléfono y solo admin la abre", async () => {
+    sesion.mockReturnValue({ role: "admin" });
+    const r = await (await GET(req("ventas"))).json();
+    expect(r.lista).toHaveLength(11);
+    expect(r.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
+    sesion.mockReturnValue({ role: "secretaria" });
+    expect((await GET(req("ventas"))).status).toBe(403);
+  });
+
+  it("Multifashion la abre gerente_acs (su único módulo)", async () => {
+    sesion.mockReturnValue({ role: "gerente_acs", modules: ["multifashion"] });
+    const r = await (await GET(req("multifashion"))).json();
+    expect(r.lista).toHaveLength(10);
+    expect(r.lista.some((v: { vertical?: boolean }) => v.vertical)).toBe(false);
+  });
+
+  it("Boston: la abre gerente_boston; vendedor no", async () => {
+    sesion.mockReturnValue({ role: "gerente_boston" });
+    const r = await (await GET(req("boston"))).json();
+    expect(r.lista).toHaveLength(5);
+    sesion.mockReturnValue({ role: "vendedor" });
+    expect((await GET(req("boston"))).status).toBe(403);
+  });
+
+  it("Consulta de artículos: serie de teléfono; bodega la abre, secretaria no", async () => {
+    sesion.mockReturnValue({ role: "bodega" });
+    const r = await (await GET(req("referencia"))).json();
+    expect(r.lista).toHaveLength(8);
+    expect(r.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
+    sesion.mockReturnValue({ role: "secretaria" });
+    expect((await GET(req("referencia"))).status).toBe(403);
+  });
+
   it("Asistencia es mixta: solo el 01 (marcar desde el teléfono) va vertical", async () => {
     sesion.mockReturnValue({ role: "contabilidad" });
     const a = await (await GET(req("asistencia"))).json();
@@ -121,7 +154,7 @@ describe("GET /api/videos-ayuda", () => {
 
   it("un módulo sin videos: 404", async () => {
     sesion.mockReturnValue({ role: "admin" });
-    expect((await GET(req("ventas"))).status).toBe(404);
+    expect((await GET(req("cargar"))).status).toBe(404);
   });
 
   it("la secretaria recibe la lista con URLs firmadas", async () => {

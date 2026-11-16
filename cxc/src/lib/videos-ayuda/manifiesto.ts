@@ -57,6 +57,10 @@ const asistencia = fila("asistencia"); // mixta: el 01 es de teléfono
 const comisiones = fila("comisiones");
 const clientes = fila("directorio"); // Clientes: la key del módulo es `directorio`
 const proveedores = fila("proveedores", { vertical: true }); // toda la serie en formato celular
+const ventas = fila("ventas", { vertical: true }); // toda la serie en formato celular
+const multifashion = fila("multifashion");
+const boston = fila("boston");
+const referencia = fila("referencia", { vertical: true }); // Consulta de artículos: serie de celular
 const despachos = fila("guias"); // Despachos: la key del módulo sigue siendo `guias`
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
@@ -212,6 +216,44 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   proveedores(3, "La ficha del proveedor", 54, "03-ficha-del-proveedor"),
   proveedores(4, "Actualizar desde Switch", 43, "04-actualizar"),
   proveedores(5, "Descargar en Excel", 42, "05-descargar-excel"),
+  ventas(0, "Ventas completo", 546, "00-completo", true),
+  ventas(0, "Introducción", 54, "00-que-es-ventas"),
+  ventas(1, "Leer el Resumen", 51, "01-leer-el-resumen"),
+  ventas(2, "Cambiar el período", 47, "02-cambiar-el-periodo"),
+  ventas(3, "Rango de fechas", 46, "03-rango-de-fechas"),
+  ventas(4, "Utilidad e histórico", 51, "04-utilidad-y-meses"),
+  ventas(5, "Clientes: la lista", 51, "05-clientes-la-lista"),
+  ventas(6, "Buscar y filtrar clientes", 42, "06-buscar-y-filtrar-clientes"),
+  ventas(7, "La ficha del cliente", 46, "07-ficha-del-cliente"),
+  ventas(8, "Productos: qué se vendió", 54, "08-productos"),
+  ventas(9, "Filtrar productos", 45, "09-filtrar-productos"),
+  ventas(10, "Descargar y actualizar", 41, "10-descargar-y-actualizar"),
+  multifashion(0, "Multifashion completo", 547, "00-completo", true),
+  multifashion(0, "Introducción", 55, "00-que-es-multifashion"),
+  multifashion(1, "Leer el Resumen", 53, "01-leer-el-resumen"),
+  multifashion(2, "Ventas día por día", 46, "02-ventas-diarias"),
+  multifashion(3, "Ver otro mes o unos días", 49, "03-elegir-el-periodo"),
+  multifashion(4, "La venta de hoy", 43, "04-venta-de-hoy"),
+  multifashion(5, "Vendedoras y comisión", 57, "05-vendedoras"),
+  multifashion(6, "Mes cerrado: bonos y Excel", 47, "06-mes-cerrado-bonos"),
+  multifashion(7, "Metas del equipo", 72, "07-metas"),
+  multifashion(8, "Productos", 52, "08-productos"),
+  multifashion(9, "Clientes", 56, "09-clientes"),
+  boston(0, "Ventas Boston completo", 257, "00-completo", true),
+  boston(0, "Introducción", 51, "00-que-es-ventas-boston"),
+  boston(1, "Las tarjetas del Inicio", 47, "01-las-tarjetas-del-inicio"),
+  boston(2, "Antigüedad de saldos", 43, "02-antiguedad-de-saldos"),
+  boston(3, "Ventas mes a mes", 55, "03-ventas-mes-a-mes"),
+  boston(4, "Las tarjetas son puertas", 47, "04-las-tarjetas-son-puertas"),
+  referencia(0, "Consulta de artículos completo", 388, "00-completo", true),
+  referencia(0, "Introducción", 44, "00-que-es-consulta"),
+  referencia(1, "Buscar un modelo", 41, "01-buscar-un-modelo"),
+  referencia(2, "Existencias", 49, "02-existencias"),
+  referencia(3, "Últimas recepciones", 41, "03-ultimas-recepciones"),
+  referencia(4, "Precio, costo y detalle", 55, "04-precio-costo-y-detalle"),
+  referencia(5, "Los colores", 41, "05-los-colores"),
+  referencia(6, "Un color o varios códigos", 51, "06-un-color-o-varios"),
+  referencia(7, "Actualizar y descargar", 48, "07-actualizar-y-excel"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */

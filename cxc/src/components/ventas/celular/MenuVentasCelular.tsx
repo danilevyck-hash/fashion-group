@@ -16,7 +16,7 @@
 // de lo que hace.
 // ============================================================================
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 import {
@@ -70,6 +70,9 @@ export function FrescuraVentasCel({
   );
 }
 
+/** «Cómo se usa» (videos de ayuda): lo pone VentasShell; sin él, no sale la fila. */
+export const ComoSeUsaVentas = createContext<(() => void) | null>(null);
+
 interface Props {
   pestana: PestanaDescarga;
   /** «año 2026», «últimos 12 meses»… para el subtítulo de la primera opción. */
@@ -97,6 +100,7 @@ export function MenuVentasCelular({
 }: Props) {
   const [menu, setMenu] = useState(false);
   const [descarga, setDescarga] = useState(false);
+  const comoSeUsa = useContext(ComoSeUsaVentas);
 
   return (
     <>
@@ -115,6 +119,18 @@ export function MenuVentasCelular({
         >
           {ROTULO_DESCARGAR}
         </button>
+        {comoSeUsa && (
+          <button
+            type="button"
+            onClick={() => {
+              setMenu(false);
+              comoSeUsa();
+            }}
+            className="mb-2 block w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-center text-[17px] text-gray-900 active:scale-[0.97]"
+          >
+            Cómo se usa
+          </button>
+        )}
         {/* Con la línea de frescura prendida, «Actualizar ahora» sale de aquí. */}
         {!FRESCURA_VISIBLE_2026_10 && (
           <div className="[&>*]:w-full">

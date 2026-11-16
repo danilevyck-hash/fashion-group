@@ -30,7 +30,11 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { hasModuleAccess } from "@/lib/auth-check";
 import AppHeader from "@/components/AppHeader";
-import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { BarraDeControles, CLASE_FILA_MENU, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { SECCION_EN_EL_TITULO_2026_11 } from "@/lib/navegacion/barra-controles-celular";
 import BostonTab from "@/components/cxc/BostonTab";
 import { MODULO_BOSTON, rolesModuloBoston, type TabBoston } from "@/lib/boston/rol";
@@ -69,6 +73,9 @@ export function BostonShell() {
   const tab = tabDeBoston(tabRaw, pestanas);
   // Celular: el título es el selector de sección, como Despachos.
   const barra = useBarraCelular(SECCION_EN_EL_TITULO_2026_11);
+  // «Cómo se usa» en la PORTADA del módulo (Inicio); la key es `boston`.
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("boston");
 
   /** Cambia de pestaña, o sale del módulo si esa pestaña ya vive en otro lado. */
   const irA = (destino: TabBoston) => {
@@ -82,6 +89,7 @@ export function BostonShell() {
   return (
     <div className="min-h-screen bg-white">
       <AppHeader module={rotuloModuloBoston()} tituloEnLaPantalla={barra} />
+      {conVideos && <VideosAyuda modulo="boston" open={verVideos} onClose={() => setVerVideos(false)} />}
       {barra && (
         <ProveedorBarraCelular activo activa={tab}>
           <BarraDeControles
@@ -89,6 +97,7 @@ export function BostonShell() {
             pestanas={pestanas.map(({ key, label }) => ({ value: key, label }))}
             activa={tab}
             onPestana={(v) => setTab(v as TabBoston)}
+            menu={conVideos ? <button type="button" onClick={() => setVerVideos(true)} className={CLASE_FILA_MENU}>Cómo se usa</button> : null}
           />
         </ProveedorBarraCelular>
       )}
@@ -97,7 +106,7 @@ export function BostonShell() {
           por su clase de Tailwind devuelve media pantalla y el script pasa en
           verde sin haber mirado la barra — el mismo motivo por el que las
           pestañas del CXC llevan su marca fija. */}
-      <div className={barra ? "hidden" : "max-w-6xl mx-auto px-2 lg:px-4 pt-2"}>
+      <div className={barra ? "hidden" : "relative max-w-6xl mx-auto px-2 lg:px-4 pt-2"}>
         <div
           data-pestanas="boston"
           className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto"
@@ -119,6 +128,12 @@ export function BostonShell() {
             </button>
           ))}
         </div>
+        {/* Fuera de `data-pestanas`: esa fila son solo las pestañas (candado). */}
+        {conVideos && (
+          <div className="absolute right-2 top-2 lg:right-4">
+            <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />
+          </div>
+        )}
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-4">
