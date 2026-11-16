@@ -17,6 +17,15 @@ export const TALLAS_POR_PEDIDO_2026_11 = true;
  */
 export const DESPACHOS_CORREO_AUTOMATICO = true;
 
+/**
+ * `true` = en el Excel cada fila «Total <ref>» sale como una fila VACÍA (también
+ * después de cada amarillo y al final) y la primera fila de cada bloque va en
+ * negrita. Solo el Excel: la vista previa en pantalla no cambia.
+ * Prendido el 16-nov-2026 (Daniel aprobó el mockup; naranjas: opción b, sin total).
+ * `false` = el Excel de antes, con sus filas «Total».
+ */
+export const TALLAS_FILA_VACIA_2026_11 = true;
+
 /** Quién usa la pantalla: los mismos de Plantilla Switch. Admin pasa siempre. */
 export const ROLES_TALLAS_PEDIDO = ["admin", "secretaria"] as const;
 
