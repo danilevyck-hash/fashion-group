@@ -67,7 +67,11 @@ import { MULTIFASHION_APPLE_2026_10 } from "@/lib/multifashion/apple";
 import { Aviso } from "@/components/ui/Aviso";
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import { MULTIFASHION_BARRA_PEGAJOSA } from "@/lib/ui/revision-110-vivo2";
-import { BarraDeControles, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { BarraDeControles, CLASE_FILA_MENU, useBarraCelular } from "@/components/celular/BarraDeControles";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 
 // Fetcher puro del overview por año. SWR lo cachea por año → volver a un año ya
 // visto pinta al instante y revalida en background.
@@ -95,6 +99,9 @@ export function MultifashionShell({
   const { authChecked } = useAuth({ moduleKey: "multifashion", allowedRoles: ROLES_MULTIFASHION });
   // 🔴 `MULTIFASHION_BARRA_2026_10`: en el celular, el encabezado compartido.
   const barra = useBarraCelular(MULTIFASHION_BARRA_2026_10);
+  // «Cómo se usa» en la PORTADA del módulo (regla en manifiesto.ts).
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("multifashion");
 
   // 🔴 El corte es el mes de PANAMÁ (UTC−5 fijo), no el del navegador: es la
   // misma regla de borde de mes de todo el módulo.
@@ -372,6 +379,7 @@ export function MultifashionShell({
         que es lo que Daniel mira; el nombre del módulo sigue `sr-only`. El
         layout no agrega otro título arriba: volvería a empujar el número. */}
     <AppHeader module="Multifashion" acciones={conFrescura ? undefined : accionesSync} tituloEnLaPantalla={MULTIFASHION_CELULAR} />
+    {conVideos && <VideosAyuda modulo="multifashion" open={verVideos} onClose={() => setVerVideos(false)} />}
     <PullToRefresh onRefresh={async () => { await mutate(); }}>
     {/* 🔴 `MULTIFASHION_BARRA_2026_10`: el encabezado del celular es el de
         Ventas. Título = la sección, con su lista; renglón 2 = el período y el
@@ -383,6 +391,7 @@ export function MultifashionShell({
         activa={seccion}
         onPestana={irASeccion}
         periodo={seccion === "anio" ? null : selectorPeriodo}
+        menu={conVideos ? <button type="button" onClick={() => setVerVideos(true)} className={CLASE_FILA_MENU}>Cómo se usa</button> : null}
       />
     )}
     <main className={`mx-auto w-full max-w-[1280px] px-4 md:px-7 md:py-6 ${barra ? "pb-5 pt-0" : "py-5"}`}>
@@ -432,7 +441,10 @@ export function MultifashionShell({
             <div className="hidden md:block">{accionesSync}</div>
           )}
         </div>
-        {selectorPeriodo}
+        <div className="flex items-center gap-2">
+          {selectorPeriodo}
+          {conVideos && <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />}
+        </div>
       </header>
 
       {/* 🔴 EL ENCABEZADO DEL CELULAR (24-sep-2026): el mes es el título, «‹

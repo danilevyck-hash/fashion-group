@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import { useUrlState } from "@/lib/hooks/useUrlState";
@@ -12,6 +12,11 @@ import dynamic from "next/dynamic";
 import { PullToRefresh } from "@/components/ui";
 import AppHeader from "@/components/AppHeader";
 import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { ComoSeUsaVentas } from "@/components/ventas/celular/MenuVentasCelular";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 
 
 /** Las tres pestañas, como selector del título en el celular. */
@@ -178,6 +183,9 @@ export function VentasShell({
   // redirigen en next.config.js — esto es la red de abajo, no el camino.
   const [tabRaw, setTab] = useUrlState("tab", "resumen");
   const barra = useBarraCelular();
+  // «Cómo se usa» en la PORTADA del módulo (videos en formato celular).
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("ventas");
   // El MODO de la pestaña Clientes (Ventas · Utilidad). Vive en la URL igual
   // que el tab para que un enlace guardado abra la misma vista.
   const [modoRaw, setModo] = useUrlState("modo", "ventas");
@@ -391,6 +399,8 @@ export function VentasShell({
     {/* Único chrome en móvil (drawer/búsqueda/logout/notifs) — el Sidebar es
         desktop-only, sin esto la página queda sin salida en la PWA. */}
     <AppHeader module="Ventas" tituloEnLaPantalla={barra} />
+    {conVideos && <VideosAyuda modulo="ventas" open={verVideos} onClose={() => setVerVideos(false)} />}
+    <ComoSeUsaVentas.Provider value={conVideos ? () => setVerVideos(true) : null}>
     <ProveedorBarraCelular activo={barra} activa={tab}>
     <PullToRefresh onRefresh={onRefresh}>
     {/* 🔴 LA BARRA DEL CELULAR (2-oct-2026, `BARRA_CELULAR_2026_10`): «Ventas»
@@ -489,6 +499,7 @@ export function VentasShell({
           </>
           )}
         </div>
+        {conVideos && <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />}
       </header>
 
       {/* Qué se quedó AFUERA de los números de este módulo. Va ARRIBA de las
@@ -572,6 +583,7 @@ export function VentasShell({
     </main>
     </PullToRefresh>
     </ProveedorBarraCelular>
+    </ComoSeUsaVentas.Provider>
     </>
   );
 }
