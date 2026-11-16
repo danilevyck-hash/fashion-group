@@ -54,6 +54,7 @@ const recordatorios = fila("cheques"); // Recordatorios: su key sigue siendo `ch
 const prestamos = fila("prestamos");
 const catalogos = fila("catalogos", { vertical: true }); // serie de teléfono (9:16)
 const asistencia = fila("asistencia"); // mixta: el 01 es de teléfono
+const comisiones = fila("comisiones");
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
   caja(0, "Caja menuda completa", 568, "00-completo", true),
@@ -161,6 +162,19 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   asistencia(7, "Cerrar la quincena", 62, "07-cerrar-la-quincena"),
   asistencia(8, "La planilla y los comprobantes", 59, "08-la-planilla-y-comprobantes"),
   asistencia(9, "Horarios, feriados y reglas", 56, "09-horarios-y-feriados"),
+  comisiones(0, "Comisiones completo", 556, "00-completo", true),
+  comisiones(0, "Introducción", 54, "00-que-es-comisiones"),
+  comisiones(1, "Leer la pantalla", 49, "01-leer-la-pantalla"),
+  comisiones(2, "Elegir el mes", 42, "02-elegir-el-mes"),
+  comisiones(3, "Ver una sola empresa", 42, "03-ver-una-empresa"),
+  comisiones(4, "El detalle de un vendedor", 43, "04-detalle-del-vendedor"),
+  comisiones(5, "Apagar un descuento este mes", 41, "05-apagar-un-descuento"),
+  comisiones(6, "Descargar y enviar", 44, "06-descargar-y-enviar"),
+  comisiones(7, "Rango de fechas", 40, "07-rango-de-fechas"),
+  comisiones(8, "No pagables, criterios y actualizar", 42, "08-no-pagables-y-actualizar"),
+  comisiones(9, "Tasas por vendedor", 42, "09-tasas-por-vendedor"),
+  comisiones(10, "Exclusiones de comisión", 51, "10-exclusiones"),
+  comisiones(11, "Descuentos fijos", 48, "11-descuentos-fijos"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */

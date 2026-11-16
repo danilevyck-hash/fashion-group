@@ -19,6 +19,7 @@
 // El ⚙ queda siempre en el mismo lugar, a la derecha.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import OverflowMenu from "@/components/ui/OverflowMenu";
 import type { ReactNode } from "react";
 import { Settings } from "lucide-react";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
@@ -60,6 +61,7 @@ interface Props {
   onActualizado: () => void;
   avisoMontos?: string | null;
   children: ReactNode;
+  onComoSeUsa?: () => void;
 }
 
 export function ComisionesComputadoraV2({
@@ -85,6 +87,7 @@ export function ComisionesComputadoraV2({
   onActualizado,
   avisoMontos,
   children,
+  onComoSeUsa,
 }: Props) {
   const etiquetaVista = opciones.find((o) => o.valor === vista)?.etiqueta ?? vista;
 
@@ -141,6 +144,7 @@ export function ComisionesComputadoraV2({
               <Settings className="h-4 w-4" />
             </button>
           )}
+          {onComoSeUsa && <OverflowMenu items={[{ label: "Cómo se usa", onClick: onComoSeUsa }]} />}
         </div>
       </div>
 
