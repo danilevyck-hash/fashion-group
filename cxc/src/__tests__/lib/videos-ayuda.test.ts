@@ -155,6 +155,14 @@ describe("GET /api/videos-ayuda", () => {
     expect((await GET(req("usuarios"))).status).toBe(403);
   });
 
+  it("Gastos: contabilidad lo abre, secretaria no", async () => {
+    sesion.mockReturnValue({ role: "contabilidad" });
+    const r = await (await GET(req("gastos-contabilidad"))).json();
+    expect(r.lista).toHaveLength(9);
+    sesion.mockReturnValue({ role: "secretaria" });
+    expect((await GET(req("gastos-contabilidad"))).status).toBe(403);
+  });
+
   it("Asistencia es mixta: solo el 01 (marcar desde el teléfono) va vertical", async () => {
     sesion.mockReturnValue({ role: "contabilidad" });
     const a = await (await GET(req("asistencia"))).json();

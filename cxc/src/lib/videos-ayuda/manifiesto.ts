@@ -62,6 +62,7 @@ const multifashion = fila("multifashion");
 const boston = fila("boston");
 const referencia = fila("referencia", { vertical: true }); // Consulta de artículos: serie de celular
 const usuarios = fila("usuarios", { vertical: true }); // serie de celular
+const gastos = fila("gastos-contabilidad");
 const despachos = fila("guias"); // Despachos: la key del módulo sigue siendo `guias`
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
@@ -266,6 +267,16 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   usuarios(7, "Sesiones activas", 48, "07-sesiones-activas"),
   usuarios(8, "Novedades", 45, "08-novedades"),
   usuarios(9, "Actividad", 47, "09-actividad"),
+  gastos(0, "Gastos completo", 428, "00-completo", true),
+  gastos(0, "Introducción", 49, "00-que-es-gastos"),
+  gastos(1, "Leer la lista", 46, "01-leer-la-lista"),
+  gastos(2, "Hasta dónde está cargada", 48, "02-hasta-donde-esta-cargada"),
+  gastos(3, "Cambiar de mes", 37, "03-cambiar-de-mes"),
+  gastos(4, "El detalle de una empresa", 51, "04-detalle-de-una-empresa"),
+  gastos(5, "Buscar una cuenta", 38, "05-buscar-una-cuenta"),
+  gastos(6, "Saldos de banco", 47, "06-saldos-de-banco"),
+  gastos(7, "Cargar un saldo", 45, "07-cargar-un-saldo"),
+  gastos(8, "Corregir un saldo", 54, "08-corregir-un-saldo"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */
