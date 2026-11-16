@@ -19,6 +19,8 @@ interface VideoFirmado {
   segundos: number;
   url: string | null;
   miniatura: string | null;
+  /** Serie de teléfono (9:16). */
+  vertical?: boolean;
 }
 interface Respuesta {
   modulo: string;
@@ -68,6 +70,8 @@ const IconoCerrar = () => (
 function useEsComputadora(): boolean {
   const [pc, setPc] = useState(false);
   useEffect(() => {
+    // Sin matchMedia (navegador viejo, jsdom) se queda en celular: la hoja sirve en las dos.
+    if (typeof window.matchMedia !== "function") return;
     const mq = window.matchMedia("(min-width: 640px)");
     const cambio = () => setPc(mq.matches);
     cambio();
@@ -164,7 +168,12 @@ function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void })
             autoPlay={reproducir}
             onLoadedMetadata={aplicarVelocidad}
             onPlay={aplicarVelocidad}
-            className="aspect-video w-full rounded-lg border border-gray-200 bg-black"
+            className={
+              actual.vertical
+                ? // 9:16 a lo alto que quepa, centrado: en 16:9 quedaba una tira angosta.
+                  "mx-auto aspect-[9/16] h-[min(62vh,560px)] max-w-full rounded-lg border border-gray-200 bg-black"
+                : "aspect-video w-full rounded-lg border border-gray-200 bg-black"
+            }
           />
           <p className="text-sm text-gray-900">
             <span className="font-medium">{actual.titulo}</span>
@@ -212,7 +221,7 @@ function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void })
                     <span className="relative block aspect-video w-28 shrink-0 overflow-hidden rounded border border-gray-200 bg-gray-100">
                       {v.miniatura && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={v.miniatura} alt="" width={112} height={63} loading="lazy" className="h-full w-full object-cover" />
+                        <img src={v.miniatura} alt="" width={112} height={63} loading="lazy" className={`h-full w-full ${v.vertical ? "bg-black object-contain" : "object-cover"}`} />
                       )}
                       <span className="absolute inset-0 flex items-center justify-center">
                         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-gray-900">

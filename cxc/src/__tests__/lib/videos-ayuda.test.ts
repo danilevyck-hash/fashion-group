@@ -52,7 +52,14 @@ describe("videos de ayuda — el manifiesto", () => {
   it("«Cómo se usa» vive en la PORTADA de cada módulo con videos (la primera pantalla que abre)", () => {
     for (const modulo of new Set(VIDEOS_AYUDA.map((v) => v.modulo))) {
       const href = ALL_MODULES.find((m) => m.key === modulo)!.href;
-      const src = fs.readFileSync(path.join(process.cwd(), `src/app${href}/page.tsx`), "utf8");
+      // La portada es `page.tsx` o el componente de su carpeta que dibuja
+      // (`./ReclamosClient`, …): una página de servidor no puede tener el estado.
+      const dir = path.join(process.cwd(), `src/app${href}`);
+      const pagina = fs.readFileSync(path.join(dir, "page.tsx"), "utf8");
+      const propios = [...pagina.matchAll(/from "\.\/([\w-]+)"/g)]
+        .map((m) => path.join(dir, `${m[1]}.tsx`))
+        .filter((f) => fs.existsSync(f));
+      const src = [pagina, ...propios.map((f) => fs.readFileSync(f, "utf8"))].join("\n");
       expect(src, `${href}/page.tsx`).toMatch(new RegExp(`VIDEOS_AYUDA_2026_11 && tieneVideos\\("${modulo}"\\)`));
       expect(src, `${href}/page.tsx`).toMatch(new RegExp(`<VideosAyuda modulo="${modulo}"`));
     }
@@ -78,6 +85,30 @@ describe("GET /api/videos-ayuda", () => {
     sesion.mockReturnValue({ role: "bodega" });
     expect((await GET(req("caja"))).status).toBe(403);
     expect(signed).not.toHaveBeenCalled();
+  });
+
+  it("la MISMA regla de la pantalla: el módulo en la sesión abre (David y /cxc); otro módulo no", async () => {
+    sesion.mockReturnValue({ role: "gerente_boston", modules: ["boston", "cxc"] });
+    expect((await GET(req("cxc"))).status).toBe(200);
+    expect((await GET(req("caja"))).status).toBe(403);
+    sesion.mockReturnValue({ role: "vendedor" });
+    expect((await GET(req("cxc"))).status).toBe(200);
+    expect((await GET(req("prestamos"))).status).toBe(403);
+  });
+
+  it("la serie de teléfono (Catálogos) viaja marcada vertical; la de Caja no", async () => {
+    sesion.mockReturnValue({ role: "bodega" });
+    const cat = await (await GET(req("catalogos"))).json();
+    expect(cat.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
+    sesion.mockReturnValue({ role: "secretaria" });
+    const caja = await (await GET(req("caja"))).json();
+    expect(caja.lista.some((v: { vertical?: boolean }) => v.vertical)).toBe(false);
+  });
+
+  it("Asistencia es mixta: solo el 01 (marcar desde el teléfono) va vertical", async () => {
+    sesion.mockReturnValue({ role: "contabilidad" });
+    const a = await (await GET(req("asistencia"))).json();
+    expect(a.lista.filter((v: { vertical?: boolean }) => v.vertical).map((v: { titulo: string }) => v.titulo)).toEqual(["Marcar desde el teléfono"]);
   });
 
   it("un módulo sin videos: 404", async () => {

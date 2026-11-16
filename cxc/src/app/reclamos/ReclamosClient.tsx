@@ -31,6 +31,9 @@ import { itemsAGuardar, type LineaFactura } from "@/lib/reclamos/lineas-factura"
 import { LISTO_COBRADO, NO_SE_PUDO_COBRAR } from "@/lib/reclamos/rotulos";
 import { RECLAMOS_CELULAR } from "@/lib/reclamos/celular";
 import AppHeader from "@/components/AppHeader";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import PortadaCelular from "./components/celular/PortadaCelular";
 import ListaEmpresaCelular from "./components/celular/ListaEmpresaCelular";
 import DetalleCelular from "./components/celular/DetalleCelular";
@@ -67,6 +70,10 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const { authChecked, role } = useAuth({ moduleKey: "reclamos", allowedRoles: ["admin", "secretaria"] });
   const [view, _setView] = useState<RView>((searchParams.get("view") as RView) || "list");
   const [urlId] = useState(searchParams.get("id") || "");
+  // «Cómo se usa» vive en la PORTADA del módulo (regla en manifiesto.ts).
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("reclamos");
+  const comoSeUsa = conVideos ? () => setVerVideos(true) : undefined;
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState<Reclamo | null>(initialData.detail);
   const [saving, setSaving] = useState(false);
@@ -533,6 +540,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
                 setGlobalSearch={setGlobalSearch}
                 onNewReclamo={() => { resetForm(); setView("form"); }}
                 onSelectEmpresa={(empresa) => { changeEmpresa(empresa); }}
+                onComoSeUsa={comoSeUsa}
                 onLoadDetail={(id, empresa) => { setEditMode(false); changeEmpresa(empresa, { view: "detail", id }); loadDetail(id); }}
               />
             </div>
@@ -547,12 +555,14 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
               setGlobalSearch={setGlobalSearch}
               onNewReclamo={() => { resetForm(); setView("form"); }}
               onSelectEmpresa={(empresa) => { changeEmpresa(empresa); }}
+                onComoSeUsa={comoSeUsa}
               onLoadDetail={(id, empresa) => { setEditMode(false); changeEmpresa(empresa, { view: "detail", id }); loadDetail(id); }}
               sinEncabezado={RECLAMOS_CELULAR}
             />
           </div>
           {deleteModal}
           {undoToast}
+          {conVideos && <VideosAyuda modulo="reclamos" open={verVideos} onClose={() => setVerVideos(false)} />}
         </PullToRefresh>
       );
     }

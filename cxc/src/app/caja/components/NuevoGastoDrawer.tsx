@@ -143,7 +143,7 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
       const faltan = camposQueFaltan({ proveedor: gProveedor, categoria: gCategoria, subtotal: subtotalNum });
       if (faltan.length > 0) {
         setError(`Falta: ${faltan.join(", ")}.`);
-        requestAnimationFrame(() => document.querySelector("[data-caja-error]")?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+        requestAnimationFrame(() => document.querySelector("[data-caja-error]")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }));
         return;
       }
     }
