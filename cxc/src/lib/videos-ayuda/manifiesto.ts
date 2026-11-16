@@ -55,6 +55,7 @@ const prestamos = fila("prestamos");
 const catalogos = fila("catalogos", { vertical: true }); // serie de teléfono (9:16)
 const asistencia = fila("asistencia"); // mixta: el 01 es de teléfono
 const comisiones = fila("comisiones");
+const clientes = fila("directorio"); // Clientes: la key del módulo es `directorio`
 const despachos = fila("guias"); // Despachos: la key del módulo sigue siendo `guias`
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
@@ -193,6 +194,16 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   despachos(13, "La lista de guías", 52, "13-lista-de-guias"),
   despachos(14, "Corregir o eliminar una guía", 53, "14-corregir-o-eliminar"),
   despachos(15, "Configuración", 58, "15-configuracion"),
+  clientes(0, "Clientes completo", 438, "00-completo", true),
+  clientes(0, "Introducción", 56, "00-que-es-clientes"),
+  clientes(1, "Leer la lista", 46, "01-leer-la-lista"),
+  clientes(2, "Buscar un cliente", 41, "02-buscar"),
+  clientes(3, "Ver lo que falta", 45, "03-ver-lo-que-falta"),
+  clientes(4, "Ordenar y actualizar", 41, "04-ordenar-y-actualizar"),
+  clientes(5, "La ficha del cliente", 49, "05-la-ficha"),
+  clientes(6, "Empresa por empresa", 42, "06-detalle-y-pagos"),
+  clientes(7, "Completar los datos", 51, "07-completar-datos"),
+  clientes(8, "Estado de cuenta y enlaces", 50, "08-estado-de-cuenta-y-enlaces"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */

@@ -23,6 +23,10 @@ import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { rolesClientes } from "@/lib/clientes/roles";
 import { useUrlState } from "@/lib/hooks/useUrlState";
@@ -93,6 +97,9 @@ export default function ClientesListClient({
   // ellos. Entrar a una ficha y volver conserva lo que se estaba mirando — eso
   // es lo que resolvió el `useUrlState` de esta pantalla y no se toca.
   const [qUrl, setQUrl] = useUrlState("search", "");
+  // «Cómo se usa» en la PORTADA del módulo; la key del módulo es `directorio`.
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("directorio");
   const [chipUrl, setChipUrl] = useUrlState("filtro", "todos");
   const chip: ChipId = CHIPS_VALIDOS.includes(chipUrl as ChipId) ? (chipUrl as ChipId) : "todos";
 
@@ -181,6 +188,7 @@ export default function ClientesListClient({
   return (
     <div className="min-h-screen bg-white">
       <AppHeader module="Clientes" />
+      {conVideos && <VideosAyuda modulo="directorio" open={verVideos} onClose={() => setVerVideos(false)} />}
       <PullToRefresh onRefresh={onRefresh}>
         <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
           <h1 className="sr-only">Clientes</h1>
@@ -212,6 +220,11 @@ export default function ClientesListClient({
                     onSuccess={async () => { router.refresh(); await mutate(); }}
                   />
                 </div>
+                {conVideos && (
+                  <div className="shrink-0">
+                    <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />
+                  </div>
+                )}
               </div>
             </>
           ) : (<>
