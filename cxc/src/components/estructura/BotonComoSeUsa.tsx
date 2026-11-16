@@ -21,6 +21,7 @@ import { ALL_MODULES } from "@/lib/modules";
 import { moduloDeRuta } from "@/lib/novedades/seleccion";
 import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
 import { tieneVideos, VIDEOS_DEL_INICIO } from "@/lib/videos-ayuda/manifiesto";
+import { curvasDeLaRuta } from "@/lib/ui/curvas-tallas-2026-11";
 
 /** La clase que avisa a la fila del título que el «?» también está arriba. */
 export const CLASE_BODY_CON_AYUDA = "fg-con-ayuda";
@@ -28,12 +29,15 @@ export const CLASE_BODY_CON_AYUDA = "fg-con-ayuda";
 /** La key de los videos de esta dirección, o null si no tiene. */
 export function videosDeLaRuta(pathname: string | null): string | null {
   if (!VIDEOS_AYUDA_2026_11 || !pathname) return null;
-  const key = pathname === "/home" ? VIDEOS_DEL_INICIO : moduloDeRuta(pathname, ALL_MODULES);
+  // El catálogo de una marca (`/catalogo/tommy`) es del módulo Catálogos.
+  const key =
+    pathname === "/home" ? VIDEOS_DEL_INICIO : /^\/catalogo\/[^/]+$/.test(pathname) ? "catalogos" : moduloDeRuta(pathname, ALL_MODULES);
   return key && tieneVideos(key) ? key : null;
 }
 
 export default function BotonComoSeUsa({ flotante = false, className = "" }: { flotante?: boolean; className?: string }) {
-  const modulo = videosDeLaRuta(usePathname());
+  const pathname = usePathname();
+  const modulo = videosDeLaRuta(pathname);
   const [abierto, setAbierto] = useState(false);
 
   useEffect(() => {
@@ -63,7 +67,7 @@ export default function BotonComoSeUsa({ flotante = false, className = "" }: { f
   return (
     <>
       {flotante ? (typeof document === "undefined" ? null : createPortal(boton, document.body)) : boton}
-      <VideosAyuda modulo={modulo} open={abierto} onClose={() => setAbierto(false)} />
+      <VideosAyuda modulo={modulo} curvas={curvasDeLaRuta(pathname)} open={abierto} onClose={() => setAbierto(false)} />
     </>
   );
 }

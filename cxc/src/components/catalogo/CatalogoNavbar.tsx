@@ -27,6 +27,8 @@ import { barraDeSubruta } from "@/lib/catalogo/catalogos-2026-10-b";
 import LogoEnLaBarra from "./LogoEnLaBarra";
 import { PANEL_COMPROBANTES } from "@/lib/catalogo/numeros-pedido";
 import RutaArriba from "@/app/catalogo/[marca]/pedidos/RutaArriba";
+import BotonComoSeUsa from "@/components/estructura/BotonComoSeUsa";
+import { CURVAS_TALLAS_2026_11 } from "@/lib/ui/curvas-tallas-2026-11";
 
 /** La lista de las cuatro marcas (el hub de Catálogos). */
 const HUB_DE_MARCAS = "/catalogos/marcas";
@@ -127,6 +129,9 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
               <LogoEnLaBarra marca={marca} />
             </Link>
             <div id={ID_ACCIONES_EN_LA_BARRA} className="ml-auto flex items-center" />
+            {/* El «?» de «Cómo se usa», con las curvas de tallas de la marca
+                (16-nov-2026, `CURVAS_TALLAS_2026_11`). */}
+            {CURVAS_TALLAS_2026_11 && <BotonComoSeUsa className="-mr-2" />}
           </>
         ) : !subruta && theme.logos.navbar && (
           /* 6-sep-2026: el logo es un ENLACE al catálogo y medía 24-28 px de
