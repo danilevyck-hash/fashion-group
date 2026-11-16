@@ -15,6 +15,7 @@ import { duracion, tituloEnLista, type FormatoVideos } from "@/lib/videos-ayuda/
 import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import { logActivityClient } from "@/lib/logActivityClient";
+import type { PdfDeCurvas } from "@/lib/ui/curvas-tallas-2026-11";
 
 interface VideoFirmado {
   orden: number;
@@ -123,6 +124,50 @@ function useArchivoParaCompartir(modulo: string | null, video: VideoFirmado | nu
   return { archivo: actual?.archivo ?? null, fallo: !!actual?.fallo, reintentar: () => setIntento((n) => n + 1) };
 }
 
+/**
+ * «Curvas de tallas por caja ›». En el celular abre la hoja de compartir con el
+ * PDF (bajado ANTES del toque, como en Despachos: iOS bloquea la hoja si el
+ * toque espera una descarga); en la computadora, o si aún no está, es un enlace
+ * que abre el PDF en otra pestaña.
+ */
+function RenglonCurvas({ pdf, modulo }: { pdf: PdfDeCurvas; modulo: string }) {
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const enComputadora = aparatoDeQuienMira() === "computadora";
+  useEffect(() => {
+    if (enComputadora) return;
+    const ctl = new AbortController();
+    fetch(pdf.href, { signal: ctl.signal })
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((b) => b && setArchivo(new File([b], pdf.nombre, { type: "application/pdf" })))
+      .catch(() => {
+        /* sin el archivo, el renglón sigue siendo un enlace */
+      });
+    return () => ctl.abort();
+  }, [pdf, enComputadora]);
+
+  const alTocar = async (e: React.MouseEvent) => {
+    if (archivo) {
+      e.preventDefault();
+      const resultado = await compartirArchivo(archivo, { title: archivo.name });
+      if (resultado !== "cancelado") logActivityClient({ action: "compartir_curvas", module: modulo, details: { archivo: pdf.href, resultado } });
+    }
+  };
+
+  return (
+    <a
+      href={pdf.href}
+      target="_blank"
+      rel="noopener"
+      data-curvas-tallas={pdf.href}
+      onClick={alTocar}
+      className="flex min-h-[44px] items-center justify-between rounded-lg border border-gray-200 px-3 text-sm text-gray-900 transition hover:border-gray-400 active:scale-[0.99]"
+    >
+      Curvas de tallas por caja
+      <span aria-hidden="true" className="text-lg leading-none text-gray-400">›</span>
+    </a>
+  );
+}
+
 function useEsComputadora(): boolean {
   const [pc, setPc] = useState(false);
   useEffect(() => {
@@ -137,7 +182,7 @@ function useEsComputadora(): boolean {
   return pc;
 }
 
-function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void }) {
+function Contenido({ modulo, curvas, onClose }: { modulo: string; curvas?: PdfDeCurvas | null; onClose: () => void }) {
   // `modulo` es la key (`guias`); el nombre del archivo lleva el rótulo («Despachos»).
   const [datos, setDatos] = useState<Respuesta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -227,6 +272,8 @@ function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void })
           <IconoCerrar />
         </button>
       </div>
+
+      {curvas && <RenglonCurvas pdf={curvas} modulo={modulo} />}
 
       {error && <Aviso tono="error">{error}</Aviso>}
       {!datos && !error && <p className="py-10 text-center text-sm text-gray-500">Cargando videos…</p>}
@@ -344,7 +391,18 @@ function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void })
   );
 }
 
-export default function VideosAyuda({ modulo, open, onClose }: { modulo: string; open: boolean; onClose: () => void }) {
+export default function VideosAyuda({
+  modulo,
+  curvas,
+  open,
+  onClose,
+}: {
+  modulo: string;
+  /** El PDF de curvas de tallas de esta dirección (`curvasDeLaRuta`). */
+  curvas?: PdfDeCurvas | null;
+  open: boolean;
+  onClose: () => void;
+}) {
   const pc = useEsComputadora();
   useEscapeClose(open && pc, onClose);
 
@@ -352,7 +410,7 @@ export default function VideosAyuda({ modulo, open, onClose }: { modulo: string;
   if (!pc) {
     return (
       <BottomSheet open={open} onClose={onClose}>
-        <Contenido modulo={modulo} onClose={onClose} />
+        <Contenido modulo={modulo} curvas={curvas} onClose={onClose} />
       </BottomSheet>
     );
   }
@@ -361,7 +419,7 @@ export default function VideosAyuda({ modulo, open, onClose }: { modulo: string;
       <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Cómo se usa">
         <div className="absolute inset-0 bg-black/30" onClick={onClose} />
         <aside className="absolute inset-y-0 right-0 w-[420px] max-w-full overflow-y-auto border-l border-gray-200 bg-white px-5 pt-4">
-          <Contenido modulo={modulo} onClose={onClose} />
+          <Contenido modulo={modulo} curvas={curvas} onClose={onClose} />
         </aside>
       </div>
     </EnElCuerpo>
