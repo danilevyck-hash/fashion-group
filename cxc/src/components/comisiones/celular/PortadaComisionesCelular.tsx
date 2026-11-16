@@ -114,6 +114,8 @@ interface Props {
   v2?: boolean;
   /** v2: el total y sus bases, ya sumados por la vista. */
   resumen?: ResumenDelTotal | null;
+  /** «Cómo se usa» (videos), en el «···». */
+  onComoSeUsa?: () => void;
 }
 
 export function PortadaComisionesCelular({
@@ -141,6 +143,7 @@ export function PortadaComisionesCelular({
   availableYears = [],
   v2 = false,
   resumen = null,
+  onComoSeUsa,
 }: Props) {
   const [menu, setMenu] = useState(false);
   /** CALENDARIO_SIMPLE_2026_10 con rango: empresa, mes y «Rango» en una línea. */
@@ -202,7 +205,7 @@ export function PortadaComisionesCelular({
           "Comisiones"
         )}
       </h1>
-      {conDescarga && !enConfig && <BotonPuntos onClick={() => setMenu(true)} ariaLabel="Más opciones" />}
+      {(conDescarga || onComoSeUsa) && !enConfig && <BotonPuntos onClick={() => setMenu(true)} ariaLabel="Más opciones" />}
     </div>
   ) : null;
   // 🔴 filtro-3 (revisión 110, aprobado 14-nov-2026): el período solo en su
@@ -399,6 +402,15 @@ export function PortadaComisionesCelular({
               onSuccess={() => { setMenu(false); onActualizado(); }}
             />
           </div>
+        )}
+        {onComoSeUsa && (
+          <button
+            type="button"
+            onClick={() => { setMenu(false); onComoSeUsa(); }}
+            className="mt-2 block w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-center text-[17px] font-semibold text-gray-900 active:scale-[0.97]"
+          >
+            Cómo se usa
+          </button>
         )}
       </HojaMenuCel>
 

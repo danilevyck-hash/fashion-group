@@ -54,6 +54,10 @@ const recordatorios = fila("cheques"); // Recordatorios: su key sigue siendo `ch
 const prestamos = fila("prestamos");
 const catalogos = fila("catalogos", { vertical: true }); // serie de teléfono (9:16)
 const asistencia = fila("asistencia"); // mixta: el 01 es de teléfono
+const comisiones = fila("comisiones");
+const clientes = fila("directorio"); // Clientes: la key del módulo es `directorio`
+const proveedores = fila("proveedores", { vertical: true }); // toda la serie en formato celular
+const despachos = fila("guias"); // Despachos: la key del módulo sigue siendo `guias`
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
   caja(0, "Caja menuda completa", 568, "00-completo", true),
@@ -161,6 +165,53 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   asistencia(7, "Cerrar la quincena", 62, "07-cerrar-la-quincena"),
   asistencia(8, "La planilla y los comprobantes", 59, "08-la-planilla-y-comprobantes"),
   asistencia(9, "Horarios, feriados y reglas", 56, "09-horarios-y-feriados"),
+  comisiones(0, "Comisiones completo", 556, "00-completo", true),
+  comisiones(0, "Introducción", 54, "00-que-es-comisiones"),
+  comisiones(1, "Leer la pantalla", 49, "01-leer-la-pantalla"),
+  comisiones(2, "Elegir el mes", 42, "02-elegir-el-mes"),
+  comisiones(3, "Ver una sola empresa", 42, "03-ver-una-empresa"),
+  comisiones(4, "El detalle de un vendedor", 43, "04-detalle-del-vendedor"),
+  comisiones(5, "Apagar un descuento este mes", 41, "05-apagar-un-descuento"),
+  comisiones(6, "Descargar y enviar", 44, "06-descargar-y-enviar"),
+  comisiones(7, "Rango de fechas", 40, "07-rango-de-fechas"),
+  comisiones(8, "No pagables, criterios y actualizar", 42, "08-no-pagables-y-actualizar"),
+  comisiones(9, "Tasas por vendedor", 42, "09-tasas-por-vendedor"),
+  comisiones(10, "Exclusiones de comisión", 51, "10-exclusiones"),
+  comisiones(11, "Descuentos fijos", 48, "11-descuentos-fijos"),
+  despachos(0, "Despachos completo", 1000, "00-completo", true),
+  despachos(0, "Introducción", 64, "00-que-es-despachos"),
+  despachos(1, "La lista de pedidos", 77, "01-lista-de-pedidos"),
+  despachos(2, "Iniciar la preparación", 54, "02-iniciar-preparacion"),
+  despachos(3, "En espera de muestra", 57, "03-espera-de-muestra"),
+  despachos(4, "Marcar preparado", 67, "04-marcar-preparado"),
+  despachos(5, "Recibir el pedido", 47, "05-recibir-pedido"),
+  despachos(6, "Etiquetas de un pedido", 69, "06-etiquetas-de-un-pedido"),
+  despachos(7, "Varias facturas en un envío", 57, "07-varias-facturas"),
+  despachos(8, "Etiqueta de un traslado", 48, "08-etiqueta-de-traslado"),
+  despachos(9, "La lista de etiquetas", 68, "09-lista-de-etiquetas"),
+  despachos(10, "Nueva guía de despacho", 88, "10-nueva-guia"),
+  despachos(11, "Despachar la guía", 71, "11-despachar-la-guia"),
+  despachos(12, "Imprimir y compartir la guía", 48, "12-imprimir-y-compartir"),
+  despachos(13, "La lista de guías", 52, "13-lista-de-guias"),
+  despachos(14, "Corregir o eliminar una guía", 53, "14-corregir-o-eliminar"),
+  despachos(15, "Configuración", 58, "15-configuracion"),
+  clientes(0, "Clientes completo", 438, "00-completo", true),
+  clientes(0, "Introducción", 56, "00-que-es-clientes"),
+  clientes(1, "Leer la lista", 46, "01-leer-la-lista"),
+  clientes(2, "Buscar un cliente", 41, "02-buscar"),
+  clientes(3, "Ver lo que falta", 45, "03-ver-lo-que-falta"),
+  clientes(4, "Ordenar y actualizar", 41, "04-ordenar-y-actualizar"),
+  clientes(5, "La ficha del cliente", 49, "05-la-ficha"),
+  clientes(6, "Empresa por empresa", 42, "06-detalle-y-pagos"),
+  clientes(7, "Completar los datos", 51, "07-completar-datos"),
+  clientes(8, "Estado de cuenta y enlaces", 50, "08-estado-de-cuenta-y-enlaces"),
+  proveedores(0, "Proveedores completo", 323, "00-completo", true),
+  proveedores(0, "Introducción", 58, "00-que-es-proveedores"),
+  proveedores(1, "Leer la pantalla", 51, "01-leer-la-pantalla"),
+  proveedores(2, "Abrir una empresa", 63, "02-abrir-una-empresa"),
+  proveedores(3, "La ficha del proveedor", 54, "03-ficha-del-proveedor"),
+  proveedores(4, "Actualizar desde Switch", 43, "04-actualizar"),
+  proveedores(5, "Descargar en Excel", 42, "05-descargar-excel"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */

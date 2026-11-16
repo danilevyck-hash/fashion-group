@@ -5,7 +5,11 @@ import { ROLES_CAMBIAR_BULTOS } from "@/lib/ui/revision-110-61";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { BarraDeControles, CLASE_FILA_MENU, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, PullToRefresh } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
@@ -123,6 +127,9 @@ export default function GuiasPage() {
   // 🔴 LA BARRA DEL CELULAR (2-oct-2026, `BARRA_CELULAR_2026_10`). Apagada o en
   // la computadora, la lista queda como estaba.
   const barra = useBarraCelular();
+  // «Cómo se usa» vive en la PORTADA del módulo (regla en manifiesto.ts); la key es `guias`.
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("guias");
   // `D-XXX` → nombre, para que el chip de cada línea diga de quién se trata.
   // Comparte el caché del selector: si ya se abrió un ClientePicker, no hay red.
   const nombresPorCodigo = useNombresDeClientes(authChecked);
@@ -259,6 +266,7 @@ export default function GuiasPage() {
     <PullToRefresh onRefresh={s.loadGuias}>
       <div>
         <AppHeader module="Despachos" tituloEnLaPantalla={barra} />
+        {conVideos && <VideosAyuda modulo="guias" open={verVideos} onClose={() => setVerVideos(false)} />}
         <ProveedorBarraCelular activo={barra} activa={vista}>
         {barra && !(PEDIDO_REGRESO_EN_EL_TITULO && enPedidos && pedidoAbierto) && (
           <BarraDeControles
@@ -267,17 +275,18 @@ export default function GuiasPage() {
             activa={vista}
             onPestana={(v) => cambiarVista(v as Vista)}
             periodo={GUIAS_LISTA_APPLE_2026_10 && vista === "guias" ? selectorPeriodo : undefined}
+            menu={conVideos ? <button type="button" onClick={() => setVerVideos(true)} className={CLASE_FILA_MENU}>Cómo se usa</button> : null}
           />
         )}
         {/* La fila de pestañas solo existe para quien puede configurar
             (admin y secretaria): para bodega y vendedor la pantalla es
             exactamente la de siempre, sin una fila extra. */}
-        {!barra && pestanas.length > 1 && (
+        {!barra && (pestanas.length > 1 || conVideos) && (
           // Revisión 110 · ajustes (9): el mismo ancho y borde que el contenido
           // (max-w-6xl, px-6), no una columna angosta centrada.
           <div className={PESTANAS_A_LA_IZQUIERDA ? "max-w-6xl mx-auto px-4 sm:px-6 pt-3" : "max-w-3xl mx-auto px-4 pt-3"}>
             <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto">
-              {pestanas.map(([v, label]) => (
+              {pestanas.length > 1 && pestanas.map(([v, label]) => (
                 <button
                   key={v}
                   type="button"
@@ -292,6 +301,11 @@ export default function GuiasPage() {
                   {label}
                 </button>
               ))}
+              {conVideos && (
+                <div className="ml-auto shrink-0 pb-1">
+                  <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />
+                </div>
+              )}
             </div>
           </div>
         )}
