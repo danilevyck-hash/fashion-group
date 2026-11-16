@@ -40,7 +40,9 @@ import {
   validarDiasLaborables,
   validarHora,
   validarHoraOpcional,
+  errorSalidaAntesDeEntrada,
 } from "@/lib/asistencia/horario-configurable";
+import { logActivity } from "@/lib/log-activity";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -171,20 +173,24 @@ interface CuerpoPut {
 
 /** Lo guardado hoy para esa persona, con las columnas nuevas si existen. */
 async function leerPrevia(codigo: string): Promise<{
+  existe: boolean;
   entrada: string | null;
+  salida: string | null;
   dias: number[] | null;
   entradaAfuera: string | null;
   salidaAfuera: string | null;
 }> {
   const conNuevas = await supabaseServer
     .from(TABLA_HORARIOS)
-    .select(`entrada, ${COLUMNA_DIAS_LABORABLES}, ${COLUMNA_ENTRADA_AFUERA}, ${COLUMNA_SALIDA_AFUERA}`)
+    .select(`entrada, salida, ${COLUMNA_DIAS_LABORABLES}, ${COLUMNA_ENTRADA_AFUERA}, ${COLUMNA_SALIDA_AFUERA}`)
     .eq("empleado_codigo", codigo)
     .maybeSingle();
   if (conNuevas.error) throw new Error(conNuevas.error.message);
   const f = (conNuevas.data ?? null) as Record<string, unknown> | null;
   return {
+    existe: !!f,
     entrada: f?.entrada ? String(f.entrada).slice(0, 5) : null,
+    salida: f?.salida ? String(f.salida).slice(0, 5) : null,
     dias: normalizarDiasLaborables(f?.[COLUMNA_DIAS_LABORABLES]),
     entradaAfuera: limpiaHora(f?.[COLUMNA_ENTRADA_AFUERA]),
     salidaAfuera: limpiaHora(f?.[COLUMNA_SALIDA_AFUERA]),
@@ -258,7 +264,44 @@ export async function PUT(req: NextRequest) {
     [COLUMNA_SALIDA_AFUERA]: body.salidaAfuera !== undefined ? salidaAfueraV.valor : previa.salidaAfuera,
   };
 
+  // 🔴 LA SALIDA NUNCA ANTES DE LA ENTRADA (16-nov-2026). La de afuera vacía
+  // vale la de adentro, así que se compara lo que de verdad va a regir.
+  const errHorario = errorSalidaAntesDeEntrada(entrada, salidaV.valor);
+  if (errHorario) return NextResponse.json({ error: errHorario }, { status: 400 });
+  const entradaAfuera = fila[COLUMNA_ENTRADA_AFUERA] as string | null;
+  const salidaAfuera = fila[COLUMNA_SALIDA_AFUERA] as string | null;
+  if (entradaAfuera || salidaAfuera) {
+    const errAfuera = errorSalidaAntesDeEntrada(entradaAfuera ?? entrada, salidaAfuera ?? salidaV.valor, "por el teléfono");
+    if (errAfuera) return NextResponse.json({ error: errAfuera }, { status: 400 });
+  }
+
   const { error } = await supabaseServer.from(TABLA_HORARIOS).upsert(fila, { onConflict: "empleado_codigo" });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // 🔑 Queda el rastro de QUIÉN guardó y qué había antes (16-nov-2026). El
+  // horario ya quedó guardado: si la bitácora falla, se anota y no se revierte.
+  try {
+    await logActivity(
+      String(auth.role ?? ""),
+      "guardar_horario",
+      "asistencia",
+      {
+        empleado_codigo: codigo,
+        antes: previa.existe
+          ? { entrada: previa.entrada, salida: previa.salida, dias_laborables: previa.dias, entrada_afuera: previa.entradaAfuera, salida_afuera: previa.salidaAfuera }
+          : null,
+        despues: {
+          entrada,
+          salida: salidaV.valor,
+          dias_laborables: fila[COLUMNA_DIAS_LABORABLES],
+          entrada_afuera: entradaAfuera,
+          salida_afuera: salidaAfuera,
+        },
+      },
+      String(auth.userName ?? "").trim() || undefined,
+    );
+  } catch (e) {
+    console.error("[asistencia/horarios PUT] rastro", e instanceof Error ? e.message : e);
+  }
   return NextResponse.json({ ok: true });
 }

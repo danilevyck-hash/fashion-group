@@ -40,6 +40,7 @@ import {
   ROTULO_DIAS,
   ROTULO_RELOJ,
   ROTULO_TELEFONO,
+  errorSalidaAntesDeEntrada,
 } from "@/lib/asistencia/horario-configurable";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { leerHora24 } from "@/lib/asistencia/hora-24";
@@ -176,7 +177,17 @@ export default function HorariosTab({ busqueda = "", empresa = "" }: {
         opcional={opcional}
         // Vacío en el teléfono = el horario del reloj: se ve en gris adentro.
         sugerencia={opcional ? (campo === "entradaAfuera" ? f.entrada : f.salida) : undefined}
-        onGuardar={(v) => void guardar(f, { [campo]: v } as Partial<Fila>)}
+        onGuardar={(v) => {
+          // 🔴 La salida nunca antes de la entrada (16-nov-2026): no se guarda y se dice.
+          const n = { ...f, [campo]: v } as Fila;
+          const err = errorSalidaAntesDeEntrada(n.entrada, n.salida)
+            ?? (n.entradaAfuera || n.salidaAfuera
+              ? errorSalidaAntesDeEntrada(n.entradaAfuera ?? n.entrada, n.salidaAfuera ?? n.salida, "por el teléfono")
+              : null);
+          if (err) { toast(err, "error"); return false; }
+          void guardar(f, { [campo]: v } as Partial<Fila>);
+          return true;
+        }}
       />
     );
   }
@@ -340,7 +351,8 @@ function CampoHora({ etiqueta, valor, opcional, sugerencia, onGuardar }: {
   valor: string | null;
   opcional: boolean;
   sugerencia?: string;
-  onGuardar: (v: string | null) => void;
+  /** `false` = no se guardó: el campo vuelve a lo guardado. */
+  onGuardar: (v: string | null) => boolean;
 }) {
   const { toast } = useToast();
   const [texto, setTexto] = useState(valor ?? "");
@@ -364,9 +376,8 @@ function CampoHora({ etiqueta, valor, opcional, sugerencia, onGuardar }: {
           setTexto(valor ?? "");
           return;
         }
-        setTexto(h);
         const nuevo = h === "" ? null : h;
-        if (nuevo !== valor) onGuardar(nuevo);
+        setTexto(nuevo !== valor && !onGuardar(nuevo) ? (valor ?? "") : h);
       }}
     />
   );

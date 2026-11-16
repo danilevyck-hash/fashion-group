@@ -350,3 +350,33 @@ export const DIAS_SEMANA_CORTO: Readonly<Record<number, string>> = Object.freeze
   1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb",
 });
 export const DIAS_ELEGIBLES: readonly number[] = LUNES_A_SABADO;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LA SALIDA NUNCA ANTES DE LA ENTRADA (16-nov-2026, aprobado por Daniel)
+// 🩸 Alguien guardó la salida de Ariel (65) a las 04:30 en vez de 16:30 y el
+// sistema le contó 12 h de extra. La MISMA función la usan la ruta (400) y la
+// pantalla (no guarda y lo dice). Una salida igual a la entrada tampoco vale.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** "16:30" → "4:30 p. m." */
+export function hora12(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h < 12 ? "a. m." : "p. m."}`;
+}
+
+/**
+ * `null` si la salida es después de la entrada; si no, el aviso con la
+ * sugerencia de la misma hora en la tarde cuando esa sí cuadra.
+ */
+export function errorSalidaAntesDeEntrada(entrada: string, salida: string, que = ""): string | null {
+  const min = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
+  if (min(salida) > min(entrada)) return null;
+  const sufijo = que ? ` ${que}` : "";
+  const base = `La salida${sufijo} (${hora12(salida)}) es antes de la entrada (${hora12(entrada)}).`;
+  const tarde = min(salida) + 12 * 60;
+  if (min(salida) < 12 * 60 && tarde > min(entrada)) {
+    const t = `${String(Math.floor(tarde / 60)).padStart(2, "0")}:${salida.slice(3, 5)}`;
+    return `${base} ¿Quisiste decir ${hora12(t)}?`;
+  }
+  return base;
+}
