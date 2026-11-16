@@ -201,6 +201,14 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // mande datos viejos por culpa de closures de un render anterior.
   const itemsRef = useRef<OrderItem[]>([]);
   const clientNameRef = useRef("");
+  // Lo que el SERVIDOR ya tiene (renglones + cliente), tal como llegó al cargar
+  // o como quedó tras el último guardado. El autoguardado compara contra esto:
+  // cargar o recargar el pedido NUNCA es un cambio del usuario (16-nov-2026 —
+  // antes, los datos que llegaban del servidor contaban como edición y a los
+  // 2 s se reescribía el pedido solo, con el total recalculado y la marca
+  // «Editado después de confirmar»).
+  const enServidor = useRef<string | null>(null);
+  const firmaDeLoEditable = (its: OrderItem[], nombre: string) => JSON.stringify({ items: its, clientName: nombre });
 
   // Escape cierra los dos modales de Switch igual que el clic fuera, con el
   // MISMO guard: mientras hay algo en vuelo no se puede cerrar. Escape nunca
@@ -230,7 +238,10 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             router.push(theme.catalogoHref); return;
           }
         }
-        setOrder(d); setItems(sortItems((d[theme.itemsField] as OrderItem[]) || [])); setClientName(d.client_name || "");
+        const itemsCargados = sortItems((d[theme.itemsField] as OrderItem[]) || []);
+        const nombreCargado = d.client_name || "";
+        enServidor.current = firmaDeLoEditable(itemsCargados, nombreCargado);
+        setOrder(d); setItems(itemsCargados); setClientName(nombreCargado);
         setReemplazadoPor(d.reemplazado_por || null); setPedidoOriginal(d.original || null);
         if (d.client_email) setClientEmail(d.client_email);
         // Estado del envío a Switch (quien arma pedidos — el vendedor también
@@ -375,12 +386,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   useEffect(() => { switchLockRef.current = switchLock; }, [switchLock]);
 
   // ── AUTO-SAVE (2s debounce) ──
-  const changeCount = useRef(0);
   useEffect(() => {
-    changeCount.current++;
     // Editar funciona en cualquier estado (incluso confirmado). El PUT no
     // manda status, asi que el pedido NO cambia de estado al guardar.
-    if (changeCount.current <= 1 || !order || switchLockRef.current) return;
+    // Solo guarda lo que el USUARIO cambió: si lo que hay en pantalla es lo
+    // mismo que tiene el servidor (recién cargado o recién guardado), nada.
+    if (!order || switchLockRef.current || firmaDeLoEditable(items, clientName) === enServidor.current) return;
     setAutoSaveStatus("dirty");
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => { performSave(); }, 2000);
@@ -422,6 +433,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         showToast("No se pudo guardar. Revisa tu conexión e intenta de nuevo.");
       } else {
         const now = new Date().toISOString();
+        enServidor.current = firmaDeLoEditable(itemsRef.current, clientNameRef.current);
         setAutoSaveStatus("saved");
         setLastSavedAt(now);
         guardado = true;
