@@ -280,12 +280,33 @@ describe("GET /api/videos-ayuda", () => {
     const j = await r.json();
     expect(j.formato).toBe("celular");
     expect(j.conFormatoCelular).toBe(false);
-    expect(j.lista).toHaveLength(5);
+    expect(j.lista).toHaveLength(6); // 5 de «Cómo se usa» + «Instalar la app en tu teléfono»
     expect(j.lista.every((v: { vertical?: boolean }) => v.vertical)).toBe(true);
     expect(j.completo.compartir).toBe("https://firmada/marcacion-celular/00-completo-liviano.mp4");
     expect(videosDeLaRuta("/marcacion")).toBe("marcacion");
     sesion.mockReturnValue({ role: "bodega" });
     expect((await GET(req("marcacion"))).status).toBe(403);
+  });
+
+  it("Marcación: «Instalar la app en tu teléfono» es un renglón propio, fuera del «Ver todo»", async () => {
+    const { lista, completo } = videosDelModulo("marcacion");
+    const r = lista.find((v) => v.titulo === "Instalar la app en tu teléfono");
+    expect(r?.video).toBe("marcacion-celular/05-instalar-la-app.mp4");
+    expect(r?.miniatura).toBe("marcacion-celular/05-instalar-la-app.jpg");
+    expect(r?.vertical).toBe(true);
+    expect(r?.completo).toBeUndefined();
+    expect(completo?.video).toBe("marcacion-celular/00-completo.mp4");
+    sesion.mockReturnValue({ role: "marcacion" });
+    const j = await (await GET(req("marcacion"))).json();
+    expect(j.lista.map((v: { titulo: string }) => v.titulo)).toContain("Instalar la app en tu teléfono");
+    // Interruptor apagado = la lista de antes, sin el renglón.
+    vi.resetModules();
+    vi.doMock("@/lib/ui/video-instalar-app-2026-11", () => ({ VIDEO_INSTALAR_APP_2026_11: false }));
+    const apagado = await import("@/lib/videos-ayuda/manifiesto");
+    expect(apagado.videosDelModulo("marcacion").lista.map((v) => v.titulo)).not.toContain("Instalar la app en tu teléfono");
+    expect(apagado.videosDelModulo("marcacion").lista).toHaveLength(5);
+    vi.doUnmock("@/lib/ui/video-instalar-app-2026-11");
+    vi.resetModules();
   });
 
   it("un módulo sin videos: 404", async () => {

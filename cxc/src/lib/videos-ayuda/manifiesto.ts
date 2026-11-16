@@ -25,6 +25,8 @@
  * Las rutas son del bucket, nunca una URL: la URL se firma al pedirla.
  * ──────────────────────────────────────────────────────────────────────────── */
 
+import { VIDEO_INSTALAR_APP_2026_11 } from "@/lib/ui/video-instalar-app-2026-11";
+
 export const BUCKET_VIDEOS_AYUDA = "videos-ayuda";
 /** Key de los videos de `/home`: no es un módulo de `modules.ts` (ver la ruta). */
 export const VIDEOS_DEL_INICIO = "inicio";
@@ -281,6 +283,8 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   marcacion(2, "El almuerzo y la salida", 51, "02-el-almuerzo-y-la-salida"),
   marcacion(3, "Sin señal", 43, "03-sin-senal"),
   marcacion(4, "Errores comunes", 53, "04-errores-comunes"),
+  // Renglón propio, aparte de «Cómo se usa» (no entra al completo): `lib/ui/video-instalar-app-2026-11.ts`.
+  ...(VIDEO_INSTALAR_APP_2026_11 ? [marcacion(5, "Instalar la app en tu teléfono", 92, "05-instalar-la-app")] : []),
   clientes(0, "Clientes completo", 438, "00-completo", true),
   clientes(0, "Introducción", 56, "00-que-es-clientes"),
   clientes(1, "Leer la lista", 46, "01-leer-la-lista"),
