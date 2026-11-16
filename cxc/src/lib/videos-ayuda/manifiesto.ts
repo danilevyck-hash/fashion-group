@@ -21,6 +21,8 @@
  * ──────────────────────────────────────────────────────────────────────────── */
 
 export const BUCKET_VIDEOS_AYUDA = "videos-ayuda";
+/** Key de los videos de `/home`: no es un módulo de `modules.ts` (ver la ruta). */
+export const VIDEOS_DEL_INICIO = "inicio";
 
 export interface VideoAyuda {
   modulo: string;
@@ -35,14 +37,14 @@ export interface VideoAyuda {
 }
 
 /** Un renglón: la carpeta del bucket es la key del módulo (`modules.ts`). */
-const fila = (modulo: string, { vertical = false } = {}) =>
+const fila = (modulo: string, { vertical = false, carpeta = modulo } = {}) =>
   (orden: number, titulo: string, segundos: number, archivo: string, completo = false, esVertical = vertical): VideoAyuda => ({
     modulo,
     orden,
     titulo,
     segundos,
-    video: `${modulo}/${archivo}.mp4`,
-    miniatura: `${modulo}/${archivo}.jpg`,
+    video: `${carpeta}/${archivo}.mp4`,
+    miniatura: `${carpeta}/${archivo}.jpg`,
     ...(completo ? { completo } : {}),
     ...(esVertical ? { vertical: true } : {}),
   });
@@ -63,6 +65,10 @@ const boston = fila("boston");
 const referencia = fila("referencia", { vertical: true }); // Consulta de artículos: serie de celular
 const usuarios = fila("usuarios", { vertical: true }); // serie de celular
 const gastos = fila("gastos-contabilidad");
+const vistaGeneral = fila("vista-general");
+// Inicio (`/home`) no es un módulo: lo ve TODO rol con sesión, así que lleva solo
+// los clips del Inicio (00–05) y sin el completo, que enseña la Vista general (admin).
+const inicio = fila(VIDEOS_DEL_INICIO, { carpeta: "vista-general" });
 const despachos = fila("guias"); // Despachos: la key del módulo sigue siendo `guias`
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
@@ -277,6 +283,24 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   gastos(6, "Saldos de banco", 47, "06-saldos-de-banco"),
   gastos(7, "Cargar un saldo", 45, "07-cargar-un-saldo"),
   gastos(8, "Corregir un saldo", 54, "08-corregir-un-saldo"),
+  vistaGeneral(0, "Inicio y Vista general completo", 561, "00-completo", true),
+  vistaGeneral(0, "Introducción", 44, "00-que-es"),
+  vistaGeneral(1, "El Inicio", 48, "01-el-inicio"),
+  vistaGeneral(2, "Abrir un módulo y volver", 44, "02-abrir-y-volver"),
+  vistaGeneral(3, "La búsqueda global", 53, "03-buscar"),
+  vistaGeneral(4, "Atajos de la búsqueda", 51, "04-atajos-de-busqueda"),
+  vistaGeneral(5, "El Inicio en el celular", 49, "05-en-el-celular"),
+  inicio(0, "Introducción", 44, "00-que-es"),
+  inicio(1, "El Inicio", 48, "01-el-inicio"),
+  inicio(2, "Abrir un módulo y volver", 44, "02-abrir-y-volver"),
+  inicio(3, "La búsqueda global", 53, "03-buscar"),
+  inicio(4, "Atajos de la búsqueda", 51, "04-atajos-de-busqueda"),
+  inicio(5, "El Inicio en el celular", 49, "05-en-el-celular"),
+  vistaGeneral(6, "La Vista general y el mes", 42, "06-vista-general-el-mes"),
+  vistaGeneral(7, "Las seis tarjetas", 60, "07-las-seis-tarjetas"),
+  vistaGeneral(8, "Inventario y gastos", 53, "08-inventario-y-gastos"),
+  vistaGeneral(9, "Ventas y rentabilidad por empresa", 58, "09-ventas-y-rentabilidad"),
+  vistaGeneral(10, "Alertas", 39, "10-alertas"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */

@@ -22,6 +22,8 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/home",
   useSearchParams: () => new URLSearchParams(),
 }));
+// El «···» de «Cómo se usa» es nuevo a propósito: este candado compara contra la pantalla sin él.
+vi.mock("@/lib/ui/videos-ayuda-2026-11", () => ({ VIDEOS_AYUDA_2026_11: false }));
 vi.mock("@/components/AppHeader", () => ({ default: () => <div data-testid="encabezado" /> }));
 vi.mock("@/components/SearchBar", () => ({
   SEARCH_ROLES: ["admin", "secretaria", "contabilidad", "vendedor", "bodega"],

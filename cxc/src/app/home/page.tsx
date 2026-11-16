@@ -15,6 +15,10 @@ import { ESTRUCTURA_APPLE_2026_10 } from "@/lib/navegacion/estructura-2026-10";
 import MenuDelUsuario from "@/components/estructura/MenuDelUsuario";
 import AvatarDelUsuario from "@/components/estructura/AvatarDelUsuario";
 import AppHeader from "@/components/AppHeader";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos, VIDEOS_DEL_INICIO } from "@/lib/videos-ayuda/manifiesto";
 import { TAB_BAR_2026_10 } from "@/lib/navegacion/tab-bar";
 import { CLAVE_NOMBRE_VISIBLE } from "@/lib/hooks/useNombreVisible";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
@@ -37,6 +41,9 @@ export default function HomePage() {
   const [displayName, setDisplayName] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
   const apple = ESTRUCTURA_APPLE_2026_10;
+  // «Cómo se usa» discreto, en un «···» junto al usuario: lo ve todo rol con sesión.
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos(VIDEOS_DEL_INICIO);
   const [frequents, setFrequents] = useState<AppModule[]>([]);
 
   // El botón de arriba a la derecha tiene que REVOCAR la sesión en el server
@@ -132,11 +139,36 @@ export default function HomePage() {
   const iconoBase = "shrink-0 transition-colors text-gray-500 group-hover:text-gray-900";
   const textoBase = "text-xs font-medium leading-tight transition-colors text-gray-900 group-hover:text-black";
 
+  // El bloque del usuario; con videos va junto al «···», sin ellos queda igual que antes.
+  const usuario = (
+    <>
+          {apple && (TAB_BAR_2026_10
+            ? <div className="hidden sm:block"><MenuDelUsuario nombre={capitalizarNombre(displayName)} rol={role} /></div>
+            : <MenuDelUsuario nombre={capitalizarNombre(displayName)} rol={role} />)}
+          {/* El nombre visible, capitalizado: «Daniel Levy», no «daniel». */}
+          {TAB_BAR_2026_10 && <AvatarDelUsuario nombre={capitalizarNombre(displayName)} rol={role} />}
+          {!apple && <div className="flex items-center shrink-0 -mr-2">
+            {/* Cambiar MI contraseña (14-sep-2026), para todos los roles. ⚠️ El
+                  comentario no nombra al botón de cerrar sesión: el candado
+                  `toque-44` busca su texto por la PRIMERA vez que aparece en el
+                  archivo, y una mención acá lo dejaría midiendo el comentario. */}
+            <BotonCambiarContrasena variante="texto" className="text-sm" />
+            <button
+              onClick={cerrarSesion}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-gray-400 hover:text-black transition active:scale-[0.97]"
+            >
+              Cerrar sesión
+            </button>
+          </div>}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-white">
       {/* La barra de pestañas también en Inicio (`TAB_BAR_2026_10`): solo la
           barra y su menú, nada del encabezado de los módulos. */}
       {TAB_BAR_2026_10 && <AppHeader module="Inicio" soloMenuDelCelular />}
+      {conVideos && <VideosAyuda modulo={VIDEOS_DEL_INICIO} open={verVideos} onClose={() => setVerVideos(false)} />}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* Encabezado: saludo en serif + fecha del día */}
         <div className="flex items-start justify-between gap-4 mb-6">
@@ -157,24 +189,12 @@ export default function HomePage() {
           {/* 🔴 Con la barra de pestañas (`TAB_BAR_2026_10`), en el celular el
               menú del usuario es el avatar con la inicial, como en las apps de
               Apple; en la computadora sigue el botón con el nombre. */}
-          {apple && (TAB_BAR_2026_10
-            ? <div className="hidden sm:block"><MenuDelUsuario nombre={capitalizarNombre(displayName)} rol={role} /></div>
-            : <MenuDelUsuario nombre={capitalizarNombre(displayName)} rol={role} />)}
-          {/* El nombre visible, capitalizado: «Daniel Levy», no «daniel». */}
-          {TAB_BAR_2026_10 && <AvatarDelUsuario nombre={capitalizarNombre(displayName)} rol={role} />}
-          {!apple && <div className="flex items-center shrink-0 -mr-2">
-            {/* Cambiar MI contraseña (14-sep-2026), para todos los roles. ⚠️ El
-                  comentario no nombra al botón de cerrar sesión: el candado
-                  `toque-44` busca su texto por la PRIMERA vez que aparece en el
-                  archivo, y una mención acá lo dejaría midiendo el comentario. */}
-            <BotonCambiarContrasena variante="texto" className="text-sm" />
-            <button
-              onClick={cerrarSesion}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-gray-400 hover:text-black transition active:scale-[0.97]"
-            >
-              Cerrar sesión
-            </button>
-          </div>}
+          {conVideos ? (
+            <div className="flex shrink-0 items-center gap-1">
+              <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />
+              {usuario}
+            </div>
+          ) : usuario}
         </div>
 
         {/* 🔴 LA CAJA DE BUSCAR ES DE LOS MISMOS CINCO ROLES EN TODAS PARTES.
