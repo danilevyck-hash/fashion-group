@@ -105,6 +105,14 @@ describe("GET /api/videos-ayuda", () => {
     expect(caja.lista.some((v: { vertical?: boolean }) => v.vertical)).toBe(false);
   });
 
+  it("Proveedores es serie de teléfono entera (lista y completo), y contabilidad la abre", async () => {
+    sesion.mockReturnValue({ role: "contabilidad" });
+    const r = await (await GET(req("proveedores"))).json();
+    expect(r.lista).toHaveLength(6);
+    expect(r.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
+    expect(r.completo.vertical).toBe(true);
+  });
+
   it("Asistencia es mixta: solo el 01 (marcar desde el teléfono) va vertical", async () => {
     sesion.mockReturnValue({ role: "contabilidad" });
     const a = await (await GET(req("asistencia"))).json();

@@ -56,6 +56,7 @@ const catalogos = fila("catalogos", { vertical: true }); // serie de teléfono (
 const asistencia = fila("asistencia"); // mixta: el 01 es de teléfono
 const comisiones = fila("comisiones");
 const clientes = fila("directorio"); // Clientes: la key del módulo es `directorio`
+const proveedores = fila("proveedores", { vertical: true }); // toda la serie en formato celular
 const despachos = fila("guias"); // Despachos: la key del módulo sigue siendo `guias`
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
@@ -204,6 +205,13 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   clientes(6, "Empresa por empresa", 42, "06-detalle-y-pagos"),
   clientes(7, "Completar los datos", 51, "07-completar-datos"),
   clientes(8, "Estado de cuenta y enlaces", 50, "08-estado-de-cuenta-y-enlaces"),
+  proveedores(0, "Proveedores completo", 323, "00-completo", true),
+  proveedores(0, "Introducción", 58, "00-que-es-proveedores"),
+  proveedores(1, "Leer la pantalla", 51, "01-leer-la-pantalla"),
+  proveedores(2, "Abrir una empresa", 63, "02-abrir-una-empresa"),
+  proveedores(3, "La ficha del proveedor", 54, "03-ficha-del-proveedor"),
+  proveedores(4, "Actualizar desde Switch", 43, "04-actualizar"),
+  proveedores(5, "Descargar en Excel", 42, "05-descargar-excel"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */
