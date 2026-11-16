@@ -25,6 +25,9 @@
 // Switch ya vienen colapsadas en una persona (alias). Muestra a todos los
 // vendedores activos aunque base=$0; los sin actividad se colapsan al pie.
 
+import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
@@ -138,6 +141,12 @@ export function ComisionesPorEmpresaView({
   const seVeLaTabla = useSeVeLaTablaComisiones();
   const enLaFila = COMISIONES_DETALLE_V3_2026_10 && seVeLaTabla;
   const abrirDetalle = conDetalle ? setDetalleVendedor : () => {};
+  // 🔴 En el celular el detalle del vendedor suma una entrada: el gesto de volver lo cierra.
+  const volverDelDetalle = useAtrasCierra(
+    !!detalleVendedor && conDetalle && !enLaFila,
+    () => setDetalleVendedor(null),
+    ATRAS_CIERRA_2026_11 && !!detalleVendedor && aparatoDeQuienMira() === "celular",
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -447,7 +456,7 @@ export function ComisionesPorEmpresaView({
           year={year}
           mes={mes}
           vendedor={detalleVendedor}
-          onClose={() => setDetalleVendedor(null)}
+          onClose={() => volverDelDetalle()}
         />
       )}
 

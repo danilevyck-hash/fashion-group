@@ -105,6 +105,7 @@ import { GUIAS_LISTA_APPLE_2026_10, resumenDeEnvios } from "@/lib/guias/lista-ap
 import { diaPanama } from "@/lib/guias/pendientes-aviso";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { ETIQUETAS_FILA_LIMPIA } from "@/lib/ui/revision-110-despachos";
+import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 
 /**
  * 🔴 EL PDF DEL ENVÍO, en pestaña nueva (la MISMA puerta que la pantalla de
@@ -139,6 +140,8 @@ export default function EtiquetasPorEnvio() {
   const [filtro, setFiltro] = useState<"pendientes" | "todas">("pendientes");
   const [buscar, setBuscar] = useState("");
   const [panel, setPanel] = useState(false);
+  // «Nuevo envío» suma una entrada: el gesto de volver lo cierra (`useAtrasCierra`).
+  const volverDelPanel = useAtrasCierra(panel, () => setPanel(false));
   const [reimprimiendo, setReimprimiendo] = useState<Envio | null>(null);
   const [anulando, setAnulando] = useState<Envio | null>(null);
 
@@ -229,10 +232,10 @@ export default function EtiquetasPorEnvio() {
         <PanelEnvio
           etiquetas={etiquetas}
           deshabilitado={sinTabla}
-          onCerrar={() => setPanel(false)}
+          onCerrar={() => volverDelPanel()}
           onListo={async (mensaje) => { setToast(mensaje); await cargar(); }}
           onRecargar={cargar}
-          onVer={(secuencial) => { setPanel(false); setFiltro("todas"); setBuscar(facturaParaMostrar(secuencial)); }}
+          onVer={(secuencial) => volverDelPanel(() => { setFiltro("todas"); setBuscar(facturaParaMostrar(secuencial)); })}
         />
       ) : (
         <>

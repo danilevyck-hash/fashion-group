@@ -16,6 +16,9 @@
 
 import { Children, useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import { COLCHON_LATERAL_FLOTANTE } from "@/lib/navegacion/barra-celular";
 import { EnLaBarra, useHayBarraCelular } from "./BarraDeControles";
 import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
@@ -231,14 +234,17 @@ export function HojaCel({
   onCerrar: () => void;
 }) {
   const caja = useRef<HTMLDivElement>(null);
+  // 🔴 Solo en el celular: abrir suma una entrada y el gesto de volver cierra.
+  const conHistorial = ATRAS_CIERRA_2026_11 && abierta && aparatoDeQuienMira() === "celular";
+  const volver = useAtrasCierra(abierta, onCerrar, conHistorial);
   useEffect(() => {
     if (!abierta) return;
     const alTeclear = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCerrar();
+      if (e.key === "Escape") volver();
     };
     document.addEventListener("keydown", alTeclear);
     return () => document.removeEventListener("keydown", alTeclear);
-  }, [abierta, onCerrar]);
+  }, [abierta, volver]);
 
   if (!abierta || typeof document === "undefined") return null;
   // 🔑 Al final de `<body>`: un `transform` o un `z-index` de un contenedor (el
@@ -254,7 +260,7 @@ export function HojaCel({
       <button
         type="button"
         aria-label="Cerrar"
-        onClick={onCerrar}
+        onClick={() => volver()}
         className="absolute inset-0 bg-black/30"
       />
       <div
@@ -272,6 +278,12 @@ export function HojaCel({
             type="button"
             disabled={o.apagada}
             onClick={() => {
+              // Con historial: primero se vuelve (la entrada sale) y después
+              // corre la opción, para que un cambio de dirección no se pierda.
+              if (conHistorial) {
+                volver(o.onClick);
+                return;
+              }
               o.onClick();
               onCerrar();
             }}
@@ -284,7 +296,7 @@ export function HojaCel({
         ))}
         <button
           type="button"
-          onClick={onCerrar}
+          onClick={() => volver()}
           className="block w-full border-t-[6px] border-gray-100 px-4 py-3.5 text-center text-[17px] font-semibold text-gray-900 active:bg-gray-100"
         >
           Cancelar
