@@ -3,6 +3,7 @@
 import XLSX from "xlsx-js-style";
 import { addr, filtroDesdeA1, makeCellStyles } from "@/lib/excel-export";
 import type { FilaTallas } from "./armar";
+import { TALLAS_FILA_VACIA_2026_11 } from "./interruptores";
 
 export const COLUMNAS_TALLAS = ["Referencia", "Descripción", "Talla", "Código de barra", "Pares", "Opción"] as const;
 
@@ -11,17 +12,40 @@ export const FONDO = { amarillo: "FFFF00", naranja: "FFC000" } as const;
 
 const esNumero = (s: string) => /^\d+(\.\d+)?$/.test(s);
 
+type RenglonExcel = { fila: FilaTallas; negrita: boolean } | null;
+
+/**
+ * Los renglones del Excel (`null` = fila vacía). Con `TALLAS_FILA_VACIA_2026_11`:
+ * cada «Total» se vuelve una fila vacía, el amarillo lleva la suya después, y la
+ * primera fila de cada bloque va en negrita. Apagado = las filas tal cual.
+ */
+export function renglonesDelExcel(filas: readonly FilaTallas[], filaVacia = TALLAS_FILA_VACIA_2026_11): RenglonExcel[] {
+  if (!filaVacia) return filas.map((fila) => ({ fila, negrita: fila.esTotal }));
+  const out: RenglonExcel[] = [];
+  for (const fila of filas) {
+    if (fila.esTotal) {
+      out.push(null);
+      continue;
+    }
+    out.push({ fila, negrita: out.length === 0 || out[out.length - 1] === null });
+    if (fila.color === "amarillo") out.push(null);
+  }
+  return out;
+}
+
 export function libroDeTallas(filas: readonly FilaTallas[], hoja = "Tallas"): XLSX.WorkBook {
   const { hdr, B } = makeCellStyles();
-  const aoa: unknown[][] = [[...COLUMNAS_TALLAS]];
-  for (const f of filas) aoa.push([f.referencia, f.descripcion, f.talla, f.codigoBarra, f.pares, f.opcion]);
+  const renglones = renglonesDelExcel(filas);
+  const aoa: unknown[][] = [[...COLUMNAS_TALLAS], ...renglones.map(() => [])];
   const ws: XLSX.WorkSheet = {};
   COLUMNAS_TALLAS.forEach((h, c) => (ws[addr(0, c)] = hdr(h)));
 
-  filas.forEach((f, i) => {
+  renglones.forEach((renglon, i) => {
+    if (!renglon) return;
+    const { fila: f, negrita } = renglon;
     const r = i + 1;
     const s = {
-      font: { sz: 10, name: "Calibri", bold: f.esTotal, color: { rgb: "222222" } },
+      font: { sz: 10, name: "Calibri", bold: negrita, color: { rgb: "222222" } },
       border: B,
       ...(f.color ? { fill: { fgColor: { rgb: FONDO[f.color] } } } : {}),
     };
