@@ -66,7 +66,7 @@ describe("videos de ayuda — el manifiesto", () => {
       expect(src, `${m.href}/page.tsx`).toMatch(/<AppHeader\b/);
     }
     expect(videosDeLaRuta("/home")).toBe(VIDEOS_DEL_INICIO);
-    expect(videosDeLaRuta("/productos/cargar")).toBeNull();
+    expect(videosDeLaRuta("/no-existe")).toBeNull();
   });
 
   it("el «?» vive en el encabezado: computadora (AppHeader), celular (avatar flotante) e Inicio", () => {
