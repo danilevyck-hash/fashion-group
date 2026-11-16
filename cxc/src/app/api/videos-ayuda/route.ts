@@ -13,7 +13,15 @@ import { verifySession } from "@/lib/session-cookie";
 import { tieneAccesoAlModulo } from "@/lib/auth-check";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ALL_MODULES } from "@/lib/modules";
-import { BUCKET_VIDEOS_AYUDA, VIDEOS_DEL_INICIO, videosDelModulo, type VideoAyuda } from "@/lib/videos-ayuda/manifiesto";
+import {
+  BUCKET_VIDEOS_AYUDA,
+  FORMATOS,
+  VIDEOS_DEL_INICIO,
+  tieneFormatoCelular,
+  videosDelModulo,
+  type FormatoVideos,
+  type VideoAyuda,
+} from "@/lib/videos-ayuda/manifiesto";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +32,10 @@ export async function GET(req: NextRequest) {
   // `/home` no es un módulo: sus videos (solo los del Inicio) los ve toda sesión.
   const esInicio = key === VIDEOS_DEL_INICIO;
   const modulo = esInicio ? { key, label: "Inicio", roles: [] as string[] } : ALL_MODULES.find((m) => m.key === key);
-  const { lista, completo } = videosDelModulo(key);
+  // `?formato=celular` pide la versión de teléfono; cualquier otro valor, la de computadora.
+  const pedido = req.nextUrl.searchParams.get("formato") as FormatoVideos | null;
+  const formato: FormatoVideos = pedido && FORMATOS.includes(pedido) ? pedido : "computadora";
+  const { lista, completo } = videosDelModulo(key, formato);
   if (!modulo || lista.length === 0) {
     return NextResponse.json({ error: "Este módulo no tiene videos." }, { status: 404 });
   }
@@ -60,7 +71,13 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json(
-    { modulo: modulo.label, lista: lista.map(conUrl), completo: completo ? conUrl(completo) : null },
+    {
+      modulo: modulo.label,
+      formato,
+      conFormatoCelular: tieneFormatoCelular(key),
+      lista: lista.map(conUrl),
+      completo: completo ? conUrl(completo) : null,
+    },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

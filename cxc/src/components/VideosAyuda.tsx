@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { BottomSheet, EnElCuerpo } from "@/components/ui";
 import { Aviso } from "@/components/ui/Aviso";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
-import { duracion, tituloEnLista } from "@/lib/videos-ayuda/manifiesto";
+import { duracion, tituloEnLista, type FormatoVideos } from "@/lib/videos-ayuda/manifiesto";
 import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import { logActivityClient } from "@/lib/logActivityClient";
@@ -29,6 +29,9 @@ interface VideoFirmado {
 }
 interface Respuesta {
   modulo: string;
+  formato: FormatoVideos;
+  /** Hay una versión de teléfono: se ofrece cambiar de formato. */
+  conFormatoCelular: boolean;
   lista: VideoFirmado[];
   completo: VideoFirmado | null;
 }
@@ -55,6 +58,23 @@ function leerVelocidad(): number {
 function guardarVelocidad(v: number) {
   try {
     localStorage.setItem(claveVelocidad(), String(v));
+  } catch {
+    /* sin almacenamiento: vale solo mientras el panel está abierto */
+  }
+}
+
+// El formato elegido, recordado por quien mira (la de computadora abre por defecto).
+const CLAVE_FORMATO = "fg_videos_formato";
+function leerFormato(): FormatoVideos {
+  try {
+    return localStorage.getItem(CLAVE_FORMATO) === "celular" ? "celular" : "computadora";
+  } catch {
+    return "computadora";
+  }
+}
+function guardarFormato(f: FormatoVideos) {
+  try {
+    localStorage.setItem(CLAVE_FORMATO, f);
   } catch {
     /* sin almacenamiento: vale solo mientras el panel está abierto */
   }
@@ -124,6 +144,7 @@ function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void })
   const [actual, setActual] = useState<VideoFirmado | null>(null);
   const [reproducir, setReproducir] = useState(false);
   const [velocidad, setVelocidad] = useState(1);
+  const [formato, setFormato] = useState<FormatoVideos>(leerFormato);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => setVelocidad(leerVelocidad()), []);
@@ -141,7 +162,7 @@ function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void })
 
   useEffect(() => {
     let vivo = true;
-    fetch(`/api/videos-ayuda?modulo=${encodeURIComponent(modulo)}`)
+    fetch(`/api/videos-ayuda?modulo=${encodeURIComponent(modulo)}&formato=${formato}`)
       .then(async (r) => {
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.error || "No se pudieron cargar los videos. Vuelve a intentarlo en un momento.");
@@ -151,12 +172,19 @@ function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void })
         if (!vivo) return;
         setDatos(j);
         setActual(j.lista[0] ?? null);
+        setReproducir(false);
       })
       .catch((e: Error) => vivo && setError(e.message));
     return () => {
       vivo = false;
     };
-  }, [modulo]);
+  }, [modulo, formato]);
+
+  const cambiarFormato = () => {
+    const otro: FormatoVideos = formato === "celular" ? "computadora" : "celular";
+    setFormato(otro);
+    guardarFormato(otro);
+  };
 
   // iPhone Safari vuelve a 1× al cambiar de video: se aplica en cada carga.
   const aplicarVelocidad = () => {
@@ -265,6 +293,16 @@ function Contenido({ modulo, onClose }: { modulo: string; onClose: () => void })
               className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
             >
               <IconoPlay /> Ver todo ({minutos} min)
+            </button>
+          )}
+          {datos.conFormatoCelular && (
+            <button
+              type="button"
+              data-cambiar-formato
+              onClick={cambiarFormato}
+              className="-my-1 inline-flex min-h-[44px] items-center self-start text-sm text-blue-600 hover:underline"
+            >
+              {formato === "celular" ? "Ver en formato computadora" : "Ver en formato celular"}
             </button>
           )}
           <ul className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200">
