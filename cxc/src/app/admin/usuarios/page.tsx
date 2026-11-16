@@ -2,7 +2,11 @@
 
 import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
-import { BarraDeControles, EnLaBarra, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { BarraDeControles, CLASE_FILA_MENU, EnLaBarra, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { USUARIOS_EMPRESA_POR_NOMBRE_2026_11, USUARIOS_NUEVO_EN_EL_TITULO_2026_11 } from "@/lib/ui/revision-110-marketing";
 import { mapEmpresaName } from "@/lib/empresa-mapping";
 import { opcionesDeEmpresa } from "@/lib/usuarios/opciones-empresa";
@@ -25,7 +29,17 @@ import { USUARIO_GUARDAR_ARRIBA_2026_11 } from "@/lib/ui/iphone-2026-11";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { etiquetaDeRol } from "@/lib/roles-etiquetas";
 import { USUARIOS_APPLE_2026_10 } from "@/lib/usuarios-apple-2026-10";
-import { SYSTEM_ROLE_KEYS } from "@/lib/modules";
+import { SYSTEM_ROLE_KEYS, SYSTEM_ROLES } from "@/lib/modules";
+
+/** Rótulo largo del selector «Rol»; el rol que no está aquí sale con su nombre de SYSTEM_ROLES. */
+const DETALLE_DEL_ROL: Record<string, string> = {
+  admin: "Administrador — acceso total",
+  secretaria: "Secretaria — operaciones diarias",
+  vendedor: "Vendedor — catálogo y cuentas por cobrar",
+  contabilidad: "Contabilidad — préstamos y ventas",
+  bodega: "Bodega — despacho de guías",
+  marcacion: "Marcación — solo marca desde el teléfono",
+};
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import MarcaAsistencia, { MARCA_APAGADA, cuerpoDeColaborador, faltaEnMarca, type EstadoMarca } from "./MarcaAsistencia";
 import CampoFecha from "@/components/ui/CampoFecha";
@@ -101,6 +115,9 @@ function UsuariosPageInner() {
   const [tabRaw, setTab] = useUrlState("tab", "usuarios");
   // Celular: el título es el selector de sección («Usuarios ▾»).
   const barra = useBarraCelular(SECCION_EN_EL_TITULO_2026_11);
+  // «Cómo se usa» en la PORTADA del módulo (videos en formato celular).
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("usuarios");
   // «Novedades» es SOLO de admin. El guard de arriba ya cierra la pantalla
   // entera, pero la pestaña se condiciona igual: así el permiso se lee en el
   // componente y un test lo puede exigir, en vez de depender de que nadie
@@ -327,6 +344,7 @@ function UsuariosPageInner() {
           Ahora el breadcrumb es `Inicio › Administración › Usuarios`, y el
           grupo sale de `grupoDeModulo("usuarios")` — nunca escrito a mano. */}
       <AppHeader module="Usuarios" grupo={grupoDeModulo("usuarios")} tituloEnLaPantalla={barra && esAdmin} />
+      {conVideos && <VideosAyuda modulo="usuarios" open={verVideos} onClose={() => setVerVideos(false)} />}
       {barra && esAdmin && (
         <ProveedorBarraCelular activo activa={tab}>
           <BarraDeControles
@@ -338,6 +356,7 @@ function UsuariosPageInner() {
             ]}
             activa={tab}
             onPestana={setTab}
+            menu={conVideos ? <button type="button" onClick={() => setVerVideos(true)} className={CLASE_FILA_MENU}>Cómo se usa</button> : null}
           />
           {/* n.º 100: «＋ Nuevo usuario» sube a la línea del título; la lista sube. */}
           {USUARIOS_NUEVO_EN_EL_TITULO_2026_11 && (
@@ -392,7 +411,10 @@ function UsuariosPageInner() {
           {/* 🔴 Estilo Apple: en la computadora «＋ Nuevo usuario» va en la fila
               de las pestañas, no en una fila sola. */}
           {USUARIOS_APPLE_2026_10 && tab === "usuarios" && (
-            <div className="absolute right-0 top-0 hidden sm:block">{botonNuevoUsuario}</div>
+            <div className="absolute right-0 top-0 hidden items-center gap-2 sm:flex">
+              {conVideos && <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />}
+              {botonNuevoUsuario}
+            </div>
           )}
 
           <TabsContent value="usuarios" className="mt-0">
@@ -597,12 +619,12 @@ function UsuariosPageInner() {
                     }}
                     className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm focus:outline-none focus:border-gray-900 transition"
                   >
-                    <option value="admin">Administrador — acceso total</option>
-                    <option value="secretaria">Secretaria — operaciones diarias</option>
-                    <option value="vendedor">Vendedor — catálogo y cuentas por cobrar</option>
-                    <option value="contabilidad">Contabilidad — préstamos y ventas</option>
-                    <option value="bodega">Bodega — despacho de guías</option>
-                    <option value="marcacion">Marcación — solo marca desde el teléfono</option>
+                    {/* 🔴 Las opciones salen de SYSTEM_ROLES: si falta un rol, el
+                        <select> nativo muestra la primera opción y editar a un
+                        gerente lo enseñaba como «Administrador». */}
+                    {SYSTEM_ROLES.map(r => (
+                      <option key={r.key} value={r.key}>{DETALLE_DEL_ROL[r.key] ?? r.label}</option>
+                    ))}
                   </select>
                   {editUserId === currentUserId && uRole !== "admin" && (
                     /* 🔴 EXCEPCIÓN a <Aviso> (Daniel, 2-oct-2026: «lo empeoraste»). Es

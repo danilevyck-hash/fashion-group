@@ -15,7 +15,7 @@
 // redirige acá (next.config.js).
 
 import { TEXTOS_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
-import { Suspense, useMemo, useRef } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import AppHeader from "@/components/AppHeader";
@@ -37,7 +37,11 @@ import DetalleEgresos from "./components/DetalleEgresos";
 import SaldosBancoTab from "./components/saldos/SaldosBancoTab";
 import { Aviso } from "@/components/ui/Aviso";
 import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
-import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { BarraDeControles, CLASE_FILA_MENU, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 
 // Las dos pestañas. `?tab=` en la URL (mismo patrón que Usuarios, Ventas y
 // Multifashion) para que un marcador, un refresh y el back/forward caigan donde
@@ -75,6 +79,9 @@ function GastosContabilidadInner({ apple }: { apple: boolean }) {
   // elige la pestaña y el mes va en su renglón—. Apagado o en la computadora,
   // nada cambia.
   const barra = useBarraCelular(apple);
+  // «Cómo se usa» en la PORTADA del módulo; la key es `gastos-contabilidad`.
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("gastos-contabilidad");
 
   // ?tab= es un filtro del MISMO nivel → replace (no ensucia el historial). Un
   // `?tab=` desconocido cae en "gastos", NUNCA en blanco: Radix no dibuja nada
@@ -158,6 +165,7 @@ function GastosContabilidadInner({ apple }: { apple: boolean }) {
         breadcrumbs={nombreAbierto ? [{ label: nombreAbierto }] : undefined}
         tituloEnLaPantalla={barra}
       />
+      {conVideos && <VideosAyuda modulo="gastos-contabilidad" open={verVideos} onClose={() => setVerVideos(false)} />}
       {barra && (
         <ProveedorBarraCelular activo activa={tab}>
           <BarraDeControles
@@ -165,6 +173,7 @@ function GastosContabilidadInner({ apple }: { apple: boolean }) {
             pestanas={[{ value: "gastos", label: "Gastos" }, { value: "saldos-banco", label: "Saldos de banco" }]}
             activa={tab}
             onPestana={setTab}
+            menu={conVideos ? <button type="button" onClick={() => setVerVideos(true)} className={CLASE_FILA_MENU}>Cómo se usa</button> : null}
             periodo={enGastos && !empresaParam ? (
               <div className="flex min-w-0 items-center gap-2">
                 <SelectorMes mes={mes} mesTope={hoyMes} onCambiar={setMesParam} compacto />
@@ -181,7 +190,12 @@ function GastosContabilidadInner({ apple }: { apple: boolean }) {
             y esté en las dos (dos h1 en una página serían uno de más). */}
         <h1 className="sr-only">Gastos</h1>
 
-        <Tabs value={tab} onValueChange={setTab}>
+        <Tabs value={tab} onValueChange={setTab} className="relative">
+          {conVideos && !barra && (
+            <div className="absolute right-0 top-0">
+              <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />
+            </div>
+          )}
           <TabsList className={`${barra ? "!hidden " : ""}-mx-4 mb-5 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent p-0 px-4 md:mx-0 md:px-0`}>
             <TabsTrigger value="gastos" className={TAB_TRIGGER_CLASS}>
               <Receipt className="hidden h-3.5 w-3.5 sm:block" /> Gastos

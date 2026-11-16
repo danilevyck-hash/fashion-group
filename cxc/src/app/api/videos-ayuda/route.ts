@@ -13,7 +13,7 @@ import { verifySession } from "@/lib/session-cookie";
 import { tieneAccesoAlModulo } from "@/lib/auth-check";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ALL_MODULES } from "@/lib/modules";
-import { BUCKET_VIDEOS_AYUDA, videosDelModulo, type VideoAyuda } from "@/lib/videos-ayuda/manifiesto";
+import { BUCKET_VIDEOS_AYUDA, VIDEOS_DEL_INICIO, videosDelModulo, type VideoAyuda } from "@/lib/videos-ayuda/manifiesto";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,9 @@ const SEGUNDOS_URL_FIRMADA = 60 * 60;
 
 export async function GET(req: NextRequest) {
   const key = req.nextUrl.searchParams.get("modulo") ?? "";
-  const modulo = ALL_MODULES.find((m) => m.key === key);
+  // `/home` no es un módulo: sus videos (solo los del Inicio) los ve toda sesión.
+  const esInicio = key === VIDEOS_DEL_INICIO;
+  const modulo = esInicio ? { key, label: "Inicio", roles: [] as string[] } : ALL_MODULES.find((m) => m.key === key);
   const { lista, completo } = videosDelModulo(key);
   if (!modulo || lista.length === 0) {
     return NextResponse.json({ error: "Este módulo no tiene videos." }, { status: 404 });
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   const sesion = verifySession(req.cookies.get("cxc_session")?.value);
   if (!sesion) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  if (!tieneAccesoAlModulo(sesion.role, sesion.modules, modulo.key, modulo.roles)) {
+  if (!esInicio && !tieneAccesoAlModulo(sesion.role, sesion.modules, modulo.key, modulo.roles)) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 

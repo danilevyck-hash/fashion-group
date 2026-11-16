@@ -11,7 +11,7 @@ vi.mock("@/lib/session-cookie", () => ({ verifySession: () => sesion() }));
 
 import { NextRequest } from "next/server";
 import { GET } from "@/app/api/videos-ayuda/route";
-import { VIDEOS_AYUDA, videosDelModulo, duracion, tituloEnLista, tieneVideos } from "@/lib/videos-ayuda/manifiesto";
+import { VIDEOS_AYUDA, videosDelModulo, duracion, tituloEnLista, tieneVideos, VIDEOS_DEL_INICIO } from "@/lib/videos-ayuda/manifiesto";
 import { ALL_MODULE_KEYS, ALL_MODULES } from "@/lib/modules";
 
 const req = (modulo: string) =>
@@ -19,12 +19,16 @@ const req = (modulo: string) =>
 
 describe("videos de ayuda — el manifiesto", () => {
   it("cada video es de un módulo que existe, con rutas únicas en su carpeta", () => {
-    const rutas = VIDEOS_AYUDA.flatMap((v) => [v.video, v.miniatura]);
-    expect(new Set(rutas).size).toBe(rutas.length);
+    for (const m of new Set(VIDEOS_AYUDA.map((v) => v.modulo))) {
+      const rutas = VIDEOS_AYUDA.filter((v) => v.modulo === m).flatMap((v) => [v.video, v.miniatura]);
+      expect(new Set(rutas).size).toBe(rutas.length);
+    }
     for (const v of VIDEOS_AYUDA) {
-      expect(ALL_MODULE_KEYS).toContain(v.modulo);
-      expect(v.video.startsWith(`${v.modulo}/`) && v.video.endsWith(".mp4")).toBe(true);
-      expect(v.miniatura.startsWith(`${v.modulo}/`) && v.miniatura.endsWith(".jpg")).toBe(true);
+      // El Inicio no es un módulo y reusa los archivos de la Vista general.
+      const carpeta = v.modulo === VIDEOS_DEL_INICIO ? "vista-general" : v.modulo;
+      if (v.modulo !== VIDEOS_DEL_INICIO) expect(ALL_MODULE_KEYS).toContain(v.modulo);
+      expect(v.video.startsWith(`${carpeta}/`) && v.video.endsWith(".mp4")).toBe(true);
+      expect(v.miniatura.startsWith(`${carpeta}/`) && v.miniatura.endsWith(".jpg")).toBe(true);
       expect(v.segundos).toBeGreaterThan(0);
     }
   });
@@ -36,7 +40,7 @@ describe("videos de ayuda — el manifiesto", () => {
     expect(tituloEnLista(lista[0])).toBe("Introducción");
     expect(tituloEnLista(lista[2])).toBe("2. Registrar un gasto");
     expect(tieneVideos("caja")).toBe(true);
-    expect(tieneVideos("cargar")).toBe(false);
+    expect(tieneVideos("no-existe")).toBe(false);
   });
 
   it("duración m:ss", () => {
@@ -51,6 +55,7 @@ describe("videos de ayuda — el manifiesto", () => {
 
   it("«Cómo se usa» vive en la PORTADA de cada módulo con videos (la primera pantalla que abre)", () => {
     for (const modulo of new Set(VIDEOS_AYUDA.map((v) => v.modulo))) {
+      if (modulo === VIDEOS_DEL_INICIO) continue; // `/home`: su prueba aparte
       const href = ALL_MODULES.find((m) => m.key === modulo)!.href;
       // La portada es `page.tsx` o el componente de su carpeta que dibuja
       // (`./ReclamosClient`, …): una página de servidor no puede tener el estado.
@@ -146,6 +151,47 @@ describe("GET /api/videos-ayuda", () => {
     expect((await GET(req("referencia"))).status).toBe(403);
   });
 
+  it("Usuarios: serie de teléfono, solo admin", async () => {
+    sesion.mockReturnValue({ role: "admin" });
+    const r = await (await GET(req("usuarios"))).json();
+    expect(r.lista).toHaveLength(10);
+    expect(r.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
+    sesion.mockReturnValue({ role: "secretaria" });
+    expect((await GET(req("usuarios"))).status).toBe(403);
+  });
+
+  it("Inicio: toda sesión ve SOLO los clips del Inicio, sin el completo; la Vista general sigue de admin", async () => {
+    const home = fs.readFileSync(path.join(process.cwd(), "src/app/home/page.tsx"), "utf8");
+    expect(home).toMatch(/VIDEOS_AYUDA_2026_11 && tieneVideos\(VIDEOS_DEL_INICIO\)/);
+    expect(home).toMatch(/<VideosAyuda modulo=\{VIDEOS_DEL_INICIO\}/);
+    sesion.mockReturnValue({ role: "bodega" });
+    const r = await (await GET(req("inicio"))).json();
+    expect(r.lista.map((v: { orden: number }) => v.orden)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(r.completo).toBeNull();
+    expect((await GET(req("vista-general"))).status).toBe(403);
+    sesion.mockReturnValue({ role: "admin" });
+    const vg = await (await GET(req("vista-general"))).json();
+    expect(vg.lista).toHaveLength(11);
+    expect(vg.completo).not.toBeNull();
+  });
+
+  it("Plantilla Switch: la secretaria la abre, bodega no", async () => {
+    sesion.mockReturnValue({ role: "secretaria" });
+    const r = await (await GET(req("cargar"))).json();
+    expect(r.lista).toHaveLength(11);
+    expect(r.completo).not.toBeNull();
+    sesion.mockReturnValue({ role: "bodega" });
+    expect((await GET(req("cargar"))).status).toBe(403);
+  });
+
+  it("Gastos: contabilidad lo abre, secretaria no", async () => {
+    sesion.mockReturnValue({ role: "contabilidad" });
+    const r = await (await GET(req("gastos-contabilidad"))).json();
+    expect(r.lista).toHaveLength(9);
+    sesion.mockReturnValue({ role: "secretaria" });
+    expect((await GET(req("gastos-contabilidad"))).status).toBe(403);
+  });
+
   it("Asistencia es mixta: solo el 01 (marcar desde el teléfono) va vertical", async () => {
     sesion.mockReturnValue({ role: "contabilidad" });
     const a = await (await GET(req("asistencia"))).json();
@@ -154,7 +200,7 @@ describe("GET /api/videos-ayuda", () => {
 
   it("un módulo sin videos: 404", async () => {
     sesion.mockReturnValue({ role: "admin" });
-    expect((await GET(req("cargar"))).status).toBe(404);
+    expect((await GET(req("no-existe"))).status).toBe(404);
   });
 
   it("la secretaria recibe la lista con URLs firmadas", async () => {

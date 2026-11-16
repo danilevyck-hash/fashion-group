@@ -21,6 +21,8 @@
  * ──────────────────────────────────────────────────────────────────────────── */
 
 export const BUCKET_VIDEOS_AYUDA = "videos-ayuda";
+/** Key de los videos de `/home`: no es un módulo de `modules.ts` (ver la ruta). */
+export const VIDEOS_DEL_INICIO = "inicio";
 
 export interface VideoAyuda {
   modulo: string;
@@ -35,14 +37,14 @@ export interface VideoAyuda {
 }
 
 /** Un renglón: la carpeta del bucket es la key del módulo (`modules.ts`). */
-const fila = (modulo: string, { vertical = false } = {}) =>
+const fila = (modulo: string, { vertical = false, carpeta = modulo } = {}) =>
   (orden: number, titulo: string, segundos: number, archivo: string, completo = false, esVertical = vertical): VideoAyuda => ({
     modulo,
     orden,
     titulo,
     segundos,
-    video: `${modulo}/${archivo}.mp4`,
-    miniatura: `${modulo}/${archivo}.jpg`,
+    video: `${carpeta}/${archivo}.mp4`,
+    miniatura: `${carpeta}/${archivo}.jpg`,
     ...(completo ? { completo } : {}),
     ...(esVertical ? { vertical: true } : {}),
   });
@@ -61,6 +63,13 @@ const ventas = fila("ventas", { vertical: true }); // toda la serie en formato c
 const multifashion = fila("multifashion");
 const boston = fila("boston");
 const referencia = fila("referencia", { vertical: true }); // Consulta de artículos: serie de celular
+const usuarios = fila("usuarios", { vertical: true }); // serie de celular
+const gastos = fila("gastos-contabilidad");
+const plantilla = fila("cargar"); // Plantilla Switch: la key del módulo es `cargar`
+const vistaGeneral = fila("vista-general");
+// Inicio (`/home`) no es un módulo: lo ve TODO rol con sesión, así que lleva solo
+// los clips del Inicio (00–05) y sin el completo, que enseña la Vista general (admin).
+const inicio = fila(VIDEOS_DEL_INICIO, { carpeta: "vista-general" });
 const despachos = fila("guias"); // Despachos: la key del módulo sigue siendo `guias`
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
@@ -254,6 +263,57 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   referencia(5, "Los colores", 41, "05-los-colores"),
   referencia(6, "Un color o varios códigos", 51, "06-un-color-o-varios"),
   referencia(7, "Actualizar y descargar", 48, "07-actualizar-y-excel"),
+  usuarios(0, "Usuarios completo", 524, "00-completo", true),
+  usuarios(0, "Introducción", 53, "00-que-es-usuarios"),
+  usuarios(1, "Leer la lista", 47, "01-leer-la-lista"),
+  usuarios(2, "Crear un usuario", 52, "02-nuevo-usuario"),
+  usuarios(3, "Rol, empresa y permisos", 60, "03-rol-y-permisos"),
+  usuarios(4, "Alguien que marca asistencia", 62, "04-marca-asistencia"),
+  usuarios(5, "Contraseña y vendedor en Switch", 44, "05-editar-clave-y-vendedor"),
+  usuarios(6, "Desactivar y dar de baja", 49, "06-desactivar-y-baja"),
+  usuarios(7, "Sesiones activas", 48, "07-sesiones-activas"),
+  usuarios(8, "Novedades", 45, "08-novedades"),
+  usuarios(9, "Actividad", 47, "09-actividad"),
+  gastos(0, "Gastos completo", 428, "00-completo", true),
+  gastos(0, "Introducción", 49, "00-que-es-gastos"),
+  gastos(1, "Leer la lista", 46, "01-leer-la-lista"),
+  gastos(2, "Hasta dónde está cargada", 48, "02-hasta-donde-esta-cargada"),
+  gastos(3, "Cambiar de mes", 37, "03-cambiar-de-mes"),
+  gastos(4, "El detalle de una empresa", 51, "04-detalle-de-una-empresa"),
+  gastos(5, "Buscar una cuenta", 38, "05-buscar-una-cuenta"),
+  gastos(6, "Saldos de banco", 47, "06-saldos-de-banco"),
+  gastos(7, "Cargar un saldo", 45, "07-cargar-un-saldo"),
+  gastos(8, "Corregir un saldo", 54, "08-corregir-un-saldo"),
+  plantilla(0, "Plantilla Switch completo", 709, "00-completo", true),
+  plantilla(0, "Introducción", 55, "00-que-es"),
+  plantilla(1, "Subir el archivo del proveedor", 73, "01-subir"),
+  plantilla(2, "Descripciones nuevas y avisos", 74, "02-descripciones-avisos"),
+  plantilla(3, "Calcular los precios", 73, "03-precios"),
+  plantilla(4, "Temporada y descargar la plantilla", 62, "04-descargar"),
+  plantilla(5, "Reebok", 78, "05-reebok"),
+  plantilla(6, "Facturas de tienda", 64, "06-tienda"),
+  plantilla(7, "El historial de descargas", 47, "07-historial"),
+  plantilla(8, "Tallas por pedido", 57, "08-tallas-pedido"),
+  plantilla(9, "Detalle por bulto desde un Excel", 45, "09-detalle-bulto"),
+  plantilla(10, "Configuración", 62, "10-configuracion"),
+  vistaGeneral(0, "Inicio y Vista general completo", 561, "00-completo", true),
+  vistaGeneral(0, "Introducción", 44, "00-que-es"),
+  vistaGeneral(1, "El Inicio", 48, "01-el-inicio"),
+  vistaGeneral(2, "Abrir un módulo y volver", 44, "02-abrir-y-volver"),
+  vistaGeneral(3, "La búsqueda global", 53, "03-buscar"),
+  vistaGeneral(4, "Atajos de la búsqueda", 51, "04-atajos-de-busqueda"),
+  vistaGeneral(5, "El Inicio en el celular", 49, "05-en-el-celular"),
+  inicio(0, "Introducción", 44, "00-que-es"),
+  inicio(1, "El Inicio", 48, "01-el-inicio"),
+  inicio(2, "Abrir un módulo y volver", 44, "02-abrir-y-volver"),
+  inicio(3, "La búsqueda global", 53, "03-buscar"),
+  inicio(4, "Atajos de la búsqueda", 51, "04-atajos-de-busqueda"),
+  inicio(5, "El Inicio en el celular", 49, "05-en-el-celular"),
+  vistaGeneral(6, "La Vista general y el mes", 42, "06-vista-general-el-mes"),
+  vistaGeneral(7, "Las seis tarjetas", 60, "07-las-seis-tarjetas"),
+  vistaGeneral(8, "Inventario y gastos", 53, "08-inventario-y-gastos"),
+  vistaGeneral(9, "Ventas y rentabilidad por empresa", 58, "09-ventas-y-rentabilidad"),
+  vistaGeneral(10, "Alertas", 39, "10-alertas"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */
