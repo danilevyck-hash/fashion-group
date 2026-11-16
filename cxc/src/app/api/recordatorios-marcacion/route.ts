@@ -2,7 +2,7 @@
 // Marcación que tocan AHORA (16-nov-2026).
 //
 // 🔴 NO ESTÁ EN `vercel.json`: la llama la BASE cada 5 minutos (`pg_cron` +
-// `pg_net`, migración `20270119130000`), con `CRON_SECRET` en el encabezado.
+// `pg_net`, migración `20270120130000`), con `CRON_SECRET` en el encabezado.
 // Sin el secreto contesta 401; sin las llaves VAPID no manda nada y lo dice.
 //
 // A quién se avisa lo decide `aQuienAvisar` (puro). Un aviso por persona,

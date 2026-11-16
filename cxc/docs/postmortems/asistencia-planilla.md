@@ -3676,12 +3676,12 @@ Daniel aprobó el mockup HOY vs RECOMENDACIÓN de Marcación (versión 2, la tab
 - Al encender el primero se pide permiso de avisos y se suscribe el aparato (web push estándar, VAPID, librería `web-push` 3.6.7). En iPhone sin instalar sale «Para recibir avisos, agrega Fashion Group a tu pantalla de inicio.»
 - El service worker (`src/app/sw.ts`) tiene `push` y `notificationclick` (abre `/marcacion`). Texto: «Fashion Group · Recuerda marcar tu entrada» (o la marca que toque).
 - **A quién se avisa** (`aQuienAvisar`, puro, en `lib/marcacion/recordatorios.ts`): recordatorio prendido · su hora cayó en los últimos 5 minutos · no lleva esa marca hoy (marcas CORREGIDAS) · día hábil SUYO (`resolverDiasLaborables`) · hoy no es feriado ni día libre (`asistencia_feriados`) · su ficha no está de baja. Un aviso por persona, marca y día: la fila de `marcacion_avisos_enviados` se aparta ANTES de mandar. Una suscripción que contesta 404/410 se borra.
-- 🔴 **La ruta `POST /api/recordatorios-marcacion` NO está en `vercel.json`** (la regla de los crons no se toca): la llama la base cada 5 minutos con `pg_cron` + `pg_net`, con `CRON_SECRET` en el encabezado, guardado en **Supabase Vault** (`marcacion_recordatorios_cron_secret`), nunca en el repo. Vive fuera de `/api/marcacion/*` porque esas exigen sesión (`requireMarcacion`). Sin las llaves VAPID contesta 503 y no manda nada.
+- 🔴 **La ruta `POST /api/recordatorios-marcacion` NO está en `vercel.json`** (la regla de los crons no se toca): la llama la base cada 5 minutos con `pg_cron` + `pg_net`, con `CRON_SECRET` en el encabezado, guardado en **Supabase Vault** (`cron_secret`), nunca en el repo. Vive fuera de `/api/marcacion/*` porque esas exigen sesión (`requireMarcacion`). Sin las llaves VAPID contesta 503 y no manda nada.
 
 ### Base de datos (SIN APLICAR al publicar)
 
 - `20270119120000_marcacion_recordatorios.sql`: `marcacion_recordatorios` (PK `empleado_codigo, marca`), `marcacion_push_suscripciones` (una fila por `endpoint`) y `marcacion_avisos_enviados` (PK `empleado_codigo, fecha, marca`). RLS prendido sin políticas (solo `service_role`). Las dos primeras son `personas` en el respaldo; la tercera, `bitacora`.
-- `20270119130000_marcacion_recordatorios_cada_5_min.sql`: `pg_cron`, `pg_net` y el job `marcacion-recordatorios` (`*/5 * * * *`). El secreto se carga aparte: `select vault.create_secret('<CRON_SECRET>', 'marcacion_recordatorios_cron_secret');`.
+- `20270120130000_marcacion_recordatorios_cada_5_min.sql`: SOLO el job `marcacion-recordatorios` (`*/5 * * * *`). 🔴 Requiere la migración que instala `pg_cron` + `pg_net` y carga el secreto `cron_secret` en Vault (es de otro trabajo: mover crons de Vercel a `pg_cron`); esta no instala nada.
 - Variables de Vercel: `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY` (están en `.env.local`).
 
 ### Candados
