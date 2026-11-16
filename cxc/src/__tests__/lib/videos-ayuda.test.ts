@@ -12,7 +12,7 @@ vi.mock("@/lib/session-cookie", () => ({ verifySession: () => sesion() }));
 import { NextRequest } from "next/server";
 import { GET } from "@/app/api/videos-ayuda/route";
 import { VIDEOS_AYUDA, videosDelModulo, duracion, tituloEnLista, tieneVideos } from "@/lib/videos-ayuda/manifiesto";
-import { ALL_MODULE_KEYS } from "@/lib/modules";
+import { ALL_MODULE_KEYS, ALL_MODULES } from "@/lib/modules";
 
 const req = (modulo: string) =>
   new NextRequest(`http://x/api/videos-ayuda?modulo=${modulo}`, { headers: { cookie: "cxc_session=x" } });
@@ -47,6 +47,15 @@ describe("videos de ayuda — el manifiesto", () => {
   it("la caja abre el panel solo detrás del interruptor y de que haya videos", () => {
     const src = fs.readFileSync(path.join(process.cwd(), "src/app/caja/[periodoId]/page.tsx"), "utf8");
     expect(src).toMatch(/VIDEOS_AYUDA_2026_11 && tieneVideos\("caja"\)/);
+  });
+
+  it("«Cómo se usa» vive en la PORTADA de cada módulo con videos (la primera pantalla que abre)", () => {
+    for (const modulo of new Set(VIDEOS_AYUDA.map((v) => v.modulo))) {
+      const href = ALL_MODULES.find((m) => m.key === modulo)!.href;
+      const src = fs.readFileSync(path.join(process.cwd(), `src/app${href}/page.tsx`), "utf8");
+      expect(src, `${href}/page.tsx`).toMatch(new RegExp(`VIDEOS_AYUDA_2026_11 && tieneVideos\\("${modulo}"\\)`));
+      expect(src, `${href}/page.tsx`).toMatch(new RegExp(`<VideosAyuda modulo="${modulo}"`));
+    }
   });
 });
 
