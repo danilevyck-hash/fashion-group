@@ -34,11 +34,17 @@ describe("videos de ayuda — el manifiesto", () => {
     }
     for (const v of VIDEOS_AYUDA) {
       // El Inicio no es un módulo y reusa los archivos de la Vista general.
-      // La versión 16:9 de una serie regrabada vive en `<key>-16x9/`.
+      // La versión 16:9 de una serie regrabada vive en `<key>-16x9/`; la de
+      // teléfono nueva, en `<nombre>-celular/` (Despachos: `despachos-celular/`).
       const base = v.modulo === VIDEOS_DEL_INICIO ? "vista-general" : v.modulo;
-      const carpeta = v.formato === "computadora" ? `${base}-16x9` : base;
+      const carpetas =
+        v.formato === "computadora" ? [`${base}-16x9`, base]
+        : v.formato === "celular" ? [base, `${base}-celular`, ...(base === "guias" ? ["despachos-celular"] : [])]
+        : [base];
       if (v.modulo !== VIDEOS_DEL_INICIO) expect(ALL_MODULE_KEYS).toContain(v.modulo);
-      expect(v.video.startsWith(`${carpeta}/`) && v.video.endsWith(".mp4")).toBe(true);
+      const carpeta = v.video.split("/")[0];
+      expect(carpetas, v.video).toContain(carpeta);
+      expect(v.video.endsWith(".mp4")).toBe(true);
       expect(v.miniatura.startsWith(`${carpeta}/`) && v.miniatura.endsWith(".jpg")).toBe(true);
       expect(v.segundos).toBeGreaterThan(0);
     }
@@ -135,8 +141,9 @@ describe("GET /api/videos-ayuda", () => {
 
   it("🔴 abre en formato COMPUTADORA (16:9) en todo módulo; la de teléfono va a un toque donde quedó", async () => {
     sesion.mockReturnValue({ role: "admin" });
-    const CON_CELULAR = ["catalogos", "proveedores", "ventas", "referencia", "usuarios", "asistencia"];
+    const CON_CELULAR = ["catalogos", "proveedores", "ventas", "referencia", "usuarios", "asistencia", "guias", "multifashion", "cxc"];
     for (const m of new Set(VIDEOS_AYUDA.map((v) => v.modulo))) {
+      if (m === "marcacion") continue; // solo tiene la de teléfono (prueba propia abajo)
       const r = await (await GET(req(m))).json();
       expect(sinVertical(r), m).toBe(true);
       expect(r.formato).toBe("computadora");
@@ -251,6 +258,34 @@ describe("GET /api/videos-ayuda", () => {
     expect(c.lista.filter((v: { vertical?: boolean }) => v.vertical).map((v: { titulo: string }) => v.titulo)).toEqual(["Marcar desde el teléfono"]);
     expect(c.lista).toHaveLength(a.lista.length);
     expect(c.completo.url).toBe(a.completo.url); // el completo de Asistencia es uno solo
+  });
+
+  it("Despachos, Multifashion y Cuentas por cobrar: la de teléfono es su lista aparte", async () => {
+    sesion.mockReturnValue({ role: "admin" });
+    for (const [m, carpeta, n] of [["guias", "despachos-celular", 16], ["multifashion", "multifashion-celular", 10], ["cxc", "cxc-celular", 11]] as const) {
+      const pc = await (await GET(req(m))).json();
+      const cel = await (await GET(reqCel(m))).json();
+      expect(pc.lista, m).toHaveLength(n);
+      expect(cel.lista, m).toHaveLength(n);
+      expect(cel.lista.every((v: { vertical?: boolean; url: string }) => v.vertical && v.url.includes(`/${carpeta}/`)), m).toBe(true);
+      expect(cel.completo.compartir).toBe(`https://firmada/${carpeta}/00-completo-liviano.mp4`);
+    }
+    expect((await (await GET(reqCel("multifashion"))).json()).lista[6].titulo).toBe("Mes cerrado: bonos");
+  });
+
+  it("Marcación: solo versión de teléfono; abre en ella, sin «Ver en formato…», y el rol marcacion la pide", async () => {
+    sesion.mockReturnValue({ role: "marcacion" });
+    const r = await GET(req("marcacion"));
+    expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j.formato).toBe("celular");
+    expect(j.conFormatoCelular).toBe(false);
+    expect(j.lista).toHaveLength(5);
+    expect(j.lista.every((v: { vertical?: boolean }) => v.vertical)).toBe(true);
+    expect(j.completo.compartir).toBe("https://firmada/marcacion-celular/00-completo-liviano.mp4");
+    expect(videosDeLaRuta("/marcacion")).toBe("marcacion");
+    sesion.mockReturnValue({ role: "bodega" });
+    expect((await GET(req("marcacion"))).status).toBe(403);
   });
 
   it("un módulo sin videos: 404", async () => {
