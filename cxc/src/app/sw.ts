@@ -99,4 +99,38 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// ── Recordatorios de Marcación (16-nov-2026) ────────────────────────────────
+// El aviso llega por web push (VAPID) desde /api/recordatorios-marcacion
+// con `{ title, body, url }`. Tocarlo abre (o trae al frente) /marcacion.
+self.addEventListener("push", (event) => {
+  let datos: { title?: string; body?: string; url?: string } = {};
+  try {
+    datos = event.data?.json() ?? {};
+  } catch {
+    datos = { body: event.data?.text() };
+  }
+  event.waitUntil(
+    self.registration.showNotification(datos.title || "Fashion Group", {
+      body: datos.body || "",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: "marcacion",
+      data: { url: datos.url || "/marcacion" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const destino = new URL((event.notification.data as { url?: string } | null)?.url || "/marcacion", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((lista) => {
+      for (const c of lista) {
+        if (c.url.startsWith(destino) && "focus" in c) return (c as WindowClient).focus();
+      }
+      return self.clients.openWindow(destino);
+    }),
+  );
+});
+
 serwist.addEventListeners();

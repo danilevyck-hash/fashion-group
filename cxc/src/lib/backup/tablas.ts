@@ -63,6 +63,10 @@ export const TABLAS_PERSONAS = [
   "asistencia_justificaciones",
   "asistencia_vacaciones",
   "asistencia_feriados",
+  // 🔴 Recordatorios de Marcación (16-nov-2026): los escribe cada persona
+  // desde su teléfono; sin copia, cada quien tendría que volver a prenderlos.
+  "marcacion_recordatorios",
+  "marcacion_push_suscripciones",
   // El singleton con TODA la parametrización del cálculo (id = 1).
   "asistencia_reglas",
   "asistencia_planilla_manual",
@@ -356,6 +360,8 @@ export const TABLAS_SWITCH = [
 
 // ─── `bitacora` — se regenera sola, envejece a propósito ────────────────────
 export const TABLAS_BITACORA = [
+  // Recordatorios de Marcación ya mandados (16-nov-2026): solo el anti-duplicado del día.
+  "marcacion_avisos_enviados",
   // Cómo le fue a cada corrida de sync. Se PODA a propósito
   // (`podar_switch_sync_log`): respaldarla sería guardar lo que decidimos tirar.
   "switch_sync_log",
@@ -484,6 +490,8 @@ export const PK_QUE_NO_ES_ID: Readonly<Record<string, readonly string[]>> = Obje
   asistencia_codigos_ignorados: ["empleado_codigo"],
   asistencia_dispositivos: ["dispositivo"],
   asistencia_feriados: ["fecha"],
+  marcacion_recordatorios: ["empleado_codigo", "marca"],
+  marcacion_avisos_enviados: ["empleado_codigo", "fecha", "marca"],
   asistencia_horarios: ["empleado_codigo"],
   asistencia_horas_extra_aprobadas: ["empleado_codigo", "fecha"],
   asistencia_lugares_referencia: ["empresa_key"],
