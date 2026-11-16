@@ -117,6 +117,8 @@ interface Props {
    * que ve la computadora).
    */
   desglose?: RenglonEmpresaCliente[] | null;
+  /** Cerrar al irse a otra pantalla por un enlace (sin tocar el historial). Sin él, `onClose`. */
+  onCerrarAlSalir?: () => void;
 }
 
 export default function HojaCobrar({
@@ -132,6 +134,7 @@ export default function HojaCobrar({
   hrefDocumentos = null,
   companyFilter,
   desglose = null,
+  onCerrarAlSalir,
 }: Props) {
   const abierto = !!client;
   const codigo = client ? codigoDe(client) : null;
@@ -334,7 +337,7 @@ export default function HojaCobrar({
       {hrefDocumentos && (
         <Link
           href={hrefDocumentos}
-          onClick={onClose}
+          onClick={onCerrarAlSalir ?? onClose}
           className="inline-flex items-center min-h-[44px] text-sm font-medium text-blue-600 hover:text-blue-800 transition"
         >
           Estado de cuenta ›
@@ -394,7 +397,7 @@ export default function HojaCobrar({
         <div className="flex justify-center">
           <Link
             href={hrefDocumentos}
-            onClick={onClose}
+            onClick={onCerrarAlSalir ?? onClose}
             className="inline-flex items-center min-h-[44px] text-sm font-medium text-blue-600 hover:text-blue-800 transition"
           >
             Ver ficha completa ›

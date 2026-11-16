@@ -37,6 +37,7 @@ import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe, hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import PedidoBultos, { type PedidoDelDetalle } from "./PedidoBultos";
+import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
 import {
@@ -155,6 +156,11 @@ export default function PedidosView({
   const barra = useHayBarraCelular();
   // El pedido abierto en el detalle con bultos; `null` = la lista.
   const [abierto, setAbierto] = useState<PedidoDelDetalle | null>(null);
+  // El gesto de volver cierra el pedido y deja en la lista (`useAtrasCierra`).
+  const volverDelPedido = useAtrasCierra(!!abierto, () => {
+    setAbierto(null);
+    void cargar();
+  });
   const { toast } = useToast();
   const [pedidos, setPedidos] = useState<PedidoBodega[] | null>(null);
   const [actualizado, setActualizado] = useState<string | null>(null);
@@ -1269,10 +1275,7 @@ export default function PedidosView({
           ocultarBulto
           volverEnElTitulo={barra && PEDIDO_REGRESO_EN_EL_TITULO}
           paso={accionDelDetalle((pedidos ?? []).find((p) => clave(p) === clave(abierto)))}
-          onVolver={() => {
-            setAbierto(null);
-            void cargar();
-          }}
+          onVolver={() => volverDelPedido()}
         />
       </>
     );
@@ -1286,10 +1289,7 @@ export default function PedidosView({
         pedido={abierto}
         puedePoner={puedeMarcar && !verificado}
         verificado={verificado}
-        onVolver={() => {
-          setAbierto(null);
-          void cargar();
-        }}
+        onVolver={() => volverDelPedido()}
       />
     );
   }

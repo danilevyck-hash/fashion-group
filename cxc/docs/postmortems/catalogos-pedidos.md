@@ -3562,3 +3562,7 @@ Las columnas de ASW son las mismas en las cinco empresas (Vistana agrega una 79.
 **Cobertura** (ingresos de Switch desde el 9-mar, por referencia; solo proveedores que mandan aviso): Fashion Shoes 39 → 30 completos · 6 parciales · 3 sin nada; Vistana 138 → 125 · 8 · 5; Fashion Wear 190 → 157 · 28 · 5; Active Wear 7 → 5 · 2 · 0; Active Shoes 19 → 17 · 2 · 0. Sin aviso por naturaleza: Aqualinda (agua), Movado (relojes), Beli 18, American Unique Brands, Boston (tazas), traslados de Active Wear.
 
 Candado: `tallas-por-pedido.test.ts` (pedido 2182 real como fixture + cada regla + los dos formatos de Reebok; 6 mutaciones cazadas y un control).
+
+## Reebok: ropa en bultos de 12 (15-nov-2026, `REEBOK_ROPA_EN_12_2026_11`, prendido)
+
+- Migración `20261231150000_reebok_bulto_en_renglon.sql` (columna `reebok_order_items.bulto_pzas` + las 3 RPC que guardan renglones + la vista de Comprobantes): **aplicada 16-nov-2026**, 0 filas cambiadas (los 662 renglones viejos quedan en NULL = regla vieja); GH8229 (medias) ya sale con bulto 12.

@@ -22,6 +22,8 @@ import { VENTAS_BOSTON, carteraDelRolEnCxc, puedeQuedarseEnCxc } from "@/lib/bos
 import TiraTotales from "./components/TiraTotales";
 import ClientTable from "./components/ClientTable";
 import HojaCobrar, { type CorreoProgramado } from "./components/HojaCobrar";
+import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
+import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import BarraSeleccion from "./components/BarraSeleccion";
 import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
@@ -276,6 +278,8 @@ function AdminDashboardInner() {
   // SOLO cuando la abrió el celular, así que la computadora queda idéntica.
   const [cobrarDesdeCelular, setCobrarDesdeCelular] = useState(false);
   const abrirCobrarCelular = useCallback((client: ConsolidatedClient) => { setCobrarClient(client); setCobrarDesdeCelular(true); }, []);
+  // 🔴 En el celular la hoja del cliente suma una entrada: el gesto de volver la cierra.
+  const volverDeCobrar = useAtrasCierra(!!cobrarClient && cobrarDesdeCelular, () => setCobrarClient(null), ATRAS_CIERRA_2026_11 && cobrarDesdeCelular);
 
   // 🔴 EL AVISO «SIN PAGAR HACE +90 D» ES UN FILTRO MÁS, y vive en la URL como
   // los otros (`?sinpagar=1`), con `replace`: es un filtro del MISMO nivel, así
@@ -1001,7 +1005,8 @@ function AdminDashboardInner() {
       <HojaCobrar
         client={cobrarClient}
         companyFilter={companyFilter}
-        onClose={() => setCobrarClient(null)}
+        onClose={() => volverDeCobrar()}
+        onCerrarAlSalir={() => setCobrarClient(null)}
         onProgramarCorreo={programarCorreo}
         onWhatsApp={openWhatsApp}
         onCopiar={copyMessage}

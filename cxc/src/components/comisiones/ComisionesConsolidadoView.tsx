@@ -54,6 +54,9 @@
 // AGUAS → REY STOUTE AGUAS), así que acá llega una fila por persona. Una grafía
 // nueva que nadie cargó en el alias sí aparece partida — es dato, no estructura.
 
+import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import { AJUSTES_APPLE_6_2026_10 } from "@/lib/ajustes-apple-6-2026-10";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
@@ -204,6 +207,12 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   /** v3: en la computadora el detalle se abre DEBAJO DE SU FILA de la tabla. */
   const seVeLaTabla = useSeVeLaTablaComisiones();
   const enLaFila = COMISIONES_DETALLE_V3_2026_10 && seVeLaTabla;
+  // 🔴 En el celular el detalle del vendedor suma una entrada: el gesto de volver lo cierra.
+  const volverDelDetalle = useAtrasCierra(
+    !!detalle && !enLaFila,
+    () => setDetalle(null),
+    ATRAS_CIERRA_2026_11 && !!detalle && aparatoDeQuienMira() === "celular",
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -682,7 +691,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
           year={year}
           mes={mes}
           vendedor={detalle.vendedor}
-          onClose={() => setDetalle(null)}
+          onClose={() => volverDelDetalle()}
         />
       )}
 

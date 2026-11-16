@@ -242,7 +242,7 @@ describe("🔴 desde el 11-oct-2026: el número trae hoy, las tasas no, y el % v
   it("la proyección y el promedio diario NO ven la venta de hoy", () => {
     const minimo = leer("src/components/multifashion/ResumenMinimo.tsx");
     expect(minimo).toContain("fmtMoney(totales.proyeccion_cierre as number)");
-    expect(leer("src/components/multifashion/GraficaDelMes.tsx")).toContain("graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados })");
+    expect(leer("src/components/multifashion/GraficaDelMes.tsx")).toContain("graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados, vsAnioPasado: comparar })");
     // La proyección del año tampoco, ni su total: `anioConHoy` solo toca el renglón del mes en curso.
     expect(leer("src/lib/multifashion/celular.ts")).toContain("return { ...overview, retail: { ...overview.retail, meses } };");
   });

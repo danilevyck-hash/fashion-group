@@ -7,7 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { etiquetaEnCelular, graficaDelMes, lineaDeLaGrafica, type EstadoDia } from "@/lib/multifashion/grafica-mes";
+import { MULTIFASHION_VS_ANIO_PASADO, etiquetaEnCelular, graficaDelMes, lineaDeLaGrafica, type EstadoDia } from "@/lib/multifashion/grafica-mes";
 
 const BARRA: Record<EstadoDia, string> = {
   venta: "bg-gray-400",
@@ -24,7 +24,7 @@ const BARRA_HOY_EN_CURSO = "bg-[repeating-linear-gradient(135deg,#111827_0_3px,#
 export function GraficaDelMes({
   dias, year, mes, esMesActual, diaActual, feriados, alta = false, ventaHoy = null,
 }: {
-  dias: readonly { dia: number; ventas: number; n_tickets: number }[];
+  dias: readonly { dia: number; ventas: number; n_tickets: number; ventas_anio_anterior?: number | null }[];
   year: number;
   mes: number;
   esMesActual: boolean;
@@ -41,9 +41,12 @@ export function GraficaDelMes({
    */
   ventaHoy?: number | null;
 }) {
+  const hayAA = MULTIFASHION_VS_ANIO_PASADO && dias.some((d) => d.ventas_anio_anterior != null);
+  const [vsAA, setVsAA] = useState(false);
+  const comparar = hayAA && vsAA;
   const g = useMemo(
-    () => graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados }),
-    [dias, year, mes, esMesActual, diaActual, feriados],
+    () => graficaDelMes({ dias, year, mes, esMesActual, diaActual, feriados, vsAnioPasado: comparar }),
+    [dias, year, mes, esMesActual, diaActual, feriados, comparar],
   );
   const maxCerrado = Math.max(0, ...g.dias.filter((d) => d.alto > 0).map((d) => d.ventas / d.alto));
   const altoHoy = ventaHoy != null && ventaHoy > 0 && maxCerrado > 0 ? Math.min(1, ventaHoy / maxCerrado) : null;
@@ -75,7 +78,7 @@ export function GraficaDelMes({
           setTocado((t) => (t === d ? null : d));
         }}
       >
-        {g.promedioAlto != null && (
+        {g.promedioAlto != null && !comparar && (
           <span
             data-elemento="grafica-promedio"
             aria-hidden
@@ -84,12 +87,12 @@ export function GraficaDelMes({
           />
         )}
         {g.dias.map((d) => (
+          <span key={d.dia} className="relative flex h-full flex-1 items-end">
           <span
-            key={d.dia}
             data-dia={d.dia}
             data-estado={d.estado}
             className={cn(
-              "flex-1 rounded-t-[3px] transition-opacity",
+              "w-full rounded-t-[3px] transition-opacity",
               d.estado === "hoy" && altoHoy != null ? BARRA_HOY_EN_CURSO
                 : d.estado === "ultimo" && altoHoy != null ? BARRA.venta : BARRA[d.estado],
               tocado != null && d.dia !== tocado && "opacity-30",
@@ -102,6 +105,16 @@ export function GraficaDelMes({
                 : `${Math.max(3, d.alto * 100)}%`,
             }}
           />
+          {/* La misma fecha del año pasado: una raya sobre el día. */}
+          {d.altoAA != null && d.altoAA > 0 && (
+            <span
+              aria-hidden
+              data-elemento="grafica-aa"
+              className={cn("pointer-events-none absolute -inset-x-px h-[2px] rounded bg-blue-600", tocado != null && d.dia !== tocado && "opacity-30")}
+              style={{ bottom: `calc(${d.altoAA * 100}% - 1px)` }}
+            />
+          )}
+          </span>
         ))}
       </div>
       {/* Grilla y no flex: un rótulo más ancho que su barra («Hoy», «31») se
@@ -124,6 +137,22 @@ export function GraficaDelMes({
           </span>
         ))}
       </div>
+      {/* «vs 2025»: prende la raya de la misma fecha del año pasado. Es su leyenda también. */}
+      {hayAA && (
+        <button
+          type="button"
+          data-elemento="grafica-vs-anio"
+          aria-pressed={comparar}
+          onClick={() => setVsAA((v) => !v)}
+          className={cn(
+            "mt-3 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors active:scale-[0.97]",
+            comparar ? "border-gray-900 text-gray-900" : "border-gray-300 text-gray-600",
+          )}
+        >
+          <span aria-hidden className="h-[2px] w-3 rounded bg-blue-600" />
+          vs {year - 1}
+        </button>
+      )}
     </div>
   );
 }

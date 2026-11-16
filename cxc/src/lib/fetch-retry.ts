@@ -94,7 +94,11 @@ export async function fetchJsonWithRetry<T>(
       const res = await fetchImpl(url, { cache: "no-store", signal });
       if (res.ok) return (await res.json()) as T;
 
-      const err = new HttpError(res.status);
+      // Un 400 trae en `error` lo que hay que decirle a la persona (p. ej.
+      // «La búsqueda es demasiado amplia: hay N…»): se conserva, no «HTTP 400».
+      const detalle =
+        res.status === 400 ? await res.json().then((b) => (typeof b?.error === "string" ? b.error : undefined), () => undefined) : undefined;
+      const err = new HttpError(res.status, detalle);
       // 4xx definitivo: cortar de inmediato, no gastar reintentos.
       if (!isRetryableStatus(res.status)) throw err;
       lastError = err;
@@ -110,7 +114,7 @@ export async function fetchJsonWithRetry<T>(
 
 /** Mensaje corto y humano a partir de lo que haya fallado. */
 export function describeFetchError(err: unknown): string {
-  if (err instanceof HttpError) return `HTTP ${err.status}`;
+  if (err instanceof HttpError) return err.message;
   if (err instanceof Error) return err.message;
   return "error inesperado";
 }

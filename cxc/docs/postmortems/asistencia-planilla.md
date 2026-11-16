@@ -3657,3 +3657,34 @@ Daniel, textual, ante las opciones de qué hacer con el sábado trabajado por qu
 ### Candados
 
 `src/__tests__/asistencia/codigo-por-reloj.test.ts` (13 pruebas): el día de Jorman con las marcas de Silenys mezcladas (8 marcas, a revisar, salida 19:00) → separadas (4 y 4, cada una con su salida, extra de él en 0) · mapa vacío devuelve la MISMA lista · una marca agregada a mano nunca se mueve · la corrección viaja con su marca · apagado no consulta la base · prendido lee solo activos y un error lanza · todo lector resuelve por el mismo lugar y antes de las correcciones · nadie escribe en el mapeo desde la app.
+
+## Mis marcaciones y recordatorios (16-nov-2026)
+
+Daniel aprobó el mockup HOY vs RECOMENDACIÓN de Marcación (versión 2, la tabla con títulos). Interruptor `MARCACION_HISTORIAL_Y_AVISOS_2026_11` en `lib/ui/marcacion-historial-avisos-2026-11.ts`, **publicado APAGADO**: con `false` la pantalla de marcar queda como antes.
+
+### Mis marcaciones
+
+- Fila «Mis marcaciones ›» debajo del botón; abre una hoja con «Esta quincena (16–30 nov)» y flechas ‹ › hasta el 1-jul-2026 (`PRIMERA_QUINCENA`).
+- Tabla **Día · Entrada · Almuerzo · Regreso · Salida**, 12 h sin «a. m.». Solo horas: ni tardanzas ni plata. Los días sin marcas no salen; un día CERRADO con menos de 4 marcas dice «Falta una marca»; hoy nunca.
+- 🔴 **Muestra la hora CORREGIDA**: `GET /api/marcacion/historial?quincena=AAAA-MM-1|2` lee con `leerMarcasEfectivas` (`quien-marco-server.ts`: marcas paginadas → `conCodigoPorReloj` → `aplicarCorrecciones`), la MISMA lectura que `leerQuienMarco` (que ahora la llama). Arma la tabla `lib/marcacion/historial.ts` (puro).
+- 🔴 **Cada persona ve SOLO lo suyo**: el código sale de `fg_users.empleado_codigo` de la sesión; un `?codigo=` se ignora.
+- 🔴 **El botón de marcar NO cambia**: sigue leyendo las horas del reloj (`estado-server.ts`). Son dos lecturas a propósito.
+
+### Recordatorios
+
+- Fila «Recordatorios ›»: Entrada · Salida a almuerzo · Regreso de almuerzo · Salida, cada uno con interruptor APAGADO por defecto y su hora. Entrada y Salida vienen con su horario (el de afuera si lo tiene: marcan por el teléfono); el almuerzo dice «Selecciona tu hora» (el glosario cambia «Elige» por «Selecciona»). Se guarda solo, sin botón (`PUT /api/marcacion/recordatorios`).
+- Al encender el primero se pide permiso de avisos y se suscribe el aparato (web push estándar, VAPID, librería `web-push` 3.6.7). En iPhone sin instalar sale «Para recibir avisos, agrega Fashion Group a tu pantalla de inicio.»
+- El service worker (`src/app/sw.ts`) tiene `push` y `notificationclick` (abre `/marcacion`). Texto: «Fashion Group · Recuerda marcar tu entrada» (o la marca que toque).
+- **A quién se avisa** (`aQuienAvisar`, puro, en `lib/marcacion/recordatorios.ts`): recordatorio prendido · su hora cayó en los últimos 5 minutos · no lleva esa marca hoy (marcas CORREGIDAS) · día hábil SUYO (`resolverDiasLaborables`) · hoy no es feriado ni día libre (`asistencia_feriados`) · su ficha no está de baja. Un aviso por persona, marca y día: la fila de `marcacion_avisos_enviados` se aparta ANTES de mandar. Una suscripción que contesta 404/410 se borra.
+- 🔴 **La ruta `POST /api/recordatorios-marcacion` NO está en `vercel.json`** (la regla de los crons no se toca): la llama la base cada 5 minutos con `pg_cron` + `pg_net`, con `CRON_SECRET` en el encabezado, guardado en **Supabase Vault** (`cron_secret`), nunca en el repo. Vive fuera de `/api/marcacion/*` porque esas exigen sesión (`requireMarcacion`). Sin las llaves VAPID contesta 503 y no manda nada. 🔴 Con el interruptor APAGADO contesta 200 (`apagado: true`) sin leer ni mandar nada: la base la llama igual cada 5 minutos.
+
+### Base de datos (SIN APLICAR al publicar)
+
+- `20270119120000_marcacion_recordatorios.sql`: `marcacion_recordatorios` (PK `empleado_codigo, marca`), `marcacion_push_suscripciones` (una fila por `endpoint`) y `marcacion_avisos_enviados` (PK `empleado_codigo, fecha, marca`). RLS prendido sin políticas (solo `service_role`). Las dos primeras son `personas` en el respaldo; la tercera, `bitacora`.
+- `20270120130000_marcacion_recordatorios_cada_5_min.sql`: SOLO el job `marcacion-recordatorios` (`*/5 * * * *`). 🔴 Requiere la migración que instala `pg_cron` + `pg_net` y carga el secreto `cron_secret` en Vault (es de otro trabajo: mover crons de Vercel a `pg_cron`); esta no instala nada.
+- Variables de Vercel: `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY` (están en `.env.local`).
+
+### Candados
+
+- `src/__tests__/marcacion/historial-y-recordatorios.test.ts`: hora corregida y marca quitada, solo lo suyo, feriado · día libre · ya marcó · anti-duplicado · baja, 401 sin secreto, interruptor apagado.
+- «Mis marcaciones» es nombre APROBADO por Daniel: anotado como excepción en `revisar-nombres.test.ts`.

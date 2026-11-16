@@ -34,8 +34,8 @@ export async function GET(req: NextRequest) {
   const modulo = esInicio ? { key, label: "Inicio", roles: [] as string[] } : ALL_MODULES.find((m) => m.key === key);
   // `?formato=celular` pide la versión de teléfono; cualquier otro valor, la de computadora.
   const pedido = req.nextUrl.searchParams.get("formato") as FormatoVideos | null;
-  const formato: FormatoVideos = pedido && FORMATOS.includes(pedido) ? pedido : "computadora";
-  const { lista, completo } = videosDelModulo(key, formato);
+  // El formato que de verdad sale: un módulo con una sola versión abre en la suya.
+  const { lista, completo, formato } = videosDelModulo(key, pedido && FORMATOS.includes(pedido) ? pedido : "computadora");
   if (!modulo || lista.length === 0) {
     return NextResponse.json({ error: "Este módulo no tiene videos." }, { status: 404 });
   }

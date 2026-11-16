@@ -12,7 +12,7 @@ import {
   type TallaDeDespacho,
 } from "@/lib/tallas-pedido/armar";
 import { adjuntosDeDespacho, empresaDelDestinatario, leerAdjuntoDeDespacho, leerDespacho, proveedorDelCorreo, SIN_CAJA, type Celda } from "@/lib/tallas-pedido/despacho-archivo";
-import { libroDeTallas, FONDO } from "@/lib/tallas-pedido/excel";
+import { libroDeTallas, renglonesDelExcel, FONDO } from "@/lib/tallas-pedido/excel";
 
 const caja = (referencia: string, codigo_caja: string, tallas: [string, number][], cajas: number, extra: Partial<TallaDeDespacho> = {}): TallaDeDespacho[] =>
   tallas.map(([talla, porCaja], i) => ({
@@ -289,17 +289,39 @@ describe("el Excel", () => {
 
   it("encabezado en la fila 1 con filtro desde A1", () => {
     expect(XLSX.utils.sheet_to_json(ws, { header: 1 })[0]).toEqual(["Referencia", "Descripción", "Talla", "Código de barra", "Pares", "Opción"]);
-    expect(ws["!autofilter"]?.ref).toBe(`A1:F${filas.length + 1}`);
+    // 5 tallas de A · fila vacía · Z amarilla · fila vacía = 8 renglones + encabezado.
+    expect(ws["!autofilter"]?.ref).toBe("A1:F9");
   });
 
-  it("código de barra como texto, talla como número, total en negrita, amarillo pintado", () => {
+  it("código de barra como texto, talla como número, amarillo pintado", () => {
     expect(ws.D2.t).toBe("s");
     expect(ws.D2.v).toBe("8721289583894");
     expect(ws.C2.t).toBe("n");
-    expect(ws.A7.v).toBe("Total A");
-    expect(ws.A7.s?.font?.bold).toBe(true);
     expect(ws.A8.s?.fill?.fgColor?.rgb).toBe(FONDO.amarillo);
     expect(() => XLSX.write(libro, { type: "array", bookType: "xlsx" })).not.toThrow();
+  });
+
+  // 16-nov-2026 (`TALLAS_FILA_VACIA_2026_11`): sin filas «Total»; una fila vacía
+  // por bloque (también tras el amarillo y al final) y la primera fila en negrita.
+  it("cada «Total» es una fila VACÍA y la primera fila de cada bloque va en negrita", () => {
+    const celdas = Object.keys(ws).filter((k) => !k.startsWith("!"));
+    expect(celdas.some((k) => String(ws[k].v).startsWith("Total"))).toBe(false);
+    for (const r of [7, 9]) for (const c of "ABCDEF") expect(ws[`${c}${r}`], `${c}${r}`).toBeUndefined();
+    expect(ws.A2.s?.font?.bold).toBe(true);
+    expect(ws.F2.s?.font?.bold).toBe(true);
+    expect(ws.A3.s?.font?.bold).toBe(false);
+    expect(ws.A8.v).toBe("Z");
+    expect(ws.A8.s?.font?.bold).toBe(true);
+  });
+
+  it("con varias opciones, cada opción es su bloque; apagado = las filas de antes", () => {
+    const { filas: dos } = armarTallasDelPedido(
+      [{ codigo: "R", descripcion: "x", cantidad: 6 }],
+      [...caja("R", "C1", [["6", 1], ["7", 2]], 2), ...caja("R", "C2", [["6", 2], ["7", 1]], 2, { factura: "F2" })],
+    );
+    const r = renglonesDelExcel(dos);
+    expect(r.map((x) => (x ? `${x.fila.talla}${x.negrita ? "*" : ""}` : "—"))).toEqual(["6*", "7", "—", "6*", "7", "—"]);
+    expect(renglonesDelExcel(dos, false).map((x) => x?.fila.esTotal)).toEqual(dos.map((f) => f.esTotal));
   });
 });
 
