@@ -919,6 +919,16 @@ Los dos envíos (el cron y la recuperación de `switch-reconciliacion`) usan el 
 - La guardia de frescura no cambió (pide una carga posterior a las 7 p.m.). La recuperación de `switch-reconciliacion` sigue en `enviarNegocioPrivado`, con `earlyUtcRun` (ventana desde las 00:00 UTC, que contiene las 03:15). Sin avisos nuevos.
 - 94 entradas de cron (tope de Vercel Pro: 100).
 
+## 16-nov-2026 — «vs 2025» en la gráfica, el 4-nov sin aviso y el 28-nov como feriado
+
+Tres cosas que Daniel aprobó con «sí» el 16-nov-2026, en una sola solicitud de cambio.
+
+**1. «vs 2025» en Multifashion › Resumen** (`MULTIFASHION_VS_ANIO_PASADO` en `lib/multifashion/grafica-mes.ts`, nace PRENDIDO). La gráfica del mes dibuja una marca por día con lo vendido la **misma fecha** del año pasado (`ventas_anio_anterior`, que `detalle-mensual` ya traía mapeado por día del mes). Por fecha y no por día de semana: los feriados de Panamá caen en fecha fija, y comparar un sábado contra el sábado más cercano del año pasado cambia qué día se compara con cuál. En la computadora hay un botón «vs 2025» que la prende y apaga; `false` = la gráfica de antes. Ninguna lectura nueva.
+
+**2. El 4-nov no avisa «sin ventas».** El Día de los Símbolos Patrios la tienda cierra, pero NO es feriado legal y por eso no vive en `asistencia_feriados` (que es de la planilla). La gráfica preguntaba «¿la tienda abrió?». Ahora `esDiaHabilTienda` (`resumen-minimo.ts`) devuelve `false` para los `MM-DD` de `CIERRES_CIVICOS = {"11-04"}`. Medido antes de tocarla: la función la leen solo `diasSinVenta` (mismo archivo) y `grafica-mes.ts`, los dos de la gráfica de Multifashion; **ningún lector de planilla, asistencia ni plata**. Candado en `multifashion-grafica.test.ts` › «el cierre cívico».
+
+**3. El 28-nov-2026 pasa de día libre a feriado** (es feriado nacional de descanso obligatorio). Antes: 1 fila en `asistencia_feriados` (`2026-11-28`, «Independencia de España», `dia_libre`), sin ninguna deuda en `asistencia_dia_libre_deuda` para esa fecha. Migración `20270118120000_feriado_28_nov_2026.sql` (un `UPDATE … WHERE fecha = '2026-11-28' AND tipo = 'dia_libre'`), **aplicada** y registrada en `schema_migrations`. Después: la misma fila con `tipo = 'feriado'`; deudas, cero antes y cero después.
+
 ## Lo que decía CLAUDE.md hasta el 8-oct-2026 (movido aquí, verbatim)
 
 > Movido desde `cxc/CLAUDE.md` el 8-oct-2026 para que el archivo vuelva a tener aire bajo el tope de `claude-md-bajo-el-tope.test.ts`. Ninguna regla cambió: es el texto tal cual estaba, con su fecha. En CLAUDE.md queda una línea que apunta aquí.
