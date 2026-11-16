@@ -523,7 +523,7 @@ describe("pg_cron — lo que se mudó sigue en el registro y no está en los dos
   const mudadas = SWITCH_CRON_ENTRADAS.filter((e) => e.origen === "pg_cron");
 
   it("hay UNA migración de jobs y define exactamente las entradas marcadas pg_cron", () => {
-    expect(MIGRACIONES_PG_CRON).toEqual(["20270118120100_crons_facturas_a_pg_cron.sql"]);
+    expect(MIGRACIONES_PG_CRON).toEqual(["20270118130100_crons_facturas_a_pg_cron.sql"]);
     expect(PG_CRON_JOBS.length).toBe(mudadas.length);
     expect(mudadas.length).toBe(15);
   });
@@ -558,7 +558,7 @@ describe("pg_cron — lo que se mudó sigue en el registro y no está en los dos
 
   it("la migración usa la ruta con www y el Bearer de Vault, nunca el secreto escrito", () => {
     const raiz = path.resolve(__dirname, "../../..");
-    const base = fs.readFileSync(path.join(raiz, "supabase/migrations/20270118120000_pg_cron_pg_net_vault.sql"), "utf8");
+    const base = fs.readFileSync(path.join(raiz, "supabase/migrations/20270118130000_pg_cron_pg_net_vault.sql"), "utf8");
     expect(base).toContain("'https://www.fashiongr.com' || ruta");
     expect(base).toContain("from vault.decrypted_secrets");
     expect(base).toContain("where name = 'cron_secret'");

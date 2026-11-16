@@ -694,7 +694,7 @@ export interface SwitchCronEntrada {
   /**
    * Quién dispara la entrada. Ausente = `vercel.json`. `"pg_cron"` = un job
    * `fg-<ruta>-<hhmm>` de pg_cron dentro de Supabase (migración
-   * `20270118120100`), que llama a la MISMA ruta con el MISMO `slot` y el
+   * `20270118130100`), que llama a la MISMA ruta con el MISMO `slot` y el
    * Bearer de Vault. Existe desde el 16-nov-2026, cuando vercel.json llegó a
    * 95 de 100 entradas y Daniel aprobó mover las de varias veces al día.
    *

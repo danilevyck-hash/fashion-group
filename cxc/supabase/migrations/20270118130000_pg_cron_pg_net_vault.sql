@@ -3,7 +3,7 @@
 -- Instala las dos extensiones y una función, `public.fg_cron_llamar(ruta)`,
 -- que lee `cron_secret` de Vault y llama a https://www.fashiongr.com<ruta>
 -- con `Authorization: Bearer …`. NO programa ningún job: eso lo hace la
--- migración siguiente (20270118120100). Sin filas tocadas.
+-- migración siguiente (20270118130100). Sin filas tocadas.
 --
 -- ══ POR QUÉ ═════════════════════════════════════════════════════════════════
 -- vercel.json tenía 95 entradas de cron sobre un tope de 100 (16-nov-2026).
@@ -75,7 +75,7 @@ begin
     from vault.decrypted_secrets
    where name = 'cron_secret';
   if secreto is null or secreto = '' then
-    raise exception 'fg_cron_llamar: falta el secreto cron_secret en Vault (ver la migración 20270118120000)';
+    raise exception 'fg_cron_llamar: falta el secreto cron_secret en Vault (ver la migración 20270118130000)';
   end if;
   return net.http_get(
     url := 'https://www.fashiongr.com' || ruta,

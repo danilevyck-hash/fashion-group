@@ -2,7 +2,7 @@
 -- las 13 de cada hora de 7 a. m. a 6 p. m. de Panamá (las 8 empresas) y las
 -- dos de solo american_classic (00:15 y 03:00 UTC). MISMOS minutos UTC, misma
 -- ruta, mismo `slot`. vercel.json queda en 80 de 100. Sin filas tocadas.
--- Depende de 20270118120000 (pg_cron, pg_net y `public.fg_cron_llamar`).
+-- Depende de 20270118130000 (pg_cron, pg_net y `public.fg_cron_llamar`).
 --
 -- ══ REGLAS ══════════════════════════════════════════════════════════════════
 -- · Una entrada = una ocurrencia = un slot: cada job lleva SU minuto y SU
@@ -16,7 +16,7 @@
 --   empresa expulsa la sesión de Switch).
 --
 -- ══ ORDEN DE PUBLICACIÓN ════════════════════════════════════════════════════
--- 1. Aplicar 20270118120000 y cargar `cron_secret` en Vault (cualquier hora).
+-- 1. Aplicar 20270118130000 y cargar `cron_secret` en Vault (cualquier hora).
 -- 2. Aplicar ESTA migración entre las 03:05 y las 11:45 UTC (22:05 → 06:45 de
 --    Panamá): es el único hueco del día sin ninguna corrida de facturas.
 -- 3. Integrar en ese mismo hueco la solicitud que quita las 15 de vercel.json.

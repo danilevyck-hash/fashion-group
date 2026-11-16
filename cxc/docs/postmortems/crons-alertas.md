@@ -1512,8 +1512,8 @@ Daniel: *«esos días [feriados] el aviso no me debería de llegar, que hace rui
   | Panamá | 19:15 · 22:00 | 06:50 | 07:30 | 08:30 | 09:15 | 10:00 | 11:45 | 12:30 | 13:40 | 14:00 | 15:20 | 16:40 | 17:30 | 18:00 |
 
 - **Dos migraciones** (escritas, 🔴 **sin aplicar** hasta el «sí» de Daniel):
-  - `20270118120000_pg_cron_pg_net_vault.sql` — instala `pg_cron`, `pg_net`, `supabase_vault` y la función `public.fg_cron_llamar(ruta, espera_ms = 800000)`: lee `cron_secret` de Vault, llama a `https://www.fashiongr.com<ruta>` (con `www`, sin redirección) con `Authorization: Bearer …` y `timeout_milliseconds` de 800 s. Si el secreto falta, **levanta error y no manda nada**. El valor del secreto **nunca va en el repo**: se carga una vez con `vault.create_secret(…, 'cron_secret', …)` (el SQL exacto y una alternativa por terminal que lo lee de Vercel están en la cabecera del archivo).
-  - `20270118120100_crons_facturas_a_pg_cron.sql` — 15 × `cron.schedule('fg-switch-sync-facturas-<hhmm>', '<m h * * *>', $$select public.fg_cron_llamar('/api/cron/switch-sync?tipo=facturas&…&slot=facturas-<hhmm>')$$)`. Idempotente por nombre. pg_cron corre en UTC (`cron.timezone = GMT`), igual que `vercel.json`.
+  - `20270118130000_pg_cron_pg_net_vault.sql` — instala `pg_cron`, `pg_net`, `supabase_vault` y la función `public.fg_cron_llamar(ruta, espera_ms = 800000)`: lee `cron_secret` de Vault, llama a `https://www.fashiongr.com<ruta>` (con `www`, sin redirección) con `Authorization: Bearer …` y `timeout_milliseconds` de 800 s. Si el secreto falta, **levanta error y no manda nada**. El valor del secreto **nunca va en el repo**: se carga una vez con `vault.create_secret(…, 'cron_secret', …)` (el SQL exacto y una alternativa por terminal que lo lee de Vercel están en la cabecera del archivo).
+  - `20270118130100_crons_facturas_a_pg_cron.sql` — 15 × `cron.schedule('fg-switch-sync-facturas-<hhmm>', '<m h * * *>', $$select public.fg_cron_llamar('/api/cron/switch-sync?tipo=facturas&…&slot=facturas-<hhmm>')$$)`. Idempotente por nombre. pg_cron corre en UTC (`cron.timezone = GMT`), igual que `vercel.json`.
 - **pg_cron no espera la respuesta**: encola la petición y la ruta sigue en Vercel. `cron.job_run_details.status = success` significa «se encoló», no «la ruta terminó bien».
 
 ### Cómo siguen vigiladas (nada se aflojó)
@@ -1527,8 +1527,8 @@ Daniel: *«esos días [feriados] el aviso no me debería de llegar, que hace rui
 Dos corridas a la vez en la misma empresa expulsan la sesión de Switch, así que las dos fuentes no pueden estar vivas al mismo tiempo. El **único hueco del día sin ninguna corrida de facturas** es **03:05 → 11:45 UTC** (22:05 → 06:45 de Panamá).
 
 1. Daniel aprueba el SQL de las dos migraciones.
-2. **A cualquier hora**: `npm run migrar supabase/migrations/20270118120000_pg_cron_pg_net_vault.sql` y cargar `cron_secret` en Vault (sin jobs todavía, no dispara nada). Comprobar: `select name from vault.secrets where name = 'cron_secret';`.
-3. **Dentro del hueco** (lo más cómodo: justo después de las 22:00 de Panamá, o antes de las 06:45): `npm run migrar supabase/migrations/20270118120100_crons_facturas_a_pg_cron.sql`, y acto seguido `gh pr merge <n> --auto --squash` de la solicitud que quita las 15 de `vercel.json`. Las pruebas tardan ~12 min y Vercel ~3: entra con horas de margen antes de las 11:50 UTC.
+2. **A cualquier hora**: `npm run migrar supabase/migrations/20270118130000_pg_cron_pg_net_vault.sql` y cargar `cron_secret` en Vault (sin jobs todavía, no dispara nada). Comprobar: `select name from vault.secrets where name = 'cron_secret';`.
+3. **Dentro del hueco** (lo más cómodo: justo después de las 22:00 de Panamá, o antes de las 06:45): `npm run migrar supabase/migrations/20270118130100_crons_facturas_a_pg_cron.sql`, y acto seguido `gh pr merge <n> --auto --squash` de la solicitud que quita las 15 de `vercel.json`. Las pruebas tardan ~12 min y Vercel ~3: entra con horas de margen antes de las 11:50 UTC.
 4. Al día siguiente, mirar que el latido `switch-sync:facturas-1150` tenga la fecha de hoy y `cron.job_run_details` 15 corridas `succeeded`.
 
 Si la solicitud entrara DESPUÉS de las 11:50 UTC con la migración ya aplicada, los dos relojes dispararían a la vez: **no hacerlo**. Volver atrás: `select cron.unschedule(jobname) from cron.job where jobname like 'fg-switch-sync-facturas-%';` y revertir la solicitud.
