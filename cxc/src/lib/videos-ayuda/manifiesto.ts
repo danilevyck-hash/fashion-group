@@ -55,6 +55,7 @@ const prestamos = fila("prestamos");
 const catalogos = fila("catalogos", { vertical: true }); // serie de teléfono (9:16)
 const asistencia = fila("asistencia"); // mixta: el 01 es de teléfono
 const comisiones = fila("comisiones");
+const despachos = fila("guias"); // Despachos: la key del módulo sigue siendo `guias`
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
   caja(0, "Caja menuda completa", 568, "00-completo", true),
@@ -175,6 +176,23 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   comisiones(9, "Tasas por vendedor", 42, "09-tasas-por-vendedor"),
   comisiones(10, "Exclusiones de comisión", 51, "10-exclusiones"),
   comisiones(11, "Descuentos fijos", 48, "11-descuentos-fijos"),
+  despachos(0, "Despachos completo", 1000, "00-completo", true),
+  despachos(0, "Introducción", 64, "00-que-es-despachos"),
+  despachos(1, "La lista de pedidos", 77, "01-lista-de-pedidos"),
+  despachos(2, "Iniciar la preparación", 54, "02-iniciar-preparacion"),
+  despachos(3, "En espera de muestra", 57, "03-espera-de-muestra"),
+  despachos(4, "Marcar preparado", 67, "04-marcar-preparado"),
+  despachos(5, "Recibir el pedido", 47, "05-recibir-pedido"),
+  despachos(6, "Etiquetas de un pedido", 69, "06-etiquetas-de-un-pedido"),
+  despachos(7, "Varias facturas en un envío", 57, "07-varias-facturas"),
+  despachos(8, "Etiqueta de un traslado", 48, "08-etiqueta-de-traslado"),
+  despachos(9, "La lista de etiquetas", 68, "09-lista-de-etiquetas"),
+  despachos(10, "Nueva guía de despacho", 88, "10-nueva-guia"),
+  despachos(11, "Despachar la guía", 71, "11-despachar-la-guia"),
+  despachos(12, "Imprimir y compartir la guía", 48, "12-imprimir-y-compartir"),
+  despachos(13, "La lista de guías", 52, "13-lista-de-guias"),
+  despachos(14, "Corregir o eliminar una guía", 53, "14-corregir-o-eliminar"),
+  despachos(15, "Configuración", 58, "15-configuracion"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */
