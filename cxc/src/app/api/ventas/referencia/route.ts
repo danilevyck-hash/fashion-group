@@ -265,10 +265,40 @@ function fusionar(
   return out.sort((a, b) => a.codigo.localeCompare(b.codigo) || a.empresa.localeCompare(b.empresa));
 }
 
-function errorAmplia(): NextResponse {
+/** Tope de modelos que se ofrecen al buscar por descripción. */
+const MAX_COINCIDENCIAS = 100;
+
+/** 🔴 Nunca se recorta en silencio: se dice CUÁNTOS hay y se pide afinar. */
+function errorAmplia(cuantos: string): NextResponse {
   return NextResponse.json(
-    { error: "La búsqueda es demasiado amplia — escribe más letras del código o la descripción." },
+    {
+      error: `La búsqueda es demasiado amplia: ${cuantos}. Escribe más letras del código o la descripción para afinar.`,
+    },
     { status: 400 },
+  );
+}
+
+const fmtN = (n: number) => n.toLocaleString("es-PA");
+
+/** Cuántos artículos del catálogo coinciden (para decirlo al pedir afinar). */
+async function contarArticulos(f: Filtro): Promise<number | null> {
+  const { count, error } = await conFiltro(
+    supabaseServer
+      .from("switch_articulo_info")
+      .select("codigo", { count: "exact", head: true })
+      .in("empresa_key", [...REFERENCIA_EMPRESA_KEYS]),
+    f,
+    "codigo",
+  );
+  return error ? null : count;
+}
+
+async function demasiadoAmplia(f: Filtro): Promise<NextResponse | null> {
+  const ventas = await contarVentas(f);
+  if (ventas <= MAX_FILAS_BUSQUEDA) return null;
+  const articulos = await contarArticulos(f);
+  return errorAmplia(
+    articulos ? `hay ${fmtN(articulos)} artículos que coinciden` : `hay ${fmtN(ventas)} renglones de venta que coinciden`,
   );
 }
 
@@ -308,7 +338,8 @@ export async function GET(req: NextRequest) {
     }
 
     if (filtro.tipo !== "descripcion") {
-      if ((await contarVentas(filtro)) > MAX_FILAS_BUSQUEDA) return errorAmplia();
+      const amplia = await demasiadoAmplia(filtro);
+      if (amplia) return amplia;
 
       const [ventas, ingresos, info] = await Promise.all([
         leerVentas("referencia", filtro),
@@ -341,52 +372,73 @@ export async function GET(req: NextRequest) {
         infoDisponible: info.disponible,
         margenVisible,
       };
-      if (articulos.length > 0 || noEncontrados.length > 0) {
-        return NextResponse.json(descartados > 0 ? { ...body, descartados } : body);
-      }
-      // Nada por código: puede que fuera una palabra ("KAHLO"). Cae a descripción.
-      filtro = { tipo: "descripcion", patron: `%${escapeLike(normalizarBusqueda(crudo))}%` };
+      const respCodigos = NextResponse.json(descartados > 0 ? { ...body, descartados } : body);
+      if (articulos.length > 0) return respCodigos;
+      // 🩸 16-nov-2026: «polo» contestaba «No se encontró el código POLO» con
+      // 2.143 artículos que lo llevan en la descripción. Ningún código trajo
+      // nada: puede que fuera una palabra («POLO», «KAHLO»). Cae a descripción,
+      // y si ahí tampoco hay nada, se dice el «no encontré» de siempre.
+      const q = normalizarBusqueda(crudo);
+      if (q.length > 60) return respCodigos;
+      filtro = { tipo: "descripcion", patron: `%${escapeLike(q)}%` };
+      const amplia2 = await demasiadoAmplia(filtro);
+      if (amplia2) return amplia2;
+      const porDescripcion = await buscarPorDescripcion(filtro, hoy, hoyMes, margenVisible);
+      if (porDescripcion.size === 0) return respCodigos;
+      return porDescripcion.resp;
     }
 
     // ── Descripción: se ofrecen los modelos que coinciden ───────────────────
-    if ((await contarVentas(filtro)) > MAX_FILAS_BUSQUEDA) return errorAmplia();
-    const [ventas, info] = await Promise.all([leerVentas("referencia (desc)", filtro), leerInfo(filtro)]);
-
-    const porModelo = new Map<string, { descripcion: string; empresa: string; colores: Set<string> }>();
-    const sumar = (codigo: string, empresa: string, desc: string | null, pisa: boolean) => {
-      const modelo = modeloDe(codigo);
-      const m = porModelo.get(modelo) ?? { descripcion: "", empresa, colores: new Set<string>() };
-      if (desc && (pisa || !m.descripcion)) m.descripcion = desc;
-      m.colores.add(codigo);
-      porModelo.set(modelo, m);
-    };
-    for (const v of ventas) if (v.codigo) sumar(v.codigo, v.empresa_key, v.descripcion, false);
-    // El nombre comercial del catálogo PISA la categoría del diario: es el que
-    // Daniel reconoce y probablemente por el que buscó.
-    for (const i of info.filas) sumar(i.codigo, i.empresa_key, i.descripcion, true);
-
-    const body: ComprasApiResp = {
-      hoy,
-      hoyMes,
-      articulos: [],
-      noEncontrados: [],
-      coincidencias: [...porModelo.entries()]
-        .map(([modelo, m]) => ({
-          modelo,
-          descripcion: m.descripcion,
-          empresa: m.empresa,
-          colores: m.colores.size,
-        }))
-        .sort((a, b) => a.modelo.localeCompare(b.modelo))
-        .slice(0, 100),
-      comprasDisponibles: true,
-      infoDisponible: info.disponible,
-      margenVisible,
-    };
-    return NextResponse.json(body);
+    const amplia = await demasiadoAmplia(filtro);
+    if (amplia) return amplia;
+    return (await buscarPorDescripcion(filtro, hoy, hoyMes, margenVisible)).resp;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[api/ventas/referencia]", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+async function buscarPorDescripcion(
+  filtro: Filtro,
+  hoy: string,
+  hoyMes: string,
+  margenVisible: boolean,
+): Promise<{ size: number; resp: NextResponse }> {
+  const [ventas, info] = await Promise.all([leerVentas("referencia (desc)", filtro), leerInfo(filtro)]);
+
+  const porModelo = new Map<string, { descripcion: string; empresa: string; colores: Set<string> }>();
+  const sumar = (codigo: string, empresa: string, desc: string | null, pisa: boolean) => {
+    const modelo = modeloDe(codigo);
+    const m = porModelo.get(modelo) ?? { descripcion: "", empresa, colores: new Set<string>() };
+    if (desc && (pisa || !m.descripcion)) m.descripcion = desc;
+    m.colores.add(codigo);
+    porModelo.set(modelo, m);
+  };
+  for (const v of ventas) if (v.codigo) sumar(v.codigo, v.empresa_key, v.descripcion, false);
+  // El nombre comercial del catálogo PISA la categoría del diario: es el que
+  // Daniel reconoce y probablemente por el que buscó.
+  for (const i of info.filas) sumar(i.codigo, i.empresa_key, i.descripcion, true);
+
+  const body: ComprasApiResp = {
+    hoy,
+    hoyMes,
+    articulos: [],
+    noEncontrados: [],
+    coincidencias: [...porModelo.entries()]
+      .map(([modelo, m]) => ({
+        modelo,
+        descripcion: m.descripcion,
+        empresa: m.empresa,
+        colores: m.colores.size,
+      }))
+      .sort((a, b) => a.modelo.localeCompare(b.modelo)),
+    comprasDisponibles: true,
+    infoDisponible: info.disponible,
+    margenVisible,
+  };
+  if (porModelo.size > MAX_COINCIDENCIAS) {
+    return { size: porModelo.size, resp: errorAmplia(`hay ${fmtN(porModelo.size)} modelos que coinciden`) };
+  }
+  return { size: porModelo.size, resp: NextResponse.json(body) };
 }

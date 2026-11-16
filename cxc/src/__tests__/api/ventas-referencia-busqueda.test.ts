@@ -110,6 +110,14 @@ const { TABLES } = vi.hoisted(() => {
       switch_articulo_info: [
         info("4D5029G002", 30),
         ...todos.filter((c) => c !== "4D5029G002").map((c) => info(c, 21)),
+        // Una palabra que NO es código: «polo» vive solo en la descripción.
+        { ...info("40HM265001", 12), descripcion: "POLO MANGA CORTA" },
+        { ...info("40HM265032", 8), descripcion: "POLO MANGA CORTA" },
+        // 101 modelos con «CAMISETA»: pasa el tope de lo que se ofrece.
+        ...Array.from({ length: 101 }, (_, i) => ({
+          ...info(`CM${String(i).padStart(4, "0")}001`, 1),
+          descripcion: "CAMISETA BASICA",
+        })),
       ],
     } as Record<string, Record<string, unknown>[]>,
   };
@@ -121,8 +129,9 @@ vi.mock("@/lib/supabase-server", () => {
       "^" +
         pat
           .replace(/[.+?^${}()|[\]\\]/g, (c) => "\\" + c)
-          .replace(/%/g, ".*")
+          // `*` antes que `%`: si no, el `.*` de un `%` se vuelve `..*`.
           .replace(/\*/g, ".*")
+          .replace(/%/g, ".*")
           .replace(/_/g, ".") +
         "$",
       flags,
@@ -301,5 +310,23 @@ describe("roles — Daniel: 'habilita referencia para los vendedores y bodega' /
     expect((await buscar("4D5029G", "secretaria")).status).toBe(403);
     expect((await buscar("4D5029G", "contabilidad")).status).toBe(403);
     expect((await buscar("4D5029G", null)).status).toBe(401);
+  });
+});
+
+describe("🩸 16-nov-2026 — una palabra que no es código busca por descripción", () => {
+  it("🔴 «polo» ofrece los modelos con POLO en la descripción, no «No se encontró el código POLO»", async () => {
+    const { status, body } = await buscar("polo");
+    expect(status).toBe(200);
+    expect(body.noEncontrados).toEqual([]);
+    expect(body.coincidencias).toEqual([
+      { modelo: "40HM265", descripcion: "POLO MANGA CORTA", empresa: "vistana", colores: 2 },
+    ]);
+  });
+
+  it("🔴 más modelos que el tope: dice CUÁNTOS hay y pide afinar — nunca recorta en silencio", async () => {
+    const { status, body } = await buscar("camiseta");
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/demasiado amplia: hay 101 modelos que coinciden/);
+    expect(body.error).toMatch(/afinar/);
   });
 });
