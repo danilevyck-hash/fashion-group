@@ -10,8 +10,6 @@
 // Estos tests usan los timestamps REALES de switch_sync_log y cron_heartbeats
 // de producción de ese día.
 import { describe, it, expect, vi } from "vitest";
-import fs from "fs";
-import path from "path";
 
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: { from: vi.fn() },
@@ -39,6 +37,7 @@ import {
 // ese día con filas reales, así que se evalúan contra los slots de ENTONCES, no
 // contra el calendario vivo (que cambia y tiene sus propios tests).
 import { SLOTS_JUL2026 } from "../fixtures/slots-jul2026";
+import { CRONS_PROGRAMADOS } from "../fixtures/cronograma-programado";
 
 const H = 3600 * 1000;
 const CXC = ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"];
@@ -109,10 +108,15 @@ const HB_25 = new Map<string, string | null | undefined>([
   ["switch-sync:facturas-0015", "2026-07-24T00:23:38Z"],
 ]);
 
-describe("SWITCH_SYNC_SLOTS — fuente única, espejo de vercel.json", () => {
-  it("los slots derivados coinciden EXACTAMENTE con los ?slot= de vercel.json", () => {
-    const vercel = fs.readFileSync(path.resolve(__dirname, "../../../vercel.json"), "utf8");
-    const enVercel = [...vercel.matchAll(/switch-sync\?[^"]*?&slot=([a-z]+-\d{4})/g)].map((m) => m[1]);
+// Desde el 16-nov-2026 el cronograma es vercel.json ∪ los jobs de pg_cron
+// (fixtures/cronograma-programado.ts): las entradas de tipo=facturas las
+// dispara pg_cron, con la MISMA ruta y el MISMO ?slot=.
+const RUTAS_PROGRAMADAS = CRONS_PROGRAMADOS.map((c) => c.path).join("\n");
+
+describe("SWITCH_SYNC_SLOTS — fuente única, espejo del cronograma (vercel.json ∪ pg_cron)", () => {
+  it("los slots derivados coinciden EXACTAMENTE con los ?slot= del cronograma", () => {
+    const vercel = RUTAS_PROGRAMADAS;
+    const enVercel = [...vercel.matchAll(/switch-sync\?[^"\n]*?&slot=([a-z]+-\d{4})/g)].map((m) => m[1]);
     // Una entrada = una ocurrencia = un slot: ningún nombre de slot repetido.
     expect(new Set(enVercel).size).toBe(enVercel.length);
     expect(enVercel.length).toBe(SWITCH_SYNC_SLOTS.length);
@@ -120,12 +124,12 @@ describe("SWITCH_SYNC_SLOTS — fuente única, espejo de vercel.json", () => {
     expect(SWITCH_SYNC_SLOT_HEARTBEATS).toEqual(SWITCH_SYNC_SLOTS.map((s) => `switch-sync:${s.slot}`));
   });
 
-  it("cada slot lleva las MISMAS empresas que su entrada de vercel.json", () => {
-    const vercel = fs.readFileSync(path.resolve(__dirname, "../../../vercel.json"), "utf8");
+  it("cada slot lleva las MISMAS empresas que su entrada del cronograma", () => {
+    const vercel = RUTAS_PROGRAMADAS;
     for (const s of SWITCH_SYNC_SLOTS) {
-      const re = new RegExp(`switch-sync\\?[^"]*empresas?=([a-z_,]+)[^"]*&slot=${s.slot}`);
+      const re = new RegExp(`switch-sync\\?[^"\\n]*empresas?=([a-z_,]+)[^"\\n]*&slot=${s.slot}`);
       const m = vercel.match(re);
-      expect(m, `slot ${s.slot} no encontrado en vercel.json`).toBeTruthy();
+      expect(m, `slot ${s.slot} no encontrado en vercel.json ni en pg_cron`).toBeTruthy();
       expect([...s.empresas].sort()).toEqual(m![1].split(",").sort());
     }
   });

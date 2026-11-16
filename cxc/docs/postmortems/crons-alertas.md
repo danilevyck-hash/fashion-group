@@ -1493,3 +1493,42 @@ Daniel: *«esos días [feriados] el aviso no me debería de llegar, que hace rui
 - Un silencio antes de un feriado **no se pierde**: avisa el siguiente hábil. Ejemplo medido en el candado: mudo desde el 2-nov 16:35 con 3, 5 y 10-nov feriados → el 4 cuenta pero aún no termina, el 5 es feriado, **avisa el 6**.
 - 🔴 Si no se pueden leer los feriados, cae a las **24 h de antes** (falla ABIERTA, nunca callar de más). Anti-repetición (2 h), texto del aviso, `vercel.json` y la alerta del hueco de 30 días: **sin cambios**.
 - Candado: `src/__tests__/lib/vigia-solo-dias-habiles.test.ts`. `false` = la conducta de antes.
+
+## Crons en pg_cron: el segundo reloj (16-nov-2026)
+
+### Lo que se midió
+
+- `vercel.json` tenía **95 entradas de cron** sobre un tope de **100** (plan Pro). Las últimas cinco entraron entre el 1 y el 13-nov-2026 (`facturas-0300`, `despachos-correo`…). A ese ritmo el tope llegaba en diciembre.
+- Las que corren **varias veces al día** son 13 paths; el grupo más grande con un solo path es `switch-sync tipo=facturas`: **15 entradas** (las 13 de cada hora de 7 a. m. a 6 p. m. de Panamá, de las 8 empresas, más las dos de solo american_classic: 00:15 y 03:00 UTC).
+- Las rutas `/api/cron/*` exigen **solo** `Authorization: Bearer CRON_SECRET` (el mismo que se usa a mano con `curl`); `src/middleware.ts` las deja pasar sin sesión. Ningún header propio de Vercel (`x-vercel-cron`, user-agent): no hubo que tocar ninguna ruta.
+- `switch-sync` declara `maxDuration = 800`; `pg_net` espera **5 s** por defecto.
+
+### Lo que se decidió (Daniel aprobó liberar cupos moviendo a pg_cron lo de varias veces al día)
+
+- Se mudó **el grupo entero** de `switch-sync tipo=facturas` —15 entradas, **mismos minutos UTC**, misma ruta, mismo `?slot=`— a **pg_cron + pg_net dentro de Supabase**. `vercel.json` queda en **80 de 100**.
+
+  | UTC | 00:15 · 03:00 (solo ACS) | 11:50 | 12:30 | 13:30 | 14:15 | 15:00 | 16:45 | 17:30 | 18:40 | 19:00 | 20:20 | 21:40 | 22:30 | 23:00 |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | Panamá | 19:15 · 22:00 | 06:50 | 07:30 | 08:30 | 09:15 | 10:00 | 11:45 | 12:30 | 13:40 | 14:00 | 15:20 | 16:40 | 17:30 | 18:00 |
+
+- **Dos migraciones** (escritas, 🔴 **sin aplicar** hasta el «sí» de Daniel):
+  - `20270118120000_pg_cron_pg_net_vault.sql` — instala `pg_cron`, `pg_net`, `supabase_vault` y la función `public.fg_cron_llamar(ruta, espera_ms = 800000)`: lee `cron_secret` de Vault, llama a `https://www.fashiongr.com<ruta>` (con `www`, sin redirección) con `Authorization: Bearer …` y `timeout_milliseconds` de 800 s. Si el secreto falta, **levanta error y no manda nada**. El valor del secreto **nunca va en el repo**: se carga una vez con `vault.create_secret(…, 'cron_secret', …)` (el SQL exacto y una alternativa por terminal que lo lee de Vercel están en la cabecera del archivo).
+  - `20270118120100_crons_facturas_a_pg_cron.sql` — 15 × `cron.schedule('fg-switch-sync-facturas-<hhmm>', '<m h * * *>', $$select public.fg_cron_llamar('/api/cron/switch-sync?tipo=facturas&…&slot=facturas-<hhmm>')$$)`. Idempotente por nombre. pg_cron corre en UTC (`cron.timezone = GMT`), igual que `vercel.json`.
+- **pg_cron no espera la respuesta**: encola la petición y la ruta sigue en Vercel. `cron.job_run_details.status = success` significa «se encoló», no «la ruta terminó bien».
+
+### Cómo siguen vigiladas (nada se aflojó)
+
+- Las 15 entradas **siguen en `SWITCH_CRON_ENTRADAS`** (`src/lib/cron-telemetry.ts`) con `origen: "pg_cron"`. De esa lista se derivan, sin cambios: los **slots de heartbeat** (`switch-sync:facturas-<hhmm>`, que escribe la RUTA al terminar, venga de donde venga la llamada), las ocurrencias perdidas y su **recuperación por la reconciliación** (10/14/18 UTC), `corridasPorDiaDelPar` (**regla 2**: fallos seguidos según el ritmo del par), `proximoCronParaEmpresa` (el candado del sync manual) y la **separación ≥ 15 min por empresa**. `datos-frescos` (+24 h) y `crons-que-avisan` no leen el cronograma: no cambian.
+- **Candados** (`cron-registro.test.ts` · `cron-calendario.test.ts` · `cron-slots-huerfanos.test.ts`) leen ahora el **cronograma programado** = `vercel.json` ∪ jobs de la migración (`src/__tests__/fixtures/cronograma-programado.ts`, que parsea los dos archivos del repo; nada escrito a mano). Exigen: cada entrada del registro está **una** vez en el cronograma y **en el reloj que dice `origen`**; cada job se llama `fg-<ruta>-<hhmm>` y lleva el slot de su minuto; **ninguna ruta+hora está en los dos relojes**; la migración usa `www` y Vault, sin ningún Bearer literal. Mutación probada: devolver una sola entrada de facturas a `vercel.json` pone **7 pruebas en rojo**.
+- Lo que NO vigila nadie: que pg_cron mismo esté vivo. Si Supabase dejara de disparar, la primera señal es el **slot perdido** en la reconciliación de las 14:00 UTC (que además lo recupera) y la **regla 1** a las 24 h. Es el mismo trato que tenía Vercel.
+
+### Orden de publicación (para no dejar huecos ni corridas dobles)
+
+Dos corridas a la vez en la misma empresa expulsan la sesión de Switch, así que las dos fuentes no pueden estar vivas al mismo tiempo. El **único hueco del día sin ninguna corrida de facturas** es **03:05 → 11:45 UTC** (22:05 → 06:45 de Panamá).
+
+1. Daniel aprueba el SQL de las dos migraciones.
+2. **A cualquier hora**: `npm run migrar supabase/migrations/20270118120000_pg_cron_pg_net_vault.sql` y cargar `cron_secret` en Vault (sin jobs todavía, no dispara nada). Comprobar: `select name from vault.secrets where name = 'cron_secret';`.
+3. **Dentro del hueco** (lo más cómodo: justo después de las 22:00 de Panamá, o antes de las 06:45): `npm run migrar supabase/migrations/20270118120100_crons_facturas_a_pg_cron.sql`, y acto seguido `gh pr merge <n> --auto --squash` de la solicitud que quita las 15 de `vercel.json`. Las pruebas tardan ~12 min y Vercel ~3: entra con horas de margen antes de las 11:50 UTC.
+4. Al día siguiente, mirar que el latido `switch-sync:facturas-1150` tenga la fecha de hoy y `cron.job_run_details` 15 corridas `succeeded`.
+
+Si la solicitud entrara DESPUÉS de las 11:50 UTC con la migración ya aplicada, los dos relojes dispararían a la vez: **no hacerlo**. Volver atrás: `select cron.unschedule(jobname) from cron.job where jobname like 'fg-switch-sync-facturas-%';` y revertir la solicitud.

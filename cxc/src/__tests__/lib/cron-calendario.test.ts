@@ -3,7 +3,8 @@
 // Estos tests son la RED que impide que un horario nuevo rompa producción. Tres
 // invariantes:
 //
-//  1. ESPEJO BIDIRECCIONAL con vercel.json. SWITCH_CRON_ENTRADAS es la fuente
+//  1. ESPEJO BIDIRECCIONAL con el cronograma programado (vercel.json ∪ los jobs
+//     de pg_cron, fixtures/cronograma-programado.ts). SWITCH_CRON_ENTRADAS es la fuente
 //     única de la que se derivan los slots de heartbeat, el candado del sync
 //     manual (proximoCronParaEmpresa) y la telemetría. Si se mueve una entrada
 //     en vercel.json y no acá (o al revés), el sistema vigila un calendario que
@@ -41,15 +42,21 @@ import {
   type SwitchCronEntrada,
 } from "@/lib/cron-telemetry";
 import { empresasConFacturas } from "@/lib/switch-api/empresas";
+import {
+  CRONS_PROGRAMADOS,
+  VERCEL_CRONS,
+  PG_CRON_JOBS,
+  MIGRACIONES_PG_CRON,
+  hhmmDeSchedule,
+} from "../fixtures/cronograma-programado";
 
 interface VercelCron {
   path: string;
   schedule: string;
 }
 
-const VERCEL: { crons: VercelCron[] } = JSON.parse(
-  fs.readFileSync(path.resolve(__dirname, "../../../vercel.json"), "utf8"),
-);
+/** Solo lo que dispara Vercel (para lo que SIGUE siendo exclusivo de vercel.json). */
+const VERCEL: { crons: VercelCron[] } = { crons: VERCEL_CRONS };
 
 /** Ruta de /api/cron que corresponde a una entrada del cronograma. */
 const rutaDe = (cron: string) =>
@@ -64,8 +71,8 @@ const scheduleDe = (e: { hhmmUtc: string; diaSemana?: number }) =>
  *  esté acá TIENE que estar en SWITCH_CRON_ENTRADAS (y viceversa). */
 const RUTAS_QUE_TOCAN_SWITCH = [...new Set(SWITCH_CRON_ENTRADAS.map((e) => rutaDe(e.cron)))];
 
-/** Entradas de vercel.json que tocan Switch, con su "hhmm". */
-const entradasVercelSwitch = VERCEL.crons
+/** Entradas del cronograma (Vercel ∪ pg_cron) que tocan Switch, con su "hhmm". */
+const entradasVercelSwitch = CRONS_PROGRAMADOS
   .filter((c) => RUTAS_QUE_TOCAN_SWITCH.includes(c.path.split("?")[0]))
   .map((c) => {
     const [min, hora, , , dow] = c.schedule.split(" ");
@@ -78,21 +85,27 @@ const entradasVercelSwitch = VERCEL.crons
   });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("SWITCH_CRON_ENTRADAS — espejo bidireccional de vercel.json", () => {
-  it("cada entrada del cronograma existe en vercel.json con su hora exacta", () => {
+describe("SWITCH_CRON_ENTRADAS — espejo bidireccional del cronograma (vercel.json ∪ pg_cron)", () => {
+  it("cada entrada del registro existe UNA vez en el cronograma, con su hora exacta y en SU reloj", () => {
     for (const e of SWITCH_CRON_ENTRADAS) {
       const ruta = rutaDe(e.cron);
-      const match = VERCEL.crons.filter(
+      const match = CRONS_PROGRAMADOS.filter(
         (c) => c.path.split("?")[0] === ruta && c.schedule === scheduleDe(e),
       );
       expect(
         match.length,
-        `${e.cron} ${e.hhmmUtc} no está en vercel.json (o está duplicada)`,
+        `${e.cron} ${e.hhmmUtc} no está en vercel.json ni en pg_cron (o está en los dos: corrida doble)`,
       ).toBe(1);
+      // Y el reloj es el que dice el registro: una entrada marcada pg_cron que
+      // siguiera en vercel.json (o al revés) es exactamente lo que la mudanza
+      // tiene que impedir.
+      expect(match[0].origen, `${e.cron} ${e.hhmmUtc}: el reloj no coincide con origen`).toBe(
+        e.origen ?? "vercel",
+      );
     }
   });
 
-  it("cada entrada de vercel.json que toca Switch está en el cronograma", () => {
+  it("cada entrada del cronograma que toca Switch está en el registro", () => {
     for (const v of entradasVercelSwitch) {
       const match = SWITCH_CRON_ENTRADAS.filter(
         (e) =>
@@ -109,10 +122,11 @@ describe("SWITCH_CRON_ENTRADAS — espejo bidireccional de vercel.json", () => {
   });
 
   it("ninguna entrada usa lista de horas (rompería el slot por ocurrencia)", () => {
-    // Vercel Pro acepta "0 15,19,23 * * *", pero el heartbeat por slot supone
-    // UNA entrada = UNA ocurrencia al día: con una lista, slotsHuerfanos y el
-    // detector de crons perdidos ya no saben cuál ocurrencia se perdió.
-    for (const c of VERCEL.crons) {
+    // Vercel Pro acepta "0 15,19,23 * * *" (y pg_cron también), pero el
+    // heartbeat por slot supone UNA entrada = UNA ocurrencia al día: con una
+    // lista, slotsHuerfanos y el detector de crons perdidos ya no saben cuál
+    // ocurrencia se perdió.
+    for (const c of CRONS_PROGRAMADOS) {
       const [min, hora] = c.schedule.split(" ");
       expect(min, `${c.path}: minuto con lista/rango`).toMatch(/^\d{1,2}$/);
       expect(hora, `${c.path}: hora con lista/rango`).toMatch(/^\d{1,2}$/);
@@ -479,10 +493,11 @@ describe("facturas del día cada hora de oficina (7 a. m. - 6 p. m. de Panamá)"
     expect(choques).toEqual([]);
   });
 
-  it("cada corrida nueva es tipo=facturas de las 8 empresas, con su slot y en vercel.json", () => {
+  it("cada corrida de cada hora es tipo=facturas de las 8 empresas, con su slot, y la dispara pg_cron", () => {
     for (const hhmm of FACTURAS_CADA_HORA_UTC) {
-      const v = VERCEL.crons.filter((c) => c.path.includes(`slot=facturas-${hhmm}`));
+      const v = CRONS_PROGRAMADOS.filter((c) => c.path.includes(`slot=facturas-${hhmm}`));
       expect(v.length, hhmm).toBe(1);
+      expect(v[0].origen, hhmm).toBe("pg_cron");
       expect(v[0].path).toContain("tipo=facturas&empresas=");
       const empresas = new URL(v[0].path, "http://x").searchParams.get("empresas")!.split(",");
       expect(empresas.sort()).toEqual([...empresasConFacturas()].sort());
@@ -493,5 +508,64 @@ describe("facturas del día cada hora de oficina (7 a. m. - 6 p. m. de Panamá)"
     for (const hhmm of ["1300", "1700", "2100"]) {
       expect(esSlotRetirado(slotHeartbeatName(`facturas-${hhmm}`)), hhmm).toBe(true);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 16-nov-2026 · vercel.json llegó a 95 de 100 entradas. Daniel aprobó mover a
+// pg_cron (dentro de Supabase, migración `*_crons_facturas_a_pg_cron.sql`) las
+// tareas que corren varias veces al día. Se mudó el grupo ENTERO de
+// `switch-sync tipo=facturas` (15 entradas: las 13 de cada hora + 00:15 y
+// 03:00 de american_classic), con los MISMOS minutos UTC. Las entradas siguen
+// en SWITCH_CRON_ENTRADAS con `origen: "pg_cron"`: de ahí salen los slots, la
+// regla 2 y la separación por empresa, que no cambian.
+describe("pg_cron — lo que se mudó sigue en el registro y no está en los dos relojes", () => {
+  const mudadas = SWITCH_CRON_ENTRADAS.filter((e) => e.origen === "pg_cron");
+
+  it("hay UNA migración de jobs y define exactamente las entradas marcadas pg_cron", () => {
+    expect(MIGRACIONES_PG_CRON).toEqual(["20270118120100_crons_facturas_a_pg_cron.sql"]);
+    expect(PG_CRON_JOBS.length).toBe(mudadas.length);
+    expect(mudadas.length).toBe(15);
+  });
+
+  it("se mudó el grupo ENTERO de tipo=facturas, y nada más", () => {
+    expect(mudadas.every((e) => e.cron === "switch-sync facturas")).toBe(true);
+    expect(SWITCH_CRON_ENTRADAS.filter((e) => e.cron === "switch-sync facturas").length).toBe(15);
+    for (const j of PG_CRON_JOBS) expect(j.path).toMatch(/^\/api\/cron\/switch-sync\?tipo=facturas&/);
+  });
+
+  it("cada job se llama fg-<ruta>-<hhmm UTC> y lleva el slot de SU minuto", () => {
+    for (const j of PG_CRON_JOBS) {
+      const hhmm = hhmmDeSchedule(j.schedule);
+      expect(j.jobname).toBe(`fg-switch-sync-facturas-${hhmm}`);
+      expect(j.path).toContain(`&slot=facturas-${hhmm}`);
+      expect(j.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/); // diaria, sin listas
+    }
+    expect(new Set(PG_CRON_JOBS.map((j) => j.jobname)).size).toBe(PG_CRON_JOBS.length);
+  });
+
+  it("ningún job de pg_cron sigue en vercel.json (corrida doble = sesión de Switch expulsada)", () => {
+    for (const j of PG_CRON_JOBS) {
+      const slot = /slot=([a-z]+-\d{4})/.exec(j.path)![1];
+      expect(VERCEL.crons.some((c) => c.path.includes(`slot=${slot}`)), slot).toBe(false);
+    }
+    expect(VERCEL.crons.some((c) => c.path.includes("tipo=facturas"))).toBe(false);
+  });
+
+  it("vercel.json quedó con aire: 80 entradas de 100", () => {
+    expect(VERCEL.crons.length).toBe(80);
+  });
+
+  it("la migración usa la ruta con www y el Bearer de Vault, nunca el secreto escrito", () => {
+    const raiz = path.resolve(__dirname, "../../..");
+    const base = fs.readFileSync(path.join(raiz, "supabase/migrations/20270118120000_pg_cron_pg_net_vault.sql"), "utf8");
+    expect(base).toContain("'https://www.fashiongr.com' || ruta");
+    expect(base).toContain("from vault.decrypted_secrets");
+    expect(base).toContain("where name = 'cron_secret'");
+    expect(base).toContain("timeout_milliseconds := espera_ms");
+    expect(base).toMatch(/espera_ms integer default 800000/);
+    const jobs = fs.readFileSync(path.join(raiz, "supabase/migrations", MIGRACIONES_PG_CRON[0]), "utf8");
+    // Ningún Bearer literal en ninguna de las dos (el secreto vive en Vault).
+    for (const sql of [base, jobs]) expect(sql).not.toMatch(/Bearer [A-Za-z0-9_-]{16,}/);
   });
 });

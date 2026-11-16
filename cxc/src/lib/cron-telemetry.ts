@@ -691,9 +691,27 @@ export interface SwitchCronEntrada {
   diaSemana?: number;
   /** Empresas cuyo Switch toca esa entrada. */
   empresas: readonly string[];
+  /**
+   * Quién dispara la entrada. Ausente = `vercel.json`. `"pg_cron"` = un job
+   * `fg-<ruta>-<hhmm>` de pg_cron dentro de Supabase (migración
+   * `20270118120100`), que llama a la MISMA ruta con el MISMO `slot` y el
+   * Bearer de Vault. Existe desde el 16-nov-2026, cuando vercel.json llegó a
+   * 95 de 100 entradas y Daniel aprobó mover las de varias veces al día.
+   *
+   * La entrada NO se borra del registro al mudarse: de acá se derivan los
+   * slots de heartbeat, `corridasPorDiaDelPar` (la regla 2), el candado del
+   * sync manual y la separación por empresa — nada de eso sabe ni le importa
+   * quién apretó el botón. El candado `cron-calendario.test.ts` exige que una
+   * entrada con `origen: "pg_cron"` esté en la migración y NO en vercel.json
+   * (y al revés): una corrida doble en la misma empresa expulsa la sesión.
+   */
+  origen?: "pg_cron";
 }
 
-/** Espejo de vercel.json — entradas que tocan Switch, con sus empresas. */
+/** Marca de las entradas que dispara pg_cron. Ver `SwitchCronEntrada.origen`. */
+export const ORIGEN_PG_CRON = "pg_cron" as const;
+
+/** Espejo del cronograma programado (vercel.json ∪ los jobs de pg_cron) — entradas que tocan Switch, con sus empresas. */
 /** Empresas del cron sync-pedidos (Guías › Pedidos): las 6 del grupo. */
 const CRON_EMPRESAS_PEDIDOS = ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"];
 export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
@@ -775,14 +793,14 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "acs-fidelizacion", hhmmUtc: "1130", empresas: ["american_classic"] },
   // Ventas de la mañana temprana (06:50 Panamá): quien entra a trabajar a las
   // 8 a.m. ya no ve el dato de la madrugada. Ver CRON_EMPRESAS_VENTAS.
-  { cron: "switch-sync facturas", hhmmUtc: "1150", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "1150", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   // Facturas del día, CADA HORA de 7 a. m. a 6 p. m. de Panamá (8-oct-2026).
   // Ver CRON_EMPRESAS_VENTAS por qué cada minuto.
-  { cron: "switch-sync facturas", hhmmUtc: "1230", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "1230", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   { cron: "switch-reconciliacion", hhmmUtc: "1400", empresas: CRON_EMPRESAS_TODAS },
   // Único hueco de las 9 a. m.: la reconciliación tiene techo de 740 s (termina
   // 14:12:20 en el peor caso) y tommy arranca 14:30.
-  { cron: "switch-sync facturas", hhmmUtc: "1415", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "1415", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   // ── CATÁLOGOS, PASE 1 de 4: 9:30-9:45 a.m. de Panamá ──────────────────────
   // Los cuatro catálogos viven ahora DENTRO de la ventana de uso (10 a.m. - 6
   // p.m. de Panamá, dato de Daniel): este pase deja el dato con 15-30 min de
@@ -801,13 +819,13 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "calvin-catalogo", hhmmUtc: "1435", empresas: ["vistana"] },
   { cron: "reebok-catalogo", hhmmUtc: "1440", empresas: ["active_shoes"] },
   { cron: "joybees-catalogo", hhmmUtc: "1445", empresas: ["joystep"] },
-  { cron: "switch-sync facturas", hhmmUtc: "1500", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "1500", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   { cron: "sync-recibos", hhmmUtc: "1515", empresas: CRON_EMPRESAS_RECIBOS },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1600", empresas: ["active_shoes", "joystep"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1605", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1610", empresas: ["vistana", "active_wear"] },
   { cron: "acs-fidelizacion", hhmmUtc: "1630", empresas: ["american_classic"] },
-  { cron: "switch-sync facturas", hhmmUtc: "1645", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "1645", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   // ── CATÁLOGOS, PASE 2 de 4: 12:00-12:15 p.m. de Panamá ────────────────────
   // Banda libre 16:15-17:45 (después del estadocuenta de cada par, antes de la
   // reconciliación de las 18:00). Mismo orden por duración. Tommy GANA margen
@@ -817,10 +835,10 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "calvin-catalogo", hhmmUtc: "1705", empresas: ["vistana"] },
   { cron: "reebok-catalogo", hhmmUtc: "1710", empresas: ["active_shoes"] },
   { cron: "joybees-catalogo", hhmmUtc: "1715", empresas: ["joystep"] },
-  { cron: "switch-sync facturas", hhmmUtc: "1730", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "1730", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   { cron: "switch-reconciliacion", hhmmUtc: "1800", empresas: CRON_EMPRESAS_TODAS },
-  { cron: "switch-sync facturas", hhmmUtc: "1840", empresas: CRON_EMPRESAS_VENTAS },
-  { cron: "switch-sync facturas", hhmmUtc: "1900", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "1840", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
+  { cron: "switch-sync facturas", hhmmUtc: "1900", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   { cron: "sync-recibos", hhmmUtc: "1915", empresas: CRON_EMPRESAS_RECIBOS },
   // ── CATÁLOGOS, PASE 3 de 4: 2:40-2:55 p.m. de Panamá ──────────────────────
   // Banda libre 19:30-20:55: por detrás quedan las ventas de las 19:00 y los
@@ -831,12 +849,12 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "calvin-catalogo", hhmmUtc: "1945", empresas: ["vistana"] },
   { cron: "reebok-catalogo", hhmmUtc: "1950", empresas: ["active_shoes"] },
   { cron: "joybees-catalogo", hhmmUtc: "1955", empresas: ["joystep"] },
-  { cron: "switch-sync facturas", hhmmUtc: "2020", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "2020", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2110", empresas: ["vistana", "active_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2115", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2120", empresas: ["active_shoes", "joystep"] },
   // Entre el estadocuenta 21:20 (cierra ~21:25) y tommy 21:55.
-  { cron: "switch-sync facturas", hhmmUtc: "2140", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "2140", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   // ── CATÁLOGOS, PASE 4 de 4: 4:55-5:10 p.m. de Panamá ──────────────────────
   // El último pase antes de que la oficina cierre. Cada uno va DESPUÉS del
   // estadocuenta de SU propia empresa (fashion_shoes 21:15 → tommy 21:55 a 40 min;
@@ -849,15 +867,15 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "calvin-catalogo", hhmmUtc: "2200", empresas: ["vistana"] },
   { cron: "reebok-catalogo", hhmmUtc: "2205", empresas: ["active_shoes"] },
   { cron: "joybees-catalogo", hhmmUtc: "2210", empresas: ["joystep"] },
-  { cron: "switch-sync facturas", hhmmUtc: "2230", empresas: CRON_EMPRESAS_VENTAS },
-  { cron: "switch-sync facturas", hhmmUtc: "2300", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "2230", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
+  { cron: "switch-sync facturas", hhmmUtc: "2300", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   { cron: "sync-recibos", hhmmUtc: "2315", empresas: CRON_EMPRESAS_RECIBOS },
-  { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"] },
+  { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"], origen: ORIGEN_PG_CRON },
   // Carga de facturas de la NOCHE de Multifashion (1-nov-2026): 22:00 Panamá,
   // justo antes del resumen de las 22:15. La tienda factura después de las 7
   // (90 días: última venta p99 = máx = 21:56). A 2h45 de la de 00:15 y a 60 min
   // de sync-articulo-info (04:00), las dos únicas de american_classic cerca.
-  { cron: "switch-sync facturas", hhmmUtc: "0300", empresas: ["american_classic"] },
+  { cron: "switch-sync facturas", hhmmUtc: "0300", empresas: ["american_classic"], origen: ORIGEN_PG_CRON },
   // Guías › Pedidos, CUATRO pasadas de día (6-oct-2026, Daniel): 8:10, 10:40,
   // 1:20 y 3:45 de Panamá, todas dentro de la jornada de bodega, y la pasada de
   // la madrugada (06:10 UTC = 01:10 de Panamá) se apagó: nadie mira el dato a
@@ -868,7 +886,7 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // de las ventas de las 19:00; 2045 a 50 de joybees (19:55) y a 25 del
   // estadocuenta de las 21:10.
   { cron: "sync-pedidos", hhmmUtc: "1310", empresas: CRON_EMPRESAS_PEDIDOS },
-  { cron: "switch-sync facturas", hhmmUtc: "1330", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "switch-sync facturas", hhmmUtc: "1330", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   { cron: "sync-pedidos", hhmmUtc: "1540", empresas: CRON_EMPRESAS_PEDIDOS },
   { cron: "sync-pedidos", hhmmUtc: "1820", empresas: CRON_EMPRESAS_PEDIDOS },
   { cron: "sync-pedidos", hhmmUtc: "2045", empresas: CRON_EMPRESAS_PEDIDOS },
