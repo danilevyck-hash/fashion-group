@@ -61,6 +61,7 @@ const ventas = fila("ventas", { vertical: true }); // toda la serie en formato c
 const multifashion = fila("multifashion");
 const boston = fila("boston");
 const referencia = fila("referencia", { vertical: true }); // Consulta de artículos: serie de celular
+const usuarios = fila("usuarios", { vertical: true }); // serie de celular
 const despachos = fila("guias"); // Despachos: la key del módulo sigue siendo `guias`
 
 export const VIDEOS_AYUDA: VideoAyuda[] = [
@@ -254,6 +255,17 @@ export const VIDEOS_AYUDA: VideoAyuda[] = [
   referencia(5, "Los colores", 41, "05-los-colores"),
   referencia(6, "Un color o varios códigos", 51, "06-un-color-o-varios"),
   referencia(7, "Actualizar y descargar", 48, "07-actualizar-y-excel"),
+  usuarios(0, "Usuarios completo", 524, "00-completo", true),
+  usuarios(0, "Introducción", 53, "00-que-es-usuarios"),
+  usuarios(1, "Leer la lista", 47, "01-leer-la-lista"),
+  usuarios(2, "Crear un usuario", 52, "02-nuevo-usuario"),
+  usuarios(3, "Rol, empresa y permisos", 60, "03-rol-y-permisos"),
+  usuarios(4, "Alguien que marca asistencia", 62, "04-marca-asistencia"),
+  usuarios(5, "Contraseña y vendedor en Switch", 44, "05-editar-clave-y-vendedor"),
+  usuarios(6, "Desactivar y dar de baja", 49, "06-desactivar-y-baja"),
+  usuarios(7, "Sesiones activas", 48, "07-sesiones-activas"),
+  usuarios(8, "Novedades", 45, "08-novedades"),
+  usuarios(9, "Actividad", 47, "09-actividad"),
 ];
 
 /** Los videos de un módulo: la lista en orden y el completo aparte. */

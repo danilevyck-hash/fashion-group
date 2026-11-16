@@ -146,6 +146,15 @@ describe("GET /api/videos-ayuda", () => {
     expect((await GET(req("referencia"))).status).toBe(403);
   });
 
+  it("Usuarios: serie de teléfono, solo admin", async () => {
+    sesion.mockReturnValue({ role: "admin" });
+    const r = await (await GET(req("usuarios"))).json();
+    expect(r.lista).toHaveLength(10);
+    expect(r.lista.every((v: { vertical?: boolean }) => v.vertical === true)).toBe(true);
+    sesion.mockReturnValue({ role: "secretaria" });
+    expect((await GET(req("usuarios"))).status).toBe(403);
+  });
+
   it("Asistencia es mixta: solo el 01 (marcar desde el teléfono) va vertical", async () => {
     sesion.mockReturnValue({ role: "contabilidad" });
     const a = await (await GET(req("asistencia"))).json();

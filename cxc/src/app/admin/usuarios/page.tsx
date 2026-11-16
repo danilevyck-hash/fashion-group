@@ -2,7 +2,11 @@
 
 import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
-import { BarraDeControles, EnLaBarra, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { BarraDeControles, CLASE_FILA_MENU, EnLaBarra, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import VideosAyuda from "@/components/VideosAyuda";
+import { VIDEOS_AYUDA_2026_11 } from "@/lib/ui/videos-ayuda-2026-11";
+import { tieneVideos } from "@/lib/videos-ayuda/manifiesto";
 import { USUARIOS_EMPRESA_POR_NOMBRE_2026_11, USUARIOS_NUEVO_EN_EL_TITULO_2026_11 } from "@/lib/ui/revision-110-marketing";
 import { mapEmpresaName } from "@/lib/empresa-mapping";
 import { opcionesDeEmpresa } from "@/lib/usuarios/opciones-empresa";
@@ -101,6 +105,9 @@ function UsuariosPageInner() {
   const [tabRaw, setTab] = useUrlState("tab", "usuarios");
   // Celular: el título es el selector de sección («Usuarios ▾»).
   const barra = useBarraCelular(SECCION_EN_EL_TITULO_2026_11);
+  // «Cómo se usa» en la PORTADA del módulo (videos en formato celular).
+  const [verVideos, setVerVideos] = useState(false);
+  const conVideos = VIDEOS_AYUDA_2026_11 && tieneVideos("usuarios");
   // «Novedades» es SOLO de admin. El guard de arriba ya cierra la pantalla
   // entera, pero la pestaña se condiciona igual: así el permiso se lee en el
   // componente y un test lo puede exigir, en vez de depender de que nadie
@@ -327,6 +334,7 @@ function UsuariosPageInner() {
           Ahora el breadcrumb es `Inicio › Administración › Usuarios`, y el
           grupo sale de `grupoDeModulo("usuarios")` — nunca escrito a mano. */}
       <AppHeader module="Usuarios" grupo={grupoDeModulo("usuarios")} tituloEnLaPantalla={barra && esAdmin} />
+      {conVideos && <VideosAyuda modulo="usuarios" open={verVideos} onClose={() => setVerVideos(false)} />}
       {barra && esAdmin && (
         <ProveedorBarraCelular activo activa={tab}>
           <BarraDeControles
@@ -338,6 +346,7 @@ function UsuariosPageInner() {
             ]}
             activa={tab}
             onPestana={setTab}
+            menu={conVideos ? <button type="button" onClick={() => setVerVideos(true)} className={CLASE_FILA_MENU}>Cómo se usa</button> : null}
           />
           {/* n.º 100: «＋ Nuevo usuario» sube a la línea del título; la lista sube. */}
           {USUARIOS_NUEVO_EN_EL_TITULO_2026_11 && (
@@ -392,7 +401,10 @@ function UsuariosPageInner() {
           {/* 🔴 Estilo Apple: en la computadora «＋ Nuevo usuario» va en la fila
               de las pestañas, no en una fila sola. */}
           {USUARIOS_APPLE_2026_10 && tab === "usuarios" && (
-            <div className="absolute right-0 top-0 hidden sm:block">{botonNuevoUsuario}</div>
+            <div className="absolute right-0 top-0 hidden items-center gap-2 sm:flex">
+              {conVideos && <OverflowMenu items={[{ label: "Cómo se usa", onClick: () => setVerVideos(true) }]} />}
+              {botonNuevoUsuario}
+            </div>
           )}
 
           <TabsContent value="usuarios" className="mt-0">
