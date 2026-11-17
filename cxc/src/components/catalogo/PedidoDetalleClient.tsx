@@ -60,6 +60,7 @@ import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import { TECLADO_DECIMAL, TECLADO_ENTERO } from "@/lib/ui/iphone-2026-11";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { COMPROBANTE_EXCEL_2026_11 } from "@/lib/ui/comprobante-excel-2026-11";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string;
   /** Precio de lista del catálogo (`<marca>_products.price`, sincronizado de
@@ -763,6 +764,42 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(false);
 
+  // Lo que el PDF y el Excel leen del comprobante: UNA sola fuente para los dos.
+  function opcionesDelPapel(prefix: string) {
+    return {
+      marca,
+      orderNumber: order!.order_number,
+      clientName,
+      createdAt: order!.created_at,
+      items: items.map(i => ({
+        sku: i.sku || "", name: i.name, quantity: i.quantity, unit_price: Number(i.unit_price),
+        image_url: i.image_url || "", category: i.category || theme.pdfFallbackCategory,
+        // Reebok: el bulto escrito en el renglón manda (ropa de 12 desde el 15-nov-2026).
+        ...(marca === "reebok" ? { bulto_pzas: i.bulto_pzas ?? null } : {}),
+      })),
+      bultoSize: (c: string | null | undefined, bultoPzas?: number | null) => theme.bulto(c || theme.pdfFallbackCategory, bultoPzas),
+      // La MISMA palabra adentro del papel y en el nombre del archivo: dos
+      // reglas para lo mismo se separan solas.
+      documentoLabel: prefix,
+    };
+  }
+
+  /** «Descargar Excel»: lo MISMO que el PDF, en hoja de cálculo (`COMPROBANTE_EXCEL_2026_11`). */
+  async function downloadExcel() {
+    if (!order) return;
+    try {
+      const prefix = palabraDelPapel(switchEnvio, order.status === "confirmado" ? "Pedido" : "Cotización");
+      const { downloadCatalogoOrderExcel } = await import("@/lib/catalogo/order-excel");
+      downloadCatalogoOrderExcel({
+        ...opcionesDelPapel(prefix),
+        filename: `${prefix}-${order.order_number}-${hoyPanama()}.xlsx`,
+      });
+      showToast("Excel listo — revisa tu carpeta de descargas");
+    } catch {
+      showToast("No se pudo generar el Excel. Intenta de nuevo.");
+    }
+  }
+
   async function downloadPDF() {
     if (!order) return;
     showToast("Generando PDF...");
@@ -787,20 +824,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       );
       const dateStr = hoyPanama();
       await downloadCatalogoOrderPdf({
-        marca,
-        orderNumber: order.order_number,
-        clientName,
-        createdAt: order.created_at,
-        items: items.map(i => ({
-          sku: i.sku || "", name: i.name, quantity: i.quantity, unit_price: Number(i.unit_price),
-          image_url: i.image_url || "", category: i.category || theme.pdfFallbackCategory,
-          // Reebok: el bulto escrito en el renglón manda (ropa de 12 desde el 15-nov-2026).
-          ...(marca === "reebok" ? { bulto_pzas: i.bulto_pzas ?? null } : {}),
-        })),
-        bultoSize: (c, bultoPzas) => theme.bulto(c || theme.pdfFallbackCategory, bultoPzas),
-        // La MISMA palabra adentro del papel y en el nombre del archivo: dos
-        // reglas para lo mismo se separan solas.
-        documentoLabel: prefix,
+        ...opcionesDelPapel(prefix),
         filename: `${prefix}-${order.order_number}-${dateStr}.pdf`,
       });
       showToast("PDF listo — revisa tu carpeta de descargas");
@@ -1411,6 +1435,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Descargar PDF
               </button>
+              {COMPROBANTE_EXCEL_2026_11 && (
+                <button onClick={downloadExcel} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2 min-h-[44px]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Descargar Excel
+                </button>
+              )}
               {/* El correo interno a Fashion Group ya NO sale solo al confirmar:
                   Daniel confirmó que es solo suyo y nadie lo usa como lista de
                   trabajo. Queda como botón aparte, cuando lo quiera.
