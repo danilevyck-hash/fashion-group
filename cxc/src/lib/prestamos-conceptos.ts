@@ -116,6 +116,11 @@ export type OrigenPago = (typeof ORIGENES_PAGO)[number];
  * 🩸 «Efectivo» se retiró: **0 filas en toda la historia**. En su lugar entra
  * **«Abono»** —plata que la persona pagó por fuera, de su bolsillo—, que es el
  * caso que el sistema ya nombraba en el concepto histórico «Abono extra».
+ *
+ * 🩸 16-nov-2026: ese cambio se hizo AQUÍ y no en la base. El CHECK de
+ * `origen_pago` siguió con «Efectivo» hasta `20270121120000`, y «Abono» se
+ * rechazaba al guardar. Un origen nuevo entra en esta lista Y en una migración;
+ * el candado `prestamos-origen-pago-check.test.ts` cruza las dos.
  */
 export const ORIGENES_QUE_SE_OFRECEN: readonly OrigenPago[] = [
   "Abono",

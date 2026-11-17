@@ -594,3 +594,30 @@ Medido 25-sep → 9-oct: 8 entradas, todas de Contabilidad y desde la computador
 - La ficha sin colaborador asignado dice «No está vinculado a ningún colaborador: la planilla no le puede descontar.»
 
 Ningún número cambia; ni una ruta ni `lib/asistencia` importan el interruptor (candado `prestamos-apple-2026-10`). `false` = la pestaña de hoy: candado `src/__tests__/components/prestamos-apple-apagado.test.tsx` (HTML del `PrestamosTab.tsx` de `origin/main` antes de traer el rediseño; prendido, rojo).
+
+---
+
+## «Abono» se ofrecía y la base lo rechazaba (16-nov-2026)
+
+El 8-sep-2026 el formulario de pago cambió «Efectivo» por «Abono» (`ORIGENES_PAGO`, `prestamos-conceptos.ts`) y
+**nadie amplió el CHECK** de `prestamos_movimientos.origen_pago` (nació en `20260925120000` con
+`Quincena · Décimo · Vacaciones · Liquidación · Efectivo`). La ruta aceptaba «Abono» y Postgres lo
+rechazaba. Lo detectó el reporte de los videos del 16-nov: el pago de **$200 de Roxana Hernández**
+(15-nov-2026, cuenta préstamo) quedó guardado con `origen_pago = 'Efectivo'`.
+
+Medido antes de tocar nada: **todo lector del origen es binario** —«Quincena o vacío» contra «lo demás»—:
+el saldo mira el concepto (`prestamos-saldo.ts`), el freno de duplicados solo frena Quincena
+(`esPagoDeQuincena`), la casilla «ya descontado» de la planilla igual (`esDescuentoDeQuincena`), la columna
+«Origen» de Movimientos dice «a mano» para ambos (`origenDelMovimiento`), y el Excel y la ficha enseñan la
+palabra tal cual. **«Efectivo» y «Abono» cuentan idéntico en todos lados**: cambiar la palabra no mueve un
+centavo. Distribución medida: 1 Efectivo · 3 Liquidación · 28 Quincena · 454 NULL.
+
+- `20270121120000_prestamos_origen_pago_abono.sql` (**aplicada**): el CHECK suma «Abono» y **conserva «Efectivo»**
+  (aditiva; el código no lo ofrece, pero una fila vieja no puede dejar de pasar).
+- `20270121120100_prestamos_roxana_pago_abono.sql` (**aplicada**, Daniel aprobó el 16-nov): UPDATE de **1 fila por
+  id** (`0fc31704-…`), con `RAISE` si no es exactamente una, y rastro en `activity_logs`
+  (`prestamo_mov_update`, antes «Efectivo» → después «Abono», firmado como corrección de Claude aprobada por Daniel).
+- Candado `src/__tests__/lib/prestamos-origen-pago-check.test.ts`: cruza `ORIGENES_PAGO` con la ÚLTIMA definición
+  del CHECK en `supabase/migrations/` (sin comentarios). Un origen nuevo en el código sin su migración pone «pruebas»
+  en rojo. Verificado por mutación: 2 mutaciones cazadas (quitar «Abono» del CHECK · agregar «Transferencia» al
+  código sin migración), 2 controles que no se cazan (un valor inventado no está en el CHECK · «Efectivo» no se ofrece).

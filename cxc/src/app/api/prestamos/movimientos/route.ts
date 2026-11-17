@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
   //
   // Ahora mira el concepto, el ORIGEN y la fecha: un segundo pago de QUINCENA de
   // la misma cuenta dentro de la misma quincena se rechaza. Los pagos de otro
-  // origen (décimo, vacaciones, liquidación, efectivo) NO se frenan: son plata
+  // origen (décimo, vacaciones, liquidación, abono) NO se frenan: son plata
   // distinta y a propósito.
   if (concepto === CONCEPTO_PAGO && origenPago === ORIGEN_POR_DEFECTO) {
     const q = quincenaDeFecha(fecha);
