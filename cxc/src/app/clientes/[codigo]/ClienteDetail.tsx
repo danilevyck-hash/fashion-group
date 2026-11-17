@@ -705,8 +705,13 @@ function CampoEnLinea({
   }
 
   const hay = !!(valor && valor.trim());
+  // 🩸 n.º 11 (revisión de los videos, 16-nov-2026): un correo largo sin
+  // espacios no se partía y el `flex-1` no bajaba de su ancho mínimo, así que
+  // el correo y «Escribir» se montaban sobre el teléfono de al lado. `min-w-0`
+  // deja encoger la celda y `break-words` parte el correo en dos renglones:
+  // se ve completo, se copia completo, y nada se monta.
   const texto = hay ? (
-    <span className="text-gray-900 whitespace-pre-wrap">{valor}</span>
+    <span className="text-gray-900 whitespace-pre-wrap break-words">{valor}</span>
   ) : (
     <span className={falta ? "text-red-600" : "text-gray-400"}>{falta ?? "—"}</span>
   );
@@ -724,16 +729,16 @@ function CampoEnLinea({
             type="button"
             onClick={() => setEditando(campo)}
             aria-label={`Cambiar ${rotulo.toLowerCase()}`}
-            className="-mx-1 min-h-[32px] flex-1 rounded px-1 text-left transition hover:bg-gray-50"
+            className="-mx-1 min-h-[32px] min-w-0 flex-1 rounded px-1 text-left transition hover:bg-gray-50"
           >
             {texto}
           </button>
         ) : (
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             {hay && href ? (
               <a
                 href={href}
-                className="relative text-blue-600 hover:underline after:absolute after:-inset-y-[14px] after:inset-x-0 after:content-['']"
+                className="relative break-words text-blue-600 hover:underline after:absolute after:-inset-y-[14px] after:inset-x-0 after:content-['']"
               >
                 {valor}
               </a>
