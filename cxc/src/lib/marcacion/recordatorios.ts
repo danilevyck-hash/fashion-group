@@ -33,8 +33,13 @@ export function textoDelAviso(marca: MarcaDelDia): string {
 export const TEXTO_PIE_RECORDATORIOS =
   "Solo te avisamos si todavía no has marcado. No avisa en feriados ni en tus días libres.";
 export const TEXTO_INSTALAR_EN_IPHONE =
-  "Para recibir avisos, agrega Fashion Group a tu pantalla de inicio.";
+  "Para recibir avisos, agrega Fashion Group a tu pantalla de inicio: en Safari toca Compartir y luego «Agregar a pantalla de inicio». Ábrela desde ese ícono.";
 export const TEXTO_SELECCIONA_TU_HORA = "Selecciona tu hora";
+
+/** «Probar aviso» (17-nov-2026): lo que llega al teléfono al tocarlo. */
+export const TITULO_AVISO_PRUEBA = "Aviso de prueba";
+export const TEXTO_AVISO_PRUEBA = "Así te llegará el recordatorio de marcación";
+export const TEXTO_PRUEBA_ENVIADA = "Aviso enviado. Debe llegar a este teléfono en unos segundos.";
 
 /** Cuánto hacia atrás mira cada pasada (la llama la base cada 5 minutos). */
 export const VENTANA_MIN = 5;
