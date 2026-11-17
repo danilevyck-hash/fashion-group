@@ -19,6 +19,7 @@
 import type { SyncNowOpcion } from "./SyncNowButton";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { empresasConFacturas, empresasConRecibos } from "@/lib/switch-api/empresas";
+import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 
 /** Ventas (facturas): las 8 empresas del grupo sincronizan facturas. */
 const FACTURAS_KEYS = empresasConFacturas();
@@ -45,6 +46,13 @@ export const SYNC_NOW_RECIBOS_OPCIONES: SyncNowOpcion[] = RECIBOS_KEYS.map((k) =
   empresa: k,
   label: EMPRESA_KEY_TO_NAME[k] ?? k,
 }));
+
+/** «Actualizar» de Comisiones: los recibos SOLO de las 6 que comisionan
+ *  (`EMPRESAS_COMISIONAN`). Multifashion es otro módulo de comisiones y Boston
+ *  no comisiona: ofrecerlas era traer cobros que el módulo no lee (error #9). */
+export const SYNC_NOW_RECIBOS_COMISIONES: SyncNowOpcion[] = SYNC_NOW_RECIBOS_OPCIONES.filter(
+  (o) => (EMPRESAS_COMISIONAN as readonly string[]).includes(o.empresa ?? ""),
+);
 
 /** Gate de UI de los botones de CxP (/proveedores): espejo de
  *  rolesSyncNow("proveedores") — contabilidad SOLO ve el botón acá. */

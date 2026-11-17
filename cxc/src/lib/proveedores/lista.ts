@@ -18,6 +18,7 @@ import {
   normProvName,
   type AmarreProveedor,
 } from "@/lib/proveedores/identidad";
+import { partirSaldo } from "@/lib/proveedores/tramos";
 
 export { normProvName };
 export type { AmarreProveedor };
@@ -94,6 +95,10 @@ export async function fetchAllProveedorRows(): Promise<ProveedorRow[]> {
 export interface ProveedorEmpresaTotals {
   empresa: string;
   por_pagar: number;       // saldo_total (negativo = saldo a favor)
+  /** Lo pendiente y lo a favor de ESA empresa (de su aging): un `por_pagar` en
+   *  cero puede tener las dos cosas adentro y entonces sí se muestra. */
+  debes: number;
+  a_favor: number;
   ultimo_pago_monto: number | null;
   ultimo_pago_fecha: string | null;
   ultimo_pago_dias: number | null;
@@ -158,6 +163,8 @@ export function buildFicha(
     .map((r) => ({
       empresa: r.empresa_key,
       por_pagar: round2(Number(r.saldo_total)),
+      debes: partirSaldo(r.aging).debes,
+      a_favor: partirSaldo(r.aging).a_favor,
       ultimo_pago_monto: r.ultimo_pago_monto != null ? round2(Number(r.ultimo_pago_monto)) : null,
       ultimo_pago_fecha: r.ultimo_pago_fecha,
       ultimo_pago_dias: r.ultimo_pago_dias,

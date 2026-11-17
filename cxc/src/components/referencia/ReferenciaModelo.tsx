@@ -467,7 +467,7 @@ function FilaDeColor({
   );
 }
 
-/** Estilo Apple, celular: el color en dos líneas y el detalle al tocarlo. */
+/** Celular: el color en dos líneas y el detalle al tocarlo, fuera de todo deslizamiento. */
 function ColorCelular({
   f,
   hoyMes,
@@ -525,7 +525,10 @@ function TablaColores({
 }) {
   const [abierta, setAbierta] = useState<string | null>(null);
   const enCelular = useEsCelularReferencia();
-  if (REFERENCIA_APPLE_2026_10 && enCelular) {
+  // 🔴 En el celular, SIEMPRE una ficha por color (16-nov-2026, error #28): la
+  // tabla de 7 columnas se deslizaba de lado y el detalle abría adentro, con
+  // «Stock» y «% vendido» cortados. Ya no depende de `REFERENCIA_APPLE_2026_10`.
+  if (enCelular) {
     return (
       <ul className="text-sm">
         {filas.map((f) => (

@@ -30,7 +30,7 @@ import { useState, type ReactNode } from "react";
 import { Settings } from "lucide-react";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import SyncNowButton from "@/components/shared/SyncNowButton";
-import { SYNC_NOW_RECIBOS_OPCIONES } from "@/components/shared/syncNowOpciones";
+import { SYNC_NOW_RECIBOS_COMISIONES } from "@/components/shared/syncNowOpciones";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import { esVistaMultifashion, VISTA_MULTIFASHION } from "@/lib/comisiones/vistas";
@@ -173,7 +173,7 @@ export function PortadaComisionesCelular({
       forma="celular"
       tabla="facturas"
       empresas={B2B_EMPRESA_KEYS}
-      opciones={SYNC_NOW_RECIBOS_OPCIONES}
+      opciones={SYNC_NOW_RECIBOS_COMISIONES}
       onSuccess={onActualizado}
     />
   ) : null;
@@ -394,7 +394,7 @@ export function PortadaComisionesCelular({
         {conDescarga && !FRESCURA_VISIBLE_2026_10 && (
           <div className="[&>*]:w-full">
             <SyncNowButton
-              opciones={SYNC_NOW_RECIBOS_OPCIONES}
+              opciones={SYNC_NOW_RECIBOS_COMISIONES}
               className="w-full justify-center"
               onSuccess={() => { setMenu(false); onActualizado(); }}
             />

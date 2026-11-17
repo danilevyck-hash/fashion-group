@@ -90,9 +90,14 @@ const texto = () => document.body.textContent ?? "";
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("1 · el encabezado: el nombre y UNA sola línea con lo fiscal", () => {
-  it("la línea fiscal sale entera y en un solo renglón", () => {
+  it("la línea fiscal sale entera y en un solo renglón (la dirección va en SU línea rotulada)", () => {
     pintar();
-    expect(screen.getByText("D-25 · City Mall S A · RUC 1513069-1-650069 · Paso Canoas, Chiriquí")).toBeTruthy();
+    expect(screen.getByText("D-25 · City Mall S A · RUC 1513069-1-650069 · Chiriquí")).toBeTruthy();
+  });
+
+  it("🔴 #12 (16-nov-2026): la dirección sale UNA sola vez en el encabezado, sin datos repetidos", () => {
+    pintar();
+    expect(texto().split("Paso Canoas").length - 1).toBe(1);
   });
 
   it("la dirección de Switch se muestra rotulada como lo que es", () => {

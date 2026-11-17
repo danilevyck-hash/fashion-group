@@ -17,7 +17,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
-import { reclamoTaxes } from "@/lib/reclamos/tax";
+import { aCentavos, reclamoTaxes } from "@/lib/reclamos/tax";
 import { ESTADO_PAGADO } from "@/lib/reclamos/pendientes";
 
 export const dynamic = "force-dynamic";
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         acc + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0),
       0,
     );
-    const snapshot = Math.round(reclamoTaxes(rec.empresa, sub).total * 100) / 100;
+    const snapshot = aCentavos(reclamoTaxes(rec.empresa, sub).total);
 
     const { error: updErr } = await supabaseServer
       .from("reclamos")

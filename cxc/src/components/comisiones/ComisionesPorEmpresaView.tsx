@@ -148,8 +148,10 @@ export function ComisionesPorEmpresaView({
     ATRAS_CIERRA_2026_11 && !!detalleVendedor && aparatoDeQuienMira() === "celular",
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // `silencioso`: vuelve a leer sin el «cargando» (que desmontaría el detalle
+  // abierto). Lo usa el detalle al apagar un descuento.
+  const load = useCallback(async (silencioso = false) => {
+    if (!silencioso) setLoading(true);
     setError(null);
     try {
       const res = await fetch(
@@ -397,6 +399,7 @@ export function ComisionesPorEmpresaView({
                         mes={mes}
                         vendedor={detalleVendedor}
                         onClose={() => setDetalleVendedor(null)}
+                        onCambio={() => void load(true)}
                       />
                     </td>
                   </tr>
@@ -457,6 +460,7 @@ export function ComisionesPorEmpresaView({
           mes={mes}
           vendedor={detalleVendedor}
           onClose={() => volverDelDetalle()}
+          onCambio={() => void load(true)}
         />
       )}
 

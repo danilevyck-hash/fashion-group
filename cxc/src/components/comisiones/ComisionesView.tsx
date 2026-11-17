@@ -57,7 +57,7 @@ import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { FRESCURA_VISIBLE_2026_10 } from "@/lib/ui/frescura";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
-import { SYNC_NOW_RECIBOS_OPCIONES } from "@/components/shared/syncNowOpciones";
+import { SYNC_NOW_RECIBOS_COMISIONES } from "@/components/shared/syncNowOpciones";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComisionesCriterios } from "./ComisionesCriterios";
 import { ComisionesPeriodo } from "./ComisionesPeriodo";
@@ -461,7 +461,7 @@ export function ComisionesView({
             className="ml-auto"
             tabla="facturas"
             empresas={EMPRESAS}
-            opciones={SYNC_NOW_RECIBOS_OPCIONES}
+            opciones={SYNC_NOW_RECIBOS_COMISIONES}
             onSuccess={() => setRefreshKey((k) => k + 1)}
           />
         )}
@@ -497,7 +497,7 @@ export function ComisionesView({
             disparo — sesión única Switch). */}
         {conPapel && !FRESCURA_VISIBLE_2026_10 && (
         <SyncNowButton
-          opciones={SYNC_NOW_RECIBOS_OPCIONES}
+          opciones={SYNC_NOW_RECIBOS_COMISIONES}
           className="shrink-0"
           onSuccess={() => setRefreshKey((k) => k + 1)}
         />

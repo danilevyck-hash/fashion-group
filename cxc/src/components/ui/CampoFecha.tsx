@@ -67,9 +67,11 @@ function CampoFechaSimple(props: Omit<Props, "simple">) {
   };
   useEffect(() => {
     if (!abierto) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setAbierto(false); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    // 🔴 Escape cierra SOLO el calendario, nunca el formulario de atrás (#23):
+    // captura en `document` y se corta la propagación.
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setAbierto(false); } };
+    document.addEventListener("keydown", h, true);
+    return () => document.removeEventListener("keydown", h, true);
   }, [abierto]);
 
   const elegir = (iso: string) => {

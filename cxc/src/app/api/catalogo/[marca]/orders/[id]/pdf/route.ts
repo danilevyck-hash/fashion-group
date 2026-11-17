@@ -10,6 +10,7 @@ import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { buildCatalogoOrderPdf, type PdfOrderItem } from "@/lib/catalogo/order-pdf";
 import { palabraDelEnvioActivo } from "@/lib/catalogo/switch-lock";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 /**
  * 🩸 «Cotización» LLEVA TILDE Y ESTO ES UN ENCABEZADO HTTP. Un `filename="…ó…"`
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       // El nombre del archivo es lo PRIMERO que se ve en WhatsApp o en el
       // correo, antes de abrirlo. Lleva la MISMA palabra que el encabezado.
       "Content-Disposition": contentDisposition(
-        `${documentoLabel ?? "Pedido"}-${row.order_number}-${new Date().toISOString().slice(0, 10)}.pdf`,
+        `${documentoLabel ?? "Pedido"}-${row.order_number}-${hoyPanama()}.pdf`,
       ),
       "Cache-Control": "no-store",
     },

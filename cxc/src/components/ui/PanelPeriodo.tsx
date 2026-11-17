@@ -63,9 +63,10 @@ export default function PanelPeriodo({
   useEffect(() => { if (abierto) setVerAnio(seleccion.anio); }, [abierto, seleccion.anio]);
   useEffect(() => {
     if (!abierto) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setAbierto(false); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    // Escape cierra SOLO el panel, nunca lo de atrás (como `CampoFecha`).
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setAbierto(false); } };
+    window.addEventListener("keydown", h, true);
+    return () => window.removeEventListener("keydown", h, true);
   }, [abierto]);
 
   const aplicar = (f: () => void) => { f(); setAbierto(false); };

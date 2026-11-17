@@ -25,6 +25,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { DIAS_RECLAMO_VIEJO } from "./viejos";
+import { aCentavos } from "./tax";
 
 /** `false` = como antes. PRENDIDO el 5-oct-2026: Daniel aprobó el mockup HOY vs RECOMENDACIÓN («aprobado»). */
 export const RECLAMOS_APPLE_2026_10 = true;
@@ -48,5 +49,5 @@ export function diasEnRojo(dias: number | null): boolean {
 
 /** ¿Se recuperó entero (al centavo)? Entonces basta una línea, sin grilla ni barra. */
 export function cobradoEntero(reclamado: number, recuperado: number): boolean {
-  return reclamado > 0 && Math.round(recuperado * 100) === Math.round(reclamado * 100);
+  return reclamado > 0 && aCentavos(recuperado) === aCentavos(reclamado);
 }

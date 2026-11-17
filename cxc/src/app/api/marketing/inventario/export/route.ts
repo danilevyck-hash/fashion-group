@@ -13,6 +13,7 @@ import {
 import { getMarcas } from "@/lib/marketing/queries";
 import { normalizarEstadoProyecto } from "@/lib/marketing/normalizar";
 import type { MkProyecto } from "@/lib/marketing/types";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
 
@@ -129,7 +130,7 @@ export async function GET(req: NextRequest) {
       proyectos,
       marcas,
     });
-    const today = new Date().toISOString().slice(0, 10);
+    const today = hoyPanama();
     const fname = `inventario-muebles-${today}.xlsx`;
     return new NextResponse(Buffer.from(buffer), {
       status: 200,

@@ -199,15 +199,22 @@ export function ClientesView({
   // El pie de la ficha del cliente tiene «Ver en Ventas ›» (solo admin, que es
   // el único rol del módulo) y hasta hoy caía en la lista pelada: había que
   // volver a buscar al cliente que se acababa de mirar. Ahora el código llega en
-  // la URL, la búsqueda arranca con él —así el cliente queda a la vista sin
-  // tocar la mecánica de filtros ni el orden— y **su fila queda resaltada**
-  // (`aria-current`) para reconocerla de un vistazo.
+  // la URL y **su fila queda resaltada** (`aria-current`) para reconocerla de
+  // un vistazo, SIN esconder las demás.
   //
-  // ⚠️ Se lee UNA sola vez, al montar, y de ahí en más manda el buscador: si
-  // esto se re-aplicara en cada render, borrar la búsqueda a mano volvería a
-  // escribir el código y la pantalla se pelearía con quien la usa.
-  const [search, setSearch] = useState(() => codigoDeLaUrl());
+  // 🩸 16-nov-2026 (error de los videos #35): el código también se escribía en
+  // el buscador, que FILTRA, así que la lista quedaba con una sola fila. El
+  // buscador nace vacío y la fila resaltada se trae a la vista con scroll.
+  //
+  // ⚠️ Se lee UNA sola vez, al montar, y de ahí en más manda el buscador.
+  const [search, setSearch] = useState("");
   const [resaltado] = useState(() => codigoDeLaUrl());
+  useEffect(() => {
+    if (!resaltado) return;
+    document
+      .querySelector(`[aria-current="true"][data-fila-cliente]`)
+      ?.scrollIntoView({ block: "center" });
+  }, [resaltado]);
   const [empresa, setEmpresa] = useState("todas");
   const [data, setData] = useState<Clientes>(initialData);
   const [loading, setLoading] = useState(false);

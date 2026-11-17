@@ -308,7 +308,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
       const hr = findHeaderRow(rows);
       const headers = hr === -1 ? [] : rows[hr];
       const opts = monthOptions(headers);
-      const detected = monthIdx !== undefined ? monthIdx : detectMonthCol(headers);
+      const detected = monthIdx !== undefined ? monthIdx : detectMonthCol(headers, hr === -1 ? [] : rows.slice(hr + 1));
 
       const { items: parsed, warnings: w } = parseReebok(rows, detected);
       setRawRows(rows);
@@ -716,7 +716,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
 
       const mb = salida.byteLength / 1048576;
       const falladas = prep.fallidas.length
-        ? ` · ${prep.fallidas.length} foto(s) no se pudieron leer y quedaron en NO IMAGEN`
+        ? ` · ${prep.fallidas.length} ${plural(prep.fallidas.length, "foto no se pudo leer y quedó", "fotos no se pudieron leer y quedaron")} en NO IMAGEN`
         : "";
       setResumenFotos(
         `Listo · ${textoEmparejado(prep.fotos.length, emparejado.pares.length)}${falladas} · el archivo pesa ${mb.toFixed(1)} MB`,
@@ -890,7 +890,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                 <>
                   <ul className="ml-4 list-disc">
                     {aRevisar.slice(0, 8).map((v, i) => (
-                      <li key={i}><b>{v.columna}</b> «{v.valor}» — {v.articulos.length} artículo(s): {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}</li>
+                      <li key={i}><b>{v.columna}</b> «{v.valor}» — {v.articulos.length} {plural(v.articulos.length, "artículo", "artículos")}: {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}</li>
                     ))}
                   </ul>
                   {aRevisar.length > 8 && <div className="mt-1">…y {aRevisar.length - 8} más.</div>}
@@ -941,7 +941,7 @@ export default function ReebokClient({ injectedFile, onReset, onDownloaded }: Re
                 <>
                   <ul className="ml-4 list-disc">
                     {segmentosRaros.slice(0, 8).map((v) => (
-                      <li key={v.valor}>«{v.valor}» — {v.articulos.length} artículo(s): {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}</li>
+                      <li key={v.valor}>«{v.valor}» — {v.articulos.length} {plural(v.articulos.length, "artículo", "artículos")}: {v.articulos.slice(0, 3).join(", ")}{v.articulos.length > 3 ? "…" : ""}</li>
                     ))}
                   </ul>
                   {segmentosRaros.length > 8 && <div className="mt-1">…y {segmentosRaros.length - 8} más.</div>}

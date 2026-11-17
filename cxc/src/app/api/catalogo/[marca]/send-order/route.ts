@@ -13,6 +13,7 @@ import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { buildCatalogoOrderPdf } from "@/lib/catalogo/order-pdf";
 import { buildOrderEmailHtml, escapeHtml } from "@/lib/catalogo/order-email";
 import { palabraDelEnvioActivo } from "@/lib/catalogo/switch-lock";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 function fmt(n: number) { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -119,7 +120,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     bultoSize: cfg.bultoSize,
     documentoLabel,
   });
-  const dateStr = new Date().toISOString().slice(0, 10);
+  const dateStr = hoyPanama();
   // El adjunto lleva la MISMA palabra que el encabezado del PDF: el papel que
   // recibe el cliente no puede decir "Pedido" si lo que salió fue una
   // cotización. Sin envío a Switch queda "Pedido", igual que siempre.

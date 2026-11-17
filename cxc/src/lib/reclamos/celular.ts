@@ -37,6 +37,7 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { DIAS_RECLAMO_VIEJO } from "./viejos";
+import { diasEnRojo } from "@/lib/reclamos/apple-2026-10";
 
 /**
  * El interruptor. `false` = el celular de antes, intacto (las tarjetas de
@@ -61,11 +62,16 @@ export function subtituloPortada(porCobrar: number, viejos: number): { texto: st
   };
 }
 
-/** «11 reclamos» + «el más viejo 599 días» (la segunda mitad va en rojo). */
-export function lineaEmpresa(n: number, masViejoDias: number | null): { texto: string; dias: string | null } {
+/**
+ * «11 reclamos» + «el más viejo 599 días». 🔴 La segunda mitad va en rojo SOLO
+ * desde el corte de «viejo» (`diasEnRojo`, el mismo de la lista): 🩸 hasta el
+ * 16-nov-2026 iba roja siempre, y 74 días se veían igual de urgentes que 599.
+ */
+export function lineaEmpresa(n: number, masViejoDias: number | null): { texto: string; dias: string | null; rojo: boolean } {
   return {
     texto: `${n} reclamo${n === 1 ? "" : "s"}`,
     dias: masViejoDias === null ? null : `el más viejo ${masViejoDias} día${masViejoDias === 1 ? "" : "s"}`,
+    rojo: diasEnRojo(masViejoDias),
   };
 }
 

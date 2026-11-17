@@ -108,6 +108,7 @@ export default function SaldosBancarios({ bancos, historial, onGuardado, titulo 
                 plegable={apple}
                 abierta={filaAbierta === key}
                 onAlternar={() => setFilaAbierta(filaAbierta === key ? null : key)}
+                onAbrir={(abrir) => setFilaAbierta((f) => (abrir ? key : f === key ? null : f))}
               />
             ))}
           </div>
@@ -126,6 +127,7 @@ function BancoRow({
   plegable = false,
   abierta = true,
   onAlternar,
+  onAbrir,
 }: {
   empresaKey: string;
   banco: BancoSaldo | undefined;
@@ -135,12 +137,18 @@ function BancoRow({
   plegable?: boolean;
   abierta?: boolean;
   onAlternar?: () => void;
+  /** Abrir (true) o cerrar (false) ESTA fila sin depender de cómo está. */
+  onAbrir?: (abrir: boolean) => void;
 }) {
   const { toast } = useToast();
   const [monto, setMonto] = useState(() => (banco ? montoInputValue(Number(banco.saldo) || 0) : ""));
   const [fecha, setFecha] = useState(() => hoyISO());
   const [guardando, setGuardando] = useState(false);
   const [verHistorial, setVerHistorial] = useState(false);
+  // 🔴 #33 (16-nov-2026): al guardar, la fila muestra el saldo nuevo al instante
+  // y el formulario se cierra; si el servidor falla, vuelve lo de antes.
+  const [optimista, setOptimista] = useState<BancoSaldo | null>(null);
+  banco = optimista ?? banco;
 
   const viejo = banco ? diasDesde(banco.fecha_dato) > 7 : false;
   const parsed = parseMonto(monto);
@@ -155,6 +163,11 @@ function BancoRow({
   const guardar = async () => {
     if (parsed == null || !fecha) return;
     setGuardando(true);
+    if (plegable) {
+      // Solo si es la carga más nueva: corregir una fecha vieja no cambia el saldo de la fila.
+      if (!banco || fecha >= banco.fecha_dato) setOptimista({ empresa_key: empresaKey, saldo: parsed, fecha_dato: fecha });
+      onAbrir?.(false);
+    }
     try {
       const res = await fetch(API_BASE, {
         method: "POST",
@@ -165,9 +178,12 @@ function BancoRow({
       if (!res.ok || !json?.ok) throw new Error("err");
       toast(corrigiendo ? `Saldo corregido del ${fechaCorta(fecha)}` : "Saldo guardado");
       await onGuardado();
+      if (plegable) setFecha(hoyISO());
     } catch {
+      if (plegable) onAbrir?.(true);
       toast("No se pudo guardar. Intenta de nuevo.", "error");
     } finally {
+      setOptimista(null);
       setGuardando(false);
     }
   };

@@ -23,19 +23,10 @@ import { modulosOfrecibles, moduloOfrecible } from "@/lib/modulos-ofrecibles";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { USUARIO_GUARDAR_ARRIBA_2026_11 } from "@/lib/ui/iphone-2026-11";
 import { Ayuda } from "@/components/shared/Ayuda";
-import { etiquetaDeRol } from "@/lib/roles-etiquetas";
+import { etiquetaDeRol, DESCRIPCION_DEL_ROL } from "@/lib/roles-etiquetas";
 import { USUARIOS_APPLE_2026_10 } from "@/lib/usuarios-apple-2026-10";
 import { SYSTEM_ROLE_KEYS, SYSTEM_ROLES } from "@/lib/modules";
 
-/** Rótulo largo del selector «Rol»; el rol que no está aquí sale con su nombre de SYSTEM_ROLES. */
-const DETALLE_DEL_ROL: Record<string, string> = {
-  admin: "Administrador — acceso total",
-  secretaria: "Secretaria — operaciones diarias",
-  vendedor: "Vendedor — catálogo y cuentas por cobrar",
-  contabilidad: "Contabilidad — préstamos y ventas",
-  bodega: "Bodega — despacho de guías",
-  marcacion: "Marcación — solo marca desde el teléfono",
-};
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import MarcaAsistencia, { MARCA_APAGADA, cuerpoDeColaborador, faltaEnMarca, type EstadoMarca } from "./MarcaAsistencia";
 import CampoFecha from "@/components/ui/CampoFecha";
@@ -611,7 +602,7 @@ function UsuariosPageInner() {
                         <select> nativo muestra la primera opción y editar a un
                         gerente lo enseñaba como «Administrador». */}
                     {SYSTEM_ROLES.map(r => (
-                      <option key={r.key} value={r.key}>{DETALLE_DEL_ROL[r.key] ?? r.label}</option>
+                      <option key={r.key} value={r.key}>{DESCRIPCION_DEL_ROL[r.key] ?? r.label}</option>
                     ))}
                   </select>
                   {editUserId === currentUserId && uRole !== "admin" && (
@@ -810,12 +801,14 @@ function UsuariosPageInner() {
                           const userTotal = countByUser[s.user_name] || 0;
                           const showRevokeAll = userTotal >= 2;
                           return (
-                            <div key={s.id} className="flex items-center gap-3 px-4 py-3">
+                            // 🔴 #31 (16-nov-2026): en el celular los botones bajan a una
+                            // segunda línea; el nombre nunca se corta.
+                            <div key={s.id} data-sesion={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
                               <Avatar name={s.user_name} role={s.user_role} size="sm" />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-sm font-medium text-gray-900 truncate">{s.user_name}</span>
-                                  <span className="text-xs text-gray-400 capitalize">{s.user_role}</span>
+                                  <span className="text-sm font-medium text-gray-900 break-words">{s.user_name}</span>
+                                  <span className="text-xs text-gray-400">{etiquetaDeRol(s.user_role)}</span>
                                 </div>
                                 <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
                                   <span title={new Date(s.last_seen).toLocaleString("es-PA")}>{relativeTime(s.last_seen)}</span>
@@ -827,7 +820,7 @@ function UsuariosPageInner() {
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
+                              <div data-sesion-acciones className="flex w-full items-center justify-end gap-2 sm:w-auto sm:shrink-0">
                                 {showRevokeAll && (
                                   <button
                                     onClick={() => revokeAllSessions(s.user_name)}

@@ -13,6 +13,7 @@
 import useSWR from "swr";
 import { fmt } from "@/lib/format";
 import SyncStatus from "@/components/shared/SyncStatus";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { empresasCarteraAparte } from "@/lib/switch-api/empresas";
 import type { TabBoston } from "@/lib/boston/rol";
@@ -59,12 +60,14 @@ function Tarjeta({
     <button
       type="button"
       onClick={onIr}
+      data-tarjeta-boston
       className="min-h-[44px] text-left rounded-xl border border-gray-200 bg-white p-4 transition
                  hover:border-gray-300 hover:shadow-sm active:scale-[0.97]"
     >
-      <span className="block text-xs uppercase tracking-wide text-gray-500">{titulo}</span>
+      {/* 🔴 #25 (16-nov-2026): las cuatro iguales — título en UNA línea, número y pie. */}
+      <span data-titulo className="block truncate text-xs uppercase tracking-wide text-gray-500">{titulo}</span>
       <span className="block mt-1 text-2xl font-semibold tabular-nums text-gray-900">{valor}</span>
-      {pie && <span className="block mt-0.5 text-xs text-gray-500">{pie}</span>}
+      <span data-pie className="block mt-0.5 truncate text-xs text-gray-500">{pie}</span>
       {enlace && <span className="block mt-1 text-xs text-blue-600">{enlace}</span>}
     </button>
   );
@@ -85,7 +88,11 @@ export default function InicioBoston({ onIr }: { onIr: (t: TabBoston) => void })
   return (
     <div>
       {/* De cuándo son las cifras de abajo. Va PRIMERO, igual que en la pestaña
-          CXC: lo primero que se lee antes de creerle a un número. */}
+          CXC: lo primero que se lee antes de creerle a un número.
+          🔴 #24 (16-nov-2026): la hora la dice `LineaDeFrescura` (la única del
+          sistema), con el MISMO dato que `/cxc` usa para Boston; `SyncStatus`
+          queda solo para el aviso de la empresa sin actualizar. */}
+      <LineaDeFrescura tabla="estadocuenta" empresas={EMPRESAS_BOSTON} className="mb-2" />
       <SyncStatus
         tabla="estadocuenta"
         empresasEsperadas={EMPRESAS_BOSTON}
@@ -108,15 +115,15 @@ export default function InicioBoston({ onIr }: { onIr: (t: TabBoston) => void })
           onIr={() => onIr("ventas")}
         />
         <Tarjeta
-          titulo="Colaboradores activos"
+          titulo="Planilla"
           valor={isLoading ? "—" : String(data?.planilla.personas ?? 0)}
-          pie="en planilla"
+          pie="colaboradores activos"
           onIr={() => onIr("planilla")}
         />
         <Tarjeta
-          titulo="Colaboradores con préstamo"
+          titulo="Préstamos"
           valor={isLoading ? "—" : String(data?.prestamos.personas ?? 0)}
-          pie={BOSTON_SIN_DE_BOSTON ? "" : "de Confecciones Boston"}
+          pie={BOSTON_SIN_DE_BOSTON ? "colaboradores con préstamo" : "colaboradores de Confecciones Boston"}
           onIr={() => onIr("prestamos")}
         />
       </div>

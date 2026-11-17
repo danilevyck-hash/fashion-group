@@ -214,3 +214,37 @@ export function textoTambienEn(empresaKeys: readonly string[]): string | null {
   const ultimo = nombres[nombres.length - 1];
   return `también en ${nombres.slice(0, -1).join(", ")} y ${ultimo}`;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 CERO NO ES LO MISMO QUE VACÍO (16-nov-2026, errores de los videos #15/#17).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Rótulo del pliegue de los que están en cero. Celular y computadora, igual. */
+export function rotuloVerSinSaldo(n: number, abierto: boolean): string {
+  return `${abierto ? "▾" : "▸"} Ver ${n} sin saldo`;
+}
+
+/**
+ * Qué dice una empresa desplegada que no tiene proveedores con saldo. `null`
+ * si tiene alguno. «Todos en cero» NO es «no llegó nada»: llegaron y se pliegan.
+ */
+export function textoVacioDeEmpresa(e: Pick<EmpresaCxp, "proveedores" | "sin_saldo">): string | null {
+  if (e.proveedores.length > 0) return null;
+  return e.sin_saldo.length > 0
+    ? "Sin saldo por pagar"
+    : "Sin proveedores recibidos de Switch para esta empresa.";
+}
+
+/**
+ * Las empresas que la ficha del proveedor dibuja Y cuenta («Por pagar · N
+ * empresas»): una sola función para los dos. La que está en cero sin nada
+ * adentro no aporta (§6); la que tiene pendiente y saldo a favor que se anulan
+ * sí se ve (§11: un cero con algo adentro muestra su número).
+ */
+export function empresasDeLaFicha<T extends { por_pagar: number; debes?: number; a_favor?: number }>(
+  empresas: readonly T[],
+): T[] {
+  return empresas.filter(
+    (e) => tieneSaldo(e.por_pagar) || tieneSaldo(e.debes ?? 0) || tieneSaldo(e.a_favor ?? 0),
+  );
+}

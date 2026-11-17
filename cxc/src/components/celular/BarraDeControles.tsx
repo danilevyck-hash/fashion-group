@@ -567,6 +567,12 @@ export function HojaMenu({
   const esElMenu = !titulo && !etiqueta;
   const ponerMenu = useCallback((el: HTMLElement | null) => { if (esElMenu) poner?.("menu", el); }, [poner, esElMenu]);
 
+  // 🔴 LA REGLA DE LAS HOJAS (16-nov-2026): esta es la hoja de UNA opción
+  // (filtro, orden, acción). Tocar una opción la CIERRA y no lleva «Listo»; se
+  // cierra también con el fondo y con Escape. Una hoja de VARIAS opciones o con
+  // formulario es otra pieza (`HojaFiltros`, con «Listo»). Candado
+  // `hojas-se-cierran.test.tsx`.
+  const puedePortal = usePuedePortal();
   useEffect(() => {
     const el = contenido.current;
     if (!el) return;
@@ -577,7 +583,9 @@ export function HojaMenu({
     };
     el.addEventListener("click", alTocar);
     return () => el.removeEventListener("click", alTocar);
-  }, [onCerrar]);
+    // 🩸 `puedePortal`: tras hidratar, la primera pasada no dibuja la hoja; sin
+    // volver a correr al aparecer, «Todos ▾» de Clientes no se cerraba (#13).
+  }, [onCerrar, puedePortal]);
 
   useEffect(() => {
     if (!abierta) return;
@@ -586,7 +594,6 @@ export function HojaMenu({
     return () => document.removeEventListener("keydown", alTeclear);
   }, [abierta, onCerrar]);
 
-  const puedePortal = usePuedePortal();
   if (!puedePortal) return null;
   return createPortal(
     <div
@@ -607,13 +614,6 @@ export function HojaMenu({
           {children}
           {esElMenu && <div ref={ponerMenu} className="flex flex-col gap-3 empty:hidden" />}
         </div>
-        <button
-          type="button"
-          onClick={onCerrar}
-          className="mt-4 block min-h-[44px] w-full rounded-md border border-gray-300 text-[15px] font-medium text-gray-700 active:bg-gray-100"
-        >
-          Listo
-        </button>
       </div>
     </div>,
     document.body,

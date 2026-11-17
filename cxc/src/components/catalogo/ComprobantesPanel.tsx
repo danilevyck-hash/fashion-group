@@ -315,7 +315,7 @@ export default function ComprobantesPanel({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${theme.admin.pedidos.exportFilename}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.download = `${theme.admin.pedidos.exportFilename}-${hoyPanama()}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
       showToast("Excel listo — revisa tu carpeta de descargas");

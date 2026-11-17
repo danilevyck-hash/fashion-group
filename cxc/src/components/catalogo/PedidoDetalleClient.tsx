@@ -59,6 +59,7 @@ import {
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import { TECLADO_DECIMAL, TECLADO_ENTERO } from "@/lib/ui/iphone-2026-11";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string;
   /** Precio de lista del catálogo (`<marca>_products.price`, sincronizado de
@@ -784,7 +785,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         switchEnvio,
         order.status === "confirmado" ? "Pedido" : "Cotización",
       );
-      const dateStr = new Date().toISOString().slice(0, 10);
+      const dateStr = hoyPanama();
       await downloadCatalogoOrderPdf({
         marca,
         orderNumber: order.order_number,

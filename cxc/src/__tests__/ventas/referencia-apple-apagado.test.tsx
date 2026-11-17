@@ -7,6 +7,10 @@
 // `__snapshots__/referencia-apple-apagado…`. La foto se sacó con el código de
 // `origin/main` ANTES del rediseño. Prendido, se pone rojo, y el bloque de
 // abajo dice qué trae la propuesta.
+//
+// ⚠️ 16-nov-2026 (error #28): la foto de «NB2570 en celular» se rehízo a
+// propósito: los colores van en fichas en el celular con el interruptor apagado
+// también (`referencia-celular-detalle-color.test.tsx`). Lo demás no cambió.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, afterEach } from "vitest";

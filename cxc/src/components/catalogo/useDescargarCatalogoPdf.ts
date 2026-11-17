@@ -30,6 +30,7 @@ import {
   SECTION_ORDER, SECTION_LABELS,
   type DisplaySection, type GroupedProduct,
 } from "./groupByModel";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 interface ItemPdf {
   name: string;
@@ -148,7 +149,7 @@ export function useDescargarCatalogoPdf() {
         sections: pdfSections,
         subtitle,
         totalCount: filteredCount,
-        filename: `catalogo-${marca}-${new Date().toISOString().slice(0, 10)}.pdf`,
+        filename: `catalogo-${marca}-${hoyPanama()}.pdf`,
       });
       avisar("Catálogo descargado");
     } catch (e) {

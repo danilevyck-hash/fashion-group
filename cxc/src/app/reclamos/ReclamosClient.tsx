@@ -139,7 +139,11 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
 
   const reclamos = reclamosData ?? [];
   const loading = reclamosLoading;
-  const loadReclamos = useCallback(async () => { await mutateReclamos(); }, [mutateReclamos]);
+  // 🔴 `router.refresh()` vacía la caché de navegación de Next (`staleTimes.dynamic:
+  // 30`). 🩸 Sin él, volver a la portada dentro de 30 s reusaba la página de
+  // ANTES y `useSembrarDelServidor` escribía esa lista vieja encima de la nueva:
+  // el correo recién enviado seguía «Sin reclamar» ~30 s (16-nov-2026).
+  const loadReclamos = useCallback(async () => { await mutateReclamos(); router.refresh(); }, [mutateReclamos, router]);
 
   // 🔴 EL BORRADO SE PUEDE DESHACER 5 SEGUNDOS (el patrón de la casa). Estaba
   // cableado y no se disparaba nunca: el modal decía «no se puede deshacer» y
@@ -235,6 +239,13 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   }, [authChecked, loadContactos]);
 
   if (!authChecked) return null;
+
+  // Lo que sale de la casa (correo, Excel, PDF) marca «Reclamado» en el
+  // servidor: con un reclamo abierto se relee TAMBIÉN el reclamo, no solo la lista.
+  async function recargarAbierto() {
+    const id = current?.id;
+    await Promise.all([loadReclamos(), id ? loadDetail(id) : null]);
+  }
 
   function resetForm() {
     setFEmpresa(""); setFFacturas([]); setFFechaFactura(""); setFPedido(""); setFNotas("");
@@ -674,7 +685,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
             onUploadFoto={uploadFoto}
             uploadingFoto={uploadingDetailFoto}
             onDeleteFoto={deleteFoto}
-            onReload={loadReclamos}
+            onReload={recargarAbierto}
             toast={toast}
             showToast={(msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); }}
           />
@@ -709,7 +720,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         onDeleteFoto={deleteFoto}
         onAddSettlement={addSettlement}
         onRemoveSettlement={removeSettlement}
-        onReload={loadReclamos}
+        onReload={recargarAbierto}
         showToast={(msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); }}
         sinEncabezado={RECLAMOS_CELULAR}
       />

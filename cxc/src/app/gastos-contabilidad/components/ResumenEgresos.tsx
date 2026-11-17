@@ -356,6 +356,8 @@ interface Props {
  * «Cargado hasta …» sigue en cada fila, en ámbar si es sospecha.
  * 🔴 Y SIN total al pie: los gastos de dos empresas nunca se suman.
  */
+const LINEA_GRIS = "mt-0.5 block text-xs text-gray-400";
+
 function ListaApple({ filas, onAbrir }: { filas: Fila[]; onAbrir: (key: string) => void }) {
   return (
     <ul data-lista="gastos-empresas-apple" className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
@@ -374,12 +376,20 @@ function ListaApple({ filas, onAbrir }: { filas: Fila[]; onAbrir: (key: string) 
           <>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-medium text-gray-900">{empresa.nombre}</span>
-              {segunda && <span className="mt-0.5 block text-sm text-gray-500 tabular-nums">{segunda}</span>}
+              {/* 🔴 #34 (16-nov-2026): sin número, la frase (Boston: «Carga manual: …»)
+                  va con el MISMO gris chico que «Cargado hasta …» de las demás. */}
+              {segunda && (
+                f.hayMonto
+                  ? <span className="mt-0.5 block text-sm text-gray-500 tabular-nums">{segunda}</span>
+                  : <span data-linea-gris className={LINEA_GRIS}>{segunda}</span>
+              )}
               {f.alDiaTexto && (
-                <span className={`mt-0.5 block text-xs ${f.alDiaDudoso ? "text-amber-700" : "text-gray-400"}`}>{f.alDiaTexto}</span>
+                <span data-linea-gris className={f.alDiaDudoso ? `${LINEA_GRIS} !text-amber-700` : LINEA_GRIS}>{f.alDiaTexto}</span>
               )}
             </span>
-            <span className={`shrink-0 text-sm tabular-nums ${f.hayMonto ? "text-gray-900" : "text-gray-400"}`}>{f.salidaTexto}</span>
+            {/* 🔴 #34: sin número va «—», nunca «Sin movimientos» (con el registro
+                pausado se leía «no gastó nada») ni otra vez «Carga manual». */}
+            <span data-monto className={`shrink-0 text-sm tabular-nums ${f.hayMonto ? "text-gray-900" : "text-gray-400"}`}>{f.hayMonto ? f.salidaTexto : "—"}</span>
             <span aria-hidden className={`shrink-0 ${f.hayMonto ? "text-gray-300" : "invisible"}`}>›</span>
           </>
         );

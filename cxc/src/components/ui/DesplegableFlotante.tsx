@@ -167,7 +167,14 @@ export default function DesplegableFlotante({
 
   useEffect(() => {
     if (!abierto || !onCerrar) return;
+    // 🔴 iOS Safari NO manda `mousedown` al tocar algo que no es tocable (el
+    // fondo de la página): sin `touchstart`, el menú no se cerraba al tocar
+    // afuera en el iPhone (#37). El `mousedown` que llega justo después de un
+    // toque se ignora, para no cerrar dos veces (`onCerrar` puede guardar).
+    let ultimoToque = 0;
     function fuera(e: MouseEvent | TouchEvent) {
+      if (e.type === "touchstart") ultimoToque = Date.now();
+      else if (Date.now() - ultimoToque < 800) return;
       const t = e.target as Node;
       // Las TRES cajas: el panel ya no es hijo del ancla.
       if (panelRef.current?.contains(t)) return;
@@ -183,9 +190,11 @@ export default function DesplegableFlotante({
       onCerrar!();
     }
     document.addEventListener("mousedown", fuera);
+    document.addEventListener("touchstart", fuera, { passive: true });
     document.addEventListener("keydown", tecla, true);
     return () => {
       document.removeEventListener("mousedown", fuera);
+      document.removeEventListener("touchstart", fuera);
       document.removeEventListener("keydown", tecla, true);
     };
   }, [abierto, onCerrar, anclaRef, extraDentroRef]);

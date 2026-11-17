@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/requireRole";
 import { buildBulkReclamosPdf, type ReclamoFull } from "@/lib/reclamos/pdf-bulk";
 import { fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/fetch-empresa";
 import { marcarReclamados } from "@/lib/reclamos/marcar-reclamado";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     await marcarReclamados(reclamos.map((r) => r.id));
     const buf = doc.output("arraybuffer");
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
-    const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`;
+    const filename = `Reclamos_${safeName}_${hoyPanama()}.pdf`;
 
     return new NextResponse(Buffer.from(buf), {
       headers: {

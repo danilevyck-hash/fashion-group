@@ -107,6 +107,11 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
   const [accion, setAccion] = useState<AccionDeFila>(null);
   const [notaAbierta, setNotaAbierta] = useState<string | null>(null);
 
+  // 🔴 #6: el número de «Fotos · N» lo pone la lista de fotos al cambiar.
+  const alContarFotos = useCallback((n: number) => {
+    setDatos((d) => (d && d.fotos !== n ? { ...d, fotos: n } : d));
+  }, []);
+
   const cargar = useCallback(async () => {
     setCargando(true);
     setError(null);
@@ -248,7 +253,7 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
           onRegistrarGasto={() => setRegistrando(true)}
           accionesDe={menuDe}
           onPdf={abrirPdf}
-          fotos={<FotosSection tiendaCodigo={datos.codigo ?? TIENDA_GENERAL} periodo={periodo} readonly={!escribe} />}
+          fotos={<FotosSection tiendaCodigo={datos.codigo ?? TIENDA_GENERAL} periodo={periodo} readonly={!escribe} onCantidad={alContarFotos} />}
           hrefVolver={hrefDePestana("tiendas")}
         />
       ) : (
@@ -428,7 +433,7 @@ export default function FichaTienda({ codigo, role }: { codigo: string; role: st
             {/* 🔴 «General» también tiene fotos: un mueble que no es de ninguna
                 tienda igual se fotografía. Se guardan bajo `GENERAL`. */}
             <div id={ANCLA_FOTOS}>
-              <FotosSection tiendaCodigo={datos.codigo ?? TIENDA_GENERAL} periodo={periodo} readonly={!escribe} />
+              <FotosSection tiendaCodigo={datos.codigo ?? TIENDA_GENERAL} periodo={periodo} readonly={!escribe} onCantidad={alContarFotos} />
             </div>
           </>
         )}
