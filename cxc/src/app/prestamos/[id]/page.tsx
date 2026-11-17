@@ -11,8 +11,9 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ConfirmModal } from "@/components/ui";
 import { PRESTAMOS_ADMIN_ROLES, PRESTAMOS_ROLES } from "@/lib/prestamos-roles";
 import { calcularSaldoPrestamo, cuentaMasVieja } from "@/lib/prestamos-saldo";
-import { CONCEPTO_PAGO, CONCEPTO_PRESTAMO, ORIGEN_POR_DEFECTO, etiquetaConcepto } from "@/lib/prestamos-conceptos";
+import { CONCEPTO_PAGO, CONCEPTO_PRESTAMO, etiquetaConcepto } from "@/lib/prestamos-conceptos";
 import { getQuincenaRangePanama, hoyPanamaYmd } from "@/lib/prestamos-quincena";
+import { esDescuentoDeQuincena } from "@/lib/asistencia/prestamos-planilla";
 // 🔴 A dónde vuelve «← Préstamos»: la pestaña con la planilla unida, la lista
 // suelta sin ella. UNA definición (11-sep-2026).
 import { enlaceVolverAPrestamos } from "@/lib/prestamos-una-puerta";
@@ -104,13 +105,14 @@ export default function PrestamoDetallePage() {
 
   const cuota = Number(empleado.deduccion_quincenal ?? 0) + Number(empleado.deduccion_dano ?? 0);
   const q = getQuincenaRangePanama();
+  // El chip mira las TRES cuentas, cada una con su cuota (el botón «Pago quincenal» sigue igual).
+  const cuotaTres = cuota + Number(empleado.deduccion_terceros ?? 0);
   const deducidaQ = movs.some(
-    (m) => m.estado === "aprobado" && m.concepto === CONCEPTO_PAGO
-      && (!m.origen_pago || m.origen_pago === ORIGEN_POR_DEFECTO)
+    (m) => m.estado === "aprobado" && esDescuentoDeQuincena(m)
       && m.fecha >= q.start && m.fecha <= q.end,
   );
   const quincenaEstado: "deducida" | "pendiente" | null =
-    cuota <= 0 || !empleado.trabaja ? null : deducidaQ ? "deducida" : s.saldo > 0 ? "pendiente" : null;
+    cuotaTres <= 0 || !empleado.trabaja ? null : deducidaQ ? "deducida" : s.saldo > 0 ? "pendiente" : null;
 
   return (
     <div className="min-h-screen bg-white">

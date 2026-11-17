@@ -22,7 +22,7 @@
 // distintas de la misma fila.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { CUENTA_DANO, CUENTA_PRESTAMO, CUENTA_TERCEROS, type CuentaPrestamo } from "./prestamos-saldo";
+import { CONCEPTOS_RESTAN, CONCEPTOS_SUMAN, CUENTA_DANO, CUENTA_PRESTAMO, CUENTA_TERCEROS, type CuentaPrestamo } from "./prestamos-saldo";
 
 /** El valor tal como se guarda en `prestamos_movimientos.concepto`. */
 export const CONCEPTO_PRESTAMO = "Préstamo";
@@ -43,8 +43,9 @@ export const CONCEPTOS_OFRECIDOS = [
   CONCEPTO_PRESTAMO, CONCEPTO_DANO, CONCEPTO_TERCEROS, CONCEPTO_PAGO,
 ] as const;
 
-/** Todos los conceptos que la base puede contener hoy. */
-export const CONCEPTOS_CONOCIDOS = [...CONCEPTOS_OFRECIDOS, ...CONCEPTOS_RETIRADOS] as const;
+/** Todos los conceptos que la base puede contener hoy: los que suman y los que
+ *  restan, de la MISMA lista que cuenta el saldo (incluye «Pago de terceros»). */
+export const CONCEPTOS_CONOCIDOS = [...CONCEPTOS_SUMAN, ...CONCEPTOS_RESTAN] as const;
 
 /**
  * Cómo se lee un concepto en pantalla. Solo uno cambia de nombre:
