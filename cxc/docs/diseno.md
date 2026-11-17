@@ -107,6 +107,7 @@ Daniel, 2-oct-2026: *«cada vez que encontramos algo así de detalle, para que s
   - Abre en el orden de siempre de la pantalla, sin flecha. El orden elegido se recuerda en el aparato; donde Daniel fijó cómo ABRE una lista, solo durante la visita.
   - En el celular, sin encabezados, va «Ordenar ▾» en la barra con las mismas opciones, solo en las listas largas (Productos, Clientes, CxC).
   - Donde Daniel decidió que una lista NO se ordena o tiene un orden fijo, se respeta. Candado `orden-tabla.test.tsx`, con las dos listas.
+- **Una hoja de UNA opción se cierra al elegir; la de VARIAS se queda hasta «Listo»** (16-nov-2026, errores de los videos #13 · #20 · #23 · #37). Elegir un filtro, un orden, una fecha o un período cierra la hoja y no lleva «Listo»; «Filtros» (casillas múltiples) y los formularios sí se quedan hasta «Listo»/«Guardar». Todo menú flotante se cierra al tocar afuera (también en el iPhone) y con Escape; Escape dentro de un calendario o un menú anidado cierra SOLO eso, nunca el formulario de atrás. Vive en las piezas compartidas (`HojaMenu` de `BarraDeControles`, `DesplegableFlotante`, `OverflowMenu`, `CampoFecha`, `PanelPeriodo`, `RangoFechas`), no hoja por hoja. Candado `hojas-se-cierran.test.tsx`.
 
 ## Lo más simple que funcione (Daniel, 7 al 9-oct-2026)
 

@@ -21,6 +21,7 @@ import { downloadWorkbook } from "@/lib/excel-export";
 import { Aviso } from "@/components/ui/Aviso";
 import { TALLAS_POR_PEDIDO_2026_11 } from "@/lib/tallas-pedido/interruptores";
 import TallasDePedido from "./TallasDePedido";
+import { plural } from "@/lib/depurador/resumen-del-archivo";
 
 const keyDe = (c: Curva) => `${c.referencia}|||${c.codigo}`;
 
@@ -250,7 +251,7 @@ export default function CurvasView() {
                     />
                     <span className="w-14 text-sm font-semibold text-gray-900">{c.codigo}</span>
                     <span className="text-[13px] text-gray-500 tabular-nums">
-                      {c.bultos} bultos · {c.ordXPp} u/bulto · {c.totalPiezas} u
+                      {c.bultos} {plural(c.bultos, "bulto", "bultos")} · {c.ordXPp} u/bulto · {c.totalPiezas} u
                     </span>
                     <span className="flex flex-wrap gap-1.5">
                       {c.tallas.map((t) => (

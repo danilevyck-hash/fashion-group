@@ -44,7 +44,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
-import { Info, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import type {
   VendedoraDetalle,
   VendedorasPeriodo,
@@ -56,7 +56,7 @@ import { ROTULO_TOTAL_MULTIFASHION } from "@/lib/comisiones/celular";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { BonosSection, ChipBono, REGLA_BONO_RETAIL } from "./BonosSection";
 import {
@@ -386,18 +386,11 @@ export function VendedorasSubtab({ selectedYear, periodo, corte, conMetas, enCel
     : null;
   const pie = pieSinBono && bonoPie ? `${pieSinBono} · ${bonoPie}` : pieSinBono;
   const detalleBono = bonoPie ? `${lineaBono(bonos)}. ${REGLA_BONO_RETAIL}` : null;
-  // 🔴 SIN HOVER-ONLY (7-oct-2026): el «ⓘ» se abre con un toque.
+  // 🔴 SIN HOVER-ONLY (7-oct-2026): el «ⓘ» se abre con un toque. #22
+  // (16-nov-2026): es el ⓘ común (`<Ayuda>`), con ancho máximo y salto de
+  // línea; el globo de antes salía en una sola línea cortada a los dos lados.
   const iconoBono = detalleBono ? (
-    <TooltipProvider delayDuration={120}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button type="button" aria-label="Regla del bono" className="ml-1 inline-flex align-[-2px] text-gray-400">
-            <Info className="h-3.5 w-3.5" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{detalleBono}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Ayuda titulo="Regla del bono" className="-my-3 align-[-2px]">{detalleBono}</Ayuda>
   ) : null;
 
   const chipLabel: Record<ChipKey, string> = {

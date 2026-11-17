@@ -72,19 +72,23 @@ export default function OverflowMenu({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      // Escape cierra SOLO el menú, nunca el modal de atrás.
+      if (e.key === "Escape") { e.stopPropagation(); setOpen(false); }
     };
-    const onClick = (e: MouseEvent) => {
+    const onClick = (e: MouseEvent | TouchEvent) => {
       const t = e.target as Node;
       if (triggerRef.current?.contains(t)) return;
       if (menuRef.current?.contains(t)) return;
       setOpen(false);
     };
-    window.addEventListener("keydown", onKey);
+    // `touchstart`: iOS no manda `mousedown` al tocar el fondo de la página.
+    window.addEventListener("keydown", onKey, true);
     document.addEventListener("mousedown", onClick);
+    document.addEventListener("touchstart", onClick, { passive: true });
     return () => {
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
       document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("touchstart", onClick);
     };
   }, [open]);
 

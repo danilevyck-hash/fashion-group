@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/requireRole";
 import XLSX from "xlsx-js-style";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
 import { workbookBuffer } from "@/lib/excel-export";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
   return new NextResponse(buf as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="Reclamos-${new Date().toISOString().slice(0, 10)}.xlsx"`,
+      "Content-Disposition": `attachment; filename="Reclamos-${hoyPanama()}.xlsx"`,
     },
   });
 }

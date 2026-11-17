@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { casaDelRol } from "@/lib/navegacion/casa-del-rol";
 import FGLogo from "@/components/FGLogo";
 import { Home, ChevronRight } from "lucide-react";
 import {
@@ -217,6 +218,8 @@ function SidebarHoy() {
 
   const width = collapsed ? "w-16" : "w-56";
   const homeActive = pathname === "/home";
+  // 🔴 #26 (16-nov-2026): «Inicio» (y el logo) llevan a la CASA del rol.
+  const casa = casaDelRol(userRole, fgModules);
 
   return (
     <aside
@@ -234,7 +237,7 @@ function SidebarHoy() {
         {/* El logo es un ENLACE a /home, así que va a 44 de alto. Sale gratis:
             la fila del encabezado ya mide 57 px. */}
         <Link
-          href="/home"
+          href={casa}
           className="flex min-h-[44px] items-center gap-2 hover:opacity-70 transition min-w-0"
           title={collapsed ? "Fashion Group" : undefined}
         >
@@ -266,7 +269,7 @@ function SidebarHoy() {
 
       <nav className="flex-1 overflow-y-auto py-2">
         <Link
-          href="/home"
+          href={casa}
           title={collapsed ? "Inicio" : undefined}
           className={`w-full flex min-h-[44px] items-center ${collapsed ? "justify-center px-0" : "gap-3 px-5"} text-sm transition-all border-l-2 ${
             homeActive

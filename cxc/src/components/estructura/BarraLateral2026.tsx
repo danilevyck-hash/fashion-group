@@ -12,6 +12,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { casaDelRol } from "@/lib/navegacion/casa-del-rol";
 import { Home } from "lucide-react";
 import { RAIL_CABE_ENTERO } from "@/lib/ui/revision-110-ajustes";
 import { RAIL_ALTO_CON_ESCALA } from "@/lib/ui/revision-110-vivo";
@@ -42,6 +43,9 @@ export default function BarraLateral2026() {
   if (!userRole) return null;
 
   const grupos = gruposDelCajon(userRole, fgModules);
+  // 🔴 #26 (16-nov-2026): «Inicio» (y el logo) llevan a la CASA del rol —
+  // `/boston`, `/multifashion`, `/marcacion`—, nunca a un `/home` que lo rebota.
+  const casa = casaDelRol(userRole, fgModules);
   const aqui = moduloDeLaRuta(pathname);
   // Revisión 110 · ajustes (15): plegada, todos los íconos CABEN en el alto de
   // la ventana (filas de 44 px que bajan hasta 32 px); si ni así caben, la
@@ -67,7 +71,7 @@ export default function BarraLateral2026() {
       className={`hidden md:flex fixed left-0 top-0 h-screen ${collapsed ? "w-16" : "w-56"} bg-white border-r border-gray-200 flex-col z-20 transition-[width] duration-200 ease-out`}
     >
       <div className={`h-[57px] border-b border-gray-200 flex items-center justify-between ${collapsed ? "px-1.5" : "px-5"}`}>
-        <Link href="/home" className="flex min-h-[44px] min-w-0 items-center gap-2 transition hover:opacity-70" title={collapsed ? "Fashion Group" : undefined}>
+        <Link href={casa} className="flex min-h-[44px] min-w-0 items-center gap-2 transition hover:opacity-70" title={collapsed ? "Fashion Group" : undefined}>
           <FGLogo variant="icon" theme="light" size={22} />
           {!collapsed && <span className="truncate text-sm font-medium text-gray-800">Fashion Group</span>}
         </Link>
@@ -85,7 +89,7 @@ export default function BarraLateral2026() {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2" style={estiloRail}>
-        <Link href="/home" title={collapsed ? "Inicio" : undefined} className={fila(pathname === "/home")}>
+        <Link href={casa} title={collapsed ? "Inicio" : undefined} className={fila(pathname === "/home")}>
           <Home size={16} strokeWidth={1.5} className="flex-shrink-0" />
           {!collapsed && <span className="truncate">Inicio</span>}
         </Link>

@@ -562,7 +562,9 @@ export default function SearchBar({ compact, fullScreen, onClose, alineado }: {
       {open && (searched || quickAction) && (
         <div className={`absolute z-50 mt-1 w-full rounded-lg border shadow-lg overflow-hidden ${bg}`} style={{ minWidth: 320 }}>
           {hasResults ? (
-            <div className="max-h-80 overflow-y-auto">
+            // 🔴 Usa el alto que queda en la pantalla (16-nov-2026, #37): con
+            // `max-h-80` el Inicio del celular mostraba ~3,5 resultados en 900 px.
+            <div data-resultados-busqueda className="max-h-[max(20rem,calc(100dvh-14rem))] overflow-y-auto overscroll-contain">
               {/* Quick Action */}
               {quickAction && (
                 <button

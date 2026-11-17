@@ -17,6 +17,7 @@ import { useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
 import { centavos } from "@/lib/caja/dinero";
 import { buscarGastoRepetido, mensajeGastoRepetido, type GastoComparable } from "@/lib/caja/gasto-repetido";
 import { avisoDeFechaPideVentana, mensajeFechaFueraDelPeriodo } from "@/lib/caja/fecha-en-periodo";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 /**
  * 🔴 «Alimentación» viene puesta. Es el 61% de los recibos (47 de 77 vivos), y
@@ -56,7 +57,7 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
   const [categorias, setCategorias] = useState<string[]>([]);
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
-  const [gFecha, setGFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [gFecha, setGFecha] = useState(hoyPanama());
   const [gDescripcion, setGDescripcion] = useState("");
   const [gProveedor, setGProveedor] = useState("");
   const [gNroFactura, setGNroFactura] = useState("");

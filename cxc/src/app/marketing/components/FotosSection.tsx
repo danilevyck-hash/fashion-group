@@ -61,6 +61,10 @@ interface FotosSectionProps {
   /** El chip de arriba: `abierto`, el id de un cierre, o `todos`. */
   periodo?: string;
   readonly?: boolean;
+  /** 🔴 #6 (16-nov-2026): cuántas fotos hay (todas, sin el chip de período),
+   *  cada vez que la lista cambia —al cargar, subir o borrar—. Así «Fotos · N»
+   *  de la ficha no espera a recargar la página. */
+  onCantidad?: (n: number) => void;
 }
 
 export default function FotosSection({
@@ -68,6 +72,7 @@ export default function FotosSection({
   tiendaCodigo,
   periodo,
   readonly = false,
+  onCantidad,
 }: FotosSectionProps) {
   const { toast } = useToast();
   const [todasLasFotos, setFotos] = useState<MkAdjunto[]>([]);
@@ -133,6 +138,10 @@ export default function FotosSection({
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  useEffect(() => {
+    if (!loading && !errorCarga) onCantidad?.(todasLasFotos.length);
+  }, [todasLasFotos, loading, errorCarga, onCantidad]);
 
   // 🔴 Falla ABIERTA: si esto no contesta, la lista queda vacía, no se pregunta
   // nada y el servidor sella con lo que corresponda (o con nada).

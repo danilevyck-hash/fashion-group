@@ -9,6 +9,7 @@ import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { validateComprobanteFile } from "./fotoUpload";
 import { COMPROBANTE_OBLIGATORIO, FALTA_COMPROBANTE, MARCAR_COBRADO } from "@/lib/reclamos/rotulos";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { aCentavos } from "@/lib/reclamos/tax";
 
 export interface SettlementInput {
   monto: number;
@@ -60,7 +61,7 @@ const money = (n: number) =>
  */
 function montoPropuesto(reclamado: number | undefined): string {
   return typeof reclamado === "number" && Number.isFinite(reclamado) && reclamado > 0
-    ? reclamado.toFixed(2)
+    ? aCentavos(reclamado).toFixed(2)
     : "";
 }
 

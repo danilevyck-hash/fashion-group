@@ -17,6 +17,7 @@ import {
 import { leerInventarioValorizado, type LecturaInventario } from "@/lib/inventario/leer";
 import { ESTADO_PAGADO } from "@/lib/reclamos/pendientes";
 import { diasDesde } from "@/lib/reclamos/dias";
+import { DIAS_RECLAMO_VIEJO } from "@/lib/reclamos/viejos";
 import { DIAS_COMO_RECLAMOS } from "@/lib/ui/revision-110-vivo";
 
 export const dynamic = "force-dynamic";
@@ -115,7 +116,7 @@ const CXC_VENCIDO_KEYS = ["d91_120", "d121_180", "d181_270", "d271_365", "mas_36
 const CXP_CORRIENTE_TITLES = new Set(["0-30", "31-60", "61-90"]);
 const CXP_VIGILANCIA_TITLES = new Set(["91-120"]); // detalle (⊂ vencido)
 const CXP_VENCIDO_TITLES = new Set(["91-120", "121-180", "181-270", "271-365", "Mas de 365"]); // ≥91
-const RECLAMO_ANTIGUO_DIAS = 30;
+// #36: el corte del reclamo viejo es el de Reclamos (`DIAS_RECLAMO_VIEJO`, 120); no hay uno propio.
 
 function num(x: unknown): number {
   const n = typeof x === "number" ? x : parseFloat(String(x ?? ""));
@@ -471,14 +472,14 @@ export async function GET(req: NextRequest) {
   const agingRows = (agingRes.data as AgingRow[] | null) ?? [];
   const cxcEmpresas = new Set(agingRows.map((r) => r.company_key));
   let cxcTotal = 0, cxcCorriente = 0, cxcVigilancia = 0, cxcVencido = 0;
-  const clientesVencidos: { nombre: string; codigo: string | null; empresa: string; saldo: number }[] = [];
+  const clientesVencidos: { nombre: string; codigo: string | null; empresa: string; empresaKey: string; saldo: number }[] = [];
   for (const r of agingRows) {
     cxcTotal += num(r.total);
     cxcCorriente += CXC_CORRIENTE_KEYS.reduce((s, k) => s + num(r[k]), 0);
     cxcVigilancia += CXC_VIGILANCIA_KEYS.reduce((s, k) => s + num(r[k]), 0);
     const venc = CXC_VENCIDO_KEYS.reduce((s, k) => s + num(r[k]), 0);
     cxcVencido += venc;
-    if (venc > 0) clientesVencidos.push({ nombre: r.nombre || "—", codigo: r.codigo, empresa: EMPRESA_KEY_TO_NAME[r.company_key] ?? r.company_key, saldo: venc });
+    if (venc > 0) clientesVencidos.push({ nombre: r.nombre || "—", codigo: r.codigo, empresa: EMPRESA_KEY_TO_NAME[r.company_key] ?? r.company_key, empresaKey: r.company_key, saldo: venc });
   }
   clientesVencidos.sort((a, b) => b.saldo - a.saldo);
   const cxc = {
@@ -495,7 +496,7 @@ export async function GET(req: NextRequest) {
   const cxpRows = (cxpRes.data as CxpRow[] | null) ?? [];
   const cxpEmpresas = new Set(cxpRows.map((r) => r.empresa_key));
   let cxpTotal = 0, cxpCorriente = 0, cxpVigilancia = 0, cxpVencido = 0;
-  const proveedoresVencidos: { nombre: string; empresa: string; saldo: number }[] = [];
+  const proveedoresVencidos: { nombre: string; empresa: string; empresaKey: string; saldo: number }[] = [];
   for (const r of cxpRows) {
     cxpTotal += num(r.saldo_total);
     let vencRow = 0;
@@ -505,7 +506,7 @@ export async function GET(req: NextRequest) {
       if (CXP_VENCIDO_TITLES.has(b.title)) vencRow += num(b.saldo);
     }
     cxpVencido += vencRow;
-    if (vencRow > 0) proveedoresVencidos.push({ nombre: r.nombre || "—", empresa: EMPRESA_KEY_TO_NAME[r.empresa_key] ?? r.empresa_key, saldo: vencRow });
+    if (vencRow > 0) proveedoresVencidos.push({ nombre: r.nombre || "—", empresa: EMPRESA_KEY_TO_NAME[r.empresa_key] ?? r.empresa_key, empresaKey: r.empresa_key, saldo: vencRow });
   }
   proveedoresVencidos.sort((a, b) => b.saldo - a.saldo);
   const cxp = {
@@ -528,7 +529,7 @@ export async function GET(req: NextRequest) {
         : r.fecha_reclamo ? Math.floor((hoy - new Date(r.fecha_reclamo).getTime()) / 86400_000) : 0;
       return { id: r.id, nro: r.nro_reclamo || "—", empresa: r.empresa || "—", estado: r.estado || "—", dias };
     })
-    .filter((r) => r.dias >= RECLAMO_ANTIGUO_DIAS)
+    .filter((r) => r.dias >= DIAS_RECLAMO_VIEJO)
     .sort((a, b) => (DIAS_COMO_RECLAMOS ? b.dias - a.dias : 0))
     .slice(0, 8);
   const reclamos = { antiguos: reclamosAntiguos, total: reclamoRows.length };

@@ -71,6 +71,7 @@ import {
   seDibujaLaFilaTipo,
   tituloDelPapel,
 } from "@/lib/guias/papel-2026-09";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 const PAGE_W = 216; // Letter
 const MARGIN = ESTILO_UNICO ? MARGEN_PAPEL : 15;
@@ -412,5 +413,5 @@ export function construirPdfGuias(guias: readonly Guia[]): jsPDF {
 /** Cómo se llama el archivo cuando lleva varias guías adentro. */
 export function nombreArchivoGuias(guias: readonly Guia[]): string {
   if (guias.length === 1) return nombreArchivoGuia(guias[0]);
-  return `Guias-${guias.length}-${new Date().toISOString().slice(0, 10)}.pdf`;
+  return `Guias-${guias.length}-${hoyPanama()}.pdf`;
 }

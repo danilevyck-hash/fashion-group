@@ -540,7 +540,11 @@ describe("4 · Vendedoras en el celular", () => {
     // 🩸 7-oct-2026: la regla del bono ya no va en un `title` (hover-only):
     // se abre con un toque, igual que «N empresas» en Ventas › Clientes.
     fireEvent.click(pie.querySelector('[aria-label="Regla del bono"]')!);
-    expect(screen.getByRole("tooltip").textContent)
+    // 🔴 #22 (16-nov-2026): el ⓘ es el común (`<Ayuda>`): panel con ancho
+    // máximo y salto de línea, dentro de la pantalla a 390 px.
+    const regla = screen.getByRole("dialog", { name: "Regla del bono" });
+    expect(regla.getAttribute("data-desplegable")).toBe("ayuda");
+    expect(regla.textContent)
       .toContain("Bono de septiembre: se define al cerrar el mes");
     const lista = container.querySelector('[data-celular="vendedoras-lista"]')!;
     expect(lista.compareDocumentPosition(pie) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

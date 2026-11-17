@@ -163,7 +163,7 @@ export function parseCurvas(rows: SheetRow[]): CurvasResult {
     else g.tallas.set(talla, { ean: col.ean !== -1 ? String(row[col.ean] ?? "").trim() : "", cantidad });
   }
 
-  if (sinCurva > 0) warnings.push(`${sinCurva} fila(s) sin CODIGO_PREPACK — no llevan curva, se ignoraron.`);
+  if (sinCurva > 0) warnings.push(`${sinCurva === 1 ? "1 fila sin CODIGO_PREPACK — no lleva curva, se ignoró." : `${sinCurva} filas sin CODIGO_PREPACK — no llevan curva, se ignoraron.`}`);
   if (grupos.size === 0) throw new Error("No se encontraron referencias con curva (CODIGO_PREPACK vacío en todas las filas).");
 
   const curvas: Curva[] = [];

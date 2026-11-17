@@ -9,6 +9,8 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { enlaceDetalleReclamo } from "@/lib/reclamos/enlace";
+import { DIAS_RECLAMO_VIEJO } from "@/lib/reclamos/viejos";
+import { enlaceClienteCxc, enlaceProveedor } from "@/lib/vista-general-enlaces";
 // Módulo PURO (no arrastra supabase al navegador): las etiquetas de "por qué no
 // hay número" salen del MISMO lugar que las usa el servidor.
 import RentabilidadPorEmpresa, {
@@ -67,8 +69,8 @@ interface VistaGeneral {
   /** `null` = la lectura se cayó. NUNCA se pinta como $0. */
   inventario: InventarioData | null;
   semaforo: RentabilidadEmpresaRow[];
-  cxc: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topClientes: { nombre: string; codigo: string | null; empresa: string; saldo: number }[] };
-  cxp: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topProveedores: { nombre: string; empresa: string; saldo: number }[] };
+  cxc: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topClientes: { nombre: string; codigo: string | null; empresa: string; empresaKey?: string; saldo: number }[] };
+  cxp: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topProveedores: { nombre: string; empresa: string; empresaKey?: string; saldo: number }[] };
   reclamos: { antiguos: { id: string; nro: string; empresa: string; estado: string; dias: number }[]; total: number };
 }
 
@@ -413,7 +415,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
             <Empty>Sin saldos a +90 días</Empty>
           ) : (
             data.cxc.topClientes.map((c) => (
-              <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/cxc" className={FILA_ALERTA}>
+              <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href={enlaceClienteCxc(c)} className={FILA_ALERTA}>
                 <NombreAlerta nombre={c.nombre} empresa={c.empresa} />
                 <span className="text-sm font-semibold text-red-600 tabular-nums shrink-0">{moneyK(c.saldo)}</span>
               </Link>
@@ -427,7 +429,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
             <Empty>Sin saldos a +90 días</Empty>
           ) : (
             data.cxp.topProveedores.map((p) => (
-              <Link key={`${p.empresa}-${p.nombre}`} href="/proveedores" className={FILA_ALERTA}>
+              <Link key={`${p.empresa}-${p.nombre}`} href={enlaceProveedor(p)} className={FILA_ALERTA}>
                 <NombreAlerta nombre={nombreProveedor(p.nombre)} empresa={p.empresa} />
                 <span className={`text-sm font-semibold tabular-nums shrink-0 ${VG_ALERTAS_SIN_ROJO ? "text-gray-800" : "text-red-600"}`}>{moneyK(p.saldo)}</span>
               </Link>
@@ -436,7 +438,7 @@ function Atencion({ data }: { data: VistaGeneral }) {
         </AlertCard>
 
         {/* Reclamos antiguos sin pagar */}
-        <AlertCard title="Reclamos sin cobrar (+30 días)" href="/reclamos" linkLabel="Ir a Reclamos" count={data.reclamos.antiguos.length}>
+        <AlertCard title={`Reclamos sin cobrar (+${DIAS_RECLAMO_VIEJO} días)`} href="/reclamos" linkLabel="Ir a Reclamos" count={data.reclamos.antiguos.length}>
           {data.reclamos.antiguos.length === 0 ? (
             <Empty>Sin reclamos antiguos pendientes.</Empty>
           ) : (

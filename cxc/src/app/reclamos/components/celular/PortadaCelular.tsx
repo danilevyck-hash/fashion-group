@@ -179,7 +179,7 @@ export default function PortadaCelular({
                     ) : (
                       <>
                         {linea.texto}
-                        {linea.dias && <> · <span className="text-red-600">{linea.dias}</span></>}
+                        {linea.dias && <> · <span className={linea.rojo ? "text-red-600" : undefined}>{linea.dias}</span></>}
                         {apple && t.sinReclamar > 0 && <> · <span className="text-red-600">{t.sinReclamar} sin reclamar</span></>}
                       </>
                     )

@@ -231,7 +231,8 @@ export default function ClienteDetail({
     codigo: cliente.codigo,
     razonSocial: cliente.razon_social,
     ruc: cliente.identificacion,
-    direccionSwitch: cliente.direccion_switch,
+    // 🔴 #12 (16-nov-2026): la dirección NO va aquí — sale en su propia línea
+    // rotulada «Dirección en Switch». Ponerla en las dos la repetía.
     provincia: cliente.provincia,
   });
 

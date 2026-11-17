@@ -16,6 +16,7 @@ import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
 import { empresasConCxp } from "@/lib/switch-api/empresas";
 import { EMPRESA_KEY_TO_NAME, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { TRAMOS, repartirEnTramos } from "@/lib/proveedores/tramos";
+import { empresasDeLaFicha } from "@/lib/proveedores/por-empresa";
 import { PROVEEDORES_APPLE_2026_10, lineaUltimoPago, nombreProveedorEnPantalla, contactoRepite } from "@/lib/proveedores/apple-2026-10";
 import { capitalizarNombre } from "@/lib/cxc/estado-cuenta-switch";
 import TramosApple from "../TramosApple";
@@ -26,6 +27,8 @@ const EMPRESAS_CXP = empresasConCxp() as readonly string[];
 interface EmpresaTotals {
   empresa: string;
   por_pagar: number;
+  debes?: number;
+  a_favor?: number;
   ultimo_pago_monto: number | null;
   ultimo_pago_fecha: string | null;
   ultimo_pago_dias: number | null;
@@ -214,7 +217,7 @@ export default function ProveedorDetail({ fichaKey, apple = PROVEEDORES_APPLE_20
                   </tr>
                 </thead>
                 <tbody>
-                  {data.empresas.map((e) => (
+                  {empresasDeLaFicha(data.empresas).map((e) => (
                     <tr key={e.empresa} className="border-b border-gray-100">
                       <td className="py-2 text-gray-700">{nombreCortoEmpresa(e.empresa)}</td>
                       <PorPagarCell value={e.por_pagar} />
@@ -285,7 +288,9 @@ function FichaApple({
 }) {
   const total = data.total_grupo.por_pagar;
   const tramos = repartirEnTramos(data.total_grupo.aging);
-  const conSaldo = data.empresas.filter((e) => e.por_pagar !== 0).length;
+  // 🔴 #17 (16-nov-2026): el contador y la lista salen de la MISMA función.
+  const empresas = empresasDeLaFicha(data.empresas);
+  const conSaldo = empresas.length;
   const campos = [
     { label: "RUC", value: data.identificacion },
     { label: "DV", value: data.dv },
@@ -332,7 +337,7 @@ function FichaApple({
 
       <h2 className="sr-only">Por empresa</h2>
       <ul data-por-empresa-apple className="mb-6 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
-        {data.empresas.map((e) => {
+        {empresas.map((e) => {
           const pago = lineaUltimoPago(e.ultimo_pago_monto, e.ultimo_pago_dias, fmt);
           return (
             <li key={e.empresa} className="flex min-h-[56px] items-center gap-4 px-4 py-2.5">

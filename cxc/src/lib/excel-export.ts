@@ -22,6 +22,7 @@
 import XLSX from "xlsx-js-style";
 
 import { congelarEncabezadosXlsx } from "./excel-panel-fijo";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 // ─── Paletas ─────────────────────────────────────────────────────────────────
 
@@ -180,7 +181,7 @@ export function fmtFechaExcel(d: string | null | undefined): string {
 
 /** Nombre estándar: kebab-case + fecha ISO. ej. exportFilename("guias-transporte") */
 export function exportFilename(base: string, ext = "xlsx"): string {
-  return `${base}-${new Date().toISOString().slice(0, 10)}.${ext}`;
+  return `${base}-${hoyPanama()}.${ext}`;
 }
 
 // ─── Fábrica de celdas (nivel bajo, para layouts propios) ────────────────────

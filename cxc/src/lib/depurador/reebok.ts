@@ -180,10 +180,14 @@ export function monthOptions(headers: Cell[]): MonthOption[] {
     .filter((o) => o.label !== "");
 }
 
-/** Autodetecta la columna de mes (primer header que sea un mes en español). -1 si ninguno. */
-export function detectMonthCol(headers: Cell[]): number {
-  for (let i = 0; i < headers.length; i++) if (MESES_ES.includes(normH(headers[i]))) return i;
-  return -1;
+/** Autodetecta la columna de mes. Con las filas de datos, abre en el mes que SÍ
+ *  trae piezas (el más a la derecha = el más reciente); nunca en uno vacío
+ *  (error #38: abría en OCTUBRE con un archivo que solo traía NOVIEMBRE). Sin
+ *  filas o sin piezas en ningún mes: el primer mes. -1 si no hay mes. */
+export function detectMonthCol(headers: Cell[], dataRows: SheetRow[] = []): number {
+  const meses = headers.map((h, i) => (MESES_ES.includes(normH(h)) ? i : -1)).filter((i) => i !== -1);
+  const conPiezas = meses.filter((i) => dataRows.some((r) => (num(r?.[i]) ?? 0) > 0));
+  return conPiezas.at(-1) ?? meses[0] ?? -1;
 }
 
 /* ============ PARSEO ============ */

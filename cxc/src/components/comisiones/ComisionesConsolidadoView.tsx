@@ -214,8 +214,10 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
     ATRAS_CIERRA_2026_11 && !!detalle && aparatoDeQuienMira() === "celular",
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // `silencioso`: vuelve a leer sin el «cargando» y sin cerrar el detalle
+  // abierto. Lo usa el detalle al apagar un descuento.
+  const load = useCallback(async (silencioso = false) => {
+    if (!silencioso) setLoading(true);
     setError(null);
     try {
       // UNA llamada. El servidor corre las 6 RPC y trae los descuentos de las 6
@@ -272,7 +274,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
       const all = [...byName.values()].sort((a, b) => b.total - a.total);
       setRows(all);
       setSinAsignar(def);
-      setDetalle(null);
+      if (!silencioso) setDetalle(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cargar. Intenta de nuevo.");
       setRows(null);
@@ -524,6 +526,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
             mes={mes}
             vendedor={detalle.vendedor}
             onClose={() => setDetalle(null)}
+            onCambio={() => void load(true)}
           />
         </td>
       </tr>
@@ -692,6 +695,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
           mes={mes}
           vendedor={detalle.vendedor}
           onClose={() => volverDelDetalle()}
+          onCambio={() => void load(true)}
         />
       )}
 

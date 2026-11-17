@@ -31,6 +31,7 @@ import {
 import type XLSX from "xlsx-js-style";
 import { TRAMOS, TRAMOS_KEYS } from "@/lib/proveedores/tramos";
 import { textoTambienEn, type CarteraCxp } from "@/lib/proveedores/por-empresa";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 // Los encabezados de los tramos salen de la MISMA lista que la pantalla: una
 // segunda copia es cómo la hoja termina diciendo tramos que ya no existen.
@@ -91,6 +92,6 @@ export function buildProveedoresSheet(cartera: CarteraCxp): XLSX.WorkSheet {
 
 export function exportProveedoresExcel(cartera: CarteraCxp) {
   const wb = workbookFromSheets([{ name: "Proveedores", ws: buildProveedoresSheet(cartera) }]);
-  const date = new Date().toISOString().slice(0, 10);
+  const date = hoyPanama();
   downloadWorkbook(wb, `Proveedores_${date}.xlsx`);
 }

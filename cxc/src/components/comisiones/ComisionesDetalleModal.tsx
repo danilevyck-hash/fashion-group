@@ -176,9 +176,16 @@ interface Props {
   v3?: boolean;
   /** 🔴 `COMISIONES_CAMBIAR_VENDEDOR_FACTURA` (apagado): «···» → «Cambiar vendedor» en cada factura, solo admin. Las pruebas lo fuerzan. */
   cambiarVendedor?: boolean;
+  /**
+   * 🔴 Se llama cuando un cambio GUARDADO mueve el total del vendedor (apagar o
+   * prender un descuento, pasar una factura a otro vendedor). La tabla de atrás
+   * vuelve a leer del servidor, que netea UNA sola vez (`netearComisiones`): sin
+   * esto, la celda y «Total a pagar» seguían con el número viejo hasta recargar.
+   */
+  onCambio?: () => void;
 }
 
-export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vendedor, onClose, inline = false, v2 = false, v3 = COMISIONES_DETALLE_V3_2026_10, cambiarVendedor = COMISIONES_CAMBIAR_VENDEDOR_FACTURA }: Props) {
+export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vendedor, onClose, inline = false, v2 = false, v3 = COMISIONES_DETALLE_V3_2026_10, cambiarVendedor = COMISIONES_CAMBIAR_VENDEDOR_FACTURA, onCambio }: Props) {
   const [data, setData] = useState<ComisionDetalle | null>(null);
   // 🔴 Cambiar el vendedor de una factura: espejo del `requireRole(["admin"])`
   // de `/api/ventas/comisiones/factura-vendedor`. Un botón que el servidor
@@ -293,6 +300,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           throw new Error("no se guardó");
         }
         setRecarga((n) => n + 1);
+        onCambio?.();
       },
     });
   }
@@ -309,6 +317,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
         body: JSON.stringify({ descuento_id: id, year, mes, activo }),
       });
       if (!res.ok) throw new Error();
+      onCambio?.();
     } catch {
       setDescuentos((prev) => prev.map((d) => (d.id === id ? { ...d, activo: !activo } : d)));
     } finally {

@@ -16,6 +16,7 @@ import {
   contarPorClase,
   repartirAdjuntos,
 } from "@/lib/reclamos/adjuntos-plan";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
 // Bajar y achicar las fotos de un lote de reclamos toma más que armar un Excel.
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     // *«sin links»*). La factura en PDF y las fotos viajan ADJUNTAS acá abajo.
     const buffer = await buildBulkReclamosExcel(reclamos, empresa, contacto);
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
-    const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const filename = `Reclamos_${safeName}_${hoyPanama()}.xlsx`;
 
     // Tabla resumen (igual estilo que el correo consolidado existente)
     let grandTotal = 0;

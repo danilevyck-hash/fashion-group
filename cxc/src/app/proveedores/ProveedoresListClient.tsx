@@ -17,6 +17,8 @@ import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
 import { tonoDeMonto, textoDeMonto } from "@/lib/proveedores/tono";
 import { TRAMOS, TRAMOS_KEYS, frasePartida } from "@/lib/proveedores/tramos";
 import {
+  textoVacioDeEmpresa,
+  rotuloVerSinSaldo,
   type CarteraCxp,
   type EmpresaCxp,
   type ProveedorEnEmpresa,
@@ -368,7 +370,7 @@ function FilaEmpresa({
 }) {
   const frase = frasePartida(empresa.saldo, fmt);
   const [verSinSaldo, setVerSinSaldo] = useState(false);
-  const vacia = empresa.proveedores.length === 0 && empresa.sin_saldo.length === 0;
+  const vacio = textoVacioDeEmpresa(empresa);
   // Apple: una columna más al final, la de la ›.
   const columnas = COLUMNAS + (apple ? 1 : 0);
 
@@ -405,10 +407,10 @@ function FilaEmpresa({
         </tr>
       )}
 
-      {abierta && vacia && (
+      {abierta && vacio && (
         <tr>
           <td colSpan={columnas} className="pb-3 pl-6 pr-1.5 xl:pl-9 xl:pr-3 text-xs text-gray-500">
-            Sin proveedores recibidos de Switch para esta empresa.
+            {vacio}
           </td>
         </tr>
       )}
@@ -425,7 +427,7 @@ function FilaEmpresa({
               onClick={() => setVerSinSaldo((v) => !v)}
               className="inline-flex min-h-[44px] items-center text-xs text-gray-400 hover:text-gray-600 transition"
             >
-              {verSinSaldo ? "▾" : "▸"} Ver {empresa.sin_saldo.length} sin saldo
+              {rotuloVerSinSaldo(empresa.sin_saldo.length, verSinSaldo)}
             </button>
           </td>
         </tr>
@@ -579,15 +581,64 @@ function TarjetaEmpresa({
                 )}
               </li>
             ))}
-            {empresa.proveedores.length === 0 && (
-              <li className="py-2 text-xs text-gray-500">
-                Sin proveedores recibidos de Switch para esta empresa.
-              </li>
-            )}
           </ul>
+          <SinSaldoCelular empresa={empresa} onProveedor={onProveedor} />
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * 🔴 #15 (16-nov-2026): en el celular, lo mismo que la computadora — el texto
+ * de la empresa sin proveedores con saldo (`textoVacioDeEmpresa`) y los que
+ * están en cero plegados en «Ver N sin saldo», no escondidos.
+ */
+function SinSaldoCelular({
+  empresa,
+  onProveedor,
+  apple = false,
+}: {
+  empresa: EmpresaCxp;
+  onProveedor: (key: string) => void;
+  apple?: boolean;
+}) {
+  const [ver, setVer] = useState(false);
+  const vacio = textoVacioDeEmpresa(empresa);
+  const n = empresa.sin_saldo.length;
+  return (
+    <>
+      {vacio && <p className="py-2 text-xs text-gray-500">{vacio}</p>}
+      {n > 0 && (
+        <button
+          type="button"
+          onClick={() => setVer((v) => !v)}
+          className="inline-flex min-h-[44px] items-center text-xs text-gray-400 hover:text-gray-600 transition"
+        >
+          {rotuloVerSinSaldo(n, ver)}
+        </button>
+      )}
+      {ver && n > 0 && (
+        <ul>
+          {empresa.sin_saldo.map((p) => (
+            <li key={p.key} className="border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => onProveedor(p.key)}
+                className="flex min-h-[44px] w-full items-center gap-3 py-2 text-left active:bg-gray-50"
+              >
+                <span className={`min-w-0 flex-1 truncate ${apple ? "text-sm" : "text-xs"} text-gray-500`}>
+                  {apple ? nombreApple(p.nombre) : p.nombre}
+                </span>
+                <span className={`shrink-0 tabular-nums ${apple ? "text-sm" : "text-xs"} text-gray-400`}>
+                  {textoDeMonto(p.saldo.por_pagar, fmt)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 
@@ -662,10 +713,8 @@ function TarjetaEmpresaApple({
                 </button>
               </li>
             ))}
-            {n === 0 && (
-              <li className="py-2 text-xs text-gray-500">Sin proveedores recibidos de Switch para esta empresa.</li>
-            )}
           </ul>
+          <SinSaldoCelular empresa={empresa} onProveedor={onProveedor} apple />
           {frase && <p className="mt-1 text-xs text-gray-500 tabular-nums">{frase}</p>}
         </div>
       )}

@@ -220,9 +220,10 @@ export default function RangoFechas({
   // Escape cierra, como el resto de los modales de la casa.
   useEffect(() => {
     if (!abierto) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") { setAbierto(false); setAncla(null); } };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    // Escape cierra SOLO el calendario, nunca lo de atrás (como `CampoFecha`).
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setAbierto(false); setAncla(null); } };
+    window.addEventListener("keydown", h, true);
+    return () => window.removeEventListener("keydown", h, true);
   }, [abierto]);
 
   /** Qué días tienen marcaciones en la ventana visible. Falla en silencio: sin

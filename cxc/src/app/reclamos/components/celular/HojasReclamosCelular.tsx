@@ -33,6 +33,7 @@ import { notaEnPantalla } from "@/lib/reclamos/texto";
 import { validateComprobanteFile } from "../fotoUpload";
 import type { Foto, Seguimiento } from "../types";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { aCentavos } from "@/lib/reclamos/tax";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // El envase
@@ -141,7 +142,7 @@ export function HojaCobrar({
   /** La MISMA firma que el modal de la computadora: filas + comprobante. */
   onCobrar: (filas: FilaDeCobro[], comprobante: File | null) => void;
 }) {
-  const [monto, setMonto] = useState(reclamado > 0 ? reclamado.toFixed(2) : "");
+  const [monto, setMonto] = useState(reclamado > 0 ? aCentavos(reclamado).toFixed(2) : "");
   const [fecha, setFecha] = useState(() => hoyPanama());
   const [nc, setNc] = useState("");
   const [verNc, setVerNc] = useState(false);

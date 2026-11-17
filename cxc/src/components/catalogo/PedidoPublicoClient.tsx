@@ -19,6 +19,7 @@ import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import type { StockLinea } from "./types";
 import { precioTexto } from "@/lib/catalogo/precio";
 import { Aviso } from "@/components/ui/Aviso";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 interface OrderItem {
   product_id: string;
@@ -136,7 +137,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
           ...(marca === "reebok" ? { bulto_pzas: i.bulto_pzas ?? null } : {}),
         })),
         bultoSize: (c, bultoPzas) => theme.bulto(c || "footwear", bultoPzas),
-        filename: `Pedido-${theme.label}-${new Date().toISOString().slice(0, 10)}.pdf`,
+        filename: `Pedido-${theme.label}-${hoyPanama()}.pdf`,
       });
     } catch {
       // Antes esto era un `silent fail`: el botón volvía a decir "Descargar

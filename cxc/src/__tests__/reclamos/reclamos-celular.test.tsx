@@ -179,8 +179,8 @@ describe("Las palabras del celular", () => {
   });
 
   it("la empresa dice cuántos y el más viejo", () => {
-    expect(lineaEmpresa(11, 599)).toEqual({ texto: "11 reclamos", dias: "el más viejo 599 días" });
-    expect(lineaEmpresa(1, null)).toEqual({ texto: "1 reclamo", dias: null });
+    expect(lineaEmpresa(11, 599)).toEqual({ texto: "11 reclamos", dias: "el más viejo 599 días", rojo: true });
+    expect(lineaEmpresa(1, null)).toEqual({ texto: "1 reclamo", dias: null, rojo: false });
   });
 
   it("el reclamo dice su factura, sus fotos y hace cuánto — y se pone rojo a los 120 días", () => {

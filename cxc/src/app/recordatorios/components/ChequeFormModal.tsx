@@ -33,6 +33,7 @@ import { ALL_COMPANIES } from "@/lib/companies";
 import { LS_CHEQUE_VENDEDORES, VENDEDORES_POR_DEFECTO } from "@/lib/cheques-vendedores";
 import CampoFecha from "@/components/ui/CampoFecha";
 import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export interface ChequeFormValues {
   cliente: string;
@@ -62,7 +63,7 @@ interface Props {
 }
 
 function hoyStr() {
-  return new Date().toISOString().slice(0, 10);
+  return hoyPanama();
 }
 
 export function chequeFormVacio(): ChequeFormValues {

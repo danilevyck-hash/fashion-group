@@ -50,6 +50,7 @@ import {
 import { prepararFotos } from "./fotos-carpeta";
 import { analizarLibro, armarLibroConFotos, celdaDeFilaExcel, type AnalisisLibro } from "./excel-propio-archivo";
 import { Aviso as AvisoEnLinea } from "@/components/ui/Aviso";
+import { plural } from "@/lib/depurador/resumen-del-archivo";
 
 const MIME_XLSM = "application/vnd.ms-excel.sheet.macroEnabled.12";
 const MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -159,7 +160,7 @@ export default function MiExcelFotosClient() {
       const mb = salida.byteLength / 1048576;
       const conFotoReal = filas.filter((f) => prep.conFoto.has(f.codigo)).length;
       const falladas = prep.fallidas.length
-        ? ` · ${prep.fallidas.length} foto(s) no se pudieron leer y quedaron en ${TEXTO_SIN_FOTO}`
+        ? ` · ${prep.fallidas.length} ${plural(prep.fallidas.length, "foto no se pudo leer y quedó", "fotos no se pudieron leer y quedaron")} en ${TEXTO_SIN_FOTO}`
         : "";
       setResumen(
         `Listo · ${textoEmparejado(conFotoReal, filas.length)}${falladas} · el archivo pesa ${mb.toFixed(2)} MB · ${((Date.now() - t0) / 1000).toFixed(1)} s`,
@@ -349,14 +350,14 @@ export default function MiExcelFotosClient() {
       )}
       {lectura.filasConAOcupada.length > 0 && (
         <Aviso>
-          <b>{lectura.filasConAOcupada.length}</b> celda(s) de la columna A tienen algo escrito y{" "}
+          <b>{lectura.filasConAOcupada.length}</b> {plural(lectura.filasConAOcupada.length, "celda de la columna A tiene", "celdas de la columna A tienen")} algo escrito y{" "}
           <b>se van a reemplazar</b> (es la columna de las fotos).
         </Aviso>
       )}
       {lectura.filasSinCodigo.length > 0 && (
         <Aviso>
-          <b>{lectura.filasSinCodigo.length}</b> fila(s) no tienen código en la columna B: se dejan
-          tal cual, sin foto y sin escribirles nada.
+          <b>{lectura.filasSinCodigo.length}</b> {plural(lectura.filasSinCodigo.length, "fila no tiene", "filas no tienen")} código en la columna B:{" "}
+          {plural(lectura.filasSinCodigo.length, "se deja tal cual, sin foto y sin escribirle nada.", "se dejan tal cual, sin foto y sin escribirles nada.")}
         </Aviso>
       )}
 

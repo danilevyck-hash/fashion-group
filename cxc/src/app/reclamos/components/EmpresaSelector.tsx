@@ -111,7 +111,7 @@ export default function EmpresaSelector({
                               <>
                                 {l.texto}
                                 {t.contacto && ` · ${t.contacto}`}
-                                {l.dias && <> · <span className="text-red-600">{l.dias}</span></>}
+                                {l.dias && <> · <span className={l.rojo ? "text-red-600" : undefined}>{l.dias}</span></>}
                                 {t.sinReclamar > 0 && <> · <span className="text-red-600">{t.sinReclamar} sin reclamar</span></>}
                               </>
                             )}

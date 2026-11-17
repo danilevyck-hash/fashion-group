@@ -77,6 +77,16 @@ export function reclamoTaxes(empresa: string | null | undefined, subtotal: numbe
 }
 
 /**
+ * 🔴 EL TOTAL DE UN RECLAMO EN CENTAVOS — UN SOLO REDONDEO (16-nov-2026).
+ * 🩸 145 × 1,177 = 170,665: la pantalla decía $170.67 y el servidor congelaba
+ * 170,67, pero «Registrar cobro» venía puesto con `toFixed(2)` = «170.66», y
+ * quedaba «Pendiente $0.01». Quien redondee un monto del reclamo usa ESTA.
+ */
+export function aCentavos(n: number): number {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+/**
  * Formatea una TASA (0.07) como porcentaje legible: "7%", "10%", "15%".
  * Sin decimales cuando el porcentaje es redondo, con los que hagan falta si no.
  *

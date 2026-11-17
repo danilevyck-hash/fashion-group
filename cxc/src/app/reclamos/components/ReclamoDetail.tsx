@@ -7,6 +7,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { Toast, ConfirmDeleteModal, FotoLightbox, ScrollableTable } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
+import { aCentavos } from "@/lib/reclamos/tax";
 import { GENEROS, generoLabel, DEFAULT_MOTIVOS, emptyItem, calcSub, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, itbmsLabel, esPendiente } from "./constants";
 import { empresasParaElegir } from "@/lib/reclamos/empresas-con-reclamos";
 import FotoBadge from "./FotoBadge";
@@ -220,7 +221,8 @@ export default function ReclamoDetail({
   const settlements = (current.reclamo_settlements ?? []).filter((s) => !s.deleted);
   const recuperado = settlements.reduce((s, x) => s + (Number(x.monto) || 0), 0);
   const reclamado = current.monto_reclamado_snapshot ?? reclamoTaxes(current.empresa, sub).total;
-  const deltaRec = reclamado - recuperado;
+  // Los dos en centavos con la MISMA función: un total de medio centavo no deja «Pendiente $0.01».
+  const deltaRec = aCentavos(reclamado) - aCentavos(recuperado);
   const pctRec = reclamado > 0 ? (recuperado / reclamado) * 100 : 0;
   /** Apple: un cobro, UNA tarjeta — el comprobante va adentro de «Recuperación». */
   const comprobanteEnTarjeta = apple && (!pendiente || settlements.length > 0);

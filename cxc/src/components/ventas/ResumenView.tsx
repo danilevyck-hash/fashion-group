@@ -284,7 +284,7 @@ export function ResumenView({
   const cols = MONTHS;
   // Columnas que abarca la fila transformada: empresa + 12 meses + Total (+
   // Proyección cuando aplica).
-  const colSpanTabla = 2 + cols.length + (!isClosedYear && data.proyeccion ? 1 : 0);
+  const colSpanTabla = 2 + cols.length + (!isClosedYear && data.proyeccion && viewMode === "ventas" ? 1 : 0);
   const rows = data.empresas.map(e => {
     // Prev YTD per empresa recortado: la RPC ya devuelve prev[cur_mes]
     // con el cutoff per-empresa aplicado, y omite meses posteriores. Sumar
@@ -331,7 +331,11 @@ export function ResumenView({
 
   // La columna "Proyección" en la tabla + la tarjeta sólo aplican al
   // año en curso. Año cerrado = ya cerró, no hay nada que proyectar.
-  const showProyeccionCol = !isClosedYear && !!data.proyeccion;
+  const hayProyeccion = !isClosedYear && !!data.proyeccion;
+  // #40 (16-nov-2026): la proyección es de VENTA. En modo Utilidad la columna
+  // no se dibuja: no existe una proyección de utilidad y poner la de venta al
+  // lado de montos de utilidad confunde. La tarjeta dice «de cierre» y se queda.
+  const showProyeccionCol = hayProyeccion && viewMode === "ventas";
   // La columna Total queda pegada al borde derecho, o al lado de Proyección.
   const rightTotal = showProyeccionCol ? ANCHO_PROYECCION_PX : 0;
 
@@ -340,7 +344,7 @@ export function ResumenView({
   // pasó sería inventar el dato. La cuenta entera vive en
   // `lib/ventas/proyeccion-mensual.ts` y la comparte el celular.
   const mesesGris =
-    showProyeccionCol && viewMode === "ventas"
+    showProyeccionCol
       ? mesesProyectadosPorFila(
           data.empresas.map(e => ({ id: e.empresa.id, ventasPrevFull: e.ventasPrevFull ?? [] })),
           data.proyeccion!.mes_corte,
@@ -485,7 +489,7 @@ export function ResumenView({
             que Daniel mira. ⚠️ LA COLUMNA «Proyección» DE LA TABLA SE QUEDA:
             ahí se ve empresa por empresa. 🔴 Y NO SE DIBUJA NINGUNA META.
             Daniel: *«quita meta, no lo uso, prefiero proyeccion»*. */}
-        {showProyeccionCol && (
+        {hayProyeccion && (
           <KpiCard
             label="PROYECCIÓN DE CIERRE"
             value={fmtMoneyCompact(data.proyeccion!.totales_grupo.proyeccion_cierre)}

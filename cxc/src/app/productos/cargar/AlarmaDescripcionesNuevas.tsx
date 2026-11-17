@@ -10,6 +10,7 @@ import { useEscapeClose, useBackdropDismiss, useFormModalDismiss } from "@/lib/h
 import { marcasCandidatasDeEmpresa } from "@/lib/depurador/tienda";
 import { normalizarEspacios } from "@/lib/depurador/veredicto";
 import { Aviso } from "@/components/ui/Aviso";
+import { plural } from "@/lib/depurador/resumen-del-archivo";
 
 // Alarma bloqueante de descripciones NUEVAS, compartida por el Depurador y
 // Facturas Tienda. Solo llegan acá las de veredicto "alerta" (ver
@@ -126,7 +127,7 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
       <div className="w-full max-w-lg rounded-2xl border-4 border-red-500 bg-white p-6">
         {ICONOS_DE_LINEA_2026_11 ? <AlertTriangle aria-hidden className="mx-auto mb-2 h-12 w-12 text-red-600" /> : <div className="mb-2 text-center text-5xl">⚠️</div>}
         <h2 className="text-center text-xl font-bold text-red-700">
-          {items.length} descripción(es) por revisar
+          {items.length} {plural(items.length, "descripción", "descripciones")} por revisar
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           {puedeAprobar

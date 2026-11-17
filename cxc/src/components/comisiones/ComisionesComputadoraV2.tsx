@@ -24,7 +24,7 @@ import { Settings } from "lucide-react";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import SyncStatus from "@/components/shared/SyncStatus";
-import { SYNC_NOW_RECIBOS_OPCIONES } from "@/components/shared/syncNowOpciones";
+import { SYNC_NOW_RECIBOS_COMISIONES } from "@/components/shared/syncNowOpciones";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EMPRESA_KEY_TO_NOMBRE_CORTO } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
@@ -165,7 +165,7 @@ export function ComisionesComputadoraV2({
             forma="computadora"
             tabla="facturas"
             empresas={empresasFrescura}
-            opciones={SYNC_NOW_RECIBOS_OPCIONES}
+            opciones={SYNC_NOW_RECIBOS_COMISIONES}
             onSuccess={onActualizado}
           />
         </div>

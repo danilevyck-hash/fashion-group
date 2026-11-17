@@ -115,7 +115,7 @@ describe("🔴 2 · casos puntuales: la línea va al final de la lista", () => {
     // Montos sin centavos.
     expect(codigo).toMatch(/montoCorto\(resp\.ventas_total\)/);
     // La regla entera, solo detrás del ⓘ.
-    expect(codigo).toMatch(/aria-label="Regla del bono"/);
+    expect(codigo).toMatch(/titulo="Regla del bono"/);
     // `BonosSection` ya no pinta la línea de arriba.
     expect(leer("components/multifashion/BonosSection.tsx")).toMatch(/if \(RETAIL_AL_FRENTE\) return null;/);
   });
