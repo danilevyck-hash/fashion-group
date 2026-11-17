@@ -61,13 +61,17 @@ function Tarjeta({
       type="button"
       onClick={onIr}
       data-tarjeta-boston
-      className="min-h-[44px] text-left rounded-xl border border-gray-200 bg-white p-4 transition
+      className="min-h-[44px] flex flex-col text-left rounded-xl border border-gray-200 bg-white p-4 transition
                  hover:border-gray-300 hover:shadow-sm active:scale-[0.97]"
     >
-      {/* 🔴 #25 (16-nov-2026): las cuatro iguales — título en UNA línea, número y pie. */}
-      <span data-titulo className="block truncate text-xs uppercase tracking-wide text-gray-500">{titulo}</span>
+      {/* 🔴 #25 (16-nov-2026): las cuatro iguales — título en UNA línea, número y pie.
+          17-nov-2026: en el celular (menos de 640 px) el título se PARTE en vez de
+          recortarse («CUENTAS POR COB…» se comía letras); en la computadora sigue en
+          una línea. Y la tarjeta arranca ARRIBA (`flex-col`): el `<button>` centraba
+          su contenido y la 1.ª, más alta por el enlace, desalineaba a las otras. */}
+      <span data-titulo className="block sm:truncate text-xs uppercase tracking-wide text-gray-500">{titulo}</span>
       <span className="block mt-1 text-2xl font-semibold tabular-nums text-gray-900">{valor}</span>
-      <span data-pie className="block mt-0.5 truncate text-xs text-gray-500">{pie}</span>
+      <span data-pie className="block mt-0.5 sm:truncate text-xs text-gray-500">{pie}</span>
       {enlace && <span className="block mt-1 text-xs text-blue-600">{enlace}</span>}
     </button>
   );
