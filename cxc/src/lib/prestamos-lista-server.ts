@@ -35,7 +35,7 @@ import {
   type MovimientoParaSaldo,
 } from "@/lib/prestamos-saldo";
 import { getQuincenaRangePanama, hoyPanamaYmd } from "@/lib/prestamos-quincena";
-import { CONCEPTO_PAGO, esPagoDeQuincena } from "@/lib/prestamos-conceptos";
+import { esDescuentoDeQuincena } from "@/lib/asistencia/prestamos-planilla";
 
 export interface MovimientoFicha extends MovimientoParaSaldo {
   id: string;
@@ -193,10 +193,11 @@ export async function leerDatosPrestamos(hoy: string = hoyPanamaYmd()): Promise<
     // 🔴 Solo quien debe. Quien llega a cero sale solo.
     if (s.saldo <= 0) continue;
 
-    // Los pagos de QUINCENA (nunca «Abono extra»: es plata del bolsillo, no del
-    // sueldo, y descontarla otra vez sería cobrarle dos veces).
+    // Los descuentos de QUINCENA de las TRES cuentas (Pago · Pago de
+    // responsabilidad · Pago de terceros), con la MISMA regla de la planilla.
+    // Nunca «Abono extra»: es plata del bolsillo, no del sueldo.
     const fechasPagos = movs
-      .filter((m) => m.estado === "aprobado" && m.concepto === CONCEPTO_PAGO && esPagoDeQuincena(m))
+      .filter((m) => m.estado === "aprobado" && esDescuentoDeQuincena(m))
       .map((m) => String(m.fecha).slice(0, 10));
 
     filas.push({
