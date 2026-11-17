@@ -6,4 +6,5 @@
 // `20270120130000` (la llamada cada 5 minutos) aplicadas y las llaves VAPID
 // puestas en Vercel. Ver docs/postmortems/asistencia-planilla.md › «Mis
 // marcaciones y recordatorios».
-export const MARCACION_HISTORIAL_Y_AVISOS_2026_11 = false;
+// 🔴 16-nov-2026: PRENDIDO. Daniel: «prende marcación».
+export const MARCACION_HISTORIAL_Y_AVISOS_2026_11 = true;
