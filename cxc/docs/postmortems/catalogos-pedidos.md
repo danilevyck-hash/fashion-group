@@ -3566,3 +3566,12 @@ Candado: `tallas-por-pedido.test.ts` (pedido 2182 real como fixture + cada regla
 ## Reebok: ropa en bultos de 12 (15-nov-2026, `REEBOK_ROPA_EN_12_2026_11`, prendido)
 
 - Migración `20261231150000_reebok_bulto_en_renglon.sql` (columna `reebok_order_items.bulto_pzas` + las 3 RPC que guardan renglones + la vista de Comprobantes): **aplicada 16-nov-2026**, 0 filas cambiadas (los 662 renglones viejos quedan en NULL = regla vieja); GH8229 (medias) ya sale con bulto 12.
+
+## El comprobante en Excel (17-nov-2026, `COMPROBANTE_EXCEL_2026_11`, prendido)
+
+- Daniel: «lo de excel sí, pero que sea igual que en el pdf». Aprobado y prendido el 17-nov-2026.
+- Dónde: en el pedido (`PedidoDetalleClient`), botón «Descargar Excel» bajo «Descargar PDF»; en Catálogos › Comprobantes, «Descargar Excel» en el «···» de la fila (solo pedidos internos, `esOrders`). Se quedan los dos.
+- Qué lleva, en el orden del PDF: banda con el nombre de la marca · Cliente · Pedido/Cotización N.º · Fecha · tabla Producto · SKU · Bultos · Cantidad · Precio/u · Subtotal (con «Pedido» y «Preventa» si hay preventa) · Total con bultos y unidades · la firma de la marca. Montos como números reales (`$#,##0.00`).
+- 🔴 **Una sola fuente**: PDF y Excel arman sus opciones con la MISMA función (`opcionesDelPapel`) y las cuentas salen de `resolverLineas`/`resumirPedido`, igual que el PDF. La palabra del papel y el nombre del archivo son los del PDF, con `.xlsx`.
+- ⚠️ El Excel no lleva el logo ni la foto de cada producto (`xlsx-js-style` no escribe imágenes). Como espejo del PDF, la tabla empieza en la fila 4, no en A1: excepción deliberada a «los Excel empiezan en la fila 1», porque Daniel pidió que fuera igual al PDF.
+- Candado: `src/__tests__/catalogo/comprobante-excel.test.ts` (encabezado, columnas, total = PDF, secciones de preventa, interruptor prendido). `false` = la pantalla de antes.

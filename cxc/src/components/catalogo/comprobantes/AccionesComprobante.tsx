@@ -29,6 +29,7 @@ import { useRef, useState } from "react";
 import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
 import { nombreArchivoPapel, palabraDelPapelDeFila } from "@/lib/catalogo/papel-de-la-fila";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { COMPROBANTE_EXCEL_2026_11 } from "@/lib/ui/comprobante-excel-2026-11";
 import type { FilaComprobante } from "@/lib/catalogo/fila-comprobante";
 import type { MarcaTheme } from "@/lib/catalogo/marcas-ui";
 
@@ -90,6 +91,48 @@ export default function AccionesComprobante({
     return p;
   }
 
+  /** Lo que el PDF y el Excel leen del pedido: UNA sola fuente para los dos. */
+  function opcionesDelPapel(full: PedidoConItems) {
+    const items = ((full[theme.itemsField] as ItemDelPedido[] | null) || []).map((i) => ({
+      sku: i.sku || "",
+      name: i.name || "",
+      quantity: Number(i.quantity) || 0,
+      unit_price: Number(i.unit_price) || 0,
+      image_url: i.image_url || "",
+      category: i.category || theme.pdfFallbackCategory,
+      bulto_pzas: i.bulto_pzas ?? null,
+    }));
+    return {
+      marca: theme.marca,
+      orderNumber: String(full.order_number ?? pedido.numero_pedido ?? ""),
+      clientName: String(full.client_name ?? pedido.cliente ?? ""),
+      createdAt: String(full.created_at ?? pedido.created_at),
+      items,
+      bultoSize: (c: string | null | undefined, bultoPzas?: number | null) => theme.bulto(c || theme.pdfFallbackCategory, bultoPzas),
+      documentoLabel: palabraDelPapelDeFila(pedido),
+    };
+  }
+
+  /** «Descargar Excel» (`COMPROBANTE_EXCEL_2026_11`): lo MISMO que el PDF. */
+  async function descargarExcel() {
+    const full = await leerPedido(pedido.id_natural);
+    if (!full) {
+      precarga.current.delete(pedido.id_natural);
+      showToast("No se pudo generar el Excel. Intenta de nuevo.", "error");
+      return;
+    }
+    try {
+      const { downloadCatalogoOrderExcel } = await import("@/lib/catalogo/order-excel");
+      downloadCatalogoOrderExcel({
+        ...opcionesDelPapel(full),
+        filename: nombreArchivoPapel(pedido, hoyPanama()).replace(/\.pdf$/, ".xlsx"),
+      });
+      showToast("Excel listo — revisa tu carpeta de descargas", "success");
+    } catch {
+      showToast("No se pudo generar el Excel. Intenta de nuevo.", "error");
+    }
+  }
+
   async function verPdf() {
     if (bajando) return;
     setBajando(true);
@@ -100,24 +143,9 @@ export default function AccionesComprobante({
         showToast("No se pudo abrir el PDF. Intenta de nuevo.", "error");
         return;
       }
-      const items = ((full[theme.itemsField] as ItemDelPedido[] | null) || []).map((i) => ({
-        sku: i.sku || "",
-        name: i.name || "",
-        quantity: Number(i.quantity) || 0,
-        unit_price: Number(i.unit_price) || 0,
-        image_url: i.image_url || "",
-        category: i.category || theme.pdfFallbackCategory,
-        bulto_pzas: i.bulto_pzas ?? null,
-      }));
       const { downloadCatalogoOrderPdf } = await import("@/lib/catalogo/order-pdf-client");
       await downloadCatalogoOrderPdf({
-        marca: theme.marca,
-        orderNumber: String(full.order_number ?? pedido.numero_pedido ?? ""),
-        clientName: String(full.client_name ?? pedido.cliente ?? ""),
-        createdAt: String(full.created_at ?? pedido.created_at),
-        items,
-        bultoSize: (c, bultoPzas) => theme.bulto(c || theme.pdfFallbackCategory, bultoPzas),
-        documentoLabel: palabraDelPapelDeFila(pedido),
+        ...opcionesDelPapel(full),
         filename: nombreArchivoPapel(pedido, hoyPanama()),
       });
       showToast("PDF listo — revisa tu carpeta de descargas", "success");
@@ -130,6 +158,9 @@ export default function AccionesComprobante({
 
   const items: OverflowMenuItem[] = [];
   items.push({ label: puedeEditar ? "Editar" : "Ver", onClick: onAbrir, disabled: abriendo });
+  if (COMPROBANTE_EXCEL_2026_11 && esOrders) {
+    items.push({ label: "Descargar Excel", onClick: () => { void descargarExcel(); } });
+  }
   // 🔴 Duplicar: solo pedidos internos que YA están en Switch (el servidor
   // contesta 409 a los demás). Ver la cabecera.
   if (puedeEditar && esOrders && pedido.en_switch) {
