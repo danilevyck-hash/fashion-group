@@ -919,10 +919,6 @@ function AdminDashboardInner() {
       {/* Smart empty state: no CXC data loaded */}
       {!loading && roleClients.length === 0 && (
         <div className="flex flex-col items-center py-16 text-center mb-8">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-4">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M12 8v4m0 4h.01" />
-          </svg>
           <p className="text-sm font-medium text-gray-500 mb-1">No hay datos de cartera cargados</p>
           <p className="text-xs text-gray-400 mb-4 max-w-xs">Los datos de cartera se actualizan automáticamente desde Switch.</p>
           {/* Botón "Importar archivo de cartera" → /upload OCULTO: upload manual

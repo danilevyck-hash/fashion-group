@@ -16,7 +16,7 @@ import { enlaceClienteCxc, enlaceProveedor } from "@/lib/vista-general-enlaces";
 import RentabilidadPorEmpresa, {
   type RentabilidadEmpresaRow,
 } from "./RentabilidadPorEmpresa";
-import GastosPorEmpresa, { type GastosData } from "./GastosPorEmpresa";
+import GastosPorEmpresa, { gastosEnUnaLinea, type GastosData } from "./GastosPorEmpresa";
 import InventarioPorEmpresa, {
   InventarioKpiValue,
   piezas,
@@ -206,7 +206,7 @@ function VistaGeneralInner() {
             {/* Los dos paneles que reemplazan a una tarjeta con un total: el
                 inventario abierto por empresa (con lo que NO se midió dicho en
                 palabras) y el gasto de cada empresa contra lo suyo. */}
-            <div className="grid grid-cols-1 gap-3 mb-8 lg:grid-cols-2">
+            <div className={`grid grid-cols-1 gap-3 mb-8 ${gastosEnUnaLinea(data.gastos) ? "" : "lg:grid-cols-2"}`}>
               <InventarioPorEmpresa inv={data.inventario} />
               <GastosPorEmpresa gastos={data.gastos} mes={mes} />
             </div>

@@ -408,7 +408,7 @@ function UsuariosPageInner() {
           {loadingUsers ? (
             <SkeletonTable rows={3} cols={4} />
           ) : fgUsers.length === 0 ? (
-            <EmptyState title="No hay usuarios" actionLabel="+ Nuevo usuario" onAction={openNewUser} />
+            <EmptyState title="No hay usuarios" />
           ) : (
             USUARIOS_APPLE_2026_10 ? (
               <ListaPorRol

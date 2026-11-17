@@ -62,14 +62,9 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center py-20 text-center">
-      <div className="min-w-[48px] min-h-[48px] flex items-center justify-center mb-4">
-        {icon || (
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M12 8v4m0 4h.01" />
-          </svg>
-        )}
-      </div>
+      {/* Revisión de 12 detalles (17-nov-2026): sin ícono por defecto. El
+          cuadrado con «!» casi blanco parecía una imagen rota. */}
+      {icon && <div className="min-w-[48px] min-h-[48px] flex items-center justify-center mb-4">{icon}</div>}
       <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
       {subtitle && <p className="text-xs text-gray-400 mb-4 max-w-xs">{subtitle}</p>}
       {actionLabel && onAction && (

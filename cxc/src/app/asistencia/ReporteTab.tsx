@@ -1158,6 +1158,9 @@ export default function ReporteTab({ empresa = "", opcionesEmpresa, onEmpresa }:
       {/* La metodología del cuadro se aprende una vez: va al ⓘ. Los avisos que
           cambian una decisión —el reloj callado, las horas de salida sin
           confirmar— siguen arriba y a la vista. */}
+      {/* Revisión de 12 detalles (17-nov-2026): sin cuadro no hay números que
+          leer; el ⓘ quedaba suelto. Sale con la misma condición que la tabla. */}
+      {!cargando && !error && !!visibles?.length && (
       <div className="-ml-2">
         <Ayuda titulo="Cómo se leen estos números" etiqueta="Cómo se leen estos números">
           <p>
@@ -1193,6 +1196,7 @@ export default function ReporteTab({ empresa = "", opcionesEmpresa, onEmpresa }:
           </p>
         </Ayuda>
       </div>
+      )}
 
       {corrigiendo && (
         <CorregirMarcacionModal

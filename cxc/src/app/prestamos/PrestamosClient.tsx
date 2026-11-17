@@ -20,6 +20,7 @@ import { hoyPanamaYmd, getQuincenaRangePanama } from "@/lib/prestamos-quincena";
 import type { Colaborador, DatosPrestamos, FilaPrestamo } from "@/lib/prestamos-lista-server";
 import AplicarQuincenaModal from "./components/AplicarQuincenaModal";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
+import { ChipSelector } from "@/components/celular/BarraDeControles";
 import NuevoMovimientoModal from "./components/NuevoMovimientoModal";
 import ElegirPersonaModal from "./components/ElegirPersonaModal";
 import { descargarHistorialPrestamos, type AmbitoHistorial } from "@/lib/prestamos-descargar-historial";
@@ -60,7 +61,8 @@ function quincenaVigente(hoy: string) {
   const [y] = hoy.split("-").map(Number);
   const dFin = Number(end.slice(8, 10));
   const dIni = Number(start.slice(8, 10));
-  return { start, end, label: `${dIni} al ${dFin} de ${MESES[m]} ${y}` };
+  // `corto`: el título de la tarjeta en el celular, en una línea («Quincena 16–30 nov»).
+  return { start, end, label: `${dIni} al ${dFin} de ${MESES[m]} ${y}`, corto: `${dIni}–${dFin} ${MESES[m].slice(0, 3).toLowerCase()}` };
 }
 
 export default function PrestamosClient({ initialData }: { initialData: PrestamosInitialData }) {
@@ -248,11 +250,11 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             quincena» debajo a todo el ancho; antes cada una ocupaba su fila. */}
         <div className={CELULAR ? "mb-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center" : "flex flex-wrap items-center gap-2 mb-5"}>
           <div className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2">
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo pendiente total</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide"><span className="sm:hidden">Saldo pendiente</span><span className="hidden sm:inline">Saldo pendiente total</span></div>
             <div className={`text-lg font-semibold tabular-nums ${totalSaldo > 0 ? "text-red-600" : "text-gray-400"}`}>$<AnimatedNumber value={totalSaldo} formatter={(n: number) => fmt(n)} /></div>
           </div>
           <div className={`rounded-lg border px-3.5 py-2 ${deduccionesCompletas ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Quincena · {quincena.label}</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide"><span className="whitespace-nowrap sm:hidden">Quincena {quincena.corto}</span><span className="hidden sm:inline">Quincena · {quincena.label}</span></div>
             <div className={`text-lg font-semibold tabular-nums ${deduccionesCompletas ? "text-emerald-700" : "text-amber-600"}`}>{deduccionesAplicadas} / {deduccionesTotal}</div>
           </div>
           {quincenaPendientesN > 0 && (
@@ -290,25 +292,22 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             envoltorio="min-w-0 flex-1 sm:w-44 sm:flex-none"
             className="min-h-[44px]"
           />
-          <select
-            value={filterEmpresa}
-            onChange={e => setFilterEmpresa(e.target.value)}
-            aria-label="Empresa"
-            // El celular le daba a «Todas» el ancho del nombre de empresa más
-            // largo y el buscador quedaba en «Buscar co». Ahora el select es
-            // angosto y el buscador se lleva el resto.
-            className={`h-11 min-h-[44px] shrink-0 rounded-md border border-campo bg-white px-3 text-sm outline-none focus:border-gray-900 transition ${CELULAR && !TODAS_LAS_EMPRESAS_2026_11 ? "w-28 sm:w-auto" : ""}`}
-          >
-            <option value="all">{ROTULO_TODAS}</option>
-            {empresas.map(e => <option key={e} value={e}>{e}</option>)}
-          </select>
+          {/* Revisión de 12 detalles (17-nov-2026): la misma cápsula de Despachos
+              («Todas las empresas ▾»), no el desplegable cuadrado. */}
+          <ChipSelector
+            rotulo="Empresa"
+            soloValor
+            valor={filterEmpresa}
+            onCambiar={setFilterEmpresa}
+            opciones={[{ valor: "all", etiqueta: ROTULO_TODAS }, ...empresas.map((e) => ({ valor: e, etiqueta: e }))]}
+          />
           </div>
         </div>
 
         {loading ? (
           <SkeletonTable rows={5} cols={4} />
         ) : filtered.length === 0 && otrosResultados.length === 0 ? (
-          <EmptyState title={search ? "No se encontró a nadie con ese nombre" : "Sin saldos pendientes"} actionLabel="+ Nuevo préstamo" onAction={() => setShowElegirPersona(true)} />
+          <EmptyState title={search ? "No se encontró a nadie con ese nombre" : "Sin saldos pendientes"} />
         ) : (
           <div className="space-y-6">
             {porEmpresa.map(([empresa, items]) => (

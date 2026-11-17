@@ -392,7 +392,7 @@ que nada cambie nunca.
 
 ## 5. Archivos de más de 800 líneas
 
-El límite de la casa es 800 (`.claude/rules/common/coding-style.md`). **47 archivos lo pasan.**
+El límite de la casa es 800 (lo fijaba `.claude/rules/common/coding-style.md`, retirado el 17-nov-2026 con toda la carpeta `.claude/rules/`). **47 archivos lo pasan.**
 
 | Líneas | Archivo |
 |---:|---|

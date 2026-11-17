@@ -74,6 +74,20 @@
   body.fg-con-tabbar:has([data-sobre-tab-bar]) {
     padding-bottom: calc(var(--fg-alto-tab-bar) + var(--fg-alto-barra-fija, 72px) + 16px);
   }
+  /* Revisión de 12 detalles (17-nov-2026): sin franja blanca al final. El
+     colchón de la barra va en el <body> (blanco) y la pantalla gris medía
+     100vh ENCIMA de él: sobraba una franja blanca y la página se deslizaba
+     sin tener contenido. El <body> (border-box, min-h-screen) ya llega hasta
+     abajo: toma el gris de la pantalla y ella deja de pedir su propio alto. */
+  body.fg-con-tabbar:has(.min-h-screen:where(.bg-gray-50, .skin-caja[data-caja-apple])) {
+    background: theme("colors.gray.50");
+  }
+  body.fg-con-tabbar:has(.min-h-screen.bg-fondo-celular) {
+    background: theme("colors.fondo-celular");
+  }
+  body.fg-con-tabbar .min-h-screen:is(.bg-white, .bg-gray-50, .bg-fondo-celular, .skin-caja) {
+    min-height: 0;
+  }
 }
 
 /* 🔴 EL AVATAR DEL USUARIO EN EL CELULAR (`TAB_BAR_2026_10`,

@@ -24,6 +24,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 vi.mock("@/lib/ui/accesibilidad-2026-11", () => ({ ACCESIBILIDAD_2026_11: false }));
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import TiraTotales from "@/app/cxc/components/TiraTotales";
+import { CLASE_CXC_COL_NOMBRE, CLASE_CXC_COL_TOTAL } from "@/lib/ui/revision-110-cxc";
 import { AGING, AGING_ORDER, tramoLabel } from "@/lib/cxc-aging";
 import type { ConsolidatedClient } from "@/lib/types";
 
@@ -49,13 +50,16 @@ const pintar = (extra: Partial<React.ComponentProps<typeof TiraTotales>> = {}) =
   );
 
 describe("🔴 la tira vive en la MISMA grilla que la tabla", () => {
-  it("es `grid-cols-12` con el reparto 4/2/2/2/2", () => {
+  it("es `grid-cols-12` con el MISMO reparto que la tabla (`CLASE_CXC_COL_*`)", () => {
+    // Revisión de 12 detalles (17-nov-2026): la tira decía 4/2/2/2/2 y la tabla
+    // 3/2/2/2/3; ahora las dos leen las mismas constantes.
     const { container } = pintar();
     const tira = container.firstElementChild as HTMLElement;
     expect(tira.className).toContain("grid-cols-12");
     const spans = [...tira.children].map((c) =>
       (c.className.match(/col-span-(\d+)/) ?? [])[1]);
-    expect(spans).toEqual(["4", "2", "2", "2", "2"]);
+    const n = (clase: string) => clase.replace("col-span-", "");
+    expect(spans).toEqual([n(CLASE_CXC_COL_NOMBRE), "2", "2", "2", n(CLASE_CXC_COL_TOTAL)]);
   });
 });
 

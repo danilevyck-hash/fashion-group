@@ -16,6 +16,11 @@ import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import { logActivityClient } from "@/lib/logActivityClient";
 import type { PdfDeCurvas } from "@/lib/ui/curvas-tallas-2026-11";
+import dynamic from "next/dynamic";
+
+/** Las reglas de Asistencia (antes, un segundo «?» junto al del encabezado).
+ *  Se cargan solo al abrir «Cómo se usa» en Asistencia. */
+const ReglasDeAsistencia = dynamic(() => import("@/app/asistencia/ComoFuncionaTab"));
 
 interface VideoFirmado {
   orden: number;
@@ -274,6 +279,18 @@ function Contenido({ modulo, curvas, onClose }: { modulo: string; curvas?: PdfDe
       </div>
 
       {curvas && <RenglonCurvas pdf={curvas} modulo={modulo} />}
+
+      {modulo === "asistencia" && (
+        <details data-reglas-asistencia className="group rounded-lg border border-gray-200 bg-white">
+          <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between px-3 text-sm font-medium text-gray-900">
+            Reglas de asistencia
+            <span aria-hidden className="text-gray-400 transition group-open:rotate-90">›</span>
+          </summary>
+          <div className="border-t border-gray-100 p-3">
+            <ReglasDeAsistencia />
+          </div>
+        </details>
+      )}
 
       {error && <Aviso tono="error">{error}</Aviso>}
       {!datos && !error && <p className="py-10 text-center text-sm text-gray-500">Cargando videos…</p>}

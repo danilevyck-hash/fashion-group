@@ -6,7 +6,7 @@
 
 import { BORDES_ALINEADOS } from "@/lib/ui/revision-110-ajustes";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { BuscadorGris } from "@/components/filtros/FiltroA";
+import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { Search, X } from "lucide-react";
 import { fmt, fmtDate } from "@/lib/format";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
@@ -134,7 +134,7 @@ export function BuscarClienteComisiones({ year, mes, empresa, children }: { year
       {ranuras ? (
         <>
           <div data-filtro-3-buscar className={`mb-2 flex items-center gap-2 ${BORDES_ALINEADOS ? "" : "px-4"}`}>
-            <BuscadorGris valor={q} onCambiar={setQ} placeholder="Buscar cliente" compacto className="min-w-0 flex-1" />
+            <CampoBuscar value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente" aria-label="Buscar cliente" envoltorio="min-w-0 flex-1" />
             {ranuras.alLado}
           </div>
           {!buscando && ranuras.antesDeLaLista}

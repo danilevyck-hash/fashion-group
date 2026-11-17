@@ -617,7 +617,7 @@ comprimidos para una página de app, o sea ~900 kB aquí.
 Las cinco de arriba pasan el presupuesto. Y los componentes más grandes explican por qué:
 `PlanillaTab.tsx` **2.035 líneas**, `ConfiguracionTab.tsx` 1.810, `ProductosSubtab.tsx` 1.541,
 `DepuradorClient.tsx` 1.420 — todos por encima del máximo de 800 líneas que fija
-`.claude/rules/common/coding-style.md`.
+`.claude/rules/common/coding-style.md` (retirado el 17-nov-2026 con toda la carpeta `.claude/rules/`).
 
 ### 8.3 · Lecturas en cascada
 

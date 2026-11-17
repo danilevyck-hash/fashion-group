@@ -535,21 +535,9 @@ function AsistenciaInner() {
               <Settings className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={() => { if (config) cambiarConfig(""); setAyuda((v) => !v); }}
-            aria-pressed={ayuda}
-            aria-label="Cómo funciona"
-            title="Cómo funciona"
-            className={`mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-base transition active:scale-[0.97] ${FOCO_TECLADO} ${
-              ayuda
-                ? "border-black bg-black text-white"
-                : "border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
-            }`}
-          >
-            ?
-          </button>
+          {/* Revisión de 12 detalles (17-nov-2026): el «?» de «Cómo funciona»
+              se fue de aquí; quedaba pegado al «?» del encabezado. Las reglas
+              viven ahora adentro de «Cómo se usa» (`VideosAyuda`). */}
         </div>
         )}
 

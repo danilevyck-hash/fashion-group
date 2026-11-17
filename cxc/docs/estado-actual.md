@@ -152,7 +152,7 @@ Ahora: **39.537 chars**. Cero líneas perdidas — todo se MOVIÓ, nada se borr�
 - `cxc/docs/historico/superado.md` — módulos retirados y changelog de abril
 - Sección nueva "Invariantes por módulo": la regla vigente + link a su post-mortem
 
-También se retiró `.claude/rules/zh/**` (traducción al chino de reglas ya cargadas en inglés) y se reemplazó `.claude/CLAUDE.md` de la raíz, que describía otro proyecto.
+También se retiró `.claude/rules/zh/**` (traducción al chino de reglas ya cargadas en inglés; el 17-nov-2026 se retiró la carpeta `.claude/rules/` entera: eran reglas genéricas de un kit que contradecían las de Daniel) y se reemplazó `.claude/CLAUDE.md` de la raíz, que describía otro proyecto.
 
 ---
 
