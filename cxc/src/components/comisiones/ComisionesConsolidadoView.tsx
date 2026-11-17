@@ -97,6 +97,16 @@ import { DESGLOSE_EN_DOS_LINEAS, FLECHA_EN_EL_MARGEN } from "@/lib/ui/revision-1
 
 /** vivo2-02: las seis columnas de empresa con 8 px a cada lado también en xl (eran 12): la tabla cabe y «Total» no se sale. */
 const PAD_X = FLECHA_EN_EL_MARGEN ? "" : " xl:px-3";
+/**
+ * 🔴 LA COLUMNA TOTAL NUNCA SALE DE LA VISTA (16-nov-2026, dudoso n.º 8 de los
+ * videos). Cuando las ocho columnas no caben (1366 y 1280 px con la barra
+ * lateral abierta: medido 1.117 px de tabla en 1.064 de tarjeta), la tarjeta
+ * se desliza de lado y antes el Total —el número que se paga— era lo que se
+ * perdía. Pegado a la derecha de la tarjeta, lo que se desliza son las
+ * empresas; el fondo gris que ya tenía lo hace opaco. En la cabecera, las
+ * filas y el pie: las tres celdas, siempre la misma clase.
+ */
+const CELDA_TOTAL = "sticky right-0";
 import { useDescargaComision } from "./comisiones-detalle/useDescargaComision";
 import { descargarPdfTablaComisiones } from "@/lib/comisiones/pdf-tabla-comisiones";
 import { anotarDescargaComision } from "@/lib/comisiones/rastro";
@@ -188,7 +198,8 @@ const moneyClass = (n: number) => (n < 0 ? "text-red-600" : "text-gray-700");
 /** La marca de «se calcula pero no se paga» — DEFAULT y Daniel. Misma en tabla y tarjetas. */
 export function MarcaNoSePaga() {
   return (
-    <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 align-middle text-[11px] font-normal not-italic text-gray-500">
+    // El chip baja entero a la línea siguiente cuando el nombre se parte; nunca «No / pagable».
+    <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 align-middle text-[11px] font-normal not-italic text-gray-500">
       {ROTULO_NO_SE_PAGA}
     </span>
   );
@@ -487,7 +498,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
           </td>
         );
       })}
-      <td className={`bg-gray-50 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${!r.se_paga ? "text-gray-400" : r.total < 0 ? "text-red-600" : "text-gray-900"}`}>
+      <td className={`${CELDA_TOTAL} bg-gray-50 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${!r.se_paga ? "text-gray-400" : r.total < 0 ? "text-red-600" : "text-gray-900"}`}>
         {/* 🔴 LA FLECHA DEL TOTAL BAJA TODAS LAS EMPRESAS DE ESA PERSONA, en un
             solo archivo — una hoja por empresa, en el orden de las columnas. */}
         <span className={FLECHA_AL_LADO ? "whitespace-nowrap" : undefined}>
@@ -538,7 +549,13 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
       data-se-paga={r.se_paga ? "si" : "no"}
       className={`border-b border-gray-100 last:border-0 transition hover:bg-gray-50 ${r.se_paga ? "" : "text-gray-400"}`}
     >
-      <td className={`px-3 py-2.5 font-medium xl:whitespace-nowrap xl:px-4 ${italica ? "italic text-gray-500" : r.se_paga ? "text-gray-900" : "text-gray-400"}`}>
+      {/* 🔴 EL NOMBRE CEDE, EL MONTO NUNCA (16-nov-2026, dudoso n.º 8 de los
+          videos). Este `td` llevaba `xl:whitespace-nowrap`: con «Oficina (sin
+          vendedor) · No pagable» en una sola línea la tabla medía 1.262 px en
+          1.138 de tarjeta (1440 px con la barra lateral abierta) y la columna
+          Total quedaba fuera de la vista, sin aviso. Sin el nowrap el nombre
+          largo se parte en dos líneas y la tabla cabe (medido: 1.138 px). */}
+      <td className={`px-3 py-2.5 font-medium xl:px-4 ${italica ? "italic text-gray-500" : r.se_paga ? "text-gray-900" : "text-gray-400"}`}>
         {/* Solo se MUESTRA capitalizado («Reynaldo Espinosa»); la clave de la
             fila, el pivote y el detalle siguen con el nombre tal cual llega. */}
         {nombreVendedorEnPantalla(r.vendedor)}
@@ -622,7 +639,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
                   {EMPRESAS.map((k) => (
                     <ThOrden key={k} col={k} api={orden} derecha className={`px-2 py-2 font-medium xl:whitespace-nowrap${PAD_X}`}>{nombreCortoEmpresa(k)}</ThOrden>
                   ))}
-                  <ThOrden col="total" api={orden} derecha className="bg-gray-100 px-3 py-2 font-semibold text-gray-700 xl:px-4">Total</ThOrden>
+                  <ThOrden col="total" api={orden} derecha className={`${CELDA_TOTAL} bg-gray-100 px-3 py-2 font-semibold text-gray-700 xl:px-4`}>Total</ThOrden>
                 </tr>
               </thead>
               <tbody>
@@ -653,7 +670,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
                     const t = colTotal(k);
                     return <td key={k} className={`px-2 py-2.5 text-right tabular-nums${PAD_X} ${t < 0 ? "text-red-600" : ""}`}>{fmtMoney(t)}</td>;
                   })}
-                  <td className={`bg-gray-100 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${grandTotal < 0 ? "text-red-600" : "text-gray-900"}`}>{fmtMoney(grandTotal)}</td>
+                  <td className={`${CELDA_TOTAL} bg-gray-100 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${grandTotal < 0 ? "text-red-600" : "text-gray-900"}`}>{fmtMoney(grandTotal)}</td>
                 </tr>
               </tfoot>
             </table>
