@@ -48,13 +48,14 @@ export const TAB_BAR_2026_10 = true;
 export const PESTANAS_DE_MODULO = BARRA_SIN_MAS_2026_11 ? 4 : 3;
 
 /**
- * 🔴 LA BARRA FIJA DE UNA PERSONA (Daniel, 14-nov-2026, mockup 37c): la suya es
- * Inicio · Catálogos · Ventas · Por cobrar · Asistencia, y no se recalcula con
- * sus visitas. Por el usuario de login (`fg_users.name`), en minúsculas.
+ * 🔴 LA BARRA FIJA DE UNA PERSONA (Daniel, 14-nov-2026, mockup 37c; cambiada el
+ * 17-nov-2026 con su «2,4,5,7» sobre su top 10 del celular): la suya es
+ * Inicio · Despachos · Multifashion (rótulo «Tienda») · Ventas · Por cobrar, y
+ * no se recalcula con sus visitas. Por el usuario de login (`fg_users.name`), en minúsculas.
  * Igual se filtra con los módulos que la persona tiene.
  */
 export const BARRA_FIJA_POR_USUARIO: Readonly<Record<string, readonly string[]>> = {
-  daniel: ["catalogos", "ventas", "cxc", "asistencia"],
+  daniel: ["guias", "multifashion", "ventas", "cxc"],
 };
 
 /** La barra fija de este usuario, o `null` si la suya es la automática. */
@@ -105,9 +106,12 @@ export const FIJAS_POR_ROL: Readonly<Record<string, readonly string[]>> = {
   secretaria: ["multifashion"],
 };
 
-/** El rótulo corto de la pestaña: «Guías de despacho» no cabe en 78 px. */
-const ROTULO_CORTO: Readonly<Record<string, string>> = {
-  guias: "Guías",
+/** El rótulo corto de la pestaña: tiene que caber sin «…» a 360 px con letra
+ *  de 12 px. «Guías» era el nombre viejo de Despachos (17-nov-2026); a
+ *  Multifashion, solo en la barra, «Tienda». */
+export const ROTULO_CORTO: Readonly<Record<string, string>> = {
+  guias: "Despachos",
+  multifashion: "Tienda",
   asistencia: "Asistencia",
   cxc: "Por cobrar",
   referencia: "Artículos",
