@@ -1,7 +1,9 @@
 // /api/marcacion/recordatorios — los recordatorios de quien marca (16-nov-2026).
 //
 //   GET → los cuatro renglones (lo guardado, o apagado con la hora de su
-//         horario) y la llave pública para suscribir el aparato.
+//         horario) y la llave pública para suscribir el aparato. Sin ficha
+//         (Daniel, admin, 17-nov-2026) contesta solo la llave, con
+//         `recordatorios: null`: así puede usar «Probar aviso».
 //   PUT → guarda los renglones y, si viene, la suscripción de este aparato.
 //
 // 🔴 El código sale de la SESIÓN, nunca del cuerpo.
@@ -35,7 +37,7 @@ export async function GET(req: NextRequest) {
   const auth = requireMarcacion(req);
   if (auth instanceof NextResponse) return auth;
   const codigo = await leerEmpleadoCodigo(auth.userId);
-  if (!codigo) return NextResponse.json({ error: AVISO_SIN_CODIGO }, { status: 404 });
+  if (!codigo) return NextResponse.json({ recordatorios: null, clavePublica: process.env.VAPID_PUBLIC_KEY ?? null });
   try {
     return NextResponse.json(await estado(codigo));
   } catch (e) {

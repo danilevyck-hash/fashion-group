@@ -232,6 +232,7 @@ Las reglas VIGENTES, en una o dos líneas cada una. 🔴 **Este archivo tiene qu
 - **«Descuento por compras» y «Daño de mercancía» son LA MISMA línea**, no dos conceptos.
 - ⚠️ **Un colaborador sin cédula ni salario no siempre es un dato olvidado** (puede no tener permiso de trabajo).
 - La incapacidad justificada **se paga**; «Trabajo fuera de la oficina» **no es ausencia**; un sueldo repartido saca la rata del **sueldo COMPLETO** y las partes deben sumar el salario de la ficha o se rechaza entero.
+- 🔴 **«Probar aviso» (17-nov-2026)** en Marcación › Recordatorios: manda al instante «Aviso de prueba · Así te llegará el recordatorio de marcación» a ESTE teléfono (`/api/marcacion/recordatorios/probar`, sesión de Marcación; con ficha guarda la suscripción a nombre del código de la SESIÓN, sin ficha —Daniel, admin— no guarda nada y ve solo esa parte); pide permiso y en iPhone sin instalar dice cómo. Candado `marcacion/probar-aviso`.
 - 📄 **La pestaña «Marcaciones», el lugar con nombre y el sello del teléfono (25-sep-2026)**: verbatim en el postmortem › «Lo que decía CLAUDE.md hasta el 8-oct-2026».
 
 ### La Planilla Unida — los dos interruptores, PRENDIDOS en producción (11-sep-2026)

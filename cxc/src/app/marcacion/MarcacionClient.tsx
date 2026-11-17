@@ -680,6 +680,22 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
           </Aviso>
         )}
 
+        {/* «Probar aviso» sin ficha (17-nov-2026): quien entra sin código de
+            colaborador (Daniel, admin) ve solo la parte de avisos. */}
+        {MARCACION_HISTORIAL_Y_AVISOS_2026_11 && sinCodigo && (
+          <>
+            <button
+              type="button"
+              onClick={() => setHojaAbierta("recordatorios")}
+              className="mt-3 flex min-h-[44px] w-full items-center justify-between rounded-xl border border-gray-200 px-4 text-left text-[16px] active:bg-gray-50"
+            >
+              Recordatorios
+              <span aria-hidden="true" className="text-[18px] text-gray-400">›</span>
+            </button>
+            <Recordatorios open={hojaAbierta === "recordatorios"} onClose={() => setHojaAbierta(null)} />
+          </>
+        )}
+
         {/* ── «UN TOQUE» (24-sep-2026) ───────────────────────────────────────
             Un botón fijo abajo que no se mueve nunca, la foto aceptada ES la
             marca, y una sola confirmación. Con el interruptor apagado, lo de

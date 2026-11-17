@@ -3,11 +3,14 @@
 // «Recordatorios» (16-nov-2026): cuatro renglones con su interruptor (apagado
 // por defecto) y su hora. Se guarda solo, sin botón. Al encender el primero se
 // pide permiso de avisos y se suscribe ESTE aparato (web push, VAPID).
+// «Probar aviso» (17-nov-2026) manda uno al instante a ESTE teléfono; quien no
+// tiene ficha de colaborador (Daniel, admin) ve solo esa parte.
 
 import { useEffect, useState } from "react";
 import {
   ROTULOS_RECORDATORIO,
   TEXTO_SELECCIONA_TU_HORA,
+  TEXTO_PRUEBA_ENVIADA,
   TEXTO_INSTALAR_EN_IPHONE,
   TEXTO_PIE_RECORDATORIOS,
   type Recordatorio,
@@ -29,7 +32,8 @@ function llaveEnBytes(base64: string): ArrayBuffer {
 }
 
 /** La suscripción de este aparato, o un texto que dice por qué no se pudo. */
-async function suscribirEsteAparato(clavePublica: string | null): Promise<PushSubscriptionJSON | string> {
+async function suscribirEsteAparato(clavePublica: string | null, renovar = false): Promise<PushSubscriptionJSON | string> {
+  if (esIphoneSinInstalar()) return TEXTO_INSTALAR_EN_IPHONE;
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
     return esIphoneSinInstalar() ? TEXTO_INSTALAR_EN_IPHONE : "Este navegador no recibe avisos.";
   }
@@ -37,14 +41,33 @@ async function suscribirEsteAparato(clavePublica: string | null): Promise<PushSu
   const permiso = await Notification.requestPermission();
   if (permiso !== "granted") return "Los avisos están bloqueados en este teléfono. Actívalos en Ajustes.";
   const reg = await navigator.serviceWorker.ready;
+  if (renovar) await (await reg.pushManager.getSubscription())?.unsubscribe();
   const sub =
     (await reg.pushManager.getSubscription()) ??
     (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: llaveEnBytes(clavePublica) }));
   return sub.toJSON();
 }
 
+/** Manda el aviso de prueba; si la suscripción vieja ya no sirve, la renueva una vez. */
+async function probarAviso(clavePublica: string | null): Promise<void> {
+  for (const renovar of [false, true]) {
+    const sub = await suscribirEsteAparato(clavePublica, renovar);
+    if (typeof sub === "string") throw new Error(sub);
+    const res = await fetch("/api/marcacion/recordatorios/probar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ suscripcion: sub }),
+    });
+    if (res.ok) return;
+    const j = await res.json().catch(() => ({}));
+    if (res.status !== 410 || renovar) throw new Error(j.error || "No se pudo mandar el aviso.");
+  }
+}
+
 export default function Recordatorios({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [lista, setLista] = useState<Recordatorio[] | null>(null);
+  const [sinFicha, setSinFicha] = useState(false);
+  const [prueba, setPrueba] = useState<"enviando" | "enviada" | null>(null);
   const [clave, setClave] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -54,11 +77,13 @@ export default function Recordatorios({ open, onClose }: { open: boolean; onClos
     if (!open) return;
     setIphoneSinInstalar(esIphoneSinInstalar());
     setError(null);
+    setPrueba(null);
     fetch("/api/marcacion/recordatorios", { cache: "no-store" })
       .then(async (r) => {
         const j = await r.json().catch(() => ({}));
         if (!r.ok) return setError(j.error || "No se pudieron leer tus recordatorios.");
-        setLista(j.recordatorios);
+        setLista(j.recordatorios ?? null);
+        setSinFicha(j.recordatorios == null);
         setClave(j.clavePublica ?? null);
       })
       .catch(() => setError("Sin conexión. Intenta de nuevo cuando tengas señal."));
@@ -150,7 +175,31 @@ export default function Recordatorios({ open, onClose }: { open: boolean; onClos
           </ul>
         )}
 
-        <p className="mt-3 text-[13px] text-gray-500">{TEXTO_PIE_RECORDATORIOS}</p>
+        {(lista || sinFicha) && (
+          <div className="mt-4">
+            <button
+              type="button"
+              disabled={prueba === "enviando"}
+              onClick={async () => {
+                setError(null);
+                setPrueba("enviando");
+                try {
+                  await probarAviso(clave);
+                  setPrueba("enviada");
+                } catch (e) {
+                  setPrueba(null);
+                  setError(e instanceof Error ? e.message : "No se pudo mandar el aviso.");
+                }
+              }}
+              className="min-h-[44px] w-full rounded-xl border border-gray-200 text-[16px] text-blue-600 active:bg-gray-50 disabled:opacity-50"
+            >
+              {prueba === "enviando" ? "Enviando…" : "Probar aviso"}
+            </button>
+            {prueba === "enviada" && <p className="mt-2 text-[13px] text-emerald-700">{TEXTO_PRUEBA_ENVIADA}</p>}
+          </div>
+        )}
+
+        {!sinFicha && <p className="mt-3 text-[13px] text-gray-500">{TEXTO_PIE_RECORDATORIOS}</p>}
         {iphoneSinInstalar && <p className="mt-2 text-[13px] text-gray-500">{TEXTO_INSTALAR_EN_IPHONE}</p>}
       </div>
     </div>
