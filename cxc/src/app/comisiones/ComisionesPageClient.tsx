@@ -38,7 +38,8 @@ export function ComisionesPageClient({
           el breadcrumb (escritorio) — repetirlo costaba 44px de la primera
           pantalla del iPhone. Mismo criterio que el encabezado de CXC. */}
       <main className="mx-auto w-full max-w-[1280px] px-4 pb-8 pt-2 md:px-7 md:pt-3">
-        <div className={barra ? "-mx-4 -mt-2" : undefined}>
+        {/* El `-mx-4` lo pone ahora `PantallaCel` (17-nov-2026). */}
+        <div className={barra ? "-mt-2" : undefined}>
         {/* El ⚙ de Configuración (solo admin) vive AQUÍ, en el módulo
             Comisiones, no en la pestaña Comisiones de Ventas. */}
         {/* 🔴 SIN `conMultifashion` desde el 5-oct-2026 (Daniel: «para no

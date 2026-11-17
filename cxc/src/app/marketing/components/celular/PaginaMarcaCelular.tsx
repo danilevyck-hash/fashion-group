@@ -83,6 +83,9 @@ export default function PaginaMarcaCelular({
   const tiendas: ReadonlyArray<TiendaDeSeccion> = abierta?.tiendas ?? [];
 
   return (
+    // Vive dentro del `<main>` de la página (`px-4`): el `-mx-4` lo deja de borde
+    // a borde para que la tarjeta no sume el margen dos veces (17-nov-2026).
+    <div className="-mx-4 sm:mx-0">
     <PantallaCelular>
       <div className="flex items-center justify-between px-2 pt-1">
         <button
@@ -188,5 +191,6 @@ export default function PaginaMarcaCelular({
         </>
       )}
     </PantallaCelular>
+    </div>
   );
 }
