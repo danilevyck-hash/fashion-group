@@ -71,6 +71,8 @@ import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeCo
 import { CLIENTES_APPLE_2026_10 } from "@/lib/clientes/apple-2026-10";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
+import type { DocumentoDeCompra } from "@/lib/cxc/ultima-compra-junta";
+import { cuantasFacturas, rotuloDeLaCompra } from "@/app/cxc/components/CompraJunta";
 
 /** Tipo c (2-oct-2026): detalle por empresa (3 partes) y últimos pagos (2), lado a lado desde 1024 px. */
 const DETALLE_Y_PAGOS = "lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4 lg:items-start";
@@ -123,6 +125,9 @@ export interface ClienteDetailData {
    *  «compró y se le acreditó todo». */
   compras_brutas: number;
   ultima_compra: string | null;
+  /** `ULTIMA_COMPRA_JUNTA_2026_11`: lo que compró ese día (facturas − NC) y sus documentos. */
+  ultima_compra_monto?: number | null;
+  ultima_compra_documentos?: DocumentoDeCompra[] | null;
   ultimo_pago: { fecha: string; monto: number } | null;
   pagos_por_fecha: PagoDelDia[];
   documentos_con_saldo: number;
@@ -225,7 +230,9 @@ export default function ClienteDetail({
     hoy,
     initialData.ultima_compra ? fmtDate(initialData.ultima_compra) : "",
     SIN_COMPRAS_NUNCA,
+    initialData.ultima_compra_monto ?? null,
   );
+  const docsCompra = initialData.ultima_compra_documentos ?? null;
 
   const fiscal = lineaFiscal({
     codigo: cliente.codigo,
@@ -392,6 +399,9 @@ export default function ClienteDetail({
               <p className="text-sm font-medium text-gray-500">{compra.frase}</p>
             )}
             {compra.detalle && <p className="mt-1 text-xs text-gray-500 tabular-nums">{compra.detalle}</p>}
+            {docsCompra && cuantasFacturas(docsCompra) > 1 && (
+              <p className="mt-0.5 text-xs text-gray-500">{rotuloDeLaCompra(docsCompra)}</p>
+            )}
           </Tarjeta>
         </div>
 

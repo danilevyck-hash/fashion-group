@@ -13,6 +13,7 @@
 // el número es una orientación, no la plata que se va a cobrar.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { DocumentoDeCompra } from "@/lib/cxc/ultima-compra-junta";
 import { AGING, type AgingKey } from "@/lib/cxc-aging";
 import {
   ordenParaRiskFilter,
@@ -198,6 +199,7 @@ export interface ClienteConEmpresas {
         ultimoPagoMonto?: number | null;
         ultimaCompraFecha?: string | null;
         ultimaCompraMonto?: number | null;
+        ultimaCompraDocumentos?: DocumentoDeCompra[] | null;
       }
     | undefined
   >;
@@ -357,8 +359,9 @@ export interface RenglonEmpresaCliente {
   documentos: number;
   masViejo: number | null;
   ultimoPago: { fecha: string; monto: number } | null;
-  /** La última factura en ESA empresa (las notas de crédito no son compras). */
-  ultimaCompra: { fecha: string; monto: number } | null;
+  /** La última factura en ESA empresa (las notas de crédito no son compras).
+   *  Con `ULTIMA_COMPRA_JUNTA_2026_11`: todo lo de ese día, con sus documentos. */
+  ultimaCompra: { fecha: string; monto: number; documentos?: DocumentoDeCompra[] | null } | null;
 }
 
 /**
@@ -391,7 +394,7 @@ export function empresasDelCliente(
       masViejo: docs?.masViejo ?? null,
       ultimoPago: fecha ? { fecha, monto: Number(d.ultimoPagoMonto) || 0 } : null,
       ultimaCompra: (d.ultimaCompraFecha ?? "").slice(0, 10)
-        ? { fecha: (d.ultimaCompraFecha ?? "").slice(0, 10), monto: Number(d.ultimaCompraMonto) || 0 }
+        ? { fecha: (d.ultimaCompraFecha ?? "").slice(0, 10), monto: Number(d.ultimaCompraMonto) || 0, ...(d.ultimaCompraDocumentos ? { documentos: d.ultimaCompraDocumentos } : {}) }
         : null,
     });
   }

@@ -1,4 +1,5 @@
 "use client";
+import { ListaDocumentosCompra, cuantasFacturas, rotuloDeLaCompra } from "./CompraJunta";
 import { telefonoParaWhatsApp, textoSinCelular } from "@/lib/ui/uso-2026-11";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -500,6 +501,9 @@ export function TablaDesgloseEmpresas({ filas, total }: { filas: RenglonEmpresaC
 function FilaDesglose({ fila }: { fila: RenglonEmpresaCliente }) {
   const diasPago = daysSince(fila.ultimoPago?.fecha);
   const diasCompra = daysSince(fila.ultimaCompra?.fecha);
+  const docs = fila.ultimaCompra?.documentos ?? null;
+  const junta = docs != null && cuantasFacturas(docs) > 1;
+  const [verCompra, setVerCompra] = useState(false);
   return (
     <>
       <tr className="border-t border-gray-100">
@@ -523,7 +527,17 @@ function FilaDesglose({ fila }: { fila: RenglonEmpresaCliente }) {
             <span className="text-gray-300">—</span>
           )}
           {" · "}Últ. compra{" "}
-          {fila.ultimaCompra ? (
+          {fila.ultimaCompra && junta && docs ? (
+            <button
+              type="button"
+              onClick={() => setVerCompra((v) => !v)}
+              aria-expanded={verCompra}
+              className="font-semibold text-gray-900 underline decoration-dotted underline-offset-2"
+            >
+              {montoExacto(fila.ultimaCompra.monto)} · {rotuloDeLaCompra(docs)} ·{" "}
+              <span className="font-normal text-gray-500">{diasCompra != null ? `${diasCompra} d` : ""}</span>
+            </button>
+          ) : fila.ultimaCompra ? (
             <>
               {montoExacto(fila.ultimaCompra.monto)} ·{" "}
               <span className="text-gray-500">{diasCompra != null ? `${diasCompra} d` : ""}</span>
@@ -533,6 +547,13 @@ function FilaDesglose({ fila }: { fila: RenglonEmpresaCliente }) {
           )}
         </td>
       </tr>
+      {verCompra && junta && docs && fila.ultimaCompra && (
+        <tr>
+          <td colSpan={5} className="pb-2">
+            <ListaDocumentosCompra fecha={fila.ultimaCompra.fecha} monto={fila.ultimaCompra.monto} documentos={docs} />
+          </td>
+        </tr>
+      )}
     </>
   );
 }
