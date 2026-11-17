@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabase-server";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { logActivity } from "@/lib/log-activity";
 
 export interface AperturaDePeriodo {
@@ -59,7 +60,9 @@ export async function abrirPeriodo(
     .single();
 
   const numero = (last?.numero || 0) + 1;
-  const today = new Date().toISOString().slice(0, 10);
+  // 🔴 La apertura lleva la fecha de PANAMÁ (17-nov-2026), no la UTC: de noche
+  // el período nacía con la fecha de mañana.
+  const today = hoyPanama();
 
   const fila: Record<string, unknown> = {
     numero,

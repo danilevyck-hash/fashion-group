@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
@@ -130,7 +131,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const diferencia = contado === null ? null : diferenciaDeCaja(contado, saldo);
 
-  const today = new Date().toISOString().slice(0, 10);
+  // 🔴 La fecha del cierre es la de PANAMÁ (17-nov-2026): con la UTC, un cierre
+  // después de las 7 p. m. quedaba con la fecha de mañana.
+  const today = hoyPanama();
   // 🔴 SE ESCRIBE TODO LO QUE SE PUEDA, EN ESE ORDEN. `saldo_cierre` congela la
   // foto del cierre (DDL 20260920120000, aplicada) y `efectivo_contado` /
   // `diferencia_cierre` la plata contada (DDL 20261211120000). Falla ABIERTA en

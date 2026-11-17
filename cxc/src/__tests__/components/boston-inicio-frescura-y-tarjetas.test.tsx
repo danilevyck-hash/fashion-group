@@ -56,7 +56,12 @@ describe("#25 · las cuatro tarjetas son parejas", () => {
     expect(tarjetas).toHaveLength(4);
     for (const t of tarjetas) {
       const titulo = t.querySelector("[data-titulo]")!;
-      expect(titulo.className).toMatch(/\btruncate\b/);
+      // 17-nov-2026: el título se recorta SOLO desde 640 px (`sm:truncate`); en el
+      // celular se parte. Un `truncate` pelado volvía a comerse letras en 390 px
+      // («CUENTAS POR COB…»), y la tarjeta arranca arriba (`flex-col`).
+      expect(titulo.className).toMatch(/\bsm:truncate\b/);
+      expect(titulo.className).not.toMatch(/(^|\s)truncate\b/);
+      expect(t.className).toMatch(/\bflex-col\b/);
       expect(titulo.textContent!.length).toBeLessThanOrEqual(20);
       expect(t.querySelector("[data-pie]")?.textContent?.trim()).toBeTruthy();
     }

@@ -476,7 +476,12 @@ export function PantallaProductos(p: PantallaProductosProps) {
 
 // ── El resumen (vivo-05 · vivo-12) ──────────────────────────────────────────
 
-const Sep = () => <span className="mx-1.5 text-gray-300">·</span>;
+// El `<wbr />` es el ÚNICO punto donde la línea puede partirse: cada `Par` es
+// `whitespace-nowrap` y entre ellos no hay espacios, así que sin él «833
+// unidades · Venta $44,798.67» era un solo bloque que no cabía al lado de
+// «Actualizado 3:15 pm ↻» y se le dibujaba debajo (n.º 42 de los videos,
+// Multifashion › Productos a 390 px: 28 px montados).
+const Sep = () => <><span className="mx-1.5 text-gray-300">·</span><wbr /></>;
 /** Un rótulo y su número nunca se separan («Margen 28%», «Utilidad $22,684.40»). */
 const Par = ({ r, v, antes }: { r?: string; v: string; antes?: boolean }) => (
   <span className="whitespace-nowrap">
