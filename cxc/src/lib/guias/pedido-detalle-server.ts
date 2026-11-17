@@ -22,6 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { leerTodoPaginado, type RespuestaPaginada } from "@/lib/supabase-paginado";
 import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { createSwitchClient } from "@/lib/switch-api/client";
@@ -323,7 +324,8 @@ export async function crearEnvioDelPedido(
       {
         switch_factura_id: null,
         secuencial: TEXTO_TRASLADO,
-        fecha_factura: new Date().toISOString().slice(0, 10),
+        // 🔴 La fecha del traslado es la de PANAMÁ (17-nov-2026), no la UTC.
+        fecha_factura: hoyPanama(),
         cajas: bultos,
         nota: notaDelPedido(pedido.secuencial),
       },

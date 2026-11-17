@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { RETAIL_AL_FRENTE } from "@/lib/multifashion/retail-al-frente";
 
 export const dynamic = "force-dynamic";
@@ -38,8 +39,10 @@ export async function GET(req: NextRequest) {
   }
 
   const sp = req.nextUrl.searchParams;
-  const today = new Date().toISOString().slice(0, 10);
-  const ene1 = `${new Date().getFullYear()}-01-01`;
+  // 🔴 El «hasta» por defecto es HOY EN PANAMÁ (17-nov-2026): con la UTC, de
+  // noche pedía hasta mañana (y el 1 de enero salía del año UTC).
+  const today = hoyPanama();
+  const ene1 = `${today.slice(0, 4)}-01-01`;
   const fecha_inicio = sp.get("fecha_inicio") ?? ene1;
   const fecha_fin = sp.get("fecha_fin") ?? today;
 
