@@ -3,7 +3,7 @@
 // filtro «a» y el buscador que encuentra por código O descripción.
 import { describe, expect, it, vi } from "vitest";
 import {
-  PESTANAS_DE_MODULO, barraFijaDe, ordenPorUso, pestanasDelRol, sinVisitasDelRobot,
+  PESTANAS_DE_MODULO, barraFijaDe, rotuloDePestana, ordenPorUso, pestanasDelRol, sinVisitasDelRobot,
 } from "@/lib/navegacion/tab-bar";
 import { filtrosPuestos, textoDelRenglon, type FiltroDeLaHoja } from "@/components/filtros/FiltroA";
 import { filtrarArticulos, type ArticuloVendido } from "@/lib/productos/filtros";
@@ -17,12 +17,14 @@ describe("la barra de abajo sin «Más»", () => {
     expect(pestanasDelRol("admin").length).toBe(4);
   });
 
-  it("la barra de Daniel es FIJA: Catálogos · Ventas · Por cobrar · Asistencia, mida lo que mida", () => {
-    expect(barraFijaDe("daniel")).toEqual(["catalogos", "ventas", "cxc", "asistencia"]);
+  it("la barra de Daniel es FIJA: Despachos · Tienda · Ventas · Por cobrar, mida lo que mida (17-nov-2026)", () => {
+    expect(barraFijaDe("daniel")).toEqual(["guias", "multifashion", "ventas", "cxc"]);
     expect(barraFijaDe("Daniel")).toEqual(barraFijaDe("daniel")); // el login no distingue mayúsculas
     expect(barraFijaDe("yulissa")).toBeNull();
     const keys = pestanasDelRol("admin", null, ["marketing", "reclamos", "caja"], "/home", "daniel").map((m) => m.key);
-    expect(keys).toEqual(["catalogos", "ventas", "cxc", "asistencia"]);
+    expect(keys).toEqual(["guias", "multifashion", "ventas", "cxc"]);
+    const rotulos = pestanasDelRol("admin", null, [], "/home", "daniel").map(rotuloDePestana);
+    expect(rotulos).toEqual(["Despachos", "Tienda", "Ventas", "Por cobrar"]);
   });
 
   it("otra persona del mismo rol sigue ordenada por su uso", () => {

@@ -692,7 +692,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
                 className={`my-1 flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full ${ROTULO_TAB} transition active:scale-[0.97] ${aqui ? "bg-black/[0.06] text-gray-950" : "text-gray-600"}`}
               >
                 <Icon size={22} strokeWidth={aqui ? 2 : 1.6} />
-                <span className="max-w-full truncate px-0.5">{rotuloDePestana(m)}</span>
+                <span className="max-w-full truncate">{rotuloDePestana(m)}</span>
               </button>
             );
           })}
