@@ -212,7 +212,7 @@ export const CONCEPTOS_PAGO = [...CONCEPTOS_PAGO_DE_CUENTA, "Abono extra"] as co
  * la quincena. Sin origen escrito (las 443 filas anteriores al 5-sep-2026) se
  * asume que sí — es lo conservador: en la duda no se vuelve a descontar.
  *
- * 🩸 Un abono con origen «Liquidación», «Décimo», «Vacaciones» o «Efectivo»
+ * 🩸 Un abono con origen «Liquidación», «Décimo», «Vacaciones» o «Abono»
  * NO es un descuento del sueldo, aunque su concepto sea «Pago». Es el caso de
  * CRISTIAM BLANCO (ver el encabezado).
  */
