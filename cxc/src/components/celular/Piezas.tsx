@@ -24,9 +24,18 @@ import { EnLaBarra, useHayBarraCelular } from "./BarraDeControles";
 import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio, vidrioSobre } from "@/lib/ui/vidrio";
 
-/** El lienzo: fondo de iOS y sitio para el botón flotante. */
+/**
+ * El lienzo: fondo de iOS y sitio para el botón flotante.
+ *
+ * 🔴 VA DE BORDE A BORDE (17-nov-2026). Vive dentro del `<main>` del módulo,
+ * que trae `px-4`; las piezas de adentro ya ponen SU margen (`mx-4`, `px-4`).
+ * Sin el `-mx-4` el margen se sumaba dos veces: el fondo quedaba a 16 px y la
+ * tarjeta a 32 px (Ventas › Resumen y Clientes). Comisiones lo cancelaba por su
+ * cuenta en la página; ahora se cancela aquí, una vez para todos.
+ * Candado: `src/__tests__/components/celular-sin-doble-margen.test.ts`.
+ */
 export function PantallaCel({ children }: { children: ReactNode }) {
-  return <div className="min-h-screen bg-fondo-celular pb-8">{children}</div>;
+  return <div className="-mx-4 min-h-screen bg-fondo-celular pb-8 md:mx-0">{children}</div>;
 }
 
 /** El título grande y su línea gris, con el «···» a la derecha. */
