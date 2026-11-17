@@ -189,13 +189,12 @@ describe("Comisiones — la tabla ancha son TARJETAS bajo lg", () => {
     // sería el que vuelve a empujar el min-content a 984.
     const cuerpoTabla = consolidado.slice(consolidado.indexOf("<thead>"));
     expect(cuerpoTabla).not.toMatch(/className="[^"]*\bwhitespace-nowrap\b(?![^"]*xl:)/);
-    // Las dos tablas recuperan su relleno de escritorio en xl.
-    for (const [nombre, src] of [
-      ["consolidado", consolidado],
-      ["por empresa", porEmpresa],
-    ] as const) {
-      expect(src, nombre).toContain("xl:px-4");
-    }
+    // La tabla por empresa recupera su relleno de escritorio en xl. La
+    // consolidada NO (16-nov-2026): a 1440 con la barra lateral tiene 1.138 px
+    // para ocho columnas y los 16 px de `xl:px-4` en Vendedor y Total eran lo
+    // que partía «Reynaldo Espinosa» en dos líneas. Ver comisiones-total-a-la-vista.
+    expect(porEmpresa).toContain("xl:px-4");
+    expect(consolidado).not.toMatch(/className=[^\n]*xl:px-4/);
   });
 
   it("ninguna tabla queda dentro de un overflow-hidden sin poder arrastrarse", () => {
@@ -206,7 +205,8 @@ describe("Comisiones — la tabla ancha son TARJETAS bajo lg", () => {
       ["consolidado", consolidado],
       ["por empresa", porEmpresa],
     ] as const) {
-      const i = src.indexOf('<div className="overflow-x-auto">');
+      // (16-nov-2026: la consolidada lleva `ref` y `data-desliza` en ese div.)
+      const i = src.search(/<div [^>]*className="overflow-x-auto">/);
       const j = src.indexOf('<table className="w-full text-sm">');
       expect(i, `${nombre}: la tabla no tiene un overflow-x-auto propio`).toBeGreaterThan(-1);
       expect(j, `${nombre}: no encontré la tabla`).toBeGreaterThan(i);
