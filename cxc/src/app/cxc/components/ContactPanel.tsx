@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 import { seLeCobra } from "@/lib/cxc/cobrable";
+import { ListaDocumentosCompra, cuantasFacturas, rotuloDeLaCompra } from "./CompraJunta";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
 interface Props {
@@ -42,6 +43,8 @@ export default function ContactPanel({
   marcaEnvio,
 }: Props) {
   const [desgloseOpen, setDesgloseOpen] = useState(true);
+  /** La empresa cuya última compra está desplegada (`ULTIMA_COMPRA_JUNTA_2026_11`). */
+  const [compraAbierta, setCompraAbierta] = useState<string | null>(null);
 
   const visibleCompanies = companyFilter !== "all"
     ? roleCompanies.filter((co) => co.key === companyFilter && client.companies[co.key])
@@ -96,8 +99,12 @@ export default function ContactPanel({
                   const overdue = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
                   const ultDias = daysSince(d.ultimoPagoFecha);
                   const compraDias = daysSince(d.ultimaCompraFecha);
+                  const docs = d.ultimaCompraDocumentos ?? null;
+                  const junta = docs != null && cuantasFacturas(docs) > 1;
+                  const abierta = junta && compraAbierta === co.key;
                   return (
-                    <tr key={co.key} className="border-t border-gray-200 hover:bg-white transition">
+                    <Fragment key={co.key}>
+                    <tr className="border-t border-gray-200 hover:bg-white transition">
                       {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
                       <td className="text-right py-1.5 tabular-nums text-emerald-700">{fmt(current)}</td>
                       <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(watch)}</td>
@@ -121,7 +128,17 @@ export default function ContactPanel({
                           compra vieja no es plata en riesgo — pintarla igual
                           diría algo que no es. */}
                       <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
-                        {d.ultimaCompraFecha ? (
+                        {d.ultimaCompraFecha && junta && docs ? (
+                          <button
+                            type="button"
+                            onClick={() => setCompraAbierta(abierta ? null : co.key)}
+                            aria-expanded={abierta}
+                            className="font-semibold text-gray-900 underline decoration-dotted underline-offset-2 hover:text-black"
+                          >
+                            ${fmt(d.ultimaCompraMonto ?? 0)} · {rotuloDeLaCompra(docs)} ·{" "}
+                            <span className="font-normal text-gray-500">{compraDias != null ? `${compraDias} d` : ""}</span>
+                          </button>
+                        ) : d.ultimaCompraFecha ? (
                           <span>
                             {d.ultimaCompraMonto != null && (
                               <span className="text-gray-600">${fmt(d.ultimaCompraMonto)} · </span>
@@ -133,6 +150,14 @@ export default function ContactPanel({
                         )}
                       </td>
                     </tr>
+                    {abierta && docs && d.ultimaCompraFecha && (
+                      <tr>
+                        <td colSpan={roleCompanies.length > 1 ? 7 : 6} className="py-2 pl-[50%]">
+                          <ListaDocumentosCompra fecha={d.ultimaCompraFecha} monto={d.ultimaCompraMonto ?? 0} documentos={docs} />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>

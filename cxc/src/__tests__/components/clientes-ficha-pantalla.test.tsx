@@ -171,6 +171,27 @@ describe("2 · las cuatro tarjetas, lo primero que se ve", () => {
   });
 });
 
+describe("2b · «Última compra» junta lo del día (ULTIMA_COMPRA_JUNTA_2026_11, 17-nov-2026)", () => {
+  it("dice cuánto compró ese día y en cuántas facturas, como en CXC", () => {
+    pintar({
+      ...D25,
+      ultima_compra: "2026-11-12",
+      ultima_compra_monto: 82_340.78,
+      ultima_compra_documentos: [
+        { secuencial: "11-1", tipo: "Factura", total: 60_000 },
+        { secuencial: "11-2", tipo: "Factura", total: 22_340.78 },
+      ],
+    });
+    expect(texto()).toContain("$82,340.78");
+    expect(texto()).toContain("2 facturas");
+  });
+
+  it("sin el monto queda como antes: la fecha sola", () => {
+    pintar();
+    expect(texto()).not.toContain("facturas");
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 describe("3 · «Empresa por empresa»", () => {
   it("las columnas son Empresa · año · año-1 · vs · Debe, y hay Total", () => {

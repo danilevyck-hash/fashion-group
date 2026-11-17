@@ -25,6 +25,8 @@ import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { comprasDelCliente, pagosDelCliente } from "@/lib/clientes/ficha-datos";
 import ClienteDetail, { type ClienteDetailData, type FilaAging } from "./ClienteDetail";
 import { rolesClientes } from "@/lib/clientes/roles";
+import { ULTIMA_COMPRA_JUNTA_2026_11 } from "@/lib/cxc/ultima-compra-junta";
+import { ultimaCompraDelCodigo } from "@/lib/cxc/ultima-compra-junta-server";
 
 // 🔴 Los roles salen de `ROLES_CLIENTES`, no de una copia escrita acá: es la
 // MISMA lista que el catálogo de módulos. Hasta el 11-sep-2026 decía además
@@ -89,7 +91,7 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
 
   // Todo lo que solo depende del código va EN PARALELO. Ninguna lectura
   // depende de otra: encadenarlas son cinco esperas de red una detrás de otra.
-  const [cliente, compras, pagos, cxcRes, docsRes, guiaItemRows] = await Promise.all([
+  const [cliente, compras, pagos, cxcRes, docsRes, guiaItemRows, compraJunta] = await Promise.all([
     leerCliente(codigo),
     comprasDelCliente(codigo),
     pagosDelCliente(codigo),
@@ -116,6 +118,15 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
       .select("guia_id")
       .eq("cliente_codigo", codigo)
       .eq("deleted", false),
+    // «Última compra» igual que en CXC: todo lo del día (facturas − NC), y si
+    // da cero o negativo, el último día positivo. 🔴 Falla ABIERTA: sin esto,
+    // la tarjeta queda como antes (la fecha sola).
+    ULTIMA_COMPRA_JUNTA_2026_11
+      ? ultimaCompraDelCodigo(codigo).catch((e) => {
+          console.error(`[clientes/ficha] última compra junta: ${e instanceof Error ? e.message : e}`);
+          return null;
+        })
+      : Promise.resolve(null),
   ]);
   if (!cliente) notFound();
 
@@ -184,7 +195,9 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
     anio: compras.anio,
     empresas,
     compras_brutas: comprasBrutas,
-    ultima_compra: ultimaCompra,
+    ultima_compra: compraJunta?.dia ?? ultimaCompra,
+    ultima_compra_monto: compraJunta?.monto ?? null,
+    ultima_compra_documentos: compraJunta?.documentos ?? null,
     ultimo_pago: pagos.ultimoPago,
     pagos_por_fecha: pagos.porFecha,
     documentos_con_saldo: docsRes.count ?? 0,

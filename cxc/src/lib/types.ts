@@ -75,6 +75,8 @@ export interface ConsolidatedClient {
        *  tiene ninguna factura registrada. */
       ultimaCompraFecha?: string | null;
       ultimaCompraMonto?: number | null;
+      /** Con `ULTIMA_COMPRA_JUNTA_2026_11`: los documentos de ese día que forman la compra. */
+      ultimaCompraDocumentos?: { secuencial: string; tipo: string; total: number }[] | null;
     };
   };
   correo: string;

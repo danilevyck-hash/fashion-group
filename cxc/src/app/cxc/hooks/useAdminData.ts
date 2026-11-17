@@ -96,13 +96,14 @@ async function fetchAdminData(): Promise<AdminData> {
   // último pago. Si la DDL todavía no corrió, la ruta devuelve [] y el mapa
   // queda vacío: cada empresa muestra "Sin compras registradas" y no cambia
   // NADA más de la pantalla.
-  const compraMap = new Map<string, { fecha: string; monto: number }>();
+  const compraMap = new Map<string, { fecha: string; monto: number; documentos: { secuencial: string; tipo: string; total: number }[] | null }>();
   if (Array.isArray(compras)) {
     for (const c of compras) {
       if (!c.cliente_codigo) continue;
       compraMap.set(`${c.empresa_key}|${c.cliente_codigo}`, {
         fecha: c.ultima_compra_fecha,
         monto: Number(c.ultima_compra_monto) || 0,
+        documentos: Array.isArray(c.ultima_compra_documentos) ? c.ultima_compra_documentos : null,
       });
     }
   }
@@ -150,6 +151,7 @@ async function fetchAdminData(): Promise<AdminData> {
           ultimoPagoMonto: pago?.monto ?? null,
           ultimaCompraFecha: compra?.fecha ?? null,
           ultimaCompraMonto: compra?.monto ?? null,
+          ultimaCompraDocumentos: compra?.documentos ?? null,
         };
       }
 
