@@ -187,9 +187,10 @@ describe("🔴 2. a bodega no se le ofrece lo que el servidor le niega", () => {
 // ── 3. La palabra: «Ver», no «Editar» ────────────────────────────────────────
 
 describe("🔴 3. la fila le promete lo que puede cumplir", () => {
-  it("bodega: lo que se le ofrece dice «Ver» — y es lo ÚNICO", async () => {
+  it("bodega: lo que se le ofrece dice «Ver» — y solo lee (más el Excel, que es el PDF en hoja)", async () => {
     await montarComo("bodega");
-    expect(opciones(fila("PED-017"))).toEqual(["Ver"]);
+    // 17-nov-2026: «Descargar Excel» (`COMPROBANTE_EXCEL_2026_11`) es lo mismo que «Ver PDF».
+    expect(opciones(fila("PED-017"))).toEqual(["Ver", "Descargar Excel"]);
   });
 
   it("bodega: y NO existe ningún «Editar» en toda la pantalla", async () => {

@@ -268,10 +268,11 @@ describe("3. 🔴 «Ver PDF» en la fila, el resto en el «···»", () => {
     expect(sueltos).not.toContain("Duplicar");
   });
 
-  it("las cuatro acciones viven en el «···», en su orden", () => {
+  it("las acciones viven en el «···», en su orden", () => {
     const { container } = pintar([EN_SWITCH]);
     expect(abrirMenu(filaDe(container, "PED-017"))).toEqual([
-      "Editar", "Duplicar", "Reenviar correo", "Eliminar", // 1-oct-2026, Daniel: nombres normales de ERP
+      // 1-oct-2026, Daniel: nombres normales de ERP · 17-nov-2026: «Descargar Excel» (`COMPROBANTE_EXCEL_2026_11`)
+      "Editar", "Descargar Excel", "Duplicar", "Reenviar correo", "Eliminar",
     ]);
   });
 

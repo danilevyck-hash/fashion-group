@@ -4,7 +4,7 @@
 // Cliente · Pedido/Cotización · Fecha, la tabla (con «Pedido»/«Preventa» si hay
 // preventa), el total con bultos y unidades y la firma de la marca.
 //
-// Las cuentas NO se hacen acá: salen de `resolverLineas`, igual que el PDF.
+// Las cuentas NO se hacen aquí: salen de `resolverLineas`, igual que el PDF.
 // ⚠️ Lo que el Excel no puede llevar: el logo y la foto de cada producto
 // (`xlsx-js-style` no escribe imágenes). La banda lleva el nombre de la marca.
 // ─────────────────────────────────────────────────────────────────────────────

@@ -52,7 +52,7 @@ describe("Excel del comprobante = el PDF", () => {
     expect(textos).toContain("Preventa");
   });
 
-  it("el interruptor nace apagado", () => {
-    expect(COMPROBANTE_EXCEL_2026_11).toBe(false);
+  it("el interruptor está prendido (17-nov-2026)", () => {
+    expect(COMPROBANTE_EXCEL_2026_11).toBe(true);
   });
 });
