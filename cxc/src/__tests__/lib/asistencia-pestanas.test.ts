@@ -245,12 +245,16 @@ describe("las 6 pestañas y su orden", () => {
     expect(src).not.toMatch(/from "\.\/FeriadosTab"/);
   });
 
-  it("«Cómo funciona» dejó de ser pestaña y es el botón ?", () => {
+  it("«Cómo funciona» dejó de ser pestaña y vive en «Cómo se usa»", () => {
     expect(tabs.map((t) => t[0])).not.toContain("ayuda");
-    // Sigue existiendo, como ayuda: el componente se monta y el botón lo nombra
-    // para quien use lector de pantalla.
+    // Sigue existiendo: el menú del celular lo monta, y en la computadora va
+    // dentro de «Cómo se usa» (revisión de 12 detalles, 17-nov-2026: el segundo
+    // «?» quedaba pegado al del encabezado).
     expect(src).toMatch(/from "\.\/ComoFuncionaTab"/);
-    expect(src).toMatch(/aria-label="Cómo funciona"/);
+    expect(src).not.toMatch(/aria-label="Cómo funciona"/);
+    const ayuda = readFileSync(join(process.cwd(), "src/components/VideosAyuda.tsx"), "utf8");
+    expect(ayuda).toMatch(/import\("@\/app\/asistencia\/ComoFuncionaTab"\)/);
+    expect(ayuda).toContain("Reglas de asistencia");
   });
 
   it("NO se borró ninguna funcionalidad: Horarios y Feriados viven en Configuración", () => {

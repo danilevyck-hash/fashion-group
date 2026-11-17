@@ -82,9 +82,13 @@ describe("Préstamos · los 5 controles medidos por debajo de 44", () => {
   });
 
   it("el selector de empresa llega a 44 (medía 39)", () => {
-    const i = lista.indexOf('<option value="all">{ROTULO_TODAS}</option>');
+    // Revisión de 12 detalles (17-nov-2026): es la cápsula de Despachos
+    // (`ChipSelector`), que toca a 44 con `CLASE_TOQUE_44`.
+    const i = lista.indexOf("<ChipSelector");
     expect(i).toBeGreaterThan(-1);
-    expect(lista.slice(i - 400, i)).toContain("min-h-[44px]");
+    expect(lista.slice(i, i + 300)).toContain("ROTULO_TODAS");
+    const barra = readFileSync(join(process.cwd(), "src/components/celular/BarraDeControles.tsx"), "utf8");
+    expect(barra).toMatch(/const BASE_BOTON_TEXTO =[^;]*CLASE_TOQUE_44/);
   });
 
   it('⛔ "Ver archivados" no vuelve — la bandera `activo` se retiró', () => {

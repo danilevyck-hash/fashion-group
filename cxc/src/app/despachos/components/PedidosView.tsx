@@ -548,6 +548,10 @@ export default function PedidosView({
     </div>
   );
   const pedidosCelular = barra && PEDIDOS_CELULAR;
+  const vacioDelCentro = `Sin pedidos ${CHIPS.find((c) => c.value === filtro)?.label.toLowerCase() ?? ""}`.trim();
+  const lineaDeArriba = SIMPLE && PEDIDOS_LINEA_DE_LA_PESTANA
+    ? lineaDeLaPestana(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple], hoy)
+    : CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy);
   const filaEmpresaCelular = pedidosCelular && NUEVO && hayQueElegirEmpresa ? (
     <div data-fila-empresa className="mb-2 flex">
       <ChipSelector rotulo="Empresa" soloValor={PEDIDOS_EMPRESA_SIN_PREFIJO} valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />
@@ -1328,9 +1332,7 @@ export default function PedidosView({
         >
           <p className={pedidosCelular ? "min-w-0 text-[13px] font-semibold leading-snug text-gray-900" : "text-base font-semibold text-gray-900"}>
             {pedidos
-              ? partesSinPartir(SIMPLE && PEDIDOS_LINEA_DE_LA_PESTANA
-                ? lineaDeLaPestana(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple], hoy)
-                : CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy))
+              ? partesSinPartir(lineaDeArriba)
               // Revisión 110 · ajustes (13): mientras carga, la línea guarda su
               // alto (un espacio que no se colapsa) y nada de abajo salta.
               : TEXTOS_SIN_PARTIR ? NBSP : " "}
@@ -1354,9 +1356,11 @@ export default function PedidosView({
       ) : !pedidos ? (
         <p className="py-10 text-center text-sm text-gray-500">Cargando…</p>
       ) : visibles.length === 0 ? (
-        <p className="py-10 text-center text-sm text-gray-500">
-          {`Sin pedidos ${CHIPS.find((c) => c.value === filtro)?.label.toLowerCase() ?? ""}`.trim()}
-        </p>
+        // Revisión de 12 detalles (17-nov-2026): si la línea de arriba ya dice
+        // lo mismo («Sin pedidos pendientes»), el centro no lo repite.
+        lineaDeArriba === vacioDelCentro ? null : (
+        <p className="py-10 text-center text-sm text-gray-500">{vacioDelCentro}</p>
+        )
       ) : SIMPLE ? (
         tablaSimple
       ) : NUEVO ? (

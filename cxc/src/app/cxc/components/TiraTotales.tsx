@@ -10,7 +10,7 @@
 // cliente.
 //
 // Ahora son UNA tira gris en la MISMA grilla de 12 columnas que la tabla
-// (4/2/2/2/2), así que cada total queda parado sobre su columna: el de 0-90d
+// (`CLASE_CXC_COL_NOMBRE` · 2 · 2 · 2 · `CLASE_CXC_COL_TOTAL`), así que cada total queda parado sobre su columna: el de 0-90d
 // arriba de la columna 0-90d, el Total arriba de la columna Total. Se lee de
 // arriba abajo sin buscar.
 //
@@ -38,6 +38,7 @@
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
+import { CLASE_CXC_COL_NOMBRE, CLASE_CXC_COL_TOTAL } from "@/lib/ui/revision-110-cxc";
 import { AGING, AGING_ORDER, tramoLabel, type AgingKey } from "@/lib/cxc-aging";
 import { rotuloSinPagar, rotuloClientes, DIAS_SIN_PAGAR_UMBRAL } from "@/lib/cxc/sin-pagar";
 
@@ -96,7 +97,7 @@ export default function TiraTotales({
     <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2 bg-gray-50 border border-b-0 border-gray-200 rounded-t-lg">
       {/* Celda 1 — sobre «Cliente». El aviso de los que no pagan hace rato, o
           el conteo de siempre cuando no hay ninguno. */}
-      <div className="col-span-4 flex items-center">
+      <div className={`${CLASE_CXC_COL_NOMBRE} flex items-center`}>
         {hayAviso && sinPagar ? (
           <button
             type="button"
@@ -164,7 +165,7 @@ export default function TiraTotales({
         onClick={() => onRiskFilterChange("all")}
         aria-pressed={riskFilter === "all"}
         title={`Total pendiente: $${fmt(totalCxc)} · ${roleClients.length} clientes — clic para ver todos`}
-        className={`col-span-2 flex flex-col items-end justify-center rounded-md px-2 py-1 min-h-[44px] transition active:scale-[0.97] ${
+        className={`${CLASE_CXC_COL_TOTAL} flex flex-col items-end justify-center rounded-md px-2 py-1 min-h-[44px] transition active:scale-[0.97] ${
           riskFilter === "all" ? `border-2 ${BORDE_ACTIVO.all} ${FONDO_ACTIVO.all}` : "border border-transparent hover:bg-white hover:border-gray-300"
         }`}
       >

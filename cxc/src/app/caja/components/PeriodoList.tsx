@@ -187,11 +187,7 @@ export default function PeriodoList({
       {loading ? (
         <SkeletonTable rows={5} cols={4} />
       ) : periodos.length === 0 ? (
-        <EmptyState
-          title="No hay períodos registrados"
-          actionLabel="+ Nuevo período"
-          onAction={onCreatePeriodo}
-        />
+        <EmptyState title="No hay períodos registrados" />
       ) : (
         <>
           {/* ── Tarjetas (celular, iPad y ventanas angostas) ──────────────────
@@ -505,7 +501,7 @@ function ListaApple({
       {loading ? (
         <SkeletonTable rows={5} cols={4} />
       ) : periodos.length === 0 ? (
-        <EmptyState title="No hay períodos registrados" actionLabel="+ Nuevo período" onAction={onCreatePeriodo} />
+        <EmptyState title="No hay períodos registrados" />
       ) : (
         <ul data-lista="caja-periodos-apple" className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
           {periodos.map((p) => {

@@ -39,7 +39,6 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, Search } from "lucide-react";
 import { getModuleColor } from "@/lib/moduleColors";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
-import { BuscadorGris } from "@/components/filtros/FiltroA";
 import { ATRIBUTO_BARRA_FIJA, ATRIBUTO_SOBRE_LA_BARRA, CONSULTA_CELULAR } from "@/lib/navegacion/barra-celular";
 import { BARRA_EN_LISTAS_2026_11, TODAS_LAS_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { HIDRATACION_SIN_PORTAL } from "@/lib/ui/revision-110-ajustes";
@@ -487,7 +486,15 @@ export function BuscarEnLaBarra({
   useContar("buscar", true, ctx?.contar);
   const campo = alLado ? (
     <div data-buscar-barra className="flex min-w-0 flex-1 items-center gap-2">
-      <BuscadorGris valor={valor} onCambiar={onCambiar} placeholder={placeholder} compacto className="min-w-0 flex-1" />
+      {/* Revisión de 12 detalles (17-nov-2026): también al lado de una cápsula
+          va el CampoBuscar de `diseno.md`, no el gris de iOS. */}
+      <CampoBuscar
+        value={valor}
+        onChange={(e) => onCambiar(e.target.value)}
+        placeholder={placeholder}
+        aria-label={etiqueta}
+        envoltorio="min-w-0 flex-1"
+      />
       {alLado}
     </div>
   ) : (

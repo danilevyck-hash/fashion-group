@@ -86,9 +86,15 @@ export function gastosPausados(filas: readonly { gasto: number | null; motivo: s
   return filas.length > 0 && filas.every((f) => f.gasto === null && !!f.motivo && MOTIVOS_DE_PAUSA.has(f.motivo));
 }
 
+/** El panel se dibuja como UNA línea (registro pausado). La Vista general lo
+ *  pone debajo del inventario, a todo el ancho, para no dejar un hueco al lado. */
+export function gastosEnUnaLinea(gastos: GastosData): boolean {
+  return VG_GASTOS_PAUSADO_UNA_LINEA && gastos.disponible && gastosPausados(gastos.porEmpresa);
+}
+
 export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; mes: string }) {
   // n.º 24 (revisión 110): mientras esté pausado, UNA línea y no 8 renglones iguales.
-  if (VG_GASTOS_PAUSADO_UNA_LINEA && gastos.disponible && gastosPausados(gastos.porEmpresa)) {
+  if (gastosEnUnaLinea(gastos)) {
     return (
       <div data-panel="gastos" data-gastos-pausado className={`rounded-[14px] border border-gray-200 bg-white px-4${GASTOS_DEL_ALTO_DE_SU_LINEA ? " self-start" : ""}`}>
         <Link
