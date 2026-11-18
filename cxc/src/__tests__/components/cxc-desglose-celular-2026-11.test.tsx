@@ -167,3 +167,52 @@ describe("🔴 el desglose del celular", () => {
     expect(screen.queryByText(/Desglose por empresa/)).toBeNull();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 CANDADO (18-nov-2026) — «Últ. compra» dice SOLO el monto y los días.
+// Daniel: «solamente tienes que poner el monto de la última compra, sin más
+// datos. Para ver cada compra es solamente al seleccionar el monto». El #830
+// le había pegado «N facturas · rango · NC» y la hoja se deslizaba a la derecha.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 «Últ. compra» = monto · N d (18-nov-2026)", () => {
+  const DOCS = [
+    { secuencial: "11-000003153", tipo: "Factura", total: 7128, dia: "2026-10-23" },
+    { secuencial: "11-000003154", tipo: "Factura", total: 1471.5, dia: "2026-10-23" },
+    { secuencial: "13-000000151", tipo: "Nota de Crédito", total: 0, dia: "2026-10-23" },
+  ];
+  const CON_DOCS = {
+    ...PASO_CANOA,
+    companies: {
+      ...EMPRESAS,
+      fashion_wear: { ...EMPRESAS.fashion_wear, ultimaCompraMonto: 8599.5, ultimaCompraDocumentos: DOCS },
+    },
+  } as unknown as ConsolidatedClient;
+
+  it("la línea no lleva «facturas», fechas ni «NC»; el monto se toca y abre la lista", () => {
+    render(
+      <HojaCobrar
+        client={CON_DOCS}
+        onClose={() => {}}
+        onProgramarCorreo={() => {}}
+        onWhatsApp={() => {}}
+        onCopiar={() => {}}
+        onEscribirloYo={() => {}}
+        marcaEnvio={null}
+        totalDeLaFila={CON_DOCS.total}
+        hrefDocumentos="/cxc/cliente/D-25"
+        desglose={empresasDelCliente(CON_DOCS, NOMBRES, {})}
+      />,
+    );
+    const lineas = [...document.querySelectorAll("td")].filter((td) => td.textContent?.includes("Últ. compra"));
+    expect(lineas.length).toBeGreaterThan(0);
+    for (const td of lineas) {
+      expect(td.textContent).toMatch(/Últ\. compra (\$[\d,]+ · \d+ d|—)$/);
+      expect(td.textContent).not.toMatch(/factura|\bNC\b|\b(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\b/i);
+      // Nunca vuelve a forzar una sola línea: eso deslizaba la hoja.
+      expect(td.className).not.toContain("whitespace-nowrap");
+    }
+    expect(screen.queryByText("Total de la compra")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "$8,600" }));
+    expect(screen.getByText("Total de la compra")).toBeTruthy();
+  });
+});

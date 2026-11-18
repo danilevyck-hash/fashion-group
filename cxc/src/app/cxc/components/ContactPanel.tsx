@@ -7,7 +7,7 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 import { seLeCobra } from "@/lib/cxc/cobrable";
-import { ListaDocumentosCompra, cuantasFacturas, rotuloDeLaCompra } from "./CompraJunta";
+import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "./CompraJunta";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
 interface Props {
@@ -100,7 +100,7 @@ export default function ContactPanel({
                   const ultDias = daysSince(d.ultimoPagoFecha);
                   const compraDias = daysSince(d.ultimaCompraFecha);
                   const docs = d.ultimaCompraDocumentos ?? null;
-                  const junta = docs != null && cuantasFacturas(docs) > 1;
+                  const junta = tieneDocumentos(docs);
                   const abierta = junta && compraAbierta === co.key;
                   return (
                     <Fragment key={co.key}>
@@ -129,15 +129,18 @@ export default function ContactPanel({
                           diría algo que no es. */}
                       <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
                         {d.ultimaCompraFecha && junta && docs ? (
-                          <button
-                            type="button"
-                            onClick={() => setCompraAbierta(abierta ? null : co.key)}
-                            aria-expanded={abierta}
-                            className="font-semibold text-gray-900 underline decoration-dotted underline-offset-2 hover:text-black"
-                          >
-                            ${fmt(d.ultimaCompraMonto ?? 0)} · {rotuloDeLaCompra(docs)} ·{" "}
-                            <span className="font-normal text-gray-500">{compraDias != null ? `${compraDias} d` : ""}</span>
-                          </button>
+                          <span>
+                            <button
+                              type="button"
+                              onClick={() => setCompraAbierta(abierta ? null : co.key)}
+                              aria-expanded={abierta}
+                              className={CLASE_MONTO_COMPRA}
+                            >
+                              ${fmt(d.ultimaCompraMonto ?? 0)}
+                            </button>
+                            <span className="text-gray-600"> · </span>
+                            <span className="text-gray-500">{compraDias != null ? `${compraDias} d` : ""}</span>
+                          </span>
                         ) : d.ultimaCompraFecha ? (
                           <span>
                             {d.ultimaCompraMonto != null && (

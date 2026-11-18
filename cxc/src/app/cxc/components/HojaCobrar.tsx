@@ -1,5 +1,5 @@
 "use client";
-import { ListaDocumentosCompra, cuantasFacturas, rotuloDeLaCompra } from "./CompraJunta";
+import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "./CompraJunta";
 import { telefonoParaWhatsApp, textoSinCelular } from "@/lib/ui/uso-2026-11";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -502,7 +502,7 @@ function FilaDesglose({ fila }: { fila: RenglonEmpresaCliente }) {
   const diasPago = daysSince(fila.ultimoPago?.fecha);
   const diasCompra = daysSince(fila.ultimaCompra?.fecha);
   const docs = fila.ultimaCompra?.documentos ?? null;
-  const junta = docs != null && cuantasFacturas(docs) > 1;
+  const junta = tieneDocumentos(docs);
   const [verCompra, setVerCompra] = useState(false);
   return (
     <>
@@ -516,35 +516,43 @@ function FilaDesglose({ fila }: { fila: RenglonEmpresaCliente }) {
         <td className="pt-2 pl-1.5 text-right whitespace-nowrap font-semibold">{montoDeTabla(fila.total)}</td>
       </tr>
       <tr>
-        <td colSpan={5} className="pb-2 text-left text-[11px] text-gray-500 whitespace-nowrap">
-          Últ. pago{" "}
-          {fila.ultimoPago ? (
-            <>
-              {montoExacto(fila.ultimoPago.monto)} ·{" "}
-              <span className={daysAgingColor(diasPago)}>{diasPago != null ? `${diasPago} d` : ""}</span>
-            </>
-          ) : (
-            <span className="text-gray-300">—</span>
-          )}
-          {" · "}Últ. compra{" "}
-          {fila.ultimaCompra && junta && docs ? (
-            <button
-              type="button"
-              onClick={() => setVerCompra((v) => !v)}
-              aria-expanded={verCompra}
-              className="font-semibold text-gray-900 underline decoration-dotted underline-offset-2"
-            >
-              {montoExacto(fila.ultimaCompra.monto)} · {rotuloDeLaCompra(docs)} ·{" "}
-              <span className="font-normal text-gray-500">{diasCompra != null ? `${diasCompra} d` : ""}</span>
-            </button>
-          ) : fila.ultimaCompra ? (
-            <>
-              {montoExacto(fila.ultimaCompra.monto)} ·{" "}
-              <span className="text-gray-500">{diasCompra != null ? `${diasCompra} d` : ""}</span>
-            </>
-          ) : (
-            <span className="text-gray-300">—</span>
-          )}
+        <td colSpan={5} className="pb-2 text-left text-[11px] text-gray-500">
+          {/* Cada mitad no se parte; si no caben juntas, la compra baja entera
+              a la línea siguiente: nunca desliza la hoja (18-nov-2026). */}
+          <span className="whitespace-nowrap">
+            Últ. pago{" "}
+            {fila.ultimoPago ? (
+              <>
+                {montoExacto(fila.ultimoPago.monto)} ·{" "}
+                <span className={daysAgingColor(diasPago)}>{diasPago != null ? `${diasPago} d` : ""}</span>
+              </>
+            ) : (
+              <span className="text-gray-300">—</span>
+            )}
+          </span>
+          {" · "}
+          <span className="whitespace-nowrap">
+            Últ. compra{" "}
+            {fila.ultimaCompra ? (
+              <>
+                {junta && docs ? (
+                  <button
+                    type="button"
+                    onClick={() => setVerCompra((v) => !v)}
+                    aria-expanded={verCompra}
+                    className={CLASE_MONTO_COMPRA}
+                  >
+                    {montoExacto(fila.ultimaCompra.monto)}
+                  </button>
+                ) : (
+                  montoExacto(fila.ultimaCompra.monto)
+                )}{" "}
+                · <span className="text-gray-500">{diasCompra != null ? `${diasCompra} d` : ""}</span>
+              </>
+            ) : (
+              <span className="text-gray-300">—</span>
+            )}
+          </span>
         </td>
       </tr>
       {verCompra && junta && docs && fila.ultimaCompra && (

@@ -8,18 +8,19 @@ import { fmt, fmtDate } from "@/lib/format";
 import { facturaParaMostrar } from "@/lib/guias/numero-factura";
 import { rangoDeLaCompra, type DocumentoDeCompra } from "@/lib/cxc/ultima-compra-junta";
 
-/** Cuántas FACTURAS forman la compra (las notas de crédito no cuentan). */
-export function cuantasFacturas(docs: DocumentoDeCompra[] | null | undefined): number {
-  return (docs ?? []).filter((d) => d.tipo === "Factura").length;
+/**
+ * 🔴 La línea dice SOLO el monto: «Últ. compra $X · N d», como «Últ. pago»
+ * (Daniel, 18-nov-2026: «solamente tienes que poner el monto de la última
+ * compra, sin más datos. Para ver cada compra es solamente al seleccionar el
+ * monto»). Sin «N facturas», sin fechas, sin «NC»: eso vive en la lista.
+ */
+export function tieneDocumentos(docs: DocumentoDeCompra[] | null | undefined): docs is DocumentoDeCompra[] {
+  return (docs ?? []).length > 0;
 }
 
-/** «3 facturas · 15–17 nov», con « · 1 NC» si alguna nota de crédito resta. */
-export function rotuloDeLaCompra(docs: DocumentoDeCompra[]): string {
-  const f = cuantasFacturas(docs);
-  const nc = docs.length - f;
-  const rango = rangoDeLaCompra(docs);
-  return `${f} ${f === 1 ? "factura" : "facturas"}${nc > 0 ? ` · ${nc} NC` : ""}${rango ? ` · ${rango}` : ""}`;
-}
+/** El monto que se toca para ver la lista: subrayado punteado sutil. */
+export const CLASE_MONTO_COMPRA =
+  "text-gray-700 underline decoration-dotted underline-offset-2 hover:text-gray-900";
 
 interface ListaProps {
   fecha: string;
