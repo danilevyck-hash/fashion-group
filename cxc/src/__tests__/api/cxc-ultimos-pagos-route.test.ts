@@ -148,13 +148,15 @@ describe("🔴 Boston NUNCA entra al CXC del grupo", () => {
   });
 });
 
-describe("son 3 por EMPRESA, y solo pagos de verdad", () => {
-  it("Fashion Wear devuelve sus 3 más recientes, del más nuevo al más viejo", async () => {
+describe("🔄 son 5 por EMPRESA (18-nov-2026, se ven al tocar «Últ. pago»), y solo pagos de verdad", () => {
+  it("Fashion Wear devuelve sus 5 más recientes, del más nuevo al más viejo", async () => {
     const body = await (await GET(req("/api/cxc/ultimos-pagos?codigo=D-25"))).json();
     expect(body.porEmpresa.fashion_wear).toEqual([
       { fecha: "2026-08-20", monto: 63592.15 },
       { fecha: "2026-07-22", monto: 187651.51 },
       { fecha: "2026-06-29", monto: 117777.33 },
+      { fecha: "2026-05-28", monto: 16750.1 },
+      { fecha: "2026-05-28", monto: 72225.62 },
     ]);
     // Vistana no se queda sin los suyos porque Fashion Wear tenga muchos.
     expect(body.porEmpresa.vistana).toEqual([{ fecha: "2026-04-02", monto: 500 }]);

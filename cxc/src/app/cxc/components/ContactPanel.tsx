@@ -8,6 +8,7 @@ import { fmt } from "@/lib/format";
 import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "./CompraJunta";
+import { ListaPagosEmpresa } from "./PagosDeEmpresa";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
 interface Props {
@@ -45,6 +46,7 @@ export default function ContactPanel({
   const [desgloseOpen, setDesgloseOpen] = useState(true);
   /** La empresa cuya última compra está desplegada (`ULTIMA_COMPRA_JUNTA_2026_11`). */
   const [compraAbierta, setCompraAbierta] = useState<string | null>(null);
+  const [pagoAbierto, setPagoAbierto] = useState<string | null>(null);
 
   const visibleCompanies = companyFilter !== "all"
     ? roleCompanies.filter((co) => co.key === companyFilter && client.companies[co.key])
@@ -113,9 +115,21 @@ export default function ContactPanel({
                       <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
                         {d.ultimoPagoFecha ? (
                           <span>
-                            {d.ultimoPagoMonto != null && (
+                            {d.ultimoPagoMonto != null && codigo ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setPagoAbierto(pagoAbierto === co.key ? null : co.key)}
+                                  aria-expanded={pagoAbierto === co.key}
+                                  className={CLASE_MONTO_COMPRA}
+                                >
+                                  ${fmt(d.ultimoPagoMonto)}
+                                </button>
+                                <span className="text-gray-600"> · </span>
+                              </>
+                            ) : d.ultimoPagoMonto != null ? (
                               <span className="text-gray-600">${fmt(d.ultimoPagoMonto)} · </span>
-                            )}
+                            ) : null}
                             <span className={daysAgingColor(ultDias)}>{ultDias != null ? `${ultDias} d` : ""}</span>
                           </span>
                         ) : (
@@ -153,6 +167,13 @@ export default function ContactPanel({
                         )}
                       </td>
                     </tr>
+                    {pagoAbierto === co.key && codigo && (
+                      <tr>
+                        <td colSpan={roleCompanies.length > 1 ? 7 : 6} className="py-2 pl-[50%]">
+                          <ListaPagosEmpresa codigo={codigo} empresa={co.key} />
+                        </td>
+                      </tr>
+                    )}
                     {abierta && docs && d.ultimaCompraFecha && (
                       <tr>
                         <td colSpan={roleCompanies.length > 1 ? 7 : 6} className="py-2 pl-[50%]">

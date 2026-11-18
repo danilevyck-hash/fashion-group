@@ -38,7 +38,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
-import { PAGOS_POR_EMPRESA, type PagoReciente } from "@/lib/cxc/ultimos-pagos";
+import { PAGOS_AL_TOCAR, type PagoReciente } from "@/lib/cxc/ultimos-pagos";
 import { agruparPagosPorFecha, type PagoDeEmpresa } from "@/lib/cxc/pagos-por-fecha";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +62,8 @@ const CXC_ROLES = ["admin", "secretaria", "vendedor"];
 // después de agrupar. Medido: el cliente con más recibos del grupo (D-25) tiene
 // 6 pagos en un solo día, así que 30 cubre con cinco veces de margen.
 //
-// ⚠️ `porEmpresa` se conserva tal cual (3 por empresa): es contrato de esta
+// 🔄 18-nov-2026: `porEmpresa` lleva 5 por empresa (`PAGOS_AL_TOCAR`): lo lee
+// el detalle que se abre al tocar «Últ. pago». Antes era contrato de esta
 // ruta, no cuesta ninguna consulta extra y quitarlo solo habría sido una
 // segunda cosa que romper el mismo día.
 const RECIBOS_PARA_FECHAS = 30;
@@ -131,7 +132,7 @@ export async function GET(req: NextRequest) {
   const todos: PagoDeEmpresa[] = [];
   empresas.forEach((e, i) => {
     const pagos = resultados[i] as PagoReciente[];
-    if (pagos.length > 0) porEmpresa[e] = pagos.slice(0, PAGOS_POR_EMPRESA);
+    if (pagos.length > 0) porEmpresa[e] = pagos.slice(0, PAGOS_AL_TOCAR);
     for (const p of pagos) todos.push({ fecha: p.fecha, monto: p.monto, empresa: e });
   });
 
