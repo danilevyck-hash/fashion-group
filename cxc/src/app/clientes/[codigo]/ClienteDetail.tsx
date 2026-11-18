@@ -72,7 +72,7 @@ import { CLIENTES_APPLE_2026_10 } from "@/lib/clientes/apple-2026-10";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 import type { DocumentoDeCompra } from "@/lib/cxc/ultima-compra-junta";
-import { ListaDocumentosCompra, cuantasFacturas, rotuloDeLaCompra } from "@/app/cxc/components/CompraJunta";
+import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "@/app/cxc/components/CompraJunta";
 
 /** Tipo c (2-oct-2026): detalle por empresa (3 partes) y últimos pagos (2), lado a lado desde 1024 px. */
 const DETALLE_Y_PAGOS = "lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4 lg:items-start";
@@ -235,6 +235,7 @@ export default function ClienteDetail({
     initialData.ultima_compra_monto ?? null,
   );
   const docsCompra = initialData.ultima_compra_documentos ?? null;
+  const montoCompra = initialData.ultima_compra_monto != null ? dinero(initialData.ultima_compra_monto) : null;
 
   const fiscal = lineaFiscal({
     codigo: cliente.codigo,
@@ -400,16 +401,16 @@ export default function ClienteDetail({
             ) : (
               <p className="text-sm font-medium text-gray-500">{compra.frase}</p>
             )}
-            {compra.detalle && <p className="mt-1 text-xs text-gray-500 tabular-nums">{compra.detalle}</p>}
-            {docsCompra && cuantasFacturas(docsCompra) > 1 && (
-              <button
-                type="button"
-                onClick={() => setVerCompra((v) => !v)}
-                aria-expanded={verCompra}
-                className="mt-0.5 text-left text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-gray-900"
-              >
-                {rotuloDeLaCompra(docsCompra)}
-              </button>
+            {/* 🔴 Solo el monto y la fecha, como «Último pago»; tocar el monto abre las facturas (18-nov-2026). */}
+            {compra.detalle && montoCompra != null && tieneDocumentos(docsCompra) && compra.detalle.startsWith(montoCompra) ? (
+              <p className="mt-1 text-xs text-gray-500 tabular-nums">
+                <button type="button" onClick={() => setVerCompra((v) => !v)} aria-expanded={verCompra} className={CLASE_MONTO_COMPRA}>
+                  {montoCompra}
+                </button>
+                {compra.detalle.slice(montoCompra.length)}
+              </p>
+            ) : (
+              compra.detalle && <p className="mt-1 text-xs text-gray-500 tabular-nums">{compra.detalle}</p>
             )}
             {verCompra && docsCompra && initialData.ultima_compra && (
               <div className="mt-2">

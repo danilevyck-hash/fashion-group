@@ -172,7 +172,10 @@ describe("2 · las cuatro tarjetas, lo primero que se ve", () => {
 });
 
 describe("2b · «Última compra» junta lo del día (ULTIMA_COMPRA_JUNTA_2026_11, 17-nov-2026)", () => {
-  it("dice cuánto compró ese día y en cuántas facturas, como en CXC", () => {
+  // 🔴 18-nov-2026, Daniel: «solamente tienes que poner el monto de la última
+  // compra, sin más datos. Para ver cada compra es solamente al seleccionar el
+  // monto». Sin «N facturas», sin rango de fechas, sin «NC» en la tarjeta.
+  it("🔴 dice solo el monto y la fecha, como «Último pago», sin «N facturas»", () => {
     pintar({
       ...D25,
       ultima_compra: "2026-11-12",
@@ -183,10 +186,11 @@ describe("2b · «Última compra» junta lo del día (ULTIMA_COMPRA_JUNTA_2026_1
       ],
     });
     expect(texto()).toContain("$82,340.78");
-    expect(texto()).toContain("2 facturas");
+    expect(texto()).not.toMatch(/\d+ facturas?/);
+    expect(texto()).not.toMatch(/\bNC\b/);
   });
 
-  it("al tocar «N facturas · rango» se ven las facturas (7 días, 17-nov-2026)", () => {
+  it("al tocar el MONTO se ven las facturas con su fecha y número", () => {
     pintar({
       ...D25,
       ultima_compra: "2026-11-17",
@@ -196,7 +200,7 @@ describe("2b · «Última compra» junta lo del día (ULTIMA_COMPRA_JUNTA_2026_1
         { secuencial: "11-000003215", tipo: "Factura", total: 4_333.5, dia: "2026-11-17" },
       ],
     });
-    const boton = screen.getByRole("button", { name: /2 facturas · 12–17 nov/ });
+    const boton = screen.getByRole("button", { name: "$86,674.28" });
     expect(texto()).not.toContain("Total de la compra");
     fireEvent.click(boton);
     expect(texto()).toContain("Total de la compra");
