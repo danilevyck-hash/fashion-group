@@ -186,6 +186,23 @@ describe("2b · «Última compra» junta lo del día (ULTIMA_COMPRA_JUNTA_2026_1
     expect(texto()).toContain("2 facturas");
   });
 
+  it("al tocar «N facturas · rango» se ven las facturas (7 días, 17-nov-2026)", () => {
+    pintar({
+      ...D25,
+      ultima_compra: "2026-11-17",
+      ultima_compra_monto: 86_674.28,
+      ultima_compra_documentos: [
+        { secuencial: "11-000003185", tipo: "Factura", total: 82_340.78, dia: "2026-11-12" },
+        { secuencial: "11-000003215", tipo: "Factura", total: 4_333.5, dia: "2026-11-17" },
+      ],
+    });
+    const boton = screen.getByRole("button", { name: /2 facturas · 12–17 nov/ });
+    expect(texto()).not.toContain("Total de la compra");
+    fireEvent.click(boton);
+    expect(texto()).toContain("Total de la compra");
+    expect(texto()).toContain("Compras 12–17 nov");
+  });
+
   it("sin el monto queda como antes: la fecha sola", () => {
     pintar();
     expect(texto()).not.toContain("facturas");

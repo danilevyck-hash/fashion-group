@@ -1,6 +1,6 @@
 // Lecturas de la «última compra» junta (`ULTIMA_COMPRA_JUNTA_2026_11`): la
 // historia de facturas y notas de crédito de unos clientes, para el CXC (solo
-// los que su último día dio cero o negativo) y para la ficha del cliente.
+// los que su ventana de 7 días dio cero o negativo) y para la ficha del cliente.
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
