@@ -6,13 +6,13 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   ULTIMA_COMPRA_JUNTA_2026_11,
   TIPOS_DE_LA_COMPRA,
-  agruparPorDia,
-  llaveDeCompra,
-  montoDeLaCompra,
-  ordenarDocumentos,
-  rangoDelDia,
+  inicioDeVentana,
+  rangoDeDias,
+  ultimaCompraPositiva,
+  type CompraJunta,
   type DocumentoLeido,
 } from "@/lib/cxc/ultima-compra-junta";
+import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { ultimasComprasPositivas } from "@/lib/cxc/ultima-compra-junta-server";
 
 // Última COMPRA por empresa+cliente — el espejo de /api/cxc/ultimo-pago.
@@ -95,14 +95,20 @@ interface FilaVista {
   ultima_compra_monto: number;
 }
 
-/** Días por tanda en el `.or()` (cada día son ~70 caracteres de URL). */
-const DIAS_POR_TANDA = 25;
+/** Ventanas por tanda en el `.or()` (cada una son ~70 caracteres de URL). */
+const VENTANAS_POR_TANDA = 25;
+
+type FilaLeida = {
+  empresa_key: string; cliente_switch_id: number; fecha: string;
+  tipo_comprobante: string; secuencial: string; total: number;
+};
 
 /**
- * La «última compra» deja de ser la última factura y pasa a ser TODO lo de ese
- * día en esa empresa: facturas menos notas de crédito del mismo día, con la
- * lista de documentos. Se leen solo los DÍAS que salen en la vista (no la
- * historia entera) y se cruza por empresa · cliente · día.
+ * La «última compra» deja de ser la última factura y pasa a ser TODO lo
+ * facturado en los 7 días que terminan en ella (facturas − NC), con la lista de
+ * documentos. Se leen solo esas VENTANAS (no la historia entera); si alguna da
+ * cero o negativo, se lee la historia de ESOS clientes y se toma la ventana
+ * anterior positiva.
  * 🔴 Falla ABIERTA: si esta lectura falla, sale lo de antes (la factura sola).
  */
 async function juntarLaCompraDelDia(filas: FilaVista[]) {
@@ -112,6 +118,12 @@ async function juntarLaCompraDelDia(filas: FilaVista[]) {
     ultima_compra_fecha: f.ultima_compra_fecha,
     ultima_compra_monto: f.ultima_compra_monto,
   });
+  const conCompra = (f: FilaVista, c: CompraJunta) => ({
+    ...sinId(f),
+    ultima_compra_fecha: c.dia,
+    ultima_compra_monto: c.monto,
+    ultima_compra_documentos: c.documentos,
+  });
   try {
     const diasPorEmpresa = new Map<string, Set<string>>();
     for (const f of filas) {
@@ -119,21 +131,19 @@ async function juntarLaCompraDelDia(filas: FilaVista[]) {
       set.add(String(f.ultima_compra_fecha).slice(0, 10));
       diasPorEmpresa.set(f.empresa_key, set);
     }
-    const leidos: DocumentoLeido[] = [];
+    // empresa|cliente → documentos leídos de sus ventanas
+    const porCliente = new Map<string, DocumentoLeido[]>();
     for (const [empresa, set] of diasPorEmpresa) {
       const dias = [...set].sort();
-      for (let i = 0; i < dias.length; i += DIAS_POR_TANDA) {
+      for (let i = 0; i < dias.length; i += VENTANAS_POR_TANDA) {
         const or = dias
-          .slice(i, i + DIAS_POR_TANDA)
+          .slice(i, i + VENTANAS_POR_TANDA)
           .map((d) => {
-            const [ini, fin] = rangoDelDia(d);
+            const [ini, fin] = rangoDeDias(inicioDeVentana(d), d);
             return `and(fecha.gte.${ini},fecha.lt.${fin})`;
           })
           .join(",");
-        const tanda = await leerTodoPaginado<{
-          empresa_key: string; cliente_switch_id: number; fecha: string;
-          tipo_comprobante: string; secuencial: string; total: number;
-        }>("switch_facturas (última compra junta)", (pedirCount, from, to) =>
+        const tanda = await leerTodoPaginado<FilaLeida>("switch_facturas (última compra junta)", (pedirCount, from, to) =>
           supabaseServer
             .from("switch_facturas")
             .select(
@@ -146,43 +156,39 @@ async function juntarLaCompraDelDia(filas: FilaVista[]) {
             .order("id", { ascending: true })
             .range(from, to),
         );
-        for (const t of tanda) leidos.push({ ...t, tipo: t.tipo_comprobante });
+        for (const t of tanda) {
+          const k = `${t.empresa_key}|${t.cliente_switch_id}`;
+          porCliente.set(k, [...(porCliente.get(k) ?? []), { ...t, tipo: t.tipo_comprobante }]);
+        }
       }
     }
-    const porDia = agruparPorDia(leidos);
     const juntas = filas.map((f) => {
-      const docs = porDia.get(
-        llaveDeCompra(f.empresa_key, f.cliente_switch_id, String(f.ultima_compra_fecha).slice(0, 10)),
-      );
-      if (!docs || docs.length === 0) return { f, compra: null };
-      return { f, compra: { monto: montoDeLaCompra(docs), documentos: ordenarDocumentos(docs) } };
+      const dia = String(f.ultima_compra_fecha).slice(0, 10);
+      const desde = inicioDeVentana(dia);
+      // Las tandas de OTROS clientes pueden traer días de más: solo su ventana.
+      const docs = (porCliente.get(`${f.empresa_key}|${f.cliente_switch_id}`) ?? []).filter((d) => {
+        const dd = fechaPanamaDe(d.fecha);
+        return dd >= desde && dd <= dia;
+      });
+      return { f, docs, compra: docs.length > 0 ? ultimaCompraPositiva(docs) : null };
     });
-    // 🔴 El día dio cero o negativo (una NC que anula algo de otro día): se toma
-    // el último día con compra POSITIVA, leyendo la historia de esos pocos clientes.
+    // 🔴 La ventana dio cero o negativo: la anterior positiva, de la historia de esos pocos clientes.
     const sinPositivo = new Map<string, number[]>();
-    for (const { f, compra } of juntas) {
-      if (compra && compra.monto <= 0) {
+    for (const { f, docs, compra } of juntas) {
+      if (docs.length > 0 && !compra) {
         sinPositivo.set(f.empresa_key, [...(sinPositivo.get(f.empresa_key) ?? []), f.cliente_switch_id]);
       }
     }
-    const anteriores = new Map<string, Awaited<ReturnType<typeof ultimasComprasPositivas>>>();
+    const anteriores = new Map<string, Map<number, CompraJunta>>();
     for (const [empresa, ids] of sinPositivo) anteriores.set(empresa, await ultimasComprasPositivas(empresa, ids));
-    return juntas.map(({ f, compra }) => {
-      if (!compra) return sinId(f);
-      if (compra.monto > 0) {
-        return { ...sinId(f), ultima_compra_monto: compra.monto, ultima_compra_documentos: compra.documentos };
-      }
+    return juntas.map(({ f, docs, compra }) => {
+      if (compra) return conCompra(f, compra);
+      if (docs.length === 0) return sinId(f);
       const previa = anteriores.get(f.empresa_key)?.get(f.cliente_switch_id);
-      if (!previa) return sinId(f); // ninguna positiva: la factura sola, como antes
-      return {
-        ...sinId(f),
-        ultima_compra_fecha: previa.dia,
-        ultima_compra_monto: previa.monto,
-        ultima_compra_documentos: previa.documentos,
-      };
+      return previa ? conCompra(f, previa) : sinId(f); // ninguna positiva: la factura sola, como antes
     });
   } catch (e) {
-    console.error(`[cxc/ultima-compra] juntar la compra del día: ${e instanceof Error ? e.message : e}`);
+    console.error(`[cxc/ultima-compra] juntar la compra: ${e instanceof Error ? e.message : e}`);
     return filas.map(sinId);
   }
 }

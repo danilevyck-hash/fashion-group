@@ -72,7 +72,7 @@ import { CLIENTES_APPLE_2026_10 } from "@/lib/clientes/apple-2026-10";
 import { CONTENIDO_ANCHO_2026_10, DOS_COLUMNAS_2026_10, CLASE_COLUMNA_QUE_ESCALA } from "@/lib/navegacion/contenido-ancho";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 import type { DocumentoDeCompra } from "@/lib/cxc/ultima-compra-junta";
-import { cuantasFacturas, rotuloDeLaCompra } from "@/app/cxc/components/CompraJunta";
+import { ListaDocumentosCompra, cuantasFacturas, rotuloDeLaCompra } from "@/app/cxc/components/CompraJunta";
 
 /** Tipo c (2-oct-2026): detalle por empresa (3 partes) y últimos pagos (2), lado a lado desde 1024 px. */
 const DETALLE_Y_PAGOS = "lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-4 lg:items-start";
@@ -198,6 +198,8 @@ export default function ClienteDetail({
     }
   }, [initialData.cliente.codigo]);
 
+  /** «Última compra»: la lista de facturas se abre al tocar «N facturas». */
+  const [verCompra, setVerCompra] = useState(false);
   if (!authChecked) return null;
 
   const puedeEditar = EDITABLE_ROLES.includes(role);
@@ -400,7 +402,19 @@ export default function ClienteDetail({
             )}
             {compra.detalle && <p className="mt-1 text-xs text-gray-500 tabular-nums">{compra.detalle}</p>}
             {docsCompra && cuantasFacturas(docsCompra) > 1 && (
-              <p className="mt-0.5 text-xs text-gray-500">{rotuloDeLaCompra(docsCompra)}</p>
+              <button
+                type="button"
+                onClick={() => setVerCompra((v) => !v)}
+                aria-expanded={verCompra}
+                className="mt-0.5 text-left text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-gray-900"
+              >
+                {rotuloDeLaCompra(docsCompra)}
+              </button>
+            )}
+            {verCompra && docsCompra && initialData.ultima_compra && (
+              <div className="mt-2">
+                <ListaDocumentosCompra fecha={initialData.ultima_compra} monto={initialData.ultima_compra_monto ?? 0} documentos={docsCompra} />
+              </div>
             )}
           </Tarjeta>
         </div>

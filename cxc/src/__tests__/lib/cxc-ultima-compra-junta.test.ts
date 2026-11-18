@@ -1,93 +1,103 @@
 import { describe, it, expect } from "vitest";
 import {
   ULTIMA_COMPRA_JUNTA_2026_11,
-  agruparPorDia,
-  llaveDeCompra,
+  DIAS_DE_LA_COMPRA,
   montoDeLaCompra,
   ordenarDocumentos,
-  rangoDelDia,
+  rangoDeDias,
+  inicioDeVentana,
+  rangoDeLaCompra,
   ultimaCompraPositiva,
   juntarDelDiaMasReciente,
 } from "@/lib/cxc/ultima-compra-junta";
 
-describe("última compra junta (City Mall Paso Canoa, Vistana, 12-nov-2026)", () => {
-  const leidos = [
-    { empresa_key: "vistana", cliente_switch_id: 25, fecha: "2026-11-13T01:25:00Z", tipo: "Factura", secuencial: "11-000003185", total: 22277.4 },
-    { empresa_key: "vistana", cliente_switch_id: 25, fecha: "2026-11-13T01:33:00Z", tipo: "Factura", secuencial: "11-000003186", total: 21230.94 },
-    { empresa_key: "vistana", cliente_switch_id: 25, fecha: "2026-11-12T15:00:00Z", tipo: "Factura", secuencial: "11-000003187", total: 11131.21 },
-    { empresa_key: "vistana", cliente_switch_id: 25, fecha: "2026-11-12T16:00:00Z", tipo: "Factura", secuencial: "11-000003188", total: 6154.64 },
-    // otro día y otro cliente: no entran
-    { empresa_key: "vistana", cliente_switch_id: 25, fecha: "2026-11-13T06:00:00Z", tipo: "Factura", secuencial: "11-000003190", total: 10 },
-    { empresa_key: "vistana", cliente_switch_id: 80, fecha: "2026-11-12T16:00:00Z", tipo: "Factura", secuencial: "11-000003189", total: 10 },
-  ];
+const doc = (fecha: string, tipo: string, secuencial: string, total: number) =>
+  ({ empresa_key: "vistana", cliente_switch_id: 12, fecha, tipo, secuencial, total });
 
-  it("está PRENDIDO (Daniel aprobó el mismo día, 17-nov-2026)", () => {
+describe("«Últ. compra» = los 7 días corridos que terminan en la última factura (Daniel, 17-nov-2026)", () => {
+  it("prendido, con 7 días", () => {
     expect(ULTIMA_COMPRA_JUNTA_2026_11).toBe(true);
+    expect(DIAS_DE_LA_COMPRA).toBe(7);
+    expect(inicioDeVentana("2026-11-17")).toBe("2026-11-11");
   });
 
-  it("junta por empresa · cliente · día de PANAMÁ (las 8:25 p. m. del 12 son del 12)", () => {
-    const docs = agruparPorDia(leidos).get(llaveDeCompra("vistana", 25, "2026-11-12"))!;
-    expect(docs).toHaveLength(4);
-    expect(montoDeLaCompra(docs)).toBe(60794.19);
-  });
-
-  it("la nota de crédito del mismo día RESTA (anulación de D-25, 23-oct-2026)", () => {
-    const docs = [
-      { secuencial: "13-000000851", tipo: "Nota de Crédito", total: 7087.68 },
-      { secuencial: "11-000003152", tipo: "Factura", total: 7087.68 },
-      { secuencial: "11-000003151", tipo: "Factura", total: 19.26 },
-    ];
-    expect(montoDeLaCompra(docs)).toBe(19.26);
-    expect(ordenarDocumentos(docs).map((d) => d.secuencial)).toEqual(["11-000003151", "11-000003152", "13-000000851"]);
-  });
-
-  it("el rango del día es UTC−5 fijo", () => {
-    expect(rangoDelDia("2026-11-12")).toEqual(["2026-11-12T05:00:00.000Z", "2026-11-13T05:00:00.000Z"]);
-  });
-});
-
-describe("si el día da cero o negativo, va el último día con compra positiva", () => {
-  // Multi Fashion Holding, Vistana: el 12-nov-2026 dio −$4,402.20 (NC más grandes que las facturas).
-  const doc = (fecha: string, tipo: string, secuencial: string, total: number) =>
-    ({ empresa_key: "vistana", cliente_switch_id: 7, fecha, tipo, secuencial, total });
-  const docs = [
-    doc("2026-11-11T15:00:00Z", "Factura", "11-1", 10000),
-    doc("2026-11-11T16:00:00Z", "Factura", "11-2", 6846.15),
-    doc("2026-11-12T15:00:00Z", "Factura", "11-3", 12990.8),
-    doc("2026-11-12T16:00:00Z", "Nota de Crédito", "13-1", 17393),
+  // City Mall Paso Canoa, Vistana: 6 facturas el 12-nov y 1 el 17-nov → una compra.
+  const cmpc = [
+    doc("2026-11-12T15:00:00Z", "Factura", "11-3185", 82340.78),
+    doc("2026-11-17T21:29:33Z", "Factura", "11-3215", 4333.5),
   ];
 
-  it("salta el 12 (negativo) y toma el 11", () => {
-    const c = ultimaCompraPositiva(docs)!;
-    expect(c.dia).toBe("2026-11-11");
-    expect(c.monto).toBe(16846.15);
+  it("junta el 12 y el 17 (dentro de 7 días)", () => {
+    const c = ultimaCompraPositiva(cmpc)!;
+    expect(c.dia).toBe("2026-11-17");
+    expect(c.desde).toBe("2026-11-11");
+    expect(c.monto).toBe(86674.28);
+    expect(rangoDeLaCompra(c.documentos)).toBe("12–17 nov");
+  });
+
+  it("lo del día 10 (8 días antes) NO entra, y la ventana NO se encadena", () => {
+    const c = ultimaCompraPositiva([doc("2026-11-10T15:00:00Z", "Factura", "11-1", 999), ...cmpc])!;
+    expect(c.monto).toBe(86674.28);
     expect(c.documentos).toHaveLength(2);
   });
 
-  it("un día que da cero exacto también se salta", () => {
-    const c = ultimaCompraPositiva([...docs.slice(0, 2), doc("2026-11-13T15:00:00Z", "Factura", "11-4", 50), doc("2026-11-13T16:00:00Z", "Nota de Crédito", "13-2", 50)])!;
-    expect(c.dia).toBe("2026-11-11");
+  it("la factura de las 8:25 p. m. del 11 es del 11 de Panamá (entra)", () => {
+    const c = ultimaCompraPositiva([doc("2026-11-12T01:25:00Z", "Factura", "11-1", 1), ...cmpc])!;
+    expect(c.monto).toBe(86675.28);
   });
 
-  it("un día con solo notas de crédito no es una compra", () => {
+  it("las notas de crédito de la ventana RESTAN", () => {
+    const c = ultimaCompraPositiva([...cmpc, doc("2026-11-13T15:00:00Z", "Nota de Crédito", "13-1", 340.78)])!;
+    expect(c.monto).toBe(86333.5);
+  });
+
+  it("si la ventana da cero o negativo, va la ventana anterior positiva (anclada en la factura de antes)", () => {
+    const c = ultimaCompraPositiva([
+      doc("2026-10-20T15:00:00Z", "Factura", "11-1", 500),
+      doc("2026-10-25T15:00:00Z", "Factura", "11-2", 300),
+      doc("2026-11-12T15:00:00Z", "Factura", "11-3", 100),
+      doc("2026-11-12T16:00:00Z", "Nota de Crédito", "13-1", 100),
+    ])!;
+    expect(c.dia).toBe("2026-10-25");
+    expect(c.monto).toBe(800);
+  });
+
+  it("solo notas de crédito o nada positivo → null", () => {
     expect(ultimaCompraPositiva([doc("2026-11-12T16:00:00Z", "Nota de Crédito", "13-1", 5)])).toBeNull();
+    expect(ultimaCompraPositiva([doc("2026-11-12T15:00:00Z", "Factura", "1", 5), doc("2026-11-12T16:00:00Z", "Nota de Crédito", "2", 5)])).toBeNull();
   });
 
-  it("si el día positivo es el último, va ese", () => {
-    expect(ultimaCompraPositiva(docs.slice(0, 3))!.dia).toBe("2026-11-12");
+  it("monto en centavos enteros y orden por día, facturas antes que NC", () => {
+    const docs = [
+      { secuencial: "13-851", tipo: "Nota de Crédito", total: 7087.68, dia: "2026-10-23" },
+      { secuencial: "11-3152", tipo: "Factura", total: 7087.68, dia: "2026-10-23" },
+      { secuencial: "11-3100", tipo: "Factura", total: 19.26, dia: "2026-10-20" },
+    ];
+    expect(montoDeLaCompra(docs)).toBe(19.26);
+    expect(ordenarDocumentos(docs).map((d) => d.secuencial)).toEqual(["11-3100", "11-3152", "13-851"]);
+  });
+
+  it("rangos en corto y UTC−5 fijo", () => {
+    expect(rangoDeLaCompra([{ secuencial: "a", tipo: "Factura", total: 1, dia: "2026-11-12" }])).toBe("12 nov");
+    expect(rangoDeLaCompra([
+      { secuencial: "a", tipo: "Factura", total: 1, dia: "2026-10-28" },
+      { secuencial: "b", tipo: "Factura", total: 1, dia: "2026-11-03" },
+    ])).toBe("28 oct – 3 nov");
+    expect(rangoDeDias("2026-11-11", "2026-11-17")).toEqual(["2026-11-11T05:00:00.000Z", "2026-11-18T05:00:00.000Z"]);
   });
 });
 
 describe("ficha del cliente: la última compra del grupo", () => {
-  it("toma el día más reciente y suma las empresas que compraron ese día", () => {
+  it("la ventana más reciente; si varias empresas terminan ese día, se suman", () => {
     const c = juntarDelDiaMasReciente([
-      { dia: "2026-11-10", monto: 999, documentos: [] },
-      { dia: "2026-11-12", monto: 100.1, documentos: [{ secuencial: "a", tipo: "Factura", total: 100.1 }] },
-      { dia: "2026-11-12", monto: 0.2, documentos: [{ secuencial: "b", tipo: "Factura", total: 0.2 }] },
+      { desde: "2026-11-04", dia: "2026-11-10", monto: 999, documentos: [] },
+      { desde: "2026-11-06", dia: "2026-11-12", monto: 100.1, documentos: [{ secuencial: "a", tipo: "Factura", total: 100.1, dia: "2026-11-12" }] },
+      { desde: "2026-11-08", dia: "2026-11-12", monto: 0.2, documentos: [{ secuencial: "b", tipo: "Factura", total: 0.2, dia: "2026-11-09" }] },
     ])!;
     expect(c.dia).toBe("2026-11-12");
+    expect(c.desde).toBe("2026-11-06");
     expect(c.monto).toBe(100.3);
-    expect(c.documentos).toHaveLength(2);
+    expect(c.documentos.map((d) => d.secuencial)).toEqual(["b", "a"]);
   });
 
   it("sin compras, null", () => {
