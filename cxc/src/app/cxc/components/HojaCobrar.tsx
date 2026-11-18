@@ -1,5 +1,6 @@
 "use client";
 import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "./CompraJunta";
+import { ListaPagosEmpresa } from "./PagosDeEmpresa";
 import { telefonoParaWhatsApp, textoSinCelular } from "@/lib/ui/uso-2026-11";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -367,7 +368,7 @@ export default function HojaCobrar({
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
           Desglose por empresa ({desglose.length})
         </p>
-        <TablaDesgloseEmpresas filas={desglose} total={total} />
+        <TablaDesgloseEmpresas filas={desglose} total={total} codigo={codigo} />
       </div>
 
       {avisos}
@@ -464,7 +465,7 @@ function FilaAccion({
  * hoja del celular y, desde la n.º 16 de la revisión 110, la página del
  * cliente: un dato, un solo dibujo.
  */
-export function TablaDesgloseEmpresas({ filas, total }: { filas: RenglonEmpresaCliente[]; total: TotalDesglose }) {
+export function TablaDesgloseEmpresas({ filas, total, codigo = null }: { filas: RenglonEmpresaCliente[]; total: TotalDesglose; codigo?: string | null }) {
   return (
     <table className="w-full text-[12.5px] tabular-nums tracking-tight">
       <thead>
@@ -478,7 +479,7 @@ export function TablaDesgloseEmpresas({ filas, total }: { filas: RenglonEmpresaC
       </thead>
       <tbody>
         {filas.map((f) => (
-          <FilaDesglose key={f.key} fila={f} />
+          <FilaDesglose key={f.key} fila={f} codigo={codigo} />
         ))}
         <tr className="border-t border-gray-300 font-semibold">
           <td className="pt-2 text-left">Total</td>
@@ -498,12 +499,13 @@ export function TablaDesgloseEmpresas({ filas, total }: { filas: RenglonEmpresaC
  * color de la computadora (`daysAgingColor`); los de la compra en gris, como
  * allá: una compra vieja no es plata en riesgo.
  */
-function FilaDesglose({ fila }: { fila: RenglonEmpresaCliente }) {
+function FilaDesglose({ fila, codigo }: { fila: RenglonEmpresaCliente; codigo: string | null }) {
   const diasPago = daysSince(fila.ultimoPago?.fecha);
   const diasCompra = daysSince(fila.ultimaCompra?.fecha);
   const docs = fila.ultimaCompra?.documentos ?? null;
   const junta = tieneDocumentos(docs);
   const [verCompra, setVerCompra] = useState(false);
+  const [verPagos, setVerPagos] = useState(false);
   return (
     <>
       <tr className="border-t border-gray-100">
@@ -523,7 +525,14 @@ function FilaDesglose({ fila }: { fila: RenglonEmpresaCliente }) {
             Últ. pago{" "}
             {fila.ultimoPago ? (
               <>
-                {montoExacto(fila.ultimoPago.monto)} ·{" "}
+                {codigo ? (
+                  <button type="button" onClick={() => setVerPagos((v) => !v)} aria-expanded={verPagos} className={CLASE_MONTO_COMPRA}>
+                    {montoExacto(fila.ultimoPago.monto)}
+                  </button>
+                ) : (
+                  montoExacto(fila.ultimoPago.monto)
+                )}{" "}
+                ·{" "}
                 <span className={daysAgingColor(diasPago)}>{diasPago != null ? `${diasPago} d` : ""}</span>
               </>
             ) : (
@@ -555,6 +564,13 @@ function FilaDesglose({ fila }: { fila: RenglonEmpresaCliente }) {
           </span>
         </td>
       </tr>
+      {verPagos && codigo && (
+        <tr>
+          <td colSpan={5} className="pb-2">
+            <ListaPagosEmpresa codigo={codigo} empresa={fila.key} />
+          </td>
+        </tr>
+      )}
       {verCompra && junta && docs && fila.ultimaCompra && (
         <tr>
           <td colSpan={5} className="pb-2">

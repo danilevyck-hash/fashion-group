@@ -22,6 +22,9 @@ export interface PagoReciente {
 /** Cuántos pagos se muestran por empresa. Lo pidió Daniel: tres. */
 export const PAGOS_POR_EMPRESA = 3;
 
+/** Cuántos pagos se ven al tocar «Últ. pago» de una empresa en CXC (18-nov-2026). */
+export const PAGOS_AL_TOCAR = 5;
+
 export const TITULO_ULTIMOS_PAGOS = "Últimos pagos";
 export const SIN_PAGOS = "Sin pagos registrados";
 export const CARGANDO_PAGOS = "Cargando pagos…";
