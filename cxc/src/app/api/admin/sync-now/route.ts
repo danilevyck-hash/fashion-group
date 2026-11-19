@@ -33,6 +33,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { puedePedir } from "@/lib/catalogo/roles";
 import { logActivity } from "@/lib/log-activity";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logoutAllSwitchSessions, logoutSwitchSessions } from "@/lib/switch-api/client";
@@ -291,7 +292,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Permiso fino por módulo (vendedor: catálogos + ficha de cliente;
   // contabilidad: solo proveedores; admin siempre pasa requireRole).
-  if (auth.role !== "admin" && !rolesSyncNow(modulo).includes(auth.role)) {
+  // Catálogos: también quien arma pedidos (`puedePedir`: Eloyn y Cuba de bodega, 19-nov-2026).
+  const pideEnCatalogo = modulo.startsWith("catalogo-") && puedePedir(auth);
+  if (auth.role !== "admin" && !rolesSyncNow(modulo).includes(auth.role) && !pideEnCatalogo) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 
