@@ -20,6 +20,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { TABLA_APROBACIONES, decisionDeToque, type Aprobacion, type Decision } from "./aprobaciones";
+import { conAprobadosSolos } from "./aprueban-solos";
 
 interface FilaAprobacionDb {
   empleado_codigo: string;
@@ -78,7 +79,11 @@ export async function leerAprobaciones(
     // horas extra (ver el encabezado).
     throw new Error(`No se pudieron leer las aprobaciones de horas extra: ${error.message}`);
   }
-  return { filas: (data ?? []).map((f) => aDominio(f as FilaAprobacionDb)) };
+  // 🔴 Quien cobra sus extras sin aprobación (el 309) recibe aquí su «sí» de
+  // cada día; lo guardado manda. Ver `aprueban-solos.ts`.
+  return {
+    filas: conAprobadosSolos((data ?? []).map((f) => aDominio(f as FilaAprobacionDb)), desde, hasta),
+  };
 }
 
 /**

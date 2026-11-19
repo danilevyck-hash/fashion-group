@@ -273,8 +273,10 @@ describe("2. aprobaciones-server.ts — el candado de las extras no se suelta po
     };
     const { leerAprobaciones, guardarAprobaciones } = await import("@/lib/asistencia/aprobaciones-server");
     const r = await leerAprobaciones("2026-08-01", "2026-08-15");
-    expect(r.filas).toHaveLength(1);
-    expect(r.filas[0].aprobado).toBe(true);
+    // El 309 recibe su «sí» de cada día (`aprueban-solos.ts`): aquí se miran las filas guardadas.
+    const guardadas = r.filas.filter((f) => f.codigo !== "309");
+    expect(guardadas).toHaveLength(1);
+    expect(guardadas[0].aprobado).toBe(true);
     expect("faltaTabla" in r).toBe(false);
     const ok = await guardarAprobaciones({
       dias: [{ codigo: JULIO, fecha: "2026-08-03", minutos: 60 }],
