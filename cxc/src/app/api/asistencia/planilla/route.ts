@@ -138,6 +138,7 @@ import {
   textoExtraNoAprobada,
 } from "@/lib/asistencia/aprobaciones";
 import { leerAprobaciones } from "@/lib/asistencia/aprobaciones-server";
+import { APRUEBAN_SOLOS } from "@/lib/asistencia/aprueban-solos";
 import {
   aplicarPrestamoEnLinea,
   avisosDeUltimaCuota,
@@ -785,7 +786,13 @@ export async function GET(req: NextRequest) {
     const puedeAprobar = aprobacionesRoles().includes(auth.role) || auth.role === "admin";
     const filasAprobacion =
       pidenAprobaciones && puedeAprobar
-        ? armarDiasAprobacion({ lineas, personas: personasVigentes, reglas, aprobaciones })
+        ? armarDiasAprobacion({
+            lineas,
+            // Quien cobra sus extras sin aprobación no tiene nada que decidir aquí.
+            personas: personasVigentes.filter((p) => !APRUEBAN_SOLOS.has(p.codigo)),
+            reglas,
+            aprobaciones,
+          })
         : null;
 
     // 🔴 LA RESPUESTA ACOTADA. Ni `lineas`, ni `totales`, ni un solo campo de
