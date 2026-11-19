@@ -1,13 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/cxc/historial?codigo=D-25&tipo=pagos|compras
+// GET /api/cxc/historial?codigo=D-25&empresa=fashion_shoes&tipo=pagos|compras
 //
-// TODOS los pagos o TODAS las compras de un cliente del GRUPO, desde oct-2022,
-// agrupados por mes (`lib/cxc/historial-cliente.ts`). Lo abren «Ver todos los
-// pagos» y «Ver compras» en la página del cliente de CxC y en su ficha.
+// TODOS los pagos o TODAS las compras de un cliente del GRUPO en UNA empresa,
+// desde oct-2022, agrupados por mes (`lib/cxc/historial-cliente.ts`). Lo abren
+// «Últ. pago» y «Últ. compra» de la tabla «Por empresa» de CxC.
 //
-// 🔴 SOLO LAS 6 DEL GRUPO (`CXC_GRUPO_EMPRESA_KEYS`), en la MISMA cadena de la
-// consulta. Boston tiene su ruta aparte (`/api/cxc/boston/historial`) y el
-// `gerente_boston` no entra aquí: no está en la lista de roles.
+// 🔴 LA EMPRESA SE VALIDA AQUÍ: solo una de las 6 del grupo
+// (`CXC_GRUPO_EMPRESA_KEYS`); Boston, ACS o cualquier otra → 400. El vendedor,
+// solo la suya (403 a otra). El `gerente_boston` no entra: no está en la lista.
 //
 // 🔴 LA IDENTIDAD ES EL CÓDIGO: los recibos llevan `cliente_codigo`; las
 // facturas se puentean por ID (`switch_clientes` → `(empresa_key,
@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_HISTORIAL_GRUPO, empresasDeQuienPide } from "@/lib/cxc/historial-servidor";
+import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { TIPOS_VENTA_CONOCIDOS } from "@/lib/ventas/tipos-comprobante";
 import {
@@ -94,17 +95,22 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const codigo = (req.nextUrl.searchParams.get("codigo") ?? "").trim();
+  const empresa = req.nextUrl.searchParams.get("empresa") ?? "";
   const tipo = req.nextUrl.searchParams.get("tipo");
   if (!codigo || (tipo !== "pagos" && tipo !== "compras")) {
     return NextResponse.json({ error: "Faltan el código del cliente o el tipo" }, { status: 400 });
   }
-
-  const empresas = await empresasDeQuienPide(auth.role, auth.userId);
-  if (empresas.length === 0) return NextResponse.json({ codigo, tipo, meses: [] });
+  if (!(CXC_GRUPO_EMPRESA_KEYS as readonly string[]).includes(empresa)) {
+    return NextResponse.json({ error: "Empresa no válida" }, { status: 400 });
+  }
+  if (!(await empresasDeQuienPide(auth.role, auth.userId)).includes(empresa)) {
+    return NextResponse.json({ error: "Sin acceso a esta empresa" }, { status: 403 });
+  }
+  const empresas = [empresa];
 
   try {
     const meses = tipo === "pagos" ? await leerPagos(codigo, empresas) : await leerCompras(codigo, empresas);
-    return NextResponse.json({ codigo, tipo, meses });
+    return NextResponse.json({ codigo, empresa, tipo, meses });
   } catch (e) {
     console.error(`[cxc/historial] ${tipo} ${codigo}:`, e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "No se pudo leer el historial" }, { status: 500 });

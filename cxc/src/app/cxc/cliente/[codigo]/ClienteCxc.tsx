@@ -33,6 +33,7 @@ import useAdminData from "../../hooks/useAdminData";
 import { useUltimosPagosGrupo } from "../../hooks/useUltimosPagosGrupo";
 import UltimosPagosPorFecha from "../../components/UltimosPagosPorFecha";
 import { TablaDesgloseEmpresas } from "../../components/HojaCobrar";
+import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
 import TituloQueVuelve from "@/components/celular/TituloQueVuelve";
 import { totalDelDesglose } from "@/lib/cxc/desglose-celular-2026-11";
 import {
@@ -40,8 +41,6 @@ import {
   CXC_CLIENTE_TITULO_VUELVE,
   CXC_UN_NOMBRE_ESTADO_DE_CUENTA,
 } from "@/lib/ui/revision-110-cxc";
-import HistorialCliente from "@/components/cxc/HistorialCliente";
-import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
 import CobrarEnFicha from "@/app/clientes/[codigo]/CobrarEnFicha";
 import type { FilaAgingCliente } from "@/lib/clientes/cliente-para-cobrar";
 import type { ConsolidatedClient } from "@/lib/types";
@@ -239,7 +238,7 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
               // n.º 16 (revisión 110): la MISMA tabla de la hoja; con
               // encabezados no hace falta la leyenda de colores.
               <div data-lista="cxc-cliente-empresas" className="mx-4 rounded-2xl bg-white px-4 py-3">
-                <TablaDesgloseEmpresas filas={filas} total={totalDelDesglose(filas)} />
+                <TablaDesgloseEmpresas filas={filas} total={totalDelDesglose(filas)} historial={HISTORIAL_CLIENTE_2026_11 ? { codigo, nombre } : null} />
               </div>
             ) : (<>
             <p className="px-5 pb-2 text-[12px] text-gray-400">
@@ -315,7 +314,6 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
         {/* ── Últimos pagos ──────────────────────────────────────────────── */}
         <div className="mx-4 mt-5 rounded-2xl bg-white px-4 py-3">
           <UltimosPagosPorFecha pagos={pagos} />
-          {HISTORIAL_CLIENTE_2026_11 && <HistorialCliente fuente={{ cartera: "grupo", codigo }} nombre={nombre} />}
         </div>
       </div>
 

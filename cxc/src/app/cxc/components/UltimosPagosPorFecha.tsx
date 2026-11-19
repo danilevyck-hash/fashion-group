@@ -27,7 +27,10 @@ import { hoyPanama } from "@/lib/fecha-panama";
 export default function UltimosPagosPorFecha({
   pagos,
   titulo = TITULO_ULTIMOS_PAGOS,
+  monto = (n: number) => `$${fmt(n)}`,
 }: {
+  /** El historial los muestra sin centavos. */
+  monto?: (n: number) => string;
   /** El historial del cliente reusa el bloque con el mes como título. */
   titulo?: ReactNode;
   /** `null` = cargando · `"error"` = no se pudo · lista (vacía si no hay). */
@@ -50,7 +53,7 @@ export default function UltimosPagosPorFecha({
             <li key={p.fecha} className="text-xs text-gray-600 tabular-nums">
               <span className="text-gray-500">{fechaCortaPago(p.fecha, hoy)}</span>
               {" · "}
-              <span className="font-medium text-gray-900">${fmt(p.monto)}</span>
+              <span className="font-medium text-gray-900">{monto(p.monto)}</span>
               {p.empresas.length > 0 && (
                 <span className="text-gray-500">
                   {" · "}

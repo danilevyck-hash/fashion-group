@@ -6,21 +6,27 @@
 // y de compras también» → «como en cuentas por cobrar pero con más historial».
 // «Últimos pagos» muestra 3 fechas; esto abre la lista ENTERA (desde oct-2022).
 //
-// 🔴 EL FILTRO DE PAGOS ES EL DE SIEMPRE: sin retenciones y sin recibos en cero
-// (lo aplica la lectura; aquí solo se agrupa). Un renglón es un DÍA, como en
-// «Últimos pagos»: lo que entró ese día y en qué empresas.
+// 🔴 EL FILTRO DE PAGOS ES EL DE SIEMPRE: sin retenciones —una retención no es
+// un pago— y sin recibos en cero (lo aplica la lectura). Un renglón es un DÍA,
+// como en «Últimos pagos».
+//
+// 🔴 CENTAVOS (Daniel, 19-nov-2026): un documento o un recibo de menos de $1 no
+// se lista ni forma compra (`MINIMO_DEL_HISTORIAL`). Los montos se muestran sin
+// centavos en la pantalla; aquí se guardan exactos.
+//
+// 🔴 NADA SE MEZCLA: compra = Factura, Tiquete o Transacción; devolución = nota
+// de crédito, aparte; la nota de débito NO entra (es un cargo, no una compra).
 //
 // 🔴 UNA COMPRA = las facturas de UNA empresa dentro de 7 días desde la primera
 // (Daniel, 19-nov-2026). La nota de crédito es una «Devolución» APARTE: no se
 // resta de ninguna compra ni del total del mes, que suma solo compras. Los
 // montos son el `total` CON ITBMS, como «Documentos» de CxC y el estado de cuenta.
 //
-// 🔴 BOSTON Y EL GRUPO NO SE MEZCLAN. Este módulo no lee la base: cada ruta
-// (`/api/cxc/historial` para las 6 del grupo, `/api/cxc/boston/historial` para
-// Boston) acota su empresa en la consulta, y aquí solo se arma la lista.
+// 🔴 Este módulo no lee la base: la ruta (`/api/cxc/historial`) valida la
+// empresa (una de las 6 del grupo) y aquí solo se arma la lista.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { signoVenta } from "@/lib/ventas/tipos-comprobante";
+import { signoVenta, TIPO_VENTA_NOTA_DEBITO } from "@/lib/ventas/tipos-comprobante";
 import { facturaParaMostrar } from "@/lib/guias/numero-factura";
 import { agruparPagosPorFecha, type PagoDeEmpresa, type PagoDelDia } from "./pagos-por-fecha";
 
@@ -39,6 +45,10 @@ export function rotuloMes(mes: string): string {
 }
 
 const centavos = (n: number) => Math.round(n * 100) / 100;
+
+/** Menos de $1 (en valor absoluto) no es una compra, una devolución ni un pago. */
+export const MINIMO_DEL_HISTORIAL = 1;
+const cuenta = (n: number) => Math.abs(n) >= MINIMO_DEL_HISTORIAL;
 
 export interface Mes<T> {
   /** `YYYY-MM`. */
@@ -70,7 +80,8 @@ const desc = (a: string, b: string) => (a < b ? 1 : a > b ? -1 : 0);
  * Más reciente primero, agrupado por mes.
  */
 export function historialDePagos(pagos: PagoDeEmpresa[]): Mes<PagoDelDia>[] {
-  return porMes(agruparPagosPorFecha(pagos, Number.POSITIVE_INFINITY), (f) => f.monto);
+  const validos = pagos.filter((p) => cuenta(Number(p.monto) || 0));
+  return porMes(agruparPagosPorFecha(validos, Number.POSITIVE_INFINITY), (f) => f.monto);
 }
 
 // ── COMPRAS ──────────────────────────────────────────────────────────────────
@@ -132,7 +143,7 @@ const numeroCorto = (f: FacturaLeida) => facturaParaMostrar(f.secuencial) || Str
  * Una compra junta las facturas de UNA empresa que caen dentro de
  * `DIAS_DE_UNA_COMPRA` días desde la primera de la compra (ventana FIJA, no
  * corrida). Nunca junta empresas. La nota de crédito es una «Devolución»
- * aparte; la nota de débito y los tiquetes cuentan como factura de la compra.
+ * aparte; la nota de débito no entra; lo de menos de $1 tampoco.
  */
 export function historialDeCompras(documentos: FacturaLeida[]): MesDeCompras[] {
   const filas: FilaDeCompras[] = [];
@@ -140,7 +151,8 @@ export function historialDeCompras(documentos: FacturaLeida[]): MesDeCompras[] {
   for (const d of documentos) {
     const signo = signoVenta(d.tipo_comprobante);
     const fecha = String(d.fecha ?? "").slice(0, 10);
-    if (signo === 0 || !fecha) continue;
+    if (signo === 0 || !fecha || d.tipo_comprobante === TIPO_VENTA_NOTA_DEBITO) continue;
+    if (!cuenta(Number(d.total) || 0)) continue;
     if (signo < 0) {
       filas.push({ clase: "devolucion", empresa: d.empresa_key, fecha, numero: numeroCorto(d), monto: -centavos(Math.abs(Number(d.total) || 0)) });
       continue;

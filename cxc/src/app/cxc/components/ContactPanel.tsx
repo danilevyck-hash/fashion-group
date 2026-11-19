@@ -9,6 +9,9 @@ import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "./CompraJunta";
 import { ListaPagosEmpresa } from "./PagosDeEmpresa";
+import TocarHistorial from "@/components/cxc/HistorialCliente";
+import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
+import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
 interface Props {
@@ -54,6 +57,8 @@ export default function ContactPanel({
 
   // Código del cliente para la ficha (mismo D-XXX en todas las empresas).
   const codigo = Object.values(client.companies).find((c) => c?.codigo)?.codigo ?? null;
+  // «Últ. pago» y «Últ. compra» se tocan y abren el historial de ESA empresa.
+  const historial = HISTORIAL_CLIENTE_2026_11 && codigo ? { codigo, nombre: nombreDeCliente(client) } : null;
 
   // 🔴 EL DESGLOSE POR EMPRESA SE QUEDA EXACTAMENTE COMO ESTABA — Daniel lo
   // eligió así el 5-sep-2026, con sus columnas «Último pago» y «Última compra».
@@ -113,7 +118,12 @@ export default function ContactPanel({
                       <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(overdue)}</td>
                       <td className="text-right py-1.5 tabular-nums font-semibold">{fmt(d.total)}</td>
                       <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
-                        {d.ultimoPagoFecha ? (
+                        {historial && d.ultimoPagoFecha && d.ultimoPagoMonto != null ? (
+                          <TocarHistorial {...historial} empresa={co.key} vista="pagos">
+                            <span className="text-gray-600">${fmt(d.ultimoPagoMonto)} · </span>
+                            <span className={daysAgingColor(ultDias)}>{ultDias != null ? `${ultDias} d` : ""}</span>
+                          </TocarHistorial>
+                        ) : d.ultimoPagoFecha ? (
                           <span>
                             {d.ultimoPagoMonto != null && codigo ? (
                               <>
@@ -142,7 +152,12 @@ export default function ContactPanel({
                           compra vieja no es plata en riesgo — pintarla igual
                           diría algo que no es. */}
                       <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
-                        {d.ultimaCompraFecha && junta && docs ? (
+                        {historial && d.ultimaCompraFecha && d.ultimaCompraMonto != null ? (
+                          <TocarHistorial {...historial} empresa={co.key} vista="compras">
+                            <span className="text-gray-600">${fmt(d.ultimaCompraMonto)} · </span>
+                            <span className="text-gray-500">{compraDias != null ? `${compraDias} d` : ""}</span>
+                          </TocarHistorial>
+                        ) : d.ultimaCompraFecha && junta && docs ? (
                           <span>
                             <button
                               type="button"

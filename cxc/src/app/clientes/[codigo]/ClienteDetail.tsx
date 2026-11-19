@@ -24,8 +24,6 @@
 // que debe.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import HistorialCliente from "@/components/cxc/HistorialCliente";
-import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -503,7 +501,6 @@ export default function ClienteDetail({
               ))}
             </ul>
           )}
-          {HISTORIAL_CLIENTE_2026_11 && <HistorialCliente fuente={{ cartera: "grupo", codigo: cliente.codigo }} nombre={cliente.nombre} />}
         </section>
         </>)}
 

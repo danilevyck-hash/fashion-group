@@ -1,13 +1,13 @@
-// Lo que el historial del cliente (`/api/cxc/historial` y sus renglones) lee
+// Lo que el historial del cliente (`/api/cxc/historial`) lee
 // del SERVIDOR antes de consultar: qué empresas del GRUPO puede ver quien pide.
-// 🔴 Solo las 6 del grupo; Boston tiene su ruta aparte y nunca pasa por aquí.
+// 🔴 Solo las 6 del grupo; Boston nunca pasa por aquí.
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { rolesClientes } from "@/lib/clientes/roles";
 
 /** Los roles de CxC del grupo y de Clientes (hoy son los mismos tres).
- *  `gerente_boston` NO está: su historial va por `/api/cxc/boston/historial`. */
+ *  `gerente_boston` NO está. */
 export const ROLES_HISTORIAL_GRUPO: string[] = [...new Set(["admin", "secretaria", "vendedor", ...rolesClientes()])];
 
 /** Las empresas que puede ver quien pide. El vendedor, solo su empresa

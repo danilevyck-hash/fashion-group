@@ -1,15 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // CANDADO del historial del cliente (19-nov-2026, `HISTORIAL_CLIENTE_2026_11`).
 //
-//  1. 🔴 Boston y el grupo NO se mezclan, en las dos direcciones:
-//     · `/api/cxc/historial` (grupo): un recibo y una factura de Boston con el
-//       MISMO código no salen; `gerente_boston` recibe 403.
-//     · `/api/cxc/boston/historial`: el mismo id de Switch en Vistana no sale.
+//  1. 🔴 La empresa la valida el SERVIDOR: solo una de las 6 del grupo (Boston y
+//     Multifashion → 400); el vendedor, solo la suya (403); `gerente_boston`
+//     no entra (403). Un recibo o una factura de otra empresa con el MISMO
+//     código no sale.
 //  2. 🩸 Un cliente con MÁS de 1.000 recibos (D-151 tiene 1.714) y más de 1.000
 //     facturas sale COMPLETO: el mock corta cada respuesta en 1.000 filas, como
 //     `db-max-rows` en producción.
 //  3. Lo puro: pagos, un renglón por día; compras, ventana de 7 días por
-//     empresa y la nota de crédito aparte como devolución.
+//     empresa y la nota de crédito aparte como devolución; menos de $1 no
+//     cuenta; la nota de débito no es compra.
 //  4. El interruptor nace en `false`.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,6 @@ vi.mock("@/lib/supabase-server", () => {
 });
 
 const grupo = await import("@/app/api/cxc/historial/route");
-const boston = await import("@/app/api/cxc/boston/historial/route");
 
 const SECRET_PREV = process.env.SESSION_SECRET;
 beforeAll(() => { process.env.SESSION_SECRET = "test-secret-historial"; });
@@ -124,7 +124,7 @@ beforeEach(() => {
       { empresa_key: "fashion_wear", codigo: "D-151", cliente_switch_id: 40 },
       { empresa_key: "confecciones_boston", codigo: "D-151", cliente_switch_id: 151 },
     ],
-    fg_users: [],
+    fg_users: [{ id: "u1", associated_company: "fashion_wear" }],
   };
 });
 
@@ -133,7 +133,7 @@ const suma = (meses: { total: number }[]) => Math.round(meses.reduce((s, m) => s
 
 describe("🩸 más de 1.000 filas salen completas", () => {
   it("1.200 recibos → 1.200 días, $12,000, sin retención ni cero", async () => {
-    const res = await grupo.GET(req("/api/cxc/historial?codigo=D-151&tipo=pagos"));
+    const res = await grupo.GET(req("/api/cxc/historial?codigo=D-151&empresa=vistana&tipo=pagos"));
     expect(res.status).toBe(200);
     const { meses } = await res.json();
     expect(cuantas(meses)).toBe(1200);
@@ -141,7 +141,7 @@ describe("🩸 más de 1.000 filas salen completas", () => {
   });
 
   it("1.100 facturas → todas en alguna compra, $110,000; la NC aparte en devoluciones", async () => {
-    const res = await grupo.GET(req("/api/cxc/historial?codigo=D-151&tipo=compras"));
+    const res = await grupo.GET(req("/api/cxc/historial?codigo=D-151&empresa=fashion_wear&tipo=compras"));
     const { meses } = await res.json();
     const filas = meses.flatMap((m: { filas: { clase: string; facturas?: string[] }[] }) => m.filas);
     expect(filas.filter((f: { clase: string }) => f.clase === "compra").reduce((n: number, f: { facturas?: string[] }) => n + (f.facturas?.length ?? 0), 0)).toBe(1100);
@@ -152,7 +152,7 @@ describe("🩸 más de 1.000 filas salen completas", () => {
 
 describe("🔴 el grupo no trae a Boston ni a Multifashion", () => {
   it("pagos: ni los $777 de Boston ni los $555 de Multifashion", async () => {
-    const { meses } = await (await grupo.GET(req("/api/cxc/historial?codigo=D-151&tipo=pagos"))).json();
+    const { meses } = await (await grupo.GET(req("/api/cxc/historial?codigo=D-151&empresa=vistana&tipo=pagos"))).json();
     const montos = meses.flatMap((m: { filas: { monto: number }[] }) => m.filas.map((f) => f.monto));
     expect(montos).not.toContain(777);
     expect(montos).not.toContain(555);
@@ -161,40 +161,40 @@ describe("🔴 el grupo no trae a Boston ni a Multifashion", () => {
   });
 
   it("facturas: ni la de Boston (mismo código) ni la del 40 de Vistana", async () => {
-    const { meses } = await (await grupo.GET(req("/api/cxc/historial?codigo=D-151&tipo=compras"))).json();
+    const { meses } = await (await grupo.GET(req("/api/cxc/historial?codigo=D-151&empresa=fashion_wear&tipo=compras"))).json();
     const empresas = new Set(meses.flatMap((m: { filas: { empresa: string }[] }) => m.filas.map((f) => f.empresa)));
     expect([...empresas]).toEqual(["fashion_wear"]);
   });
 
   it("gerente_boston no entra a la ruta del grupo (403)", async () => {
-    const res = await grupo.GET(req("/api/cxc/historial?codigo=D-151&tipo=pagos", "gerente_boston"));
+    const res = await grupo.GET(req("/api/cxc/historial?codigo=D-151&empresa=vistana&tipo=pagos", "gerente_boston"));
     expect(res.status).toBe(403);
   });
 
 });
 
-describe("🔴 Boston no trae al grupo", () => {
-  it("el id 151 de Boston: solo sus $777, nunca los 1.200 de Vistana", async () => {
-    const res = await boston.GET(req("/api/cxc/boston/historial?cliente=151&tipo=pagos", "gerente_boston"));
-    expect(res.status).toBe(200);
-    const { meses } = await res.json();
-    expect(cuantas(meses)).toBe(1);
-    expect(suma(meses)).toBe(777);
+describe("🔴 la empresa la valida el servidor", () => {
+  const status = async (q: string, role = "admin") => (await grupo.GET(req(`/api/cxc/historial?codigo=D-151&tipo=pagos${q}`, role))).status;
+
+  it("Boston, Multifashion, una inventada o ninguna → 400", async () => {
+    expect(await status("&empresa=confecciones_boston")).toBe(400);
+    expect(await status("&empresa=american_classic")).toBe(400);
+    expect(await status("&empresa=otra")).toBe(400);
+    expect(await status("")).toBe(400);
   });
 
-  it("facturas de Boston: solo la suya", async () => {
-    const { meses } = await (await boston.GET(req("/api/cxc/boston/historial?cliente=151&tipo=compras", "gerente_boston"))).json();
-    expect(meses.flatMap((m: { filas: { empresa: string }[] }) => m.filas.map((f) => f.empresa))).toEqual(["confecciones_boston"]);
+  it("el vendedor de Fashion Wear: la suya sí, Vistana no (403)", async () => {
+    expect(await status("&empresa=fashion_wear", "vendedor")).toBe(200);
+    expect(await status("&empresa=vistana", "vendedor")).toBe(403);
   });
 
-  it("el vendedor del grupo no entra a la ruta de Boston", async () => {
-    const res = await boston.GET(req("/api/cxc/boston/historial?cliente=151&tipo=pagos", "vendedor"));
-    expect(res.status).toBe(403);
+  it("solo la empresa pedida: Vistana no trae lo de Fashion Wear", async () => {
+    const { meses } = await (await grupo.GET(req("/api/cxc/historial?codigo=D-151&empresa=vistana&tipo=compras"))).json();
+    expect(meses).toEqual([]);
   });
 
-  it("la ruta de Boston no importa la del grupo ni su helper de empresas", () => {
-    const src = fs.readFileSync(path.resolve(__dirname, "../../app/api/cxc/boston/historial/route.ts"), "utf8");
-    expect(src).not.toMatch(/historial-servidor|CXC_GRUPO_EMPRESA_KEYS|api\/cxc\/historial\/route/);
+  it("ya no existe una ruta de historial de Boston", () => {
+    expect(fs.existsSync(path.resolve(__dirname, "../../app/api/cxc/boston/historial/route.ts"))).toBe(false);
   });
 });
 
@@ -209,6 +209,15 @@ describe("lo puro", () => {
       { mes: "2026-11", total: 150, filas: [{ fecha: "2026-11-03", monto: 150, empresas: ["vistana", "fashion_wear"] }] },
       { mes: "2026-10", total: 25.5, filas: [{ fecha: "2026-10-20", monto: 25.5, empresas: ["vistana"] }] },
     ]);
+  });
+
+  it("💰 un pago de menos de $1 no se lista", () => {
+    const meses = historialDePagos([
+      { fecha: "2026-11-03", monto: 0.5, empresa: "vistana" },
+      { fecha: "2026-11-02", monto: -0.99, empresa: "vistana" },
+      { fecha: "2026-11-01", monto: 1, empresa: "vistana" },
+    ]);
+    expect(meses).toEqual([{ mes: "2026-11", total: 1, filas: [{ fecha: "2026-11-01", monto: 1, empresas: ["vistana"] }] }]);
   });
 
 });
@@ -255,6 +264,26 @@ describe("🔴 una COMPRA: misma empresa, ventana fija de 7 días", () => {
       { clase: "devolucion", empresa: "vistana", fecha: "2026-11-03", monto: -50, numero: "0860" },
       { clase: "compra", empresa: "vistana", fecha: "2026-11-02", monto: 200, facturas: ["3224"] },
     ]);
+  });
+
+  it("💰 la factura de $0.01 no es compra NI abre la ventana", () => {
+    // Sin el filtro, el 1-sep abriría la ventana y el 9-sep sería otra compra.
+    const c = compras(historialDeCompras([
+      fac("active_shoes", "2026-09-01", 352, 0.01), fac("active_shoes", "2026-09-05", 400), fac("active_shoes", "2026-09-09", 401),
+    ]));
+    expect(c).toEqual([{ clase: "compra", empresa: "active_shoes", fecha: "2026-09-05", monto: 200, facturas: ["0400", "0401"] }]);
+  });
+
+  it("💰 una nota de crédito de menos de $1 no es devolución", () => {
+    const meses = historialDeCompras([fac("vistana", "2026-11-03", 861, 0.5, "Nota de Crédito")]);
+    expect(meses).toEqual([]);
+  });
+
+  it("la nota de débito no entra: ni compra ni devolución", () => {
+    const meses = historialDeCompras([
+      fac("vistana", "2026-11-02", 3224, 200), fac("vistana", "2026-11-03", 77, 40, "Nota de Débito"),
+    ]);
+    expect(meses).toEqual([{ mes: "2026-11", total: 200, devoluciones: 0, filas: [{ clase: "compra", empresa: "vistana", fecha: "2026-11-02", monto: 200, facturas: ["3224"] }] }]);
   });
 
   it("la compra va en el mes de su PRIMERA factura", () => {
