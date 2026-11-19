@@ -12,16 +12,9 @@ export const TABLA_RECORDATORIOS = "marcacion_recordatorios";
 export const TABLA_SUSCRIPCIONES = "marcacion_push_suscripciones";
 export const TABLA_AVISOS = "marcacion_avisos_enviados";
 
-/** Entrada y salida con las que se marca POR EL TELÉFONO (el horario de afuera si lo tiene). */
-export async function leerHorarioDeMarcacion(codigo: string): Promise<{ entrada: string; salida: string } | null> {
-  const { data, error } = await supabaseServer
-    .from("asistencia_horarios")
-    .select("entrada, salida, entrada_afuera, salida_afuera")
-    .eq("empleado_codigo", codigo)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) return null;
-  const f = data as { entrada: unknown; salida: unknown; entrada_afuera: unknown; salida_afuera: unknown };
+type FilaHorario = { entrada: unknown; salida: unknown; entrada_afuera: unknown; salida_afuera: unknown };
+
+function horarioDeLaFila(f: FilaHorario): { entrada: string; salida: string } | null {
   const entrada = limpiaHora(f.entrada);
   const salida = limpiaHora(f.salida);
   if (!entrada || !salida) return null;
@@ -30,6 +23,33 @@ export async function leerHorarioDeMarcacion(codigo: string): Promise<{ entrada:
     DISPOSITIVO_TELEFONO,
   );
   return { entrada: h.entrada, salida: h.salida };
+}
+
+/** Entrada y salida con las que se marca POR EL TELÉFONO (el horario de afuera si lo tiene). */
+export async function leerHorarioDeMarcacion(codigo: string): Promise<{ entrada: string; salida: string } | null> {
+  const { data, error } = await supabaseServer
+    .from("asistencia_horarios")
+    .select("entrada, salida, entrada_afuera, salida_afuera")
+    .eq("empleado_codigo", codigo)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? horarioDeLaFila(data as FilaHorario) : null;
+}
+
+/** Lo mismo para varios a la vez (el cron): código → horario. */
+export async function leerHorariosDeMarcacion(codigos: readonly string[]): Promise<Map<string, { entrada: string; salida: string }>> {
+  const out = new Map<string, { entrada: string; salida: string }>();
+  if (codigos.length === 0) return out;
+  const { data, error } = await supabaseServer
+    .from("asistencia_horarios")
+    .select("empleado_codigo, entrada, salida, entrada_afuera, salida_afuera")
+    .in("empleado_codigo", codigos);
+  if (error) throw new Error(error.message);
+  for (const f of (data ?? []) as (FilaHorario & { empleado_codigo: string })[]) {
+    const h = horarioDeLaFila(f);
+    if (h) out.set(String(f.empleado_codigo).trim(), h);
+  }
+  return out;
 }
 
 export async function leerRecordatoriosGuardados(codigo: string) {
