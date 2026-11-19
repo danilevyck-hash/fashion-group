@@ -1,12 +1,13 @@
-// 🔴 LA ÚNICA LECTURA DE `asistencia_feriados` PARA EL MOTOR (30-sep-2026).
-// La usan el Reporte, la Planilla y la deuda automática del día libre: leer
-// distinto en cada una es la forma de que la pantalla y el pago no cuadren.
+// 🔴 LA ÚNICA LECTURA DE FERIADOS (30-sep-2026). La usan el Reporte, la
+// Planilla, la deuda automática del día libre, los avisos de marcación, el
+// vigía del reloj y Multifashion: leer distinto en cada una es la forma de que
+// la pantalla y el pago no cuadren.
 //
-// Sin la columna `tipo` (migración `20261222120000` sin aplicar) se vuelve a
-// leer sin ella y TODO es feriado: exactamente lo de antes.
+// 🔴 19-nov-2026: los feriados NACIONALES salen calculados (`juntarFeriados`);
+// la tabla trae lo extra (días libres, decretos) y su fila manda en su fecha.
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { separarFeriados, type FilaFeriado } from "./feriados";
+import { juntarFeriados, type FilaFeriado } from "./feriados";
 
 export async function leerFeriados(desde: string, hasta: string): Promise<{
   feriados: Map<string, string>;
@@ -20,5 +21,5 @@ export async function leerFeriados(desde: string, hasta: string): Promise<{
     .lte("fecha", hasta);
   if (error) throw new Error(error.message);
   // `faltaColumna` se conserva (siempre `false` desde el 9-oct-2026) porque quien llama lo lee.
-  return { ...separarFeriados((data ?? []) as unknown as FilaFeriado[]), faltaColumna: false };
+  return { ...juntarFeriados(desde, hasta, (data ?? []) as unknown as FilaFeriado[]), faltaColumna: false };
 }
