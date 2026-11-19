@@ -383,7 +383,7 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       // propia columna. Esta hoja es la que la contadora mira para cuadrar.
       ["Hora extra", `Desde ${r.extraMinimoMin} minutos se paga completa, desde el primer minuto; el atraso del mismo día se descuenta aparte, no se le resta. Hasta las ${r.horaCorteNocturno} × ${r.recargoExtraDiurno}; desde el minuto siguiente × ${r.recargoExtraNocturno}.`],
       ["Excedente", `NO SE USA: esos minutos se pagan × ${r.recargoExtraNocturno} junto con el resto de la hora extra de noche. La columna queda en $0.00, igual que en el cuadro de la contadora.`],
-      ["Domingos y feriados", `Horas trabajadas × ${r.recargoDomingoFeriado}.`],
+      ["Domingos y feriados", `Horas trabajadas × ${r.recargoDomingoFeriado}. Un feriado que cae en su día de descanso se paga además el día (× ${r.recargoDomingoFeriado + 1} en total), igual que un feriado en día laborable.`],
       ["Ausencias", "8 horas × rata por hora, sin recargo, por cada día completo sin marcar. Son 8 fijas para todos: no las mueve el horario de cada quien."],
       ["Vacaciones «ya se le pagó»", "Se muestran en la columna «Ausencias» pero NO son una ausencia: el colaborador no faltó. Son días de vacaciones que ya había cobrado en dinero antes, así que no se le pagan otra vez y se le descuentan como un día no trabajado. Una vacación SIN marcar se paga normal y no aparece en ninguna columna."],
       ["Llegar más de 30 minutos tarde", "Se muestra en la columna «Ausencias», no en «Tardanzas» — pero SE DESCUENTAN LOS MINUTOS, exactamente igual que una tardanza. La columna solo cambia de nombre: el total bruto y el neto son los mismos. Hasta 30 minutos va en «Tardanzas»."],

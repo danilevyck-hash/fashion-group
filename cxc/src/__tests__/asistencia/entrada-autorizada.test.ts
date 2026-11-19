@@ -200,8 +200,10 @@ describe("🔴 en la planilla: el recargo por la hora del día, y Aprobaciones",
     expect(Object.keys(HORAS_CERO).sort()).toEqual([
       "ausenciaDias", "ausenciaJustificadaDias", "ausenciaMin", "diasARevisar", "diasTrabajados",
       "domingoMin", "excedenteMin", "extraAutoMin", "extraDiurnoMin", "extraNoAprobadaDiurnoMin",
-      "extraNoAprobadaDomFerMin", "extraNoAprobadaMin", "extraNoAprobadaNocturnoMin", "extraNocturnoMin",
-      "feriadoMin", "jornadaDiariaMin", "sabadoMin", "salidaTempranaMin", "tardanzaDeDiasARevisarMin",
+      "extraNoAprobadaDomFerMin",
+      // 19-nov-2026: el feriado en día de descanso, desglose para VALUAR (no se congela: `COLUMNAS_HORAS` lo excluye).
+      "extraNoAprobadaFeriadoDescansoMin", "extraNoAprobadaMin", "extraNoAprobadaNocturnoMin", "extraNocturnoMin",
+      "feriadoDescansoMin", "feriadoMin", "jornadaDiariaMin", "sabadoMin", "salidaTempranaMin", "tardanzaDeDiasARevisarMin",
       "tardanzaGraveDias", "tardanzaGraveMin", "tardanzaMin",
       // 9-oct-2026: «Tiempo no laborado», su propia columna (migración aditiva).
       "tiempoNoLaboradoMin",

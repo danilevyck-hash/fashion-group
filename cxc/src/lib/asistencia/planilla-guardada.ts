@@ -186,7 +186,12 @@ export const COLUMNAS_DINERO: Record<keyof DineroLinea, string> = {
  * día se quieren congelar, es una migración y dos filas acá, no un `Partial`.
  */
 export const COLUMNAS_HORAS: Record<
-  Exclude<keyof HorasPersona, "extraNoAprobadaDiurnoMin" | "extraNoAprobadaNocturnoMin" | "extraNoAprobadaDomFerMin">,
+  Exclude<
+    keyof HorasPersona,
+    // 🔴 Los dos `…FeriadoDescansoMin` (19-nov-2026) tampoco se congelan: el feriado ya viaja en `feriado_min` y su monto en `feriados`.
+    | "extraNoAprobadaDiurnoMin" | "extraNoAprobadaNocturnoMin" | "extraNoAprobadaDomFerMin"
+    | "extraNoAprobadaFeriadoDescansoMin" | "feriadoDescansoMin"
+  >,
   string
 > = {
   extraDiurnoMin: "extra_diurno_min",

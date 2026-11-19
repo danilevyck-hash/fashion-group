@@ -43,8 +43,8 @@ describe("🔴 lo cerrado se LEE, no se recalcula", () => {
     expect(sql.match(/CREATE TABLE IF NOT EXISTS/g)?.length).toBe(1);
   });
 
-  it("lo que se congela no cambió de forma: `HorasPersona` tiene las 26 cifras (25 + «Tiempo no laborado», 9-oct-2026, migración aditiva)", () => {
-    expect(Object.keys(HORAS_CERO).length).toBe(26);
+  it("lo que se congela no cambió de forma: `HorasPersona` tiene las 26 cifras (25 + «Tiempo no laborado», 9-oct-2026, migración aditiva) + 2 desgloses del feriado en descanso (19-nov-2026, no se congelan)", () => {
+    expect(Object.keys(HORAS_CERO).length).toBe(28);
   });
 });
 
