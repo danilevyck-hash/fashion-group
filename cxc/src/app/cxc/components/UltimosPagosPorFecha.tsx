@@ -17,6 +17,7 @@
 // ni una función de consulta.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { ReactNode } from "react";
 import { fmt } from "@/lib/format";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { fechaCortaPago, type PagoDelDia } from "@/lib/cxc/pagos-por-fecha";
@@ -25,7 +26,10 @@ import { hoyPanama } from "@/lib/fecha-panama";
 
 export default function UltimosPagosPorFecha({
   pagos,
+  titulo = TITULO_ULTIMOS_PAGOS,
 }: {
+  /** El historial del cliente reusa el bloque con el mes como título. */
+  titulo?: ReactNode;
   /** `null` = cargando · `"error"` = no se pudo · lista (vacía si no hay). */
   pagos: PagoDelDia[] | null | "error";
 }) {
@@ -33,7 +37,7 @@ export default function UltimosPagosPorFecha({
   return (
     <div>
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-        {TITULO_ULTIMOS_PAGOS}
+        {titulo}
       </p>
       {pagos === null && <p className="text-xs text-gray-400">{CARGANDO_PAGOS}</p>}
       {pagos === "error" && <p className="text-xs text-red-600">{ERROR_PAGOS}</p>}

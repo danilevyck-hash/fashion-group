@@ -71,6 +71,8 @@ import { Toast, PullToRefresh } from "@/components/ui";
 import BostonDocumentosDrawer from "@/components/cxc/BostonDocumentosDrawer";
 import BostonHojaCobrar, { type CorreoProgramadoBoston } from "@/components/cxc/BostonHojaCobrar";
 import UltimosPagos from "@/components/cxc/UltimosPagos";
+import HistorialCliente from "@/components/cxc/HistorialCliente";
+import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
 import { useUltimosPagosBoston } from "@/components/cxc/useUltimosPagosBoston";
 import TiraTotales from "./TiraTotales";
 import ClientTable from "./ClientTable";
@@ -119,6 +121,9 @@ function DetalleBoston({
         <span className="font-semibold text-gray-900">Total ${fmt(client.total)}</span>
       </div>
       <UltimosPagos pagos={pagos} />
+      {HISTORIAL_CLIENTE_2026_11 && clienteSwitchId != null && (
+        <HistorialCliente fuente={{ cartera: "boston", cliente: clienteSwitchId }} nombre={nombreDeCliente(client)} />
+      )}
       <div className="flex items-center gap-3 flex-wrap">
         {seLeCobra(client.total) && (
           <button

@@ -40,6 +40,8 @@ import {
   CXC_CLIENTE_TITULO_VUELVE,
   CXC_UN_NOMBRE_ESTADO_DE_CUENTA,
 } from "@/lib/ui/revision-110-cxc";
+import HistorialCliente from "@/components/cxc/HistorialCliente";
+import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
 import CobrarEnFicha from "@/app/clientes/[codigo]/CobrarEnFicha";
 import type { FilaAgingCliente } from "@/lib/clientes/cliente-para-cobrar";
 import type { ConsolidatedClient } from "@/lib/types";
@@ -313,6 +315,7 @@ export default function ClienteCxc({ codigo }: { codigo: string }) {
         {/* ── Últimos pagos ──────────────────────────────────────────────── */}
         <div className="mx-4 mt-5 rounded-2xl bg-white px-4 py-3">
           <UltimosPagosPorFecha pagos={pagos} />
+          {HISTORIAL_CLIENTE_2026_11 && <HistorialCliente fuente={{ cartera: "grupo", codigo }} nombre={nombre} />}
         </div>
       </div>
 
