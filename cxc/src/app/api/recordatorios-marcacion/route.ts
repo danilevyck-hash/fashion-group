@@ -24,12 +24,12 @@ import {
   aQuienAvisar,
   enLaVentana,
   llaveAviso,
+  recordatoriosDe,
   textoDelAviso,
   TITULO_AVISO,
-  type MarcaDelDia,
 } from "@/lib/marcacion/recordatorios";
 import { MARCACION_HISTORIAL_Y_AVISOS_2026_11 } from "@/lib/ui/marcacion-historial-avisos-2026-11";
-import { TABLA_AVISOS, TABLA_RECORDATORIOS, TABLA_SUSCRIPCIONES } from "@/lib/marcacion/recordatorios-server";
+import { leerHorariosDeMarcacion, TABLA_AVISOS, TABLA_RECORDATORIOS, TABLA_SUSCRIPCIONES } from "@/lib/marcacion/recordatorios-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -54,13 +54,29 @@ export async function POST(req: NextRequest) {
     const hoy = hoyPanama();
     const ahora = horaCorta(ahoraIso);
 
-    const { data: recs, error } = await supabaseServer
-      .from(TABLA_RECORDATORIOS)
-      .select("empleado_codigo, marca, hora")
-      .eq("activo", true);
-    if (error) throw new Error(error.message);
-    const recordatorios = ((recs ?? []) as { empleado_codigo: string; marca: number; hora: string | null }[])
-      .map((r) => ({ codigo: String(r.empleado_codigo).trim(), marca: Number(r.marca) as MarcaDelDia, hora: r.hora ? String(r.hora).slice(0, 5) : null }))
+    // 🔴 Quien tiene suscripción y NO tiene fila recibe Entrada y Salida por
+    // defecto: se resuelve con `recordatoriosDe`, la MISMA función de la pantalla.
+    const { data: subs0, error: eSubs } = await supabaseServer.from(TABLA_SUSCRIPCIONES).select("empleado_codigo");
+    if (eSubs) throw new Error(eSubs.message);
+    const suscritos = [...new Set(((subs0 ?? []) as { empleado_codigo: string }[]).map((s) => String(s.empleado_codigo).trim()))];
+    const [horariosMarcacion, recs] = await Promise.all([
+      leerHorariosDeMarcacion(suscritos),
+      suscritos.length
+        ? supabaseServer.from(TABLA_RECORDATORIOS).select("empleado_codigo, marca, activo, hora").in("empleado_codigo", suscritos)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (recs.error) throw new Error(recs.error.message);
+    const guardados = new Map<string, { marca: number; activo: boolean; hora: string | null }[]>();
+    for (const r of (recs.data ?? []) as { empleado_codigo: string; marca: number; activo: boolean; hora: string | null }[]) {
+      const c = String(r.empleado_codigo).trim();
+      guardados.set(c, [...(guardados.get(c) ?? []), r]);
+    }
+    const recordatorios = suscritos
+      .flatMap((codigo) =>
+        recordatoriosDe(guardados.get(codigo) ?? [], horariosMarcacion.get(codigo) ?? null)
+          .filter((r) => r.activo)
+          .map((r) => ({ codigo, marca: r.marca, hora: r.hora })),
+      )
       .filter((r) => enLaVentana(r.hora, ahora));
     // Lo normal: nadie en esta ventana. No se lee nada más.
     if (recordatorios.length === 0) return NextResponse.json({ ok: true, avisos: 0 });

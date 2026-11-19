@@ -188,14 +188,20 @@ describe("3 · a quién avisar", () => {
     expect(r.aQuienAvisar({ ...e, deBaja: new Set(["306"]) })).toEqual([]);
   });
 
-  it("renglones: apagados por defecto, Entrada y Salida con su horario, el almuerzo sin hora inventada", async () => {
+  it("renglones: sin filas, Entrada y Salida prendidas a su horario; el almuerzo apagado y sin hora inventada; lo guardado manda", async () => {
     const { r } = await base();
-    expect(r.recordatoriosDe([], { entrada: "09:00", salida: "18:00" })).toEqual([
-      { marca: 0, activo: false, hora: "09:00" },
+    const h = { entrada: "09:00", salida: "18:00" };
+    expect(r.recordatoriosDe([], h)).toEqual([
+      { marca: 0, activo: true, hora: "09:30" },
       { marca: 1, activo: false, hora: null },
       { marca: 2, activo: false, hora: null },
-      { marca: 3, activo: false, hora: "18:00" },
+      { marca: 3, activo: true, hora: "18:30" },
     ]);
+    expect(r.recordatoriosDe([], { entrada: "10:00", salida: "19:00" }).filter((x: { activo: boolean }) => x.activo).map((x: { hora: string }) => x.hora)).toEqual(["10:30", "19:30"]);
+    // Sin horario no hay hora: no se prende nada.
+    expect(r.recordatoriosDe([], null).every((x: { activo: boolean }) => !x.activo)).toBe(true);
+    // Una fila apagada sigue apagada.
+    expect(r.recordatoriosDe([{ marca: 0, activo: false, hora: "09:00" }], h)[0]).toEqual({ marca: 0, activo: false, hora: "09:00" });
     // Un recordatorio encendido sin hora no vale.
     expect(r.validarRecordatorios([{ marca: 1, activo: true, hora: null }])).toBeNull();
     expect(r.validarRecordatorios([{ marca: 1, activo: true, hora: "12:30" }])).toEqual([{ marca: 1, activo: true, hora: "12:30" }]);

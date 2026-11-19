@@ -51,26 +51,39 @@ export interface Recordatorio {
   hora: string | null;
 }
 
-/** La hora con la que viene el renglón: el horario para Entrada y Salida, nada para el almuerzo. */
+/** Los avisos por defecto salen 30 min DESPUÉS de la hora del horario (Daniel, 19-nov-2026). */
+export const MIN_DESPUES_DEL_HORARIO = 30;
+
+/** «HH:MM» + 30 min; no pasa de las 23:59 (el aviso es del mismo día). */
+function mas30(hhmm: string | null): string | null {
+  if (!hhmm) return null;
+  const t = Math.min(Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5)) + MIN_DESPUES_DEL_HORARIO, 23 * 60 + 59);
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
+
+/** La hora con la que viene el renglón: 30 min después de la entrada / salida del horario; nada para el almuerzo. */
 export function horaPorDefecto(marca: MarcaDelDia, horario: { entrada: string; salida: string } | null): string | null {
   if (!horario) return null;
-  if (marca === 0) return limpiaHora(horario.entrada);
-  if (marca === 3) return limpiaHora(horario.salida);
+  if (marca === 0) return mas30(limpiaHora(horario.entrada));
+  if (marca === 3) return mas30(limpiaHora(horario.salida));
   return null;
 }
 
-/** Los cuatro renglones: lo guardado, y si no hay, apagado con la hora por defecto. */
+/**
+ * Los cuatro renglones: lo guardado manda (también si lo apagó). 🔴 Sin fila
+ * guardada, Entrada y Salida vienen PRENDIDAS a la hora del horario
+ * (Daniel, 19-nov-2026: «a todos los que marcan les debe llegar notificación
+ * de entrada y salida, by default»); el almuerzo sigue apagado.
+ */
 export function recordatoriosDe(
   guardados: readonly { marca: number; activo: boolean; hora: string | null }[],
   horario: { entrada: string; salida: string } | null,
 ): Recordatorio[] {
   return MARCAS_DEL_DIA.map((marca) => {
     const g = guardados.find((x) => Number(x.marca) === marca);
-    return {
-      marca,
-      activo: Boolean(g?.activo),
-      hora: limpiaHora(g?.hora) ?? horaPorDefecto(marca, horario),
-    };
+    const hora = limpiaHora(g?.hora) ?? horaPorDefecto(marca, horario);
+    const porDefecto = !g && (marca === 0 || marca === 3) && hora !== null;
+    return { marca, activo: g ? Boolean(g.activo) : porDefecto, hora };
   });
 }
 
