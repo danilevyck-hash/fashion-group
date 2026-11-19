@@ -26,6 +26,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import LineaDeFrescura from "./LineaDeFrescura";
 import { syncConEnganche } from "./syncNowClient";
+import { puedePedir, usuarioDelNavegador } from "@/lib/catalogo/roles";
 
 const ROLES_PERMITIDOS = ["admin", "secretaria", "vendedor"];
 
@@ -73,7 +74,7 @@ export default function CatalogoSyncNow({ catalogo, onSuccess, className, forma 
   // useState inicial — SSR). Solo si pasa, se consulta el sync-status (capa 2).
   useEffect(() => {
     const role = sessionStorage.getItem("cxc_role") || "";
-    if (!ROLES_PERMITIDOS.includes(role)) return;
+    if (!ROLES_PERMITIDOS.includes(role) && !puedePedir({ role, userName: usuarioDelNavegador() })) return;
     setVisible(true);
     void fetchStatus();
   }, [fetchStatus]);

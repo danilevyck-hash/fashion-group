@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/requireRole";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,8 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  // Quien arma pedidos (`requirePedido`: + Eloyn y Cuba de bodega, 19-nov-2026).
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
 
   const supabaseServer = await cfg.mainDb();
