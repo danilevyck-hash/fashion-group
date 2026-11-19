@@ -142,19 +142,18 @@ function ListaHistorial({ fuente, vista, nombre, titulo, enHoja }: {
   );
 }
 
-/** «Compra · 14 sept 2026 · Vistana» / «Facturas 3087 · 3090», el total a la derecha. */
+/** «Compra · 25 sept 2025» y el monto; debajo «Fashion Wear · Facturas 2576 · 2584».
+ *  Dos renglones siempre: todas las filas miden lo mismo en el teléfono. */
 function RenglonCompra({ fila: f }: { fila: FilaDeCompras }) {
   const devolucion = f.clase === "devolucion";
-  const abajo = devolucion
+  const documentos = devolucion
     ? `Nota de crédito ${f.numero}`
     : `${f.facturas.length === 1 ? "Factura" : "Facturas"} ${f.facturas.join(" · ")}`;
   return (
     <li className="flex items-start gap-3 border-t border-gray-100 px-4 py-3 first:border-t-0">
       <div className="min-w-0 flex-1">
-        <p className="text-[16px] text-gray-900">
-          {devolucion ? "Devolución" : "Compra"} · {fmtDate(f.fecha)} · {nombreCortoEmpresa(f.empresa)}
-        </p>
-        <p className="mt-0.5 text-[13px] tabular-nums text-gray-500">{abajo}</p>
+        <p className="text-[16px] text-gray-900">{devolucion ? "Devolución" : "Compra"} · {fmtDate(f.fecha)}</p>
+        <p className="mt-0.5 text-[13px] tabular-nums text-gray-500">{nombreCortoEmpresa(f.empresa)} · {documentos}</p>
       </div>
       <span className={`shrink-0 text-[16px] tabular-nums ${devolucion ? "text-emerald-700" : "text-gray-900"}`}>{dinero(f.monto)}</span>
     </li>
