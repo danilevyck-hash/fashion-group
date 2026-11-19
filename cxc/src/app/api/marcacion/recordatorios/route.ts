@@ -53,7 +53,9 @@ export async function PUT(req: NextRequest) {
   if (!codigo) return NextResponse.json({ error: AVISO_SIN_CODIGO }, { status: 404 });
 
   const cuerpo = (await req.json().catch(() => null)) as { recordatorios?: unknown; suscripcion?: unknown } | null;
-  const recordatorios = validarRecordatorios(cuerpo?.recordatorios);
+  // Solo suscripción (aviso «Activa los avisos»): no toca los renglones.
+  const soloSuscripcion = cuerpo?.recordatorios == null && cuerpo?.suscripcion != null;
+  const recordatorios = soloSuscripcion ? [] : validarRecordatorios(cuerpo?.recordatorios);
   if (!recordatorios) {
     return NextResponse.json({ error: "Revisa las horas: un recordatorio encendido necesita su hora." }, { status: 400 });
   }
@@ -63,7 +65,7 @@ export async function PUT(req: NextRequest) {
   }
   try {
     if (suscripcion) await guardarSuscripcion(codigo, suscripcion);
-    await guardarRecordatorios(codigo, recordatorios);
+    if (!soloSuscripcion) await guardarRecordatorios(codigo, recordatorios);
     return NextResponse.json(await estado(codigo));
   } catch (e) {
     console.error("[marcacion recordatorios PUT]", e instanceof Error ? e.message : e);

@@ -16,37 +16,7 @@ import {
   type Recordatorio,
 } from "@/lib/marcacion/recordatorios";
 import { enDoceHoras } from "@/lib/marcacion/marcacion";
-
-function esIphoneSinInstalar(): boolean {
-  if (typeof window === "undefined") return false;
-  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
-  const instalada =
-    window.matchMedia?.("(display-mode: standalone)").matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true;
-  return ios && !instalada;
-}
-
-function llaveEnBytes(base64: string): ArrayBuffer {
-  const b = (base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(b), (c) => c.charCodeAt(0)).buffer as ArrayBuffer;
-}
-
-/** La suscripción de este aparato, o un texto que dice por qué no se pudo. */
-async function suscribirEsteAparato(clavePublica: string | null, renovar = false): Promise<PushSubscriptionJSON | string> {
-  if (esIphoneSinInstalar()) return TEXTO_INSTALAR_EN_IPHONE;
-  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-    return esIphoneSinInstalar() ? TEXTO_INSTALAR_EN_IPHONE : "Este navegador no recibe avisos.";
-  }
-  if (!clavePublica) return "Los avisos todavía no están disponibles.";
-  const permiso = await Notification.requestPermission();
-  if (permiso !== "granted") return "Los avisos están bloqueados en este teléfono. Actívalos en Ajustes.";
-  const reg = await navigator.serviceWorker.ready;
-  if (renovar) await (await reg.pushManager.getSubscription())?.unsubscribe();
-  const sub =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: llaveEnBytes(clavePublica) }));
-  return sub.toJSON();
-}
+import { esIphoneSinInstalar, suscribirEsteAparato } from "@/lib/marcacion/push-cliente";
 
 /** Manda el aviso de prueba; si la suscripción vieja ya no sirve, la renueva una vez. */
 async function probarAviso(clavePublica: string | null): Promise<void> {
