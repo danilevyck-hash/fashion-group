@@ -446,6 +446,8 @@ export interface HorasPersona {
    * dos de arriba.
    */
   extraNoAprobadaDomFerMin: number;
+  /** De `extraNoAprobadaDomFerMin`, el feriado en día de descanso (ver `feriadoDescansoMin`). Solo para VALUAR. */
+  extraNoAprobadaFeriadoDescansoMin: number;
   /**
    * 🔴 LOS MINUTOS DE EXTRA QUE SE PAGARON SIN QUE NADIE LOS APROBARA, porque
    * son el horario de la tienda (ACS cierra a las 7 p.m.: 30 min por día).
@@ -468,6 +470,12 @@ export interface HorasPersona {
   domingoMin: number;
   /** Feriado trabajado. Va al 1,50. */
   feriadoMin: number;
+  /**
+   * 🔴 De `feriadoMin`, lo trabajado en un feriado que caía en SU día de
+   * descanso (19-nov-2026). El sueldo no trae ese día, así que se le suma el
+   * día ×1: ver `valorFeriados`. Solo para VALUAR; no se congela.
+   */
+  feriadoDescansoMin: number;
   /**
    * Minutos de tardanza pasada la tolerancia. SE RESTAN.
    *
@@ -536,7 +544,8 @@ export interface HorasPersona {
 export const HORAS_CERO: HorasPersona = {
   extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0, extraNoAprobadaMin: 0,
   extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0, extraNoAprobadaDomFerMin: 0, extraAutoMin: 0,
-  domingoMin: 0, feriadoMin: 0, tardanzaMin: 0,
+  extraNoAprobadaFeriadoDescansoMin: 0,
+  domingoMin: 0, feriadoMin: 0, feriadoDescansoMin: 0, tardanzaMin: 0,
   tardanzaGraveMin: 0, tardanzaGraveDias: 0, salidaTempranaMin: 0, tiempoNoLaboradoMin: 0,
   ausenciaMin: 0, ausenciaDias: 0, ausenciaJustificadaDias: 0,
   vacacionesYaPagadasMin: 0, vacacionesYaPagadasDias: 0, vacacionesDias: 0,
@@ -738,7 +747,7 @@ export function clasificarDia(
 ): Pick<
   HorasPersona,
   | "extraDiurnoMin" | "extraNocturnoMin" | "excedenteMin"
-  | "domingoMin" | "feriadoMin" | "tardanzaMin" | "ausenciaMin" | "sabadoMin"
+  | "domingoMin" | "feriadoMin" | "feriadoDescansoMin" | "tardanzaMin" | "ausenciaMin" | "sabadoMin"
   | "vacacionesYaPagadasMin" | "salidaTempranaMin" | "tiempoNoLaboradoMin"
 > & {
   /**
@@ -751,7 +760,7 @@ export function clasificarDia(
 } {
   const cero = {
     extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0,
-    domingoMin: 0, feriadoMin: 0, tardanzaMin: 0, ausenciaMin: 0, sabadoMin: 0,
+    domingoMin: 0, feriadoMin: 0, feriadoDescansoMin: 0, tardanzaMin: 0, ausenciaMin: 0, sabadoMin: 0,
     vacacionesYaPagadasMin: 0, salidaTempranaMin: 0, tiempoNoLaboradoMin: 0,
   };
   // 🔴 LABORABLE LO DICE EL MOTOR (`d.habil`, 18-sep-2026): lunes a viernes, o
@@ -781,7 +790,11 @@ export function clasificarDia(
 
   // Feriado trabajado: TODO lo trabajado va al recargo de feriado. No se le
   // mide tardanza ni hora extra — ese día no tiene horario que cumplir.
-  if (d.feriado) return { ...cero, feriadoMin: d.trabajadoMin };
+  // 🔴 Y si el feriado cae en SU día de descanso (19-nov-2026, Daniel: «debe
+  // ser automático»), se aparta para sumarle el día que el sueldo no trae.
+  if (d.feriado) {
+    return { ...cero, feriadoMin: d.trabajadoMin, feriadoDescansoMin: habil ? 0 : d.trabajadoMin };
+  }
 
   // 🔴 «No laborable» LO DICE EL MOTOR (`d.habil`), no el calendario
   // (18-sep-2026): para Multifashion el sábado es un día normal y cae más
@@ -939,6 +952,7 @@ export function medirHoras(
       // ⚠️ Va ANTES del bloque de los 30 min de ACS, que solo toca la hora extra.
       h.extraNoAprobadaDomFerMin += c.domingoMin + c.feriadoMin;
       h.extraNoAprobadaMin += c.domingoMin + c.feriadoMin;
+      h.extraNoAprobadaFeriadoDescansoMin += c.feriadoDescansoMin;
     }
     if (pagaExtra) {
       h.extraDiurnoMin += c.extraDiurnoMin;
@@ -946,6 +960,7 @@ export function medirHoras(
       h.excedenteMin += c.excedenteMin;
       h.domingoMin += c.domingoMin;
       h.feriadoMin += c.feriadoMin;
+      h.feriadoDescansoMin += c.feriadoDescansoMin;
     } else {
       // ── 🔴 LOS MINUTOS QUE NO HAY QUE APROBAR (ACS: 30 por día) ───────────
       //
@@ -1204,6 +1219,7 @@ const COLUMNAS_EXTRA = [
   // 🔑 El desglose de lo no aprobado va con su total, a la MISMA parte: es lo
   // que hace que el aviso «sin aprobar» salga en la empresa que pagaría.
   "extraNoAprobadaDiurnoMin", "extraNoAprobadaNocturnoMin", "extraNoAprobadaDomFerMin",
+  "extraNoAprobadaFeriadoDescansoMin",
 ] as const;
 
 /**
@@ -1214,7 +1230,7 @@ const COLUMNAS_EXTRA = [
  * las partes. Repartirlo dejaría a una línea creyendo que el día dura 0 minutos.
  */
 const COLUMNAS_RELOJ = [
-  "domingoMin", "feriadoMin", "tardanzaMin", "tardanzaGraveMin", "tardanzaGraveDias",
+  "domingoMin", "feriadoMin", "feriadoDescansoMin", "tardanzaMin", "tardanzaGraveMin", "tardanzaGraveDias",
   "ausenciaMin", "ausenciaDias", "ausenciaJustificadaDias",
   "vacacionesYaPagadasMin", "vacacionesYaPagadasDias", "vacacionesDias",
   "sabadoMin", "diasTrabajados", "diasARevisar", "tardanzaDeDiasARevisarMin",
@@ -1714,7 +1730,7 @@ export function calcularDinero(
   const extraNocturno = centavos(h(horas.extraNocturnoMin) * reglas.recargoExtraNocturno * rataHora);
   const excedente = centavos(h(horas.excedenteMin) * reglas.recargoExcedenteNocturnaMixta * rataHora);
   const domingos = centavos(h(horas.domingoMin) * reglas.recargoDomingoFeriado * rataHora);
-  const feriados = centavos(h(horas.feriadoMin) * reglas.recargoDomingoFeriado * rataHora);
+  const feriados = valorFeriados(horas.feriadoMin, horas.feriadoDescansoMin || 0, reglas, rataHora);
   // La ausencia va SIN recargo: es la hora que no se trabajó, ni más ni menos.
   // Esto es la ausencia de DÍA COMPLETO —quien no marcó ni una vez—, que no se
   // tocó y se sigue valuando `jornada × rata`.
@@ -1874,6 +1890,8 @@ export function resumenExtra(
   reglas: ReglasAsistencia,
   /** 🔴 Lo trabajado en domingo o feriado sin aprobar (10-sep-2026): se valúa con SU recargo. */
   domFerMin = 0,
+  /** De `domFerMin`, el feriado en día de descanso: suma el día ×1 (`valorFeriados`). */
+  feriadoDescansoMin = 0,
 ): { minutos: number; diurnoMin: number; nocturnoMin: number; domFerMin: number; monto: number | null } | null {
   const minutos = diurnoMin + nocturnoMin + domFerMin;
   if (!(minutos > 0)) return null;
@@ -1883,7 +1901,8 @@ export function resumenExtra(
       : centavos(
         centavos((diurnoMin / 60) * reglas.recargoExtraDiurno * rataHora)
         + centavos((nocturnoMin / 60) * reglas.recargoExtraNocturno * rataHora)
-        + centavos((domFerMin / 60) * reglas.recargoDomingoFeriado * rataHora),
+        + centavos((domFerMin / 60) * reglas.recargoDomingoFeriado * rataHora)
+        + centavos((feriadoDescansoMin / 60) * rataHora),
       );
   return { minutos, diurnoMin, nocturnoMin, domFerMin, monto };
 }
@@ -1909,9 +1928,26 @@ export function sinHorasExtra(h: HorasPersona): HorasPersona {
     ...h,
     extraDiurnoMin: 0, extraNocturnoMin: 0, excedenteMin: 0,
     extraNoAprobadaMin: 0, extraNoAprobadaDiurnoMin: 0, extraNoAprobadaNocturnoMin: 0,
-    extraNoAprobadaDomFerMin: 0,
-    domingoMin: 0, feriadoMin: 0,
+    extraNoAprobadaDomFerMin: 0, extraNoAprobadaFeriadoDescansoMin: 0,
+    domingoMin: 0, feriadoMin: 0, feriadoDescansoMin: 0,
   };
+}
+
+/**
+ * 🔴 EL FERIADO TRABAJADO VALE ×2,5 EL DÍA, SIEMPRE (19-nov-2026, Daniel: «debe
+ * ser automático»). En un día laborable el sueldo ya trae el día y se suma el
+ * recargo (×1,5). En SU día de descanso (domingo, o sábado de quien trabaja de
+ * lunes a viernes) el sueldo no lo trae: se suma el día (×1) además del
+ * recargo. 🩸 Hasta hoy ese feriado se pagaba ×1,5 en total, como un domingo.
+ * El domingo o sábado trabajado que NO es feriado sigue en ×1,5.
+ */
+export function valorFeriados(
+  feriadoMin: number,
+  feriadoDescansoMin: number,
+  reglas: ReglasAsistencia,
+  rataHora: number,
+): number {
+  return centavos((feriadoMin / 60) * reglas.recargoDomingoFeriado * rataHora + (feriadoDescansoMin / 60) * rataHora);
 }
 
 /** Una línea completa: la ficha + sus horas + su dinero (o lo que le falta). */
@@ -2133,6 +2169,7 @@ export function armarLinea(
     reglas,
     // 🔴 El domingo y el feriado sin aprobar también se dicen (10-sep-2026).
     horasEfectivas.extraNoAprobadaDomFerMin || 0,
+    horasEfectivas.extraNoAprobadaFeriadoDescansoMin || 0,
   );
 
   return {
