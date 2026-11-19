@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/cxc/historial?codigo=D-25&tipo=pagos|facturas
+// GET /api/cxc/historial?codigo=D-25&tipo=pagos|compras
 //
-// TODOS los pagos o TODAS las facturas de un cliente del GRUPO, desde oct-2022,
+// TODOS los pagos o TODAS las compras de un cliente del GRUPO, desde oct-2022,
 // agrupados por mes (`lib/cxc/historial-cliente.ts`). Lo abren «Ver todos los
-// pagos» y «Ver facturas» en la página del cliente de CxC y en su ficha.
+// pagos» y «Ver compras» en la página del cliente de CxC y en su ficha.
 //
 // 🔴 SOLO LAS 6 DEL GRUPO (`CXC_GRUPO_EMPRESA_KEYS`), en la MISMA cadena de la
 // consulta. Boston tiene su ruta aparte (`/api/cxc/boston/historial`) y el
@@ -26,7 +26,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { TIPOS_VENTA_CONOCIDOS } from "@/lib/ventas/tipos-comprobante";
 import {
   HISTORIAL_CLIENTE_2026_11,
-  historialDeFacturas,
+  historialDeCompras,
   historialDePagos,
   type FacturaLeida,
 } from "@/lib/cxc/historial-cliente";
@@ -55,7 +55,7 @@ async function leerPagos(codigo: string, empresas: string[]) {
   );
 }
 
-async function leerFacturas(codigo: string, empresas: string[]) {
+async function leerCompras(codigo: string, empresas: string[]) {
   const { data: pares, error } = await supabaseServer
     .from("switch_clientes")
     .select("empresa_key, cliente_switch_id")
@@ -85,7 +85,7 @@ async function leerFacturas(codigo: string, empresas: string[]) {
         .order("id", { ascending: true })
         .range(desde, hasta),
   );
-  return historialDeFacturas(filas);
+  return historialDeCompras(filas);
 }
 
 export async function GET(req: NextRequest) {
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
 
   const codigo = (req.nextUrl.searchParams.get("codigo") ?? "").trim();
   const tipo = req.nextUrl.searchParams.get("tipo");
-  if (!codigo || (tipo !== "pagos" && tipo !== "facturas")) {
+  if (!codigo || (tipo !== "pagos" && tipo !== "compras")) {
     return NextResponse.json({ error: "Faltan el código del cliente o el tipo" }, { status: 400 });
   }
 
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
   if (empresas.length === 0) return NextResponse.json({ codigo, tipo, meses: [] });
 
   try {
-    const meses = tipo === "pagos" ? await leerPagos(codigo, empresas) : await leerFacturas(codigo, empresas);
+    const meses = tipo === "pagos" ? await leerPagos(codigo, empresas) : await leerCompras(codigo, empresas);
     return NextResponse.json({ codigo, tipo, meses });
   } catch (e) {
     console.error(`[cxc/historial] ${tipo} ${codigo}:`, e instanceof Error ? e.message : e);

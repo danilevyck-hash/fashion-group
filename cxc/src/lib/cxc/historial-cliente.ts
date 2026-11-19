@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// HISTORIAL DEL CLIENTE — todos sus pagos y todas sus facturas, por mes.
+// HISTORIAL DEL CLIENTE — todos sus pagos y todas sus compras, por mes.
 // Módulo PURO (19-nov-2026).
 //
 // Daniel, textual: «Quiero ver últimos pagos o historial de pago de clientes…
@@ -10,9 +10,10 @@
 // (lo aplica la lectura; aquí solo se agrupa). Un renglón es un DÍA, como en
 // «Últimos pagos»: lo que entró ese día y en qué empresas.
 //
-// 🔴 LAS NOTAS DE CRÉDITO RESTAN (`signoVenta`): el total del mes es neto. El
-// monto es el `total` CON ITBMS, el mismo que «Documentos» de CxC y el estado
-// de cuenta: un documento no puede valer dos cosas en dos pantallas.
+// 🔴 UNA COMPRA = las facturas de UNA empresa dentro de 7 días desde la primera
+// (Daniel, 19-nov-2026). La nota de crédito es una «Devolución» APARTE: no se
+// resta de ninguna compra ni del total del mes, que suma solo compras. Los
+// montos son el `total` CON ITBMS, como «Documentos» de CxC y el estado de cuenta.
 //
 // 🔴 BOSTON Y EL GRUPO NO SE MEZCLAN. Este módulo no lee la base: cada ruta
 // (`/api/cxc/historial` para las 6 del grupo, `/api/cxc/boston/historial` para
@@ -20,7 +21,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { signoVenta } from "@/lib/ventas/tipos-comprobante";
-import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { facturaParaMostrar } from "@/lib/guias/numero-factura";
 import { agruparPagosPorFecha, type PagoDeEmpresa, type PagoDelDia } from "./pagos-por-fecha";
 
 /** Interruptor: `false` = la pantalla de antes, sin botones ni rutas. */
@@ -72,7 +73,7 @@ export function historialDePagos(pagos: PagoDeEmpresa[]): Mes<PagoDelDia>[] {
   return porMes(agruparPagosPorFecha(pagos, Number.POSITIVE_INFINITY), (f) => f.monto);
 }
 
-// ── FACTURAS ─────────────────────────────────────────────────────────────────
+// ── COMPRAS ──────────────────────────────────────────────────────────────────
 
 /** Lo que llega de `switch_facturas`, ya acotado a la empresa correcta. */
 export interface FacturaLeida {
@@ -84,58 +85,95 @@ export interface FacturaLeida {
   total: number | string | null;
 }
 
-export interface FacturaHistorial {
-  /** Llave para pedir sus renglones: empresa + tipo + id de Switch (única). */
-  id: number;
+/** Días de la ventana de una COMPRA, contados desde su PRIMERA factura:
+ *  día 0 a día 7 es la misma compra; el día 8 abre otra. Daniel, 19-nov-2026. */
+export const DIAS_DE_UNA_COMPRA = 7;
+
+/** Varias facturas del mismo cliente, en la MISMA empresa, dentro de la ventana. */
+export interface Compra {
+  clase: "compra";
   empresa: string;
-  tipo: string;
+  /** La fecha de su PRIMERA factura (la que decide el mes). */
   fecha: string;
-  /** El número como lo muestra «Documentos» en CxC (`11-000003224`). */
-  numero: string;
-  /** Con signo: la nota de crédito va en negativo. */
+  /** La suma de sus facturas, con ITBMS. */
   monto: number;
-  esNotaCredito: boolean;
+  /** Los números cortos (`11-000003087` → `3087`), en orden de fecha. */
+  facturas: string[];
 }
 
-/** Facturas, notas de crédito y de débito, más reciente primero, por mes. */
-export function historialDeFacturas(facturas: FacturaLeida[]): Mes<FacturaHistorial>[] {
-  const filas: FacturaHistorial[] = [];
-  for (const f of facturas) {
-    const signo = signoVenta(f.tipo_comprobante);
-    const fecha = String(f.fecha ?? "").slice(0, 10);
-    if (signo === 0 || !fecha) continue;
-    filas.push({
-      id: f.switch_factura_id,
-      empresa: f.empresa_key,
-      tipo: f.tipo_comprobante,
-      fecha,
-      numero: f.secuencial || String(f.switch_factura_id),
-      monto: centavos(signo * Math.abs(Number(f.total) || 0)),
-      esNotaCredito: signo < 0,
-    });
-  }
-  filas.sort((a, b) => desc(a.fecha, b.fecha) || b.id - a.id);
-  return porMes(filas, (f) => f.monto);
+/** Una nota de crédito: va APARTE, nunca se resta de una compra. */
+export interface Devolucion {
+  clase: "devolucion";
+  empresa: string;
+  fecha: string;
+  /** Negativo. */
+  monto: number;
+  numero: string;
 }
 
-/** «Nota de Crédito» → «Nota de crédito» (mayúscula solo en la primera palabra). */
-export function nombreDelTipo(tipo: string): string {
-  return tipo.charAt(0) + tipo.slice(1).toLowerCase();
+export type FilaDeCompras = Compra | Devolucion;
+
+export interface MesDeCompras {
+  /** `YYYY-MM`. */
+  mes: string;
+  /** Solo las compras: las devoluciones no lo tocan. */
+  total: number;
+  /** Suma de las devoluciones del mes (negativa), o 0 si no hubo. */
+  devoluciones: number;
+  filas: FilaDeCompras[];
 }
+
+const diaNumero = (fecha: string) => Math.round(Date.parse(`${fecha}T00:00:00Z`) / 86400000);
+const numeroCorto = (f: FacturaLeida) => facturaParaMostrar(f.secuencial) || String(f.switch_factura_id);
 
 /**
- * ¿Esta empresa tiene renglones de factura en el sistema? `switch_factura_lineas`
- * cubre solo las 6 del grupo: Boston y Multifashion no.
+ * Las facturas del cliente como COMPRAS, más reciente primero y por mes.
+ *
+ * Una compra junta las facturas de UNA empresa que caen dentro de
+ * `DIAS_DE_UNA_COMPRA` días desde la primera de la compra (ventana FIJA, no
+ * corrida). Nunca junta empresas. La nota de crédito es una «Devolución»
+ * aparte; la nota de débito y los tiquetes cuentan como factura de la compra.
  */
-export function tieneRenglones(empresa: string): boolean {
-  return (B2B_EMPRESA_KEYS as readonly string[]).includes(empresa);
-}
+export function historialDeCompras(documentos: FacturaLeida[]): MesDeCompras[] {
+  const filas: FilaDeCompras[] = [];
+  const porEmpresa = new Map<string, FacturaLeida[]>();
+  for (const d of documentos) {
+    const signo = signoVenta(d.tipo_comprobante);
+    const fecha = String(d.fecha ?? "").slice(0, 10);
+    if (signo === 0 || !fecha) continue;
+    if (signo < 0) {
+      filas.push({ clase: "devolucion", empresa: d.empresa_key, fecha, numero: numeroCorto(d), monto: -centavos(Math.abs(Number(d.total) || 0)) });
+      continue;
+    }
+    const lista = porEmpresa.get(d.empresa_key) ?? [];
+    lista.push({ ...d, fecha });
+    porEmpresa.set(d.empresa_key, lista);
+  }
+  for (const [empresa, lista] of porEmpresa) {
+    const ordenadas = [...lista].sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.switch_factura_id - b.switch_factura_id));
+    let actual: Compra | null = null;
+    let inicio = 0;
+    for (const f of ordenadas) {
+      const dia = diaNumero(f.fecha);
+      if (!actual || dia - inicio > DIAS_DE_UNA_COMPRA) {
+        actual = { clase: "compra", empresa, fecha: f.fecha, monto: 0, facturas: [] };
+        inicio = dia;
+        filas.push(actual);
+      }
+      actual.monto = centavos(actual.monto + Math.abs(Number(f.total) || 0));
+      actual.facturas.push(numeroCorto(f));
+    }
+  }
+  filas.sort((a, b) => desc(a.fecha, b.fecha) || (a.clase === b.clase ? (a.empresa < b.empresa ? -1 : 1) : a.clase === "compra" ? -1 : 1));
 
-export interface RenglonFactura {
-  codigo: string;
-  descripcion: string;
-  cantidad: number;
-  precio: number;
-  /** Lo que vale el renglón con su descuento (`subtotal_con_descuento`). */
-  subtotal: number;
+  const meses: MesDeCompras[] = [];
+  for (const f of filas) {
+    const mes = f.fecha.slice(0, 7);
+    let m = meses[meses.length - 1];
+    if (!m || m.mes !== mes) { m = { mes, total: 0, devoluciones: 0, filas: [] }; meses.push(m); }
+    m.filas.push(f);
+    if (f.clase === "compra") m.total = centavos(m.total + f.monto);
+    else m.devoluciones = centavos(m.devoluciones + f.monto);
+  }
+  return meses;
 }

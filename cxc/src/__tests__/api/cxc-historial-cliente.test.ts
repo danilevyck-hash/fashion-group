@@ -5,11 +5,11 @@
 //     · `/api/cxc/historial` (grupo): un recibo y una factura de Boston con el
 //       MISMO código no salen; `gerente_boston` recibe 403.
 //     · `/api/cxc/boston/historial`: el mismo id de Switch en Vistana no sale.
-//     · `/renglones` no le da productos de Boston a nadie (404).
 //  2. 🩸 Un cliente con MÁS de 1.000 recibos (D-151 tiene 1.714) y más de 1.000
 //     facturas sale COMPLETO: el mock corta cada respuesta en 1.000 filas, como
 //     `db-max-rows` en producción.
-//  3. Lo puro: un renglón por día, por mes con su total; la nota de crédito resta.
+//  3. Lo puro: pagos, un renglón por día; compras, ventana de 7 días por
+//     empresa y la nota de crédito aparte como devolución.
 //  4. El interruptor nace en `false`.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { NextRequest } from "next/server";
 import { signSession } from "@/lib/session-cookie";
-import { historialDeFacturas, historialDePagos } from "@/lib/cxc/historial-cliente";
+import { DIAS_DE_UNA_COMPRA, historialDeCompras, historialDePagos } from "@/lib/cxc/historial-cliente";
 
 type Fila = Record<string, unknown>;
 const TOPE = 1000;
@@ -75,7 +75,6 @@ vi.mock("@/lib/supabase-server", () => {
 
 const grupo = await import("@/app/api/cxc/historial/route");
 const boston = await import("@/app/api/cxc/boston/historial/route");
-const renglones = await import("@/app/api/cxc/historial/renglones/route");
 
 const SECRET_PREV = process.env.SESSION_SECRET;
 beforeAll(() => { process.env.SESSION_SECRET = "test-secret-historial"; });
@@ -125,9 +124,6 @@ beforeEach(() => {
       { empresa_key: "fashion_wear", codigo: "D-151", cliente_switch_id: 40 },
       { empresa_key: "confecciones_boston", codigo: "D-151", cliente_switch_id: 151 },
     ],
-    switch_factura_lineas: [
-      { id: "l1", empresa_key: "fashion_wear", tipo_comprobante: "Factura", switch_factura_id: 5000, linea_orden: 0, codigo: "NB2570400", descripcion: "Men-Boxer Brief", cantidad: "12", precio: "27", subtotal_con_descuento: "324" },
-    ],
     fg_users: [],
   };
 });
@@ -144,11 +140,13 @@ describe("🩸 más de 1.000 filas salen completas", () => {
     expect(suma(meses)).toBe(12000);
   });
 
-  it("1.100 facturas y una nota de crédito → 1.101 documentos, la NC resta", async () => {
-    const res = await grupo.GET(req("/api/cxc/historial?codigo=D-151&tipo=facturas"));
+  it("1.100 facturas → todas en alguna compra, $110,000; la NC aparte en devoluciones", async () => {
+    const res = await grupo.GET(req("/api/cxc/historial?codigo=D-151&tipo=compras"));
     const { meses } = await res.json();
-    expect(cuantas(meses)).toBe(1101);
-    expect(suma(meses)).toBe(110000 - 30);
+    const filas = meses.flatMap((m: { filas: { clase: string; facturas?: string[] }[] }) => m.filas);
+    expect(filas.filter((f: { clase: string }) => f.clase === "compra").reduce((n: number, f: { facturas?: string[] }) => n + (f.facturas?.length ?? 0), 0)).toBe(1100);
+    expect(suma(meses)).toBe(110000);
+    expect(meses.reduce((s: number, m: { devoluciones: number }) => s + m.devoluciones, 0)).toBe(-30);
   });
 });
 
@@ -163,7 +161,7 @@ describe("🔴 el grupo no trae a Boston ni a Multifashion", () => {
   });
 
   it("facturas: ni la de Boston (mismo código) ni la del 40 de Vistana", async () => {
-    const { meses } = await (await grupo.GET(req("/api/cxc/historial?codigo=D-151&tipo=facturas"))).json();
+    const { meses } = await (await grupo.GET(req("/api/cxc/historial?codigo=D-151&tipo=compras"))).json();
     const empresas = new Set(meses.flatMap((m: { filas: { empresa: string }[] }) => m.filas.map((f) => f.empresa)));
     expect([...empresas]).toEqual(["fashion_wear"]);
   });
@@ -173,14 +171,6 @@ describe("🔴 el grupo no trae a Boston ni a Multifashion", () => {
     expect(res.status).toBe(403);
   });
 
-  it("renglones: los de Boston no se le dan a nadie (404); los del grupo, sí", async () => {
-    const r1 = await renglones.GET(req("/api/cxc/historial/renglones?empresa=confecciones_boston&tipo=Factura&id=8"));
-    expect(r1.status).toBe(404);
-    const r2 = await renglones.GET(req("/api/cxc/historial/renglones?empresa=fashion_wear&tipo=Factura&id=5000"));
-    expect((await r2.json()).renglones).toEqual([
-      { codigo: "NB2570400", descripcion: "Men-Boxer Brief", cantidad: 12, precio: 27, subtotal: 324 },
-    ]);
-  });
 });
 
 describe("🔴 Boston no trae al grupo", () => {
@@ -193,7 +183,7 @@ describe("🔴 Boston no trae al grupo", () => {
   });
 
   it("facturas de Boston: solo la suya", async () => {
-    const { meses } = await (await boston.GET(req("/api/cxc/boston/historial?cliente=151&tipo=facturas", "gerente_boston"))).json();
+    const { meses } = await (await boston.GET(req("/api/cxc/boston/historial?cliente=151&tipo=compras", "gerente_boston"))).json();
     expect(meses.flatMap((m: { filas: { empresa: string }[] }) => m.filas.map((f) => f.empresa))).toEqual(["confecciones_boston"]);
   });
 
@@ -221,13 +211,55 @@ describe("lo puro", () => {
     ]);
   });
 
-  it("facturas: la NC va en negativo y el número es el de Documentos", () => {
-    const [mes] = historialDeFacturas([
-      { empresa_key: "vistana", switch_factura_id: 1, secuencial: "11-000003224", tipo_comprobante: "Factura", fecha: "2026-11-02T10:00:00Z", total: 200 },
-      { empresa_key: "vistana", switch_factura_id: 2, secuencial: "13-000000860", tipo_comprobante: "Nota de Crédito", fecha: "2026-11-05T10:00:00Z", total: 50 },
+});
+
+describe("🔴 una COMPRA: misma empresa, ventana fija de 7 días", () => {
+  const fac = (empresa: string, fecha: string, id: number, total = 100, tipo = "Factura") => ({
+    empresa_key: empresa, switch_factura_id: id, secuencial: `11-00000${id}`, tipo_comprobante: tipo, fecha: `${fecha}T15:00:00+00:00`, total,
+  });
+  const compras = (meses: ReturnType<typeof historialDeCompras>) => meses.flatMap((m) => m.filas).filter((f) => f.clase === "compra");
+
+  it("son 7 días", () => expect(DIAS_DE_UNA_COMPRA).toBe(7));
+
+  it("día 0, día 6 y día 7 son la misma compra; el día 8 abre otra", () => {
+    const c = compras(historialDeCompras([
+      fac("vistana", "2026-09-01", 3087), fac("vistana", "2026-09-07", 3090),
+      fac("vistana", "2026-09-08", 3101), fac("vistana", "2026-09-09", 3120),
+    ]));
+    expect(c).toEqual([
+      { clase: "compra", empresa: "vistana", fecha: "2026-09-09", monto: 100, facturas: ["3120"] },
+      { clase: "compra", empresa: "vistana", fecha: "2026-09-01", monto: 300, facturas: ["3087", "3090", "3101"] },
     ]);
-    expect(mes.total).toBe(150);
-    expect(mes.filas.map((f) => [f.numero, f.monto, f.esNotaCredito])).toEqual([["13-000000860", -50, true], ["11-000003224", 200, false]]);
+  });
+
+  it("la ventana es FIJA: se cuenta desde la primera, no desde la última", () => {
+    const c = compras(historialDeCompras([
+      fac("vistana", "2026-09-01", 1001), fac("vistana", "2026-09-06", 1002), fac("vistana", "2026-09-11", 1003),
+    ]));
+    expect(c.map((x) => (x.clase === "compra" ? x.facturas : []))).toEqual([["1003"], ["1001", "1002"]]);
+  });
+
+  it("dos empresas el mismo día son dos compras", () => {
+    const c = compras(historialDeCompras([fac("vistana", "2026-09-01", 1), fac("fashion_wear", "2026-09-01", 2)]));
+    expect(c.map((x) => x.empresa).sort()).toEqual(["fashion_wear", "vistana"]);
+  });
+
+  it("la nota de crédito queda APARTE: no resta de la compra ni del total del mes", () => {
+    const [mes] = historialDeCompras([
+      fac("vistana", "2026-11-02", 3224, 200),
+      fac("vistana", "2026-11-03", 860, 50, "Nota de Crédito"),
+    ]);
+    expect(mes.total).toBe(200);
+    expect(mes.devoluciones).toBe(-50);
+    expect(mes.filas).toEqual([
+      { clase: "devolucion", empresa: "vistana", fecha: "2026-11-03", monto: -50, numero: "0860" },
+      { clase: "compra", empresa: "vistana", fecha: "2026-11-02", monto: 200, facturas: ["3224"] },
+    ]);
+  });
+
+  it("la compra va en el mes de su PRIMERA factura", () => {
+    const meses = historialDeCompras([fac("vistana", "2026-08-30", 1), fac("vistana", "2026-09-03", 2)]);
+    expect(meses.map((m) => [m.mes, m.total])).toEqual([["2026-08", 200]]);
   });
 });
 

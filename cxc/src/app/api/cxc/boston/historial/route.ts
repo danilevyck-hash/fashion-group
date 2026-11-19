@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/cxc/boston/historial?cliente=5429&tipo=pagos|facturas
+// GET /api/cxc/boston/historial?cliente=5429&tipo=pagos|compras
 //
 // El gemelo de `/api/cxc/historial` para la cartera APARTE de Confecciones
 // Boston. 🔴 NO comparte ni una función de consulta con la del grupo: la
@@ -20,7 +20,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { TIPOS_VENTA_CONOCIDOS } from "@/lib/ventas/tipos-comprobante";
 import {
   HISTORIAL_CLIENTE_2026_11,
-  historialDeFacturas,
+  historialDeCompras,
   historialDePagos,
   type FacturaLeida,
 } from "@/lib/cxc/historial-cliente";
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   const raw = (req.nextUrl.searchParams.get("cliente") ?? "").trim();
   const cliente = /^\d+$/.test(raw) ? Number(raw) : NaN;
   const tipo = req.nextUrl.searchParams.get("tipo");
-  if (!Number.isInteger(cliente) || cliente <= 0 || (tipo !== "pagos" && tipo !== "facturas")) {
+  if (!Number.isInteger(cliente) || cliente <= 0 || (tipo !== "pagos" && tipo !== "compras")) {
     return NextResponse.json({ error: "Faltan el cliente o el tipo" }, { status: 400 });
   }
 
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
           .order("id", { ascending: true })
           .range(desde, hasta),
     );
-    return NextResponse.json({ cliente, tipo, meses: historialDeFacturas(filas) });
+    return NextResponse.json({ cliente, tipo, meses: historialDeCompras(filas) });
   } catch (e) {
     console.error(`[cxc/boston/historial] ${tipo} ${cliente}:`, e instanceof Error ? e.message : e);
     return NextResponse.json({ error: "No se pudo leer el historial" }, { status: 500 });
