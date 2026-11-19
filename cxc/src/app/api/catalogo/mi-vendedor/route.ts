@@ -5,9 +5,9 @@
 // muestra y bloquea el envío con mensaje accionable).
 
 import { NextRequest, NextResponse } from "next/server";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
 import { EMPRESAS_CATALOGO } from "@/lib/catalogo/marcas";
-import { requireRole } from "@/lib/requireRole";
-import { leerMiVendedor, ROLES_MI_VENDEDOR } from "@/lib/catalogo/mi-vendedor";
+import { leerMiVendedor } from "@/lib/catalogo/mi-vendedor";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 // lib/catalogo/marcas.ts). Ver el porqué en EMPRESAS_CATALOGO.
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const auth = requireRole(req, ROLES_MI_VENDEDOR);
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
 
   const empresa = req.nextUrl.searchParams.get("empresa") || "";

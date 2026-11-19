@@ -36,7 +36,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
 import ComprobantesPanel from "@/components/catalogo/ComprobantesPanel";
 import { filasDeOrders, type FilaComprobante, type FilaDeOrders } from "@/lib/catalogo/fila-comprobante";
-import { CATALOGO_ADMIN_ROLES, COMPROBANTES_EDITAR_ROLES } from "@/lib/catalogo/roles";
+import { CATALOGO_ADMIN_ROLES, COMPROBANTES_EDITAR_ROLES, puedePedir, usuarioDelNavegador } from "@/lib/catalogo/roles";
 import { PANEL_COMPROBANTES } from "@/lib/catalogo/numeros-pedido";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
@@ -72,7 +72,7 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   // 🔴 El segundo gate (25-ago-2026): quién TRABAJA el pedido, no quién lo
   // administra. Bodega entró a la lista *"solo a mirar"* y sin esto vería
   // «Editar» y «Duplicar», que le mueren en 403 en el servidor.
-  const puedeEditar = (COMPROBANTES_EDITAR_ROLES as readonly string[]).includes(String(role ?? ""));
+  const puedeEditar = (COMPROBANTES_EDITAR_ROLES as readonly string[]).includes(String(role ?? "")) || puedePedir({ role, userName: usuarioDelNavegador() });
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">

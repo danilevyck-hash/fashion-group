@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MarcaTheme } from "@/lib/catalogo/marcas-ui";
 import type { CatalogoProducto } from "@/components/catalogo/types";
+import { usuarioDelNavegador } from "@/lib/catalogo/roles";
 import {
   envioBloquea, hrefPedidoDetalle, mapaEnPedido, puedeAgregarAlPedido,
 } from "@/lib/catalogo/modo-pedido";
@@ -55,7 +56,7 @@ export function useModoPedido({
   orderId: string | null;
   onAviso: (mensaje: string) => void;
 }): ModoPedido {
-  const activo = !!orderId && puedeAgregarAlPedido(role);
+  const activo = !!orderId && puedeAgregarAlPedido(role, usuarioDelNavegador());
   const [estado, setEstado] = useState<EstadoModoPedido>("cargando");
   const [pedido, setPedido] = useState<{ id: string; order_number: string; client_name: string } | null>(null);
   const [lineas, setLineas] = useState<Map<string, Linea>>(new Map());

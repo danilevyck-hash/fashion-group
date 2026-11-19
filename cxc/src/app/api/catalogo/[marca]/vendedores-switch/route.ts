@@ -12,9 +12,8 @@
 // legacy), exactamente los mismos del selector de cliente. Ver `clienteSwitchRoles`.
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/requireRole";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
-import { clienteSwitchRoles } from "@/lib/catalogo/roles";
 import {
   buscarVendedor,
   errorVendedorNoExiste,
@@ -53,7 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, clienteSwitchRoles(cfg.createRoles));
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
 
   const orderId = req.nextUrl.searchParams.get("orderId");
@@ -95,7 +94,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, clienteSwitchRoles(cfg.createRoles));
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
 
   let body: { orderId?: unknown; vendedorSwitchId?: unknown };

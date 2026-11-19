@@ -125,10 +125,11 @@ describe("2 · quién arma pedidos: PEDIDO_ROLES, en un solo lugar", () => {
   });
 
   it("el checkout, `send-order` y el detalle leen la MISMA lista", () => {
-    expect(sinComentarios(leer("src/app/api/catalogo/checkout/route.ts"))).toContain("const ROLES = pedidoRoles();");
-    expect(sinComentarios(leer("src/app/api/catalogo/[marca]/send-order/route.ts"))).toContain("requireRole(req, pedidoRoles())");
+    // Desde el 19-nov-2026 la puerta es `requirePedido` (PEDIDO_ROLES + las personas de bodega que piden).
+    expect(sinComentarios(leer("src/app/api/catalogo/checkout/route.ts"))).toContain("requirePedido(req)");
+    expect(sinComentarios(leer("src/app/api/catalogo/[marca]/send-order/route.ts"))).toContain("requirePedido(req)");
     const detalle = sinComentarios(leer("src/components/catalogo/PedidoDetalleClient.tsx"));
-    expect(detalle).toContain("const isEditorRole = puedeArmarPedido(role);");
+    expect(detalle).toContain("const isEditorRole = puedePedir({ role, userName: usuarioDelNavegador() });");
     expect(detalle).not.toMatch(/\["admin", "secretaria", "vendedor"\]/);
   });
 
@@ -186,7 +187,7 @@ describe("2 · el catálogo interno en SOLO LECTURA para quien no arma pedidos",
 
   it("la pantalla del catálogo deriva `soloLectura` del rol y lo pasa a las 4 formas de dibujar", () => {
     const src = sinComentarios(leer("src/components/catalogo/CatalogoVendedorPage.tsx"));
-    expect(src).toContain('const soloLectura = role !== "" && !puedeArmarPedido(role);');
+    expect(src).toContain('const soloLectura = role !== "" && !puedePedir({ role, userName: usuarioDelNavegador() });');
     expect(src.match(/soloLectura=\{soloLectura\}/g)?.length).toBe(4);
     // Sin carrito no hay «Ver pedido» que ofrecer.
     expect(src).toContain("{!modo.activo && !soloLectura && cartCount > 0 && (");

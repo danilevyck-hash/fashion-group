@@ -230,9 +230,48 @@ export const PEDIDO_ROLES = ["admin", "secretaria", "vendedor"] as const;
 /** Copia mutable para quien reciba `string[]`. */
 export const pedidoRoles = (): string[] => [...PEDIDO_ROLES];
 
-/** ¿Este rol arma pedidos (ve «Agregar» y el carrito en el catálogo interno)? */
+/** ¿Este rol arma pedidos (ve «Agregar» y el carrito en el catálogo interno)?
+ *  🔴 Mira SOLO el rol: para decidir de verdad usa `puedePedir(sesion)`, que
+ *  suma las personas de `PIDEN_EN_CATALOGO_POR_USUARIO`. */
 export function puedeArmarPedido(role: string | null | undefined): boolean {
   return (PEDIDO_ROLES as readonly string[]).includes(role ?? "");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 DOS PERSONAS DE BODEGA SÍ PIDEN (19-nov-2026, decisión de Daniel)
+//
+// Eloyn y Cuba son `bodega` y arman pedidos y cotizaciones en los catálogos
+// igual que un vendedor, y ven los precios del pedido. El resto de bodega sigue
+// en solo lectura y sin precios. La excepción es POR PERSONA (`fg_users.name`,
+// igualdad exacta en minúsculas, nunca por parecido) y SOLO para bodega: el
+// mismo nombre con otro rol no abre nada. No toca Despachos.
+//
+// Todo lugar que decide «¿arma pedidos?» —servidor y pantalla— pasa por
+// `puedePedir`; el servidor usa `requirePedido` (`require-pedido.ts`).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Usuarios de BODEGA que arman pedidos en el catálogo (`fg_users.name`, en minúsculas). */
+export const PIDEN_EN_CATALOGO_POR_USUARIO: ReadonlySet<string> = new Set(["eloyn", "cuba"]);
+
+/** Lo que hace falta de la sesión para decidir: el rol y el usuario. */
+export type QuienPide = { role?: string | null; userName?: string | null } | null | undefined;
+
+/** ¿Esta sesión arma pedidos? Rol en `PEDIDO_ROLES`, o bodega con el usuario en la lista. */
+export function puedePedir(s: QuienPide): boolean {
+  const role = s?.role ?? "";
+  if (puedeArmarPedido(role)) return true;
+  return role === "bodega" && PIDEN_EN_CATALOGO_POR_USUARIO.has((s?.userName ?? "").trim().toLowerCase());
+}
+
+/** El usuario de la sesión en ESTE navegador (`fg_user_name`, lo guarda el
+ *  login junto a `cxc_role`). Solo para la pantalla: el servidor decide por la
+ *  cookie firmada. Sin almacenamiento, vacío. */
+export function usuarioDelNavegador(): string {
+  try {
+    return sessionStorage.getItem("fg_user_name") || "";
+  } catch {
+    return "";
+  }
 }
 
 /** TRABAJAN un comprobante desde la lista: «Editar» y «Duplicar». Es el mismo
@@ -266,6 +305,6 @@ export const comprobantesEditarRoles = (): string[] => [...COMPROBANTES_EDITAR_R
  *  precio_lista del detalle)? Bodega entra a mirar el pedido pero no a su
  *  plata — el resto de `COMPROBANTES_ROLES` (admin, secretaria, vendedor) la
  *  ve igual que siempre. */
-export function puedeVerPrecioDePedido(role: string | null | undefined): boolean {
-  return (PEDIDO_ROLES as readonly string[]).includes(role ?? "");
+export function puedeVerPrecioDePedido(s: QuienPide): boolean {
+  return puedePedir(s);
 }

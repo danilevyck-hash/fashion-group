@@ -30,7 +30,7 @@
 
 import { bultoEnRenglon, colsConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/requireRole";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
 import { getSession } from "@/lib/require-auth";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { getEnvioActivo } from "@/lib/catalogo/switch-lock";
@@ -43,7 +43,6 @@ import {
 } from "@/lib/catalogo/cliente-switch";
 import { vendedorParaDuplicado } from "@/lib/catalogo/vendedor-switch";
 
-const DUP_ROLES = ["admin", "secretaria", "vendedor"];
 
 /** ¿El nombre pedido es OTRO cliente? Espacios y mayúsculas no cuentan como
  *  cambio (retipear "juan" por "Juan" es la misma persona). */
@@ -79,7 +78,7 @@ export async function handleDuplicarPedido(
   marca: string,
   orderId: string,
 ): Promise<NextResponse> {
-  const auth = requireRole(req, DUP_ROLES);
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
   const session = getSession(req);
   const cfg = MARCAS_CONFIG[marca];

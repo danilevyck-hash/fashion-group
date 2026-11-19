@@ -5,7 +5,7 @@
 import { bultoEnRenglon, colsConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { bultoReebokNuevo } from "@/lib/reebok-bulto";
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/requireRole";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import { getEnvioActivo, switchLockResponse } from "@/lib/catalogo/switch-lock";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
@@ -50,7 +50,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
   const { product_id, sku, name, image_url, quantity, unit_price, is_preorder } = await req.json();
   if (!product_id) return NextResponse.json({ error: "product_id requerido" }, { status: 400 });

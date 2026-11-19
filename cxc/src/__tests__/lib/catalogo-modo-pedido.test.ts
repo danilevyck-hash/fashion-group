@@ -77,8 +77,11 @@ describe("quién puede agregar", () => {
   it("CANDADO: son EXACTAMENTE los que acepta el PATCH /item", () => {
     // Uno de más = un botón que el server contesta 403; uno de menos = alguien
     // que sí puede editar el pedido y no puede agregar desde el catálogo.
+    // El PATCH /item pasa por `requirePedido`, que es PEDIDO_ROLES (+ las personas de bodega).
     const route = SRC("src/app/api/catalogo/[marca]/orders/[id]/item/route.ts");
-    const m = route.match(/requireRole\(req,\s*\[([^\]]+)\]/);
+    expect(route).toContain("requirePedido(req)");
+    const puerta = SRC("src/lib/catalogo/roles.ts");
+    const m = puerta.match(/export const PEDIDO_ROLES = \[([^\]]+)\]/);
     expect(m).toBeTruthy();
     const delRoute = m![1].split(",").map((s) => s.trim().replace(/["']/g, "")).sort();
     expect([...ROLES_QUE_AGREGAN].sort()).toEqual(delRoute);

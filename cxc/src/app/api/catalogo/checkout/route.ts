@@ -20,6 +20,7 @@
 
 import { bultoEnRenglon, sellarBultoReebok } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
 import {
   buscarVendedor,
   errorVendedorNoExiste,
@@ -29,8 +30,6 @@ import {
 } from "@/lib/catalogo/vendedor-switch";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
-import { requireRole } from "@/lib/requireRole";
-import { pedidoRoles } from "@/lib/catalogo/roles";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { enviarPedidoSwitch, type EnvioItem, type EnvioParams } from "@/lib/catalogo/switch-envio";
 import { enviarEnSegundoPlano, entregarAWaitUntil } from "@/lib/catalogo/envio-en-segundo-plano";
@@ -44,7 +43,6 @@ export const maxDuration = 300;
 
 // Quién arma pedidos: UNA lista (`PEDIDO_ROLES`), la misma que lee el catálogo
 // para esconderle «Agregar» a quien solo mira (11-sep-2026).
-const ROLES = pedidoRoles();
 
 interface CheckoutItem extends EnvioItem {
   image_url?: string | null;
@@ -52,7 +50,7 @@ interface CheckoutItem extends EnvioItem {
 }
 
 async function handleCheckout(req: NextRequest, estado: { segundoPlano: boolean }): Promise<NextResponse> {
-  const auth = requireRole(req, ROLES);
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json().catch(() => null);

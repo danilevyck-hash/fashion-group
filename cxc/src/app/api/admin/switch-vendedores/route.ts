@@ -21,10 +21,9 @@
 // sesión cuando esta llamada realmente fue a Switch.
 
 import { NextRequest, NextResponse } from "next/server";
-import { EMPRESAS_CATALOGO, MARCAS_CONFIG } from "@/lib/catalogo/marcas";
-import { clienteSwitchRoles } from "@/lib/catalogo/roles";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
+import { EMPRESAS_CATALOGO } from "@/lib/catalogo/marcas";
 import { listarVendedores } from "@/lib/catalogo/vendedor-switch";
-import { requireRole } from "@/lib/requireRole";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 
 export const dynamic = "force-dynamic";
@@ -37,12 +36,9 @@ export const maxDuration = 60;
 
 /** Quien arma pedidos en CUALQUIER marca puede leer la lista de vendedores
  *  (mismo criterio que /api/catalogo/switch-clientes para el directorio). */
-const ROLES = clienteSwitchRoles(
-  Array.from(new Set(Object.values(MARCAS_CONFIG).flatMap((m) => m.createRoles))),
-);
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const auth = requireRole(req, ROLES);
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
 
   const empresa = req.nextUrl.searchParams.get("empresa") || "";

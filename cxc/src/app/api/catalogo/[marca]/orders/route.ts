@@ -52,7 +52,7 @@ import { resumirDesdeItems, type ContextoLineas, type ItemCrudo } from "@/lib/ca
 import { contextoDeLineas, totalDeLaLista } from "@/lib/catalogo/totales-lista";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
-import { comprobantesRoles, puedeVerPrecioDePedido } from "@/lib/catalogo/roles";
+import { comprobantesRoles, puedePedir, puedeVerPrecioDePedido } from "@/lib/catalogo/roles";
 import { esPedidoDelLink } from "@/lib/catalogo/cliente-elegido";
 import {
   errorClienteNoExiste,
@@ -200,7 +200,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   // 🔴 BODEGA NO VE PLATA (7-oct-2026): el Total de cada fila se recorta ACÁ,
   // antes de salir — nunca escondido en el navegador. `puedeVerPrecioDePedido`
   // es el mismo trío que ya trabaja el pedido (`PEDIDO_ROLES`).
-  const salida = puedeVerPrecioDePedido(session.role)
+  const salida = puedeVerPrecioDePedido(session)
     ? todos
     : todos.map((o) => ({ ...o, total: null }));
   return NextResponse.json(salida);
@@ -331,7 +331,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
 
   const session = getSession(req);
   // QUIRK 2: los roles de creación vienen de la config (Reebok incluye 'cliente').
-  if (!session || !cfg.createRoles.includes(session.role)) {
+  if (!session || !(cfg.createRoles.includes(session.role) || puedePedir(session))) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 

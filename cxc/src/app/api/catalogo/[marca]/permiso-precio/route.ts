@@ -23,8 +23,8 @@
 // no poder preguntar.
 
 import { NextRequest, NextResponse } from "next/server";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
-import { requireRole } from "@/lib/requireRole";
 import { createSwitchClient, logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import {
   PROCESO_CAMBIO_PRECIO,
@@ -40,13 +40,12 @@ export const maxDuration = 60;
 
 // Los mismos roles que pueden enviar el pedido: quien edita el precio es quien
 // necesita saber si Switch se lo va a aceptar.
-const ROLES = ["admin", "secretaria", "vendedor"];
 
 export async function GET(req: NextRequest, { params }: { params: { marca: string } }) {
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, ROLES);
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
 
   try {
