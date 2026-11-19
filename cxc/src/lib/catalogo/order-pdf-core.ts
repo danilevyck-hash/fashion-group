@@ -60,7 +60,7 @@ export interface OrderPdfOpts {
 
 /** Lado máximo (px) al que se reduce cada foto antes de embeberla: se pinta a
  *  10 mm (~57 px) — 200 px da margen de sobra y reduce el PDF ~10-20x. */
-export const ORDER_PDF_IMG_PX = 200;
+export { ORDER_PDF_IMG_PX } from "./foto-reducida";
 
 // Precio del catálogo: `35` / `12.50` / `4,422` — sin `.00` y sin redondear.
 const fmt = precioTexto;

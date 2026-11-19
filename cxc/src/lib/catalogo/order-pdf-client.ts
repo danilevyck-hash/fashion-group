@@ -4,36 +4,11 @@
 // interno (Reebok/Joybees) y las páginas públicas /pedido-reebok y
 // /pedido-joybees. Importar SIEMPRE con dynamic import desde componentes.
 
-import {
-  buildOrderPdfDoc,
-  ORDER_PDF_IMG_PX,
-  type OrderPdfOpts,
-} from "@/lib/catalogo/order-pdf-core";
+import { buildOrderPdfDoc, type OrderPdfOpts } from "@/lib/catalogo/order-pdf-core";
+import { loadImageDownscaled } from "@/lib/catalogo/foto-reducida";
 
-/** Carga una imagen y la devuelve como dataURL JPEG reducido (fondo blanco). */
-function loadImageDownscaled(url: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      try {
-        const scale = Math.min(1, ORDER_PDF_IMG_PX / Math.max(img.naturalWidth, img.naturalHeight));
-        const w = Math.max(1, Math.round(img.naturalWidth * scale));
-        const h = Math.max(1, Math.round(img.naturalHeight * scale));
-        const c = document.createElement("canvas");
-        c.width = w; c.height = h;
-        const ctx = c.getContext("2d")!;
-        // Fondo blanco: los PNG con transparencia se ven negros al pasar a JPEG.
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(c.toDataURL("image/jpeg", 0.72));
-      } catch { resolve(null); }
-    };
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
-}
+// La misma reducción la usa el Excel del pedido (`order-excel.ts`).
+export { loadImageDownscaled };
 
 export async function downloadCatalogoOrderPdf(
   opts: Omit<OrderPdfOpts, "images"> & { filename: string },
@@ -42,7 +17,7 @@ export async function downloadCatalogoOrderPdf(
   const images: Record<string, string> = {};
   await Promise.all(urls.map(async (u) => {
     const data = await loadImageDownscaled(u);
-    if (data) images[u] = data;
+    if (data) images[u] = data.dataUrl;
   }));
   const doc = buildOrderPdfDoc({ ...opts, images });
   doc.save(opts.filename);

@@ -789,8 +789,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     if (!order) return;
     try {
       const prefix = palabraDelPapel(switchEnvio, order.status === "confirmado" ? "Pedido" : "Cotización");
+      showToast("Generando Excel...");
       const { downloadCatalogoOrderExcel } = await import("@/lib/catalogo/order-excel");
-      downloadCatalogoOrderExcel({
+      await downloadCatalogoOrderExcel({
         ...opcionesDelPapel(prefix),
         filename: `${prefix}-${order.order_number}-${hoyPanama()}.xlsx`,
       });

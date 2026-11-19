@@ -123,7 +123,7 @@ export default function AccionesComprobante({
     }
     try {
       const { downloadCatalogoOrderExcel } = await import("@/lib/catalogo/order-excel");
-      downloadCatalogoOrderExcel({
+      await downloadCatalogoOrderExcel({
         ...opcionesDelPapel(full),
         filename: nombreArchivoPapel(pedido, hoyPanama()).replace(/\.pdf$/, ".xlsx"),
       });
