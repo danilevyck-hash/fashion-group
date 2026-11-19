@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { ROLES_MULTIFASHION } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerFeriados } from "@/lib/asistencia/feriados-server";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
   MESES_DEL_PATRON, agregarPatrones, mesesDeLaVentana,
@@ -126,7 +127,11 @@ export async function GET(req: NextRequest) {
     // Los feriados del mes, para «¿la tienda abrió?» (un día hábil en $0 que no
     // es feriado). Solo con el interruptor; si falla, `null` = no se avisa.
     RETAIL_AL_FRENTE
-      ? supabaseServer.from("asistencia_feriados").select("fecha").gte("fecha", mesInicio).lt("fecha", mesNext)
+      // 🔴 Por `leerFeriados` (19-nov-2026): los nacionales calculados + lo de la tabla, de cualquier tipo.
+      ? leerFeriados(mesInicio, new Date(Date.UTC(year, mes, 0)).toISOString().slice(0, 10)).then(
+          (r) => ({ data: [...r.feriados.keys(), ...r.diasLibres.keys()].map((fecha) => ({ fecha })), error: null }),
+          (error: unknown) => ({ data: null, error }),
+        )
       : sinConsulta,
     // ── «Cuándo vende la tienda» sobre los ÚLTIMOS 3 MESES ──────────────────
     // 🩸 Con la ventana de UN mes, «mejor día de semana» y «mejor día del mes»
