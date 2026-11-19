@@ -73,6 +73,7 @@ import PantallaUnToque from "./PantallaUnToque";
 import PantallaDeAntes from "./PantallaDeAntes";
 import MisMarcaciones from "./MisMarcaciones";
 import Recordatorios from "./Recordatorios";
+import AvisoActivarAvisos from "./AvisoActivarAvisos";
 import { MARCACION_HISTORIAL_Y_AVISOS_2026_11 } from "@/lib/ui/marcacion-historial-avisos-2026-11";
 import {
   AVISO_UBICACION_NEGADA,
@@ -671,6 +672,8 @@ export default function MarcacionClient({ inicial = null }: { inicial?: EstadoSe
         {errorCarga && estado && (
           <p className="mb-3 text-sm text-gray-500">{errorCarga}</p>
         )}
+
+        {MARCACION_HISTORIAL_Y_AVISOS_2026_11 && estado?.codigo && <AvisoActivarAvisos />}
 
         {sinCodigo && (
           <Aviso
