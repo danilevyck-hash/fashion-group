@@ -120,7 +120,7 @@ export default function ContactPanel({
                       <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
                         {historial && d.ultimoPagoFecha && d.ultimoPagoMonto != null ? (
                           <TocarHistorial {...historial} empresa={co.key} vista="pagos">
-                            <span className="text-gray-600">${fmt(d.ultimoPagoMonto)} · </span>
+                            ${fmt(d.ultimoPagoMonto)} ·{" "}
                             <span className={daysAgingColor(ultDias)}>{ultDias != null ? `${ultDias} d` : ""}</span>
                           </TocarHistorial>
                         ) : d.ultimoPagoFecha ? (
@@ -154,8 +154,7 @@ export default function ContactPanel({
                       <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
                         {historial && d.ultimaCompraFecha && d.ultimaCompraMonto != null ? (
                           <TocarHistorial {...historial} empresa={co.key} vista="compras">
-                            <span className="text-gray-600">${fmt(d.ultimaCompraMonto)} · </span>
-                            <span className="text-gray-500">{compraDias != null ? `${compraDias} d` : ""}</span>
+                            ${fmt(d.ultimaCompraMonto)} · {compraDias != null ? `${compraDias} d` : ""}
                           </TocarHistorial>
                         ) : d.ultimaCompraFecha && junta && docs ? (
                           <span>

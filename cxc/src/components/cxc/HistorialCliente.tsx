@@ -43,8 +43,8 @@ function useEsTelefono(): boolean {
   return tel;
 }
 
-/** El texto «Últ. pago $X · N d» (o «Últ. compra …») hecho botón: subrayado
- *  punteado y un chevron chico. Abre la hoja o el panel de esa empresa. */
+/** El texto «Últ. pago $X · N d ›» (o «Últ. compra …») hecho botón, en el azul
+ *  de los enlaces del sistema. Abre la hoja o el panel de esa empresa. */
 export default function TocarHistorial({ codigo, nombre, empresa, vista, children }: {
   codigo: string; nombre: string; empresa: string; vista: Vista; children: ReactNode;
 }) {
@@ -61,10 +61,10 @@ export default function TocarHistorial({ codigo, nombre, empresa, vista, childre
         type="button"
         data-historial={vista}
         onClick={(e) => { e.stopPropagation(); setAbierto(true); }}
-        className="whitespace-nowrap underline decoration-gray-300 decoration-dotted underline-offset-2 hover:text-gray-900 active:opacity-60"
+        className="whitespace-nowrap text-blue-600 hover:text-blue-800 active:opacity-60"
       >
         {children}
-        <span aria-hidden className="ml-0.5 text-gray-400">›</span>
+        <span aria-hidden className="ml-0.5">›</span>
       </button>
       {tel ? (
         <BottomSheet open={abierto} onClose={cerrar} abreCompleta>{cuerpo}</BottomSheet>
