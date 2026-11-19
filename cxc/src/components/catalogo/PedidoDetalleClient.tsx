@@ -49,7 +49,7 @@ import { hrefCatalogoAgregando } from "@/lib/catalogo/modo-pedido";
 import { avisosBloqueantes, type AvisoEnvio } from "@/lib/catalogo/switch-prevalidacion";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 import { PANEL_COMPROBANTES } from "@/lib/catalogo/numeros-pedido";
-import { puedeArmarPedido } from "@/lib/catalogo/roles";
+import { puedePedir, usuarioDelNavegador } from "@/lib/catalogo/roles";
 import {
   SIN_CLIENTE_ELEGIDO,
   esPedidoDelLink,
@@ -216,7 +216,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   // Quién TRABAJA el pedido: `PEDIDO_ROLES`, la misma lista que el checkout y
   // el catálogo (11-sep-2026). Bodega y `gerente_boston` lo ven en solo lectura.
-  const isEditorRole = puedeArmarPedido(role);
+  const isEditorRole = puedePedir({ role, userName: usuarioDelNavegador() });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -238,7 +238,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         // Estado del envío a Switch (quien arma pedidos — el vendedor también
         // necesita ver el candado post-envío; otros roles se ignoran). La lista
         // es `PEDIDO_ROLES`, la misma del checkout (11-sep-2026).
-        if (puedeArmarPedido(r)) {
+        if (puedePedir({ role: r, userName: usuarioDelNavegador() })) {
           try {
             const er = await fetch(`${theme.api}/orders/${id}/enviar-switch`);
             if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }

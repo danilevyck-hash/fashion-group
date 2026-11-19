@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { leerCategoriaYBulto, leerPreciosLista } from "@/lib/catalogo/bulto-productos";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
-import { comprobantesRoles, puedeVerPrecioDePedido } from "@/lib/catalogo/roles";
+import { comprobantesRoles, puedePedir, puedeVerPrecioDePedido } from "@/lib/catalogo/roles";
 import { getEnvioActivo, switchLockResponse, fetchReemplazoInfo } from "@/lib/catalogo/switch-lock";
 
 const EDIT_ROLES = ["admin", "secretaria", "vendedor"];
@@ -152,7 +152,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   // pedido, salen en null. `puedeVerPrecioDePedido` es el trío de siempre
   // (`PEDIDO_ROLES`); nadie que ya veía precio para trabajar el pedido pierde
   // nada.
-  const verPrecio = puedeVerPrecioDePedido(session.role);
+  const verPrecio = puedeVerPrecioDePedido(session);
   const itemsFinal = verPrecio
     ? itemsOut
     : itemsOut.map((i) => ({ ...i, unit_price: null, precio_lista: null }));
@@ -170,7 +170,7 @@ export async function PUT(req: NextRequest, { params }: { params: { marca: strin
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
   const session = getSession(req);
-  if (!session || !EDIT_ROLES.includes(session.role)) {
+  if (!session || !(EDIT_ROLES.includes(session.role) || puedePedir(session))) {
     return NextResponse.json({ error: "Sin permiso para editar" }, { status: 403 });
   }
 

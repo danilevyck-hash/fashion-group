@@ -1,6 +1,6 @@
 import { bultoEnRenglon, conservarBultoReebok } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/requireRole";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +50,7 @@ export async function POST(
   // único que hace es numerar el pedido del link como <prefijo>-###. Borrar
   // (orders DELETE, pedidos-publicos DELETE, bulk-delete) y exportar siguen
   // siendo de admin/secretaria: no son parte de este flujo.
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
 
   const shortId = params.short_id;

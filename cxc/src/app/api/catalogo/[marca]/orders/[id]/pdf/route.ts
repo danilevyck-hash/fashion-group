@@ -5,8 +5,8 @@
 
 import { bultoEnRenglon, colsConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
-import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { buildCatalogoOrderPdf, type PdfOrderItem } from "@/lib/catalogo/order-pdf";
 import { palabraDelEnvioActivo } from "@/lib/catalogo/switch-lock";
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
 
   const db = await cfg.db();

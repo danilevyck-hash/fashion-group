@@ -5,7 +5,8 @@ import { getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import { CATALOGOS_APPLE_V2_2026_10 } from "@/lib/catalogo/catalogos-2026-10-v2";
 import { VENDEDOR_PUESTO_2026_11 } from "@/lib/catalogo/reebok-catalogo-2026-11";
-import { leerMiVendedor, ROLES_MI_VENDEDOR, type MiVendedor } from "@/lib/catalogo/mi-vendedor";
+import { leerMiVendedor, type MiVendedor } from "@/lib/catalogo/mi-vendedor";
+import { puedePedir } from "@/lib/catalogo/roles";
 import { verifySession } from "@/lib/session-cookie";
 
 /**
@@ -19,7 +20,7 @@ async function vendedorDelServidor(empresa: string): Promise<MiVendedor | null |
   try {
     const s = verifySession(cookies().get("cxc_session")?.value);
     if (!s?.userId) return undefined;
-    if (s.role !== "admin" && !ROLES_MI_VENDEDOR.includes(s.role)) return undefined;
+    if (!puedePedir(s)) return undefined;
     return await leerMiVendedor(s.userId, empresa);
   } catch {
     return undefined;

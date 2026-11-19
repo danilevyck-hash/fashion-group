@@ -16,8 +16,8 @@
 
 import { bultoEnRenglon, colsConBulto } from "@/lib/catalogo/bulto-renglon-reebok";
 import { NextRequest, NextResponse } from "next/server";
+import { requirePedido } from "@/lib/catalogo/require-pedido";
 import { leerCategoriaYBulto } from "./bulto-productos";
-import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { enviarPedidoSwitch, type EnvioItem, type EnvioResult } from "@/lib/catalogo/switch-envio";
@@ -27,7 +27,6 @@ import { normalizarDocumento } from "@/lib/catalogo/documento-switch";
 
 // El vendedor también puede consultar/reintentar el envío: crear+enviar desde
 // el checkout ya es suyo — el Reintentar es la misma operación tras un fallo.
-const SEND_ROLES = ["admin", "secretaria", "vendedor"];
 
 interface OrderRow {
   id: string;
@@ -82,7 +81,7 @@ async function fetchOrder(marca: string, orderId: string): Promise<OrderRow | nu
 }
 
 export async function handleGetEnvio(req: NextRequest, marca: string, orderId: string): Promise<NextResponse> {
-  const auth = requireRole(req, SEND_ROLES);
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
   const cfg = MARCAS_CONFIG[marca];
   const db = await cfg.db();
@@ -109,7 +108,7 @@ export async function handleGetEnvio(req: NextRequest, marca: string, orderId: s
 }
 
 export async function handlePostEnvio(req: NextRequest, marca: string, orderId: string): Promise<NextResponse> {
-  const auth = requireRole(req, SEND_ROLES);
+  const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
   const cfg = MARCAS_CONFIG[marca];
   const db = await cfg.db();

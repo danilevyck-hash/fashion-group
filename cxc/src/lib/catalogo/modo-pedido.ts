@@ -12,6 +12,8 @@
 // sobrevive un refresh, se puede compartir y sale limpio (se va el parámetro,
 // vuelve el catálogo de siempre). Módulo PURO: acá no se toca la red.
 
+import { puedePedir } from "@/lib/catalogo/roles";
+
 /** Parámetro de query que enciende el modo. */
 export const PARAM_AGREGAR_A = "agregarA";
 
@@ -24,8 +26,9 @@ export const PARAM_AGREGAR_A = "agregarA";
  */
 export const ROLES_QUE_AGREGAN = ["admin", "secretaria", "vendedor"] as const;
 
-export function puedeAgregarAlPedido(role: string | null | undefined): boolean {
-  return !!role && (ROLES_QUE_AGREGAN as readonly string[]).includes(role);
+export function puedeAgregarAlPedido(role: string | null | undefined, userName?: string | null): boolean {
+  // + las personas de bodega que piden (`puedePedir`, 19-nov-2026).
+  return !!role && ((ROLES_QUE_AGREGAN as readonly string[]).includes(role) || puedePedir({ role, userName }));
 }
 
 /**

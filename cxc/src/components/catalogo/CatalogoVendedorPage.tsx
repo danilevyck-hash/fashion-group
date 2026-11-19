@@ -44,7 +44,7 @@ import {
   groupByModel, getDisplaySection, type DisplaySection, SECTION_ORDER, SECTION_LABELS,
   type GroupedProduct, type JoybeesProduct,
 } from "./groupByModel";
-import { COMPROBANTES_ROLES, puedeArmarPedido } from "@/lib/catalogo/roles";
+import { COMPROBANTES_ROLES, puedePedir, usuarioDelNavegador } from "@/lib/catalogo/roles";
 import { precioTexto } from "@/lib/catalogo/precio";
 import { opcionesConDatos } from "@/lib/catalogo/filtros-derivados";
 import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
@@ -175,7 +175,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   // regla se LEE de `PEDIDO_ROLES` (la misma del checkout), nunca se escribe
   // acá. Mientras el rol no se conoce (primer render, antes del efecto) la
   // ficha se dibuja como siempre: el vendedor no ve aparecer el botón.
-  const soloLectura = role !== "" && !puedeArmarPedido(role);
+  const soloLectura = role !== "" && !puedePedir({ role, userName: usuarioDelNavegador() });
   const agregarA = idAgregarA(searchParams);
   const avisar = useCallback((m: string) => {
     setToast(m);

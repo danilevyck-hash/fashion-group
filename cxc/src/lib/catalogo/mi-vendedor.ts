@@ -2,9 +2,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 export interface MiVendedor { id: number; nombre: string | null }
 
-/** Roles que arman pedidos y tienen «su» vendedor de Switch. */
-export const ROLES_MI_VENDEDOR = ["admin", "secretaria", "vendedor"];
-
 /**
  * El vendedor de Switch mapeado a un usuario en una empresa
  * (`fg_user_switch_vendedor`). UNA lectura, la usan la ruta
