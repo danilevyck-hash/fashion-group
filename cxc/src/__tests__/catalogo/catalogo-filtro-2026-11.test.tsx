@@ -78,6 +78,27 @@ describe("CATALOGO_FILTRO_2026_11", () => {
     expect(screen.getByRole("button", { name: "Quitar Women" })).toBeTruthy();
   });
 
+  it("sin deslizar (19-nov-2026): categorías de a 3, género en una línea, orden corto de a 2", () => {
+    estado.prendido = true;
+    render(<Pantalla />);
+    fireEvent.click(boton());
+    const grilla = (s: string) => hoja()!.querySelector(`[data-seccion="${s}"] [role=radiogroup]`)!.className;
+    expect(grilla("categoria")).toContain("grid-cols-2"); // 2 opciones
+    expect(grilla("genero")).toContain("grid-cols-2");
+    expect(grilla("orden")).toContain("grid-cols-2");
+    const orden = within(hoja()!).getAllByRole("radio").map(r => r.textContent);
+    expect(orden).toEqual(expect.arrayContaining(["Relevancia", "Menor precio", "Mayor precio", "Nombre A-Z"]));
+    for (const r of within(hoja()!).getAllByRole("radio")) expect(r.className).toContain("min-h-[44px]");
+  });
+
+  it("6 categorías van de a 3", () => {
+    estado.prendido = true;
+    const seis = [{ value: "", label: "Todas" }, ...["a", "b", "c", "d", "e", "f"].map(v => ({ value: v, label: v }))];
+    render(<Pantalla categorias={seis} />);
+    fireEvent.click(boton());
+    expect(hoja()!.querySelector('[data-seccion="categoria"] [role=radiogroup]')!.className).toContain("grid-cols-3");
+  });
+
   it("una sola categoría: sin sección Categoría", () => {
     estado.prendido = true;
     render(<Pantalla categorias={[{ value: "", label: "Todas" }, { value: "clogs", label: "Clogs" }]} />);
