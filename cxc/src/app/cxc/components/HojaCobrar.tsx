@@ -1,6 +1,8 @@
 "use client";
 import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "./CompraJunta";
 import { ListaPagosEmpresa } from "./PagosDeEmpresa";
+import TocarHistorial from "@/components/cxc/HistorialCliente";
+import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
 import { telefonoParaWhatsApp, textoSinCelular } from "@/lib/ui/uso-2026-11";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -368,7 +370,12 @@ export default function HojaCobrar({
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
           Desglose por empresa ({desglose.length})
         </p>
-        <TablaDesgloseEmpresas filas={desglose} total={total} codigo={codigo} />
+        <TablaDesgloseEmpresas
+          filas={desglose}
+          total={total}
+          codigo={codigo}
+          historial={HISTORIAL_CLIENTE_2026_11 && codigo ? { codigo, nombre } : null}
+        />
       </div>
 
       {avisos}
@@ -465,7 +472,13 @@ function FilaAccion({
  * hoja del celular y, desde la n.º 16 de la revisión 110, la página del
  * cliente: un dato, un solo dibujo.
  */
-export function TablaDesgloseEmpresas({ filas, total, codigo = null }: { filas: RenglonEmpresaCliente[]; total: TotalDesglose; codigo?: string | null }) {
+/** Con `historial` (interruptor `HISTORIAL_CLIENTE_2026_11`), «Últ. pago» y
+ *  «Últ. compra» se tocan y abren el historial de ESA empresa. */
+export interface HistorialDeLaTabla { codigo: string; nombre: string }
+
+export function TablaDesgloseEmpresas({ filas, total, codigo = null, historial = null }: {
+  filas: RenglonEmpresaCliente[]; total: TotalDesglose; codigo?: string | null; historial?: HistorialDeLaTabla | null;
+}) {
   return (
     <table className="w-full text-[12.5px] tabular-nums tracking-tight">
       <thead>
@@ -479,7 +492,7 @@ export function TablaDesgloseEmpresas({ filas, total, codigo = null }: { filas: 
       </thead>
       <tbody>
         {filas.map((f) => (
-          <FilaDesglose key={f.key} fila={f} codigo={codigo} />
+          <FilaDesglose key={f.key} fila={f} codigo={codigo} historial={historial} />
         ))}
         <tr className="border-t border-gray-300 font-semibold">
           <td className="pt-2 text-left">Total</td>
@@ -493,13 +506,41 @@ export function TablaDesgloseEmpresas({ filas, total, codigo = null }: { filas: 
   );
 }
 
+/** «Últ. pago $X · N d» y «Últ. compra $Y · N d», cada una entera como botón
+ *  que abre el historial de pagos o de compras de ESA empresa. */
+function LineaQueSeToca({ fila, historial, diasPago, diasCompra }: {
+  fila: RenglonEmpresaCliente; historial: HistorialDeLaTabla; diasPago: number | null; diasCompra: number | null;
+}) {
+  const base = { codigo: historial.codigo, nombre: historial.nombre, empresa: fila.key };
+  return (
+    <>
+      {fila.ultimoPago ? (
+        <TocarHistorial {...base} vista="pagos">
+          Últ. pago {montoExacto(fila.ultimoPago.monto)} ·{" "}
+          <span className={daysAgingColor(diasPago)}>{diasPago != null ? `${diasPago} d` : ""}</span>
+        </TocarHistorial>
+      ) : (
+        <span className="whitespace-nowrap">Últ. pago <span className="text-gray-300">—</span></span>
+      )}
+      {" · "}
+      {fila.ultimaCompra ? (
+        <TocarHistorial {...base} vista="compras">
+          Últ. compra {montoExacto(fila.ultimaCompra.monto)} · {diasCompra != null ? `${diasCompra} d` : ""}
+        </TocarHistorial>
+      ) : (
+        <span className="whitespace-nowrap">Últ. compra <span className="text-gray-300">—</span></span>
+      )}
+    </>
+  );
+}
+
 /**
  * Una empresa del desglose del celular: sus tres tramos y el total, y debajo
  * «Últ. pago $X · N d · Últ. compra $Y · N d». Los días del pago con el MISMO
  * color de la computadora (`daysAgingColor`); los de la compra en gris, como
  * allá: una compra vieja no es plata en riesgo.
  */
-function FilaDesglose({ fila, codigo }: { fila: RenglonEmpresaCliente; codigo: string | null }) {
+function FilaDesglose({ fila, codigo, historial }: { fila: RenglonEmpresaCliente; codigo: string | null; historial: HistorialDeLaTabla | null }) {
   const diasPago = daysSince(fila.ultimoPago?.fecha);
   const diasCompra = daysSince(fila.ultimaCompra?.fecha);
   const docs = fila.ultimaCompra?.documentos ?? null;
@@ -519,6 +560,9 @@ function FilaDesglose({ fila, codigo }: { fila: RenglonEmpresaCliente; codigo: s
       </tr>
       <tr>
         <td colSpan={5} className="pb-2 text-left text-[11px] text-gray-500">
+          {historial ? (
+            <LineaQueSeToca fila={fila} historial={historial} diasPago={diasPago} diasCompra={diasCompra} />
+          ) : (<>
           {/* Cada mitad no se parte; si no caben juntas, la compra baja entera
               a la línea siguiente: nunca desliza la hoja (18-nov-2026). */}
           <span className="whitespace-nowrap">
@@ -562,6 +606,7 @@ function FilaDesglose({ fila, codigo }: { fila: RenglonEmpresaCliente; codigo: s
               <span className="text-gray-300">—</span>
             )}
           </span>
+          </>)}
         </td>
       </tr>
       {verPagos && codigo && (
