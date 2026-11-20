@@ -1659,3 +1659,22 @@ Daniel: «quítame el hover que no me gusta… lo vi en CxC, y creo que en Venta
 - 🔴 **Boston: mismo FORMATO, APARTE.** Ruta propia, **no reusa `fetchEstadoCuentaData`**; sus teléfonos y correos de `switch_clientes` acotado a Boston, **nunca de `clientes_master`**.
 - 🩸 `/api/cxc-rows` se retiró; `contact-log` y `cxc-summary` se quedan. `cxc_rows` y `cxc_contact_log` **no se borran**.
 - 🔴 **EN EL CELULAR, LA LISTA ES LA CARTERA (24-sep-2026)**: `/cxc` hasta `sm` abre en la lista, con el total **EXACTO** y tres chips que **filtran Y ordenan por su plata**; el cliente son DOS renglones (nombre de Switch · lo que urge · monto sin centavos · rayita del tramo **DOMINANTE**) y **tocar la fila abre la MISMA `HojaCobrar`**. 🔴 **Abre por PLATA** (`ordenDelCelular` = `ordenParaRiskFilter`); la computadora conserva `ORDEN_AL_ABRIR`. El total abre **«Por empresa»**; `/cxc/cliente/[codigo]` va en **RENGLONES, nunca una tabla**. `lib/cxc/lista-celular.ts`, interruptor `CXC_CELULAR` (`false` = `PanelCxcMobile` intacto). ⚠️ Boston aparte. Candado `cxc-celular`.
+
+
+## 19-nov-2026 — Historial de pagos y compras por empresa
+
+**Lo que pidió Daniel.** «Quiero ver últimos pagos o historial de pago de clientes… y de compras también», y después: «como en cuentas por cobrar pero con más historial». De la compra: «solo quiero el número» (sin detalle de productos). Aprobó el diseño final con un «Sí».
+
+**Cómo quedó** (interruptor `HISTORIAL_CLIENTE_2026_11` en `lib/cxc/historial-cliente.ts`, prendido; `false` = lo de antes: nada se toca y la ruta contesta 404):
+
+- En la tabla «Por empresa» de CxC —página del cliente, hoja del celular y fila desplegada de la computadora— «Últ. pago $X · N d ›» y «Últ. compra $X · N d ›» van en el azul de los enlaces (el de «Estado de cuenta»), sin subrayado. Tocar abre una hoja en el teléfono o un panel en la computadora, con el título «Pagos · Vistana» o «Compras · Fashion Shoes» y el cliente debajo. Componente: `components/cxc/HistorialCliente.tsx`.
+- Se descartaron en el camino: los renglones «Ver todos los pagos» / «Ver compras» debajo de «Últimos pagos» y la lista que mezclaba las empresas (Daniel los cambió por el toque en cada empresa), y la vista de productos de cada compra.
+- **Compra** = las facturas (Factura, Tiquete, Transacción) del cliente en UNA empresa dentro de 7 días desde la primera; ventana fija: día 0 a 7 es la misma compra, el día 8 abre otra. Va en el mes de su primera factura. Fila: «Compra · 1 sept 2026» y el monto; debajo «Factura 2534» o «Facturas 2576 · 2584».
+- **Devolución** = nota de crédito, APARTE: no se resta de la compra ni del total del mes; el mes lleva su línea «Devoluciones −$X».
+- **Nota de débito: fuera** del historial (es un cargo, no una compra). Medido el 19-nov-2026: 678 en las 6 empresas, unos $167K.
+- **Pago** = recibo que NO es retención y no está en cero, agrupado por día como «Últimos pagos». El «Últ. pago» de la tabla sale de `switch_ultimo_pago_cliente_v2`, que ya excluye retenciones y ceros: no se tocó.
+- **Centavos**: nada de menos de $1 (en valor absoluto) se lista ni forma compra —la factura de $0,01 de Active Shoes de D-156 no abre ventana—; todo monto del historial va sin centavos («$4,794», «Devoluciones −$166»). La tabla «Por empresa» y el resto de la página no cambian.
+- **Servidor**: `GET /api/cxc/historial?codigo=&empresa=&tipo=pagos|compras`. La empresa se valida: solo una de las 6 del grupo (Boston, Multifashion u otra → 400); el vendedor, solo su empresa asociada (403 a otra); `gerente_boston` no entra (403). Identidad por CÓDIGO (recibos por `cliente_codigo`; facturas por el puente `switch_clientes` → `(empresa_key, cliente_switch_id)`). Todo con `leerTodoPaginado`: D-151 tiene 1.714 recibos y D-25 1.937 facturas.
+- **Boston y la ficha de Clientes no aplican**: ninguna tiene «Últ. pago» / «Últ. compra» por empresa. La ruta de historial de Boston se retiró para no dejar código sin lectores.
+
+**Candado**: `src/__tests__/api/cxc-historial-cliente.test.ts` — más de 1.000 recibos y facturas salen completos, la empresa validada, la ventana de 7 días, devoluciones aparte, menos de $1 y nota de débito fuera.

@@ -30,8 +30,9 @@ import { signoVenta, TIPO_VENTA_NOTA_DEBITO } from "@/lib/ventas/tipos-comproban
 import { facturaParaMostrar } from "@/lib/guias/numero-factura";
 import { agruparPagosPorFecha, type PagoDeEmpresa, type PagoDelDia } from "./pagos-por-fecha";
 
-/** Interruptor: `false` = la pantalla de antes, sin botones ni rutas. */
-export const HISTORIAL_CLIENTE_2026_11 = false;
+/** Interruptor, PRENDIDO el 19-nov-2026 (Daniel: «Sí»). `false` = la pantalla de
+ *  antes: «Últ. pago» y «Últ. compra» sin tocar y la ruta contesta 404. */
+export const HISTORIAL_CLIENTE_2026_11 = true;
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",

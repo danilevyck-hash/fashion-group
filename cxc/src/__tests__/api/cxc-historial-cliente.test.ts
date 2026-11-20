@@ -11,7 +11,7 @@
 //  3. Lo puro: pagos, un renglón por día; compras, ventana de 7 días por
 //     empresa y la nota de crédito aparte como devolución; menos de $1 no
 //     cuenta; la nota de débito no es compra.
-//  4. El interruptor nace en `false`.
+//  4. El interruptor está prendido (19-nov-2026).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
@@ -293,8 +293,10 @@ describe("🔴 una COMPRA: misma empresa, ventana fija de 7 días", () => {
 });
 
 describe("el interruptor", () => {
-  it("nace en false", () => {
+  it("está prendido (19-nov-2026); con false la ruta contesta 404", () => {
     const src = fs.readFileSync(path.resolve(__dirname, "../../lib/cxc/historial-cliente.ts"), "utf8");
-    expect(src).toMatch(/export const HISTORIAL_CLIENTE_2026_11 = false;/);
+    expect(src).toMatch(/export const HISTORIAL_CLIENTE_2026_11 = true;/);
+    const ruta = fs.readFileSync(path.resolve(__dirname, "../../app/api/cxc/historial/route.ts"), "utf8");
+    expect(ruta).toMatch(/if \(!HISTORIAL_CLIENTE_2026_11\) return NextResponse\.json\(\{ error: "No disponible" \}, \{ status: 404 \}\)/);
   });
 });
