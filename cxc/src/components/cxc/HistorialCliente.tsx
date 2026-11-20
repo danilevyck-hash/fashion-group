@@ -66,11 +66,12 @@ export default function TocarHistorial({ codigo, nombre, empresa, vista, childre
         {children}
         <span aria-hidden className="ml-0.5">›</span>
       </button>
-      {tel ? (
+      {/* Solo se monta abierta: cada fila tiene dos, y cerradas no dejan nada en la tabla. */}
+      {abierto && (tel ? (
         <BottomSheet open={abierto} onClose={cerrar} abreCompleta>{cuerpo}</BottomSheet>
       ) : (
         <Drawer open={abierto} onClose={cerrar} title={titulo}>{cuerpo}</Drawer>
-      )}
+      ))}
     </>
   );
 }

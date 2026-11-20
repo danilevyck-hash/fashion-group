@@ -19,6 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import React from "react";
 import HojaCobrar from "@/app/cxc/components/HojaCobrar";
+import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
 import { empresasDelCliente } from "@/lib/cxc/lista-celular";
 import {
   CXC_DESGLOSE_CELULAR_2026_11,
@@ -188,7 +189,7 @@ describe("🔴 «Últ. compra» = monto · N d (18-nov-2026)", () => {
     },
   } as unknown as ConsolidatedClient;
 
-  it("la línea no lleva «facturas», fechas ni «NC»; el monto se toca y abre la lista", () => {
+  it("la línea no lleva «facturas», fechas ni «NC»; «Últ. compra» se toca (historial, 19-nov-2026)", () => {
     render(
       <HojaCobrar
         client={CON_DOCS}
@@ -206,13 +207,20 @@ describe("🔴 «Últ. compra» = monto · N d (18-nov-2026)", () => {
     const lineas = [...document.querySelectorAll("td")].filter((td) => td.textContent?.includes("Últ. compra"));
     expect(lineas.length).toBeGreaterThan(0);
     for (const td of lineas) {
-      expect(td.textContent).toMatch(/Últ\. compra (\$[\d,]+ · \d+ d|—)$/);
+      // Con `HISTORIAL_CLIENTE_2026_11` la línea entera es un enlace y termina en «›».
+      expect(td.textContent).toMatch(/Últ\. compra (\$[\d,]+ · \d+ d ?›?|—)$/);
       expect(td.textContent).not.toMatch(/factura|\bNC\b|\b(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\b/i);
       // Nunca vuelve a forzar una sola línea: eso deslizaba la hoja.
       expect(td.className).not.toContain("whitespace-nowrap");
     }
     expect(screen.queryByText("Total de la compra")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "$8,600" }));
-    expect(screen.getByText("Total de la compra")).toBeTruthy();
+    if (HISTORIAL_CLIENTE_2026_11) {
+      // Tocar abre el historial de compras de ESA empresa (la hoja trae sus datos al abrir).
+      const boton = document.querySelector('button[data-historial="compras"]');
+      expect(boton?.textContent).toContain("Últ. compra $8,600");
+    } else {
+      fireEvent.click(screen.getByRole("button", { name: "$8,600" }));
+      expect(screen.getByText("Total de la compra")).toBeTruthy();
+    }
   });
 });
