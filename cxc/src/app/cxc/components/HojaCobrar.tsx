@@ -1,8 +1,9 @@
 "use client";
 import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "./CompraJunta";
 import { ListaPagosEmpresa } from "./PagosDeEmpresa";
-import TocarHistorial from "@/components/cxc/HistorialCliente";
-import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
+import TocarHistorial, { HojaDeLaEmpresa } from "@/components/cxc/HistorialCliente";
+import { HISTORIAL_CLIENTE_2026_11, HISTORIAL_CLIENTE_FILA_2026_11 } from "@/lib/cxc/historial-cliente";
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { telefonoParaWhatsApp, textoSinCelular } from "@/lib/ui/uso-2026-11";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -547,6 +548,52 @@ function FilaDesglose({ fila, codigo, historial }: { fila: RenglonEmpresaCliente
   const junta = tieneDocumentos(docs);
   const [verCompra, setVerCompra] = useState(false);
   const [verPagos, setVerPagos] = useState(false);
+  const [hoja, setHoja] = useState(false);
+  // `HISTORIAL_CLIENTE_FILA_2026_11`: la FILA entera se toca y abre «Compras · Pagos».
+  const fila_ = historial && HISTORIAL_CLIENTE_FILA_2026_11 ? historial : null;
+  const abrir = () => setHoja(true);
+  const tocable = fila_ ? { onClick: abrir, className: "cursor-pointer active:bg-gray-50" } : { className: "" };
+  if (fila_) {
+    return (
+      <>
+        <tr {...clicConTeclado(abrir, { fila: true, nombre: `Historial de ${nombreCortoEmpresa(fila.key, fila.nombre)}` })} onClick={tocable.onClick} className={`border-t border-gray-100 ${tocable.className}`} data-fila-historial={fila.key}>
+          <td className="pt-2 text-left text-[13.5px] font-semibold text-gray-900 whitespace-nowrap">
+            {nombreCortoEmpresa(fila.key, fila.nombre)}
+          </td>
+          <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-emerald-700">{montoDeTabla(fila.current)}</td>
+          <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-amber-600">{montoDeTabla(fila.watch)}</td>
+          <td className="pt-2 pl-1.5 text-right whitespace-nowrap text-red-600">{montoDeTabla(fila.overdue)}</td>
+          <td className="pt-2 pl-1.5 text-right whitespace-nowrap font-semibold">{montoDeTabla(fila.total)}</td>
+        </tr>
+        <tr onClick={tocable.onClick} className={tocable.className}>
+          <td colSpan={5} className="pb-2 text-left text-[11px] text-gray-500">
+            <div className="flex items-baseline justify-between gap-2">
+              <span>
+                <span className="whitespace-nowrap">
+                  Últ. pago{" "}
+                  {fila.ultimoPago ? (
+                    <>{montoExacto(fila.ultimoPago.monto)} · <span className={daysAgingColor(diasPago)}>{diasPago != null ? `${diasPago} d` : ""}</span></>
+                  ) : <span className="text-gray-300">—</span>}
+                </span>
+                {" · "}
+                <span className="whitespace-nowrap">
+                  Últ. compra{" "}
+                  {fila.ultimaCompra ? <>{montoExacto(fila.ultimaCompra.monto)} · {diasCompra != null ? `${diasCompra} d` : ""}</> : <span className="text-gray-300">—</span>}
+                </span>
+              </span>
+              <span aria-hidden data-chevron-fila className="text-[15px] leading-none text-gray-400">›</span>
+            </div>
+            {hoja && (
+              // La hoja vive dentro de la fila: sus toques no deben subir y reabrirla.
+              <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                <HojaDeLaEmpresa codigo={fila_.codigo} nombre={fila_.nombre} empresa={fila.key} onClose={() => setHoja(false)} />
+              </span>
+            )}
+          </td>
+        </tr>
+      </>
+    );
+  }
   return (
     <>
       <tr className="border-t border-gray-100">

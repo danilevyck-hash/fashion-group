@@ -9,8 +9,9 @@ import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 import { seLeCobra } from "@/lib/cxc/cobrable";
 import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "./CompraJunta";
 import { ListaPagosEmpresa } from "./PagosDeEmpresa";
-import TocarHistorial from "@/components/cxc/HistorialCliente";
-import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
+import TocarHistorial, { HojaDeLaEmpresa } from "@/components/cxc/HistorialCliente";
+import { HISTORIAL_CLIENTE_2026_11, HISTORIAL_CLIENTE_FILA_2026_11 } from "@/lib/cxc/historial-cliente";
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
 
@@ -50,6 +51,7 @@ export default function ContactPanel({
   /** La empresa cuya última compra está desplegada (`ULTIMA_COMPRA_JUNTA_2026_11`). */
   const [compraAbierta, setCompraAbierta] = useState<string | null>(null);
   const [pagoAbierto, setPagoAbierto] = useState<string | null>(null);
+  const [hojaDe, setHojaDe] = useState<string | null>(null);
 
   const visibleCompanies = companyFilter !== "all"
     ? roleCompanies.filter((co) => co.key === companyFilter && client.companies[co.key])
@@ -109,6 +111,48 @@ export default function ContactPanel({
                   const docs = d.ultimaCompraDocumentos ?? null;
                   const junta = tieneDocumentos(docs);
                   const abierta = junta && compraAbierta === co.key;
+                  // `HISTORIAL_CLIENTE_FILA_2026_11`: la fila entera se toca y abre
+                  // «Compras · Pagos». Hoy la fila no hace nada al tocarla (solo sus botones).
+                  if (historial && HISTORIAL_CLIENTE_FILA_2026_11) {
+                    const abrir = () => setHojaDe(co.key);
+                    return (
+                      <tr
+                        key={co.key}
+                        {...clicConTeclado(abrir, { fila: true, nombre: `Historial de ${co.name}` })}
+                        onClick={(e) => { e.stopPropagation(); abrir(); }}
+                        data-fila-historial={co.key}
+                        className="border-t border-gray-200 cursor-pointer hover:bg-white transition"
+                      >
+                        {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
+                        <td className="text-right py-1.5 tabular-nums text-emerald-700">{fmt(current)}</td>
+                        <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(watch)}</td>
+                        <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(overdue)}</td>
+                        <td className="text-right py-1.5 tabular-nums font-semibold">{fmt(d.total)}</td>
+                        <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
+                          {d.ultimoPagoFecha ? (
+                            <>
+                              {d.ultimoPagoMonto != null && <span className="text-gray-600">${fmt(d.ultimoPagoMonto)} · </span>}
+                              <span className={daysAgingColor(ultDias)}>{ultDias != null ? `${ultDias} d` : ""}</span>
+                            </>
+                          ) : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="text-right py-1.5 tabular-nums whitespace-nowrap">
+                          {d.ultimaCompraFecha ? (
+                            <>
+                              {d.ultimaCompraMonto != null && <span className="text-gray-600">${fmt(d.ultimaCompraMonto)} · </span>}
+                              <span className="text-gray-500">{compraDias != null ? `${compraDias} d` : ""}</span>
+                            </>
+                          ) : <span className="text-gray-300">—</span>}
+                          <span aria-hidden data-chevron-fila className="ml-2 text-gray-400">›</span>
+                          {hojaDe === co.key && (
+                            <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                              <HojaDeLaEmpresa {...historial} empresa={co.key} onClose={() => setHojaDe(null)} />
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  }
                   return (
                     <Fragment key={co.key}>
                     <tr className="border-t border-gray-200 hover:bg-white transition">
