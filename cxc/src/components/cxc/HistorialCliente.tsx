@@ -23,9 +23,17 @@ import { montoExacto } from "@/lib/cxc/lista-celular";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import type { PagoDelDia } from "@/lib/cxc/pagos-por-fecha";
 import UltimosPagosPorFecha from "@/app/cxc/components/UltimosPagosPorFecha";
-import { rotuloMes, type FilaDeCompras, type Mes, type MesDeCompras } from "@/lib/cxc/historial-cliente";
+import { ControlSegmentado } from "@/components/ventas/ControlSegmentado";
+import {
+  HISTORIAL_CLIENTE_FILA_2026_11,
+  rotuloMes,
+  type FilaDeCompras,
+  type Mes,
+  type MesDeCompras,
+} from "@/lib/cxc/historial-cliente";
 
-type Vista = "pagos" | "compras";
+export type Vista = "pagos" | "compras";
+const PESTANAS = [{ value: "compras", label: "Compras" }, { value: "pagos", label: "Pagos" }] as const;
 
 /** Sin centavos (Daniel, 19-nov-2026) y con el menos tipográfico: «−$18». */
 const dinero = (n: number) => (n < 0 ? `−${montoExacto(-n)}` : montoExacto(n));
@@ -76,8 +84,32 @@ export default function TocarHistorial({ codigo, nombre, empresa, vista, childre
   );
 }
 
-function ListaHistorial({ codigo, empresa, vista, nombre, titulo, enHoja }: {
-  codigo: string; empresa: string; vista: Vista; nombre: string; titulo: string; enHoja: boolean;
+/**
+ * `HISTORIAL_CLIENTE_FILA_2026_11`: la hoja (teléfono) o el panel (computadora)
+ * de UNA empresa, con «Compras · Pagos». Título = la empresa; debajo, el cliente.
+ * La monta quien la abre (la fila de «Por empresa») y solo mientras está abierta.
+ */
+export function HojaDeLaEmpresa({ codigo, nombre, empresa, inicial = "compras", onClose }: {
+  codigo: string; nombre: string; empresa: string; inicial?: Vista; onClose: () => void;
+}) {
+  const [vista, setVista] = useState<Vista>(inicial);
+  const tel = useEsTelefono();
+  const titulo = nombreCortoEmpresa(empresa);
+  const pestanas = (
+    <ControlSegmentado options={PESTANAS} active={vista} onChange={setVista} ariaLabel="Historial" className="mt-3" />
+  );
+  const cuerpo = (
+    <ListaHistorial key={vista} codigo={codigo} empresa={empresa} vista={vista} nombre={nombre} titulo={titulo} enHoja={tel} pestanas={pestanas} />
+  );
+  return tel ? (
+    <BottomSheet open onClose={onClose} abreCompleta>{cuerpo}</BottomSheet>
+  ) : (
+    <Drawer open onClose={onClose} title={titulo}>{cuerpo}</Drawer>
+  );
+}
+
+function ListaHistorial({ codigo, empresa, vista, nombre, titulo, enHoja, pestanas }: {
+  codigo: string; empresa: string; vista: Vista; nombre: string; titulo: string; enHoja: boolean; pestanas?: ReactNode;
 }) {
   const [meses, setMeses] = useState<(Mes<PagoDelDia> | MesDeCompras)[] | null | "error">(null);
   const url = `/api/cxc/historial?codigo=${encodeURIComponent(codigo)}&empresa=${encodeURIComponent(empresa)}&tipo=${vista}`;
@@ -101,11 +133,29 @@ function ListaHistorial({ codigo, empresa, vista, nombre, titulo, enHoja }: {
       <header className="px-1 pt-3">
         {enHoja && <h2 className="text-[22px] font-semibold tracking-tight text-gray-900">{titulo}</h2>}
         <p className="text-[15px] text-gray-500">{nombre}</p>
+        {pestanas}
       </header>
       {meses === null && aviso(vista === "pagos" ? "Cargando los pagos…" : "Cargando las compras…")}
       {meses === "error" && aviso("No se pudo cargar el historial. Intenta de nuevo en unos segundos.", true)}
       {Array.isArray(meses) && meses.length === 0 && aviso(vista === "pagos" ? "Sin pagos registrados." : "Sin compras registradas.")}
-      {Array.isArray(meses) && vista === "pagos" && (meses as Mes<PagoDelDia>[]).map((m) => (
+      {Array.isArray(meses) && vista === "pagos" && HISTORIAL_CLIENTE_FILA_2026_11 && (meses as Mes<PagoDelDia>[]).map((m) => (
+        // El MISMO formato de las compras: el mes como sección y un renglón por pago.
+        <section key={m.mes}>
+          <h3 className="flex items-baseline justify-between px-1 pb-2 pt-5 text-[12px] uppercase tracking-wider text-gray-500">
+            <span>{rotuloMes(m.mes)}</span>
+            <span className="tabular-nums">{dinero(m.total)}</span>
+          </h3>
+          <ul data-historial-mes={m.mes} className="overflow-hidden rounded-2xl bg-white">
+            {m.filas.map((p) => (
+              <li key={p.fecha} className="flex items-baseline justify-between gap-3 border-t border-gray-100 px-4 py-3 first:border-t-0">
+                <span className="text-[16px] text-gray-900">{fmtDate(p.fecha)}</span>
+                <span className="text-[16px] tabular-nums text-gray-900">{dinero(p.monto)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      {Array.isArray(meses) && vista === "pagos" && !HISTORIAL_CLIENTE_FILA_2026_11 && (meses as Mes<PagoDelDia>[]).map((m) => (
         // El MISMO bloque de «Últimos pagos», un mes por tarjeta; la empresa ya está en el título.
         <div key={m.mes} data-historial-mes={m.mes} className="mt-4 rounded-2xl bg-white px-4 py-3">
           <UltimosPagosPorFecha pagos={m.filas.map((p) => ({ ...p, empresas: [] }))} titulo={`${rotuloMes(m.mes)} · ${dinero(m.total)}`} monto={dinero} />

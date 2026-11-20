@@ -1678,3 +1678,5 @@ Daniel: «quítame el hover que no me gusta… lo vi en CxC, y creo que en Venta
 - **Boston y la ficha de Clientes no aplican**: ninguna tiene «Últ. pago» / «Últ. compra» por empresa. La ruta de historial de Boston se retiró para no dejar código sin lectores.
 
 **Candado**: `src/__tests__/api/cxc-historial-cliente.test.ts` — más de 1.000 recibos y facturas salen completos, la empresa validada, la ventana de 7 días, devoluciones aparte, menos de $1 y nota de débito fuera.
+
+- **Ajuste aprobado el mismo día** (Daniel: «Aprobado»; interruptor `HISTORIAL_CLIENTE_FILA_2026_11`, prendido): se toca la FILA entera de la empresa en «Por empresa» —teléfono y computadora; antes la fila no hacía nada, solo sus botones— y abre una hoja o panel con título = la empresa, el cliente debajo y las pestañas «Compras · Pagos» (abre en Compras). «Últ. pago» y «Últ. compra» vuelven a gris y un › chico al final de la fila indica que se toca. Los pagos van con el formato de las compras: el mes como título con su total a la derecha y un renglón por pago («14 oct 2026» · monto sin centavos). `false` = el azul de arriba.
