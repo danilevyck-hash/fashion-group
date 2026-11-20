@@ -36,7 +36,10 @@ import { Toast, AccordionContent } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { telHref, mailtoHref } from "@/lib/contact-links";
-import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { CXC_GRUPO_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { HojaDeLaEmpresa } from "@/components/cxc/HistorialCliente";
+import { HISTORIAL_CLIENTE_2026_11, HISTORIAL_EN_FICHA_2026_11 } from "@/lib/cxc/historial-cliente";
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { Ayuda } from "@/components/shared/Ayuda";
 import {
@@ -143,10 +146,13 @@ const EDITABLE_ROLES = ["admin", "secretaria"];
 export default function ClienteDetail({
   initialData,
   apple = CLIENTES_APPLE_2026_10,
+  historial = HISTORIAL_EN_FICHA_2026_11 && HISTORIAL_CLIENTE_2026_11,
 }: {
   initialData: ClienteDetailData;
   /** `CLIENTES_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
   apple?: boolean;
+  /** `HISTORIAL_EN_FICHA_2026_11`: la fila de «Detalle por empresa» abre «Compras · Pagos». */
+  historial?: boolean;
 }) {
   const { authChecked, role } = useAuth({
     moduleKey: "directorio",
@@ -200,7 +206,20 @@ export default function ClienteDetail({
 
   /** «Última compra»: la lista de facturas se abre al tocar «N facturas». */
   const [verCompra, setVerCompra] = useState(false);
+  /** La empresa cuya hoja «Compras · Pagos» está abierta (`HISTORIAL_EN_FICHA_2026_11`). */
+  const [historialDe, setHistorialDe] = useState<string | null>(null);
   if (!authChecked) return null;
+
+  // 🔴 Solo las 6 del grupo, igual que CxC; la ruta lo vuelve a validar.
+  const seToca = (empresa: string) => historial && (CXC_GRUPO_EMPRESA_KEYS as readonly string[]).includes(empresa);
+  const filaQueAbre = (empresa: string) => ({
+    ...clicConTeclado(() => setHistorialDe(empresa), { fila: true, nombre: `Historial de ${nombreCortoEmpresa(empresa)}` }),
+    onClick: () => setHistorialDe(empresa),
+    "data-fila-historial": empresa,
+  });
+  const chevron = (visible = true) => (
+    <span aria-hidden data-chevron-fila className={`text-[15px] leading-none text-gray-400${visible ? "" : " invisible"}`}>›</span>
+  );
 
   const puedeEditar = EDITABLE_ROLES.includes(role);
   // 🔴 «Cobrar», «Ver los N documentos» y «Ver en Cuentas por Cobrar» solo para
@@ -276,11 +295,16 @@ export default function ClienteDetail({
                     <th className="py-2 font-normal text-right whitespace-nowrap">{anio - 1}</th>
                     <th className="py-2 font-normal text-right whitespace-nowrap">Variación %</th>
                     <th className="py-2 font-normal text-right whitespace-nowrap">Saldo</th>
+                    {historial && <th aria-hidden className="w-6" />}
                   </tr>
                 </thead>
                 <tbody>
                   {activas.map((e) => (
-                    <tr key={e.empresa} className="border-b border-gray-100">
+                    <tr
+                      key={e.empresa}
+                      {...(seToca(e.empresa) ? filaQueAbre(e.empresa) : {})}
+                      className={`border-b border-gray-100${seToca(e.empresa) ? " cursor-pointer hover:bg-gray-50 active:bg-gray-100" : ""}`}
+                    >
                       <td className="py-2 pr-4 text-gray-700 whitespace-nowrap">{nombreCortoEmpresa(e.empresa)}</td>
                       <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap">{dinero(e.compras)}</td>
                       <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap text-gray-500">
@@ -288,6 +312,7 @@ export default function ClienteDetail({
                       </td>
                       <CeldaVariacion actual={e.compras} anterior={e.comprasAnterior} />
                       <CeldaDebe valor={e.debe} />
+                      {historial && <td className="py-2 pl-3 text-right">{chevron(seToca(e.empresa))}</td>}
                     </tr>
                   ))}
                   <tr className="font-medium">
@@ -298,6 +323,7 @@ export default function ClienteDetail({
                     </td>
                     <CeldaVariacion actual={total.compras} anterior={total.comprasAnterior} className="py-2.5" />
                     <CeldaDebe valor={total.debe} className="py-2.5" />
+                    {historial && <td />}
                   </tr>
                 </tbody>
               </table>
@@ -452,8 +478,14 @@ export default function ClienteDetail({
               {[...activas, null].map((e) => {
                 const f = e ?? { empresa: "", compras: total.compras, comprasAnterior: total.comprasAnterior, debe: total.debe };
                 const v = variacionVsAnterior(f.compras, f.comprasAnterior);
+                const abre = !!e && seToca(e.empresa);
                 return (
-                  <li key={e?.empresa ?? "total"} className={`py-2 text-sm tabular-nums ${e ? "" : "font-medium"}`}>
+                  <li
+                    key={e?.empresa ?? "total"}
+                    {...(abre && e ? filaQueAbre(e.empresa) : {})}
+                    className={`py-2 text-sm tabular-nums ${e ? "" : "font-medium"}${historial ? " flex items-center gap-2" : ""}${abre ? " cursor-pointer active:bg-gray-50" : ""}`}
+                  >
+                    <div className={historial ? "min-w-0 flex-1" : undefined}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-gray-700">{e ? nombreCortoEmpresa(e.empresa) : "Total"}</span>
                       <span className="text-gray-900">{dinero(f.compras)}</span>
@@ -467,12 +499,17 @@ export default function ClienteDetail({
                         {f.debe > 0 ? `Saldo ${dinero(f.debe)}` : f.debe < 0 ? `Saldo a favor ${dinero(Math.abs(f.debe))}` : "Sin saldo"}
                       </span>
                     </div>
+                    </div>
+                    {historial && chevron(abre)}
                   </li>
                 );
               })}
             </ul>
             <div className="hidden sm:block">{tablaEmpresas()}</div>
           </>) : tablaEmpresas()}
+          {historialDe && (
+            <HojaDeLaEmpresa codigo={cliente.codigo} nombre={cliente.nombre} empresa={historialDe} onClose={() => setHistorialDe(null)} />
+          )}
         </section>
 
         {/* ── 4. ÚLTIMOS PAGOS — POR FECHA, no por empresa ────────────────

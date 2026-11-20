@@ -40,6 +40,13 @@ export const HISTORIAL_CLIENTE_2026_11 = true;
  *  `false` = lo publicado: «Últ. pago ›» y «Últ. compra ›» en azul. */
 export const HISTORIAL_CLIENTE_FILA_2026_11 = true;
 
+/** Propuesta del 19-nov-2026, APAGADA hasta el «sí» de Daniel: en la ficha del
+ *  cliente (`/clientes/[codigo]`) cada fila de «Detalle por empresa» se toca y
+ *  abre la MISMA hoja «Compras · Pagos» (`HojaDeLaEmpresa`), también con saldo 0
+ *  —hoy un cliente sin saldo no tiene ningún camino al historial—. Solo las 6
+ *  del grupo; la ruta sigue validando empresa y rol. `false` = filas quietas. */
+export const HISTORIAL_EN_FICHA_2026_11 = false;
+
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
