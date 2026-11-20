@@ -1,27 +1,8 @@
-// Lo que el historial del cliente (`/api/cxc/historial`) lee
-// del SERVIDOR antes de consultar: qué empresas del GRUPO puede ver quien pide.
-// 🔴 Solo las 6 del grupo; Boston nunca pasa por aquí.
+// Quién puede leer el historial del cliente (`/api/cxc/historial`).
+// 🔴 Admin y secretaria (Daniel, 19-nov-2026): el vendedor NO —403—, igual que
+// en pantalla, donde no ve el ›. `gerente_boston` tampoco. Solo las 6 del grupo:
+// la empresa la valida la ruta.
 
-import { supabaseServer } from "@/lib/supabase-server";
-import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
-import { rolesClientes } from "@/lib/clientes/roles";
+import { ROLES_HISTORIAL } from "@/lib/cxc/historial-cliente";
 
-/** Los roles de CxC del grupo y de Clientes (hoy son los mismos tres).
- *  `gerente_boston` NO está. */
-export const ROLES_HISTORIAL_GRUPO: string[] = [...new Set(["admin", "secretaria", "vendedor", ...rolesClientes()])];
-
-/** Las empresas que puede ver quien pide. El vendedor, solo su empresa
- *  asociada (fuente: la base, no la cookie), igual que `/api/cxc/ultimos-pagos`. */
-export async function empresasDeQuienPide(role: string, userId?: string | null): Promise<string[]> {
-  const grupo = [...CXC_GRUPO_EMPRESA_KEYS] as string[];
-  if (role !== "vendedor" || !userId) return grupo;
-  const { data: u } = await supabaseServer
-    .from("fg_users")
-    .select("associated_company")
-    .eq("id", userId)
-    .maybeSingle();
-  const asociada = (u as { associated_company?: string | null } | null)?.associated_company ?? null;
-  if (!asociada) return grupo;
-  return grupo.includes(asociada) ? [asociada] : [];
-}
-
+export const ROLES_HISTORIAL_GRUPO: string[] = [...ROLES_HISTORIAL];

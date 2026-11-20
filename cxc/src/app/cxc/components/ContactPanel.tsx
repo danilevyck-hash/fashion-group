@@ -10,7 +10,7 @@ import { seLeCobra } from "@/lib/cxc/cobrable";
 import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "./CompraJunta";
 import { ListaPagosEmpresa } from "./PagosDeEmpresa";
 import TocarHistorial, { HojaDeLaEmpresa } from "@/components/cxc/HistorialCliente";
-import { HISTORIAL_CLIENTE_2026_11, HISTORIAL_CLIENTE_FILA_2026_11 } from "@/lib/cxc/historial-cliente";
+import { HISTORIAL_CLIENTE_2026_11, HISTORIAL_CLIENTE_FILA_2026_11, veHistorial } from "@/lib/cxc/historial-cliente";
 import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { ESTADO_CUENTA_UN_BOTON_2026_10 } from "@/lib/cxc/estado-cuenta-un-boton-2026-10";
@@ -60,7 +60,7 @@ export default function ContactPanel({
   // Código del cliente para la ficha (mismo D-XXX en todas las empresas).
   const codigo = Object.values(client.companies).find((c) => c?.codigo)?.codigo ?? null;
   // «Últ. pago» y «Últ. compra» se tocan y abren el historial de ESA empresa.
-  const historial = HISTORIAL_CLIENTE_2026_11 && codigo ? { codigo, nombre: nombreDeCliente(client) } : null;
+  const historial = HISTORIAL_CLIENTE_2026_11 && codigo && veHistorial() ? { codigo, nombre: nombreDeCliente(client) } : null;
 
   // 🔴 EL DESGLOSE POR EMPRESA SE QUEDA EXACTAMENTE COMO ESTABA — Daniel lo
   // eligió así el 5-sep-2026, con sus columnas «Último pago» y «Última compra».

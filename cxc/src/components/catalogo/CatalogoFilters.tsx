@@ -111,7 +111,8 @@
 
 import { ArrowUpDown } from "lucide-react";
 import { ORDEN_ICONO_DE_LINEA } from "@/lib/ui/revision-110-vivo";
-import { BuscadorConFiltros, RenglonInterruptor, SeccionHoja, type FiltroDeLaHoja, type FiltroPuesto } from "@/components/filtros/FiltroA";
+import { BuscadorConFiltros, RenglonInterruptor, SeccionHoja, filtrosPuestos, type FiltroDeLaHoja, type FiltroPuesto } from "@/components/filtros/FiltroA";
+import FiltrarCelular from "./FiltrarCelular";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useRef, useState, type ReactNode } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
@@ -124,7 +125,7 @@ import FiltroPrecioChip from "./FiltroPrecioChip";
 import ChipFiltro from "./ChipFiltro";
 import { vidrioSobre } from "@/lib/ui/vidrio";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
-import { CATALOGO_ORDEN_CELULAR, FILA_QUE_SE_DESLIZA, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
+import { CATALOGO_FILTRO_2026_11, CATALOGO_ORDEN_CELULAR, FILA_QUE_SE_DESLIZA, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
 import { clasesBarraFiltros, textoOrdenCorto } from "@/lib/catalogo/catalogos-2026-10";
 import { CHIP_V4 } from "@/lib/catalogo/catalogos-2026-10-b";
 
@@ -445,6 +446,26 @@ function CatalogoFiltroACelular({
     ...(conBultos && bultosFilter ? [{ clave: "bultos", texto: "2+ bultos", onQuitar: () => onBultosFilterChange!(false) }] : []),
     ...(hayPrecio ? [{ clave: "precio", texto: textoPrecio, onQuitar: () => onPrecioChange!(PRECIO_VACIO) }] : []),
   ];
+  if (CATALOGO_FILTRO_2026_11) {
+    // Categoría con 2+ opciones (Joybees, todo clogs, no la muestra).
+    const categoria = conCategorias && categoriaOpts.length > 1 ? filtros.find(x => x.clave === "categoria") : undefined;
+    const genero = filtros.find(x => x.clave === "genero");
+    const grupo = (x: FiltroDeLaHoja) => ({ opciones: x.opciones, valor: x.valor, onCambiar: x.onCambiar });
+    return (
+      <FiltrarCelular
+        busqueda={searchInput}
+        onBuscar={onSearchChange}
+        categoria={categoria && grupo(categoria)}
+        genero={genero && grupo(genero)}
+        orden={{ opciones: ORDEN_CATALOGO, valor: sortBy || "relevancia", onCambiar: onSortByChange }}
+        precio={conPrecio ? <PrecioDesdeHasta precio={precio} onChange={onPrecioChange!} precios={preciosDisponibles} /> : undefined}
+        bultos={conBultos ? { activo: bultosFilter, onCambiar: v => onBultosFilterChange!(v) } : undefined}
+        puestos={[...filtrosPuestos([...filtros].reverse()), ...puestosExtra]}
+        cantidad={filteredCount}
+        frescura={frescuraCelular}
+      />
+    );
+  }
   return (
     <div data-filtro-a-catalogo className="mb-3 space-y-2 sm:hidden">
       <BuscadorConFiltros

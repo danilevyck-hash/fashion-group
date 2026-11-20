@@ -40,6 +40,26 @@ export const HISTORIAL_CLIENTE_2026_11 = true;
  *  `false` = lo publicado: «Últ. pago ›» y «Últ. compra ›» en azul. */
 export const HISTORIAL_CLIENTE_FILA_2026_11 = true;
 
+/** PRENDIDO el 19-nov-2026 (Daniel: «Ambos sí»): en la ficha del
+ *  cliente (`/clientes/[codigo]`) cada fila de «Detalle por empresa» se toca y
+ *  abre la MISMA hoja «Compras · Pagos» (`HojaDeLaEmpresa`), también con saldo 0
+ *  —hoy un cliente sin saldo no tiene ningún camino al historial—. Solo las 6
+ *  del grupo; la ruta sigue validando empresa y rol. `false` = filas quietas. */
+export const HISTORIAL_EN_FICHA_2026_11 = true;
+
+/** 🔴 Quién ve el historial «Compras · Pagos» (Daniel, 19-nov-2026): admin y
+ *  secretaria. El vendedor NO, ni en la ficha ni en CxC; la ruta le contesta 403. */
+export const ROLES_HISTORIAL = ["admin", "secretaria"] as const;
+
+/** ¿Este rol ve el historial? Sin `role`, lee el de la sesión del navegador. */
+export function veHistorial(role?: string | null): boolean {
+  let r = role;
+  if (r == null && typeof window !== "undefined") {
+    try { r = sessionStorage.getItem("cxc_role"); } catch { r = null; }
+  }
+  return typeof r === "string" && (ROLES_HISTORIAL as readonly string[]).includes(r);
+}
+
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",

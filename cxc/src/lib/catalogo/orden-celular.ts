@@ -162,3 +162,16 @@ export function lineaDeExistencias(
  */
 export const FILA_QUE_SE_DESLIZA =
   "flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+
+/**
+ * 🔴 «Filtrar» en el catálogo del celular (19-nov-2026, PRENDIDO: Daniel, «Ambos sí»). Lo que le molesta de hoy: «el ícono no se entiende» y «son
+ * muchos toques». Al lado del buscador, un botón con ícono y la palabra
+ * «Filtrar» («Filtrar (1)» con filtros puestos). La hoja muestra TODO a la
+ * vista: Categoría en cuadrícula de 2 columnas (tocar una aplica y cierra:
+ * Sneakers en 2 toques, hoy 4), luego Género, Precio, Orden y «2+ bultos», que
+ * se aplican al instante; se cierra tocando afuera o la ✕. Lo puesto se ve
+ * junto a la cantidad, «Sneakers ✕», y se quita con un toque. Nada se desliza.
+ * Público e interno, las 4 marcas. `false` = la pantalla de hoy.
+ * (El título «Todas las categorías ▾» se descartó: Daniel no lo aprobó.)
+ */
+export const CATALOGO_FILTRO_2026_11 = true;
