@@ -14,6 +14,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MarcaConfig } from "@/lib/catalogo/marcas";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
+import { guardarFotoConMiniaturas } from "@/lib/catalogo/miniaturas";
+import { pathDeImageUrl } from "./fotos-en-uso";
 import {
   STORAGE_PREFIX,
   variantesRoot,
@@ -259,6 +261,12 @@ export async function guardarFotoElegida(
   imageUrl: string,
   manual: boolean,
 ): Promise<void> {
+  // La variante la subió el NAVEGADOR con un token firmado (ZIP) y no pasó por
+  // nuestro servidor: aquí, antes de ponerla en el producto, se le hacen sus
+  // miniaturas por la única puerta del bucket. Si fallan, cae al original.
+  const ruta = imageUrl.includes(`/${BUCKET}/`) ? pathDeImageUrl(imageUrl) : null;
+  if (ruta) await guardarFotoConMiniaturas(await storageDbDe(cfg), ruta);
+
   const db = await cfg.products.writeDb();
   const idField = cfg.products.idField;
 

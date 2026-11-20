@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
+import { guardarFotoConMiniaturas } from "@/lib/catalogo/miniaturas";
 
 export const dynamic = "force-dynamic";
 
@@ -50,15 +51,14 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
 
   const storageDb = cfg.upload.storage === "main" ? await cfg.mainDb() : await cfg.db();
 
-  // cacheControl 1 año: la URL guardada lleva `?v=` nuevo en cada re-subida,
-  // así que el objeto puede cachearse como inmutable (browser + CDN). Sin esto
-  // Supabase sirve `cache-control: no-cache` y cada PDF/catálogo re-descarga
-  // TODAS las fotos en cada generación.
-  const { error: uploadError } = await storageDb.storage
-    .from("product-images")
-    .upload(filename, buffer, { contentType: file.type, upsert: true, cacheControl: "31536000" });
-
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
+  // La foto y sus dos miniaturas salen por la ÚNICA puerta del bucket
+  // (lib/catalogo/miniaturas.ts): original con cacheControl de 1 año, igual
+  // que antes (la URL guardada lleva `?v=` nuevo en cada re-subida).
+  try {
+    await guardarFotoConMiniaturas(storageDb, filename, { bytes: buffer, contentType: file.type });
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "No se pudo subir la foto." }, { status: 500 });
+  }
 
   const { data: { publicUrl } } = storageDb.storage
     .from("product-images")
