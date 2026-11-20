@@ -217,7 +217,8 @@ describe("2b · «Última compra» junta lo del día (ULTIMA_COMPRA_JUNTA_2026_1
 describe("3 · «Empresa por empresa»", () => {
   it("las columnas son Empresa · año · año-1 · vs · Debe, y hay Total", () => {
     pintar();
-    const enc = [...document.querySelectorAll("thead th")].map((t) => t.textContent);
+    // La columna del › (historial, 19-nov-2026) no lleva rótulo.
+    const enc = [...document.querySelectorAll("thead th")].map((t) => t.textContent).filter(Boolean);
     // 1-oct-2026, Daniel: nombres normales de ERP («vs 2025 · Debe»).
     expect(enc).toEqual(["Empresa", "2026", "2025", "Variación %", "Saldo"]);
     expect(screen.getByText("Total")).toBeTruthy();

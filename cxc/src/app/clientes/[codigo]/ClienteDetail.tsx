@@ -38,7 +38,7 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 import { CXC_GRUPO_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { HojaDeLaEmpresa } from "@/components/cxc/HistorialCliente";
-import { HISTORIAL_CLIENTE_2026_11, HISTORIAL_EN_FICHA_2026_11 } from "@/lib/cxc/historial-cliente";
+import { HISTORIAL_CLIENTE_2026_11, HISTORIAL_EN_FICHA_2026_11, veHistorial } from "@/lib/cxc/historial-cliente";
 import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -210,6 +210,8 @@ export default function ClienteDetail({
   const [historialDe, setHistorialDe] = useState<string | null>(null);
   if (!authChecked) return null;
 
+  // 🔴 Sin vendedor (Daniel, 19-nov-2026): sin el ›, la fila no se toca.
+  historial = historial && veHistorial(role);
   // 🔴 Solo las 6 del grupo, igual que CxC; la ruta lo vuelve a validar.
   const seToca = (empresa: string) => historial && (CXC_GRUPO_EMPRESA_KEYS as readonly string[]).includes(empresa);
   const filaQueAbre = (empresa: string) => ({

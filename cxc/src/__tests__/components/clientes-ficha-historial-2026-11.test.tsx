@@ -1,4 +1,4 @@
-// `HISTORIAL_EN_FICHA_2026_11` (19-nov-2026, apagado): en la ficha del cliente
+// `HISTORIAL_EN_FICHA_2026_11` (19-nov-2026, prendido; sin vendedor): en la ficha del cliente
 // cada fila de «Detalle por empresa» abre la MISMA hoja «Compras · Pagos» de CxC,
 // también con saldo 0. Solo las 6 del grupo; la fila «Total» no abre nada.
 
@@ -7,7 +7,8 @@ import { render, fireEvent, waitFor } from "@testing-library/react";
 import ClienteDetail, { type ClienteDetailData } from "@/app/clientes/[codigo]/ClienteDetail";
 import { HISTORIAL_EN_FICHA_2026_11 } from "@/lib/cxc/historial-cliente";
 
-vi.mock("@/lib/hooks/useAuth", () => ({ useAuth: () => ({ authChecked: true, role: "admin", isOwner: false }) }));
+let ROL = "admin";
+vi.mock("@/lib/hooks/useAuth", () => ({ useAuth: () => ({ authChecked: true, role: ROL, isOwner: false }) }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(""),
@@ -45,8 +46,23 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); window.sessionStorage.clear(); });
 
 describe("historial en la ficha", () => {
-  it("el interruptor sale APAGADO hasta el sí de Daniel", () => {
-    expect(HISTORIAL_EN_FICHA_2026_11).toBe(false);
+  it("el interruptor está PRENDIDO (Daniel, 19-nov-2026: «Ambos sí»)", () => {
+    expect(HISTORIAL_EN_FICHA_2026_11).toBe(true);
+  });
+
+  it("🔴 el vendedor no ve el › ni toca la fila", () => {
+    ROL = "vendedor";
+    const { container } = render(<ClienteDetail initialData={D45} historial />);
+    ROL = "admin";
+    expect(container.querySelectorAll("[data-fila-historial]").length).toBe(0);
+    expect(container.querySelectorAll("[data-chevron-fila]").length).toBe(0);
+  });
+
+  it("la secretaria sí", () => {
+    ROL = "secretaria";
+    const { container } = render(<ClienteDetail initialData={D45} historial />);
+    ROL = "admin";
+    expect(container.querySelectorAll("[data-fila-historial]").length).toBe(4);
   });
 
   it("apagado, ninguna fila se toca", () => {

@@ -6,8 +6,8 @@
 // «Últ. pago» y «Últ. compra» de la tabla «Por empresa» de CxC.
 //
 // 🔴 LA EMPRESA SE VALIDA AQUÍ: solo una de las 6 del grupo
-// (`CXC_GRUPO_EMPRESA_KEYS`); Boston, ACS o cualquier otra → 400. El vendedor,
-// solo la suya (403 a otra). El `gerente_boston` no entra: no está en la lista.
+// (`CXC_GRUPO_EMPRESA_KEYS`); Boston, ACS o cualquier otra → 400. Solo admin y
+// secretaria: el vendedor y el `gerente_boston` reciben 403 (19-nov-2026).
 //
 // 🔴 LA IDENTIDAD ES EL CÓDIGO: los recibos llevan `cliente_codigo`; las
 // facturas se puentean por ID (`switch_clientes` → `(empresa_key,
@@ -21,7 +21,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
-import { ROLES_HISTORIAL_GRUPO, empresasDeQuienPide } from "@/lib/cxc/historial-servidor";
+import { ROLES_HISTORIAL_GRUPO } from "@/lib/cxc/historial-servidor";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { TIPOS_VENTA_CONOCIDOS } from "@/lib/ventas/tipos-comprobante";
@@ -102,9 +102,6 @@ export async function GET(req: NextRequest) {
   }
   if (!(CXC_GRUPO_EMPRESA_KEYS as readonly string[]).includes(empresa)) {
     return NextResponse.json({ error: "Empresa no válida" }, { status: 400 });
-  }
-  if (!(await empresasDeQuienPide(auth.role, auth.userId)).includes(empresa)) {
-    return NextResponse.json({ error: "Sin acceso a esta empresa" }, { status: 403 });
   }
   const empresas = [empresa];
 

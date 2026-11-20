@@ -2,7 +2,7 @@
 // CANDADO del historial del cliente (19-nov-2026, `HISTORIAL_CLIENTE_2026_11`).
 //
 //  1. 🔴 La empresa la valida el SERVIDOR: solo una de las 6 del grupo (Boston y
-//     Multifashion → 400); el vendedor, solo la suya (403); `gerente_boston`
+//     Multifashion → 400); el vendedor no entra (403); `gerente_boston`
 //     no entra (403). Un recibo o una factura de otra empresa con el MISMO
 //     código no sale.
 //  2. 🩸 Un cliente con MÁS de 1.000 recibos (D-151 tiene 1.714) y más de 1.000
@@ -183,9 +183,13 @@ describe("🔴 la empresa la valida el servidor", () => {
     expect(await status("")).toBe(400);
   });
 
-  it("el vendedor de Fashion Wear: la suya sí, Vistana no (403)", async () => {
-    expect(await status("&empresa=fashion_wear", "vendedor")).toBe(200);
+  it("🔴 el vendedor no entra, ni a la suya (403, Daniel 19-nov-2026)", async () => {
+    expect(await status("&empresa=fashion_wear", "vendedor")).toBe(403);
     expect(await status("&empresa=vistana", "vendedor")).toBe(403);
+  });
+
+  it("la secretaria sí entra", async () => {
+    expect(await status("&empresa=vistana", "secretaria")).toBe(200);
   });
 
   it("solo la empresa pedida: Vistana no trae lo de Fashion Wear", async () => {

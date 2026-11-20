@@ -2,7 +2,7 @@
 import { CLASE_MONTO_COMPRA, ListaDocumentosCompra, tieneDocumentos } from "./CompraJunta";
 import { ListaPagosEmpresa } from "./PagosDeEmpresa";
 import TocarHistorial, { HojaDeLaEmpresa } from "@/components/cxc/HistorialCliente";
-import { HISTORIAL_CLIENTE_2026_11, HISTORIAL_CLIENTE_FILA_2026_11 } from "@/lib/cxc/historial-cliente";
+import { HISTORIAL_CLIENTE_2026_11, HISTORIAL_CLIENTE_FILA_2026_11, veHistorial } from "@/lib/cxc/historial-cliente";
 import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { telefonoParaWhatsApp, textoSinCelular } from "@/lib/ui/uso-2026-11";
 
@@ -375,7 +375,7 @@ export default function HojaCobrar({
           filas={desglose}
           total={total}
           codigo={codigo}
-          historial={HISTORIAL_CLIENTE_2026_11 && codigo ? { codigo, nombre } : null}
+          historial={HISTORIAL_CLIENTE_2026_11 && codigo && veHistorial() ? { codigo, nombre } : null}
         />
       </div>
 

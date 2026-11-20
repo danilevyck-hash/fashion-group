@@ -190,6 +190,8 @@ describe("🔴 «Últ. compra» = monto · N d (18-nov-2026)", () => {
   } as unknown as ConsolidatedClient;
 
   it("la línea no lleva «facturas», fechas ni «NC»; «Últ. compra» se toca (historial, 19-nov-2026)", () => {
+    // El historial es de admin y secretaria (19-nov-2026): la hoja lee el rol de la sesión.
+    window.sessionStorage.setItem("cxc_role", "admin");
     render(
       <HojaCobrar
         client={CON_DOCS}
