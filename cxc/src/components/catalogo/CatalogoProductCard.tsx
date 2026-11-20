@@ -13,7 +13,7 @@ import type { CatalogoProducto } from "./types";
 import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
 import { CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
-import { supabaseThumb } from "@/lib/image-thumb";
+import { supabaseThumb, estadoAlMontar } from "@/lib/image-thumb";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 import VisorFoto from "./VisorFoto";
 import { TECLADO_ENTERO } from "@/lib/ui/iphone-2026-11";
@@ -44,6 +44,12 @@ export default function CatalogoProductCard({
   const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">("loading");
   // Thumbnail (render transform); si falla, cae a la URL original una vez.
   const [useThumb, setUseThumb] = useState(true);
+  // 1er fallo: reintenta con la URL original (por si el transform no soporta
+  // ese archivo); 2do fallo: error real.
+  const alFallarFoto = () => {
+    if (useThumb) { setUseThumb(false); setImageStatus("loading"); }
+    else setImageStatus("error");
+  };
   const [justAdded, setJustAdded] = useState(false);
   const [showLightbox, setShowLightbox] = useState(false);
   const [showQtyInput, setShowQtyInput] = useState(false);
@@ -151,13 +157,14 @@ export default function CatalogoProductCard({
                   fetchPriority={priority ? "high" : "auto"}
                   decoding="async"
                   className={t.imageFit}
-                  onLoad={() => setImageStatus("loaded")}
-                  onError={() => {
-                    // 1er fallo: reintenta con la URL original (por si el
-                    // transform no soporta ese archivo); 2do fallo: error real.
-                    if (useThumb) { setUseThumb(false); setImageStatus("loading"); }
-                    else setImageStatus("error");
+                  ref={(img) => {
+                    // Cargó (o falló) antes de hidratar: los eventos no llegan.
+                    const e = estadoAlMontar(img);
+                    if (e === "cargada") setImageStatus("loaded");
+                    else if (e === "fallo") alFallarFoto();
                   }}
+                  onLoad={() => setImageStatus("loaded")}
+                  onError={alFallarFoto}
                 />
               )}
             </>
