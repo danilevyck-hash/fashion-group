@@ -74,17 +74,19 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   const sinMatch: string[] = [];
   const errores: string[] = [];
 
-  for (const item of items) {
+  // Cada foto elegida ahora también genera sus miniaturas (descarga + sharp +
+  // dos subidas): de a 8 a la vez para caber en los 300 s con ~500 productos.
+  const asignarUno = async (item: ManifiestoItem) => {
     const prod = porCodigo.get(normalizarCodigo(item.sku));
     if (!prod) {
       sinMatch.push(item.sku);
-      continue;
+      return;
     }
-    if (item.elegida == null) continue; // todas sus vistas eran lifestyle → sin foto
+    if (item.elegida == null) return; // todas sus vistas eran lifestyle → sin foto
     // La elegida tiene que ser una de las que el navegador dice haber subido.
     if (item.variantes.length > 0 && !item.variantes.includes(item.elegida)) {
       errores.push(`${prod.sku}: la foto elegida no se subió`);
-      continue;
+      return;
     }
     try {
       const url = await urlDeVariante(cfg, prod.sku, item.elegida, { verificar: false });
@@ -95,6 +97,9 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     } catch (err) {
       errores.push(`${prod.sku}: ${err instanceof Error ? err.message : "error"}`);
     }
+  };
+  for (let i = 0; i < items.length; i += 8) {
+    await Promise.all(items.slice(i, i + 8).map(asignarUno));
   }
 
   const s = getSession(req);

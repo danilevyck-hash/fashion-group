@@ -3575,3 +3575,18 @@ Candado: `tallas-por-pedido.test.ts` (pedido 2182 real como fixture + cada regla
 - 🔴 **Una sola fuente**: PDF y Excel arman sus opciones con la MISMA función (`opcionesDelPapel`) y las cuentas salen de `resolverLineas`/`resumirPedido`, igual que el PDF. La palabra del papel y el nombre del archivo son los del PDF, con `.xlsx`.
 - ⚠️ El Excel no lleva el logo ni la foto de cada producto (`xlsx-js-style` no escribe imágenes). Como espejo del PDF, la tabla empieza en la fila 4, no en A1: excepción deliberada a «los Excel empiezan en la fila 1», porque Daniel pidió que fuera igual al PDF.
 - Candado: `src/__tests__/catalogo/comprobante-excel.test.ts` (encabezado, columnas, total = PDF, secciones de preventa, interruptor prendido). `false` = la pantalla de antes.
+
+## 19-nov-2026 — Miniaturas guardadas: la foto entra por una sola puerta
+
+Daniel: *«Ok. Pero arregla lo de que la foto no suba por otro camino. Todo tiene que ir en orden.»*
+
+- **Por qué.** Las tarjetas del catálogo y las líneas de pedido pedían la miniatura al transform de Supabase (`/storage/v1/render/image`, `supabaseThumb(url, 600|160)`), que se cobra por cada foto de origen distinta en cada ciclo. Medido: 1.432 objetos en `product-images` al empezar.
+- **Cómo.** `guardarFotoConMiniaturas(db, ruta, original?)` en `src/lib/catalogo/miniaturas.ts` guarda el original (igual que antes, `upsert` y caché de 1 año) y, al lado, `<ruta>__600.webp` y `<ruta>__160.webp` (sharp, `fit: inside` en caja cuadrada, `withoutEnlargement`, calidad 70, la misma del render). Sin columnas nuevas ni migración: la ruta es DERIVADA. `supabaseThumb` (lib/image-thumb.ts, sin sharp, la usan componentes de cliente) devuelve esa ruta con el mismo `?v=` del original. Si la miniatura no existe, el `onError` cae al original (se agregó a `LineasPedidoEditables` y `ConfirmarPedidoAgrupado`, que no lo tenían).
+- **Los caminos que escriben en el bucket** (grep de `product-images`, `.upload(`, `image_url`, `storage.from(`):
+  1. `api/catalogo/[marca]/upload` (subida de administración, una foto por producto) → usa la función con `original`.
+  2. `variantes/firmar` + `zip-b2b-client.ts` (ZIP del B2B): el NAVEGADOR sube cada variante con token firmado, nunca pasa por el servidor. Por eso `guardarFotoElegida` (variantes-server.ts, el único que pone una variante en `image_url`: selector «Cambiar foto» y `variantes/manifiesto`) llama a la función SIN `original` antes del `update`: descarga la variante y hace sus miniaturas. El manifiesto va de a 8 productos a la vez para caber en sus 300 s.
+  3. `foto_manual` no sube nada: es una marca que escriben los dos caminos de arriba. El sync de catálogos (`sync-catalogo.ts`) no trae fotos: solo pone `image_url: null` a lo nuevo.
+  4. Scripts de una vez, fuera de `src/` (no los barre el candado): `upload-joybees-photos.mjs`, `retrofit-image-cache.mjs`, `_recortar-fotos-calvin.ts`. Si se vuelven a correr, después corre `scripts/miniaturas-pasada-unica.ts --apply`.
+- **Limpieza de fotos.** `planLimpiezaFotos` y `planBorradoAlternativas` (fotos-en-uso.ts) ignoran las miniaturas: siguen a su original.
+- **Candados.** `fotos-catalogo-una-puerta.test.ts`: nadie en `src/` escribe en `product-images` fuera de la puerta (única excepción, el token firmado de `firmar`), la subida de administración usa la puerta, `guardarFotoElegida` hace las miniaturas antes del `update`, y ninguna `render/image` en `src/`. `catalogo-miniaturas.test.ts`: genera 600 y 160 y no agranda.
+- **Pasada única.** `npx tsx scripts/miniaturas-pasada-unica.ts --apply`: solo sube miniaturas que falten, no borra, no pisa originales, no toca la base; idempotente.

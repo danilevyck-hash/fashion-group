@@ -1,27 +1,35 @@
-// Thumbnails vía el transform de imágenes de Supabase Storage (verificado
-// activo en este proyecto el 4-jul-2026): /object/public/ → /render/image/
-// public/ + width/quality. Evita bajar fotos a resolución completa en listas
-// (catálogo Reebok en iPad con datos móviles). Si la URL no es de Supabase
-// Storage se devuelve tal cual; el caller debe tener fallback onError a la
-// URL original por si el render falla para algún archivo.
+// Miniaturas GUARDADAS (19-nov-2026). Hasta hoy la miniatura salía del
+// transform de Supabase (`/render/image`), que se cobra por foto de origen
+// distinta en cada ciclo. Ahora cada foto del catálogo se guarda con dos WebP
+// al lado, en una ruta DERIVADA de la original (`<ruta>__600.webp`,
+// `<ruta>__160.webp`), y aquí solo se apunta a ese archivo normal
+// (`/object/public/...`). Las genera `guardarFotoConMiniaturas`
+// (lib/catalogo/miniaturas.ts), la ÚNICA puerta de escritura del bucket.
+// Si la miniatura no existe, el `onError` del llamador cae al original: nunca
+// una foto rota. Este archivo NO importa sharp: lo usan componentes de cliente.
 
 const OBJECT_PREFIX = "/storage/v1/object/public/";
-const RENDER_PREFIX = "/storage/v1/render/image/public/";
+export const BUCKET_FOTOS = "product-images";
+export const ANCHOS_MINIATURA = [600, 160] as const;
+export type AnchoMiniatura = (typeof ANCHOS_MINIATURA)[number];
 
-export function supabaseThumb(url: string | null | undefined, width = 600, quality = 70): string | null {
+/** `tommy/_v/abc/1.jpg` → `tommy/_v/abc/1.jpg__600.webp` (sirve igual con URL). */
+export function rutaMiniatura(ruta: string, ancho: AnchoMiniatura): string {
+  return `${ruta}__${ancho}.webp`;
+}
+
+/** ¿Es una miniatura derivada (y no una foto original)? */
+export function esMiniatura(ruta: string): boolean {
+  return /__(600|160)\.webp$/.test(ruta.split("?")[0]);
+}
+
+export function supabaseThumb(url: string | null | undefined, width: AnchoMiniatura = 600): string | null {
   if (!url) return null;
-  if (!url.includes(OBJECT_PREFIX)) return url;
+  if (!url.includes(`${OBJECT_PREFIX}${BUCKET_FOTOS}/`)) return url;
   const [base, qs] = url.split("?");
-  const params = new URLSearchParams(qs || "");
-  params.set("width", String(width));
-  params.set("height", String(width));
-  // GOTCHA verificado en vivo (5-jul-2026): sin `resize=contain`, el default
-  // del render es cover Y con solo width devuelve width×altoOriginal — una
-  // FRANJA vertical recortada (1000×1000 → 160×1000). contain + caja cuadrada
-  // preserva la foto completa (160×160), como object-contain en el catálogo.
-  params.set("resize", "contain");
-  params.set("quality", String(quality));
-  return `${base.replace(OBJECT_PREFIX, RENDER_PREFIX)}?${params.toString()}`;
+  // El `?v=` del original viaja igual: cambia cuando cambia la foto, y la
+  // miniatura se regenera en la misma subida.
+  return `${rutaMiniatura(base, width)}${qs ? `?${qs}` : ""}`;
 }
 
 // 🩸 19-nov-2026 — fotos grises para siempre en el catálogo público: las

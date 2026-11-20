@@ -115,7 +115,7 @@ export default function ConfirmarPedidoAgrupado(p: Props) {
               <div className="flex gap-3">
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-gray-50">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {l.image_url ? <img src={supabaseThumb(l.image_url, 160) ?? l.image_url} alt="" className="h-full w-full object-contain" /> : null}
+                  {l.image_url ? <img src={supabaseThumb(l.image_url, 160) ?? l.image_url} alt="" className="h-full w-full object-contain" onError={(e) => { const el = e.currentTarget; if (l.image_url && el.src !== l.image_url) el.src = l.image_url; }} /> : null}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">

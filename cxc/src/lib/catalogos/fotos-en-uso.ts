@@ -38,6 +38,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { normalizarSkuStorage } from "./fotos-b2b";
+import { esMiniatura } from "@/lib/image-thumb";
 
 export interface ObjetoStorage {
   /** Ruta completa dentro del bucket. ej. `tommy/_v/fw0fw05034dw5/1.jpg`. */
@@ -124,6 +125,8 @@ export function planLimpiezaFotos(
   productos: readonly ProductoConFoto[],
   prefijo: string,
 ): PlanLimpiezaFotos {
+  // Las miniaturas (`…__600.webp`) siguen a su original: no se clasifican aparte.
+  objetos = objetos.filter((o) => !esMiniatura(o.path));
   const vacio: PlanLimpiezaFotos = { fotos: [], aBorrar: [], bytesLiberados: 0, abortado: null };
   if (objetos.length === 0) return vacio;
   if (productos.length === 0) {
@@ -224,6 +227,8 @@ export function planBorradoAlternativas(
   productos: readonly ProductoConFoto[],
   prefijo: string,
 ): PlanBorradoAlternativas {
+  // Las miniaturas (`…__600.webp`) siguen a su original: no se clasifican aparte.
+  objetos = objetos.filter((o) => !esMiniatura(o.path));
   const vacio: PlanBorradoAlternativas = {
     aBorrar: [], bytesLiberados: 0, skusProtegidos: [], abortado: null,
   };

@@ -63,7 +63,7 @@ export default function LineasPedidoEditables({
           <div className="h-16 w-16 shrink-0 rounded-md bg-gray-50 overflow-hidden">
             {l.image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={supabaseThumb(l.image_url, 160) ?? l.image_url} alt="" className="h-full w-full object-contain" />
+              <img src={supabaseThumb(l.image_url, 160) ?? l.image_url} alt="" className="h-full w-full object-contain" onError={(e) => { const el = e.currentTarget; if (l.image_url && el.src !== l.image_url) el.src = l.image_url; }} />
             ) : null}
           </div>
           <div className="min-w-0 flex-1">
