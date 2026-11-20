@@ -162,3 +162,17 @@ export function lineaDeExistencias(
  */
 export const FILA_QUE_SE_DESLIZA =
   "flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+
+/**
+ * 🔴 La categoría es el TÍTULO del catálogo en el celular (19-nov-2026,
+ * propuesta para Daniel, sin aprobar). Arriba del buscador, «Todas las
+ * categorías ▾» en grande; al tocarlo sale la lista y elegir la cierra:
+ * Sneakers en 2 toques (hoy son 4: ícono, Categoría, elegir y «Listo»).
+ * Género, precio, «2+ bultos» y el orden siguen en la hoja «Filtros».
+ * Sin fila de chips y sin nada que se deslice. Público e interno, las 4 marcas.
+ * `false` = la pantalla de hoy.
+ */
+export const CATALOGO_FILTRO_2026_11 = false;
+
+/** El título dice qué filtra, también sin nada elegido. */
+export const TODAS_LAS_CATEGORIAS = "Todas las categorías";

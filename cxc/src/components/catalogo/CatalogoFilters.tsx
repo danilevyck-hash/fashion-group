@@ -111,7 +111,7 @@
 
 import { ArrowUpDown } from "lucide-react";
 import { ORDEN_ICONO_DE_LINEA } from "@/lib/ui/revision-110-vivo";
-import { BuscadorConFiltros, RenglonInterruptor, SeccionHoja, type FiltroDeLaHoja, type FiltroPuesto } from "@/components/filtros/FiltroA";
+import { BuscadorConFiltros, Capsula, RenglonInterruptor, SeccionHoja, type FiltroDeLaHoja, type FiltroPuesto } from "@/components/filtros/FiltroA";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { useRef, useState, type ReactNode } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
@@ -124,7 +124,7 @@ import FiltroPrecioChip from "./FiltroPrecioChip";
 import ChipFiltro from "./ChipFiltro";
 import { vidrioSobre } from "@/lib/ui/vidrio";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
-import { CATALOGO_ORDEN_CELULAR, FILA_QUE_SE_DESLIZA, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
+import { CATALOGO_FILTRO_2026_11, CATALOGO_ORDEN_CELULAR, FILA_QUE_SE_DESLIZA, TODAS_LAS_CATEGORIAS, cuantosFiltrosPuestos, textoBotonFiltros } from "@/lib/catalogo/orden-celular";
 import { clasesBarraFiltros, textoOrdenCorto } from "@/lib/catalogo/catalogos-2026-10";
 import { CHIP_V4 } from "@/lib/catalogo/catalogos-2026-10-b";
 
@@ -432,6 +432,9 @@ function CatalogoFiltroACelular({
   const generoOpts = (genderOptions ?? f.genderOptions).filter(o => o.value);
   const categoriaOpts = (categoryOptions ?? f.categoryOptions).filter(o => o.value);
   const conCategorias = theme.features.categoryChips && categoriaOpts.length > 0;
+  // CATALOGO_FILTRO_2026_11: con 2+ categorías, la categoría sale de la hoja y
+  // pasa a ser el título (una sola puerta). Con una sola, todo como hoy.
+  const categoriaEnTitulo = CATALOGO_FILTRO_2026_11 && conCategorias && categoriaOpts.length > 1;
   const conBultos = theme.features.filtroBultos && !!onBultosFilterChange;
   const conPrecio = theme.features.filtroPrecio && !!onPrecioChange;
   const hayPrecio = conPrecio && !!(precio.desde.trim() || precio.hasta.trim());
@@ -439,7 +442,7 @@ function CatalogoFiltroACelular({
     ? `$${precio.desde.trim()}` : `$${precio.desde.trim() || "0"}–$${precio.hasta.trim()}`;
   const filtros: FiltroDeLaHoja[] = [
     ...(generoOpts.length > 0 ? [{ clave: "genero", etiqueta: "Género", opciones: generoOpts.map(o => ({ valor: o.value, etiqueta: o.label })), valor: gender, onCambiar: onGenderChange }] : []),
-    ...(conCategorias ? [{ clave: "categoria", etiqueta: "Categoría", todos: "Todas", opciones: categoriaOpts.map(o => ({ valor: o.value, etiqueta: o.label })), valor: category, onCambiar: onCategoryChange }] : []),
+    ...(conCategorias && !categoriaEnTitulo ? [{ clave: "categoria", etiqueta: "Categoría", todos: "Todas", opciones: categoriaOpts.map(o => ({ valor: o.value, etiqueta: o.label })), valor: category, onCambiar: onCategoryChange }] : []),
   ];
   const puestosExtra: FiltroPuesto[] = [
     ...(conBultos && bultosFilter ? [{ clave: "bultos", texto: "2+ bultos", onQuitar: () => onBultosFilterChange!(false) }] : []),
@@ -447,6 +450,17 @@ function CatalogoFiltroACelular({
   ];
   return (
     <div data-filtro-a-catalogo className="mb-3 space-y-2 sm:hidden">
+      {categoriaEnTitulo && (
+        <div data-titulo-categoria>
+          <Capsula
+            etiqueta="Categoría"
+            opciones={[{ valor: "", etiqueta: TODAS_LAS_CATEGORIAS }, ...categoriaOpts.map(o => ({ valor: o.value, etiqueta: o.label }))]}
+            valor={category}
+            onCambiar={onCategoryChange}
+            className="-ml-0.5 h-11 gap-1 border-0 bg-transparent px-0 text-[24px] font-bold tracking-tight text-gray-950 [&>svg]:h-5 [&>svg]:w-5 [&>svg]:text-gray-900"
+          />
+        </div>
+      )}
       <BuscadorConFiltros
         busqueda={searchInput}
         onBuscar={onSearchChange}
