@@ -90,7 +90,8 @@ describe("ContactPanel (escritorio) — el desglose por empresa", () => {
     const fila = screen.getByText("Fashion Shoes").closest("tr")!;
     // Las dos últimas celdas (último pago y última compra) van en guion.
     const celdas = within(fila).getAllByRole("cell");
-    expect(celdas[celdas.length - 1].textContent).toBe("—");
+    // Con `HISTORIAL_CLIENTE_FILA_2026_11` la celda termina en el › de la fila.
+    expect(celdas[celdas.length - 1].textContent?.replace(/›$/, "")).toBe("—");
     expect(celdas[celdas.length - 2].textContent).toBe("—");
     expect(fila.textContent).not.toContain("$0.00");
   });

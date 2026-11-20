@@ -19,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import React from "react";
 import HojaCobrar from "@/app/cxc/components/HojaCobrar";
-import { HISTORIAL_CLIENTE_2026_11 } from "@/lib/cxc/historial-cliente";
+import { HISTORIAL_CLIENTE_2026_11, HISTORIAL_CLIENTE_FILA_2026_11 } from "@/lib/cxc/historial-cliente";
 import { empresasDelCliente } from "@/lib/cxc/lista-celular";
 import {
   CXC_DESGLOSE_CELULAR_2026_11,
@@ -208,13 +208,17 @@ describe("🔴 «Últ. compra» = monto · N d (18-nov-2026)", () => {
     expect(lineas.length).toBeGreaterThan(0);
     for (const td of lineas) {
       // Con `HISTORIAL_CLIENTE_2026_11` la línea entera es un enlace y termina en «›».
-      expect(td.textContent).toMatch(/Últ\. compra (\$[\d,]+ · \d+ d ?›?|—)$/);
+      expect(td.textContent).toMatch(/Últ\. compra (\$[\d,]+ · \d+ d ?›?|—)›?$/);
       expect(td.textContent).not.toMatch(/factura|\bNC\b|\b(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\b/i);
       // Nunca vuelve a forzar una sola línea: eso deslizaba la hoja.
       expect(td.className).not.toContain("whitespace-nowrap");
     }
     expect(screen.queryByText("Total de la compra")).toBeNull();
-    if (HISTORIAL_CLIENTE_2026_11) {
+    if (HISTORIAL_CLIENTE_FILA_2026_11) {
+      // Se toca la FILA de la empresa; el › chico al final lo indica.
+      expect(document.querySelector('tr[data-fila-historial="fashion_wear"]')).toBeTruthy();
+      expect(document.querySelector("[data-chevron-fila]")).toBeTruthy();
+    } else if (HISTORIAL_CLIENTE_2026_11) {
       // Tocar abre el historial de compras de ESA empresa (la hoja trae sus datos al abrir).
       const boton = document.querySelector('button[data-historial="compras"]');
       expect(boton?.textContent).toContain("Últ. compra $8,600");

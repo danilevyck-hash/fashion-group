@@ -34,11 +34,11 @@ import { agruparPagosPorFecha, type PagoDeEmpresa, type PagoDelDia } from "./pag
  *  antes: «Últ. pago» y «Últ. compra» sin tocar y la ruta contesta 404. */
 export const HISTORIAL_CLIENTE_2026_11 = true;
 
-/** Ajuste propuesto (19-nov-2026), APAGADO hasta el «sí» de Daniel: se toca la
+/** Ajuste PRENDIDO el 19-nov-2026 (Daniel: «Aprobado»): se toca la
  *  FILA entera de la empresa y abre una hoja con «Compras · Pagos»; los pagos van
  *  con el formato de las compras (mes como sección, un renglón por pago).
  *  `false` = lo publicado: «Últ. pago ›» y «Últ. compra ›» en azul. */
-export const HISTORIAL_CLIENTE_FILA_2026_11 = false;
+export const HISTORIAL_CLIENTE_FILA_2026_11 = true;
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
