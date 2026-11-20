@@ -27,6 +27,7 @@ import { logActivity } from "@/lib/log-activity";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
 import { esVisibleEnCatalogo } from "@/lib/catalogos/visibilidad";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
+import { calentarFoto } from "@/lib/catalogo/calentar-foto";
 
 export const dynamic = "force-dynamic";
 // Sin Data Cache en los fetch internos (gotcha Next.js + supabase-js): el
@@ -267,6 +268,7 @@ async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextRes
   }
   // Foto / etiqueta / nombre son campos que el catálogo público muestra.
   invalidarCatalogoPublico(cfg.marca);
+  if (typeof updates.image_url === "string") calentarFoto(updates.image_url);
   return NextResponse.json(data);
 }
 

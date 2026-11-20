@@ -14,6 +14,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MarcaConfig } from "@/lib/catalogo/marcas";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
+import { calentarFoto } from "@/lib/catalogo/calentar-foto";
 import {
   STORAGE_PREFIX,
   variantesRoot,
@@ -275,6 +276,7 @@ export async function guardarFotoElegida(
   // que es el otro llamador. revalidateTag deduplica por request, así que un
   // ZIP de 5000 SKUs invalida la tag UNA vez.
   invalidarCatalogoPublico(cfg.marca);
+  calentarFoto(imageUrl);
 }
 
 /** Borra todos los objetos de una carpeta de variantes. Devuelve bytes liberados. */
