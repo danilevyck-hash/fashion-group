@@ -3590,3 +3590,17 @@ Daniel: *«Ok. Pero arregla lo de que la foto no suba por otro camino. Todo tien
 - **Limpieza de fotos.** `planLimpiezaFotos` y `planBorradoAlternativas` (fotos-en-uso.ts) ignoran las miniaturas: siguen a su original.
 - **Candados.** `fotos-catalogo-una-puerta.test.ts`: nadie en `src/` escribe en `product-images` fuera de la puerta (única excepción, el token firmado de `firmar`), la subida de administración usa la puerta, `guardarFotoElegida` hace las miniaturas antes del `update`, y ninguna `render/image` en `src/`. `catalogo-miniaturas.test.ts`: genera 600 y 160 y no agranda.
 - **Pasada única.** `npx tsx scripts/miniaturas-pasada-unica.ts --apply`: solo sube miniaturas que falten, no borra, no pisa originales, no toca la base; idempotente.
+
+## 19-nov-2026 — «Filtrar» en el catálogo del celular
+
+**Lo que dijo Daniel** del catálogo de hoy en el teléfono: «el ícono no se entiende» y «son muchos toques». Aprobó la propuesta con «Ambos sí».
+
+**Cómo quedó** (interruptor `CATALOGO_FILTRO_2026_11` en `lib/catalogo/orden-celular.ts`, prendido; `false` = la pantalla de antes; componente `components/catalogo/FiltrarCelular.tsx`):
+- Al lado del buscador, un botón que se lee: ícono + «Filtrar» («Filtrar (1)» con filtros puestos).
+- La hoja muestra todo a la vista: Categoría en cuadrícula de 2 columnas (tocar una aplica y cierra: Sneakers en 2 toques, antes 4), Género, Precio, Orden y «2+ bultos», que se aplican al instante; se cierra tocando afuera o la ✕.
+- Orden va en UNA columna: «Precio: menor a mayor» se partía en dos líneas en media fila de 390 px.
+- Lo puesto se ve junto a la cantidad («Sneakers ✕») y se quita con un toque; nada se desliza de lado.
+- Público e interno, las 4 marcas. Joybees (todo clogs) no muestra Categoría.
+- 🩸 Se descartó el título «Todas las categorías ▾» arriba del catálogo: Daniel no lo aprobó.
+
+**Candado**: `src/__tests__/catalogo/catalogo-filtro-2026-11.test.tsx`.

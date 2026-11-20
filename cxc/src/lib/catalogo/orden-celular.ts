@@ -164,8 +164,7 @@ export const FILA_QUE_SE_DESLIZA =
   "flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 /**
- * 🔴 «Filtrar» en el catálogo del celular (19-nov-2026, propuesta para Daniel,
- * sin aprobar). Lo que le molesta de hoy: «el ícono no se entiende» y «son
+ * 🔴 «Filtrar» en el catálogo del celular (19-nov-2026, PRENDIDO: Daniel, «Ambos sí»). Lo que le molesta de hoy: «el ícono no se entiende» y «son
  * muchos toques». Al lado del buscador, un botón con ícono y la palabra
  * «Filtrar» («Filtrar (1)» con filtros puestos). La hoja muestra TODO a la
  * vista: Categoría en cuadrícula de 2 columnas (tocar una aplica y cierra:
@@ -175,4 +174,4 @@ export const FILA_QUE_SE_DESLIZA =
  * Público e interno, las 4 marcas. `false` = la pantalla de hoy.
  * (El título «Todas las categorías ▾» se descartó: Daniel no lo aprobó.)
  */
-export const CATALOGO_FILTRO_2026_11 = false;
+export const CATALOGO_FILTRO_2026_11 = true;

@@ -41,9 +41,9 @@ const hoja = () => document.querySelector("[data-hoja-filtrar]") as HTMLElement 
 const boton = () => document.querySelector("[data-boton-filtrar]") as HTMLElement;
 
 describe("CATALOGO_FILTRO_2026_11", () => {
-  it("nace apagado", async () => {
+  it("PRENDIDO (Daniel, 19-nov-2026: «Ambos sí»)", async () => {
     const real = await vi.importActual<typeof OrdenCelular>("@/lib/catalogo/orden-celular");
-    expect(real.CATALOGO_FILTRO_2026_11).toBe(false);
+    expect(real.CATALOGO_FILTRO_2026_11).toBe(true);
   });
 
   it("apagado: la pantalla de hoy (ícono y hoja «Filtros»)", () => {

@@ -91,9 +91,9 @@ const TITULO = "mb-2 mt-5 px-1 text-[13px] font-semibold uppercase tracking-wide
 
 /** Cuadrícula de 2 columnas que no se desliza; la elegida, en negro. Tocar la
  *  elegida otra vez la quita. */
-function Cuadricula({ grupo, alto, onTocado }: { grupo: GrupoFiltrar; alto: "grande" | "normal"; onTocado?: () => void }) {
+function Cuadricula({ grupo, alto, onTocado, columnas = 2 }: { grupo: GrupoFiltrar; alto: "grande" | "normal"; onTocado?: () => void; columnas?: 1 | 2 }) {
   return (
-    <div role="radiogroup" className="grid grid-cols-2 gap-2">
+    <div role="radiogroup" className={cn("grid gap-2", columnas === 2 ? "grid-cols-2" : "grid-cols-1")}>
       {grupo.opciones.map((o) => {
         const elegida = o.valor === grupo.valor;
         return (
@@ -104,7 +104,7 @@ function Cuadricula({ grupo, alto, onTocado }: { grupo: GrupoFiltrar; alto: "gra
             aria-checked={elegida}
             onClick={() => { grupo.onCambiar(elegida ? "" : o.valor); onTocado?.(); }}
             className={cn(
-              "rounded-[12px] border px-3 text-left font-medium transition active:scale-[0.98]",
+              "whitespace-nowrap rounded-[12px] border px-3 text-left font-medium transition active:scale-[0.98]",
               alto === "grande" ? "min-h-[56px] text-[17px]" : "min-h-[44px] text-[15px]",
               elegida ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 bg-white text-gray-900",
             )}
@@ -162,7 +162,8 @@ function HojaFiltrar(p: FiltrarCelularProps & { abierta: boolean; onCerrar: () =
           )}
           <section data-seccion="orden">
             <h3 className={TITULO}>Orden</h3>
-            <Cuadricula grupo={orden} alto="normal" />
+            {/* Una columna: «Precio: menor a mayor» no cabe en media fila de 390 px. */}
+            <Cuadricula grupo={orden} alto="normal" columnas={1} />
           </section>
           {p.bultos && (
             <section data-seccion="bultos">
