@@ -6,7 +6,7 @@
 // entiende» y «son muchos toques».
 //   · Al lado del buscador, un botón que SE LEE: ícono + «Filtrar» («Filtrar (1)»).
 //   · La hoja muestra todo a la vista, sin pasos intermedios. Categoría primero,
-//     en cuadrícula de 2 columnas: tocar una APLICA Y CIERRA (Sneakers = 2
+//     en cuadrícula de 3 columnas: tocar una APLICA Y CIERRA (Sneakers = 2
 //     toques). Género, Precio, Orden y «2+ bultos» se aplican al instante y la
 //     hoja se cierra tocando afuera o la ✕.
 //   · Lo puesto va junto a la cantidad, «Sneakers ✕», y se quita con un toque.
@@ -87,13 +87,19 @@ export default function FiltrarCelular(p: FiltrarCelularProps) {
   );
 }
 
-const TITULO = "mb-2 mt-5 px-1 text-[13px] font-semibold uppercase tracking-wide text-gray-500 first:mt-1";
+// 🔴 Sin deslizar (Daniel, 19-nov-2026: «no quiero hacer scroll para buscar
+// todas las opciones»). Medido en WebKit con la pantalla VISIBLE del iPhone en
+// Safari (375×553 SE · 390×664 · 430×740): Tommy, el de más categorías (6),
+// faltaban 349 px en el SE. Todo de 44 px de alto y letra de 14 px o más:
+// categorías de a 3, género en una línea, precio en una línea, orden de a 2.
+const TITULO = "mb-1.5 mt-3 px-1 text-[14px] font-semibold text-gray-500 first:mt-0";
+const COLUMNAS = { 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" } as const;
 
-/** Cuadrícula de 2 columnas que no se desliza; la elegida, en negro. Tocar la
- *  elegida otra vez la quita. */
-function Cuadricula({ grupo, alto, onTocado, columnas = 2 }: { grupo: GrupoFiltrar; alto: "grande" | "normal"; onTocado?: () => void; columnas?: 1 | 2 }) {
+/** Cuadrícula que no se desliza; la elegida, en negro. Tocar la elegida otra
+ *  vez la quita. */
+function Cuadricula({ grupo, onTocado, columnas }: { grupo: GrupoFiltrar; onTocado?: () => void; columnas: 2 | 3 | 4 }) {
   return (
-    <div role="radiogroup" className={cn("grid gap-2", columnas === 2 ? "grid-cols-2" : "grid-cols-1")}>
+    <div role="radiogroup" className={cn("grid gap-2", COLUMNAS[columnas])}>
       {grupo.opciones.map((o) => {
         const elegida = o.valor === grupo.valor;
         return (
@@ -104,8 +110,7 @@ function Cuadricula({ grupo, alto, onTocado, columnas = 2 }: { grupo: GrupoFiltr
             aria-checked={elegida}
             onClick={() => { grupo.onCambiar(elegida ? "" : o.valor); onTocado?.(); }}
             className={cn(
-              "whitespace-nowrap rounded-[12px] border px-3 text-left font-medium transition active:scale-[0.98]",
-              alto === "grande" ? "min-h-[56px] text-[17px]" : "min-h-[44px] text-[15px]",
+              "min-h-[44px] min-w-0 truncate rounded-[10px] border px-1.5 text-center text-[15px] font-medium transition active:scale-[0.98]",
               elegida ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 bg-white text-gray-900",
             )}
           >
@@ -116,6 +121,11 @@ function Cuadricula({ grupo, alto, onTocado, columnas = 2 }: { grupo: GrupoFiltr
     </div>
   );
 }
+
+/** Tres por fila desde 3 opciones; con 2, dos. */
+const deATres = (n: number) => (n >= 3 ? 3 : 2);
+/** En una línea mientras sean 4 o menos. */
+const enUnaLinea = (n: number) => (Math.min(Math.max(n, 2), 4) as 2 | 3 | 4);
 
 function HojaFiltrar(p: FiltrarCelularProps & { abierta: boolean; onCerrar: () => void }) {
   const { abierta, onCerrar } = p;
@@ -132,8 +142,8 @@ function HojaFiltrar(p: FiltrarCelularProps & { abierta: boolean; onCerrar: () =
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="Filtrar" data-hoja-filtrar className="fixed inset-0 z-[60] flex flex-col justify-end sm:hidden">
       <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/30" />
-      <div className="relative flex max-h-[90dvh] flex-col overflow-hidden rounded-t-[14px] bg-gray-100 shadow-xl" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        <div aria-hidden className="mx-auto mt-1.5 h-[5px] w-9 rounded-full bg-gray-300" />
+      <div className="relative flex max-h-[calc(100dvh-12px)] flex-col overflow-hidden rounded-t-[14px] bg-gray-100 shadow-xl" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div aria-hidden className="absolute left-1/2 top-1.5 h-[5px] w-9 -translate-x-1/2 rounded-full bg-gray-300" />
         <header className="grid grid-cols-[44px_1fr_44px] items-center px-2">
           <span />
           <h2 className="text-center text-[17px] font-semibold text-gray-950">Filtrar</h2>
@@ -141,33 +151,31 @@ function HojaFiltrar(p: FiltrarCelularProps & { abierta: boolean; onCerrar: () =
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-gray-600"><X className="h-4 w-4" strokeWidth={2.5} /></span>
           </button>
         </header>
-        <div className="overflow-y-auto overscroll-contain px-4 pb-6">
+        <div className="overflow-y-auto overscroll-contain px-4 pb-3">
           {p.categoria && (
             <section data-seccion="categoria">
               <h3 className={TITULO}>Categoría</h3>
-              <Cuadricula grupo={p.categoria} alto="grande" onTocado={onCerrar} />
+              <Cuadricula grupo={p.categoria} columnas={deATres(p.categoria.opciones.length)} onTocado={onCerrar} />
             </section>
           )}
           {p.genero && (
             <section data-seccion="genero">
               <h3 className={TITULO}>Género</h3>
-              <Cuadricula grupo={p.genero} alto="normal" />
+              <Cuadricula grupo={p.genero} columnas={enUnaLinea(p.genero.opciones.length)} />
             </section>
           )}
           {p.precio && (
             <section data-seccion="precio">
               <h3 className={TITULO}>Precio</h3>
-              <div className="overflow-hidden rounded-[10px]">{p.precio}</div>
+              {p.precio}
             </section>
           )}
           <section data-seccion="orden">
             <h3 className={TITULO}>Orden</h3>
-            {/* Una columna: «Precio: menor a mayor» no cabe en media fila de 390 px. */}
-            <Cuadricula grupo={orden} alto="normal" columnas={1} />
+            <Cuadricula grupo={orden} columnas={2} />
           </section>
           {p.bultos && (
-            <section data-seccion="bultos">
-              <h3 className={TITULO}>Disponibilidad</h3>
+            <section data-seccion="bultos" className="mt-3">
               <div className="overflow-hidden rounded-[10px] bg-white">
                 <RenglonInterruptor etiqueta="2+ bultos" activo={p.bultos.activo} onCambiar={p.bultos.onCambiar} />
               </div>

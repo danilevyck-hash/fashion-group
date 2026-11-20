@@ -422,6 +422,13 @@ const ORDEN_CATALOGO = [
   { valor: "precio-desc", etiqueta: "Precio: mayor a menor" },
   { valor: "nombre-az", etiqueta: "Nombre A-Z" },
 ];
+/** Los mismos cuatro, cortos: caben de a dos por fila en la hoja «Filtrar». */
+const ORDEN_CORTO = [
+  { valor: "relevancia", etiqueta: "Relevancia" },
+  { valor: "precio-asc", etiqueta: "Menor precio" },
+  { valor: "precio-desc", etiqueta: "Mayor precio" },
+  { valor: "nombre-az", etiqueta: "Nombre A-Z" },
+];
 
 function CatalogoFiltroACelular({
   marca, searchInput, onSearchChange, gender, onGenderChange, category, onCategoryChange,
@@ -457,7 +464,7 @@ function CatalogoFiltroACelular({
         onBuscar={onSearchChange}
         categoria={categoria && grupo(categoria)}
         genero={genero && grupo(genero)}
-        orden={{ opciones: ORDEN_CATALOGO, valor: sortBy || "relevancia", onCambiar: onSortByChange }}
+        orden={{ opciones: ORDEN_CORTO, valor: sortBy || "relevancia", onCambiar: onSortByChange }}
         precio={conPrecio ? <PrecioDesdeHasta precio={precio} onChange={onPrecioChange!} precios={preciosDisponibles} /> : undefined}
         bultos={conBultos ? { activo: bultosFilter, onCambiar: v => onBultosFilterChange!(v) } : undefined}
         puestos={[...filtrosPuestos([...filtros].reverse()), ...puestosExtra]}
@@ -499,23 +506,27 @@ function CatalogoFiltroACelular({
   );
 }
 
-/** «Desde» y «Hasta» como renglones de la hoja. El ESPEJO de siempre: mientras
- *  «Hasta» siga igual a «Desde» (o vacío), escribir «Desde» lo copia. */
+/** «Desde» y «Hasta» en UNA línea (19-nov-2026: la hoja cabe sin deslizar).
+ *  El ESPEJO de siempre: mientras «Hasta» siga igual a «Desde» (o vacío),
+ *  escribir «Desde» lo copia. Letra de 16 px: con menos, el iPhone acerca la
+ *  pantalla al tocar el campo. */
 function PrecioDesdeHasta({ precio, onChange, precios }: { precio: FiltroPrecio; onChange: (p: FiltroPrecio) => void; precios: number[] }) {
   const espejo = !precio.hasta.trim() || precio.hasta === precio.desde;
   const aviso = mensajeFiltroPrecio(precio.desde, precio.hasta, precios);
-  const renglon = (etiqueta: string, valor: string, cambiar: (v: string) => void) => (
-    <label className="flex min-h-[44px] items-center justify-between gap-3 px-4">
-      <span className="text-[17px] text-gray-900">{etiqueta}</span>
-      <input value={valor} onChange={e => cambiar(e.target.value)} inputMode="decimal" placeholder="$0.00"
-        className="w-28 bg-transparent text-right text-[17px] tabular-nums text-gray-900 outline-none placeholder:text-gray-400" />
+  const campo = (etiqueta: string, valor: string, cambiar: (v: string) => void) => (
+    <label className="flex min-h-[44px] min-w-0 items-center justify-between gap-2 rounded-[10px] bg-white px-3">
+      <span className="text-[16px] text-gray-900">{etiqueta}</span>
+      <input value={valor} onChange={e => cambiar(e.target.value)} inputMode="decimal" placeholder="$0.00" aria-label={`Precio ${etiqueta.toLowerCase()}`}
+        className="w-full min-w-0 bg-transparent text-right text-[16px] tabular-nums text-gray-900 outline-none placeholder:text-gray-400" />
     </label>
   );
   return (
-    <div className="divide-y divide-gray-200 bg-white">
-      {renglon("Desde", precio.desde, v => onChange({ desde: v, hasta: espejo ? v : precio.hasta }))}
-      {renglon("Hasta", precio.hasta, v => onChange({ desde: precio.desde, hasta: v }))}
-      {aviso && <p className="px-4 py-2 text-xs text-gray-500">{aviso}</p>}
+    <div>
+      <div className="grid grid-cols-2 gap-2">
+        {campo("Desde", precio.desde, v => onChange({ desde: v, hasta: espejo ? v : precio.hasta }))}
+        {campo("Hasta", precio.hasta, v => onChange({ desde: precio.desde, hasta: v }))}
+      </div>
+      {aviso && <p className="px-1 pt-1.5 text-[14px] text-gray-500">{aviso}</p>}
     </div>
   );
 }

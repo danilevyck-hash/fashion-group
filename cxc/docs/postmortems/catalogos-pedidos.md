@@ -3602,5 +3602,6 @@ Daniel: *«Ok. Pero arregla lo de que la foto no suba por otro camino. Todo tien
 - Lo puesto se ve junto a la cantidad («Sneakers ✕») y se quita con un toque; nada se desliza de lado.
 - Público e interno, las 4 marcas. Joybees (todo clogs) no muestra Categoría.
 - 🩸 Se descartó el título «Todas las categorías ▾» arriba del catálogo: Daniel no lo aprobó.
+- 🔴 **La hoja cabe sin scroll en el iPhone SE, en las 4 marcas** (Daniel: «no quiero hacer scroll para buscar todas las opciones»; mockup aprobado el mismo día). Medido en WebKit con la pantalla visible de Safari (375×553 · 390×664 · 430×740): a Tommy (6 categorías) le faltaban 349 px en el SE; ahora le sobran 53. Categorías de a 3, Género en una línea, Precio Desde/Hasta en una línea, Orden de a 2 con nombres cortos («Menor precio», «Mayor precio»), sin el título «Disponibilidad»; botones de 44 px y letra de 14 px o más. Esto reemplaza la cuadrícula de 2 columnas y el Orden en una columna de arriba.
 
 **Candado**: `src/__tests__/catalogo/catalogo-filtro-2026-11.test.tsx`.
