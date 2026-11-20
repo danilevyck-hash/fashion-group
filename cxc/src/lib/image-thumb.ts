@@ -23,3 +23,15 @@ export function supabaseThumb(url: string | null | undefined, width = 600, quali
   params.set("quality", String(quality));
   return `${base.replace(OBJECT_PREFIX, RENDER_PREFIX)}?${params.toString()}`;
 }
+
+// 🩸 19-nov-2026 — fotos grises para siempre en el catálogo público: las
+// primeras tarjetas llegan en el HTML del servidor y la foto termina de
+// cargar ANTES de que React hidrate, así que `onLoad`/`onError` nunca se
+// disparan y el esqueleto queda encima. Al montar la <img> se pregunta cómo
+// quedó: "cargada", "fallo" o null (todavía no termina; los eventos avisan).
+// `currentSrc` vacío = una lazy que ni empezó: no es un fallo.
+export function estadoAlMontar(img: HTMLImageElement | null): "cargada" | "fallo" | null {
+  if (!img || !img.complete) return null;
+  if (img.naturalWidth > 0) return "cargada";
+  return img.currentSrc ? "fallo" : null;
+}
