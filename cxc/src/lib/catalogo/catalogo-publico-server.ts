@@ -12,6 +12,7 @@ import type { MarcaConfig } from "@/lib/catalogo/marcas";
 import { paquetePublico } from "@/lib/catalogo/publico-payload";
 import { catalogoTag, CATALOGO_PUBLICO_TTL_SEGUNDOS } from "@/lib/catalogo/cache";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { conDistintivoNuevo } from "@/lib/catalogo/distintivo-nuevo";
 
 /** Error cuyo `message` es EXACTAMENTE el texto que devuelve el endpoint. */
 export class ErrorCatalogo extends Error {}
@@ -113,5 +114,7 @@ export async function leerCatalogoPublico(cfg: MarcaConfig): Promise<PayloadPubl
   if (cfg.marca === "reebok" && (await bultoEnRenglon(cfg))) {
     payload = { ...payload, products: payload.products.map((p) => productoConBulto(p as { category?: string | null }, true)) } as PayloadPublico;
   }
-  return payload;
+  // «Nuevo» (22-nov-2026): fuera del caché del catálogo, con su propio caché y
+  // falla ABIERTA. Al navegador va solo el booleano.
+  return { ...payload, products: await conDistintivoNuevo(cfg.empresaKey, payload.products) };
 }

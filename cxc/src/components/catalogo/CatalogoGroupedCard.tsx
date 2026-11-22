@@ -180,6 +180,16 @@ export default function CatalogoGroupedCard({
             </div>
           )}
 
+          {/* «Nuevo» calculado: alguna de sus variantes llegó por primera vez
+              hace ≤ 30 días. Regalía y Popular conservan la esquina. */}
+          {!isRegalia && !group.popular && group.variants.some(v => v.product.nuevo) && (
+            <div className="absolute top-2 left-2 z-[5]" data-distintivo-nuevo>
+              <span className="inline-block rounded-full bg-white px-2.5 py-[3px] text-xs font-semibold text-[#B45309] shadow-sm ring-1 ring-black/5">
+                Nuevo
+              </span>
+            </div>
+          )}
+
           {group.image_url ? (
             <>
               {imageStatus === "loading" && <div className="absolute inset-0 shimmer" />}

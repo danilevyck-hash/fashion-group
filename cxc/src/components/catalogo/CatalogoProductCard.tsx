@@ -130,6 +130,16 @@ export default function CatalogoProductCard({
             </div>
           )}
 
+          {/* «Nuevo» calculado (primera llegada ≤ 30 días, `DISTINTIVO_NUEVO`):
+              la esquina es de un solo distintivo, el manual manda si existe. */}
+          {product.nuevo && !product.badge && (
+            <div className="absolute top-2 left-2 z-[5]" data-distintivo-nuevo>
+              <span className="inline-block rounded-full bg-white px-2.5 py-[3px] text-xs font-semibold text-[#B45309] shadow-sm ring-1 ring-black/5">
+                Nuevo
+              </span>
+            </div>
+          )}
+
           {product.image_url ? (
             <>
               {imageStatus === "loading" && <div className="absolute inset-0 shimmer" />}

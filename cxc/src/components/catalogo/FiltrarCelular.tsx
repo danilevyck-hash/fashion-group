@@ -37,6 +37,8 @@ export interface FiltrarCelularProps {
   /** Los campos Desde/Hasta, ya armados por quien conoce el espejo. */
   precio?: ReactNode;
   bultos?: { activo: boolean; onCambiar: (v: boolean) => void };
+  /** «Nuevo» (22-nov-2026): solo llega si el catálogo tiene al menos uno. */
+  nuevo?: { activo: boolean; onCambiar: (v: boolean) => void };
   /** Los filtros puestos, en orden: categoría primero. */
   puestos: readonly FiltroPuesto[];
   cantidad: number;
@@ -178,6 +180,13 @@ function HojaFiltrar(p: FiltrarCelularProps & { abierta: boolean; onCerrar: () =
             <section data-seccion="bultos" className="mt-3">
               <div className="overflow-hidden rounded-[10px] bg-white">
                 <RenglonInterruptor etiqueta="2+ bultos" activo={p.bultos.activo} onCambiar={p.bultos.onCambiar} />
+              </div>
+            </section>
+          )}
+          {p.nuevo && (
+            <section data-seccion="nuevo" className="mt-3">
+              <div className="overflow-hidden rounded-[10px] bg-white">
+                <RenglonInterruptor etiqueta="Nuevo" activo={p.nuevo.activo} onCambiar={p.nuevo.onCambiar} />
               </div>
             </section>
           )}

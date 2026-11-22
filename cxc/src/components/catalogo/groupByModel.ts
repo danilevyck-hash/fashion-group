@@ -20,6 +20,8 @@ export interface JoybeesProduct {
   popular: boolean;
   is_regalia: boolean;
   created_at: string;
+  /** «Nuevo» calculado en el servidor (primera llegada ≤ 30 días). */
+  nuevo?: boolean;
 }
 
 /** Gender suffix → Spanish label */

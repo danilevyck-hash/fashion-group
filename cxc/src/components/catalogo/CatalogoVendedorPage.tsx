@@ -14,6 +14,7 @@
 // carrito NO se lee ni se escribe mientras el modo está vivo, así que lo que el
 // vendedor tuviera armado aparte queda intacto. Ver lib/catalogo/modo-pedido.ts.
 
+import { filtroNuevo } from "@/lib/ui/catalogo-nuevo-2026-11";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
@@ -79,6 +80,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const [bultosFilter, setBultosFilter] = useState(
     theme.features.filtroBultos ? searchParams.get("bultos") === "1" : false,
   );
+  const [nuevoFilter, setNuevoFilter] = useState(searchParams.get("nuevo") === "1");
   const [precio, setPrecio] = useState<FiltroPrecio>(() =>
     theme.features.filtroPrecio
       ? {
@@ -202,6 +204,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     if (category) params.set("category", category);
     if (search) params.set("search", search);
     if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
+    if (nuevoFilter) params.set("nuevo", "1");
     if (theme.features.filtroPrecio && precio.desde.trim()) params.set("precio_desde", precio.desde.trim());
     if (theme.features.filtroPrecio && precio.hasta.trim()) params.set("precio_hasta", precio.hasta.trim());
     // El modo pedido viaja en la URL y esta línea la reescribe entera: sin
@@ -211,7 +214,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, "", newUrl);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gender, category, search, bultosFilter, precio.desde, precio.hasta, agregarA]);
+  }, [gender, category, search, bultosFilter, precio.desde, precio.hasta, agregarA, nuevoFilter]);
 
   // `loadError` separa "no cargó" de "no hay resultados" — la misma regla que
   // ya usaba el catálogo PÚBLICO desde jul-2026. Hasta hoy, los tres `catch` de
@@ -366,7 +369,10 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     [theme, products],
   );
 
+  // «Nuevo» (22-nov-2026): solo se ofrece si el catálogo tiene al menos uno.
+  const nuevo = filtroNuevo(products, nuevoFilter);
   const filtered = agrupado ? [] : products
+    .filter(p => !nuevo.activo || p.nuevo)
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => theme.genero.match(p.gender, gender))
     .filter(p => !category || p.category === category)
@@ -414,6 +420,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   // ── Derived state — pipeline AGRUPADO (groupByModel + secciones) ──
   const allGrouped = agrupado ? groupByModel(
     (products as JoybeesProduct[])
+      .filter(p => !nuevo.activo || p.nuevo)
       .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()))
       .filter(p => !category || p.category === category)
       // Misma regla de precio que la lista plana. Hoy es un no-op (Joybees es
@@ -517,7 +524,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
   function handleClearAll() {
     setSearchInput(""); setSearch(""); setGender(""); setCategory("");
-    setBultosFilter(false); setPrecio(PRECIO_VACIO);
+    setBultosFilter(false); setPrecio(PRECIO_VACIO); setNuevoFilter(false);
     setSortBy("relevancia");
   }
 
@@ -546,7 +553,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
   // ¿Hay ALGÚN filtro puesto? Decide cuál de los tres vacíos se muestra.
   const hayFiltros = !!(
-    search || gender || category || bultosFilter || precio.desde.trim() || precio.hasta.trim()
+    search || gender || category || bultosFilter || nuevo.activo || precio.desde.trim() || precio.hasta.trim()
   );
 
   // Tres estados distintos, porque las tres causas se arreglan distinto — copia
@@ -846,6 +853,8 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           onCategoryChange={setCategory}
           bultosFilter={bultosFilter}
           onBultosFilterChange={theme.features.filtroBultos ? setBultosFilter : undefined}
+          nuevoFilter={nuevo.activo}
+          onNuevoFilterChange={nuevo.hay ? setNuevoFilter : undefined}
           precio={precio}
           onPrecioChange={theme.features.filtroPrecio ? setPrecio : undefined}
           preciosDisponibles={preciosDisponibles}

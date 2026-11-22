@@ -141,7 +141,7 @@ describe("candados estáticos", () => {
     // armara a mano, tocar "Mujer" apagaría el modo.
     expect(src).toMatch(/querySinPerderModo\(params, agregarA\)[\s\S]{0,300}history\.replaceState/);
     // Y el efecto se vuelve a correr si cambia el pedido al que se agrega.
-    expect(src).toMatch(/\[gender, category, search, bultosFilter, precio\.desde, precio\.hasta, agregarA\]/);
+    expect(src).toMatch(/\[gender, category, search, bultosFilter, precio\.desde, precio\.hasta, agregarA, nuevoFilter\]/);
   });
 
   it("en modo pedido las tarjetas escriben en el PEDIDO, no en el carrito", () => {
