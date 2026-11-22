@@ -130,13 +130,12 @@ export default function CatalogoProductCard({
             </div>
           )}
 
-          {/* «Nuevo» calculado (primera llegada ≤ 30 días, `DISTINTIVO_NUEVO`):
-              la esquina es de un solo distintivo, el manual manda si existe. */}
-          {product.nuevo && !product.badge && (
-            <div className="absolute top-2 left-2 z-[5]" data-distintivo-nuevo>
-              <span className="inline-block rounded-full bg-white px-2.5 py-[3px] text-xs font-semibold text-[#B45309] shadow-sm ring-1 ring-black/5">
-                Nuevo
-              </span>
+          {/* Bolita «Llegó en los últimos 30 días» (`DISTINTIVO_NUEVO`): SOLO el
+              catálogo interno (showStock); el cliente no la ve (Daniel, 22-nov-2026). */}
+          {showStock && product.nuevo && !product.badge && (
+            <div className="absolute top-3 left-3 z-[5]" data-distintivo-nuevo>
+              <span role="img" title="Llegó en los últimos 30 días" aria-label="Llegó en los últimos 30 días"
+                className="block h-2.5 w-2.5 rounded-full bg-[#B45309] ring-2 ring-white" />
             </div>
           )}
 

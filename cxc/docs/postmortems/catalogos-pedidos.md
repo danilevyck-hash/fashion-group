@@ -3615,3 +3615,12 @@ Daniel (22-nov-2026) aprobó sobre el mockup «HOY vs RECOMENDACIÓN» una píld
 - **La tarjeta**: plana y agrupada (en la agrupada, si alguna variante es nueva). La esquina es de un solo distintivo: el `badge` manual, Regalía y Popular la conservan. 🩸 El `badge` manual («nuevo · oferta · proximamente») sigue vacío y **no se revivió**.
 - **El filtro**: «Nuevo» es una opción más junto a «2+ bultos» — chip en la computadora, renglón con interruptor en la hoja «Filtrar» del celular—, va en la URL (`?nuevo=1`, `replaceState` como los demás) y entra a «Limpiar filtros». Solo se ofrece si el catálogo tiene al menos uno (`filtroNuevo`); medido el 22-nov-2026: Reebok 62, Tommy 35, Calvin 5, Joybees 0 (no sale).
 - Interruptor `DISTINTIVO_NUEVO` (`lib/ui/catalogo-nuevo-2026-11.ts`, prendido; `false` = el catálogo de antes). Candado `src/__tests__/lib/catalogo-distintivo-nuevo.test.ts`.
+
+### 22-nov-2026 (tarde) — Solo para la casa: una bolita, y el cliente no lo sabe
+
+Publicado lo de arriba (#848), Daniel lo vio en producción y pidió: *«quita lo de nuevo, mejor deja una bolita para yo saber, que el cliente no lo sepa»*.
+
+- **Catálogo público y pedido público**: sin rastro. `leerCatalogoPublico` ya no llama a `conDistintivoNuevo`, así que el dato no viaja en el paquete; la página pública perdió el chip, el renglón de «Filtrar» y `?nuevo=1`.
+- **Catálogo interno**: la píldora «Nuevo» pasó a ser una **bolita** sin texto (10 px, ámbar oscuro con borde blanco) en la esquina de la foto, con `title`/`aria-label` «Llegó en los últimos 30 días». Se dibuja solo con `showStock` (que solo pasa el interno), además de que el público ya no tiene el dato. El filtro interno se queda como estaba (chip «Nuevo» / renglón de «Filtrar», `?nuevo=1`).
+- **Lo que sale hacia el cliente**: el PDF del catálogo (`catalog-pdf.ts`) no lee el dato, y «Copiar enlace» comparte la dirección pública sin filtros.
+- Candado `catalogo-distintivo-nuevo`, ahora con «el CLIENTE no lo sabe».
