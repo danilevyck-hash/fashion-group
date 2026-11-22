@@ -16,6 +16,9 @@ export interface CatalogoProducto {
   /** 🩸 `color` se podó el 22-sep-2026: vacío en 391 de 391 y sin nadie que lo
    *  pueda escribir. La COLUMNA de la base no se dropea. Ver la tarjeta. */
   badge?: string | null;
+  /** «Nuevo» calculado en el SERVIDOR: primera llegada ≤ 30 días
+   *  (`lib/catalogo/distintivo-nuevo.ts`). Nunca el `badge` manual. */
+  nuevo?: boolean;
   description?: string | null;
   active?: boolean;
   on_sale?: boolean;

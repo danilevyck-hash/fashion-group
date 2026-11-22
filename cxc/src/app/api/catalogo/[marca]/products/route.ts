@@ -27,6 +27,7 @@ import { logActivity } from "@/lib/log-activity";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
 import { esVisibleEnCatalogo } from "@/lib/catalogos/visibilidad";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
+import { conDistintivoNuevo } from "@/lib/catalogo/distintivo-nuevo";
 
 export const dynamic = "force-dynamic";
 // Sin Data Cache en los fetch internos (gotcha Next.js + supabase-js): el
@@ -113,9 +114,9 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     // Reebok: el bulto con que se pide HOY (ropa de 12, reebok-cat-05). Solo
     // con la columna del renglón; sin ella, el producto va como siempre.
     if (cfg.marca === "reebok" && Array.isArray(data) && (await bultoEnRenglon(cfg))) {
-      return NextResponse.json((data as { category?: string | null }[]).map((p) => productoConBulto(p, true)));
+      return NextResponse.json(await conDistintivoNuevo(cfg.empresaKey, (data as { category?: string | null; sku?: unknown }[]).map((p) => productoConBulto(p, true))));
     }
-    return NextResponse.json(data);
+    return NextResponse.json(Array.isArray(data) ? await conDistintivoNuevo(cfg.empresaKey, data as { sku?: unknown }[]) : data);
   }
 
   // QUIRK 4 (Joybees): sesión SIEMPRE, con los roles del módulo Catálogos.
@@ -145,7 +146,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     console.error(error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
-  return NextResponse.json(data);
+  return NextResponse.json(Array.isArray(data) ? await conDistintivoNuevo(cfg.empresaKey, data as { sku?: unknown }[]) : data);
 }
 
 // ── Edición manual (allow-list image_url/badge) ──────────────────────────────

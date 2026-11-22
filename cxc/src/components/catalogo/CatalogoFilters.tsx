@@ -372,6 +372,11 @@ interface CatalogoFiltersProps {
   onCategoryChange: (v: string) => void;
   bultosFilter?: boolean;
   onBultosFilterChange?: (v: boolean) => void;
+  /** «Nuevo» (22-nov-2026, `DISTINTIVO_NUEVO`): solo los artículos de primera
+   *  llegada ≤ 30 días. La página pasa `onNuevoFilterChange` SOLO si hay al
+   *  menos uno: sin él, la opción no se dibuja. */
+  nuevoFilter?: boolean;
+  onNuevoFilterChange?: (v: boolean) => void;
   /** Los dos campos de precio, tal cual los escribió la persona. */
   precio?: FiltroPrecio;
   /** Se llama con los DOS campos a la vez: el espejo cambia los dos juntos. */
@@ -434,6 +439,7 @@ function CatalogoFiltroACelular({
   marca, searchInput, onSearchChange, gender, onGenderChange, category, onCategoryChange,
   bultosFilter = false, onBultosFilterChange, precio = PRECIO_VACIO, onPrecioChange, preciosDisponibles = [],
   sortBy, onSortByChange, filteredCount, onClearAll, genderOptions, categoryOptions, frescuraCelular,
+  nuevoFilter = false, onNuevoFilterChange,
 }: CatalogoFiltersProps) {
   const theme = getMarcaTheme(marca)!;
   const f = theme.filtros;
@@ -451,6 +457,7 @@ function CatalogoFiltroACelular({
   ];
   const puestosExtra: FiltroPuesto[] = [
     ...(conBultos && bultosFilter ? [{ clave: "bultos", texto: "2+ bultos", onQuitar: () => onBultosFilterChange!(false) }] : []),
+    ...(onNuevoFilterChange && nuevoFilter ? [{ clave: "nuevo", texto: "Nuevo", onQuitar: () => onNuevoFilterChange(false) }] : []),
     ...(hayPrecio ? [{ clave: "precio", texto: textoPrecio, onQuitar: () => onPrecioChange!(PRECIO_VACIO) }] : []),
   ];
   if (CATALOGO_FILTRO_2026_11) {
@@ -467,6 +474,7 @@ function CatalogoFiltroACelular({
         orden={{ opciones: ORDEN_CORTO, valor: sortBy || "relevancia", onCambiar: onSortByChange }}
         precio={conPrecio ? <PrecioDesdeHasta precio={precio} onChange={onPrecioChange!} precios={preciosDisponibles} /> : undefined}
         bultos={conBultos ? { activo: bultosFilter, onCambiar: v => onBultosFilterChange!(v) } : undefined}
+        nuevo={onNuevoFilterChange ? { activo: nuevoFilter, onCambiar: onNuevoFilterChange } : undefined}
         puestos={[...filtrosPuestos([...filtros].reverse()), ...puestosExtra]}
         cantidad={filteredCount}
         frescura={frescuraCelular}
@@ -537,6 +545,7 @@ function CatalogoFiltrosDeHoy({
   gender, onGenderChange,
   category, onCategoryChange,
   bultosFilter = false, onBultosFilterChange,
+  nuevoFilter = false, onNuevoFilterChange,
   precio = PRECIO_VACIO, onPrecioChange, preciosDisponibles = [],
   sortBy, onSortByChange,
   filteredCount, onClearAll,
@@ -581,12 +590,13 @@ function CatalogoFiltrosDeHoy({
   const hasActiveFilters = !!(
     searchInput || gender || category ||
     (conBultos && bultosFilter) ||
+    (!!onNuevoFilterChange && nuevoFilter) ||
     (conPrecio && (precio.desde.trim() || precio.hasta.trim()))
   );
 
   // Las piezas se arman UNA vez y se acomodan según el interruptor: así no
   // se duplica ningún control (candado `catalogo-orden-celular`).
-  const puestosVisibles = filtrosPuestos;
+  const puestosVisibles = filtrosPuestos + (onNuevoFilterChange && nuevoFilter ? 1 : 0);
   // v4: chips compactos (13 px, 36 de alto, 44 de toque). Sin la v4, el literal de hoy.
   const chipTam = unaFila ? CHIP_V4 : "px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px]";
   const buscador = (placeholder: string, rellenoDerecho?: string, adentro?: ReactNode) => (
@@ -617,6 +627,18 @@ function CatalogoFiltrosDeHoy({
   const buscadorPiezas = buscador(f.searchPlaceholder);
   const desplegablesPiezas = (
     <>
+    {onNuevoFilterChange && unaFila && (
+      <ChipFiltro onClick={() => onNuevoFilterChange(!nuevoFilter)} aria-pressed={nuevoFilter}
+        activo={nuevoFilter} chipActive={f.chipActive} chipInactive={f.chipInactive}>
+        Nuevo
+      </ChipFiltro>
+    )}
+    {onNuevoFilterChange && !unaFila && (
+      <button onClick={() => onNuevoFilterChange(!nuevoFilter)} aria-pressed={nuevoFilter}
+        className={`${chipTam} ${nuevoFilter ? f.chipActive : f.chipInactive}`}>
+        Nuevo
+      </button>
+    )}
     {conBultos && unaFila && (
       <ChipFiltro onClick={() => onBultosFilterChange!(!bultosFilter)} aria-pressed={bultosFilter}
         activo={bultosFilter} chipActive={f.chipActive} chipInactive={f.chipInactive}>
