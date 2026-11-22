@@ -80,7 +80,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const [bultosFilter, setBultosFilter] = useState(
     theme.features.filtroBultos ? searchParams.get("bultos") === "1" : false,
   );
-  const [nuevoFilter, setNuevoFilter] = useState(searchParams.get("nuevo") === "1");
+  const [nuevoFilter, setNuevoFilter] = useState(searchParams.get("llegada") === "1");
   const [precio, setPrecio] = useState<FiltroPrecio>(() =>
     theme.features.filtroPrecio
       ? {
@@ -204,7 +204,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     if (category) params.set("category", category);
     if (search) params.set("search", search);
     if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
-    if (nuevoFilter) params.set("nuevo", "1");
+    if (nuevoFilter) params.set("llegada", "1");
     if (theme.features.filtroPrecio && precio.desde.trim()) params.set("precio_desde", precio.desde.trim());
     if (theme.features.filtroPrecio && precio.hasta.trim()) params.set("precio_hasta", precio.hasta.trim());
     // El modo pedido viaja en la URL y esta línea la reescribe entera: sin
@@ -369,7 +369,8 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     [theme, products],
   );
 
-  // «Nuevo» (22-nov-2026): solo se ofrece si el catálogo tiene al menos uno.
+  // «Llegada reciente» (22-nov-2026): solo le llega al admin (lo decide el
+  // servidor) y solo se ofrece si el catálogo tiene al menos una.
   const nuevo = filtroNuevo(products, nuevoFilter);
   const filtered = agrupado ? [] : products
     .filter(p => !nuevo.activo || p.nuevo)

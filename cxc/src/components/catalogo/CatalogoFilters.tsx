@@ -372,8 +372,9 @@ interface CatalogoFiltersProps {
   onCategoryChange: (v: string) => void;
   bultosFilter?: boolean;
   onBultosFilterChange?: (v: boolean) => void;
-  /** «Nuevo» (22-nov-2026, `DISTINTIVO_NUEVO`): solo los artículos de primera
-   *  llegada ≤ 30 días. La página pasa `onNuevoFilterChange` SOLO si hay al
+  /** «Llegada reciente» (22-nov-2026, `DISTINTIVO_NUEVO`): artículos con alguna
+   *  llegada ≤ 30 días; SOLO admin y sin palabra (una bolita). La página pasa
+   *  `onNuevoFilterChange` SOLO si hay al
    *  menos uno: sin él, la opción no se dibuja. */
   nuevoFilter?: boolean;
   onNuevoFilterChange?: (v: boolean) => void;
@@ -457,7 +458,7 @@ function CatalogoFiltroACelular({
   ];
   const puestosExtra: FiltroPuesto[] = [
     ...(conBultos && bultosFilter ? [{ clave: "bultos", texto: "2+ bultos", onQuitar: () => onBultosFilterChange!(false) }] : []),
-    ...(onNuevoFilterChange && nuevoFilter ? [{ clave: "nuevo", texto: "Nuevo", onQuitar: () => onNuevoFilterChange(false) }] : []),
+    ...(onNuevoFilterChange && nuevoFilter ? [{ clave: "nuevo", texto: "●", onQuitar: () => onNuevoFilterChange(false) }] : []),
     ...(hayPrecio ? [{ clave: "precio", texto: textoPrecio, onQuitar: () => onPrecioChange!(PRECIO_VACIO) }] : []),
   ];
   if (CATALOGO_FILTRO_2026_11) {
@@ -628,15 +629,15 @@ function CatalogoFiltrosDeHoy({
   const desplegablesPiezas = (
     <>
     {onNuevoFilterChange && unaFila && (
-      <ChipFiltro onClick={() => onNuevoFilterChange(!nuevoFilter)} aria-pressed={nuevoFilter}
+      <ChipFiltro onClick={() => onNuevoFilterChange(!nuevoFilter)} aria-pressed={nuevoFilter} title="Llegada reciente" aria-label="Llegada reciente"
         activo={nuevoFilter} chipActive={f.chipActive} chipInactive={f.chipInactive}>
-        Nuevo
+        <span aria-hidden="true" className="block h-2.5 w-2.5 rounded-full bg-[#B45309]" />
       </ChipFiltro>
     )}
     {onNuevoFilterChange && !unaFila && (
-      <button onClick={() => onNuevoFilterChange(!nuevoFilter)} aria-pressed={nuevoFilter}
+      <button onClick={() => onNuevoFilterChange(!nuevoFilter)} aria-pressed={nuevoFilter} title="Llegada reciente" aria-label="Llegada reciente"
         className={`${chipTam} ${nuevoFilter ? f.chipActive : f.chipInactive}`}>
-        Nuevo
+        <span aria-hidden="true" className="block h-2.5 w-2.5 rounded-full bg-[#B45309]" />
       </button>
     )}
     {conBultos && unaFila && (

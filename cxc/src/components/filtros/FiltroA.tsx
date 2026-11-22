@@ -393,9 +393,9 @@ export function HojaFiltros({ abierta, onCerrar, orden, filtros, extra, onRestab
 }
 
 /** Un renglón con interruptor, para la hoja («2+ bultos»). */
-export function RenglonInterruptor({ etiqueta, activo, onCambiar }: { etiqueta: string; activo: boolean; onCambiar: (v: boolean) => void }) {
+export function RenglonInterruptor({ etiqueta, activo, onCambiar, titulo }: { etiqueta: ReactNode; activo: boolean; onCambiar: (v: boolean) => void; titulo?: string }) {
   return (
-    <label className={cn(RENGLON, "cursor-pointer")}>
+    <label className={cn(RENGLON, "cursor-pointer")} title={titulo} aria-label={titulo}>
       <span>{etiqueta}</span>
       <input
         type="checkbox"
