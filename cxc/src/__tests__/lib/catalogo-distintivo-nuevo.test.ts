@@ -48,10 +48,9 @@ describe("distintivo «Nuevo» — la regla", () => {
     expect(Object.keys(p).sort()).toEqual(["name", "nuevo", "sku"]);
   });
 
-  it("falla ABIERTA y se resuelve en el SERVIDOR (público e interno)", () => {
+  it("falla ABIERTA y se resuelve en el SERVIDOR, SOLO en el catálogo interno", () => {
     const lib = readFileSync("src/lib/catalogo/distintivo-nuevo.ts", "utf8");
     expect(lib).toMatch(/catch \(e\)/);
-    expect(readFileSync("src/lib/catalogo/catalogo-publico-server.ts", "utf8")).toMatch(/conDistintivoNuevo\(cfg\.empresaKey/);
     expect(readFileSync("src/app/api/catalogo/[marca]/products/route.ts", "utf8").match(/conDistintivoNuevo\(cfg\.empresaKey/g)?.length).toBe(3);
   });
 });
@@ -66,12 +65,32 @@ describe("filtro «Nuevo» — una opción más del filtro de siempre", () => {
     expect(filtroNuevo([{ nuevo: true }], true)).toEqual({ hay: true, activo: true });
   });
 
-  it("va en la URL (?nuevo=1, replace) y en las dos páginas, junto a «2+ bultos»", () => {
-    for (const f of ["src/components/catalogo/CatalogoPublicoPage.tsx", "src/components/catalogo/CatalogoVendedorPage.tsx"]) {
-      const s = readFileSync(f, "utf8");
-      expect(s).toMatch(/params\.set\("nuevo", "1"\)/);
-      expect(s).toMatch(/onNuevoFilterChange=\{nuevo\.hay \? setNuevoFilter : undefined\}/);
-    }
+  it("va en la URL (?nuevo=1, replace) del catálogo INTERNO, junto a «2+ bultos»", () => {
+    const s = readFileSync("src/components/catalogo/CatalogoVendedorPage.tsx", "utf8");
+    expect(s).toMatch(/params\.set\("nuevo", "1"\)/);
+    expect(s).toMatch(/onNuevoFilterChange=\{nuevo\.hay \? setNuevoFilter : undefined\}/);
     expect(readFileSync("src/components/catalogo/FiltrarCelular.tsx", "utf8")).toMatch(/etiqueta="Nuevo"/);
+  });
+});
+
+// 🔴 Daniel, 22-nov-2026: «quita lo de nuevo, mejor deja una bolita para yo
+// saber, que el cliente no lo sepa».
+describe("el CLIENTE no lo sabe", () => {
+  it("el catálogo público no manda el dato ni ofrece el filtro", () => {
+    expect(readFileSync("src/lib/catalogo/catalogo-publico-server.ts", "utf8")).not.toMatch(/DistintivoNuevo|distintivo-nuevo/);
+    const pub = readFileSync("src/components/catalogo/CatalogoPublicoPage.tsx", "utf8");
+    expect(pub).not.toMatch(/nuevoFilter|filtroNuevo|"nuevo"/);
+  });
+
+  it("la tarjeta dibuja una bolita sin texto, solo con showStock (interno)", () => {
+    for (const f of ["src/components/catalogo/CatalogoProductCard.tsx", "src/components/catalogo/CatalogoGroupedCard.tsx"]) {
+      const s = readFileSync(f, "utf8");
+      expect(s).toMatch(/\{showStock && [^\n]*nuevo/);
+      expect(s).toMatch(/aria-label="Llegó en los últimos 30 días"/);
+    }
+  });
+
+  it("el PDF del catálogo no lee el dato", () => {
+    expect(readFileSync("src/lib/catalogo/catalog-pdf.ts", "utf8")).not.toMatch(/\.nuevo\b/);
   });
 });

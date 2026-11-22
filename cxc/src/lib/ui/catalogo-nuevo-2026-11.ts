@@ -1,8 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Catálogos › distintivo «Nuevo» (22-nov-2026, aprobado por Daniel sobre el
-// mockup «HOY vs RECOMENDACIÓN»). Calculado, no a mano: sale en el artículo cuya
-// PRIMERA llegada (switch_ingresos_mercancia) fue hace 30 días o menos. Regla en
+// mockup «HOY vs RECOMENDACIÓN»). Calculado, no a mano: el artículo cuya PRIMERA
+// llegada (switch_ingresos_mercancia) fue hace 30 días o menos. Regla en
 // `lib/catalogo/distintivo-nuevo.ts`. `false` = el catálogo de antes.
+// 🔴 Mismo día, Daniel: «quita lo de nuevo, mejor deja una bolita para yo saber,
+// que el cliente no lo sepa» → SOLO el catálogo interno, con una bolita sin
+// texto; el público no recibe el dato ni el filtro.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const DISTINTIVO_NUEVO = true;

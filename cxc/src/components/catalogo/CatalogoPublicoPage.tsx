@@ -5,7 +5,6 @@
 // que el grid vendedor. Confirmar pedido: crea el pedido público en el server
 // (precios validados server-side), lo confirma y navega a /pedido-<marca>/[id].
 
-import { filtroNuevo } from "@/lib/ui/catalogo-nuevo-2026-11";
 import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -68,7 +67,6 @@ function CatalogoPublico({ marca, inicial }: { marca: MarcaUiKey; inicial?: unkn
   const [bultosFilter, setBultosFilter] = useState(
     theme.features.filtroBultos ? searchParams.get("bultos") === "1" : false,
   );
-  const [nuevoFilter, setNuevoFilter] = useState(searchParams.get("nuevo") === "1");
   const [precio, setPrecio] = useState<FiltroPrecio>(() =>
     theme.features.filtroPrecio
       ? {
@@ -159,14 +157,13 @@ function CatalogoPublico({ marca, inicial }: { marca: MarcaUiKey; inicial?: unkn
     if (category) params.set("category", category);
     if (search) params.set("search", search);
     if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
-    if (nuevoFilter) params.set("nuevo", "1");
     if (theme.features.filtroPrecio && precio.desde.trim()) params.set("precio_desde", precio.desde.trim());
     if (theme.features.filtroPrecio && precio.hasta.trim()) params.set("precio_hasta", precio.hasta.trim());
     const qs = params.toString();
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, "", newUrl);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gender, category, search, bultosFilter, precio.desde, precio.hasta, nuevoFilter]);
+  }, [gender, category, search, bultosFilter, precio.desde, precio.hasta]);
 
   // Load products
   // `loadError` separa "no cargó" de "no hay resultados": hasta jul-2026 el
@@ -254,10 +251,7 @@ function CatalogoPublico({ marca, inicial }: { marca: MarcaUiKey; inicial?: unkn
     [theme, products],
   );
 
-  // «Nuevo» (22-nov-2026): solo se ofrece si el catálogo tiene al menos uno.
-  const nuevo = filtroNuevo(products, nuevoFilter);
   const filtered = agrupado ? [] : products
-    .filter(p => !nuevo.activo || p.nuevo)
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => theme.genero.match(p.gender, gender))
     .filter(p => !category || p.category === category)
@@ -301,7 +295,6 @@ function CatalogoPublico({ marca, inicial }: { marca: MarcaUiKey; inicial?: unkn
   // ── Derived state — pipeline AGRUPADO ──
   const allGrouped = agrupado ? groupByModel(
     (products as JoybeesProduct[])
-      .filter(p => !nuevo.activo || p.nuevo)
       .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()))
       .filter(p => !category || p.category === category)
       // Misma regla de precio que la lista plana. Hoy es un no-op (Joybees es
@@ -359,7 +352,7 @@ function CatalogoPublico({ marca, inicial }: { marca: MarcaUiKey; inicial?: unkn
 
   function handleClearAll() {
     setSearchInput(""); setSearch(""); setGender(""); setCategory("");
-    setBultosFilter(false); setPrecio(PRECIO_VACIO); setNuevoFilter(false);
+    setBultosFilter(false); setPrecio(PRECIO_VACIO);
     setSortBy("relevancia");
   }
 
@@ -400,7 +393,7 @@ function CatalogoPublico({ marca, inicial }: { marca: MarcaUiKey; inicial?: unkn
 
   // ¿El cliente puso ALGÚN filtro? Decide cuál de los tres vacíos se muestra.
   const hayFiltros = !!(
-    search || gender || category || bultosFilter || nuevo.activo || precio.desde.trim() || precio.hasta.trim()
+    search || gender || category || bultosFilter || precio.desde.trim() || precio.hasta.trim()
   );
 
   // Tres estados distintos, porque las tres causas se arreglan distinto:
@@ -593,8 +586,6 @@ function CatalogoPublico({ marca, inicial }: { marca: MarcaUiKey; inicial?: unkn
           onCategoryChange={setCategory}
           bultosFilter={bultosFilter}
           onBultosFilterChange={theme.features.filtroBultos ? setBultosFilter : undefined}
-          nuevoFilter={nuevo.activo}
-          onNuevoFilterChange={nuevo.hay ? setNuevoFilter : undefined}
           precio={precio}
           onPrecioChange={theme.features.filtroPrecio ? setPrecio : undefined}
           preciosDisponibles={preciosDisponibles}
