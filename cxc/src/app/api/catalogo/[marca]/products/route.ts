@@ -29,6 +29,12 @@ import { esVisibleEnCatalogo } from "@/lib/catalogos/visibilidad";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import { conDistintivoNuevo } from "@/lib/catalogo/distintivo-nuevo";
 
+/** «Llegada reciente» SOLO para el admin (Daniel, 22-nov-2026): a los demás
+ *  roles el dato ni les llega. Lo decide el servidor con la sesión. */
+async function conLlegadaSiEsAdmin<T extends { sku?: unknown }>(req: NextRequest, cfg: MarcaConfig, data: T[]) {
+  return getSession(req)?.role === "admin" ? conDistintivoNuevo(cfg.empresaKey, data) : data;
+}
+
 export const dynamic = "force-dynamic";
 // Sin Data Cache en los fetch internos (gotcha Next.js + supabase-js): el
 // catálogo debe reflejar al instante el sync y el toggle "Ocultar del catálogo".
@@ -114,9 +120,9 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     // Reebok: el bulto con que se pide HOY (ropa de 12, reebok-cat-05). Solo
     // con la columna del renglón; sin ella, el producto va como siempre.
     if (cfg.marca === "reebok" && Array.isArray(data) && (await bultoEnRenglon(cfg))) {
-      return NextResponse.json(await conDistintivoNuevo(cfg.empresaKey, (data as { category?: string | null; sku?: unknown }[]).map((p) => productoConBulto(p, true))));
+      return NextResponse.json(await conLlegadaSiEsAdmin(req, cfg, (data as { category?: string | null; sku?: unknown }[]).map((p) => productoConBulto(p, true))));
     }
-    return NextResponse.json(Array.isArray(data) ? await conDistintivoNuevo(cfg.empresaKey, data as { sku?: unknown }[]) : data);
+    return NextResponse.json(Array.isArray(data) ? await conLlegadaSiEsAdmin(req, cfg, data as { sku?: unknown }[]) : data);
   }
 
   // QUIRK 4 (Joybees): sesión SIEMPRE, con los roles del módulo Catálogos.
@@ -146,7 +152,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     console.error(error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
-  return NextResponse.json(Array.isArray(data) ? await conDistintivoNuevo(cfg.empresaKey, data as { sku?: unknown }[]) : data);
+  return NextResponse.json(Array.isArray(data) ? await conLlegadaSiEsAdmin(req, cfg, data as { sku?: unknown }[]) : data);
 }
 
 // ── Edición manual (allow-list image_url/badge) ──────────────────────────────

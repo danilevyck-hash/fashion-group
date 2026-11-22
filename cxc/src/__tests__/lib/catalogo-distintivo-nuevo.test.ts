@@ -15,7 +15,7 @@ describe("distintivo «Nuevo» — la regla", () => {
     expect(desdeNuevo(HOY)).toBe("2026-10-23");
   });
 
-  it("primera llegada dentro de 30 días = nuevo (el día 30 cuenta)", () => {
+  it("alguna llegada dentro de 30 días = bolita (el día 30 cuenta)", () => {
     const n = codigosNuevos([
       { codigo_articulo: "A", fecha: "2026-11-20" },
       { codigo_articulo: "B", fecha: "2026-10-23" }, // hace 30 días justos
@@ -23,16 +23,16 @@ describe("distintivo «Nuevo» — la regla", () => {
     expect([...n].sort()).toEqual(["A", "B"]);
   });
 
-  it("hace 31 días NO es nuevo", () => {
+  it("hace 31 días NO", () => {
     expect(codigosNuevos([{ codigo_articulo: "C", fecha: "2026-10-22" }], HOY).size).toBe(0);
   });
 
-  it("una reposición (ya había llegado antes) NO es nuevo", () => {
+  it("una REPOSICIÓN reciente SÍ lleva bolita (Daniel, 22-nov-2026)", () => {
     const n = codigosNuevos([
       { codigo_articulo: "R", fecha: "2026-11-15" },
       { codigo_articulo: "R", fecha: "2024-03-01" },
     ], HOY);
-    expect(n.has("R")).toBe(false);
+    expect(n.has("R")).toBe(true);
   });
 
   it("el código es EXACTO (con color): otro color del mismo estilo no contagia", () => {
@@ -48,10 +48,13 @@ describe("distintivo «Nuevo» — la regla", () => {
     expect(Object.keys(p).sort()).toEqual(["name", "nuevo", "sku"]);
   });
 
-  it("falla ABIERTA y se resuelve en el SERVIDOR, SOLO en el catálogo interno", () => {
+  it("falla ABIERTA y se resuelve en el SERVIDOR, SOLO para el admin", () => {
     const lib = readFileSync("src/lib/catalogo/distintivo-nuevo.ts", "utf8");
     expect(lib).toMatch(/catch \(e\)/);
-    expect(readFileSync("src/app/api/catalogo/[marca]/products/route.ts", "utf8").match(/conDistintivoNuevo\(cfg\.empresaKey/g)?.length).toBe(3);
+    const ruta = readFileSync("src/app/api/catalogo/[marca]/products/route.ts", "utf8");
+    expect(ruta).toMatch(/getSession\(req\)\?\.role === "admin" \? conDistintivoNuevo\(/);
+    expect(ruta.match(/conDistintivoNuevo\(/g)?.length).toBe(1);
+    expect(ruta.match(/await conLlegadaSiEsAdmin\(req, cfg, /g)?.length).toBe(3);
   });
 });
 
@@ -65,11 +68,17 @@ describe("filtro «Nuevo» — una opción más del filtro de siempre", () => {
     expect(filtroNuevo([{ nuevo: true }], true)).toEqual({ hay: true, activo: true });
   });
 
-  it("va en la URL (?nuevo=1, replace) del catálogo INTERNO, junto a «2+ bultos»", () => {
+  it("va en la URL (?llegada=1) del catálogo interno y SIN la palabra «Nuevo» a la vista", () => {
     const s = readFileSync("src/components/catalogo/CatalogoVendedorPage.tsx", "utf8");
-    expect(s).toMatch(/params\.set\("nuevo", "1"\)/);
+    expect(s).toMatch(/params\.set\("llegada", "1"\)/);
     expect(s).toMatch(/onNuevoFilterChange=\{nuevo\.hay \? setNuevoFilter : undefined\}/);
-    expect(readFileSync("src/components/catalogo/FiltrarCelular.tsx", "utf8")).toMatch(/etiqueta="Nuevo"/);
+    const cel = readFileSync("src/components/catalogo/FiltrarCelular.tsx", "utf8");
+    expect(cel).toMatch(/titulo="Llegada reciente"/);
+    expect(cel).not.toMatch(/etiqueta="Nuevo"/);
+    const filtros = readFileSync("src/components/catalogo/CatalogoFilters.tsx", "utf8");
+    expect(filtros.match(/aria-label="Llegada reciente"/g)?.length).toBe(2);
+    expect(filtros).not.toMatch(/>\s*Nuevo\s*</);
+    expect(filtros).not.toMatch(/texto: "Nuevo"/);
   });
 });
 
@@ -86,7 +95,7 @@ describe("el CLIENTE no lo sabe", () => {
     for (const f of ["src/components/catalogo/CatalogoProductCard.tsx", "src/components/catalogo/CatalogoGroupedCard.tsx"]) {
       const s = readFileSync(f, "utf8");
       expect(s).toMatch(/\{showStock && [^\n]*nuevo/);
-      expect(s).toMatch(/aria-label="Llegó en los últimos 30 días"/);
+      expect(s).toMatch(/aria-label="Llegada reciente"/);
     }
   });
 

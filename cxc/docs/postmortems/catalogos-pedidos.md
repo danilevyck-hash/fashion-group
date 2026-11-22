@@ -3624,3 +3624,13 @@ Publicado lo de arriba (#848), Daniel lo vio en producción y pidió: *«quita l
 - **Catálogo interno**: la píldora «Nuevo» pasó a ser una **bolita** sin texto (10 px, ámbar oscuro con borde blanco) en la esquina de la foto, con `title`/`aria-label` «Llegó en los últimos 30 días». Se dibuja solo con `showStock` (que solo pasa el interno), además de que el público ya no tiene el dato. El filtro interno se queda como estaba (chip «Nuevo» / renglón de «Filtrar», `?nuevo=1`).
 - **Lo que sale hacia el cliente**: el PDF del catálogo (`catalog-pdf.ts`) no lee el dato, y «Copiar enlace» comparte la dirección pública sin filtros.
 - Candado `catalogo-distintivo-nuevo`, ahora con «el CLIENTE no lo sabe».
+
+### 22-nov-2026 (noche) — Solo el admin, sin palabra, y las reposiciones cuentan
+
+Daniel, sobre el mockup «solo el administrador»: solo ÉL debe saber qué llegó, porque los vendedores a veces muestran su pantalla al cliente. Aprobó:
+
+- **Solo admin, decidido en el SERVIDOR**: `GET /api/catalogo/[marca]/products` agrega `nuevo` únicamente si la sesión es `admin` (`conLlegadaSiEsAdmin`). Secretaria, vendedor y bodega no reciben el dato (igual que el público), así que no ven bolita ni filtro.
+- **Sin la palabra «Nuevo» a la vista**: el chip del filtro es solo la bolita ● (mismo ámbar que la tarjeta), con `title`/`aria-label` «Llegada reciente»; en la hoja «Filtrar» del celular, un renglón con la bolita; el filtro puesto se muestra como «●»; la URL pasó de `?nuevo=1` a `?llegada=1`. La bolita de la tarjeta dice «Llegada reciente» al pasar el mouse.
+- **Cambia la regla: las REPOSICIONES TAMBIÉN cuentan.** Ahora es «alguna llegada del código exacto en los últimos 30 días» (antes, solo la primera). La lectura quedó en una sola consulta paginada (la ventana de 30 días por empresa). 30 días se queda.
+- Medido el 22-nov-2026 con la regla nueva (activos): Reebok 66 de 228 · Tommy 37 de 427 · Calvin 5 de 225 · Joybees 0 de 81.
+- Candados: `catalogo-distintivo-nuevo` (reposición sí, 31 días no, sin «Nuevo» a la vista) y `catalogo-llegada-reciente-solo-admin` (la ruta con sesión de secretaria, vendedor y bodega no devuelve el dato).

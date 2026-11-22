@@ -130,11 +130,11 @@ export default function CatalogoProductCard({
             </div>
           )}
 
-          {/* Bolita «Llegó en los últimos 30 días» (`DISTINTIVO_NUEVO`): SOLO el
-              catálogo interno (showStock); el cliente no la ve (Daniel, 22-nov-2026). */}
+          {/* Bolita «Llegada reciente» (`DISTINTIVO_NUEVO`): el dato solo le llega
+              al ADMIN (servidor) y solo se dibuja en el interno (showStock). */}
           {showStock && product.nuevo && !product.badge && (
             <div className="absolute top-3 left-3 z-[5]" data-distintivo-nuevo>
-              <span role="img" title="Llegó en los últimos 30 días" aria-label="Llegó en los últimos 30 días"
+              <span role="img" title="Llegada reciente" aria-label="Llegada reciente"
                 className="block h-2.5 w-2.5 rounded-full bg-[#B45309] ring-2 ring-white" />
             </div>
           )}
