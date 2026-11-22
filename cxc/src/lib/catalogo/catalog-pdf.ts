@@ -152,12 +152,14 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
   const PW = 215.9, PH = 279.4;
   const M = 18;
   const CONTENT_W = PW - 2 * M;
-  const COLS = 3, GAP = 8;
+  const COLS = 3, GAP = 4;
   const CW = (CONTENT_W - (COLS - 1) * GAP) / COLS;
-  const IH = 54;
-  const TH = 22;
+  // 3 filas por hoja (9 productos) con la foto más grande, Daniel 20-nov-2026;
+  // antes IH 54 · TH 22 · RGAP 10 · GAP 8 · margen de foto 4 = 2 filas.
+  const IH = 53;
+  const TH = 16;
   const CH = IH + TH;
-  const RGAP = 10;
+  const RGAP = 5;
   const SECTION_H = 14;
   const FOOTER_H = 10;
 
@@ -258,7 +260,7 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
         doc.roundedRect(x, y, CW, IH, 2, 2, "F");
         const cached = p.image_url ? images[p.image_url] : null;
         if (cached?.data) {
-          const pad = 4;
+          const pad = 1.5;
           const boxW = CW - pad * 2, boxH = IH - pad * 2;
           const scale = Math.min(boxW / cached.w, boxH / cached.h);
           const dw = cached.w * scale, dh = cached.h * scale;
@@ -281,14 +283,14 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
           doc.setFont("helvetica", "bold");
           doc.text("NUEVO", x + 3.2, y + 5.2);
         }
-        let ty = y + IH + 5;
+        let ty = y + IH + 4.5;
         doc.setTextColor(...theme.primary);
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         const maxNameLen = Math.floor(CW / 1.8);
         const name = p.name.length > maxNameLen ? p.name.substring(0, maxNameLen - 1) + "…" : p.name;
         doc.text(name.toUpperCase(), x + 1, ty);
-        ty += 4;
+        ty += 3.5;
         doc.setFontSize(6.5);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(...GRAY_LIGHT);
@@ -296,7 +298,7 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
         // los 391 productos que lo tenían como columna (22-sep-2026). Se podó
         // con el puntito de la tarjeta; ver `CatalogoProductCard.tsx`.
         doc.text(p.sku || "", x + 1, ty);
-        ty += 5.5;
+        ty += 5;
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...(p.badge === "oferta" ? theme.saleColor : theme.primary));
