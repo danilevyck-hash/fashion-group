@@ -181,8 +181,8 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
     theme.drawLogo(doc, M, 8, false);
     doc.setDrawColor(...theme.accent);
     doc.setLineWidth(0.4);
-    doc.line(M, 15, PW - M, 15);
-    y = 20;
+    doc.line(M, 14, PW - M, 14);
+    y = 18.5;
   }
 
   function needPage(h: number): boolean {
@@ -196,43 +196,32 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
     return false;
   }
 
-  // ── Portada / encabezado primera página ──
-  theme.drawLogo(doc, M, y, true);
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...theme.primary);
-  doc.text("CATÁLOGO", PW - M, y + 5.5, { align: "right" });
-  y += 11;
-  doc.setDrawColor(...theme.accent);
-  doc.setLineWidth(0.5);
-  doc.line(M, y, PW - M, y);
-  y += 6;
-
+  // ── Primera hoja: franja delgada (Daniel, 22-nov-2026, opción A) ──
+  // Logo a la izquierda y «CATÁLOGO · fecha · N productos» (y los filtros, si
+  // hay) a la derecha, en la MISMA franja que las hojas siguientes. Así la hoja
+  // 1 lleva 3 filas como las demás; antes el encabezado grande se comía una.
+  // La franja termina en 14 mm y deja ~1,9 mm de aire bajo la 3.ª fila.
+  drawPageHeader();
   const dateStr = new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" });
-  doc.setFontSize(9);
+  const resto = `  ·  ${dateStr}  ·  ${totalCount} productos` + (subtitle ? `  ·  ${subtitle.toUpperCase()}` : "");
+  const maxW = CONTENT_W - 45; // nunca se monta sobre el logo (el más ancho, Tommy, mide 38)
+  let fs = 8;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(fs);
+  const anchoDe = () => {
+    doc.setFont("helvetica", "bold");
+    const a = doc.getTextWidth("CATÁLOGO");
+    doc.setFont("helvetica", "normal");
+    return a + doc.getTextWidth(resto);
+  };
+  while (fs > 5.5 && anchoDe() > maxW) doc.setFontSize(fs -= 0.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...GRAY_MID);
-  doc.text(dateStr, M, y);
-
-  doc.setFontSize(9);
+  doc.text(resto, PW - M, 11.8, { align: "right" });
+  const wResto = doc.getTextWidth(resto);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...theme.primary);
-  doc.text(`${totalCount} productos`, PW - M, y, { align: "right" });
-  y += 5;
-
-  // El subtítulo solo se dibuja si DICE algo: con filtros trae "HOMBRE ·
-  // CALZADO", y sin filtros llega vacío desde el catálogo (antes decía "TODOS
-  // LOS PRODUCTOS", relleno al lado del "{n} productos" de arriba). Cuando no
-  // hay línea tampoco se reserva su alto, o quedaría un hueco donde estaba.
-  if (subtitle) {
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...GRAY_LIGHT);
-    doc.text(subtitle.toUpperCase(), M, y);
-    y += 8;
-  } else {
-    y += 3;
-  }
+  doc.text("CATÁLOGO", PW - M - wResto, 11.8, { align: "right" });
 
   // ── Secciones ──
   for (const section of sections) {
