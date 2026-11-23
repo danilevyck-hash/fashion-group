@@ -3563,6 +3563,15 @@ Las columnas de ASW son las mismas en las cinco empresas (Vistana agrega una 79.
 
 Candado: `tallas-por-pedido.test.ts` (pedido 2182 real como fixture + cada regla + los dos formatos de Reebok; 6 mutaciones cazadas y un control).
 
+
+### La factura de hoy trae sus renglones al momento (23-nov-2026)
+
+**Qué pasó.** La factura 11-000002650 (Fashion Shoes, Metro Shoes, hecha el 23-nov a las 9:24 a.m.) decía «Esa factura todavía no tiene renglones cargados»: estaba en `switch_facturas` (sync de cada hora) pero con `lineas_synced_at = null` y 0 filas en `switch_factura_lineas`, porque los renglones solo los trae el cron `sync-factura-lineas` a las 03:30 UTC.
+
+**Decisión de Daniel («a»).** Si la factura no tiene renglones, la pantalla los trae de Switch en ese momento y sigue normal; aceptó que abra sesión en Switch de esa empresa.
+
+**Cómo.** `GET /api/productos/tallas-pedido` (mismos roles, admin y secretaria) llama `leerFacturaOTraerla`: si `leerFactura` no encuentra renglones, corre el MISMO lector del cron, `sincronizarLineasEmpresa(empresa, { soloFactura: id, triggeredBy: "manual" })` (mismo upsert, misma marca `lineas_synced_at` después de escribir, `cache: "no-store"` en el cliente de Switch), cierra la sesión con `logoutSwitchSessions([empresa])` y vuelve a leer. Si Switch no contesta o la factura no existe allá: «No se pudieron traer los artículos de Switch. Prueba en un minuto o usa el número de pedido» (la factura queda sin marcar y el cron la reintenta; Daniel lo dictó «No pude…», pero el candado `nombres-erp-prohibidos` prohíbe «No pude» y se dijo impersonal). La pantalla dice «Trayendo los artículos de Switch…» cuando la lectura pasa de 2 s. `maxDuration` subió a 120 s: con los reintentos del cliente, un Switch caído tarda ~50 s en rendirse (medido). Queda una fila `factura_lineas` «manual» en `switch_sync_log` por cada vez. Candado `tallas-factura-trae-renglones.test.ts`.
+
 ## Reebok: ropa en bultos de 12 (15-nov-2026, `REEBOK_ROPA_EN_12_2026_11`, prendido)
 
 - Migración `20261231150000_reebok_bulto_en_renglon.sql` (columna `reebok_order_items.bulto_pzas` + las 3 RPC que guardan renglones + la vista de Comprobantes): **aplicada 16-nov-2026**, 0 filas cambiadas (los 662 renglones viejos quedan en NULL = regla vieja); GH8229 (medias) ya sale con bulto 12.

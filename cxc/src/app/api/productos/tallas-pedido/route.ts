@@ -20,10 +20,32 @@ import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { ROLES_TALLAS_PEDIDO, TALLAS_POR_PEDIDO_2026_11 } from "@/lib/tallas-pedido/interruptores";
 import { armarTallasDelPedido, idDelPedido, juntarEncontrados } from "@/lib/tallas-pedido/armar";
+import { logoutSwitchSessions } from "@/lib/switch-api/client";
+import { sincronizarLineasEmpresa } from "@/lib/switch-api/sync-factura-lineas";
+import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { buscarFactura, buscarPedido, leerFactura, leerPedido, leerTallasDeDespacho, type TipoDocumento } from "@/lib/tallas-pedido/server";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120; // una factura de hoy se lee de Switch: con reintentos, ~50 s si Switch no contesta
+
+/**
+ * 🔴 La factura sin renglones NO se corta ahí (23-nov-2026, Daniel: «a»): los
+ * renglones solo los trae el cron de las 03:30 UTC, así que la factura de hoy
+ * los trae de Switch EN ESE MOMENTO con el MISMO lector del cron (mismo upsert,
+ * marca `lineas_synced_at`) y sigue. Abre sesión en Switch de esa empresa y la
+ * cierra al terminar. Candado `tallas-factura-trae-renglones`.
+ */
+async function leerFacturaOTraerla(empresa: string, id: number) {
+  const ya = await leerFactura(empresa, id);
+  if (ya) return ya;
+  try {
+    const r = await sincronizarLineasEmpresa(empresa as EmpresaKey, { soloFactura: id, triggeredBy: "manual" });
+    if (!r.ok) console.error("[tallas-pedido] traer renglones", empresa, id, r.error);
+  } finally {
+    await logoutSwitchSessions([empresa]);
+  }
+  return leerFactura(empresa, id);
+}
 
 export async function GET(req: NextRequest) {
   if (!TALLAS_POR_PEDIDO_2026_11) return NextResponse.json({ error: "No disponible" }, { status: 404 });
@@ -46,9 +68,11 @@ export async function GET(req: NextRequest) {
       if (opciones.length > 1) return NextResponse.json({ opciones });
       ({ empresa, id, tipo } = opciones[0]);
     }
-    const pedido = tipo === "factura" ? await leerFactura(empresa, id) : await leerPedido(empresa, id);
+    const pedido = tipo === "factura" ? await leerFacturaOTraerla(empresa, id) : await leerPedido(empresa, id);
     if (!pedido) {
-      const error = tipo === "factura" ? "Esa factura todavía no tiene renglones cargados" : "No se encontró ese pedido en Switch";
+      const error = tipo === "factura"
+        ? "No se pudieron traer los artículos de Switch. Prueba en un minuto o usa el número de pedido"
+        : "No se encontró ese pedido en Switch";
       return NextResponse.json({ error }, { status: 404 });
     }
     const despachos = await leerTallasDeDespacho(empresa, pedido.lineas.map((l) => l.codigo));

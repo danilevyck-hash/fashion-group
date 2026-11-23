@@ -38,6 +38,14 @@ export default function TallasDePedido() {
   const [datos, setDatos] = useState<Respuesta | null>(null);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
+  // Pasados 2 s, el servidor está leyendo Switch (la factura de hoy o el pedido).
+  const [lento, setLento] = useState(false);
+  useEffect(() => {
+    setLento(false);
+    if (!cargando) return;
+    const t = setTimeout(() => setLento(true), 2000);
+    return () => clearTimeout(t);
+  }, [cargando]);
   const [bajando, setBajando] = useState(false);
 
   // Se lee solo: medio segundo después de escribir un número de pedido válido.
@@ -106,7 +114,7 @@ export default function TallasDePedido() {
         />
       </label>
 
-      {cargando && <p className="mt-3 text-sm text-gray-500">Buscando…</p>}
+      {cargando && <p className="mt-3 text-sm text-gray-500">{lento ? "Trayendo los artículos de Switch…" : "Buscando…"}</p>}
       {error && <Aviso tono="error" className="mt-3">{error}</Aviso>}
 
       {opciones.length > 0 && (

@@ -95,11 +95,12 @@ interface FilaPendiente {
 async function leerPendientes(
   empresaKey: EmpresaKey,
   limite: number | null,
+  soloFactura: number | null = null,
 ): Promise<FilaPendiente[]> {
   const filas = await leerTodoPaginado<FilaPendiente>(
     `pendientes de ${empresaKey}`,
-    (_primera, desde, hasta) =>
-      supabaseServer
+    (_primera, desde, hasta) => {
+      const q = supabaseServer
         .from("switch_facturas")
         .select(
           "switch_factura_id,tipo_comprobante,secuencial,fecha," +
@@ -114,7 +115,10 @@ async function leerPendientes(
         // mismo instante); el id desempata y es único.
         .order("fecha", { ascending: true })
         .order("switch_factura_id", { ascending: true })
-        .range(desde, hasta),
+        .range(desde, hasta);
+      // Tallas por bulto pide UNA factura al momento (23-nov-2026).
+      return soloFactura === null ? q : q.eq("tipo_comprobante", "Factura").eq("switch_factura_id", soloFactura);
+    },
   );
   return limite === null ? filas : filas.slice(0, limite);
 }
@@ -149,7 +153,7 @@ async function bajarDetalle(
  */
 export async function sincronizarLineasEmpresa(
   empresaKey: EmpresaKey,
-  opts: { limite?: number | null; triggeredBy?: SwitchSyncTriggeredBy } = {},
+  opts: { limite?: number | null; triggeredBy?: SwitchSyncTriggeredBy; soloFactura?: number } = {},
 ): Promise<ResultadoLineas> {
   const limite = opts.limite ?? null;
   const logId = await createSwitchSyncLog({
@@ -169,7 +173,7 @@ export async function sincronizarLineasEmpresa(
   };
 
   try {
-    const pendientes = await leerPendientes(empresaKey, limite);
+    const pendientes = await leerPendientes(empresaKey, limite, opts.soloFactura ?? null);
     res.pendientesAlEmpezar = pendientes.length;
     if (pendientes.length === 0) {
       res.ok = true;
