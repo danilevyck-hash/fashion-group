@@ -377,7 +377,9 @@ describe("grid del catálogo — 5 columnas SOLO en escritorio grande", () => {
 describe("menú Compartir — Copiar link + Descargar PDF en las 3 marcas", () => {
   it("el menú vive UNA sola vez y no está condicionado por marca", () => {
     const vendedorSinComentarios = sinComentarios(VENDEDOR);
-    expect(vendedorSinComentarios.split("Descargar PDF").length - 1).toBe(1);
+    // Se cuenta el ítem del menú (el texto entre comillas): la barra de
+    // «Seleccionar para PDF» (23-nov-2026) tiene su propio «Descargar PDF (N)».
+    expect(vendedorSinComentarios.split('"Descargar PDF"').length - 1).toBe(1);
     // El ítem del PDF no puede colgar de ningún flag/feature de marca.
     const item = vendedorSinComentarios.slice(vendedorSinComentarios.indexOf("const shareMenu"));
     const pdfBtn = item.slice(0, item.indexOf("Descargar PDF"));

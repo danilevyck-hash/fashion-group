@@ -3643,3 +3643,18 @@ Daniel, sobre el mockup «solo el administrador»: solo ÉL debe saber qué lleg
 - **Cambia la regla: las REPOSICIONES TAMBIÉN cuentan.** Ahora es «alguna llegada del código exacto en los últimos 30 días» (antes, solo la primera). La lectura quedó en una sola consulta paginada (la ventana de 30 días por empresa). 30 días se queda.
 - Medido el 22-nov-2026 con la regla nueva (activos): Reebok 66 de 228 · Tommy 37 de 427 · Calvin 5 de 225 · Joybees 0 de 81.
 - Candados: `catalogo-distintivo-nuevo` (reposición sí, 31 días no, sin «Nuevo» a la vista) y `catalogo-llegada-reciente-solo-admin` (la ruta con sesión de secretaria, vendedor y bodega no devuelve el dato).
+
+## Seleccionar para PDF (23-nov-2026)
+
+**El pedido.** Daniel, 23-nov-2026: poder elegir artículos del catálogo y descargar SOLO esos en PDF — *«seleccionándolo, me imagino algo como un botón arriba, digamos "Seleccionar para PDF"»*. Mockup HOY vs RECOMENDACIÓN con capturas reales (servidor local, sin tocar producción); aprobado con «a. a.»: tal cual el mockup, solo interno, y lo marcado que deje de verse al filtrar no sale.
+
+**Cómo quedó** (`CatalogoVendedorPage.tsx` + `useDescargarCatalogoPdf.ts`, interruptor `SELECCIONAR_PARA_PDF_2026_11`; `false` = como antes):
+- Computadora e iPad: botón «Seleccionar para PDF» en la barra de arriba, junto a Comprobantes y Compartir. Celular: dentro del «···», debajo de «Descargar PDF» (junto al logo no cabe: se encimaba con «REEBOK»).
+- Modo selección, como «Seleccionar» de Fotos: cada tarjeta muestra un círculo; tocar la tarjeta la marca (borde azul y ✓) y no abre la foto ni suma al pedido. La barra del pedido se esconde mientras se selecciona.
+- Barra abajo: «N seleccionados · Cancelar · Descargar PDF (N)» (en el celular el botón dice solo «Descargar PDF»: el número ya está a la izquierda). Al descargar, sale del modo.
+- El PDF es el MISMO (`downloadCatalogPdf`, mismas secciones y 3 por fila) con solo los marcados; el subtítulo dice «N artículos seleccionados» (singular con 1) y la portada cuenta N.
+- La selección se aplica sobre lo filtrado: un marcado que el filtro esconde no entra.
+- Roles: los que ven el catálogo interno. El catálogo público (`CatalogoPublicoPage`) usa el mismo hook pero NO pasa `seleccion`: no cambia.
+- «Compartir › Descargar PDF» sigue igual: baja todo lo filtrado.
+
+**Candado:** `src/__tests__/catalogo-seleccionar-para-pdf.test.tsx` (solo los marcados, subtítulo, singular, lo filtrado afuera, sin selección = el de siempre, el público no lo ofrece).

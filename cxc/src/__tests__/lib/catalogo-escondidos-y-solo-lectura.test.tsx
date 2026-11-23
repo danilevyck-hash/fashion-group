@@ -190,7 +190,8 @@ describe("2 · el catálogo interno en SOLO LECTURA para quien no arma pedidos",
     expect(src).toContain('const soloLectura = role !== "" && !puedePedir({ role, userName: usuarioDelNavegador() });');
     expect(src.match(/soloLectura=\{soloLectura\}/g)?.length).toBe(4);
     // Sin carrito no hay «Ver pedido» que ofrecer.
-    expect(src).toContain("{!modo.activo && !soloLectura && cartCount > 0 && (");
+    // «Seleccionar para PDF» (23-nov-2026) también esconde la barra mientras se marca.
+    expect(src).toMatch(/\{(!seleccionando && )?!modo\.activo && !soloLectura && cartCount > 0 && \(/);
     // Y la regla no se escribe a mano en la pantalla.
     expect(src).not.toMatch(/role === "bodega"|role === "gerente_boston"/);
   });
