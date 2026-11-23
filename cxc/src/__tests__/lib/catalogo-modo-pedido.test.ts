@@ -150,7 +150,8 @@ describe("candados estáticos", () => {
     expect(src).toContain("modo.activo ? modo.enPedido :");
     // La barra del carrito no puede aparecer en modo pedido (ni en solo
     // lectura, desde el 11-sep-2026: `soloLectura` se sumó a la misma condición).
-    expect(src).toContain("{!modo.activo && !soloLectura && cartCount > 0 && (");
+    // «Seleccionar para PDF» (23-nov-2026) también esconde la barra mientras se marca.
+    expect(src).toMatch(/\{(!seleccionando && )?!modo\.activo && !soloLectura && cartCount > 0 && \(/);
   });
 
   it("el carrito solo se toca por lib/catalogo/carrito (nadie escribe storage a mano)", () => {
