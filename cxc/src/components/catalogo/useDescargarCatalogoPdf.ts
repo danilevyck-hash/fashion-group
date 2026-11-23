@@ -32,6 +32,10 @@ import {
 } from "./groupByModel";
 import { hoyPanama } from "@/lib/fecha-panama";
 
+/** «Seleccionar para PDF» (23-nov-2026, pedido de Daniel): en el catálogo
+ *  interno se marcan artículos y el PDF sale SOLO con esos. `false` = como antes. */
+export const SELECCIONAR_PARA_PDF_2026_11 = true;
+
 interface ItemPdf {
   name: string;
   sku: string;
@@ -60,16 +64,19 @@ export interface DescargaPdfArgs {
    *  color sale: un error se lee 8 s, un éxito 3 s (regla de la casa). Quien
    *  solo maneja éxitos puede pasar una función de un argumento. */
   avisar: (mensaje: string, tipo?: "success" | "error") => void;
+  /** Solo los artículos marcados (id del producto, o `baseSku` del grupo).
+   *  Con selección, el subtítulo dice «N artículos seleccionados». */
+  seleccion?: ReadonlySet<string>;
 }
 
 export function useDescargarCatalogoPdf() {
   const [descargando, setDescargando] = useState(false);
 
   const descargar = useCallback(async (a: DescargaPdfArgs) => {
-    const {
-      marca, theme, agrupado, filtered, sortedGroups, filteredCount,
-      gender, category, search, bultosFilter, precio, catLabel, avisar,
-    } = a;
+    const { marca, theme, agrupado, gender, category, search, bultosFilter, precio, catLabel, avisar, seleccion } = a;
+    const filtered = seleccion ? a.filtered.filter(p => seleccion.has(p.id)) : a.filtered;
+    const sortedGroups = seleccion ? a.sortedGroups.filter(gs => seleccion.has(gs.group.baseSku)) : a.sortedGroups;
+    const filteredCount = seleccion ? (agrupado ? sortedGroups.length : filtered.length) : a.filteredCount;
 
     if ((agrupado ? !sortedGroups.length : !filtered.length) || descargando) return;
 
@@ -111,7 +118,9 @@ export function useDescargarCatalogoPdf() {
       // productos" sobre un PDF que ya anuncia "{n} productos" en la portada —
       // no distinguía nada de nada. Con filtros puestos sí informa ("HOMBRE ·
       // CALZADO"), y ahí se conserva tal cual.
-      const subtitle = filterDesc.length > 0 ? filterDesc.join("  ·  ") : "";
+      const subtitle = seleccion
+        ? `${filteredCount} ${filteredCount === 1 ? "artículo seleccionado" : "artículos seleccionados"}`
+        : filterDesc.length > 0 ? filterDesc.join("  ·  ") : "";
 
       let pdfSections: { label: string; items: ItemPdf[] }[];
       if (agrupado) {

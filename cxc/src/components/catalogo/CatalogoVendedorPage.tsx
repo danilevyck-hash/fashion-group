@@ -16,7 +16,7 @@
 
 import { filtroNuevo } from "@/lib/ui/catalogo-nuevo-2026-11";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
-import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -52,7 +52,7 @@ import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carr
 import { idAgregarA, querySinPerderModo, tituloPedido } from "@/lib/catalogo/modo-pedido";
 import { useModoPedido } from "@/lib/hooks/useModoPedido";
 import BarraModoPedido from "./BarraModoPedido";
-import { useDescargarCatalogoPdf } from "./useDescargarCatalogoPdf";
+import { useDescargarCatalogoPdf, SELECCIONAR_PARA_PDF_2026_11 } from "./useDescargarCatalogoPdf";
 
 // Fotos que se piden YA (eager + fetchpriority=high) al abrir el catálogo: las
 // del primer viewport. A 1440px el grid es de 5 columnas → 10 cards visibles;
@@ -466,6 +466,33 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   // ── Download catalog as PDF ──
   const { descargando: downloading, descargar: descargarPdf } = useDescargarCatalogoPdf();
 
+  // ── «Seleccionar para PDF» (23-nov-2026) — como «Seleccionar» de Fotos ──
+  // En modo selección tocar la tarjeta la MARCA (no abre la foto ni suma al
+  // pedido). Solo existe en el catálogo interno: el público no cambia.
+  const [seleccionando, setSeleccionando] = useState(false);
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  const puedeSeleccionar = SELECCIONAR_PARA_PDF_2026_11 && !modo.activo && filteredCount > 0;
+  function alternar(id: string) {
+    setSeleccion(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+  function salirDeSeleccion() { setSeleccionando(false); setSeleccion(new Set()); }
+  function seleccionable(id: string, card: ReactNode) {
+    if (!seleccionando) return card;
+    const marcada = seleccion.has(id);
+    return (
+      <div key={id} className="relative" data-seleccionable>
+        {card}
+        <button type="button" aria-pressed={marcada} aria-label={marcada ? "Quitar de la selección" : "Seleccionar"}
+          onClick={() => alternar(id)}
+          className={`absolute inset-0 z-20 rounded-xl ${marcada ? "ring-[3px] ring-blue-600 bg-white/10" : "bg-white/30"}`}>
+          <span className={`absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full border-2 ${marcada ? "border-white bg-blue-600 text-white" : "border-white bg-black/20"} shadow`}>
+            {marcada && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   // ── Share dropdown ──
   const [showShareMenu, setShowShareMenu] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
@@ -515,11 +542,11 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   // El PDF lo arma un hook COMPARTIDO con el catálogo público
   // (`useDescargarCatalogoPdf`): las ~90 líneas que vivían acá se MUDARON,
   // no se copiaron, para que las dos pantallas saquen el MISMO archivo.
-  function handleDownloadCatalog() {
+  function handleDownloadCatalog(soloSeleccion?: ReadonlySet<string>) {
     return descargarPdf({
       marca, theme, agrupado, filtered, sortedGroups, filteredCount,
       gender, category, search, bultosFilter, precio, catLabel,
-      avisar: setToast,
+      avisar: setToast, seleccion: soloSeleccion,
     });
   }
 
@@ -610,7 +637,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                   {s.items.map((g, i) => (
-                    <CatalogoGroupedCard
+                    seleccionable(g.baseSku, <CatalogoGroupedCard
                       key={g.baseSku}
                       priority={si === 0 && i < FOTOS_PRIORITARIAS}
                       marca={marca}
@@ -619,7 +646,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                       onQtyChange={onQtyChange}
                       showStock
                       soloLectura={soloLectura}
-                    />
+                    />)
                   ))}
                 </div>
               </div>
@@ -628,7 +655,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
             {sortedGroups.map((gs, i) => (
-              <CatalogoGroupedCard
+              seleccionable(gs.group.baseSku, <CatalogoGroupedCard
                 key={gs.group.baseSku}
                 priority={i < FOTOS_PRIORITARIAS}
                 marca={marca}
@@ -637,7 +664,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                 onQtyChange={onQtyChange}
                 showStock
                 soloLectura={soloLectura}
-              />
+              />)
             ))}
           </div>
         )
@@ -652,7 +679,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                 {g.items.map((p, i) => (
-                  <CatalogoProductCard
+                  seleccionable(p.id, <CatalogoProductCard
                     key={p.id}
                     priority={gi === 0 && i < FOTOS_PRIORITARIAS}
                     marca={marca}
@@ -661,7 +688,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                     onQtyChange={onQtyChange}
                     showStock
                     soloLectura={soloLectura}
-                  />
+                  />)
                 ))}
               </div>
             </div>
@@ -670,7 +697,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
           {filtered.map((p, i) => (
-            <CatalogoProductCard
+            seleccionable(p.id, <CatalogoProductCard
               key={p.id}
               priority={i < FOTOS_PRIORITARIAS}
               marca={marca}
@@ -679,7 +706,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
               onQtyChange={onQtyChange}
               showStock
               soloLectura={soloLectura}
-            />
+            />)
           ))}
         </div>
       )}
@@ -759,10 +786,14 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   // catalogo-mas-04: la hora va en la fila de filtros (solo existe con el
   // buscador en una fila); entonces sale de la barra de arriba.
   const frescuraEnFiltros = CATALOGOS_APPLE_2026_10 && CATALOGOS_APPLE_2026_10_B.buscadorEnUnaFila && ACTUALIZADO_EN_FILTROS_2026_11;
+  const seleccionarBtn = puedeSeleccionar && !seleccionando ? (
+    <button type="button" onClick={() => setSeleccionando(true)} className={theme.vendorShare.pedidosBtn}>Seleccionar para PDF</button>
+  ) : null;
   const accionesEnLaBarra = (
     <>
       <div data-medir="acciones-catalogo" className={CLASES_MENU_MAS.computadora}>
         {!frescuraEnFiltros && <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} forma="computadora" />}
+        {seleccionarBtn}
         {pedidosBtn}
         {(theme.vendorShare.enHeader || filteredCount > 0) && shareMenu}
       </div>
@@ -784,6 +815,12 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                 <Link href={theme.pedidosHref} className={theme.vendorShare.item}>Comprobantes</Link>
               )}
               <div onClick={() => setMasAbierto(false)}>{shareMenuItems}</div>
+              {puedeSeleccionar && !seleccionando && (
+                <button type="button" onClick={() => { setMasAbierto(false); setSeleccionando(true); }} className={theme.vendorShare.item}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width={theme.vendorShare.iconSize} height={theme.vendorShare.iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8 12 11 15 16 9"/></svg>
+                  Seleccionar para PDF
+                </button>
+              )}
             </div>
           </>
         )}
@@ -908,7 +945,23 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
         {/* ── Sticky cart bar ── (jamás en modo pedido: ahí no hay carrito, y
             jamás en solo lectura: no hay «Ver pedido» que ofrecer) */}
-        {!modo.activo && !soloLectura && cartCount > 0 && (
+        {seleccionando && (
+          <div className="fixed inset-x-0 z-50 flex justify-center px-4 bottom-4 max-sm:bottom-[calc(var(--fg-alto-tab-bar,0px)+12px)]">
+            <div className="flex w-full max-w-xl items-center gap-2 sm:gap-3 rounded-2xl border border-gray-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+              <span className="flex-1 whitespace-nowrap text-sm font-medium text-gray-900 tabular-nums">
+                {seleccion.size === 0 ? "Toca los artículos" : `${seleccion.size} ${seleccion.size === 1 ? "seleccionado" : "seleccionados"}`}
+              </span>
+              <button type="button" onClick={salirDeSeleccion} className="h-11 whitespace-nowrap rounded-md px-2 text-sm font-medium text-blue-600 hover:text-blue-800">Cancelar</button>
+              <button type="button" disabled={seleccion.size === 0 || downloading}
+                onClick={async () => { await handleDownloadCatalog(seleccion); salirDeSeleccion(); }}
+                className="h-11 whitespace-nowrap rounded-md bg-black px-4 text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] disabled:opacity-40">
+                {downloading ? "Generando..." : <>Descargar PDF{seleccion.size > 0 && <span className="max-sm:hidden"> ({seleccion.size})</span>}</>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!seleccionando && !modo.activo && !soloLectura && cartCount > 0 && (
           <CatalogoStickyCartBar
             marca={marca}
             cart={cart}
