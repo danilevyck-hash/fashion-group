@@ -104,25 +104,53 @@ export interface ComisionVendedor {
  * Entra todo lo que tiene base (también el vendedor no pagable, marcado `se_paga: false`).
  */
 export function comisionPorVendedor(ventas: readonly FilaConBase[], cobros: readonly FilaConBase[]): ComisionVendedor[] {
-  const m = new Map<string, { empresa: string; vendedor: string; v: number; c: number; tv: number; tc: number }>();
+  // La base se junta POR TASA: si la tasa del vendedor cambió dentro del rango
+  // (vigencia por fecha, 24-nov-2026), cada tramo se redondea con la suya. Con
+  // una sola tasa es exactamente la cuenta de siempre.
+  type Grupo = { empresa: string; vendedor: string; v: Map<number, number>; c: Map<number, number> };
+  const m = new Map<string, Grupo>();
   const tomar = (f: FilaConBase, cual: "v" | "c") => {
     if (f.comision == null) return;
     const k = `${f.empresa}|${f.vendedor}`;
-    const g = m.get(k) ?? { empresa: f.empresa, vendedor: f.vendedor, v: 0, c: 0, tv: 0, tc: 0 };
-    g[cual] += f.base;
-    if (cual === "v") g.tv = f.tasa; else g.tc = f.tasa;
+    const g = m.get(k) ?? { empresa: f.empresa, vendedor: f.vendedor, v: new Map(), c: new Map() };
+    g[cual].set(f.tasa, (g[cual].get(f.tasa) ?? 0) + f.base);
     m.set(k, g);
   };
   ventas.forEach((f) => tomar(f, "v"));
   cobros.forEach((f) => tomar(f, "c"));
+  const base = (x: Map<number, number>) => [...x.values()].reduce((s, n) => s + n, 0);
+  const comision = (x: Map<number, number>) => [...x].reduce((s, [tasa, n]) => s + centavos(n * tasa), 0);
   return [...m.values()].map((g) => ({
     empresa: g.empresa,
     vendedor: g.vendedor,
-    ventas_base: centavos(g.v),
-    cobros_base: centavos(g.c),
-    comision: centavos(centavos(g.v * g.tv) + centavos(g.c * g.tc)),
+    ventas_base: centavos(base(g.v)),
+    cobros_base: centavos(base(g.c)),
+    comision: centavos(comision(g.v) + comision(g.c)),
     se_paga: sePagaComision(g.vendedor),
   }));
+}
+
+export interface TasaDeHoy { vendedor_nombre: string; tasa_venta: number | string; tasa_cobro: number | string }
+export interface TasaPasada extends TasaDeHoy { vigente_hasta: string }
+
+/**
+ * La tasa que rige para un vendedor en una fecha — la MISMA regla que la función
+ * SQL `comision_tasa_vigente` (migración 20270122120000): la fila del historial
+ * con el menor `vigente_hasta >= fecha`; sin ninguna, la tasa de hoy; sin fila, 0,5 %.
+ */
+export function tasaEnFecha(
+  hoy: readonly TasaDeHoy[],
+  historial: readonly TasaPasada[],
+  vendedor: string,
+  fecha: string,
+  campo: "tasa_venta" | "tasa_cobro",
+): number {
+  const dia = String(fecha).slice(0, 10);
+  const pasada = historial
+    .filter((h) => h.vendedor_nombre === vendedor && h.vigente_hasta >= dia)
+    .sort((x, y) => x.vigente_hasta.localeCompare(y.vigente_hasta))[0];
+  const fila = pasada ?? hoy.find((t) => t.vendedor_nombre === vendedor);
+  return fila ? Number(fila[campo]) : 0.005;
 }
 
 /** Lo que se paga del cliente: la suma de lo pagable, ya redondeado por vendedor. */
