@@ -42,12 +42,15 @@ let errorMaestro: { message: string } | null;
 let tablasLeidas: string[];
 
 function dobleMv() {
-  const res = { data: filasMv, error: null };
+  // La ruta lee PAGINADO (`leerTodoPaginado`): el doble respeta `.range()` y el COUNT.
+  let rango: [number, number] = [0, Infinity];
   const cadena = {
     select: () => cadena,
     eq: () => cadena,
-    // La ruta hace `await mvQuery` directo: el builder tiene que ser awaitable.
-    then: (ok: (v: unknown) => unknown) => Promise.resolve(res).then(ok),
+    order: () => cadena,
+    range: (a: number, b: number) => { rango = [a, b]; return cadena; },
+    then: (ok: (v: unknown) => unknown) =>
+      Promise.resolve({ data: filasMv.slice(rango[0], rango[1] + 1), error: null, count: filasMv.length }).then(ok),
   };
   return cadena;
 }
@@ -114,6 +117,15 @@ async function pedir() {
   const res = await GET(req);
   return { status: res.status, json: (await res.json()) as { rows: Record<string, unknown>[] } };
 }
+
+describe("🩸 la cartera no se corta en 1000 filas (`db-max-rows`)", () => {
+  it("1.005 filas de la MV llegan las 1.005", async () => {
+    filasMv = Array.from({ length: 1005 }, (_, i) => filaAging({ id: `id-${i}`, codigo: `C-${i}` }));
+    const r = await pedir();
+    expect(r.status).toBe(200);
+    expect(r.json.rows).toHaveLength(1005);
+  });
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. EL ARREGLO
