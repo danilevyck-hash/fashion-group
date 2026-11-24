@@ -103,12 +103,12 @@ export interface ClienteOrdenable {
 }
 
 /**
- * ¿Este cliente pertenece al tramo elegido? Un cliente sin deuda en el tramo NO
- * aparece. "0-90 días" es el cliente cuya deuda está ENTERA dentro del plazo
- * (nada en 91-120 ni en 121+), no el que tiene algo ahí.
+ * ¿Este cliente pertenece al tramo elegido? Los tres tramos filtran igual: entra
+ * todo cliente con algo positivo en ese tramo, aunque también deba en otro
+ * (Daniel, 24-nov-2026: «0-90 días» mostraba solo a quien debía TODO ahí).
  */
 export function pasaFiltroRiesgo(c: ClienteOrdenable, risk: RiskFilter): boolean {
-  if (risk === "current") return c.total > 0 && c.overdue === 0 && c.watch === 0;
+  if (risk === "current") return c.current > 0;
   if (risk === "watch") return c.watch > 0;
   if (risk === "overdue") return c.overdue > 0;
   return true;
