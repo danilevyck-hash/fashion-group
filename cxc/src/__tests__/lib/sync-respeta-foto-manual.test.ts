@@ -47,6 +47,7 @@ function makeDb(existentes: Record<string, unknown>[]) {
         not: () => chain,
         order: () => chain,
         limit: () => chain,
+        range: () => chain,
         update(payload: Record<string, unknown>) {
           escrituras.push({ tabla, op: "update", payload });
           return chain;
@@ -59,7 +60,7 @@ function makeDb(existentes: Record<string, unknown>[]) {
         single: async () => ({ data: { id: "nuevo-1" }, error: null }),
         maybeSingle: async () => ({ data: null, error: null }),
         then(res: (v: { data: unknown; error: null }) => unknown) {
-          return Promise.resolve(res({ data: existentes, error: null }));
+          return Promise.resolve(res({ data: existentes, error: null, count: existentes.length }));
         },
       };
       return chain;

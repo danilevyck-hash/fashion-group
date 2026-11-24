@@ -205,7 +205,11 @@ describe("🔴 3 · se suman los bultos FINALES, los que firmó el transportista
       },
     ];
     mockFrom.mockReturnValue({
-      select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: filas, error: null }) }) }),
+      select: () => ({
+        eq: () => ({
+          order: () => ({ order: () => ({ range: () => Promise.resolve({ data: filas, error: null, count: filas.length }) }) }),
+        }),
+      }),
     });
     const { GET } = await import("@/app/api/guias/route");
     const { NextRequest } = await import("next/server");

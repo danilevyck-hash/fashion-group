@@ -9,6 +9,7 @@ import { LISTA_SELECT } from "@/lib/reclamos/lista-select";
 import { buildReclamoItemRows } from "@/lib/reclamos/item-rows";
 import { reclamoInitials } from "@/lib/empresa-mapping";
 import { datosDeEmpresa } from "@/lib/reclamos/empresas";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,9 @@ export async function POST(req: NextRequest) {
   // recalculando el siguiente correlativo — nro_reclamo es UNIQUE (global), esa es
   // la garantía real. Los reclamos existentes (REC-YYYY-XXXX) NO se tocan: su
   // prefijo nunca coincide con el nuevo, conservan su número.
-  const year = new Date().getFullYear();
+  // El año de PANAMÁ: el servidor corre en UTC y el 31-dic a las 7 p. m. ya
+  // numeraría con el año siguiente.
+  const year = Number(hoyPanama().slice(0, 4));
   const prefix = `${reclamoInitials(empresa)}-${year}-`;
 
   async function nextNroReclamo(): Promise<string> {

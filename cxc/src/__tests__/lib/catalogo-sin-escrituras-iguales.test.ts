@@ -283,6 +283,7 @@ function makeDb(existentes: Record<string, unknown>[], erroresDeSelect: (string 
         not: () => chain,
         order: () => chain,
         limit: () => chain,
+        range: () => chain,
         update(payload: Record<string, unknown>) {
           escrituras.push({ tabla, op: "update", payload });
           return chain;
@@ -313,7 +314,7 @@ function makeDb(existentes: Record<string, unknown>[], erroresDeSelect: (string 
             for (const c of cols) if (Object.prototype.hasOwnProperty.call(f, c)) o[c] = f[c];
             return o;
           });
-          return Promise.resolve(res({ data, error: null }));
+          return Promise.resolve(res({ data, error: null, count: data.length }));
         },
       };
       return chain;

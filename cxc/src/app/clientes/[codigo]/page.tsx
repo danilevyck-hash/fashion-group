@@ -20,6 +20,7 @@ import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import { mundosDeClientes, soloClientesDelGrupo } from "@/lib/clientes/mundos";
 import { supabaseServer } from "@/lib/supabase-server";
+import { inEnTandas } from "@/lib/supabase-paginado";
 import { verifySession } from "@/lib/session-cookie";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { comprasDelCliente, pagosDelCliente } from "@/lib/clientes/ficha-datos";
@@ -179,15 +180,21 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
   )];
   let ultimasGuias: { id: string; numero: number; fecha: string }[] = [];
   if (guiaIds.length > 0) {
-    const { data: gts } = await supabaseServer
-      .from("guia_transporte")
-      .select("id, numero, fecha")
-      .in("id", guiaIds)
-      .eq("deleted", false)
-      .order("fecha", { ascending: false })
-      .order("numero", { ascending: false })
-      .limit(3);
-    ultimasGuias = (gts ?? []) as { id: string; numero: number; fecha: string }[];
+    // En tandas (con ~640 ids la base contesta Bad Request): las 3 últimas de
+    // cada tanda, y de esas las 3 últimas, en el MISMO orden que la consulta.
+    const { data: gts } = await inEnTandas<{ id: string; numero: number; fecha: string }>(guiaIds, (tanda) =>
+      supabaseServer
+        .from("guia_transporte")
+        .select("id, numero, fecha")
+        .in("id", tanda)
+        .eq("deleted", false)
+        .order("fecha", { ascending: false })
+        .order("numero", { ascending: false })
+        .limit(3),
+    );
+    ultimasGuias = [...(gts ?? [])]
+      .sort((a, b) => (a.fecha === b.fecha ? b.numero - a.numero : a.fecha < b.fecha ? 1 : -1))
+      .slice(0, 3);
   }
 
   const data: ClienteDetailData = {

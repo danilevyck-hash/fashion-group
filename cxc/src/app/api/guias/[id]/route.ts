@@ -22,6 +22,7 @@ import { ETIQUETAS_POR_ENVIO, type RenglonParaAtar } from "@/lib/guias/etiquetas
 import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import { entregadoPorElegido } from "@/lib/guias/despachado-por";
 import { textoGuiaDespachada } from "@/lib/guias/aviso-despachada";
+import { guiaYaDespachada } from "@/lib/guias/modo-despacho";
 
 /** 🔴 1-oct-2026: lo que contesta el servidor si se completa sin «Despachado por». */
 const FALTA_DESPACHADO_POR = "Despachado por requerido";
@@ -192,10 +193,19 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     }
   }
 
-  const { data: previous } = await supabaseServer.from("guia_transporte").select("estado, placa, modo_entrega, transportista_id").eq("id", id).single();
+  const { data: previous, error: prevErr } = await supabaseServer
+    .from("guia_transporte")
+    .select("estado, placa, modo_entrega, transportista_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (prevErr) return NextResponse.json({ error: "No se pudo leer la guía. Intenta de nuevo en unos segundos." }, { status: 500 });
+  if (!previous) return NextResponse.json({ error: "Guía no encontrada" }, { status: 404 });
 
-  // Block edits on dispatched guías (only dispatch flow itself can update)
-  if (previous?.estado === "Completada" && estado !== "Completada") {
+  // 🔴 Completada = bloqueada, ENTERA, sin importar el `estado` que traiga el
+  // cuerpo: antes un `estado: "Completada"` la dejaba editar toda. Lo que sí se
+  // corrige de una despachada va por sus rutas por columna (`campos-editables.ts`:
+  // `PATCH …/item`, `…/cliente`, `…/numero-transp`), nunca por este PUT.
+  if (guiaYaDespachada(previous.estado)) {
     return NextResponse.json({ error: "Guía ya despachada, no se puede editar" }, { status: 400 });
   }
 
@@ -220,8 +230,19 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (tipo_despacho !== undefined) updateData.tipo_despacho = tipo_despacho;
   if (nombre_chofer !== undefined) updateData.nombre_chofer = nombre_chofer;
 
-  const { error: guiaErr } = await supabaseServer.from("guia_transporte").update(updateData).eq("id", id);
+  // 🔴 La escritura lleva el estado que se LEYÓ: si otro (un segundo toque, otra
+  // persona) la despachó en el medio, no se escribe nada y se contesta 409.
+  // Sin cabecera que cambiar, se reescribe el mismo estado solo para el guard.
+  const escritura = Object.keys(updateData).length > 0 ? updateData : { estado: previous.estado };
+  const base = supabaseServer.from("guia_transporte").update(escritura).eq("id", id);
+  const { data: escritas, error: guiaErr } = await (previous.estado == null
+    ? base.is("estado", null)
+    : base.eq("estado", previous.estado)
+  ).select("id");
   if (guiaErr) return NextResponse.json({ error: guiaErr.message }, { status: 500 });
+  if (!escritas || escritas.length === 0) {
+    return NextResponse.json({ error: "La guía cambió mientras la editabas. Vuelve a abrirla." }, { status: 409 });
+  }
 
   if (items !== undefined) {
     // 🩸 EL BUG DEL 1-oct-2026: este reemplazo BORRA de verdad los renglones
@@ -263,16 +284,20 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         (insertados ?? []) as RenglonParaAtar[],
       );
       for (const [renglonId, total] of bultosPorRenglon) {
-        await supabaseServer.from("guia_items").update({ bultos: total }).eq("id", renglonId).eq("guia_id", id);
+        const { error: bErr } = await supabaseServer.from("guia_items").update({ bultos: total }).eq("id", renglonId).eq("guia_id", id);
+        if (bErr) return NextResponse.json({ error: bErr.message }, { status: 500 });
       }
       // New items inserted successfully — delete old items (positive orden)
-      await supabaseServer.from("guia_items").delete().eq("guia_id", id).gte("orden", 0);
+      // 🩸 supabase NO lanza: el `.error` se mira, o un fallo quedaba mudo.
+      const { error: delErr } = await supabaseServer.from("guia_items").delete().eq("guia_id", id).gte("orden", 0);
+      if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
       // Fix orden: flip negative to positive en paralelo (vs loop secuencial N+1)
-      const { data: newItems } = await supabaseServer
+      const { data: newItems, error: newErr } = await supabaseServer
         .from("guia_items")
         .select("id, orden")
         .eq("guia_id", id)
         .lt("orden", 0);
+      if (newErr) return NextResponse.json({ error: newErr.message }, { status: 500 });
       if (newItems && newItems.length > 0) {
         const results = await Promise.allSettled(
           newItems.map((ni) =>
@@ -282,7 +307,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
               .eq("id", ni.id)
           )
         );
-        const failed = results.filter((r) => r.status === "rejected");
+        // Un fallo de supabase llega como `{ error }` en un fulfilled, no como rejected.
+        const failed = results.filter((r) => r.status === "rejected" || r.value.error);
         if (failed.length > 0) {
           console.error("[guias/PUT] flip parcial fallido:", failed);
           return NextResponse.json(
@@ -293,7 +319,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       }
     } else {
       // Empty items array = delete all
-      await supabaseServer.from("guia_items").delete().eq("guia_id", id);
+      const { error: delTodoErr } = await supabaseServer.from("guia_items").delete().eq("guia_id", id);
+      if (delTodoErr) return NextResponse.json({ error: delTodoErr.message }, { status: 500 });
     }
   }
 
@@ -485,10 +512,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   await logActivity(session?.role || "unknown", "guia_patch", "guias", { guiaId: params.id, fields: Object.keys(update) }, session?.userName);
 
   // If setting to Completada, add condition to prevent race: only update if NOT already Completada
-  let query = supabaseServer.from("guia_transporte").update(update).eq("id", params.id);
-  if (body.estado === "Completada") {
-    query = query.neq("estado", "Completada");
-  }
+  // 🔴 Y una Completada no se toca por aquí con NINGÚN campo (antes, sin `estado`
+  // en el cuerpo, se le podía cambiar la placa o la firma).
+  const query = supabaseServer
+    .from("guia_transporte")
+    .update(update)
+    .eq("id", params.id)
+    .neq("estado", "Completada");
   const { data: updated, error } = await query.select("id").maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!updated) return NextResponse.json({ error: "Guía no encontrada o ya fue despachada" }, { status: 404 });

@@ -391,8 +391,25 @@ async function patchFlujoSimple(
   // «recibido_por». Ahora avanzar y deshacer salen de una sola función.
   const cols = columnasDelPaso(desde, estado, quienFirma, ahora, bultosNuevos);
   const fila = { empresa_key: empresa, pedido_switch_id: id, cambiado_por: quienFirma, cambiado_en: ahora, ...cols };
-  const { error } = await supabaseServer.from("pedidos_bodega_estado").upsert(fila, { onConflict: "empresa_key,pedido_switch_id" });
-  if (error) return NextResponse.json({ error: "No se pudo guardar el estado" }, { status: 500 });
+  // 🔴 Guarda `.eq("estado", …)` como la de bultos: si alguien lo movió entretanto
+  // (dos toques, dos personas), no se escribe y se contesta 409. Sin fila previa
+  // se INSERTA, y si otro la creó en el medio, el choque de llave también es 409.
+  const yaMovido = () => NextResponse.json({ error: "El pedido cambió de estado. Vuelve a cargar la lista." }, { status: 409 });
+  if (previo) {
+    const estadoLeido = (previo.estado ?? null) as string | null;
+    const base = supabaseServer
+      .from("pedidos_bodega_estado")
+      .update(fila)
+      .eq("empresa_key", empresa)
+      .eq("pedido_switch_id", id);
+    const { data: escritas, error } = await (estadoLeido == null ? base.is("estado", null) : base.eq("estado", estadoLeido)).select("pedido_switch_id");
+    if (error) return NextResponse.json({ error: "No se pudo guardar el estado" }, { status: 500 });
+    if (!escritas || escritas.length === 0) return yaMovido();
+  } else {
+    const { error } = await supabaseServer.from("pedidos_bodega_estado").insert(fila);
+    if (error?.code === "23505") return yaMovido();
+    if (error) return NextResponse.json({ error: "No se pudo guardar el estado" }, { status: 500 });
+  }
   // Rastro de cada paso, con la fila de ANTES: deshacer no borra quién lo había marcado.
   await logActivity(
     auth.role,

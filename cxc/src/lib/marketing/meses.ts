@@ -3,6 +3,8 @@
 // ============================================================================
 // Se usan tanto en la lib de impulsadoras (server) como en la UI (client).
 
+import { hoyPanama } from "@/lib/fecha-panama";
+
 export const MESES_ES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
@@ -15,16 +17,15 @@ export function primerDiaMes(d: Date): string {
   return `${y}-${m}-01`;
 }
 
-/** Mes actual (día 1, "YYYY-MM-01"). */
-export function mesActualISO(): string {
-  return primerDiaMes(new Date());
+/** Mes actual de PANAMÁ (día 1, "YYYY-MM-01"); el reloj UTC se adelanta 5 h. */
+export function mesActualISO(now: Date = new Date()): string {
+  return `${hoyPanama(now).slice(0, 7)}-01`;
 }
 
-/** Mes anterior (día 1, "YYYY-MM-01"). */
-export function mesAnteriorISO(): string {
-  const d = new Date();
-  d.setUTCMonth(d.getUTCMonth() - 1, 1);
-  return primerDiaMes(d);
+/** Mes anterior de PANAMÁ (día 1, "YYYY-MM-01"). */
+export function mesAnteriorISO(now: Date = new Date()): string {
+  const [y, m] = hoyPanama(now).slice(0, 7).split("-").map(Number);
+  return primerDiaMes(new Date(Date.UTC(y, m - 2, 1)));
 }
 
 /** Etiqueta legible de un mes: "Junio 2026" desde "YYYY-MM-01" (o "YYYY-MM"). */
