@@ -79,6 +79,8 @@ import {
   agruparPorEmpresa,
   haceDias,
   haceDiasCorto,
+  diasDesde,
+  fechaDeAntiguedad,
   lineaDePendientes,
   lineaDePendientesCorta,
   lineaDeLaPestana,
@@ -450,7 +452,7 @@ export default function PedidosView({
     columnas: ["antiguedad", "cliente", "vendedor"], textos: ["cliente", "vendedor"],
   });
   const ordenarGrupo = (ps: PedidoBodega[]) => orden.ordenar(ps, (p, c) =>
-    c === "antiguedad" ? -Date.parse(p.fecha) : c === "cliente" ? p.cliente_nombre : vendedorEnPantalla(p.vendedor_nombre));
+    c === "antiguedad" ? -Date.parse(fechaDeAntiguedad(p)) : c === "cliente" ? p.cliente_nombre : vendedorEnPantalla(p.vendedor_nombre));
   // Con una sola empresa el chip no decide nada: no se dibuja (docs/diseno.md).
   const OPCIONES_EMPRESA = [
     // n.º 59 + regla n.º 1: el chip dice qué filtra, sin «Empresa:» delante.
@@ -557,7 +559,7 @@ export default function PedidosView({
   // 24-nov-2026: celular 2×2, computadora una fila de 4; la elegida, negra.
   const tarjetas = conTarjetas && pedidos ? (
     <div role="group" aria-label="Estado" data-tarjetas-pedidos className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {tarjetasDePedidos(deLaEmpresa, hoy, new Date().toISOString()).map((t) => {
+      {tarjetasDePedidos(deLaEmpresa, hoy).map((t) => {
         const activa = filtro === t.estado;
         return (
           <button
@@ -884,7 +886,8 @@ export default function PedidosView({
     if (estadoFlujoSimpleLeido(p.estado) !== "preparado" || !p.preparado_en) return null;
     // El instante EXACTO de ahora, no la fecha-sin-hora de `hoy`: dos
     // pedidos preparados el mismo día pueden llevar horas muy distintas.
-    const dias = diasEnPreparado(p.preparado_en, new Date().toISOString());
+    // 24-nov-2026: por día de Panamá, como la fila («hace 2 días» = «2 d»).
+    const dias = diasDesde(p.preparado_en, hoy);
     if (!preparadoViejo(dias)) return null;
     return <span className="block text-xs font-medium text-amber-700">{lineaPreparadoHaceDias(dias)}</span>;
   };
@@ -929,14 +932,14 @@ export default function PedidosView({
                 <td className="whitespace-nowrap py-2 pl-3 pr-1 text-gray-700 sm:px-3">
                   <button
                     type="button"
-                    title={fmtDate(fechaPanamaDe(p.fecha))}
+                    title={fmtDate(fechaPanamaDe(fechaDeAntiguedad(p)))}
                     onClick={() => setFechaAbierta((k) => (k === clave(p) ? null : clave(p)))}
                     className="text-left"
                   >
-                    {fechaAbierta === clave(p) ? fmtDate(fechaPanamaDe(p.fecha)) : (
+                    {fechaAbierta === clave(p) ? fmtDate(fechaPanamaDe(fechaDeAntiguedad(p))) : (
                       <>
-                        <span className="sm:hidden">{haceDiasCorto(p.fecha, hoy)}</span>
-                        <span className="hidden sm:inline">{haceDias(p.fecha, hoy)}</span>
+                        <span className="sm:hidden">{haceDiasCorto(fechaDeAntiguedad(p), hoy)}</span>
+                        <span className="hidden sm:inline">{haceDias(fechaDeAntiguedad(p), hoy)}</span>
                       </>
                     )}
                   </button>
@@ -1034,14 +1037,14 @@ export default function PedidosView({
                 <td className={`whitespace-nowrap py-2 pr-1 text-gray-700 sm:px-3 ${conCirculo ? "pl-1 pt-3" : "pl-3"}`}>
                   <button
                     type="button"
-                    title={fmtDate(fechaPanamaDe(p.fecha))}
+                    title={fmtDate(fechaPanamaDe(fechaDeAntiguedad(p)))}
                     onClick={() => setFechaAbierta((k) => (k === clave(p) ? null : clave(p)))}
                     className="text-left"
                   >
-                    {fechaAbierta === clave(p) ? fmtDate(fechaPanamaDe(p.fecha)) : (
+                    {fechaAbierta === clave(p) ? fmtDate(fechaPanamaDe(fechaDeAntiguedad(p))) : (
                       <>
-                        <span className="sm:hidden">{haceDiasCorto(p.fecha, hoy)}</span>
-                        <span className="hidden sm:inline">{haceDias(p.fecha, hoy)}</span>
+                        <span className="sm:hidden">{haceDiasCorto(fechaDeAntiguedad(p), hoy)}</span>
+                        <span className="hidden sm:inline">{haceDias(fechaDeAntiguedad(p), hoy)}</span>
                       </>
                     )}
                   </button>
@@ -1122,11 +1125,11 @@ export default function PedidosView({
               <td className="py-2 pl-3 pr-1 text-gray-700 sm:whitespace-nowrap sm:px-3">
                 <button
                   type="button"
-                  title={fmtDate(fechaPanamaDe(p.fecha))}
+                  title={fmtDate(fechaPanamaDe(fechaDeAntiguedad(p)))}
                   onClick={() => setFechaAbierta((k) => (k === clave(p) ? null : clave(p)))}
                   className="text-left"
                 >
-                  {fechaAbierta === clave(p) ? fmtDate(fechaPanamaDe(p.fecha)) : haceDias(p.fecha, hoy).replace(/ días$/, "\u00a0días")}
+                  {fechaAbierta === clave(p) ? fmtDate(fechaPanamaDe(fechaDeAntiguedad(p))) : haceDias(fechaDeAntiguedad(p), hoy).replace(/ días$/, "\u00a0días")}
                 </button>
               </td>
               <td className="break-words px-1 py-2 sm:px-3">
@@ -1290,7 +1293,7 @@ export default function PedidosView({
           : e === "preparado" && puedeRecibir ? boton("Recibir", () => setPorConfirmarSimple({ pedido: p, destino: "recibido" }))
             : null;
     return {
-      linea: `${ROTULO_ESTADO_FLUJO_SIMPLE[e]} · ${haceDias(p.fecha, hoy)}`,
+      linea: `${ROTULO_ESTADO_FLUJO_SIMPLE[e]} · ${haceDias(fechaDeAntiguedad(p), hoy)}`,
       accion,
     };
   };

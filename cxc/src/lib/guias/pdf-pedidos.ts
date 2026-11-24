@@ -21,7 +21,7 @@ import {
   textoDePdf,
 } from "@/lib/comisiones/pdf-chrome";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
-import { agruparPorEmpresa, haceDias, vendedorEnPantalla, type PedidoBodega } from "./pedidos-bodega";
+import { agruparPorEmpresa, fechaDeAntiguedad, haceDias, vendedorEnPantalla, type PedidoBodega } from "./pedidos-bodega";
 
 const NEGRO: [number, number, number] = [0, 0, 0];
 const BLANCO: [number, number, number] = [255, 255, 255];
@@ -45,7 +45,7 @@ export function construirPdfPedidos(titulo: string, pedidos: readonly PedidoBode
       head: [COLUMNAS_PEDIDOS_IMPRESOS.map(textoDePdf)],
       // Las dos últimas van vacías: se firman a mano.
       body: g.pedidos.map((p) =>
-        [haceDias(p.fecha, hoy), p.secuencial, p.cliente_nombre, vendedorEnPantalla(p.vendedor_nombre), "", ""].map(textoDePdf),
+        [haceDias(fechaDeAntiguedad(p), hoy), p.secuencial, p.cliente_nombre, vendedorEnPantalla(p.vendedor_nombre), "", ""].map(textoDePdf),
       ),
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, textColor: NEGRO, lineColor: NEGRO, lineWidth: 0.1, valign: "middle" },
       headStyles: { fillColor: BLANCO, textColor: NEGRO, fontStyle: "bold", fontSize: 7.5, lineWidth: { bottom: 0.4 } },
