@@ -132,6 +132,8 @@ export const TABLAS_PERSONAS = [
   "comision_factura_vendedor",
   "comision_vendedor_alias",
   "comision_vendedor_tasa",
+  // 24-nov-2026: la tasa de un vendedor en UNA empresa desde un mes. Escritas a mano.
+  "comision_vendedor_tasa_excepcion",
   "comision_descuentos_fijos",
   "comision_descuento_excepciones",
 
@@ -501,6 +503,7 @@ export const PK_QUE_NO_ES_ID: Readonly<Record<string, readonly string[]>> = Obje
   asistencia_reparto_empresa: ["empleado_codigo", "empresa"],
   comision_vendedor_alias: ["nombre_switch"],
   comision_vendedor_tasa: ["vendedor_nombre"],
+  comision_vendedor_tasa_excepcion: ["vendedor_nombre", "empresa_key", "vigente_desde"],
   cron_heartbeats: ["cron_name"],
   cuentas_contables: ["empresa_key", "cuenta"],
   fg_catalogo_publico_switch: ["empresa_key"],

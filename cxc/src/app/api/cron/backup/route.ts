@@ -294,6 +294,7 @@ const DATASETS: Dataset[] = [
   { table: "comision_exclusion" },
   // 11-nov-2026: la comisión de UNA factura pasada a otro vendedor; soft delete = HISTORIAL.
   { table: "comision_factura_vendedor" },
+  { table: "comision_vendedor_tasa_excepcion" },
   { table: "comision_vendedor_alias" },
   { table: "comision_descuentos_fijos" },
   { table: "comision_descuento_excepciones" },
