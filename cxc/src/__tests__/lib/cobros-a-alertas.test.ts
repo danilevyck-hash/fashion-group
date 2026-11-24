@@ -58,6 +58,7 @@ const MAPA: Record<string, string[]> = {
   "src/lib/campos-obligatorios.ts": [S],
   "src/lib/catalogo/envio-en-segundo-plano.ts": [S], // velocidad-2026-11: el envío en segundo plano que no salió
   "src/lib/catalogo/switch-envio.ts": [S], // 26-oct-2026: enviado a Switch ya no se manda; falla y ambiguo siguen en S
+  "src/lib/asistencia/cierre-prestamo-server.ts": [S], // 24-nov-2026: descuento de préstamo sin anotar al cerrar
   "src/lib/catalogos/clasificacion-aviso.ts": [S],
   "src/lib/catalogos/fotos-nuevos.ts": [N],
   "src/lib/cheques-alert.ts": [N, A],

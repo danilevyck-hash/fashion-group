@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { calcularSaldoPrestamo, type MovimientoParaSaldo } from "@/lib/prestamos-saldo";
 import { empresasConFacturas } from "@/lib/switch-api/empresas";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
@@ -73,17 +74,24 @@ async function checkChequesCriticosNull(): Promise<CheckResult> {
 // 5-sep-2026). Un check que mida con otra regla avisa —o calla— sobre un saldo
 // que no es el que ve nadie.
 async function checkPrestamosSaldoAnomalo(): Promise<CheckResult> {
-  const { data, error } = await supabaseServer
-    .from("prestamos_movimientos")
-    .select("empleado_id, concepto, monto, estado, deleted, cuenta")
-    .eq("estado", "aprobado");
-
-  if (error) {
-    return checkError("prestamos_saldo_anomalo", "prestamos_movimientos", error.message);
+  // 🩸 24-nov-2026: paginado — sin él, pasadas 1.000 filas el saldo de alguien
+  // salía incompleto y el chequeo avisaba (o callaba) sobre un número falso.
+  let data: Array<MovimientoParaSaldo & { empleado_id: string | null }>;
+  try {
+    data = await leerTodoPaginado<MovimientoParaSaldo & { empleado_id: string | null }>("prestamos_movimientos", (pedirCount, from, to) =>
+      supabaseServer
+        .from("prestamos_movimientos")
+        .select("empleado_id, concepto, monto, estado, deleted, cuenta", pedirCount ? { count: "exact" } : {})
+        .eq("estado", "aprobado")
+        .order("id", { ascending: true })
+        .range(from, to),
+    );
+  } catch (e) {
+    return checkError("prestamos_saldo_anomalo", "prestamos_movimientos", e instanceof Error ? e.message : String(e));
   }
 
   const porEmpleado = new Map<string, MovimientoParaSaldo[]>();
-  for (const m of data ?? []) {
+  for (const m of data) {
     const empId = m.empleado_id as string | null;
     if (!empId) continue;
     const lista = porEmpleado.get(empId);
