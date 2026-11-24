@@ -86,8 +86,10 @@ describe("pedidos de bodega — reglas de Daniel", () => {
     expect(leer("src/app/despachos/components/PedidosView.tsx")).not.toMatch(/\{p\.vendedor_nombre/);
   });
 
-  it("sin montos: ni la ruta ni la pantalla mandan o dibujan el total", () => {
-    expect(leer("src/app/api/guias/pedidos/route.ts")).not.toMatch(/select\([^)]*total/);
+  // 24-nov-2026: solo daniel ve montos (subtotal sin ITBMS, decidido en el
+  // servidor; candado en pedidos-conteos-montos). El TOTAL no sale nunca.
+  it("sin total: ni la ruta ni la pantalla mandan o dibujan el total", () => {
+    expect(leer("src/app/api/guias/pedidos/route.ts")).not.toMatch(/select\([^)]*[^b]total/);
     expect(leer("src/app/despachos/components/PedidosView.tsx")).not.toMatch(/\.total\b|fmt\(/);
   });
 

@@ -5,14 +5,16 @@
  *   PATCH → { empresa_key, pedido_switch_id, estado } → { ok, cambiado_por, cambiado_en }
  *   PATCH → { empresa_key, pedido_switch_id, muestra: true|false, nota? } → «En espera de muestra»
  *
- * Ven los de `PEDIDOS_VER_ROLES`; marcan solo admin y bodega. Sin montos:
- * la pantalla la ve bodega, así que `total` no sale de aquí. Lee `switch_pedidos` (lo escribe el cron de madrugada)
+ * Ven los de `PEDIDOS_VER_ROLES`; marcan solo admin y bodega. 🔴 Montos: SOLO
+ * a `daniel` le viaja `monto` (subtotal sin ITBMS, `montoDelPedido`, 24-nov-2026);
+ * a nadie más le sale ese campo. `total` no sale nunca. Lee `switch_pedidos` (lo escribe el cron de madrugada)
  * y escribe SOLO `pedidos_bodega_estado`. 🔴 No abre Switch: la ruta no saca
  * a nadie del panel. El quién sale de la cookie FIRMADA, nunca del cuerpo.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, type SessionPayload } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { montoDelPedido } from "@/lib/ui/pedidos-conteos-2026-11";
 import {
   PEDIDOS_BODEGA_2026_10,
   PEDIDOS_BODEGA_ROLES,
@@ -179,7 +181,7 @@ export async function GET(req: NextRequest) {
   const [ped, est, alias, bultos, asignacion] = await Promise.all([
     supabaseServer
       .from("switch_pedidos")
-      .select("empresa_key, pedido_switch_id, secuencial, fecha, cliente_codigo, cliente_nombre, vendedor_nombre, synced_at")
+      .select("empresa_key, pedido_switch_id, secuencial, fecha, cliente_codigo, cliente_nombre, vendedor_nombre, synced_at, subtotal")
       .in("empresa_key", [...empresas])
       .order("fecha")
       .limit(1000),
@@ -251,6 +253,8 @@ export async function GET(req: NextRequest) {
       espera_muestra_por: m?.espera_muestra_por ?? null,
       espera_muestra_nota: m?.espera_muestra_nota ?? null,
       ...(BULTOS_EN_EL_PEDIDO ? { facturado: facturados.has(`${p.empresa_key}:${p.pedido_switch_id}`) } : {}),
+      // 🔴 La plata la decide el SERVIDOR: el campo solo existe para `daniel`.
+      ...montoDelPedido(auth.userName, p.subtotal),
     };
   });
   return NextResponse.json({
