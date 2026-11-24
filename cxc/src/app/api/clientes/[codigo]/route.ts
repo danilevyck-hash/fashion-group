@@ -69,10 +69,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
 
   // Puente por ID: pares (empresa_key, cliente_switch_id) del cliente. El id es
   // por-empresa → matcheamos el par exacto, no solo el cliente_switch_id.
-  const { data: pares } = await supabaseServer
+  const { data: pares, error: paresErr } = await supabaseServer
     .from("switch_clientes")
     .select("empresa_key, cliente_switch_id")
     .eq("codigo", codigo);
+  // 🔴 Sin el puente la ficha saldría en cero («Sin compras») cuando en verdad no se leyó.
+  if (paresErr) {
+    console.error("[api/clientes/codigo] puente error:", paresErr.message);
+    return NextResponse.json({ error: paresErr.message }, { status: 500 });
+  }
   const cids = [...new Set((pares ?? [])
     .map(p => (p as { cliente_switch_id: number | null }).cliente_switch_id)
     .filter((x): x is number => typeof x === "number"))];

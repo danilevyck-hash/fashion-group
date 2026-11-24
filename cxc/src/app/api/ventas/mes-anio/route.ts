@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_VENTAS_ID,
@@ -64,11 +65,16 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const { data, error } = await supabaseServer
-      .from("ventas_rollup_mensual_mv")
-      .select("empresa_key, anio, mes_num, ventas_netas, costo_total, utilidad");
-    if (error) throw new Error(`ventas_rollup_mensual_mv: ${error.message}`);
-    const rows = (data ?? []) as MvRow[];
+    // 🩸 Paginado: `db-max-rows` = 1000 corta EN SILENCIO (8 empresas × 12 meses × años crece).
+    const rows = await leerTodoPaginado<MvRow>("ventas_rollup_mensual_mv (mes-anio)", (pedirCount, a, b) =>
+      supabaseServer
+        .from("ventas_rollup_mensual_mv")
+        .select("empresa_key, anio, mes_num, ventas_netas, costo_total, utilidad", pedirCount ? { count: "exact" } : {})
+        .order("empresa_key", { ascending: true })
+        .order("anio", { ascending: true })
+        .order("mes_num", { ascending: true })
+        .range(a, b),
+    );
 
     // byEmp[empKey][mes_num][anio] = Vals
     const byEmp = new Map<string, Map<number, Map<number, Vals>>>();

@@ -21,6 +21,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { ALL_EMPRESA_KEYS, type EmpresaKey } from "@/lib/empresa-mapping";
 import { esCodigoDelGrupo } from "@/lib/clientes/mundos";
+import { fechaPanamaDe, hoyPanama } from "@/lib/fecha-panama";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 
 export const dynamic = "force-dynamic";
 
@@ -82,9 +84,18 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   //    (meses 0-12) alimenta total_12m y la serie del HoverCard; la segunda
   //    mitad (meses 13-24) alimenta total_12m_prior para el delta del
   //    bloque Ventas. El primer día del mes de hace 24 meses, YYYY-MM-DD.
-  const now = new Date();
-  const fromDate = new Date(now.getFullYear(), now.getMonth() - 24, 1);
-  const fromIso = fromDate.toISOString().slice(0, 10);
+  // 🔴 El mes es el de PANAMÁ, no el del servidor (UTC): `mesAtras` cuenta en
+  // meses de calendario desde hoy en Panamá, sin pasar por la zona del servidor.
+  const hoy = hoyPanama();
+  const anioHoy = Number(hoy.slice(0, 4));
+  const mesHoy = Number(hoy.slice(5, 7));
+  const mesAtras = (i: number) => {
+    const t = anioHoy * 12 + (mesHoy - 1) - i;
+    return { anio: Math.floor(t / 12), mes: (t % 12) + 1 };
+  };
+  const desde = mesAtras(24);
+  // Medianoche de Panamá (UTC−5 fijo) del primer día del mes de hace 24 meses.
+  const fromIso = `${desde.anio}-${String(desde.mes).padStart(2, "0")}-01T00:00:00-05:00`;
 
   // 3. Fuente única switch_facturas (historia completa backfilleada del API),
   //    puenteada por ID vía switch_clientes. Base pre-impuesto neto
@@ -109,17 +120,26 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
 
   // 3b. switch_facturas — neto por tipo sobre subtotal_descuento.
   if (cids.length > 0) {
-    const { data: sf, error: sErr } = await supabaseServer
-      .from("switch_facturas")
-      .select("fecha, tipo_comprobante, subtotal_descuento")
-      .eq("empresa_key", empresaKey)
-      .in("cliente_switch_id", cids)
-      .gte("fecha", fromIso);
-    if (sErr) {
-      console.error("[historial-mensual] switch_facturas query error:", sErr.message);
-      return NextResponse.json({ error: sErr.message }, { status: 500 });
+    // Paginado: `db-max-rows` = 1000 corta EN SILENCIO un cliente grande.
+    let sf: unknown[];
+    try {
+      sf = await leerTodoPaginado<unknown>("switch_facturas (historial mensual)", (pedirCount, a, b) =>
+        supabaseServer
+          .from("switch_facturas")
+          .select("fecha, tipo_comprobante, subtotal_descuento", pedirCount ? { count: "exact" } : {})
+          .eq("empresa_key", empresaKey)
+          .in("cliente_switch_id", cids)
+          .gte("fecha", fromIso)
+          .order("fecha", { ascending: true })
+          .order("id", { ascending: true })
+          .range(a, b),
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[historial-mensual] switch_facturas query error:", msg);
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
-    for (const f of (sf ?? []) as {
+    for (const f of sf as {
       fecha: string | null;
       tipo_comprobante: string | null;
       subtotal_descuento: number | string | null;
@@ -134,8 +154,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
               f.tipo_comprobante === "Nota de Débito"
             ? base
             : 0;
-      // fecha de switch es timestamptz → recortar a YYYY-MM-DD para el bucketing.
-      rows.push({ anio: null, mes: null, fecha: f.fecha ? String(f.fecha).slice(0, 10) : null, total: signed });
+      // fecha de switch es timestamptz → la fecha de negocio es la de PANAMÁ
+      // (una factura de las 8 p. m. cae al día UTC siguiente, y el 31 al mes siguiente).
+      rows.push({ anio: null, mes: null, fecha: f.fecha ? fechaPanamaDe(String(f.fecha)) : null, total: signed });
     }
   }
 
@@ -174,9 +195,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   //    recientes para back-compat con consumidores que esperen la serie corta.
   const allMeses: MesAgg[] = [];
   for (let i = 24; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const anio = d.getFullYear();
-    const mes = d.getMonth() + 1;
+    const { anio, mes } = mesAtras(i);
     const found = bucket.get(`${anio}-${mes}`);
     allMeses.push({
       anio,
@@ -199,9 +218,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   // días desde la última factura (no desde el inicio del mes)
   let diasDesdeUltimaCompra: number | null = null;
   if (maxFechaIso) {
-    const ms = Date.parse(maxFechaIso);
+    // Días entre dos fechas de Panamá (YYYY-MM-DD), sin la hora del servidor.
+    const ms = Date.parse(`${hoy}T00:00:00Z`) - Date.parse(`${maxFechaIso}T00:00:00Z`);
     if (!Number.isNaN(ms)) {
-      diasDesdeUltimaCompra = Math.max(0, Math.floor((Date.now() - ms) / 86_400_000));
+      diasDesdeUltimaCompra = Math.max(0, Math.round(ms / 86_400_000));
     }
   }
 

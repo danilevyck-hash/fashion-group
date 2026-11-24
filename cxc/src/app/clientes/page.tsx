@@ -29,6 +29,9 @@ import ClientesListClient, { type Cliente } from "./ClientesListClient";
 import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
 import { rolesClientes } from "@/lib/clientes/roles";
 
+const AVISO_DIRECTORIO_NO_LEIDO = "No se pudo leer el directorio de clientes. Intenta de nuevo.";
+const AVISO_SALDO_NO_LEIDO = "No se pudo leer el saldo de los clientes: «Sin saldo» puede no ser cierto. Intenta de nuevo.";
+
 // 🔴 Los roles salen de `ROLES_CLIENTES`, no de una copia escrita acá: es la
 // MISMA lista que el catálogo de módulos. Hasta el 11-sep-2026 decía además
 // `bodega`, que no tiene el módulo y entraba escribiendo la dirección.
@@ -65,18 +68,17 @@ async function isSessionValid(token: string | undefined): Promise<boolean> {
  * se filtra por las 6 en la misma cadena — Boston tiene su propia vista y no se
  * mezcla ni acá ni en ningún lado.
  *
- * Falla ABIERTO: sin este dato la lista igual sale, con la columna vacía. Una
- * lista de clientes que no abre porque el aging no respondió es peor que una
- * columna en blanco.
+ * Falla ABIERTO: sin este dato la lista igual sale, pero `null` hace que la
+ * pantalla DIGA que el saldo no se pudo leer (nunca «Sin saldo» callado).
  */
-async function saldoPorCodigo(): Promise<Record<string, number>> {
+async function saldoPorCodigo(): Promise<Record<string, number> | null> {
   const { data, error } = await supabaseServer
     .from("switch_estadocuenta_aging")
     .select("codigo, company_key, total")
     .in("company_key", [...B2B_EMPRESA_KEYS]);
   if (error) {
     console.error("[clientes/lista] aging:", error.message);
-    return {};
+    return null;
   }
   const mapa: Record<string, number> = {};
   for (const r of (data ?? []) as { codigo: string | null; total: number | string }[]) {
@@ -100,11 +102,18 @@ export default async function ClientesPage() {
   // con su caché de 60 s y su filtro de mundos. Sin `incluirAusentes`: el
   // default de esa puerta es «solo lo que se puede ofrecer», que es exactamente
   // lo que esta lista quiere desde el 5-sep-2026.
-  const filas = await leerClientesDelGrupo("").catch(() => []);
+  // `null` = no se pudo leer: la pantalla lo dice, no muestra una lista vacía.
+  const filas = await leerClientesDelGrupo("").catch((e: unknown) => {
+    console.error("[clientes/lista] directorio:", e instanceof Error ? e.message : String(e));
+    return null;
+  });
   const debe = await saldoPorCodigo();
+  const errorLectura = filas === null
+    ? AVISO_DIRECTORIO_NO_LEIDO
+    : debe === null ? AVISO_SALDO_NO_LEIDO : null;
   // De cuándo es el directorio: el último sync de Switch entre sus filas, para
   // la línea de frescura (4-oct-2026). Sin fecha, la línea dice «Actualizar».
-  const actualizado = filas.reduce<string | null>(
+  const actualizado = (filas ?? []).reduce<string | null>(
     (max, c) => (c.last_synced_at && (!max || c.last_synced_at > max) ? c.last_synced_at : max),
     null,
   );
@@ -112,7 +121,7 @@ export default async function ClientesPage() {
   // ⚠️ `.slice()` OBLIGATORIO: `filas` puede ser el MISMO array que guarda el
   // caché en memoria. Acá se mapea (que ya crea uno nuevo), pero el orden se
   // aplica sobre la copia, nunca sobre el estado compartido entre requests.
-  const clientes: Cliente[] = filas
+  const clientes: Cliente[] = (filas ?? [])
     .filter((c) => !!c.codigo)
     .map((c) => ({
       id: c.id,
@@ -122,9 +131,9 @@ export default async function ClientesPage() {
       telefono: c.telefono,
       celular: c.celular,
       email: c.email,
-      debe: debe[c.codigo as string] ?? 0,
+      debe: debe?.[c.codigo as string] ?? 0,
     }))
     .sort((a, b) => (a.nombre ?? "").localeCompare(b.nombre ?? "", "es"));
 
-  return <ClientesListClient initialClientes={clientes} actualizado={actualizado} />;
+  return <ClientesListClient initialClientes={clientes} actualizado={actualizado} errorLectura={errorLectura} />;
 }

@@ -100,7 +100,10 @@ describe("🔴 el descuento se resta donde se ve — y AHORA en el servidor", ()
     // sale con los descuentos en 0, igual que antes de que existieran.
     // 🔄 6-sep-2026: se lee un mes a la vez (`m`) porque «Todo el año» pide
     // varios; el `.catch(() => [])` —que es lo que este candado cuida— no cambió.
-    expect(consolidado).toContain("leerDescuentosEfectivos(EMPRESAS_COMISIONAN, year, m).catch(() => [])");
+    // 🔄 24-nov-2026: sigue sin caerse, pero ya no CALLA: `null` en vez de `[]`
+    // y la respuesta lleva `descuentos_no_leidos` (ver robustez-lecturas.test.ts).
+    expect(consolidado).toContain("leerDescuentosEfectivos(EMPRESAS_COMISIONAN, year, m).catch(() => null)");
+    expect(consolidado).toContain("descuentosPorMes[i] ?? []");
   });
 
   it("un error de las COMISIONES sí se propaga (no se disfraza de tabla vacía)", () => {

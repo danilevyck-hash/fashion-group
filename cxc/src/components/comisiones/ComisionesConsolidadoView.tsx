@@ -90,6 +90,8 @@ import { esTodoElAnio, etiquetaPeriodo } from "@/lib/comisiones/periodo";
 import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
+import { AVISO_DESCUENTOS_NO_LEIDOS } from "@/lib/comisiones/descuentos-aviso";
+import { Aviso } from "@/components/ui/Aviso";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { MenuDescargaComision } from "./comisiones-detalle/MenuDescargaComision";
 import { FLECHA_AL_LADO } from "@/lib/ui/revision-110-vivo";
@@ -218,6 +220,8 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   const [sinAsignar, setSinAsignar] = useState<Row | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** La lectura de descuentos falló: el total no es definitivo (ni PDF ni Excel). */
+  const [descuentosNoLeidos, setDescuentosNoLeidos] = useState(false);
   const [detalle, setDetalle] = useState<{ empresa: string; vendedor: string } | null>(null);
   const [verNoSePagan, setVerNoSePagan] = useState(false);
   // El motor de la flechita ↓: los MISMOS archivos que ya bajaban desde adentro
@@ -274,8 +278,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
         const body = await res.json().catch(() => ({}));
         throw new Error(String(body.error ?? `HTTP ${res.status}`));
       }
-      const { empresas } = (await res.json()) as { empresas?: ApiResp[] };
+      const { empresas, descuentos_no_leidos } = (await res.json()) as { empresas?: ApiResp[]; descuentos_no_leidos?: boolean };
       const resp = empresas ?? [];
+      setDescuentosNoLeidos(descuentos_no_leidos === true);
 
       // Pivot por nombre de vendedor.
       const byName = new Map<string, Row>();
@@ -372,7 +377,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
     anotarDescargaComision(formato, { alcance: "matriz-grupo", empresa: EMPRESAS.join(","), year, mes });
 
   const handleExport = () => {
-    if (empty || !rows) return;
+    if (empty || !rows || descuentosNoLeidos) return;
     anotar("excel");
     void exportComisionesConsolidado({
       year,
@@ -412,7 +417,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   // montar, nada que esperar, nada que desmontar — y el nombre lo ponemos
   // nosotros, el MISMO que ya usa el Excel de este período.
   const handlePdf = () => {
-    if (empty || !rows) return;
+    if (empty || !rows || descuentosNoLeidos) return;
     anotar("pdf");
     descargarPdfTablaComisiones(
       {
@@ -442,13 +447,13 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
   const printRef = useRef(handlePdf);
   printRef.current = handlePdf;
   useEffect(() => {
-    onExcel?.({ run: () => exportRef.current(), disabled: empty });
+    onExcel?.({ run: () => exportRef.current(), disabled: empty || descuentosNoLeidos });
     return () => onExcel?.(null);
-  }, [onExcel, empty]);
+  }, [onExcel, empty, descuentosNoLeidos]);
   useEffect(() => {
-    onPdf?.({ run: () => printRef.current(), disabled: empty });
+    onPdf?.({ run: () => printRef.current(), disabled: empty || descuentosNoLeidos });
     return () => onPdf?.(null);
-  }, [onPdf, empty]);
+  }, [onPdf, empty, descuentosNoLeidos]);
 
   // 🔴 CON «TODO EL AÑO» NO SE ABRE EL DETALLE. El reporte por vendedor es de UN
   // mes (`comision_b2b_detalle` recibe year + mes) y armar doce y pegarlos sería
@@ -593,6 +598,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, onPdf, refreshKe
 
   return (
     <div className="space-y-4">
+      {descuentosNoLeidos && !loading && !error && (
+        <Aviso tono="aviso">{AVISO_DESCUENTOS_NO_LEIDOS}</Aviso>
+      )}
       {loading ? (
         <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-3"><SkeletonTable rows={6} cols={6} /></div>

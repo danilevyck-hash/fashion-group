@@ -127,11 +127,16 @@ export async function GET(req: NextRequest) {
   // Empresa asociada del vendedor (fuente de verdad: DB, no la cookie).
   let companyKey: string | null = null;
   if (session.role === "vendedor" && session.userId) {
-    const { data: u } = await supabaseServer
+    const { data: u, error: uErr } = await supabaseServer
       .from("fg_users")
       .select("associated_company")
       .eq("id", session.userId)
       .maybeSingle();
+    // 🔴 Si no se pudo leer su empresa, NUNCA se le abren las 6: 500.
+    if (uErr) {
+      console.error("[cxc/aging] empresa del vendedor:", uErr.message);
+      return NextResponse.json({ error: "No se pudo leer la empresa del vendedor" }, { status: 500 });
+    }
     companyKey = u?.associated_company ?? null;
   }
 

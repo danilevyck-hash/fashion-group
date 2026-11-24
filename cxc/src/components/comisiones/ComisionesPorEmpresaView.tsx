@@ -54,6 +54,8 @@ import { anotarDescargaComision } from "@/lib/comisiones/rastro";
 import { tituloPapelEmpresa } from "@/lib/comisiones/tabla-papel";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
+import { AVISO_DESCUENTOS_NO_LEIDOS } from "@/lib/comisiones/descuentos-aviso";
+import { Aviso } from "@/components/ui/Aviso";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 import { ComisionesTarjetasPorEmpresa } from "./ComisionesTarjetas";
 import type { ClienteSinComision } from "@/lib/comisiones/exclusiones";
@@ -79,6 +81,8 @@ interface ComisionVendedor {
   clientes_sin_comision?: ClienteSinComision[];
 }
 interface ComisionResp {
+  /** La lectura de descuentos falló: el total no es definitivo. */
+  descuentos_no_leidos?: boolean;
   empresa_key: string;
   year: number;
   mes: number;
@@ -210,6 +214,7 @@ export function ComisionesPorEmpresaView({
   // salen de las filas con actividad (un descuento deja la fila en negativo,
   // así que nunca queda afuera): es lo informativo de «− $X en descuentos».
   const totalDescuentos = sumarPagable(conActividad, (v) => v.descuento ?? 0);
+  const descuentosNoLeidos = data?.descuentos_no_leidos === true;
   const sinDatos = loading || !!error || vendedores.length === 0;
   useEffect(() => {
     onResumen?.(
@@ -224,7 +229,7 @@ export function ComisionesPorEmpresaView({
     anotarDescargaComision(formato, { alcance: "matriz-empresa", empresa, year, mes });
 
   const handleExport = () => {
-    if (vendedores.length === 0) return;
+    if (vendedores.length === 0 || descuentosNoLeidos) return;
     anotar("excel");
     void exportComisionesResumen({
       empresaKey: empresa,
@@ -257,7 +262,7 @@ export function ComisionesPorEmpresaView({
   // arma el PDF y se baja, con el MISMO nombre que ya usa el Excel de esta
   // empresa y este período.
   const handlePdf = () => {
-    if (vendedores.length === 0) return;
+    if (vendedores.length === 0 || descuentosNoLeidos) return;
     anotar("pdf");
     descargarPdfTablaComisiones(
       {
@@ -291,16 +296,19 @@ export function ComisionesPorEmpresaView({
   const printRef = useRef(handlePdf);
   printRef.current = handlePdf;
   useEffect(() => {
-    onExcel?.({ run: () => exportRef.current(), disabled: vendedores.length === 0 });
+    onExcel?.({ run: () => exportRef.current(), disabled: vendedores.length === 0 || descuentosNoLeidos });
     return () => onExcel?.(null);
-  }, [onExcel, vendedores.length]);
+  }, [onExcel, vendedores.length, descuentosNoLeidos]);
   useEffect(() => {
-    onPdf?.({ run: () => printRef.current(), disabled: vendedores.length === 0 });
+    onPdf?.({ run: () => printRef.current(), disabled: vendedores.length === 0 || descuentosNoLeidos });
     return () => onPdf?.(null);
-  }, [onPdf, vendedores.length]);
+  }, [onPdf, vendedores.length, descuentosNoLeidos]);
 
   return (
     <div className="space-y-2">
+      {descuentosNoLeidos && !loading && !error && (
+        <Aviso tono="aviso">{AVISO_DESCUENTOS_NO_LEIDOS}</Aviso>
+      )}
       {loading ? (
         <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-3"><SkeletonTable rows={6} cols={5} /></div>
