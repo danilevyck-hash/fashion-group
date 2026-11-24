@@ -415,10 +415,18 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       pedidoSwitchId = primerIdNumerico(result.pedidoId);
       numeroInterno = String(result.numeroInterno);
     }
-    await p.db
+    // 🩸 supabase NO lanza: si esta marca no se guarda, Switch YA creó el
+    // documento y el sistema no lo sabe. No se deshace nada (el pedido existe);
+    // se avisa con el número para anotarlo a mano.
+    const { error: marcaErr } = await p.db
       .from(p.enviosTable)
       .update({ estado: "enviado", pedido_switch_id: pedidoSwitchId, numero_interno: numeroInterno, updated_at: new Date().toISOString() })
       .eq("id", envio.id);
+    if (marcaErr) {
+      await enviarSistema(
+        `⚠️ ${p.marcaLabel} ${p.orderNumber} (${queEs}): Switch lo creó con el N.° ${numeroInterno}, pero el sistema no pudo anotarlo (${shortError(marcaErr.message)}). Significa que la pantalla puede no mostrarlo como enviado. Qué hacer: NO reintentar el envío; revisar el pedido y anotar ese número.`,
+      ).catch(() => false);
+    }
   } catch (e) {
     if (e instanceof SwitchApiError) {
       // Rechazo claro del API: Switch no creó nada → liberar candado (estado error).

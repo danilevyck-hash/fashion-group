@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer, HAS_SERVICE_ROLE } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 
 export const dynamic = "force-dynamic";
 
@@ -33,13 +34,24 @@ export async function GET(req: NextRequest) {
   if (authError) return authError;
   if (!HAS_SERVICE_ROLE) return MISCONFIG;
 
-  const { data, error } = await supabaseServer
-    .from("depurador_descripciones")
-    .select(COLS)
-    .order("marca", { ascending: true })
-    .order("descripcion", { ascending: true });
+  // Paginado contra el COUNT: el tope silencioso de 1.000 filas dejaría marcas
+  // sin descripciones. Mismo orden de presentación, `id` de desempate.
+  let data: Array<{ id: string; marca: string; descripcion: string; activa: boolean }> | null = null;
+  try {
+    data = await leerTodoPaginado("depurador_descripciones", (pedirCount, desde, hasta) =>
+      supabaseServer
+        .from("depurador_descripciones")
+        .select(COLS, pedirCount ? { count: "exact" } : {})
+        .order("marca", { ascending: true })
+        .order("descripcion", { ascending: true })
+        .order("id", { ascending: true })
+        .range(desde, hasta),
+    );
+  } catch {
+    data = null;
+  }
 
-  if (error) {
+  if (!data) {
     return NextResponse.json({ error: "No se pudo cargar el catálogo de descripciones." }, { status: 500 });
   }
 

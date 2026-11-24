@@ -150,3 +150,33 @@ async function leerUnaVez<T>(
   }
   return filas;
 }
+
+/**
+ * 🩸 Nov-2026: un `.in("id", lista)` con ~640 UUID arma una URL que la base
+ * rechaza (Bad Request), y varias lecturas lo tomaban como «no hay nada».
+ * Tommy ya va en 516 productos. Tamaño de cada tanda.
+ */
+export const TANDA_IN = 200;
+
+/**
+ * Corre la MISMA consulta `.in()` en tandas de `TANDA_IN` y junta las filas.
+ * Devuelve la forma de supabase (`{ data, error }`) para que cada lector
+ * conserve su manejo de errores; ante el PRIMER error se corta y se devuelve
+ * ese error con `data: null` — nunca filas a medias.
+ * Ojo: cada tanda sigue sujeta al tope de 1.000 filas; úsalo cuando cada valor
+ * trae pocas filas (por id, o por pedido).
+ */
+export async function inEnTandas<T, E = { message: string }>(
+  valores: readonly string[],
+  consulta: (tanda: string[]) => PromiseLike<{ data: unknown | null; error: E | null }>,
+  tamano: number = TANDA_IN,
+): Promise<{ data: T[] | null; error: E | null }> {
+  const unicos = [...new Set(valores)];
+  const filas: T[] = [];
+  for (let i = 0; i < unicos.length; i += tamano) {
+    const { data, error } = await consulta(unicos.slice(i, i + tamano));
+    if (error) return { data: null, error };
+    filas.push(...((data ?? []) as T[]));
+  }
+  return { data: filas, error: null };
+}

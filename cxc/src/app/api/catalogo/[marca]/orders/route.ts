@@ -62,6 +62,7 @@ import {
   traeEleccionDeCliente,
 } from "@/lib/catalogo/cliente-switch";
 import { enviosActivosPorPedido } from "@/lib/catalogo/switch-lock";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   guardarVendedorSwitchEnPedido,
   leerVendedorDePedido,
@@ -104,20 +105,26 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   // Reebok: el bulto escrito en cada renglón (si la columna ya existe).
   const colsItem = colsConBulto("id, product_id, quantity, unit_price", await bultoEnRenglon(cfg));
   for (const extra of [extraOrigen, ""]) {
-    const res = await db
-      .from(cfg.ordersTable)
-      .select(`${colsBase}${extra}, ${cfg.itemsRelation}(${colsItem})`)
-      // 🩸 EL FILTRO DE VIDA. Sin él la lista trae los 67 pedidos borrados de
-      // las 4 marcas y los conteos dicen 110 donde hay 44 — el error que este
-      // repo ya cometió una vez con este mismo dato. No es por marca: es
-      // siempre, y va encadenado para que no se pueda "olvidar" con un if.
-      .eq("deleted", false)
-      .order("created_at", { ascending: false });
-    if (!res.error) {
-      data = (res.data || []) as unknown as Record<string, unknown>[];
+    // Paginado contra el COUNT (tope silencioso de 1.000 filas); mismo orden,
+    // con `id` de desempate. Un error (p. ej. columna ausente) baja al escalón siguiente.
+    try {
+      data = await leerTodoPaginado<Record<string, unknown>>(cfg.ordersTable, (pedirCount, desde, hasta) =>
+        db
+          .from(cfg.ordersTable)
+          .select(`${colsBase}${extra}, ${cfg.itemsRelation}(${colsItem})`, pedirCount ? { count: "exact" } : {})
+          // 🩸 EL FILTRO DE VIDA. Sin él la lista trae los 67 pedidos borrados de
+          // las 4 marcas y los conteos dicen 110 donde hay 44 — el error que este
+          // repo ya cometió una vez con este mismo dato. No es por marca: es
+          // siempre, y va encadenado para que no se pueda "olvidar" con un if.
+          .eq("deleted", false)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(desde, hasta),
+      );
       break;
+    } catch {
+      if (extra === "") return NextResponse.json({ error: "Error interno" }, { status: 500 });
     }
-    if (extra === "") return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 

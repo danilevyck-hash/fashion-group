@@ -14,6 +14,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { inEnTandas } from "@/lib/supabase-paginado";
 import {
   ESTADOS_EN_SWITCH,
   normalizarDocumento,
@@ -124,11 +125,10 @@ export async function enviosActivosPorPedido(
     "order_id, numero_interno, pedido_switch_id, documento",
     "order_id, numero_interno, pedido_switch_id",
   ]) {
-    const { data, error } = await db
-      .from(enviosTable)
-      .select(cols)
-      .in("order_id", orderIds)
-      .in("estado", ["enviado", "verificado"]);
+    // En tandas: con ~640 ids la base contesta Bad Request y TODOS caían a Borradores.
+    const { data, error } = await inEnTandas<unknown>(orderIds, (tanda) =>
+      db.from(enviosTable).select(cols).in("order_id", tanda).in("estado", ["enviado", "verificado"]),
+    );
     // Tabla ausente (DDL pendiente) u otro error → nadie queda en "Pedidos a
     // Switch". Fail-open hacia Borradores: es la lectura conservadora, y el
     // candado de edición usa la misma tolerancia.

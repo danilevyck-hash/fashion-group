@@ -60,6 +60,7 @@ import { logCronError } from "@/lib/cron-telemetry";
 import { esVisibleEnCatalogo } from "@/lib/catalogos/visibilidad";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
 import { enParalelo } from "./en-paralelo";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   filaIgual,
   todoSalteado,
@@ -644,10 +645,21 @@ export async function syncCatalogo(
       // `oculto_manual` (toggle admin, DDL 20260723120000) puede no existir aún:
       // fallback pre-migración — se relee sin la columna y se trata como false,
       // para que la migración manual pendiente NO tumbe el cron del catálogo.
-      const readExisting = (cols: string) => {
-        let q = db.from(productsTable).select(cols);
-        if (emp.categories.length > 0) q = q.in("category", emp.categories as string[]);
-        return q;
+      // 🩸 Paginado con orden estable: el tope silencioso de 1.000 filas dejaba
+      // productos fuera de `bySku` y el sync los trataba como NUEVOS. El error
+      // (que nombra la columna) vuelve en la forma `{ data, error }` de siempre
+      // para que la escalera de abajo no cambie.
+      const readExisting = async (cols: string): Promise<{ data: unknown[] | null; error: { message: string } | null }> => {
+        try {
+          const data = await leerTodoPaginado<unknown>(productsTable, (pedirCount, desde, hasta) => {
+            let q = db.from(productsTable).select(cols, pedirCount ? { count: "exact" } : {});
+            if (emp.categories.length > 0) q = q.in("category", emp.categories as string[]);
+            return q.order("id", { ascending: true }).range(desde, hasta);
+          });
+          return { data, error: null };
+        } catch (e) {
+          return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
+        }
       };
       const COLS_BASE = "id, sku, name, price, active, image_url, badge, keep_visible";
       // Columnas opcionales: oculto_manual + las extraCols del hook derive

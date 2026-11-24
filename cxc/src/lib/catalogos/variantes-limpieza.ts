@@ -17,6 +17,7 @@ import {
   storageDbDe,
 } from "./variantes-server";
 import { planHousekeeping, type ResumenHousekeeping } from "./variantes-housekeeping";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 
 const MARCAS: MarcaKey[] = ["reebok", "joybees", "tommy", "calvin"];
 
@@ -32,13 +33,21 @@ export async function limpiarVariantesRetiradas(): Promise<ResumenHousekeeping> 
 
       // TODAS las filas de la marca (activas e inactivas): un producto agotado
       // u oculto sigue vivo y sus fotos NO se tocan.
+      // 🩸 PAGINADO y contra el COUNT exacto: con el tope silencioso de 1.000
+      // filas, los SKU de más allá parecían retirados y se borraban sus fotos.
+      // Si la lista no cuadra con el conteo, `leerTodoPaginado` lanza y el
+      // catch de abajo cuenta el fallo SIN borrar nada de esa marca.
       const db = await cfg.products.writeDb();
-      const { data, error } = await db.from(cfg.productsTable).select("sku");
-      if (error) {
-        total.fallos++;
-        continue;
-      }
-      const skusVivos = (data ?? [])
+      const data = await leerTodoPaginado<{ sku: string | null }>(
+        `${cfg.productsTable} (limpieza de variantes)`,
+        (pedirCount, desde, hasta) =>
+          db
+            .from(cfg.productsTable)
+            .select("sku", pedirCount ? { count: "exact" } : {})
+            .order("id", { ascending: true })
+            .range(desde, hasta),
+      );
+      const skusVivos = data
         .map((r) => String((r as { sku: string | null }).sku ?? ""))
         .filter(Boolean);
 

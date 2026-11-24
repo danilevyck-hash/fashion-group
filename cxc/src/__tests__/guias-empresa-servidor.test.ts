@@ -103,7 +103,7 @@ describe("una sola fuente de empresas", () => {
     const { resolve } = await import("node:path");
     const src = readFileSync(resolve(process.cwd(), "src/app/api/guias/[id]/route.ts"), "utf8");
     const guard = src.indexOf("validarEmpresasItems(items, heredadas)");
-    const update = src.indexOf('.from("guia_transporte").update(updateData)');
+    const update = src.indexOf('.from("guia_transporte").update(escritura)');
     expect(guard).toBeGreaterThan(0);
     expect(update).toBeGreaterThan(0);
     expect(guard).toBeLessThan(update);

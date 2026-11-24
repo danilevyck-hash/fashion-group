@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { inEnTandas, leerTodoPaginado } from "@/lib/supabase-paginado";
 import { mapEmpresaName } from "@/lib/empresa-mapping";
 import { yaSalioEn } from "@/lib/guias/atajos-facturas";
 import { leerYaSalio } from "@/lib/guias/ya-salio-server";
@@ -184,12 +184,13 @@ async function guiasDeLosRenglones(ids: readonly string[]): Promise<Map<string, 
   const salida = new Map<string, number>();
   if (ids.length === 0) return salida;
 
-  const unicos = [...new Set(ids)];
-  const { data: renglones, error: rErr } = await supabaseServer
-    .from("guia_items")
-    .select("id, guia_id, deleted")
-    .in("id", unicos);
-  if (rErr || !renglones) return salida;
+  // En tandas y con el error a la vista: con ~640 ids la base contesta Bad
+  // Request y antes eso se leía como «ninguna guía».
+  const { data: renglones, error: rErr } = await inEnTandas<{ id: string; guia_id: string | null; deleted: boolean | null }>(
+    ids,
+    (tanda) => supabaseServer.from("guia_items").select("id, guia_id, deleted").in("id", tanda),
+  );
+  if (rErr || !renglones) throw new Error(`guia_items (etiquetas): ${rErr?.message ?? "sin datos"}`);
 
   const guiaIds = [
     ...new Set(
@@ -200,10 +201,10 @@ async function guiasDeLosRenglones(ids: readonly string[]): Promise<Map<string, 
   ];
   const porGuia = new Map<string, { numero: number | null; deleted: boolean | null }>();
   if (guiaIds.length > 0) {
-    const { data: guias } = await supabaseServer
-      .from("guia_transporte")
-      .select("id, numero, deleted")
-      .in("id", guiaIds);
+    const { data: guias, error: gErr } = await inEnTandas<unknown>(guiaIds, (tanda) =>
+      supabaseServer.from("guia_transporte").select("id, numero, deleted").in("id", tanda),
+    );
+    if (gErr) throw new Error(`guia_transporte (etiquetas): ${gErr.message}`);
     for (const g of (guias ?? []) as Array<{ id: string; numero: number | null; deleted: boolean | null }>) {
       porGuia.set(g.id, { numero: g.numero, deleted: g.deleted });
     }

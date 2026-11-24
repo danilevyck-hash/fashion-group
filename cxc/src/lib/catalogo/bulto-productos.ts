@@ -20,6 +20,8 @@
 // queda escrito en el total del pedido.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { inEnTandas } from "@/lib/supabase-paginado";
+
 /** Cliente Supabase mínimo — el tipo real varía por marca. */
 interface DbLike {
   from(table: string): {
@@ -53,7 +55,12 @@ export async function leerCategoriaYBulto(
   const ids = [...new Set(productIds.filter(Boolean))];
   if (ids.length === 0) return vacio;
 
-  const leer = (cols: string) => db.from(productsTable).select(cols).in("id", ids);
+  // En tandas: con ~640 ids la base contesta Bad Request y esto caía al default.
+  const leer = (cols: string) =>
+    inEnTandas<{ id: string; category: string | null; bulto_pzas?: number | null }, { message?: string }>(
+      ids,
+      (tanda) => db.from(productsTable).select(cols).in("id", tanda),
+    );
   let { data, error } = await leer("id, category, bulto_pzas");
   if (error?.message?.includes("bulto_pzas")) {
     ({ data, error } = await leer("id, category"));
@@ -93,7 +100,9 @@ export async function leerPreciosLista(
   const ids = [...new Set(productIds.filter(Boolean))];
   if (ids.length === 0) return new Map();
   try {
-    const { data, error } = await db.from(productsTable).select("id, price").in("id", ids);
+    const { data, error } = await inEnTandas<unknown, { message?: string }>(ids, (tanda) =>
+      db.from(productsTable).select("id, price").in("id", tanda),
+    );
     if (error || !data) return new Map();
     const filas = data as Array<{ id: string; price: number | string | null }>;
     const out = new Map<string, number>();
