@@ -36,11 +36,16 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   // Vendedor: forzar su empresa asociada (fuente de verdad: DB, no la cookie).
   let empresas: string[];
   if (auth.role === "vendedor" && auth.userId) {
-    const { data: u } = await supabaseServer
+    const { data: u, error: uErr } = await supabaseServer
       .from("fg_users")
       .select("associated_company")
       .eq("id", auth.userId)
       .maybeSingle();
+    // 🔴 Si no se pudo leer su empresa, NUNCA se le abren las 6: 500.
+    if (uErr) {
+      console.error("[cxc/estado-cuenta] empresa del vendedor:", uErr.message);
+      return NextResponse.json({ error: "No se pudo leer la empresa del vendedor" }, { status: 500 });
+    }
     const asociada = u?.associated_company ?? null;
     empresas = asociada ? [asociada] : [...CXC_GRUPO_EMPRESA_KEYS];
   } else if (isTodas) {

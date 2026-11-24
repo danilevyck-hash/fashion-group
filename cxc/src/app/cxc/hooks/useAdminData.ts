@@ -34,7 +34,16 @@ interface AdminData {
    * servidor y acotado a las 6 del grupo. `null` = no hay nada que decir.
    */
   avisoMontos: string | null;
+  /**
+   * `true` = la lectura del último pago FALLÓ. Sin esto, cada cliente diría
+   * «Sin pagos» cuando lo cierto es «no se pudo leer».
+   */
+  pagosNoLeidos: boolean;
 }
+
+/** Lo que dice la pantalla cuando no se pudo leer el último pago. */
+export const AVISO_PAGOS_NO_LEIDOS =
+  "No se pudo leer el último pago de los clientes: «Sin pagos» puede no ser cierto. Intenta de nuevo.";
 
 /**
  * Trae y consolida todo el estado de CXC. Es la misma lógica que tenía el
@@ -67,7 +76,8 @@ async function fetchAdminData(): Promise<AdminData> {
     await Promise.all([
       fetch("/api/cxc/aging", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
       fetch(`/api/cxc/overrides?cartera=${CARTERA_GRUPO}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
-      fetch("/api/cxc/ultimo-pago", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      // `null` = no se pudo leer (≠ `[]`, que es «nadie ha pagado»).
+      fetch("/api/cxc/ultimo-pago", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch("/api/cxc/ultima-compra", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
     ]);
 
@@ -204,6 +214,7 @@ async function fetchAdminData(): Promise<AdminData> {
     ts: refreshTs,
     ultimoPago,
     avisoMontos: (agingJson?.avisoMontos as string | null | undefined) ?? null,
+    pagosNoLeidos: !Array.isArray(pagos),
   };
 }
 
@@ -243,6 +254,7 @@ export default function useAdminData(authReady: boolean = true) {
     loadData,
     dataTs: data?.ts ?? null,
     avisoMontos: data?.avisoMontos ?? null,
+    pagosNoLeidos: data?.pagosNoLeidos ?? false,
     // Mostrando la caché en memoria (dato viejo) porque el refetch falló.
     fromCache: !!error && hasData,
   };

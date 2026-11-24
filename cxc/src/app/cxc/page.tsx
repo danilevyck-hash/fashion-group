@@ -35,7 +35,7 @@ import TabsCartera from "./components/TabsCartera";
 import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
 import MenuDescargar from "./components/MenuDescargar";
 import EnviarEmailModal from "./components/EnviarEmailModal";
-import useAdminData from "./hooks/useAdminData";
+import useAdminData, { AVISO_PAGOS_NO_LEIDOS } from "./hooks/useAdminData";
 import { useDescargasCartera } from "./hooks/useDescargasCartera";
 import { tabCxcPermitida, pestanasCxc } from "@/lib/cxc/boston-roles";
 import { veCxc } from "@/lib/cxc/roles";
@@ -160,8 +160,9 @@ function buildEmailBody(client: ConsolidatedClient) {
  * «Último pago 20 ago · $234,189.21» — o que nunca pagó. Sale del dato que la
  * pantalla YA tiene (el último pago por empresa): no pide nada a la red.
  */
-function textoUltimoPagoDe(client: ConsolidatedClient, hoy: string): string {
+function textoUltimoPagoDe(client: ConsolidatedClient, hoy: string, pagosNoLeidos = false): string {
   const pago = ultimoPagoDelCliente(client);
+  if (!pago && pagosNoLeidos) return "No se pudo leer el último pago";
   if (!pago) return "Sin pagos"; // 1-oct-2026, Daniel: nombres normales de ERP
   return `Último pago ${fechaCortaPago(pago.fecha, hoy)} · $${fmt(pago.monto)}`;
 }
@@ -202,7 +203,9 @@ function AdminDashboardInner() {
   }, [authChecked, userRole, router]);
   // `uploads` (la lista de cargas de archivo) se dejó de pedir: se desestructuraba
   // acá y no lo leía ninguna línea de la pantalla. Ver `useAdminData`.
-  const { clients, loading, loadError, loadData, avisoMontos, ultimoPago } = useAdminData(authChecked && !esCarteraBoston);
+  const { clients, loading, loadError, loadData, avisoMontos: avisoRechazos, ultimoPago, pagosNoLeidos } = useAdminData(authChecked && !esCarteraBoston);
+  // El aviso de montos rechazados y el de «no se pudo leer el último pago» van en la MISMA línea ámbar.
+  const avisoMontos = [avisoRechazos, pagosNoLeidos ? AVISO_PAGOS_NO_LEIDOS : null].filter(Boolean).join(" ") || null;
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
   // Pestaña activa. Las dos carteras NUNCA se ven juntas: son dos consultas a
@@ -1009,7 +1012,7 @@ function AdminDashboardInner() {
         onEscribirloYo={openEmail}
         marcaEnvio={cobrarClient ? marcaEnvioDe(cobrarClient) : null}
         totalDeLaFila={cobrarDesdeCelular && cobrarClient ? cobrarClient.total : null}
-        ultimoPagoTexto={cobrarDesdeCelular && cobrarClient && !CXC_DESGLOSE_CELULAR_2026_11 ? textoUltimoPagoDe(cobrarClient, hoy) : null}
+        ultimoPagoTexto={cobrarDesdeCelular && cobrarClient && !CXC_DESGLOSE_CELULAR_2026_11 ? textoUltimoPagoDe(cobrarClient, hoy, pagosNoLeidos) : null}
         desglose={
           cobrarDesdeCelular && cobrarClient && CXC_DESGLOSE_CELULAR_2026_11
             ? empresasDelCliente(cobrarClient, nombrePorKeyCelular, {})

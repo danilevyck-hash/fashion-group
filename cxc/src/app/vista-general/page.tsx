@@ -69,9 +69,10 @@ interface VistaGeneral {
   /** `null` = la lectura se cayó. NUNCA se pinta como $0. */
   inventario: InventarioData | null;
   semaforo: RentabilidadEmpresaRow[];
-  cxc: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topClientes: { nombre: string; codigo: string | null; empresa: string; empresaKey?: string; saldo: number }[] };
-  cxp: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topProveedores: { nombre: string; empresa: string; empresaKey?: string; saldo: number }[] };
-  reclamos: { antiguos: { id: string; nro: string; empresa: string; estado: string; dias: number }[]; total: number };
+  /** `null` = la lectura se cayó: «No se pudo medir», nunca $0. */
+  cxc: null | { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topClientes: { nombre: string; codigo: string | null; empresa: string; empresaKey?: string; saldo: number }[] };
+  cxp: null | { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topProveedores: { nombre: string; empresa: string; empresaKey?: string; saldo: number }[] };
+  reclamos: null | { antiguos: { id: string; nro: string; empresa: string; estado: string; dias: number }[]; total: number };
 }
 
 // ── Helpers de meses (locales a esta página) ─────────────────────────────────
@@ -319,11 +320,15 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       <KpiCard
         href="/cxc"
         label="Cuentas por cobrar"
-        value={moneyK(cxc.total)}
+        value={cxc ? moneyK(cxc.total) : "—"}
         sub={
+          !cxc ? (
+            <span className="text-gray-400">No se pudo medir</span>
+          ) : (
           <span className={cxc.vencido > 0 ? "text-red-600 font-medium" : "text-gray-400"}>
             {moneyK(cxc.vencido)} con más de 90 días
           </span>
+          )
         }
       />
 
@@ -331,9 +336,11 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
       <KpiCard
         href="/proveedores"
         label="Cuentas por pagar"
-        value={moneyK(cxp.total)}
+        value={cxp ? moneyK(cxp.total) : "—"}
         sub={
-          VG_CXP_SIN_VENCIDO ? (
+          !cxp ? (
+            <span className="text-gray-400">No se pudo medir</span>
+          ) : VG_CXP_SIN_VENCIDO ? (
             // n.º 22: la edad, no la mora — nunca «vencido» (regla de Proveedores).
             <span className={cxp.vencido > 0 ? "text-gray-700 font-medium" : "text-gray-400"}>
               {moneyK(cxp.vencido)} con más de 90 días
@@ -410,8 +417,10 @@ function Atencion({ data }: { data: VistaGeneral }) {
           escritorio no cambia. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {/* CXC +90d */}
-        <AlertCard title="Clientes +90 días" href="/cxc" linkLabel="Ir a Cuentas por cobrar" count={data.cxc.topClientes.length}>
-          {data.cxc.topClientes.length === 0 ? (
+        <AlertCard title="Clientes +90 días" href="/cxc" linkLabel="Ir a Cuentas por cobrar" count={data.cxc?.topClientes.length ?? 0}>
+          {!data.cxc ? (
+            <Empty>No se pudo medir</Empty>
+          ) : data.cxc.topClientes.length === 0 ? (
             <Empty>Sin saldos a +90 días</Empty>
           ) : (
             data.cxc.topClientes.map((c) => (
@@ -424,8 +433,10 @@ function Atencion({ data }: { data: VistaGeneral }) {
         </AlertCard>
 
         {/* Proveedores vencidos +90d */}
-        <AlertCard title="Proveedores +90 días" href="/proveedores" linkLabel="Ir a Proveedores" count={data.cxp.topProveedores.length}>
-          {data.cxp.topProveedores.length === 0 ? (
+        <AlertCard title="Proveedores +90 días" href="/proveedores" linkLabel="Ir a Proveedores" count={data.cxp?.topProveedores.length ?? 0}>
+          {!data.cxp ? (
+            <Empty>No se pudo medir</Empty>
+          ) : data.cxp.topProveedores.length === 0 ? (
             <Empty>Sin saldos a +90 días</Empty>
           ) : (
             data.cxp.topProveedores.map((p) => (
@@ -438,8 +449,10 @@ function Atencion({ data }: { data: VistaGeneral }) {
         </AlertCard>
 
         {/* Reclamos antiguos sin pagar */}
-        <AlertCard title={`Reclamos sin cobrar (+${DIAS_RECLAMO_VIEJO} días)`} href="/reclamos" linkLabel="Ir a Reclamos" count={data.reclamos.antiguos.length}>
-          {data.reclamos.antiguos.length === 0 ? (
+        <AlertCard title={`Reclamos sin cobrar (+${DIAS_RECLAMO_VIEJO} días)`} href="/reclamos" linkLabel="Ir a Reclamos" count={data.reclamos?.antiguos.length ?? 0}>
+          {!data.reclamos ? (
+            <Empty>No se pudo medir</Empty>
+          ) : data.reclamos.antiguos.length === 0 ? (
             <Empty>Sin reclamos antiguos pendientes.</Empty>
           ) : (
             data.reclamos.antiguos.map((r) => (

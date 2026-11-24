@@ -49,9 +49,21 @@ const claveSku = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 async function fotosDe(empresa: string): Promise<Map<string, string>> {
   const tabla = CATALOGO[empresa];
   if (!tabla) return new Map();
-  const { data, error } = await supabaseServer.from(tabla).select("sku, image_url").not("image_url", "is", null).limit(1000);
-  if (error) return new Map(); // la foto es una ayuda: sin ella, la lista igual
-  return new Map(((data ?? []) as { sku: string; image_url: string }[]).map(r => [claveSku(r.sku), r.image_url]));
+  // 🩸 Paginado: `db-max-rows` = 1000 corta en silencio y las fotos de más allá se perdían.
+  let data: { sku: string; image_url: string }[];
+  try {
+    data = await leerTodoPaginado<{ sku: string; image_url: string }>(`${tabla} (fotos de Productos)`, (pedirCount, desde, hasta) =>
+      supabaseServer.from(tabla)
+        .select("sku, image_url", pedirCount ? { count: "exact" } : {})
+        .not("image_url", "is", null)
+        .order("sku", { ascending: true })
+        .order("id", { ascending: true })
+        .range(desde, hasta),
+    );
+  } catch {
+    return new Map(); // la foto es una ayuda: sin ella, la lista igual
+  }
+  return new Map(data.map(r => [claveSku(r.sku), r.image_url]));
 }
 
 export async function leerArticulos(empresa: string, desde: string, hasta: string, hoy: string): Promise<ArticuloVendido[]> {

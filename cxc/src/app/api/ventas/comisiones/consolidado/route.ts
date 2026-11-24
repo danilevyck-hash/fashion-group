@@ -129,7 +129,8 @@ export async function GET(req: NextRequest) {
       }),
     ).catch((e: unknown) => e instanceof Error ? e : new Error(String(e))),
     Promise.all(
-      meses.map((m) => leerDescuentosEfectivos(EMPRESAS_COMISIONAN, year, m).catch(() => [])),
+      // `null` = no se pudo leer: la tabla sale igual, pero la respuesta lo DICE.
+      meses.map((m) => leerDescuentosEfectivos(EMPRESAS_COMISIONAN, year, m).catch(() => null)),
     ),
     leerExclusionesActivasOVacio(EMPRESAS_COMISIONAN),
   ]);
@@ -155,7 +156,7 @@ export async function GET(req: NextRequest) {
         marcarSePaga(
           acumularVendedores(
             porMes.map((vendedores, i) =>
-              netearComisiones(vendedores, totalPorVendedor(descuentosPorMes[i], empresa)),
+              netearComisiones(vendedores, totalPorVendedor(descuentosPorMes[i] ?? [], empresa)),
             ),
           ),
         ),
@@ -164,5 +165,6 @@ export async function GET(req: NextRequest) {
       ),
     })),
     ...(esTodoElAnio(mes) ? { meses } : {}),
+    ...(descuentosPorMes.some((d) => d === null) ? { descuentos_no_leidos: true } : {}),
   });
 }

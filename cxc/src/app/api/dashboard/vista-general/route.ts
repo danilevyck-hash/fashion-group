@@ -482,7 +482,9 @@ export async function GET(req: NextRequest) {
     if (venc > 0) clientesVencidos.push({ nombre: r.nombre || "—", codigo: r.codigo, empresa: EMPRESA_KEY_TO_NAME[r.company_key] ?? r.company_key, empresaKey: r.company_key, saldo: venc });
   }
   clientesVencidos.sort((a, b) => b.saldo - a.saldo);
-  const cxc = {
+  // `null` = la lectura se cayó: la pantalla dice «No se pudo medir», nunca $0.
+  if (agingRes.error) console.error("[vista-general] cxc:", agingRes.error.message);
+  const cxc = agingRes.error ? null : {
     total: cxcTotal, corriente: cxcCorriente, vigilancia: cxcVigilancia, vencido: cxcVencido,
     empresasCount: cxcEmpresas.size,
     topClientes: clientesVencidos.slice(0, 6),
@@ -509,7 +511,8 @@ export async function GET(req: NextRequest) {
     if (vencRow > 0) proveedoresVencidos.push({ nombre: r.nombre || "—", empresa: EMPRESA_KEY_TO_NAME[r.empresa_key] ?? r.empresa_key, empresaKey: r.empresa_key, saldo: vencRow });
   }
   proveedoresVencidos.sort((a, b) => b.saldo - a.saldo);
-  const cxp = {
+  if (cxpRes.error) console.error("[vista-general] cxp:", cxpRes.error.message);
+  const cxp = cxpRes.error ? null : {
     total: cxpTotal, corriente: cxpCorriente, vigilancia: cxpVigilancia, vencido: cxpVencido,
     empresasCount: cxpEmpresas.size,
     topProveedores: proveedoresVencidos.slice(0, 6),
@@ -532,7 +535,8 @@ export async function GET(req: NextRequest) {
     .filter((r) => r.dias >= DIAS_RECLAMO_VIEJO)
     .sort((a, b) => (DIAS_COMO_RECLAMOS ? b.dias - a.dias : 0))
     .slice(0, 8);
-  const reclamos = { antiguos: reclamosAntiguos, total: reclamoRows.length };
+  if (reclamosRes.error) console.error("[vista-general] reclamos:", reclamosRes.error.message);
+  const reclamos = reclamosRes.error ? null : { antiguos: reclamosAntiguos, total: reclamoRows.length };
 
   // `null` = la lectura del inventario se cayó. La pantalla lo dice; no hay
   // ningún camino que lo pinte como cero.

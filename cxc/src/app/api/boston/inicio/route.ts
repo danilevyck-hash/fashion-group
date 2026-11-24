@@ -54,7 +54,9 @@ export async function GET(req: NextRequest) {
   const mesNum = Number(hoy.slice(5, 7));
 
   // ── Cartera: la vista de Boston, paginada (PostgREST corta en 1.000) ───────
+  // 🔴 Cada lectura que se cae va como `null`: la tarjeta dice «No se pudo medir», nunca 0.
   let cartera = { total: 0, d0_90: 0, d91_120: 0, d121_plus: 0, clientes: 0 };
+  let carteraLeida = true;
   try {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabaseServer
@@ -75,7 +77,8 @@ export async function GET(req: NextRequest) {
     }
   } catch (e) {
     console.error(`[boston/inicio] cartera: ${e instanceof Error ? e.message : String(e)}`);
-    // No-crítico: la tarjeta se dibuja en cero y las otras tres siguen.
+    // No-crítico: las otras tres siguen; esta dice que no se pudo medir.
+    carteraLeida = false;
   }
   const round2 = (n: number) => Math.round(n * 100) / 100;
   cartera = {
@@ -89,13 +92,17 @@ export async function GET(req: NextRequest) {
   // ── Ventas: mes en curso y año en curso, del MISMO rollup que la pestaña ───
   let ventasMes = 0;
   let ventasAnio = 0;
+  let ventasLeidas = true;
   {
     const { data, error } = await supabaseServer
       .from("ventas_rollup_mensual_mv")
       .select("mes_num, ventas_netas")
       .eq("empresa_key", EMPRESA_BOSTON)
       .eq("anio", anio);
-    if (error) console.error(`[boston/inicio] ventas: ${error.message}`);
+    if (error) {
+      console.error(`[boston/inicio] ventas: ${error.message}`);
+      ventasLeidas = false;
+    }
     for (const r of data ?? []) {
       const v = Number(r.ventas_netas ?? 0);
       ventasAnio += v;
@@ -107,7 +114,7 @@ export async function GET(req: NextRequest) {
   // 🔴 Solo el CONTEO. Ni un salario, con o sin la línea de `VE_SUELDOS_DE_BOSTON`:
   // el Inicio no es la pantalla donde se decide eso, y un total de planilla en
   // la portada sería el sueldo promedio a una división de distancia.
-  let personas = 0;
+  let personas: number | null = 0;
   {
     const { count, error } = await supabaseServer
       .from("asistencia_personas")
@@ -115,7 +122,7 @@ export async function GET(req: NextRequest) {
       .eq("empresa", EMPRESA_BOSTON)
       .eq("activo", true);
     if (error) console.error(`[boston/inicio] planilla: ${error.message}`);
-    personas = count ?? 0;
+    personas = error ? null : count ?? 0;
   }
 
   // ── Préstamos DE BOSTON (ver la nota del encabezado) ──────────────────────
@@ -124,7 +131,7 @@ export async function GET(req: NextRequest) {
   // `activo = true`, y esa bandera nunca significó «trabaja acá» ni «debe algo»:
   // significaba «tiene algo abierto», y se la ponían y quitaban a mano. La
   // tarjeta de David decía un número que no era ninguna de las dos cosas.
-  let prestamos = { personas: 0 };
+  let prestamos: { personas: number } | null = { personas: 0 };
   {
     const { data, error } = await supabaseServer
       .from("prestamos_empleados")
@@ -140,16 +147,16 @@ export async function GET(req: NextRequest) {
         (e as unknown as { prestamos_movimientos: MovimientoParaSaldo[] | null }).prestamos_movimientos,
       ).saldo > 0,
     );
-    prestamos = { personas: conSaldo.length };
+    prestamos = error ? null : { personas: conSaldo.length };
   }
 
   return NextResponse.json({
     empresa: EMPRESA_BOSTON,
     anio,
     mes: mesNum,
-    cartera,
-    ventas: { mes: round2(ventasMes), anio: round2(ventasAnio) },
-    planilla: { personas },
+    cartera: carteraLeida ? cartera : null,
+    ventas: ventasLeidas ? { mes: round2(ventasMes), anio: round2(ventasAnio) } : null,
+    planilla: personas === null ? null : { personas },
     prestamos,
   });
 }
