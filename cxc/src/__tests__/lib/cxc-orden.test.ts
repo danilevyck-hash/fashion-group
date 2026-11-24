@@ -68,12 +68,14 @@ describe("orden derivado del tramo tocado", () => {
     expect(enWatch.every((c) => c.watch > 0)).toBe(true);
   });
 
-  it('"Por vencer" es el que tiene TODA la deuda dentro del plazo, no el que tiene algo ahí', () => {
-    // ANA tiene 10.000 en 0-90d pero también 500 en 121d+ → no es "por vencer".
-    expect(pasaFiltroRiesgo(ANA, "current")).toBe(false);
-    expect(pasaFiltroRiesgo(DIEGO, "current")).toBe(true);
-    // Saldo a favor (total negativo) no es "por vencer".
-    expect(pasaFiltroRiesgo({ ...cliente("CREDITO", 0, 0, 0), total: -500 }, "current")).toBe(false);
+  it('"0-90 días" muestra a todo el que tiene algo en 0-90, igual que los otros tramos', () => {
+    // ANA tiene 10.000 en 0-90d y también 500 en 121d+ → sí entra (24-nov-2026).
+    const enCurrent = CARTERA.filter((c) => pasaFiltroRiesgo(c, "current"));
+    expect(enCurrent.map((c) => c.nombre_normalized)).toEqual(["ANA", "CARLA", "DIEGO"]);
+    // BETO no tiene nada en 0-90 → no entra.
+    expect(pasaFiltroRiesgo(BETO, "current")).toBe(false);
+    // Saldo a favor en 0-90 no entra.
+    expect(pasaFiltroRiesgo(cliente("CREDITO", -500, 0, 0), "current")).toBe(false);
   });
 
   it('"Total pendiente" no filtra a nadie', () => {
