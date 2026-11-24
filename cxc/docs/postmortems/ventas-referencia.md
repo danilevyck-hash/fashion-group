@@ -1662,3 +1662,35 @@ Candado: `src/__tests__/lib/comision-factura-vendedor-v10.test.ts` (interruptor 
 ## 16-nov-2026 — Consulta de artículos: una palabra ya no se toma por código
 
 🩸 Buscar «polo» contestaba «No se encontró el código POLO» (2.143 artículos lo llevan en la descripción): toda palabra de 3+ letras pasaba por código y el salto a descripción nunca corría. Ahora, si ningún código trae nada, busca por descripción (sin coincidencias, el «no encontré» de siempre); si pasa el tope (20.000 renglones de venta o 100 modelos) dice cuántos hay y pide afinar, sin recortar en silencio, y la pantalla muestra ese texto en vez de «HTTP 400» (`fetch-retry.ts`). Candado: `src/__tests__/api/ventas-referencia-busqueda.test.ts` › «16-nov-2026».
+
+## 🔴 Comisiones: la tasa por empresa y con fecha (24-nov-2026)
+
+Daniel bajó la comisión de Reynaldo Espinosa de 1 % venta / 1 % cobro a 0,5 % / 0,5 %, **solo en Active Shoes y Active Wear y desde el 1-nov-2026**. En Fashion Wear, Fashion Shoes, Vistana y Joystep sigue al 1 %, y hasta octubre de 2026 va 1 % en todas.
+
+🩸 `comision_vendedor_tasa` guarda UNA tasa por vendedor, global y sin fecha, y no hay cierre de comisiones: un UPDATE habría recalculado todos los meses de todas las empresas (octubre de Active Shoes habría pasado de $1.271,84 a la mitad).
+
+Migración `20270122120000_comision_tasa_vigencia.sql`, aditiva (sin DROP, DELETE ni UPDATE):
+
+- `comision_vendedor_tasa` **no se toca**: es la tasa general, la que muestra y guarda Comisiones › Configuración › «Tasas por vendedor». La pantalla no cambió.
+- `comision_vendedor_tasa_excepcion` (vendedor canónico, `empresa_key`, `vigente_desde`, tasas): «en esta empresa, desde este mes, esta persona cobra esto». `vigente_desde` es siempre día 1 (CHECK), porque la comisión se calcula y se redondea por mes. Solo SELECT e INSERT: para cambiarla se agrega otra fila con su fecha. Un cambio con fecha para todas las empresas = una fila por empresa.
+- `comision_tasa_vigente(vendedor, empresa, fecha)`: la excepción más reciente de esa empresa con `vigente_desde <= fecha`; sin ninguna, la tasa general; sin fila, las RPC caen al 0,5 % de siempre.
+- `comision_b2b_v10` y `comision_b2b_detalle` se redefinieron con CREATE OR REPLACE, byte a byte iguales a las de `20261111130000` salvo de dónde sale la tasa y la marca `tasa_por_empresa_y_fecha`. La empresa es la del cálculo: la de la factura para la venta y la del recibo para el cobro.
+- «Buscar cliente» usa la misma regla en TS (`tasaEnFecha` en `lib/comisiones/buscar-cliente.ts`) y, si la tasa cambia dentro del rango buscado, redondea cada tramo con la suya (con una sola tasa, la cuenta de siempre).
+- Dato: 2 filas (REYNALDO ESPINOSA · active_shoes y active_wear · 2026-11-01 · 0,0050 / 0,0050).
+
+Cuadre medido contra producción el 24-nov-2026, antes de aplicar, en una transacción con ROLLBACK (6 empresas × nov-2025, ene, jun, jul, ago, sep, oct y nov-2026; la respuesta de la v10 comparada vendedor por vendedor):
+
+| | Antes | Después |
+|---|---|---|
+| Reynaldo · Active Shoes · oct-2026 | $1.271,84 | $1.271,84 |
+| Reynaldo · Active Wear · oct-2026 | $221,84 | $221,84 |
+| Total oct-2026, todos | $12.230,79 | $12.230,79 |
+| Reynaldo · Active Shoes · nov-2026 (al 24) | $1.099,52 | $549,76 |
+| Reynaldo · Fashion Wear · nov-2026 | $6.406,70 | $6.406,70 |
+| Reynaldo · Fashion Shoes · nov-2026 | $3.834,88 | $3.834,88 |
+
+Todo mes anterior a noviembre, idéntico; en noviembre solo cambian las filas de Reynaldo en Active Shoes y Active Wear.
+
+⚠️ Lo que sigue igual que antes: guardar una tasa GENERAL desde la pantalla recalcula hacia atrás (para un cambio con fecha se usa una excepción), y las v9…v5 de la red de `rpc.ts` no miran las excepciones.
+
+Candado: `src/__tests__/lib/comision-tasa-vigencia.test.ts` (la última definición de la v10 y del detalle pasa empresa y fecha · la migración no toca la tasa general ni borra · las dos filas de Reynaldo · `tasaEnFecha`).
