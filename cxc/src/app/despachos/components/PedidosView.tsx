@@ -39,6 +39,8 @@ import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import PedidoBultos, { type PedidoDelDetalle } from "./PedidoBultos";
 import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
+import { veTarjetasDePedidos, tarjetasDePedidos, lineaMasViejo } from "@/lib/ui/pedidos-tarjetas-2026-11";
+import { useSemillaSesion } from "@/lib/sesion-semilla-provider";
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
 import {
   PEDIDOS_BULTOS_2026_10 as BULTOS,
@@ -154,6 +156,10 @@ export default function PedidosView({
   onDetalle?: (abierto: boolean) => void;
 }) {
   const barra = useHayBarraCelular();
+  // Las 4 tarjetas (24-nov-2026): solo Daniel y Rey, por el nombre de la sesión
+  // FIRMADA que el servidor bajó en la semilla (no por nada del navegador).
+  const semilla = useSemillaSesion();
+  const conTarjetas = SIMPLE && veTarjetasDePedidos(semilla?.userName);
   // El pedido abierto en el detalle con bultos; `null` = la lista.
   const [abierto, setAbierto] = useState<PedidoDelDetalle | null>(null);
   // El gesto de volver cierra el pedido y deja en la lista (`useAtrasCierra`).
@@ -482,7 +488,7 @@ export default function PedidosView({
   // recortar un rótulo hasta dejarlo sin sentido.
   const chips = (
     <div className="-mx-4 flex min-w-0 items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0">
-      <div role="group" aria-label="Estado" className="flex shrink-0 gap-1.5">
+      {!conTarjetas && <div role="group" aria-label="Estado" className="flex shrink-0 gap-1.5">
         {CHIPS.map((c) => (
           <button
             key={c.value}
@@ -501,7 +507,7 @@ export default function PedidosView({
             {c.label}
           </button>
         ))}
-      </div>
+      </div>}
       {/* Con `PEDIDOS_CELULAR_2026_11` la empresa del celular va en su propia fila. */}
       {NUEVO && hayQueElegirEmpresa && !(barra && PEDIDOS_CELULAR) && <ChipSelector rotulo="Empresa" soloValor={PEDIDOS_EMPRESA_SIN_PREFIJO} valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
       {POR_EMPRESA && !barra && (
@@ -548,6 +554,29 @@ export default function PedidosView({
     </div>
   );
   const pedidosCelular = barra && PEDIDOS_CELULAR;
+  // 24-nov-2026: celular 2×2, computadora una fila de 4; la elegida, negra.
+  const tarjetas = conTarjetas && pedidos ? (
+    <div role="group" aria-label="Estado" data-tarjetas-pedidos className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {tarjetasDePedidos(deLaEmpresa, hoy, new Date().toISOString()).map((t) => {
+        const activa = filtro === t.estado;
+        return (
+          <button
+            key={t.estado}
+            type="button"
+            aria-pressed={activa}
+            onClick={() => { setFiltro(t.estado); void cargar(); }}
+            className={`rounded-xl border px-3 py-2 text-left transition active:scale-[0.97] ${activa ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 bg-white text-gray-900 hover:border-gray-300"}`}
+          >
+            <span className={`block text-[13px] ${activa ? "text-gray-300" : "text-gray-500"}`}>{t.rotulo}</span>
+            <span className="block text-2xl font-bold leading-tight tabular-nums">{t.cantidad}</span>
+            <span className={`block min-h-[16px] text-xs ${t.enRojo ? `font-semibold ${activa ? "text-red-300" : "text-red-700"}` : activa ? "text-gray-300" : "text-gray-500"}`}>
+              {lineaMasViejo(t.masViejoDias)}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  ) : null;
   const vacioDelCentro = `Sin pedidos ${CHIPS.find((c) => c.value === filtro)?.label.toLowerCase() ?? ""}`.trim();
   const lineaDeArriba = SIMPLE && PEDIDOS_LINEA_DE_LA_PESTANA
     ? lineaDeLaPestana(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple], hoy)
@@ -1305,7 +1334,7 @@ export default function PedidosView({
       {barra && (
         <EnLaBarra
           pestana="pedidos"
-          filaIzq={pedidosCelular && ESTADOS_CELULAR === "una-linea" ? segmentadoCelular : pedidosCelular && dosPorDos ? null : chips}
+          filaIzq={pedidosCelular && (conTarjetas || dosPorDos) ? null : pedidosCelular && ESTADOS_CELULAR === "una-linea" ? segmentadoCelular : chips}
           // n.º 60: el «···» tenía UNA opción; la impresora (ícono de línea) va directo al título.
           iconos={POR_EMPRESA && PEDIDOS_IMPRESORA_EN_EL_TITULO && !sinNadaQueImprimir ? (
             <IconoBarra etiqueta="Imprimir" onClick={() => void imprimir()}>
@@ -1321,7 +1350,8 @@ export default function PedidosView({
       )}
 
       {/* Dos por dos no cabe en el renglón de 44 px de la barra: va arriba de la página. */}
-      {pedidosCelular && dosPorDos && <div className="mb-2 flex">{segmentadoCelular}</div>}
+      {tarjetas}
+      {pedidosCelular && dosPorDos && !conTarjetas && <div className="mb-2 flex">{segmentadoCelular}</div>}
       {filaEmpresaCelular}
       <div className={pedidosCelular ? "mb-2" : "mb-3 flex flex-wrap items-center justify-between gap-3"}>
         {/* AJUSTES_APPLE_6 (punto 2): el título en una línea y la frescura al lado si cabe; si no, debajo, chica.
