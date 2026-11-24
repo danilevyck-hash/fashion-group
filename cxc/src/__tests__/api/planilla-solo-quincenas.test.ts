@@ -71,7 +71,7 @@ vi.mock("@/lib/asistencia/planilla-guardada-server", () => ({
 
 vi.mock("@/lib/asistencia/cierre-prestamo-server", () => ({
   planearCierre: async () => { llamadas.prestamos += 1; return []; },
-  escribirPagosDelCierre: async () => ({ escritos: 0, total: 0 }),
+  escribirPagosDelCierre: async () => ({ escritos: 0, total: 0, fallidos: [] }),
   revertirPagosDelCierre: async () => ({ revertidos: 0 }),
 }));
 

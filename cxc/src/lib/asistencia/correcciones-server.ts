@@ -120,7 +120,7 @@ export async function leerCorrecciones(
  */
 function errorDeLectura(e: unknown): { code?: string; message: string } {
   const crudo = e instanceof Error ? e.message : String(e);
-  return { message: crudo.replace(`${TABLA_CORRECCIONES} (rango): `, "") };
+  return { message: crudo.replace(new RegExp(`^${TABLA_CORRECCIONES} \\((rango|motivos)\\): `), "") };
 }
 
 /** Todas las correcciones de una persona en un día, ANULADAS INCLUIDAS. Es el
@@ -168,17 +168,23 @@ export async function leerHistorialDelDia(
  */
 export async function leerMotivosFrecuentes(hoy = hoyPanama()): Promise<string[]> {
   try {
-    const { data, error } = await supabaseServer
-      .from(TABLA_CORRECCIONES)
-      .select("motivo, creada_en")
-      .gte("creada_en", `${desdeDeLaVentana(hoy)}T00:00:00-05:00`)
-      .order("creada_en", { ascending: false })
-      .limit(1000);
-    if (error) {
-      if (esTablaFaltante(error, TABLA_CORRECCIONES)) return [];
-      throw new Error(error.message);
+    // Paginado (24-nov-2026): con `.limit(1000)` la ventana de 90 días se
+    // cortaba en silencio al pasar las 1.000 correcciones.
+    let filas: Array<{ motivo: string; creada_en: string }>;
+    try {
+      filas = await leerTodoPaginado(`${TABLA_CORRECCIONES} (motivos)`, (pedirCount, from, to) =>
+        supabaseServer
+          .from(TABLA_CORRECCIONES)
+          .select("motivo, creada_en", pedirCount ? { count: "exact" } : {})
+          .gte("creada_en", `${desdeDeLaVentana(hoy)}T00:00:00-05:00`)
+          .order("creada_en", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to),
+      );
+    } catch (e) {
+      if (esTablaFaltante(errorDeLectura(e), TABLA_CORRECCIONES)) return [];
+      throw e;
     }
-    const filas = (data ?? []) as Array<{ motivo: string; creada_en: string }>;
     return motivosFrecuentes(
       filas.map((f) => ({ motivo: String(f.motivo ?? ""), creadaEn: String(f.creada_en ?? "") })),
       hoy,

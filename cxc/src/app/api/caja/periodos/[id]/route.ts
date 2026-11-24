@@ -118,11 +118,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!periodo || periodo.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 404 });
   if (periodo.estado === "cerrado") return NextResponse.json({ error: "Este período ya está cerrado." }, { status: 400 });
 
-  const { data: gastos } = await supabaseServer
+  const { data: gastos, error: errorGastos } = await supabaseServer
     .from("caja_gastos")
     .select("total")
     .eq("periodo_id", params.id)
     .eq("deleted", false);
+  // 🩸 24-nov-2026: si la lectura fallaba, el período se cerraba con el saldo
+  // del fondo entero (sin un solo gasto). Sin los gastos NO se cierra.
+  if (errorGastos) {
+    console.error("[caja/periodos PATCH] gastos:", errorGastos.message);
+    return NextResponse.json(
+      { error: "No se pudieron leer los gastos del período. No se cerró; intenta de nuevo." },
+      { status: 500 },
+    );
+  }
   const fondo = Number(periodo.fondo_inicial) || 0;
   // 🩸 El saldo se redondea a centavos ANTES de guardarse y de compararse: la
   // suma en coma flotante daba 200.00000000000003 y el período Nº2 se veía en

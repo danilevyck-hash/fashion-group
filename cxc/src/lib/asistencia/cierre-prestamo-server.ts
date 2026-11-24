@@ -15,6 +15,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { enviarSistema } from "@/lib/alertas/canal";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   CUENTA_DANO,
@@ -161,12 +162,25 @@ export async function planearCierre(opts: {
   return planDeCierre({ lineas: opts.lineas, deudas, fecha: opts.hasta });
 }
 
+export interface PagoFallido {
+  nombre: string;
+  cuenta: string;
+  monto: number;
+  error: string;
+}
+
 export interface ResultadoEscritura {
   escritos: number;
   total: number;
   /** `true` = ya estaban escritos (se cerró dos veces). No se cobró de nuevo. */
   yaEstaban: boolean;
+  /** Los pagos que no se pudieron anotar ni al segundo intento (24-nov-2026).
+   *  Vacío = todo anotado. Nunca se calla: la ruta los dice y avisa. */
+  fallidos: PagoFallido[];
 }
+
+/** Cuántas vueltas se intenta cada pago que falla, dentro del MISMO cierre. */
+const INTENTOS_POR_PAGO = 2;
 
 /**
  * ESCRIBE los pagos de un cuadro que se acaba de cerrar.
@@ -186,7 +200,7 @@ export async function escribirPagosDelCierre(opts: {
   plan: PlanDeCierre;
 }): Promise<ResultadoEscritura> {
   const { planillaId, plan } = opts;
-  if (!plan.pagos.length) return { escritos: 0, total: 0, yaEstaban: false };
+  if (!plan.pagos.length) return { escritos: 0, total: 0, yaEstaban: false, fallidos: [] };
 
   const { data: yaHay, error: errLee } = await supabaseServer
     .from(TABLA_AMARRE)
@@ -199,20 +213,98 @@ export async function escribirPagosDelCierre(opts: {
   );
   const faltan = plan.pagos.filter((p) => !hechos.has(`${p.codigo}|${p.cuenta}`));
   if (!faltan.length) {
-    return { escritos: 0, total: 0, yaEstaban: hechos.size > 0 };
+    return { escritos: 0, total: 0, yaEstaban: hechos.size > 0, fallidos: [] };
   }
 
+  // 🔴 24-nov-2026: un pago que falla YA NO corta a los demás ni se pierde en
+  // silencio. Se reintenta en el mismo cierre (escribirUnPago es idempotente:
+  // reusa el movimiento huérfano si el primer intento lo dejó escrito) y lo que
+  // siga fallando vuelve en `fallidos` para que la ruta lo diga y avise.
   let escritos = 0;
   let total = 0;
+  const fallidos: PagoFallido[] = [];
   for (const p of faltan) {
-    await escribirUnPago(planillaId, p);
+    let ultimoError = "";
+    for (let intento = 1; intento <= INTENTOS_POR_PAGO; intento += 1) {
+      try {
+        await escribirUnPago(planillaId, p);
+        ultimoError = "";
+        break;
+      } catch (e) {
+        ultimoError = e instanceof Error ? e.message : String(e);
+      }
+    }
+    if (ultimoError) {
+      fallidos.push({ nombre: p.nombrePrestamos, cuenta: p.cuenta, monto: p.monto, error: ultimoError });
+      continue;
+    }
     escritos += 1;
     total += p.monto;
   }
-  return { escritos, total: Math.round(total * 100) / 100, yaEstaban: hechos.size > 0 };
+  return { escritos, total: Math.round(total * 100) / 100, yaEstaban: hechos.size > 0, fallidos };
 }
 
-async function escribirUnPago(planillaId: string, p: PagoAEscribir): Promise<void> {
+/**
+ * 🔧 SISTEMA: la quincena quedó cerrada pero algún descuento de préstamo no se
+ * anotó en Préstamos. Qué pasó / qué significa / qué hacer, sin jerga.
+ * «Reabrir» y «Cerrar» de nuevo lo completa sin cobrar dos veces (los ya
+ * anotados se saltan y un movimiento huérfano se reusa).
+ */
+export async function avisarPagosSinAnotar(opts: {
+  empresa: string | null;
+  desde: string;
+  hasta: string;
+  fallidos: readonly PagoFallido[];
+}): Promise<void> {
+  const renglones = opts.fallidos
+    .map((f) => `• ${f.nombre} (${f.cuenta}): $${f.monto.toFixed(2)}`)
+    .join("\n");
+  const texto =
+    `Se cerró la planilla ${opts.empresa ?? ""} del ${opts.desde} al ${opts.hasta}, ` +
+    `pero ${opts.fallidos.length} descuento(s) de préstamo no quedaron anotados en Préstamos:\n${renglones}\n` +
+    `Significa que el saldo de esa deuda no bajó aunque el sueldo sí se descontó. ` +
+    `Qué hacer: reabrir esa quincena y volver a cerrarla; lo que ya está anotado no se cobra dos veces.`;
+  try {
+    await enviarSistema(texto);
+  } catch (e) {
+    console.error("[cierre-prestamo] no se pudo avisar:", e instanceof Error ? e.message : String(e));
+  }
+}
+
+function notaDelPago(p: PagoAEscribir): string {
+  return `Descuento de la planilla cerrada del ${p.fecha}`;
+}
+
+/**
+ * El movimiento que un intento ANTERIOR dejó escrito sin su amarre (falló entre
+ * los dos inserts). Reusarlo es lo que hace seguro el reintento: sin esto, un
+ * segundo intento anotaría el pago DOS veces. Mismo colaborador, fecha,
+ * concepto, cuenta, monto y nota del cierre, vivo y sin amarre.
+ */
+async function movimientoHuerfano(p: PagoAEscribir): Promise<string | null> {
+  const { data, error } = await supabaseServer
+    .from("prestamos_movimientos")
+    .select("id")
+    .eq("empleado_id", p.fichaId)
+    .eq("fecha", p.fecha)
+    .eq("concepto", p.concepto)
+    .eq("cuenta", p.cuenta)
+    .eq("monto", p.monto)
+    .eq("notas", notaDelPago(p))
+    .or("deleted.is.null,deleted.eq.false");
+  if (error) throw new Error(`No se pudo revisar el pago de ${p.nombrePrestamos}: ${error.message}`);
+  const ids = (data ?? []).map((r) => String((r as { id: string }).id));
+  if (!ids.length) return null;
+  const { data: amarrados, error: errAm } = await supabaseServer
+    .from(TABLA_AMARRE)
+    .select("movimiento_id")
+    .in("movimiento_id", ids);
+  if (errAm) throw new Error(`No se pudo leer ${TABLA_AMARRE}: ${errAm.message}`);
+  const usados = new Set((amarrados ?? []).map((r) => String((r as { movimiento_id: string }).movimiento_id)));
+  return ids.find((id) => !usados.has(id)) ?? null;
+}
+
+async function insertarMovimiento(p: PagoAEscribir): Promise<string> {
   const { data, error } = await supabaseServer
     .from("prestamos_movimientos")
     .insert({
@@ -229,13 +321,27 @@ async function escribirUnPago(planillaId: string, p: PagoAEscribir): Promise<voi
       origen_pago: p.origenPago,
       // ⚠️ La nota NO es el freno de duplicados (ese es el amarre). Es lo que
       // una persona lee en la ficha para saber de dónde salió este renglón.
-      notas: `Descuento de la planilla cerrada del ${p.fecha}`,
+      notas: notaDelPago(p),
     })
     .select("id")
     .single();
   if (error) throw new Error(`No se pudo registrar el pago de ${p.nombrePrestamos}: ${error.message}`);
+  return String((data as { id: string }).id);
+}
 
-  const movimientoId = String((data as { id: string }).id);
+async function escribirUnPago(planillaId: string, p: PagoAEscribir): Promise<void> {
+  // Un intento anterior pudo dejarlo completo aunque contestara con error.
+  const { data: ya, error: errYa } = await supabaseServer
+    .from(TABLA_AMARRE)
+    .select("id")
+    .eq("planilla_id", planillaId)
+    .eq("empleado_codigo", p.codigo)
+    .eq("cuenta", p.cuenta)
+    .limit(1);
+  if (errYa) throw new Error(`No se pudo leer ${TABLA_AMARRE}: ${errYa.message}`);
+  if ((ya ?? []).length) return;
+  const huerfano = await movimientoHuerfano(p);
+  const movimientoId = huerfano ?? (await insertarMovimiento(p));
   const { error: errAmarre } = await supabaseServer.from(TABLA_AMARRE).insert({
     planilla_id: planillaId,
     empleado_codigo: p.codigo,

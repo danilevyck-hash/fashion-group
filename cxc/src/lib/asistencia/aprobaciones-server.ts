@@ -19,6 +19,7 @@
  * ────────────────────────────────────────────────────────────────────────── */
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { TABLA_APROBACIONES, decisionDeToque, type Aprobacion, type Decision } from "./aprobaciones";
 import { conAprobadosSolos } from "./aprueban-solos";
 
@@ -66,23 +67,37 @@ export async function leerAprobaciones(
   desde: string,
   hasta: string,
 ): Promise<AprobacionesLeidas> {
-  const { data, error } = await supabaseServer
-    .from(TABLA_APROBACIONES)
-    // Select EXPLÍCITO, nunca `*`: si mañana la tabla gana una columna, esta
-    // consulta sigue trayendo lo mismo.
-    .select("empleado_codigo, fecha, aprobado, decision, minutos_vistos, marcado_por, marcado_en")
-    .gte("fecha", desde)
-    .lte("fecha", hasta);
-
-  if (error) {
+  // 🩸 24-nov-2026: sin paginar, PostgREST cortaba en 1.000 filas EN SILENCIO
+  // y, en rangos de más de ~6 semanas, lo aprobado salía como pendiente.
+  // Orden estable = la llave primaria (fecha, empleado_codigo).
+  let data: FilaAprobacionDb[];
+  try {
+    data = await leerTodoPaginado<FilaAprobacionDb>(`${TABLA_APROBACIONES} (rango)`, (pedirCount, from, to) =>
+      supabaseServer
+        .from(TABLA_APROBACIONES)
+        // Select EXPLÍCITO, nunca `*`: si mañana la tabla gana una columna, esta
+        // consulta sigue trayendo lo mismo.
+        .select(
+          "empleado_codigo, fecha, aprobado, decision, minutos_vistos, marcado_por, marcado_en",
+          pedirCount ? { count: "exact" } : {},
+        )
+        .gte("fecha", desde)
+        .lte("fecha", hasta)
+        .order("fecha", { ascending: true })
+        .order("empleado_codigo", { ascending: true })
+        .range(from, to),
+    );
+  } catch (e) {
     // 🔴 Nada de «cero filas» ante un error: eso soltaría el candado de las
     // horas extra (ver el encabezado).
-    throw new Error(`No se pudieron leer las aprobaciones de horas extra: ${error.message}`);
+    throw new Error(
+      `No se pudieron leer las aprobaciones de horas extra: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
   // 🔴 Quien cobra sus extras sin aprobación (el 309) recibe aquí su «sí» de
   // cada día; lo guardado manda. Ver `aprueban-solos.ts`.
   return {
-    filas: conAprobadosSolos((data ?? []).map((f) => aDominio(f as FilaAprobacionDb)), desde, hasta),
+    filas: conAprobadosSolos(data.map(aDominio), desde, hasta),
   };
 }
 
