@@ -107,6 +107,7 @@ describe("Pedidos — conteos y línea de resumen", () => {
 
   it("daniel: primero la plata, después las unidades", () => {
     expect(lineaDeResumen(rows, "pendiente", nombre)).toBe("3 pendientes · $14,296 · 572 unidades");
+    expect(lineaDeResumen(rows, "pendiente", nombre, { corta: true })).toBe("3 pendientes · $14,296 · 572 uds.");
   });
 
   it("sin montos (todos los demás): solo pedidos y unidades", () => {

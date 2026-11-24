@@ -563,7 +563,7 @@ export default function PedidosView({
   const pedidosCelular = barra && PEDIDOS_CELULAR;
   const frescura = (
     <LineaDeFrescura
-      className={conConteos ? "shrink-0 !text-[12px]" : pedidosCelular ? "shrink-0 !text-[12px]" : CIRCULO ? "!text-xs" : undefined}
+      className={conConteos ? (barra ? "shrink-0 whitespace-nowrap !text-[12px]" : "shrink-0 !text-[12px]") : pedidosCelular ? "shrink-0 !text-[12px]" : CIRCULO ? "!text-xs" : undefined}
       actualizado={actualizado}
       opciones={susEmpresas.map((empresa) => ({ modulo: "pedidos", empresa, label: nombreCortoEmpresa(empresa) }))}
       secuencial
@@ -575,7 +575,7 @@ export default function PedidosView({
   );
   const vacioDelCentro = `Sin pedidos ${CHIPS.find((c) => c.value === filtro)?.label.toLowerCase() ?? ""}`.trim();
   const lineaDeArriba = conConteos
-    ? lineaDeResumen(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple])
+    ? lineaDeResumen(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple], { corta: barra })
     : SIMPLE && PEDIDOS_LINEA_DE_LA_PESTANA
     ? lineaDeLaPestana(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple], hoy)
     : CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy);
@@ -1361,19 +1361,20 @@ export default function PedidosView({
       {conConteos ? (
         <div data-resumen-pedidos className="mb-3">
           {!barra && <div className="mb-3">{chips}</div>}
-          <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className={`flex min-w-0 items-center justify-between ${barra ? "gap-1.5" : "gap-2"}`}>
             {NUEVO && hayQueElegirEmpresa ? (
-              <span className={barra ? "shrink-0 [&_button]:h-8 [&_button]:px-2.5 [&_button]:text-[13px]" : "shrink-0"}>
+              // Celular (24-nov-2026): la cápsula más chica para que el resumen quepa en UN renglón a 360 px.
+              <span className={barra ? "flex shrink-0 [&_[data-chip-selector]]:!h-8 [&_[data-chip-selector]]:!px-1.5 [&_[data-chip-selector]]:!text-[12px]" : "shrink-0"}>
                 <ChipSelector rotulo="Empresa" sinRotulo valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />
               </span>
             ) : <span />}
-            <p className={`min-w-0 text-right font-semibold leading-snug text-gray-900 ${barra ? "text-[12.5px] tracking-tight" : "text-base"}`}>
-              {pedidos ? partesSinPartir(lineaDeArriba) : NBSP}
+            <p data-linea-resumen className={`min-w-0 text-right font-semibold leading-snug text-gray-900 ${barra ? "whitespace-nowrap text-[12px] tracking-tighter" : "text-base"}`}>
+              {pedidos ? (barra ? resumenCelular(lineaDeArriba) : partesSinPartir(lineaDeArriba)) : NBSP}
             </p>
           </div>
-          <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-xs text-gray-500">
-            <span className="min-w-0">
-              {partesSinPartir([pedidos ? lineaMasViejo(deLaEmpresa, filtro, hoy) : null, visibles.some((p) => typeof p.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · "))}
+          <div className={`mt-1 flex min-w-0 items-center justify-between gap-2 text-gray-500 ${barra ? "text-[12px]" : "text-xs"}`}>
+            <span className={barra ? "min-w-0 truncate whitespace-nowrap" : "min-w-0"}>
+              {(barra ? (t: string) => t : partesSinPartir)([pedidos ? lineaMasViejo(deLaEmpresa, filtro, hoy) : null, visibles.some((p) => typeof p.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · "))}
             </span>
             {frescura}
           </div>
@@ -1457,6 +1458,17 @@ export default function PedidosView({
       )}
     </div>
   );
+}
+
+/**
+ * 24-nov-2026: en el celular la línea va en UN renglón junto al filtro. Con la
+ * plata (tres tramos) no cabe a 360 px con la letra mínima del sistema (12 px):
+ * ahí se calla «16 pendientes», que la pestaña de arriba ya dice.
+ */
+function resumenCelular(texto: string): ReactNode {
+  const partes = texto.split(" · ");
+  if (partes.length < 3) return texto;
+  return <><span className="max-[379px]:hidden">{partes[0]} · </span>{partes.slice(1).join(" · ")}</>;
 }
 
 /**

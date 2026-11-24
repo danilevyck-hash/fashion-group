@@ -51,14 +51,23 @@ type Fila = Pick<PedidoBodega, "estado" | "fecha" | "piezas" | "monto" | "en_pre
  * «16 pendientes · $146,509 · 8,594 unidades»: primero la plata (solo si
  * viajó, o sea solo `daniel`), después las unidades (las que se conocen).
  */
-export function lineaDeResumen(rows: readonly Fila[], estado: string, nombre: { singular: string; plural: string }): string {
+export function lineaDeResumen(
+  rows: readonly Fila[],
+  estado: string,
+  nombre: { singular: string; plural: string },
+  /** Celular: «8,594 uds.» para que la línea quepa en UN renglón junto al filtro. */
+  { corta = false }: { corta?: boolean } = {},
+): string {
   const del = rows.filter((r) => r.estado === estado);
   if (del.length === 0) return `Sin pedidos ${nombre.plural}`;
   const partes = [`${del.length} ${del.length === 1 ? nombre.singular : nombre.plural}`];
   const montos = del.filter((r) => typeof r.monto === "number");
   if (montos.length > 0) partes.push(textoMonto(montos.reduce((s, r) => s + (r.monto as number), 0)));
   const piezas = del.filter((r) => typeof r.piezas === "number");
-  if (piezas.length > 0) partes.push(textoUnidades(piezas.reduce((s, r) => s + (r.piezas as number), 0)));
+  if (piezas.length > 0) {
+    const n = piezas.reduce((s, r) => s + (r.piezas as number), 0);
+    partes.push(corta ? `${n.toLocaleString("en-US")} uds.` : textoUnidades(n));
+  }
   return partes.join(" · ");
 }
 
