@@ -23,6 +23,7 @@ import { GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import { entregadoPorElegido } from "@/lib/guias/despachado-por";
 import { textoGuiaDespachada } from "@/lib/guias/aviso-despachada";
 import { guiaYaDespachada } from "@/lib/guias/modo-despacho";
+import { RESUMEN_DEL_DIA_2026_11 } from "@/lib/alertas/resumen-del-dia";
 
 /** 🔴 1-oct-2026: lo que contesta el servidor si se completa sin «Despachado por». */
 const FALTA_DESPACHADO_POR = "Despachado por requerido";
@@ -40,6 +41,9 @@ interface GuiaForNotify {
 
 /** Aviso Telegram al despachar una guía: va al chat PRIVADO de Daniel con trato de negocio (`enviarNegocioPrivado`, 25-oct-2026). No lanza. */
 async function notifyGuiaDespachada(guia: GuiaForNotify): Promise<void> {
+  // 🔒 24-nov-2026 (Daniel): los despachos van juntos en el resumen de las 7:00 p. m.
+  // (`lib/alertas/resumen-del-dia.ts`); `false` = un mensaje por guía, como antes.
+  if (RESUMEN_DEL_DIA_2026_11) return;
   const numero = `GT-${String(guia.numero).padStart(3, "0")}`;
   const transp = transportistaLabel(guia) || "—";
   const vivos = (guia.guia_items || []).filter((i) => !i.deleted);
@@ -526,6 +530,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Aviso de despacho por Telegram (solo cuando esta corrida lo dejó en "Completada";
   // `updated` no es null gracias al guard neq → fue esta corrida la que despachó).
   if (body.estado === "Completada") {
+    // La hora de despacho la lee el resumen del día de la bitácora: el PATCH la
+    // deja igual que el PUT (24-nov-2026).
+    await logActivity(
+      session?.role || "unknown",
+      "guia_dispatch",
+      "guias",
+      { guiaId: params.id, changes: { estado: { from: null, to: "Completada" } } },
+      session?.userName,
+    );
     const { data: guia } = await supabaseServer
       .from("guia_transporte")
       .select("numero, modo_entrega, transportista_id, transportistas(nombre), guia_items(cliente, empresa, bultos, deleted)")

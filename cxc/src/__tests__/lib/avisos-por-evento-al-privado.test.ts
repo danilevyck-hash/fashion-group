@@ -46,6 +46,35 @@ describe("lo que se queda como estaba", () => {
     expect(s).toMatch(/await enviarNegocioPrivado\(`<pre>/);
     expect(s).not.toMatch(/enviarNegocio\(/);
   });
+});
+
+/**
+ * 🔒 Cambio de dirección (24-nov-2026, Daniel): el aviso por guía se APAGA y los
+ * despachos van juntos en el resumen de las 7:00 p. m. (`RESUMEN_DEL_DIA_2026_11`).
+ * Con el interruptor en `false` vuelve el aviso por guía: por eso el control de
+ * arriba (el texto `<pre>` al privado) se conserva.
+ */
+describe("resumen del día (24-nov-2026)", () => {
+  it("el aviso por guía se corta con el interruptor, antes de mandar", () => {
+    const s = src("app/api/guias/[id]/route.ts");
+    const cuerpo = s.slice(s.indexOf("async function notifyGuiaDespachada"));
+    const corte = cuerpo.indexOf("if (RESUMEN_DEL_DIA_2026_11) return;");
+    expect(corte).toBeGreaterThan(0);
+    expect(corte).toBeLessThan(cuerpo.indexOf("enviarNegocioPrivado("));
+  });
+  it("el cron de cobros arma el resumen solo con el interruptor prendido", () => {
+    const s = src("app/api/cron/cobros-del-dia/route.ts");
+    expect(s).toMatch(/RESUMEN_DEL_DIA_2026_11\s*\?\s*resumenDelDia\(/);
+    expect(s).toMatch(/:\s*cobrosTexto;/);
+    expect(s).toMatch(/partirParaTelegram\(mensaje\)/);
+  });
+  it("el interruptor está prendido", async () => {
+    const { RESUMEN_DEL_DIA_2026_11 } = await import("@/lib/alertas/resumen-del-dia");
+    expect(RESUMEN_DEL_DIA_2026_11).toBe(true);
+  });
+  it("el aviso de guías pendientes de la mañana no se toca", () => {
+    expect(src("app/api/cron/guias-pendientes/route.ts")).not.toMatch(/RESUMEN_DEL_DIA/);
+  });
   it("«menos piezas de las pedidas» sigue en el grupo NEGOCIO", () => {
     expect(src(CONFIRMAR)).toMatch(/await enviarNegocio\(\s*`⚠️[^`]*menos piezas de las pedidas/);
   });

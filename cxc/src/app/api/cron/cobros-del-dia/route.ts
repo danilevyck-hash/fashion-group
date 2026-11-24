@@ -13,6 +13,10 @@
 // del grupo como clientes (`CLIENTES_FUERA`).
 // ⚠️ Un recibo registrado después de las 6:15 p.m. no sale ni hoy ni mañana.
 // El texto: `lib/cxc/cobros-del-dia.ts`.
+//
+// 🔒 24-nov-2026 (Daniel): con `RESUMEN_DEL_DIA_2026_11` este mismo cron manda
+// UN solo mensaje — 🧾 Facturas · 🚚 Despachos · 💰 Cobros de hoy — y el aviso
+// por guía despachada se apaga. Ver `lib/alertas/resumen-del-dia.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -23,6 +27,14 @@ import { enviarNegocioPrivado } from "@/lib/alertas/canal";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { mensajeCobrosDelDia, type CobroDelDia } from "@/lib/cxc/cobros-del-dia";
+import {
+  RESUMEN_DEL_DIA_2026_11,
+  bloqueDespachos,
+  bloqueFacturas,
+  partirParaTelegram,
+  resumenDelDia,
+} from "@/lib/alertas/resumen-del-dia";
+import { leerDespachosDelDia, leerFacturasDelDia } from "@/lib/alertas/resumen-del-dia-io";
 
 const CRON_NAME = "cobros-del-dia";
 
@@ -91,15 +103,26 @@ export async function GET(req: NextRequest) {
     }
     const corte = Object.fromEntries(empresas.map((e, i) => [e, (cortes[i].data?.[0]?.synced_at as string | undefined) ?? null]));
 
-    const mensaje = mensajeCobrosDelDia(cobros, mas90, corte);
+    const cobrosTexto = mensajeCobrosDelDia(cobros, mas90, corte);
+    const mensaje = RESUMEN_DEL_DIA_2026_11
+      ? resumenDelDia([
+          bloqueFacturas(await leerFacturasDelDia(fecha)),
+          bloqueDespachos(await leerDespachosDelDia(fecha)),
+          cobrosTexto,
+        ])
+      : cobrosTexto;
+    const partes = mensaje ? partirParaTelegram(mensaje) : [];
     if (req.nextUrl.searchParams.get("test") === "true") {
-      return NextResponse.json({ fecha, cobros: cobros.length, mensaje: mensaje ?? "(no se mandaría nada)" });
+      return NextResponse.json({ fecha, cobros: cobros.length, mensajes: partes.length ? partes : ["(no se mandaría nada)"] });
     }
 
-    let enviado = false;
-    if (mensaje) {
-      enviado = await enviarNegocioPrivado(mensaje);
-      if (!enviado) await logCronError("cobros_del_dia_telegram_failed", "Telegram no aceptó el mensaje", null, { telegram: false });
+    // Varios mensajes seguidos si no cabe en uno (tope de Telegram); nunca se corta.
+    let enviado = partes.length > 0;
+    for (const parte of partes) {
+      if (!(await enviarNegocioPrivado(parte))) enviado = false;
+    }
+    if (partes.length && !enviado) {
+      await logCronError("cobros_del_dia_telegram_failed", "Telegram no aceptó el mensaje", null, { telegram: false });
     }
     await recordCronHeartbeat(CRON_NAME);
     return NextResponse.json({ ok: true, fecha, cobros: cobros.length, enviado });
