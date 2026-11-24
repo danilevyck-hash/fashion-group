@@ -105,7 +105,7 @@ export interface ComisionVendedor {
  */
 export function comisionPorVendedor(ventas: readonly FilaConBase[], cobros: readonly FilaConBase[]): ComisionVendedor[] {
   // La base se junta POR TASA: si la tasa del vendedor cambió dentro del rango
-  // (vigencia por fecha, 24-nov-2026), cada tramo se redondea con la suya. Con
+  // (excepción por empresa con fecha, 24-nov-2026), cada tramo se redondea con la suya. Con
   // una sola tasa es exactamente la cuenta de siempre.
   type Grupo = { empresa: string; vendedor: string; v: Map<number, number>; c: Map<number, number> };
   const m = new Map<string, Grupo>();
@@ -130,26 +130,26 @@ export function comisionPorVendedor(ventas: readonly FilaConBase[], cobros: read
   }));
 }
 
-export interface TasaDeHoy { vendedor_nombre: string; tasa_venta: number | string; tasa_cobro: number | string }
-export interface TasaPasada extends TasaDeHoy { vigente_hasta: string }
+export interface TasaGeneral { vendedor_nombre: string; tasa_venta: number | string; tasa_cobro: number | string }
+export interface TasaExcepcion extends TasaGeneral { empresa_key: string; vigente_desde: string }
 
 /**
- * La tasa que rige para un vendedor en una fecha — la MISMA regla que la función
- * SQL `comision_tasa_vigente` (migración 20270122120000): la fila del historial
- * con el menor `vigente_hasta >= fecha`; sin ninguna, la tasa de hoy; sin fila, 0,5 %.
+ * La tasa que rige para un vendedor en una empresa y una fecha — la MISMA regla
+ * que la función SQL `comision_tasa_vigente` (migración 20270122120000): la
+ * excepción más reciente de esa empresa con `vigente_desde <= fecha`; sin
+ * ninguna, la tasa general; sin fila, 0,5 %.
  */
 export function tasaEnFecha(
-  hoy: readonly TasaDeHoy[],
-  historial: readonly TasaPasada[],
-  vendedor: string,
-  fecha: string,
+  generales: readonly TasaGeneral[],
+  excepciones: readonly TasaExcepcion[],
+  p: { vendedor: string; empresa: string; fecha: string },
   campo: "tasa_venta" | "tasa_cobro",
 ): number {
-  const dia = String(fecha).slice(0, 10);
-  const pasada = historial
-    .filter((h) => h.vendedor_nombre === vendedor && h.vigente_hasta >= dia)
-    .sort((x, y) => x.vigente_hasta.localeCompare(y.vigente_hasta))[0];
-  const fila = pasada ?? hoy.find((t) => t.vendedor_nombre === vendedor);
+  const dia = String(p.fecha).slice(0, 10);
+  const excepcion = excepciones
+    .filter((e) => e.vendedor_nombre === p.vendedor && e.empresa_key === p.empresa && e.vigente_desde <= dia)
+    .sort((x, y) => y.vigente_desde.localeCompare(x.vigente_desde))[0];
+  const fila = excepcion ?? generales.find((t) => t.vendedor_nombre === p.vendedor);
   return fila ? Number(fila[campo]) : 0.005;
 }
 

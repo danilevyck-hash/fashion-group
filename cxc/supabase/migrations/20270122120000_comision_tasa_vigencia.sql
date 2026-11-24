@@ -1,95 +1,101 @@
 -- ═════════════════════════════════════════════════════════════════════════════
--- LA TASA DE COMISIÓN TIENE VIGENCIA POR FECHA (24-nov-2026).
+-- LA TASA DE COMISIÓN PUEDE SER POR EMPRESA Y CON FECHA (24-nov-2026).
 -- ═════════════════════════════════════════════════════════════════════════════
 -- Daniel: a Reynaldo Espinosa la comisión le baja de 1 % venta / 1 % cobro a
--- 0,5 % / 0,5 % A PARTIR DEL 1-nov-2026. Hasta octubre de 2026 sigue al 1 %.
+-- 0,5 % / 0,5 % SOLO en Active Shoes y Active Wear, A PARTIR DEL 1-nov-2026. En
+-- Fashion Wear, Fashion Shoes, Vistana y Joystep sigue al 1 %; y hasta octubre
+-- de 2026, 1 % en todas.
 --
--- 🩸 `comision_vendedor_tasa` tiene UNA tasa por vendedor, sin fecha: un UPDATE
--- recalcula TODOS los meses hacia atrás (octubre pasaría a la mitad).
+-- 🩸 `comision_vendedor_tasa` tiene UNA tasa por vendedor, global y sin fecha:
+-- un UPDATE recalcula TODOS los meses de TODAS las empresas hacia atrás.
 --
 -- Diseño mínimo, aditivo:
---   • `comision_vendedor_tasa` sigue siendo LA TASA DE HOY (la que muestra y
---     guarda Comisiones › Configuración › «Tasas por vendedor»; no cambia).
---   • `comision_vendedor_tasa_historial` guarda las tasas QUE YA NO RIGEN, cada
---     una con el último día en que rigió (`vigente_hasta`).
---   • `comision_tasa_vigente(vendedor, fecha)`: la fila del historial con el
---     menor `vigente_hasta >= fecha`; sin ninguna, la tasa de hoy. Sin fila en
---     ningún lado, las RPC siguen cayendo al 0,5 % de siempre (su COALESCE).
+--   • `comision_vendedor_tasa` NO se toca: sigue siendo la tasa general (la que
+--     muestra y guarda Comisiones › Configuración › «Tasas por vendedor»).
+--   • `comision_vendedor_tasa_excepcion` (vendedor, empresa, vigente_desde,
+--     tasas): «en ESTA empresa, desde ESTE mes, esta persona cobra esto».
+--   • `comision_tasa_vigente(vendedor, empresa, fecha)`: la excepción más
+--     reciente de esa empresa con `vigente_desde <= fecha`; sin ninguna, la tasa
+--     general. Sin fila en ningún lado, las RPC siguen cayendo al 0,5 % de
+--     siempre (su COALESCE).
 --   • comision_b2b_v10 y comision_b2b_detalle = las de 20261111130000 BYTE A
---     BYTE salvo de dónde sale la tasa (y la marca `tasa_por_fecha`).
+--     BYTE salvo de dónde sale la tasa (y la marca `tasa_por_empresa_y_fecha`).
+--     La empresa es la del cálculo: la de la factura para la venta y la del
+--     RECIBO para el cobro (las dos son p_empresa_key).
 --
--- ponytail: la vigencia es POR MES (CHECK: `vigente_hasta` es fin de mes), porque
--- la comisión se calcula y se redondea por mes: la fecha de la factura y la del
--- recibo caen siempre en el mes que se pide. Un cambio a mitad de mes pediría
--- tasa por documento y otro redondeo; no se pidió.
+-- ponytail: la vigencia es POR MES (CHECK: `vigente_desde` es día 1), porque la
+-- comisión se calcula y se redondea por mes. Un cambio a mitad de mes pediría
+-- tasa por documento y otro redondeo; no se pidió. Un cambio con fecha para
+-- TODAS las empresas = una fila por empresa.
 --
--- ⚠️ Las v9…v5 (la red de `rpc.ts`) NO miran el historial: si la v10 dejara de
--- existir, octubre de Reynaldo saldría con la tasa de hoy.
+-- ⚠️ Las v9…v5 (la red de `rpc.ts`) NO miran las excepciones: si la v10 dejara
+-- de existir, Reynaldo saldría al 1 % también en Active Shoes y Active Wear.
 --
--- Todo en UNA migración (función + dato) para que no haya un instante con
--- octubre al 0,5 %. Filas que toca: 1 INSERT en el historial + 1 UPDATE en
--- comision_vendedor_tasa (REYNALDO ESPINOSA). Candado: comision-tasa-vigencia.test.ts.
+-- Filas que toca: 2 INSERT en comision_vendedor_tasa_excepcion. Ninguna fila
+-- existente cambia. Candado: comision-tasa-vigencia.test.ts.
 -- ═════════════════════════════════════════════════════════════════════════════
 
--- ─── 1) El historial ─────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS comision_vendedor_tasa_historial (
+-- ─── 1) Las excepciones ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS comision_vendedor_tasa_excepcion (
   vendedor_nombre text NOT NULL,           -- el CANÓNICO, igual que en comision_vendedor_tasa
-  vigente_hasta   date NOT NULL,           -- último día (fin de mes) en que rigió esta tasa
+  empresa_key     text NOT NULL,
+  vigente_desde   date NOT NULL,           -- día 1 del primer mes en que rige
   tasa_venta      numeric(6,4) NOT NULL,
   tasa_cobro      numeric(6,4) NOT NULL,
   creado_por      text NOT NULL,
   creado_en       timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (vendedor_nombre, vigente_hasta),
-  CONSTRAINT comision_tasa_historial_fin_de_mes
-    CHECK (vigente_hasta = (date_trunc('month', vigente_hasta) + INTERVAL '1 month' - INTERVAL '1 day')::date),
-  CONSTRAINT comision_tasa_historial_tasas_validas
+  PRIMARY KEY (vendedor_nombre, empresa_key, vigente_desde),
+  CONSTRAINT comision_tasa_excepcion_dia_uno
+    CHECK (vigente_desde = date_trunc('month', vigente_desde)::date),
+  CONSTRAINT comision_tasa_excepcion_tasas_validas
     CHECK (tasa_venta BETWEEN 0 AND 1 AND tasa_cobro BETWEEN 0 AND 1)
 );
 
-ALTER TABLE comision_vendedor_tasa_historial ENABLE ROW LEVEL SECURITY;
+ALTER TABLE comision_vendedor_tasa_excepcion ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE tablename = 'comision_vendedor_tasa_historial' AND policyname = 'service_role_all'
+    WHERE tablename = 'comision_vendedor_tasa_excepcion' AND policyname = 'service_role_all'
   ) THEN
-    CREATE POLICY service_role_all ON comision_vendedor_tasa_historial
+    CREATE POLICY service_role_all ON comision_vendedor_tasa_excepcion
       FOR ALL TO service_role USING (true) WITH CHECK (true);
   END IF;
 END $$;
 
--- Sin UPDATE ni DELETE a propósito: lo ya pagado no se reescribe.
-GRANT SELECT, INSERT ON comision_vendedor_tasa_historial TO service_role;
+-- Sin UPDATE ni DELETE a propósito: para cambiarla se agrega otra fila con su fecha.
+GRANT SELECT, INSERT ON comision_vendedor_tasa_excepcion TO service_role;
 
-COMMENT ON TABLE comision_vendedor_tasa_historial IS
-  'Tasas de comisión que YA NO RIGEN: cada fila vale hasta `vigente_hasta` (fin de mes) inclusive. '
-  'La tasa de hoy sigue en comision_vendedor_tasa. Las lee comision_tasa_vigente(vendedor, fecha), '
+COMMENT ON TABLE comision_vendedor_tasa_excepcion IS
+  'Tasa de comisión de un vendedor en UNA empresa desde un mes (vigente_desde, día 1). Le gana a la '
+  'tasa general de comision_vendedor_tasa. La lee comision_tasa_vigente(vendedor, empresa, fecha), '
   'que usan comision_b2b_v10, comision_b2b_detalle y «Buscar cliente». Sin UPDATE ni DELETE.';
 
--- ─── 2) La tasa que rige en una fecha: UNA función para todos ────────────────
-CREATE OR REPLACE FUNCTION comision_tasa_vigente(p_vendedor text, p_fecha date)
+-- ─── 2) La tasa que rige: UNA función para todos ─────────────────────────────
+CREATE OR REPLACE FUNCTION comision_tasa_vigente(p_vendedor text, p_empresa_key text, p_fecha date)
 RETURNS TABLE (tasa_venta numeric, tasa_cobro numeric) LANGUAGE sql STABLE AS $$
   SELECT x.tasa_venta, x.tasa_cobro
   FROM (
-    SELECT h.tasa_venta, h.tasa_cobro, h.vigente_hasta
-      FROM comision_vendedor_tasa_historial h
-     WHERE h.vendedor_nombre = p_vendedor AND h.vigente_hasta >= p_fecha
+    SELECT e.tasa_venta, e.tasa_cobro, e.vigente_desde
+      FROM comision_vendedor_tasa_excepcion e
+     WHERE e.vendedor_nombre = p_vendedor AND e.empresa_key = p_empresa_key AND e.vigente_desde <= p_fecha
     UNION ALL
-    SELECT t.tasa_venta, t.tasa_cobro, 'infinity'::date
+    SELECT t.tasa_venta, t.tasa_cobro, '-infinity'::date
       FROM comision_vendedor_tasa t
      WHERE t.vendedor_nombre = p_vendedor
   ) x
-  ORDER BY x.vigente_hasta
+  ORDER BY x.vigente_desde DESC
   LIMIT 1;
 $$;
-GRANT EXECUTE ON FUNCTION comision_tasa_vigente(text, date) TO service_role;
+GRANT EXECUTE ON FUNCTION comision_tasa_vigente(text, text, date) TO service_role;
 
-COMMENT ON FUNCTION comision_tasa_vigente(text, date) IS
-  'Tasa de venta y de cobro de un vendedor (canónico) en una fecha: el historial con el menor '
-  'vigente_hasta >= fecha; si no hay, la tasa de hoy (comision_vendedor_tasa). Cero filas = sin tasa propia.';
+COMMENT ON FUNCTION comision_tasa_vigente(text, text, date) IS
+  'Tasa de venta y de cobro de un vendedor (canónico) en una empresa y una fecha: la excepción más '
+  'reciente de esa empresa con vigente_desde <= fecha; si no hay, la tasa general '
+  '(comision_vendedor_tasa). Cero filas = sin tasa propia.';
 
--- ─── 3) comision_b2b_v10 — la misma, con la tasa del MES que se pide ─────────
+-- ─── 3) comision_b2b_v10 — la misma, con la tasa de la EMPRESA y el MES ──────
 CREATE OR REPLACE FUNCTION comision_b2b_v10(p_empresa_key text, p_year int, p_mes int)
 RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
 DECLARE
@@ -199,7 +205,7 @@ BEGIN
   FROM universo u
   LEFT JOIN ventas vt ON vt.vendedor = u.vendedor
   LEFT JOIN cobros cb ON cb.vendedor = u.vendedor
-  LEFT JOIN LATERAL comision_tasa_vigente(u.vendedor, v_inicio) t ON true;
+  LEFT JOIN LATERAL comision_tasa_vigente(u.vendedor, p_empresa_key, v_inicio) t ON true;
 
   RETURN jsonb_build_object(
     'empresa_key', p_empresa_key,
@@ -210,7 +216,7 @@ BEGIN
     'exclusiones', 'cliente_vendedor_o_todos',
     'alias', 'canonico',
     'vendedor_por_factura', 'aplicado',
-    'tasa_por_fecha', 'aplicado',
+    'tasa_por_empresa_y_fecha', 'aplicado',
     'vendedores', COALESCE(v_rows, '[]'::jsonb)
   );
 END;
@@ -239,7 +245,7 @@ BEGIN
   v_vendedor := comision_vendedor_canonico(p_vendedor);
 
   SELECT t.tasa_venta, t.tasa_cobro INTO v_tasa_venta, v_tasa_cobro
-  FROM comision_tasa_vigente(v_vendedor, v_inicio) t;
+  FROM comision_tasa_vigente(v_vendedor, p_empresa_key, v_inicio) t;
   v_tasa_venta := COALESCE(v_tasa_venta, 0.0050);
   v_tasa_cobro := COALESCE(v_tasa_cobro, 0.0050);
 
@@ -332,7 +338,7 @@ BEGIN
     'exclusiones', 'cliente_vendedor_o_todos',
     'alias', 'canonico',
     'vendedor_por_factura', 'aplicado',
-    'tasa_por_fecha', 'aplicado',
+    'tasa_por_empresa_y_fecha', 'aplicado',
     'tasa_venta', v_tasa_venta, 'tasa_cobro', v_tasa_cobro,
     'ventas', COALESCE(v_ventas, '[]'::jsonb),
     'cobros', COALESCE(v_cobros, '[]'::jsonb),
@@ -348,19 +354,12 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION comision_b2b_detalle(text, int, int, text) TO service_role;
 
--- ─── 5) Reynaldo Espinosa: 1 % hasta el 31-oct-2026, 0,5 % desde el 1-nov ────
--- El 1 % se copia de la fila viva (no se escribe a mano) y solo si todavía no
--- se bajó: correr esto dos veces no hace nada la segunda.
-INSERT INTO comision_vendedor_tasa_historial (vendedor_nombre, vigente_hasta, tasa_venta, tasa_cobro, creado_por)
-SELECT t.vendedor_nombre, DATE '2026-10-31', t.tasa_venta, t.tasa_cobro, 'daniel'
-  FROM comision_vendedor_tasa t
- WHERE t.vendedor_nombre = 'REYNALDO ESPINOSA' AND t.tasa_venta = 0.0100 AND t.tasa_cobro = 0.0100
-ON CONFLICT (vendedor_nombre, vigente_hasta) DO NOTHING;
-
-UPDATE comision_vendedor_tasa
-   SET tasa_venta = 0.0050, tasa_cobro = 0.0050, updated_at = now()
- WHERE vendedor_nombre = 'REYNALDO ESPINOSA'
-   AND EXISTS (SELECT 1 FROM comision_vendedor_tasa_historial h
-                WHERE h.vendedor_nombre = 'REYNALDO ESPINOSA' AND h.vigente_hasta = DATE '2026-10-31');
+-- ─── 5) Reynaldo Espinosa: 0,5 % en Active Shoes y Active Wear desde nov-2026 ─
+-- Su tasa general (1 % / 1 %) NO se toca. Correr esto dos veces no hace nada.
+INSERT INTO comision_vendedor_tasa_excepcion (vendedor_nombre, empresa_key, vigente_desde, tasa_venta, tasa_cobro, creado_por)
+VALUES
+  ('REYNALDO ESPINOSA', 'active_shoes', DATE '2026-11-01', 0.0050, 0.0050, 'daniel'),
+  ('REYNALDO ESPINOSA', 'active_wear',  DATE '2026-11-01', 0.0050, 0.0050, 'daniel')
+ON CONFLICT (vendedor_nombre, empresa_key, vigente_desde) DO NOTHING;
 
 NOTIFY pgrst, 'reload schema';

@@ -62,11 +62,11 @@ export async function buscarClienteEnComisiones(
   if (!grupos.length) return [];
 
   // 2. Lo que no depende del cliente: exclusiones activas y tasas.
-  const [{ data: excl, error: e2 }, { data: tasas, error: e3 }, { data: pasadas, error: e7 }] = await Promise.all([
+  const [{ data: excl, error: e2 }, { data: tasas, error: e3 }, { data: excepciones, error: e7 }] = await Promise.all([
     sb.from("comision_exclusion").select("empresa_key, cliente_codigo, vendedor, excluye_venta, excluye_cobro").eq("activa", true),
     sb.from("comision_vendedor_tasa").select("vendedor_nombre, tasa_venta, tasa_cobro"),
-    // Las tasas que ya no rigen (vigencia por fecha): cada documento usa la de SU fecha.
-    sb.from("comision_vendedor_tasa_historial").select("vendedor_nombre, vigente_hasta, tasa_venta, tasa_cobro"),
+    // Excepciones por empresa con fecha: cada documento usa la tasa de SU empresa y SU fecha.
+    sb.from("comision_vendedor_tasa_excepcion").select("vendedor_nombre, empresa_key, vigente_desde, tasa_venta, tasa_cobro"),
   ]);
   if (e2) throw e2;
   if (e3) throw e3;
@@ -81,8 +81,8 @@ export async function buscarClienteEnComisiones(
     }
     return canon.get(k)!;
   };
-  const tasa = (v: string, fecha: string, campo: "tasa_venta" | "tasa_cobro") =>
-    tasaEnFecha(tasas ?? [], pasadas ?? [], v, fecha, campo);
+  const tasa = (vendedor: string, empresa: string, fecha: string, campo: "tasa_venta" | "tasa_cobro") =>
+    tasaEnFecha(tasas ?? [], excepciones ?? [], { vendedor, empresa, fecha }, campo);
   const excluido = (empresa: string, codigo: string, vendedor: string, campo: "excluye_venta" | "excluye_cobro") =>
     (excl ?? []).some((e) => e.empresa_key === empresa && String(e.cliente_codigo).trim().toUpperCase() === codigo && e[campo] &&
       (e.vendedor === "*" || e.vendedor === vendedor.toUpperCase()));
@@ -116,7 +116,7 @@ export async function buscarClienteEnComisiones(
       for (const s of [...(sf ?? [])].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))) vendFactura.set(s.secuencial, s.vendedor_nombre);
       for (const f of fu ?? []) {
         const vendedor = await canonico(vendFactura.get(f.secuencial) ?? f.vendedor);
-        const t = tasa(vendedor, f.fecha, "tasa_venta");
+        const t = tasa(vendedor, empresa, f.fecha, "tasa_venta");
         const r = resultadoFactura({
           tipo: f.tipo_comprobante, cliente: f.cliente, pctUtilidad: f.pct_utilidad == null ? null : Number(f.pct_utilidad),
           subtotal: Number(f.subtotal_con_descuento), vendedor, excluido: excluido(empresa, g.codigo, vendedor, "excluye_venta"), tasa: t,
@@ -125,7 +125,7 @@ export async function buscarClienteEnComisiones(
       }
       for (const x of rc ?? []) {
         const vendedor = await canonico(x.vendedor_registro);
-        const t = tasa(vendedor, x.fecha, "tasa_cobro");
+        const t = tasa(vendedor, empresa, x.fecha, "tasa_cobro");
         const r = resultadoRecibo({
           esRetencion: !!x.es_retencion, clienteCodigo: String(x.cliente_codigo ?? ""), total: Number(x.total), vendedor,
           excluido: excluido(empresa, g.codigo, vendedor, "excluye_cobro"), tasa: t,

@@ -1,15 +1,16 @@
 // ═════════════════════════════════════════════════════════════════════════════
-// 🔴 LA TASA DE COMISIÓN TIENE VIGENCIA POR FECHA (24-nov-2026).
+// 🔴 LA TASA DE COMISIÓN PUEDE SER POR EMPRESA Y CON FECHA (24-nov-2026).
 // ═════════════════════════════════════════════════════════════════════════════
-// Daniel: a Reynaldo Espinosa le baja de 1 % a 0,5 % (venta y cobro) DESDE el
-// 1-nov-2026; octubre y lo anterior siguen al 1 %. Medido contra producción en
-// una transacción con ROLLBACK: octubre Active Shoes $1.271,84 y Active Wear
-// $221,84 antes y después; agosto, septiembre y octubre de las 6 empresas sin
-// mover un centavo; noviembre de Reynaldo, la mitad.
+// Daniel: a Reynaldo Espinosa le baja de 1 % a 0,5 % (venta y cobro) SOLO en
+// Active Shoes y Active Wear, DESDE el 1-nov-2026. En las otras cuatro sigue al
+// 1 %, y hasta octubre va 1 % en todas. Medido contra producción en una
+// transacción con ROLLBACK: octubre igual en todo (Active Shoes $1.271,84,
+// Active Wear $221,84, total $12.230,79); noviembre Active Shoes $1.099,52 →
+// $549,76, y Fashion Wear $6.406,70 y Fashion Shoes $3.834,88 sin cambio.
 //
 // 🩸 Lo que este candado impide: que una RPC o «Buscar cliente» vuelvan a leer
-// la tasa SIN fecha de `comision_vendedor_tasa` — ahí un cambio de tasa
-// recalcula todos los meses hacia atrás.
+// la tasa general de `comision_vendedor_tasa` sin mirar empresa ni fecha — ahí
+// un cambio de tasa recalcula todos los meses de todas las empresas hacia atrás.
 // ═════════════════════════════════════════════════════════════════════════════
 
 import { describe, it, expect } from "vitest";
@@ -29,9 +30,9 @@ function cuerpo(sql: string, fn: string): string {
   return m![1];
 }
 
-describe("🔴 las RPC vigentes sacan la tasa por fecha, nunca la tasa sin fecha", () => {
+describe("🔴 las RPC vigentes sacan la tasa por empresa y fecha, nunca la general a secas", () => {
   // La ÚLTIMA definición de cada función en todo supabase/migrations: si una
-  // migración futura la redefine leyendo la tasa sin fecha, esto se pone rojo.
+  // migración futura la redefine leyendo la tasa general, esto se pone rojo.
   const ultima = (fn: string) => {
     const re = new RegExp(`CREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION\\s+${fn}\\s*\\(`, "i");
     const archivo = readdirSync(path.join(RAIZ, DIR)).filter((a) => /^\d{14}_.*\.sql$/.test(a)).sort().reverse()
@@ -40,70 +41,83 @@ describe("🔴 las RPC vigentes sacan la tasa por fecha, nunca la tasa sin fecha
     return cuerpo(leerSql(archivo!), fn);
   };
 
-  it("comision_b2b_v10: la tasa sale de comision_tasa_vigente(vendedor, inicio del mes)", () => {
+  it("comision_b2b_v10: la tasa sale de comision_tasa_vigente(vendedor, empresa, inicio del mes)", () => {
     const v10 = ultima("comision_b2b_v10");
-    expect(v10).toMatch(/LEFT JOIN LATERAL comision_tasa_vigente\(u\.vendedor, v_inicio\) t ON true/);
-    // La tabla sin fecha solo queda en el universo (quién aparece), nunca para la tasa.
+    expect(v10).toMatch(/LEFT JOIN LATERAL comision_tasa_vigente\(u\.vendedor, p_empresa_key, v_inicio\) t ON true/);
+    // La tabla general solo queda en el universo (quién aparece), nunca para la tasa.
     expect(v10).not.toMatch(/comision_vendedor_tasa t ON t\.vendedor_nombre = u\.vendedor/);
   });
 
   it("comision_b2b_detalle: lo mismo (paridad tabla ↔ modal)", () => {
     const det = ultima("comision_b2b_detalle");
-    expect(det).toMatch(/FROM comision_tasa_vigente\(v_vendedor, v_inicio\) t;/);
+    expect(det).toMatch(/FROM comision_tasa_vigente\(v_vendedor, p_empresa_key, v_inicio\) t;/);
     expect(det).not.toMatch(/comision_vendedor_tasa\b/);
   });
 
-  it("comision_tasa_vigente: el historial que alcanza la fecha le gana a la tasa de hoy", () => {
+  it("comision_tasa_vigente: la excepción de ESA empresa que ya rige le gana a la general", () => {
     const f = cuerpo(leerSql(MIG), "comision_tasa_vigente");
-    expect(f).toMatch(/h\.vigente_hasta >= p_fecha/);
-    expect(f).toMatch(/'infinity'::date/);
-    expect(f).toMatch(/ORDER BY x\.vigente_hasta\s+LIMIT 1/);
+    expect(f).toMatch(/e\.empresa_key = p_empresa_key AND e\.vigente_desde <= p_fecha/);
+    expect(f).toMatch(/'-infinity'::date/);
+    expect(f).toMatch(/ORDER BY x\.vigente_desde DESC\s+LIMIT 1/);
   });
 
-  it("el historial es por mes y no se reescribe; la migración no borra nada", () => {
+  it("las excepciones son por mes y no se reescriben; la migración no borra ni toca la tasa general", () => {
     const sql = leerSql(MIG);
-    expect(sql).toMatch(/CONSTRAINT comision_tasa_historial_fin_de_mes/);
-    expect(sql).toMatch(/GRANT SELECT, INSERT ON comision_vendedor_tasa_historial TO service_role/);
+    expect(sql).toMatch(/CONSTRAINT comision_tasa_excepcion_dia_uno/);
+    expect(sql).toMatch(/GRANT SELECT, INSERT ON comision_vendedor_tasa_excepcion TO service_role/);
     expect(sql).not.toMatch(/\b(DROP\s+\w+|TRUNCATE|DELETE\s+FROM)\b/i);
+    expect(sql).not.toMatch(/\bUPDATE\s+comision_vendedor_tasa\b/i);
+    expect(sql).not.toMatch(/INSERT INTO comision_vendedor_tasa\s*\(/i);
   });
 
-  it("Reynaldo: el 1 % queda guardado hasta el 31-oct-2026 ANTES de bajar la tasa de hoy", () => {
+  it("Reynaldo: 0,5 % solo en Active Shoes y Active Wear, desde el 1-nov-2026", () => {
     const sql = leerSql(MIG);
-    const insert = sql.indexOf("INSERT INTO comision_vendedor_tasa_historial");
-    const update = sql.indexOf("UPDATE comision_vendedor_tasa");
-    expect(insert).toBeGreaterThan(-1);
-    expect(update).toBeGreaterThan(insert);
-    expect(sql.slice(insert, update)).toMatch(/DATE '2026-10-31'/);
-    // Y el UPDATE no corre si el historial no quedó escrito.
-    expect(sql.slice(update)).toMatch(/EXISTS \(SELECT 1 FROM comision_vendedor_tasa_historial/);
+    const filas = sql.slice(sql.indexOf("INSERT INTO comision_vendedor_tasa_excepcion")).match(/\('REYNALDO ESPINOSA'[^)]*\)/g) ?? [];
+    expect(filas.map((f) => f.replace(/\s+/g, " "))).toEqual([
+      "('REYNALDO ESPINOSA', 'active_shoes', DATE '2026-11-01', 0.0050, 0.0050, 'daniel')",
+      "('REYNALDO ESPINOSA', 'active_wear', DATE '2026-11-01', 0.0050, 0.0050, 'daniel')",
+    ]);
   });
 });
 
-describe("🔴 «Buscar cliente» usa la misma regla: la tasa de la fecha del documento", () => {
-  const hoy = [{ vendedor_nombre: "REYNALDO ESPINOSA", tasa_venta: 0.005, tasa_cobro: 0.005 }];
-  const historial = [{ vendedor_nombre: "REYNALDO ESPINOSA", vigente_hasta: "2026-10-31", tasa_venta: 0.01, tasa_cobro: 0.01 }];
+describe("🔴 «Buscar cliente» usa la misma regla: la tasa de la empresa y la fecha del documento", () => {
+  const generales = [{ vendedor_nombre: "REYNALDO ESPINOSA", tasa_venta: 0.01, tasa_cobro: 0.01 }];
+  const excepciones = ["active_shoes", "active_wear"].map((empresa_key) => (
+    { vendedor_nombre: "REYNALDO ESPINOSA", empresa_key, vigente_desde: "2026-11-01", tasa_venta: 0.005, tasa_cobro: 0.005 }
+  ));
+  const tasa = (empresa: string, fecha: string, campo: "tasa_venta" | "tasa_cobro" = "tasa_venta", vendedor = "REYNALDO ESPINOSA") =>
+    tasaEnFecha(generales, excepciones, { vendedor, empresa, fecha }, campo);
 
-  it("octubre y antes al 1 %; desde el 1-nov al 0,5 %", () => {
-    expect(tasaEnFecha(hoy, historial, "REYNALDO ESPINOSA", "2026-10-31", "tasa_venta")).toBe(0.01);
-    expect(tasaEnFecha(hoy, historial, "REYNALDO ESPINOSA", "2025-03-10", "tasa_cobro")).toBe(0.01);
-    expect(tasaEnFecha(hoy, historial, "REYNALDO ESPINOSA", "2026-11-01", "tasa_venta")).toBe(0.005);
-    expect(tasaEnFecha(hoy, historial, "REYNALDO ESPINOSA", "2026-11-01T00:00:00", "tasa_cobro")).toBe(0.005);
+  it("Active Shoes y Active Wear: octubre y antes al 1 %; desde el 1-nov al 0,5 %", () => {
+    expect(tasa("active_shoes", "2026-10-31")).toBe(0.01);
+    expect(tasa("active_wear", "2025-03-10", "tasa_cobro")).toBe(0.01);
+    expect(tasa("active_shoes", "2026-11-01")).toBe(0.005);
+    expect(tasa("active_wear", "2026-11-01T00:00:00", "tasa_cobro")).toBe(0.005);
+    expect(tasa("active_shoes", "2027-02-15")).toBe(0.005);
   });
 
-  it("con dos tramos pasados gana el más cercano que todavía alcanza la fecha", () => {
-    const dos = [...historial, { vendedor_nombre: "REYNALDO ESPINOSA", vigente_hasta: "2025-12-31", tasa_venta: 0.02, tasa_cobro: 0.02 }];
-    expect(tasaEnFecha(hoy, dos, "REYNALDO ESPINOSA", "2025-12-31", "tasa_venta")).toBe(0.02);
-    expect(tasaEnFecha(hoy, dos, "REYNALDO ESPINOSA", "2026-01-01", "tasa_venta")).toBe(0.01);
+  it("las otras empresas siguen al 1 %, también en noviembre (venta y cobro)", () => {
+    for (const empresa of ["fashion_wear", "fashion_shoes", "vistana", "joystep"]) {
+      expect(tasa(empresa, "2026-11-20")).toBe(0.01);
+      expect(tasa(empresa, "2026-11-20", "tasa_cobro")).toBe(0.01);
+    }
   });
 
-  it("sin historial vale la tasa de hoy, y sin fila el 0,5 % de siempre", () => {
-    expect(tasaEnFecha(hoy, [], "REYNALDO ESPINOSA", "2026-10-15", "tasa_venta")).toBe(0.005);
-    expect(tasaEnFecha(hoy, historial, "OTRA PERSONA", "2026-10-15", "tasa_venta")).toBe(0.005);
+  it("con dos excepciones de la misma empresa gana la más reciente que ya rige", () => {
+    const dos = [...excepciones, { vendedor_nombre: "REYNALDO ESPINOSA", empresa_key: "active_shoes", vigente_desde: "2027-03-01", tasa_venta: 0.002, tasa_cobro: 0.002 }];
+    const en = (fecha: string) => tasaEnFecha(generales, dos, { vendedor: "REYNALDO ESPINOSA", empresa: "active_shoes", fecha }, "tasa_venta");
+    expect(en("2027-02-28")).toBe(0.005);
+    expect(en("2027-03-01")).toBe(0.002);
+  });
+
+  it("sin excepción vale la tasa general, y sin fila el 0,5 % de siempre", () => {
+    expect(tasaEnFecha(generales, [], { vendedor: "REYNALDO ESPINOSA", empresa: "active_shoes", fecha: "2026-11-15" }, "tasa_venta")).toBe(0.01);
+    expect(tasa("active_shoes", "2026-11-15", "tasa_venta", "OTRA PERSONA")).toBe(0.005);
   });
 
   it("un rango que cruza el cambio cobra cada tramo con SU tasa (octubre y noviembre de Active Shoes, medidos)", () => {
-    const fila = (base: number, tasa: number): FilaConBase =>
-      ({ empresa: "active_shoes", vendedor: "REYNALDO ESPINOSA", base, tasa, motivo: null, comision: 0 });
+    const fila = (base: number, t: number): FilaConBase =>
+      ({ empresa: "active_shoes", vendedor: "REYNALDO ESPINOSA", base, tasa: t, motivo: null, comision: 0 });
     const [r] = comisionPorVendedor([fila(75581, 0.01), fila(101674, 0.005)], [fila(51603.35, 0.01), fila(8277.52, 0.005)]);
     // 755,81 + 508,37 de venta; 516,03 + 41,39 de cobro = 1.271,84 + 549,76.
     expect(r.comision).toBe(1821.6);
