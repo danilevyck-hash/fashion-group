@@ -180,6 +180,8 @@ export interface PedidoBodega {
    * bajadas): la fila dice «—», nunca un 0 inventado.
    */
   piezas?: number | null;
+  /** 🔴 Subtotal sin ITBMS. SOLO le llega a `daniel`: lo decide el servidor (`montoDelPedido`). */
+  monto?: number | null;
 }
 
 /**

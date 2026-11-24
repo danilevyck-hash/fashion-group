@@ -39,8 +39,7 @@ import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import PedidoBultos, { type PedidoDelDetalle } from "./PedidoBultos";
 import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
-import { veTarjetasDePedidos, tarjetasDePedidos, lineaMasViejo } from "@/lib/ui/pedidos-tarjetas-2026-11";
-import { useSemillaSesion } from "@/lib/sesion-semilla-provider";
+import { PEDIDOS_CONTEOS_2026_11 as CONTEOS, conteosPorEstado, lineaDeResumen, lineaMasViejo, textoMonto } from "@/lib/ui/pedidos-conteos-2026-11";
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
 import {
   PEDIDOS_BULTOS_2026_10 as BULTOS,
@@ -158,10 +157,6 @@ export default function PedidosView({
   onDetalle?: (abierto: boolean) => void;
 }) {
   const barra = useHayBarraCelular();
-  // Las 4 tarjetas (24-nov-2026): solo Daniel y Rey, por el nombre de la sesión
-  // FIRMADA que el servidor bajó en la semilla (no por nada del navegador).
-  const semilla = useSemillaSesion();
-  const conTarjetas = SIMPLE && veTarjetasDePedidos(semilla?.userName);
   // El pedido abierto en el detalle con bultos; `null` = la lista.
   const [abierto, setAbierto] = useState<PedidoDelDetalle | null>(null);
   // El gesto de volver cierra el pedido y deja en la lista (`useAtrasCierra`).
@@ -483,6 +478,10 @@ export default function PedidosView({
     }
   }
   const sinNadaQueImprimir = visibles.length === 0;
+  // 24-nov-2026: cada pestaña dice cuántos tiene (respeta la empresa) y la
+  // línea de resumen va al lado del filtro de empresa. Para TODOS.
+  const conConteos = SIMPLE && CONTEOS;
+  const conteos = conteosPorEstado(deLaEmpresa);
 
   // 🩸 Con TRES chips de estado, el de «Empresa» quedaba aplastado a «E. ⌄» en
   // el celular: el grupo de estados no se encoge y el que sobraba era el otro.
@@ -490,7 +489,7 @@ export default function PedidosView({
   // recortar un rótulo hasta dejarlo sin sentido.
   const chips = (
     <div className="-mx-4 flex min-w-0 items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0">
-      {!conTarjetas && <div role="group" aria-label="Estado" className="flex shrink-0 gap-1.5">
+      <div role="group" aria-label="Estado" className="flex shrink-0 gap-1.5">
         {CHIPS.map((c) => (
           <button
             key={c.value}
@@ -507,13 +506,14 @@ export default function PedidosView({
             }`}
           >
             {c.label}
+            {conConteos && <span className={`ml-1.5 tabular-nums ${conteos[c.value as EstadoFlujoSimple] === 0 ? "text-gray-400" : ""}`}>{conteos[c.value as EstadoFlujoSimple]}</span>}
           </button>
         ))}
-      </div>}
+      </div>
       {/* Con `PEDIDOS_CELULAR_2026_11` la empresa del celular va en su propia fila. */}
-      {NUEVO && hayQueElegirEmpresa && !(barra && PEDIDOS_CELULAR) && <ChipSelector rotulo="Empresa" soloValor={PEDIDOS_EMPRESA_SIN_PREFIJO} valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
+      {NUEVO && hayQueElegirEmpresa && !(barra && PEDIDOS_CELULAR) && !conConteos && <ChipSelector rotulo="Empresa" soloValor={PEDIDOS_EMPRESA_SIN_PREFIJO} valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
       {POR_EMPRESA && !barra && (
-        <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={`${CLASE_BOTON_TEXTO} gap-1.5`}>
+        <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={`${CLASE_BOTON_TEXTO} gap-1.5 ${conConteos ? "ml-auto" : ""}`}>
           <Printer size={15} strokeWidth={1.8} aria-hidden /> Imprimir
         </button>
       )}
@@ -547,43 +547,39 @@ export default function PedidosView({
             type="button"
             aria-pressed={activo}
             onClick={() => { setFiltro(c.value); void cargar(); }}
-            className={clase}
+            className={`${clase} ${conConteos ? "py-1 leading-tight" : ""}`}
           >
             {c.label}
+            {conConteos && (
+              <span className={`block text-[15px] font-semibold tabular-nums ${conteos[c.value as EstadoFlujoSimple] === 0 ? "text-gray-400" : ""}`}>
+                {conteos[c.value as EstadoFlujoSimple]}
+              </span>
+            )}
           </button>
         );
       })}
     </div>
   );
   const pedidosCelular = barra && PEDIDOS_CELULAR;
-  // 24-nov-2026: celular 2×2, computadora una fila de 4; la elegida, negra.
-  const tarjetas = conTarjetas && pedidos ? (
-    <div role="group" aria-label="Estado" data-tarjetas-pedidos className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {tarjetasDePedidos(deLaEmpresa, hoy).map((t) => {
-        const activa = filtro === t.estado;
-        return (
-          <button
-            key={t.estado}
-            type="button"
-            aria-pressed={activa}
-            onClick={() => { setFiltro(t.estado); void cargar(); }}
-            className={`rounded-xl border px-3 py-2 text-left transition active:scale-[0.97] ${activa ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 bg-white text-gray-900 hover:border-gray-300"}`}
-          >
-            <span className={`block text-[13px] ${activa ? "text-gray-300" : "text-gray-500"}`}>{t.rotulo}</span>
-            <span className="block text-2xl font-bold leading-tight tabular-nums">{t.cantidad}</span>
-            <span className={`block min-h-[16px] text-xs ${t.enRojo ? `font-semibold ${activa ? "text-red-300" : "text-red-700"}` : activa ? "text-gray-300" : "text-gray-500"}`}>
-              {lineaMasViejo(t.masViejoDias)}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  ) : null;
+  const frescura = (
+    <LineaDeFrescura
+      className={conConteos ? "shrink-0 !text-[12px]" : pedidosCelular ? "shrink-0 !text-[12px]" : CIRCULO ? "!text-xs" : undefined}
+      actualizado={actualizado}
+      opciones={susEmpresas.map((empresa) => ({ modulo: "pedidos", empresa, label: nombreCortoEmpresa(empresa) }))}
+      secuencial
+      paralelo={PEDIDOS_ACTUALIZAR_EN_PARALELO}
+      engancharRunning
+      roles={[...PEDIDOS_BODEGA_ROLES]}
+      onSuccess={cargar}
+    />
+  );
   const vacioDelCentro = `Sin pedidos ${CHIPS.find((c) => c.value === filtro)?.label.toLowerCase() ?? ""}`.trim();
-  const lineaDeArriba = SIMPLE && PEDIDOS_LINEA_DE_LA_PESTANA
+  const lineaDeArriba = conConteos
+    ? lineaDeResumen(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple])
+    : SIMPLE && PEDIDOS_LINEA_DE_LA_PESTANA
     ? lineaDeLaPestana(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple], hoy)
     : CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy);
-  const filaEmpresaCelular = pedidosCelular && NUEVO && hayQueElegirEmpresa ? (
+  const filaEmpresaCelular = pedidosCelular && NUEVO && hayQueElegirEmpresa && !conConteos ? (
     <div data-fila-empresa className="mb-2 flex">
       <ChipSelector rotulo="Empresa" soloValor={PEDIDOS_EMPRESA_SIN_PREFIJO} valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />
     </div>
@@ -736,9 +732,16 @@ export default function PedidosView({
     const fila = "flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5";
     // 🔴 LAS UNIDADES TAMBIÉN EN PENDIENTES (Daniel, 8-oct-2026): antes solo
     // salían pegadas a los bultos, y un pedido pendiente no tiene bultos.
-    const chipUnidades = p.piezas != null && (
-      <span className={`${base} border-gray-300 bg-white text-gray-700`}>{textoUnidades(p.piezas)}</span>
+    // 24-nov-2026: el monto (solo le llega a daniel, lo decide el servidor),
+    // chico y gris, ANTES de las unidades; en el celular, arriba.
+    const monto = typeof p.monto === "number" && (
+      <span data-monto-pedido className="whitespace-nowrap text-xs tabular-nums text-gray-500">{textoMonto(p.monto)}</span>
     );
+    const conMonto = (x: ReactNode) =>
+      monto ? <span className="inline-flex flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-1.5">{monto}{x}</span> : x;
+    const chipUnidades = conMonto(p.piezas != null && (
+      <span className={`${base} border-gray-300 bg-white text-gray-700`}>{textoUnidades(p.piezas)}</span>
+    ));
     // 🔴 DESHACER (Daniel, 8-oct-2026): le toca a quien marcó el paso —bodega
     // deshace Preparado, la secretaria deshace Recibido; admin, los dos—. El
     // servidor aplica la misma regla (`puedeMoverFlujoSimple`).
@@ -804,7 +807,7 @@ export default function PedidosView({
     // Revisión 110 · 61: «N bultos ✎» o «+ Bultos» se toca (bodega y admin;
     // en Recibido, mientras no se facture) y las unidades van en gris al lado.
     const editaBultos = BULTOS_EN_EL_PEDIDO && puedeCambiarBultos && (e === "preparado" || (e === "recibido" && p.facturado === false));
-    const chipBultos = BULTOS_EN_EL_PEDIDO ? (
+    const chipBultos = conMonto(BULTOS_EN_EL_PEDIDO ? (
       <span className="inline-flex items-center gap-1.5">
         {editaBultos ? (
           <button
@@ -827,7 +830,7 @@ export default function PedidosView({
       <span className={`${base} border-gray-300 bg-white text-gray-700`}>
         {[p.bultos ? `${p.bultos} ${p.bultos === 1 ? "bulto" : "bultos"}` : null, p.piezas != null ? textoUnidades(p.piezas) : null].filter(Boolean).join(" · ") || "—"}
       </span>
-    );
+    ));
     if (e === "preparado") {
       if (!puedeRecibir) {
         return puedeMarcar ? (
@@ -1337,7 +1340,7 @@ export default function PedidosView({
       {barra && (
         <EnLaBarra
           pestana="pedidos"
-          filaIzq={pedidosCelular && (conTarjetas || dosPorDos) ? null : pedidosCelular && ESTADOS_CELULAR === "una-linea" ? segmentadoCelular : chips}
+          filaIzq={pedidosCelular && dosPorDos ? null : pedidosCelular && ESTADOS_CELULAR === "una-linea" ? segmentadoCelular : chips}
           // n.º 60: el «···» tenía UNA opción; la impresora (ícono de línea) va directo al título.
           iconos={POR_EMPRESA && PEDIDOS_IMPRESORA_EN_EL_TITULO && !sinNadaQueImprimir ? (
             <IconoBarra etiqueta="Imprimir" onClick={() => void imprimir()}>
@@ -1353,9 +1356,29 @@ export default function PedidosView({
       )}
 
       {/* Dos por dos no cabe en el renglón de 44 px de la barra: va arriba de la página. */}
-      {tarjetas}
-      {pedidosCelular && dosPorDos && !conTarjetas && <div className="mb-2 flex">{segmentadoCelular}</div>}
+      {pedidosCelular && dosPorDos && <div className="mb-2 flex">{segmentadoCelular}</div>}
       {filaEmpresaCelular}
+      {conConteos ? (
+        <div data-resumen-pedidos className="mb-3">
+          {!barra && <div className="mb-3">{chips}</div>}
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            {NUEVO && hayQueElegirEmpresa ? (
+              <span className={barra ? "shrink-0 [&_button]:h-8 [&_button]:px-2.5 [&_button]:text-[13px]" : "shrink-0"}>
+                <ChipSelector rotulo="Empresa" sinRotulo valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />
+              </span>
+            ) : <span />}
+            <p className={`min-w-0 text-right font-semibold leading-snug text-gray-900 ${barra ? "text-[12.5px] tracking-tight" : "text-base"}`}>
+              {pedidos ? partesSinPartir(lineaDeArriba) : NBSP}
+            </p>
+          </div>
+          <div className="mt-1 flex min-w-0 items-center justify-between gap-2 text-xs text-gray-500">
+            <span className="min-w-0">
+              {partesSinPartir([pedidos ? lineaMasViejo(deLaEmpresa, filtro, hoy) : null, visibles.some((p) => typeof p.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · "))}
+            </span>
+            {frescura}
+          </div>
+        </div>
+      ) : (
       <div className={pedidosCelular ? "mb-2" : "mb-3 flex flex-wrap items-center justify-between gap-3"}>
         {/* AJUSTES_APPLE_6 (punto 2): el título en una línea y la frescura al lado si cabe; si no, debajo, chica.
             En el celular (14-nov-2026) van en UNA línea: el resumen a la izquierda y la frescura a la derecha. */}
@@ -1370,19 +1393,11 @@ export default function PedidosView({
               // alto (un espacio que no se colapsa) y nada de abajo salta.
               : TEXTOS_SIN_PARTIR ? NBSP : " "}
           </p>
-          <LineaDeFrescura
-            className={pedidosCelular ? "shrink-0 !text-[12px]" : CIRCULO ? "!text-xs" : undefined}
-            actualizado={actualizado}
-            opciones={susEmpresas.map((empresa) => ({ modulo: "pedidos", empresa, label: nombreCortoEmpresa(empresa) }))}
-            secuencial
-            paralelo={PEDIDOS_ACTUALIZAR_EN_PARALELO}
-            engancharRunning
-            roles={[...PEDIDOS_BODEGA_ROLES]}
-            onSuccess={cargar}
-          />
+          {frescura}
         </div>
         {!barra && chips}
       </div>
+      )}
 
       {error ? (
         <Aviso tono="error">No se pudieron leer los pedidos. Intenta de nuevo.</Aviso>

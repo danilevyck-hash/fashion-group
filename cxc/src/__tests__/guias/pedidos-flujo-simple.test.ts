@@ -357,7 +357,7 @@ describe("🔴 9 · deshacer un paso (Daniel, 8-oct-2026)", () => {
 describe("🔴 10 · las unidades también en Pendientes (Daniel, 8-oct-2026)", () => {
   it("la fila pendiente muestra las unidades, también a quien solo mira", () => {
     const v = vista();
-    expect(v).toContain("const chipUnidades = p.piezas != null");
+    expect(v).toContain("const chipUnidades = conMonto(p.piezas != null");
     expect(v).toContain("if (!puedeMarcar) return chipUnidades ||");
     expect(v).toMatch(/<div className=\{fila\}>\s*\{chipUnidades\}/);
   });
