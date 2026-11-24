@@ -337,8 +337,8 @@ describe("d. la migración y el servidor", () => {
       { empleado_codigo: "6", fecha: "2026-08-25", aprobado: true, decision: null, minutos_vistos: 20, marcado_por: "Julio", marcado_en: null },
       { empleado_codigo: "6", fecha: "2026-08-26", aprobado: false, decision: null, minutos_vistos: 0, marcado_por: null, marcado_en: null },
     ];
-    const lte = vi.fn(async () => ({ data: filasDb, error: null }));
-    const cadena = { select: () => cadena, gte: () => cadena, lte };
+    const range = vi.fn(async () => ({ data: filasDb, error: null, count: filasDb.length }));
+    const cadena = { select: () => cadena, gte: () => cadena, lte: () => cadena, order: () => cadena, range };
     vi.resetModules();
     vi.doMock("@/lib/supabase-server", () => ({ supabaseServer: { from: () => cadena } }));
     const { leerAprobaciones } = await import("@/lib/asistencia/aprobaciones-server");

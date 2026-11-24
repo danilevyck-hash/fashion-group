@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
-import { transportistaLabel } from "@/lib/transportistaLabel";
+import { transportistaLabel, type TransportistaSource } from "@/lib/transportistaLabel";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { validarEmpresasItems } from "@/lib/guias/validar-items";
 import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
 import {
@@ -12,6 +13,12 @@ import {
 } from "@/lib/campos-obligatorios";
 
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
+
+/** Fila del listado (lo que el GET usa para armar la respuesta). */
+type GuiaListada = TransportistaSource & {
+  guia_items: Array<{ orden?: number; bultos: number }> | null;
+  [col: string]: unknown;
+};
 
 export const dynamic = "force-dynamic";
 
@@ -50,11 +57,26 @@ export async function GET(req: NextRequest) {
   // podía mirar el de la cabecera —que NO se reescribe al anotar un número
   // tarde— y el chip ámbar se quedaría puesto para siempre en una guía que ya
   // tiene su número. Es un TEXT corto; las firmas base64 siguen fuera.
-  const { data, error } = await supabaseServer
-    .from("guia_transporte")
-    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, estado, tipo_despacho, receptor_nombre, entregado_por, nombre_chofer, cedula, numero_guia_transp, created_at, deleted, guia_items(orden, bultos, facturas, cliente, cliente_codigo, direccion, empresa, numero_guia_transp)")
-    .eq("deleted", false)
-    .order("numero", { ascending: false });
+  // 🩸 Paginado contra el COUNT: el tope silencioso de 1.000 filas dejaría las
+  // guías más viejas fuera de la lista sin decir nada. Mismo orden (número desc).
+  let data: GuiaListada[] | null = null;
+  let error: unknown = null;
+  try {
+    data = await leerTodoPaginado<GuiaListada>("guia_transporte (lista)", (pedirCount, desde, hasta) =>
+      supabaseServer
+        .from("guia_transporte")
+        .select(
+          "id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, estado, tipo_despacho, receptor_nombre, entregado_por, nombre_chofer, cedula, numero_guia_transp, created_at, deleted, guia_items(orden, bultos, facturas, cliente, cliente_codigo, direccion, empresa, numero_guia_transp)",
+          pedirCount ? { count: "exact" } : {},
+        )
+        .eq("deleted", false)
+        .order("numero", { ascending: false })
+        .order("id", { ascending: true })
+        .range(desde, hasta),
+    );
+  } catch (e) {
+    error = e;
+  }
 
   // 🩸 `monto_total` Y `nombre_entregador` SALIERON DE ESTE SELECT (5-sep-2026).
   // Medido sobre las 242 guías de toda la historia: `monto_total` vale **0.00 en
@@ -185,7 +207,13 @@ export async function POST(req: NextRequest) {
     }));
 
     const { error: itemsErr } = await supabaseServer.from("guia_items").insert(rows);
-    if (itemsErr) return respuestaErrorEscritura(itemsErr, { tabla: "guia_items", accion: "Guías › crear guía" });
+    if (itemsErr) {
+      // 🩸 Sin renglones no hay guía: se deshace la cabecera recién creada (como
+      // `api/reclamos`), para que no quede una guía VACÍA en la lista.
+      const { error: rbErr } = await supabaseServer.from("guia_transporte").delete().eq("id", guia.id);
+      if (rbErr) console.error("[guias] no se pudo deshacer la guía sin renglones", guia.id, rbErr.message);
+      return respuestaErrorEscritura(itemsErr, { tabla: "guia_items", accion: "Guías › crear guía" });
+    }
   }
 
   const session = getSession(req);

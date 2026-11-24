@@ -28,11 +28,14 @@ const EMPRESAS_BOSTON = empresasCarteraAparte();
 interface Inicio {
   anio: number;
   mes: number;
-  cartera: { total: number; d0_90: number; d91_120: number; d121_plus: number; clientes: number };
-  ventas: { mes: number; anio: number };
-  planilla: { personas: number };
-  prestamos: { personas: number };
+  // `null` = esa lectura se cayó: la tarjeta dice «No se pudo medir», nunca 0.
+  cartera: { total: number; d0_90: number; d91_120: number; d121_plus: number; clientes: number } | null;
+  ventas: { mes: number; anio: number } | null;
+  planilla: { personas: number } | null;
+  prestamos: { personas: number } | null;
 }
+
+const NO_SE_PUDO_MEDIR = "No se pudo medir";
 
 const fetcher = (u: string) =>
   fetch(u, { cache: "no-store" }).then((r) => {
@@ -107,27 +110,27 @@ export default function InicioBoston({ onIr }: { onIr: (t: TabBoston) => void })
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         <Tarjeta
           titulo="Cuentas por cobrar"
-          valor={isLoading ? "—" : `$${fmt(c?.total ?? 0)}`}
-          pie={isLoading ? "cargando…" : `${c?.clientes ?? 0} clientes`}
+          valor={isLoading || !c ? "—" : `$${fmt(c.total)}`}
+          pie={isLoading ? "cargando…" : !c ? NO_SE_PUDO_MEDIR : `${c.clientes} clientes`}
           enlace={BOSTON_CXC_ABRE_BOSTON ? "Abre Confecciones Boston ›" : undefined}
           onIr={() => onIr("cxc")}
         />
         <Tarjeta
           titulo={`Ventas de ${mesNombre || "el mes"}`}
-          valor={isLoading ? "—" : `$${fmt(data?.ventas.mes ?? 0)}`}
-          pie={isLoading ? "cargando…" : `$${fmt(data?.ventas.anio ?? 0)} en ${data?.anio ?? ""}`}
+          valor={isLoading || !data?.ventas ? "—" : `$${fmt(data.ventas.mes)}`}
+          pie={isLoading ? "cargando…" : !data?.ventas ? NO_SE_PUDO_MEDIR : `$${fmt(data.ventas.anio)} en ${data.anio}`}
           onIr={() => onIr("ventas")}
         />
         <Tarjeta
           titulo="Planilla"
-          valor={isLoading ? "—" : String(data?.planilla.personas ?? 0)}
-          pie="colaboradores activos"
+          valor={isLoading || !data?.planilla ? "—" : String(data.planilla.personas)}
+          pie={!isLoading && data && !data.planilla ? NO_SE_PUDO_MEDIR : "colaboradores activos"}
           onIr={() => onIr("planilla")}
         />
         <Tarjeta
           titulo="Préstamos"
-          valor={isLoading ? "—" : String(data?.prestamos.personas ?? 0)}
-          pie={BOSTON_SIN_DE_BOSTON ? "colaboradores con préstamo" : "colaboradores de Confecciones Boston"}
+          valor={isLoading || !data?.prestamos ? "—" : String(data.prestamos.personas)}
+          pie={!isLoading && data && !data.prestamos ? NO_SE_PUDO_MEDIR : BOSTON_SIN_DE_BOSTON ? "colaboradores con préstamo" : "colaboradores de Confecciones Boston"}
           onIr={() => onIr("prestamos")}
         />
       </div>

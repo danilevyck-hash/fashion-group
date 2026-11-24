@@ -101,6 +101,7 @@ import { verifySession } from "@/lib/session-cookie";
 import { shortError } from "@/lib/telegram";
 import { enviarSistema } from "@/lib/alertas/canal";
 import { columnasDeOrden } from "@/lib/backup/tablas";
+import { listarTodoElBucket, type FileEntry } from "@/lib/backup/listar-storage";
 
 /**
  * ¿El fallo de ESTA corrida de backup puede esperar a la próxima entrada del
@@ -456,6 +457,10 @@ const STORAGE_REPLICA_BUCKETS = [
   // Los videos de «Cómo se usa» (15-nov-2026): se graban a mano; si se pierden
   // hay que volver a grabarlos.
   "videos-ayuda",
+  // La foto de la cédula de cada colaborador (Asistencia): la sube una persona
+  // y no se vuelve a conseguir sola. Las selfies de marcación NO: se borran
+  // por diseño.
+  "asistencia-cedulas",
 ];
 const STORAGE_PREFIX = "_storage";
 // Réplica off-site a Cloudflare R2 (src/lib/backup/r2.ts): el set completo pesa
@@ -533,33 +538,9 @@ async function fetchTableNdjson(
   return { ndjson: parts.join("\n"), rows: count };
 }
 
-interface FileEntry {
-  path: string;
-  size: number;
-  updated_at: string;
-  mimetype: string;
-}
-
-/** Lista TODOS los archivos de un bucket, recursivo (el list de Storage es por carpeta). */
-async function listAllFiles(bucket: string, prefix = ""): Promise<FileEntry[]> {
-  const { data, error } = await supabaseServer.storage.from(bucket).list(prefix, { limit: 1000 });
-  if (error) throw new Error(`list ${bucket}/${prefix}: ${error.message}`);
-  const out: FileEntry[] = [];
-  for (const e of data || []) {
-    const path = prefix ? `${prefix}/${e.name}` : e.name;
-    if (!e.id) {
-      // Carpeta → descender
-      out.push(...(await listAllFiles(bucket, path)));
-    } else {
-      out.push({
-        path,
-        size: (e.metadata as { size?: number } | null)?.size ?? 0,
-        updated_at: e.updated_at || e.created_at || "",
-        mimetype: (e.metadata as { mimetype?: string } | null)?.mimetype || "application/octet-stream",
-      });
-    }
-  }
-  return out;
+/** Lista TODOS los archivos de un bucket, recursivo y por páginas (ver listar-storage.ts). */
+function listAllFiles(bucket: string): Promise<FileEntry[]> {
+  return listarTodoElBucket(bucket, (prefix, opts) => supabaseServer.storage.from(bucket).list(prefix, opts));
 }
 
 // ── Réplica OFF-SITE de los buckets de Storage a R2 (?grupo=storage) ─────────

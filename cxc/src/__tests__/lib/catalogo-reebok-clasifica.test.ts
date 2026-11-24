@@ -64,7 +64,7 @@ function chainDe(filas: () => Array<Record<string, unknown>>, tabla: string) {
         for (const c of nombres) if (Object.prototype.hasOwnProperty.call(f, c)) o[c] = f[c];
         return o;
       });
-      return Promise.resolve(res({ data, error: null }));
+      return Promise.resolve(res({ data, error: null, count: data.length }));
     },
   };
   return chain;

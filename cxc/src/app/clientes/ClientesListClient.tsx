@@ -38,6 +38,7 @@ import { ChevronDown } from "lucide-react";
 import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, HojaMenu } from "@/components/celular/BarraDeControles";
 import { CLIENTES_LISTA_DESPLEGABLES as LISTA_DESPLEGABLES } from "@/lib/ui/revision-110-cxc";
 import { CORREO_ENTERO, FRESCURA_SIN_DESBORDE } from "@/lib/ui/revision-110-ajustes";
+import { Aviso } from "@/components/ui/Aviso";
 import {
   contarChips,
   contarClientes,
@@ -72,9 +73,12 @@ const CHIPS_VALIDOS: ChipId[] = ["todos", "sin-contacto", "sin-correo", "sin-tel
 export default function ClientesListClient({
   initialClientes,
   actualizado = null,
+  errorLectura = null,
   apple = CLIENTES_APPLE_2026_10,
 }: {
   initialClientes: Cliente[];
+  /** Una lectura del servidor se cayó: se DICE arriba de la lista (nunca lista vacía ni «Sin saldo» callados). */
+  errorLectura?: string | null;
   /** El último sync del directorio (`clientes_master`), para la línea de frescura. */
   actualizado?: string | null;
   /** `CLIENTES_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
@@ -282,12 +286,15 @@ export default function ClientesListClient({
               150». Se va; al buscar, «12 de 150» baja al pie. */}
           {apple ? <div className="mb-2" /> : <p className="mt-3 mb-2 text-xs text-gray-500 tabular-nums">{contarClientes(visibles.length)}</p>}
 
-          {!ytdData && initialClientes.length === 0 ? (
+          {errorLectura && (
+            <Aviso tono="error" className="mb-3">{errorLectura}</Aviso>
+          )}
+          {!ytdData && initialClientes.length === 0 && !errorLectura ? (
             <SkeletonTable rows={8} cols={4} />
           ) : visibles.length === 0 ? (
             <EmptyState
               title="Sin resultados"
-              subtitle={q || chip !== "todos" ? undefined : "Todavía no hay clientes cargados."}
+              subtitle={q || chip !== "todos" || errorLectura ? undefined : "Todavía no hay clientes cargados."}
             />
           ) : (
             <>

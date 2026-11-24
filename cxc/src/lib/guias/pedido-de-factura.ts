@@ -21,6 +21,8 @@ import { RUNNING_STALE_MIN } from "@/lib/switch-api/sync-log";
 import { cerrarSesionWeb, leerFacturaMostrar, loginSwitchWeb } from "@/lib/switch-api/web-client";
 import { normalizarPedido } from "./etiquetas-por-envio";
 import { TIPO_FACTURA } from "./atajos-facturas";
+import { cerrarPedidoFacturado } from "./pedido-cerrado-por-factura";
+import { PEDIDO_SE_CIERRA_CON_FACTURA } from "@/lib/ui/pedido-cerrado-por-factura-2026-11";
 
 /** Tope de la búsqueda entera (login + facturas). Medido: login 2–12 s, cada factura 0,5–3,5 s. */
 export const TOPE_BUSQUEDA_PEDIDO_MS = 12_000;
@@ -102,7 +104,9 @@ async function guardarPedido(empresaKey: string, id: number, pedido: string | nu
     .update({ pedido_referencia: pedido, pedido_leido_en: new Date().toISOString() })
     .eq("empresa_key", empresaKey)
     .eq("switch_factura_id", id);
-  if (error) console.error(`[guias/pedido] guardar ${empresaKey} ${id}:`, error.message);
+  if (error) { console.error(`[guias/pedido] guardar ${empresaKey} ${id}:`, error.message); return; }
+  // 🔴 Switch ya facturó ese pedido: si seguía En preparación o Preparado, se cierra solo.
+  if (PEDIDO_SE_CIERRA_CON_FACTURA && pedido) await cerrarPedidoFacturado(empresaKey, id, pedido);
 }
 
 export type PedidosPorFactura = Record<string, string | null>;

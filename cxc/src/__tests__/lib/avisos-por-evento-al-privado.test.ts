@@ -23,7 +23,9 @@ describe("pedido nuevo, enviado a Switch y confirmado del link: sin Telegram", (
   it("enviado a Switch: solo quedan los avisos de falla y ambiguo, a SISTEMA", () => {
     const s = src(ENVIO);
     expect(s).not.toMatch(/\benviarNegocio(Privado)?\s*\(|sendTelegramAlert/);
-    expect(s.match(/\benviarSistema\s*\(/g)).toHaveLength(2);
+    // Tres fallas: rechazo, ambiguo, y Switch lo creó pero no se pudo anotar.
+    expect(s.match(/\benviarSistema\s*\(/g)).toHaveLength(3);
+    expect(s).toContain("pero el sistema no pudo anotarlo");
     expect(s).toContain("🚨 Envío a Switch FALLÓ");
     expect(s).toContain("🚨 Envío a Switch AMBIGUO");
   });

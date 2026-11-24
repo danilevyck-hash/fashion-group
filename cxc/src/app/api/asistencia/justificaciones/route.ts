@@ -12,6 +12,7 @@ import { asistenciaRoles, diaLibreRoles } from "@/lib/asistencia/roles";
 import { requireAsistencia } from "@/lib/asistencia/guard";
 import { alcanceDelRol, empresaEnAlcance, empresaForzada, rechazarFueraDeAlcance } from "@/lib/asistencia/alcance-boston-server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { esDiaLibreDeLaEmpresa, motivosParaElegir, motivoSeOfrece } from "@/lib/asistencia/motivos";
 import { avisoMigracionDiaLibre } from "@/lib/asistencia/dia-libre-empresa";
 import { cargarDeudasDiaLibre } from "@/lib/asistencia/dia-libre-empresa-server";
@@ -34,15 +35,21 @@ export async function GET(req: NextRequest) {
   const desde = sp.get("desde"), hasta = sp.get("hasta");
   // Se solapa con el rango pedido, no "está contenido en": unas vacaciones que
   // arrancan antes del rango igual cubren días de adentro.
-  const armar = (cols: string) => {
-    let q = supabaseServer
-      .from("asistencia_justificaciones")
-      .select(cols)
-      .order("desde", { ascending: false })
-      .limit(500);
-    if (desde && hasta) q = q.lte("desde", hasta).gte("hasta", desde);
-    return q;
-  };
+  // 🩸 24-nov-2026: era `.limit(500)` sin página siguiente — pasadas las 500,
+  // las más viejas desaparecían en silencio. Ahora se lee TODO, paginado.
+  const armar = (cols: string) =>
+    leerTodoPaginado<{ empleado_codigo: string }>("asistencia_justificaciones", (pedirCount, from, to) => {
+      let q = supabaseServer
+        .from("asistencia_justificaciones")
+        .select(cols, pedirCount ? { count: "exact" } : {})
+        .order("desde", { ascending: false })
+        .order("id", { ascending: true });
+      if (desde && hasta) q = q.lte("desde", hasta).gte("hasta", desde);
+      return q.range(from, to);
+    }).then(
+      (data) => ({ data, error: null }),
+      (e: unknown) => ({ data: null, error: { message: e instanceof Error ? e.message : String(e) } }),
+    );
 
   // 🩸 La lista de personas se pide ACÁ y no a `/horarios`, que es de donde
   // salía antes. Aquella devuelve solo a quien marcó en los últimos 90 días y
@@ -65,7 +72,7 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   // 🔴 Filtro por empresa (10-sep-2026): las justificaciones de la gente de ESA empresa.
   const empresaDe = new Map(filas.map((f) => [String(f.empleado_codigo), f.empresa ?? null]));
-  const lista = ((data ?? []) as unknown as Array<{ empleado_codigo: string }>)
+  const lista = (data ?? [])
     .filter((j) => !empresaFiltro || empresaDe.get(String(j.empleado_codigo)) === empresaFiltro);
   return NextResponse.json({
     justificaciones: lista,

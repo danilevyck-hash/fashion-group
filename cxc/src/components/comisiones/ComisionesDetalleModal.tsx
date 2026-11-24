@@ -86,6 +86,7 @@ import {
 import { useEsCelularComisiones } from "./celular/useEsCelularComisiones";
 import { MenuDescargaComision } from "./comisiones-detalle/MenuDescargaComision";
 import { ROTULO_NO_SE_PAGA } from "@/lib/comisiones/sin-pago";
+import { AVISO_DESCUENTOS_NO_LEIDOS } from "@/lib/comisiones/descuentos-aviso";
 import { ROTULO_DESCARGAR_V2 } from "@/lib/comisiones/apple-v2";
 import { seccionesDePantalla } from "@/lib/comisiones/papel-pagable";
 import { lineaDeComisionesDelPapel, lineaDelPieDelPapel } from "@/lib/comisiones/reporte-comision";
@@ -240,14 +241,12 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           const b = await resDet.json().catch(() => ({}));
           throw new Error(b.error ?? `HTTP ${resDet.status}`);
         }
+        // 🔴 Sin descuentos leídos el total no es definitivo: se DICE, no se muestra en 0.
+        if (!resDesc.ok) throw new Error(AVISO_DESCUENTOS_NO_LEIDOS);
         if (alive) setData((await resDet.json()) as ComisionDetalle);
         // Los descuentos son opcionales (solo algunos vendedores los tienen).
-        if (resDesc.ok) {
-          const dj = (await resDesc.json()) as { descuentos?: ComisionDescuento[] };
-          if (alive) setDescuentos(Array.isArray(dj.descuentos) ? dj.descuentos : []);
-        } else if (alive) {
-          setDescuentos([]);
-        }
+        const dj = (await resDesc.json()) as { descuentos?: ComisionDescuento[] };
+        if (alive) setDescuentos(Array.isArray(dj.descuentos) ? dj.descuentos : []);
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "No se pudo cargar.");
       } finally {

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { fetchAvailableYears } from "@/lib/ventas/queries";
 import { lineaDeRechazos } from "@/lib/rechazos-de-switch";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { ComisionesPageClient } from "./ComisionesPageClient";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,8 @@ export const dynamic = "force-dynamic";
 // modules.ts). Contabilidad entró el 25-ago-2026 — las 4 rutas de LECTURA ya
 // le contestaban 200 desde antes; lo que le faltaba era esta puerta.
 export default async function ComisionesPage() {
-  const year = new Date().getFullYear();
+  // Año de Panamá, no del servidor (UTC).
+  const year = Number(hoyPanama().slice(0, 4));
   // En paralelo. La familia es `recibo`: la comisión sobre cobro lee
   // `switch_recibos`, y ésta es la pantalla donde ese número se ve.
   const [availableYears, avisoMontos] = await Promise.all([

@@ -107,8 +107,10 @@ import {
 import { corteValido } from "@/lib/asistencia/corte-quincena";
 import { logActivity } from "@/lib/log-activity";
 import {
+  avisarPagosSinAnotar,
   escribirPagosDelCierre,
   planearCierre,
+  type PagoFallido,
   revertirPagosDelCierre,
 } from "@/lib/asistencia/cierre-prestamo-server";
 import {
@@ -381,10 +383,17 @@ export async function POST(req: NextRequest) {
     // 🔴 CON `await`. Esto mueve plata: un `.then().catch()` acá sería una
     // deuda que baja a veces.
     let prestamosAnotados: { escritos: number; total: number } | null = null;
+    // 🔴 24-nov-2026: lo que no se pudo anotar (ni al segundo intento) YA NO
+    // se calla: va en la respuesta y por 🔧 SISTEMA. El cuadro queda cerrado.
+    let prestamosSinAnotar: PagoFallido[] = [];
     if (PLANILLA_UNIDA && r.id) {
       const plan = await planearCierre({ lineas, desde, hasta });
       const escrito = await escribirPagosDelCierre({ planillaId: r.id, plan });
       prestamosAnotados = { escritos: escrito.escritos, total: escrito.total };
+      prestamosSinAnotar = escrito.fallidos;
+      if (prestamosSinAnotar.length) {
+        await avisarPagosSinAnotar({ empresa, desde, hasta, fallidos: prestamosSinAnotar });
+      }
     }
 
     // ── 🔴 Y EL PAGO DEL DÍA LIBRE, POR LA MISMA REGLA Y EN EL MISMO LUGAR ──
@@ -412,6 +421,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true, id: r.id, version: r.version, totales: r.totales, empresa, desde, hasta,
       prestamosAnotados,
+      prestamosSinAnotar,
       diaLibreAnotado,
     });
   } catch (e) {

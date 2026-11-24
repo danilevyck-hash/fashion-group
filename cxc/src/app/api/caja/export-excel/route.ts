@@ -13,7 +13,10 @@ export async function POST(req: NextRequest) {
 
     const { data: periodo, error: pErr } = await supabaseServer.from("caja_periodos").select("*").eq("id", periodo_id).single();
     if (pErr || !periodo) return NextResponse.json({ error: "Período no encontrado" }, { status: 404 });
-    const { data: gastos } = await supabaseServer.from("caja_gastos").select("*").eq("periodo_id", periodo_id).eq("deleted", false).order("fecha", { ascending: true });
+    const { data: gastos, error: gErr } = await supabaseServer.from("caja_gastos").select("*").eq("periodo_id", periodo_id).eq("deleted", false).order("fecha", { ascending: true });
+
+    // 🩸 24-nov-2026: un fallo de lectura salía como un Excel SIN gastos.
+    if (gErr) throw new Error(`caja_gastos: ${gErr.message}`);
 
     const wb = buildCajaWorkbook(periodo, gastos || []);
     const buf = workbookBuffer(wb);

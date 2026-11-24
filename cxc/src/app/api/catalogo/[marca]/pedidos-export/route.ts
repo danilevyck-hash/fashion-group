@@ -5,6 +5,7 @@ import { workbookBuffer, exportFilename, XLSX_MIME } from "@/lib/excel-export";
 import { buildPedidosWorkbook, type PedidoExportRow } from "@/lib/catalogos/pedidos-excel";
 import { normalizarDocumento, type DocumentoSwitch } from "@/lib/catalogo/documento-switch";
 import { contextoDeLineas, totalDeLaLista } from "@/lib/catalogo/totales-lista";
+import { inEnTandas } from "@/lib/supabase-paginado";
 
 export const dynamic = "force-dynamic";
 
@@ -119,11 +120,10 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
         "order_id, numero_interno, pedido_switch_id, documento",
         "order_id, numero_interno, pedido_switch_id",
       ]) {
-        const { data: envios, error: enviosError } = await marcaDb
-          .from(cfg.enviosTable)
-          .select(cols)
-          .in("order_id", orderIds)
-          .in("estado", ["enviado", "verificado"]);
+        // En tandas: con ~640 ids la base contesta Bad Request.
+        const { data: envios, error: enviosError } = await inEnTandas<unknown>(orderIds, (tanda) =>
+          marcaDb.from(cfg.enviosTable).select(cols).in("order_id", tanda).in("estado", ["enviado", "verificado"]),
+        );
         if (enviosError) continue;
         for (const e of (envios || []) as unknown as Record<string, unknown>[]) {
           const id = String(e.order_id);
@@ -137,10 +137,9 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
       // no tuviera `status`, el libro sale sin saber qué es un borrador en vez
       // de caerse. Un export que no baja es peor que una columna imprecisa.
       for (const cols of ["id, order_number, status", "id, order_number"]) {
-        const { data: ords, error: ordsError } = await marcaDb
-          .from(cfg.ordersTable)
-          .select(cols)
-          .in("id", orderIds);
+        const { data: ords, error: ordsError } = await inEnTandas<unknown>(orderIds, (tanda) =>
+          marcaDb.from(cfg.ordersTable).select(cols).in("id", tanda),
+        );
         if (ordsError) continue;
         for (const o of (ords || []) as unknown as Record<string, unknown>[]) {
           if (o.order_number) numerosPedido.set(String(o.id), String(o.order_number));

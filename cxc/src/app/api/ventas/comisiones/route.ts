@@ -80,7 +80,8 @@ export async function GET(req: NextRequest) {
   // la RPC (comision_b2b_v8). Sin tabla o sin red, la tabla sale sin la marca.
   const [porMes, descuentosPorMes, exclusiones] = await Promise.all([
     Promise.all(meses.map((m) => leerComision(empresa, year, m))),
-    Promise.all(meses.map((m) => leerDescuentosEfectivos([empresa], year, m).catch(() => []))),
+    // `null` = no se pudo leer: la tabla sale igual, pero la respuesta lo DICE.
+    Promise.all(meses.map((m) => leerDescuentosEfectivos([empresa], year, m).catch(() => null))),
     leerExclusionesActivasOVacio([empresa]),
   ]);
   const roto = porMes.find((r) => r.error || !r.data);
@@ -102,11 +103,12 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ...data,
     mes,
+    ...(descuentosPorMes.some((d) => d === null) ? { descuentos_no_leidos: true } : {}),
     vendedores: adjuntarClientesSinComision(
       marcarSePaga(
         acumularVendedores(
           porMes.map((r, i) =>
-            netearComisiones(r.data!.vendedores, totalPorVendedor(descuentosPorMes[i], empresa)),
+            netearComisiones(r.data!.vendedores, totalPorVendedor(descuentosPorMes[i] ?? [], empresa)),
           ),
         ),
       ),

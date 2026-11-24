@@ -195,13 +195,24 @@ export async function bajarLineas(empresaKey: string, pedidoId: number): Promise
  */
 export async function bajarLineasQueFaltan(empresaKey: string, pedidoIds: readonly number[], ahora = Date.now()): Promise<number> {
   if (pedidoIds.length === 0) return 0;
-  const { data, error } = await supabaseServer
-    .from("pedidos_lineas")
-    .select("pedido_switch_id, synced_at")
-    .eq("empresa_key", empresaKey)
-    .in("pedido_switch_id", [...pedidoIds])
-    .limit(50000);
-  if (error) return 0;
+  // 🩸 Era un límite de 50.000, y `db-max-rows` = 1000 lo cortaba EN SILENCIO: un
+  // pedido con líneas más allá de la fila 1.000 parecía «sin bajar» y se volvía
+  // a pedir a Switch en cada corrida. Paginado por la llave primaria; falla ABIERTA.
+  let data: Array<{ pedido_switch_id: number; synced_at: string }>;
+  try {
+    data = await leerTodoPaginado("pedidos_lineas (frescura)", (pedirCount, desde, hasta) =>
+      supabaseServer
+        .from("pedidos_lineas")
+        .select("pedido_switch_id, synced_at", pedirCount ? { count: "exact" } : undefined)
+        .eq("empresa_key", empresaKey)
+        .in("pedido_switch_id", [...pedidoIds])
+        .order("pedido_switch_id")
+        .order("codigo_barra_id")
+        .range(desde, hasta) as unknown as PromiseLike<RespuestaPaginada>,
+    );
+  } catch {
+    return 0;
+  }
   const bajado = new Map<number, string>();
   for (const f of data ?? []) {
     const id = Number(f.pedido_switch_id);

@@ -703,13 +703,14 @@ export async function fetchAvailableYears(): Promise<number[]> {
   ]);
   const minF = minRes.data?.[0]?.fecha as string | undefined;
   const maxF = maxRes.data?.[0]?.fecha as string | undefined;
-  const minYear = minF ? new Date(minF).getFullYear() : null;
-  const maxYear = maxF ? new Date(maxF).getFullYear() : null;
+  const minYear = minF ? Number(minF.slice(0, 4)) : null;
+  const maxYear = maxF ? Number(maxF.slice(0, 4)) : null;
   const years = new Set<number>();
   if (minYear && maxYear) {
     for (let y = minYear; y <= maxYear; y++) years.add(y);
   }
-  years.add(new Date().getFullYear());
+  // El año en curso es el de Panamá: el servidor corre en UTC (31-dic 19:00 ya es año nuevo).
+  years.add(Number(hoyPanama().slice(0, 4)));
   return [...years].sort((a, b) => b - a);
 }
 

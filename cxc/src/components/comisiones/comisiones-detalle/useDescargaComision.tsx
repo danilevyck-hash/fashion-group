@@ -42,6 +42,7 @@ import {
   nombreArchivoComisionTodas,
 } from "@/lib/comisiones/nombre-archivo";
 import { alcanceDeVendedor, anotarDescargaComision } from "@/lib/comisiones/rastro";
+import { AVISO_DESCUENTOS_NO_LEIDOS } from "@/lib/comisiones/descuentos-aviso";
 
 /** Una empresa del alcance: su key y su nombre CORTO (diccionario § 0). */
 export interface EmpresaDelAlcance {
@@ -71,13 +72,10 @@ async function cargarUna(
   ]);
   if (!resDet.ok) throw new Error(MENSAJE_ERROR);
   const data = (await resDet.json()) as ComisionDetalle;
-  // Los descuentos son opcionales: sin ellos el reporte sale igual que el que
-  // se ve cuando esa lectura falla dentro del detalle (falla ABIERTO).
-  let descuentos: ComisionDescuento[] = [];
-  if (resDesc.ok) {
-    const dj = (await resDesc.json()) as { descuentos?: ComisionDescuento[] };
-    if (Array.isArray(dj.descuentos)) descuentos = dj.descuentos;
-  }
+  // 🔴 Sin descuentos leídos el papel NO sale: su total no sería definitivo.
+  if (!resDesc.ok) throw new Error(AVISO_DESCUENTOS_NO_LEIDOS);
+  const dj = (await resDesc.json()) as { descuentos?: ComisionDescuento[] };
+  const descuentos: ComisionDescuento[] = Array.isArray(dj.descuentos) ? dj.descuentos : [];
   return { empresa, data, descuentos };
 }
 

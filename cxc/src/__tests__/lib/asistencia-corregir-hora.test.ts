@@ -230,7 +230,7 @@ describe("2b. la ruta GET /api/asistencia/correcciones/motivos: solo lectura, si
     const srv = puro("lib/asistencia/correcciones-server.ts");
     const fn = srv.slice(srv.indexOf("export async function leerMotivosFrecuentes"), srv.indexOf("export interface NuevaCorreccion"));
     expect(fn).toMatch(/\.from\(TABLA_CORRECCIONES\)/);
-    expect(fn).toMatch(/\.select\("motivo, creada_en"\)/);
+    expect(fn).toMatch(/\.select\("motivo, creada_en"/);
     expect(fn).toMatch(/\.gte\("creada_en", `\$\{desdeDeLaVentana\(hoy\)\}/);
     expect(fn).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
     const ruta = puro("app/api/asistencia/correcciones/motivos/route.ts");
@@ -254,8 +254,8 @@ describe("2b. la ruta GET /api/asistencia/correcciones/motivos: solo lectura, si
       supabaseServer: {
         from: () => {
           const q: Record<string, unknown> = {};
-          for (const m of ["select", "gte", "order", "limit"]) q[m] = () => q;
-          (q as { then: unknown }).then = (ok: (v: unknown) => unknown) => ok({ data: FILAS, error: null });
+          for (const m of ["select", "gte", "order", "range"]) q[m] = () => q;
+          (q as { then: unknown }).then = (ok: (v: unknown) => unknown) => ok({ data: FILAS, error: null, count: FILAS.length });
           return q;
         },
       },

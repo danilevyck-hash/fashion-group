@@ -127,11 +127,16 @@ export async function GET(req: NextRequest) {
   // Empresa asociada del vendedor (fuente de verdad: DB, no la cookie).
   let companyKey: string | null = null;
   if (session.role === "vendedor" && session.userId) {
-    const { data: u } = await supabaseServer
+    const { data: u, error: uErr } = await supabaseServer
       .from("fg_users")
       .select("associated_company")
       .eq("id", session.userId)
       .maybeSingle();
+    // 🔴 Si no se pudo leer su empresa, NUNCA se le abren las 6: 500.
+    if (uErr) {
+      console.error("[cxc/aging] empresa del vendedor:", uErr.message);
+      return NextResponse.json({ error: "No se pudo leer la empresa del vendedor" }, { status: 500 });
+    }
     companyKey = u?.associated_company ?? null;
   }
 
@@ -153,22 +158,31 @@ export async function GET(req: NextRequest) {
   });
   avisoMontosP.catch(() => {});
 
-  let mvQuery = supabaseServer.from("switch_estadocuenta_aging_mv").select("*");
-  if (companyKey) mvQuery = mvQuery.eq("company_key", companyKey);
-  const mvRes = await mvQuery;
+  // 🩸 `db-max-rows` = 1000 corta EN SILENCIO: la cartera se lee PAGINADA, con `id` (único) de orden.
+  const leerCartera = (tabla: string) =>
+    leerTodoPaginado<Record<string, unknown>>(tabla, (pedirCount, from, to) => {
+      let q = supabaseServer.from(tabla).select("*", pedirCount ? { count: "exact" } : {});
+      if (companyKey) q = q.eq("company_key", companyKey);
+      return q.order("id", { ascending: true }).range(from, to);
+    });
 
-  if (mvRes.error) {
+  let mvRows: Record<string, unknown>[] | null = null;
+  try {
+    mvRows = await leerCartera("switch_estadocuenta_aging_mv");
+  } catch {
+    mvRows = null;
+  }
+
+  if (!mvRows) {
     // Fallback a la view en vivo (mismo shape de filas).
-    let vQuery = supabaseServer.from("switch_estadocuenta_aging").select("*");
-    if (companyKey) vQuery = vQuery.eq("company_key", companyKey);
-    const vRes = await vQuery;
-    if (vRes.error) {
-      return NextResponse.json({ error: vRes.error.message }, { status: 500 });
+    try {
+      rows = await leerCartera("switch_estadocuenta_aging");
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
     }
-    rows = vRes.data ?? [];
   } else {
-    rows = mvRes.data ?? [];
-    refreshedAt = (mvRes.data?.[0] as { materializado_en?: string } | undefined)?.materializado_en ?? null;
+    rows = mvRows;
+    refreshedAt = (mvRows[0] as { materializado_en?: string } | undefined)?.materializado_en ?? null;
     // El contacto de la MV puede tener horas; el de la ficha se acaba de guardar.
     // (En la rama del fallback la VIEW ya joinea clientes_master en vivo.)
     try {
