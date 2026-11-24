@@ -182,9 +182,27 @@ export interface PedidoBodega {
   piezas?: number | null;
 }
 
-/** Del más viejo al más nuevo; empate por número. */
-export function ordenarPedidos<T extends Pick<PedidoBodega, "fecha" | "secuencial">>(rows: readonly T[]): T[] {
-  return [...rows].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.secuencial.localeCompare(b.secuencial));
+/**
+ * 🔴 DESDE CUÁNDO CUENTA LA ANTIGÜEDAD (Daniel, 24-nov-2026): «En preparación»
+ * y «Preparado» cuentan desde que BODEGA LO MARCÓ (su firma), no desde la
+ * fecha de Switch, que Switch mueve al editar el pedido (AS 557: marcado el
+ * 10-nov, Switch dice 22-nov). Pendiente y Recibido, la fecha del pedido.
+ * Sin firma, la fecha del pedido. Fila, línea de arriba, orden, tarjetas y
+ * papel leen ESTA función. `false` = todo desde la fecha de Switch.
+ */
+export const PEDIDOS_ANTIGUEDAD_DESDE_LA_MARCA = true;
+type ConAntiguedad = Pick<PedidoBodega, "fecha" | "estado"> & Partial<Pick<PedidoBodega, "en_preparacion_en" | "preparado_en">>;
+export function fechaDeAntiguedad(p: ConAntiguedad): string {
+  if (!PEDIDOS_ANTIGUEDAD_DESDE_LA_MARCA) return p.fecha;
+  if (p.estado === "en_preparacion") return p.en_preparacion_en ?? p.fecha;
+  if (p.estado === "preparado") return p.preparado_en ?? p.fecha;
+  return p.fecha;
+}
+
+/** Del más viejo al más nuevo (por `fechaDeAntiguedad`); empate por número. */
+export function ordenarPedidos<T extends Pick<PedidoBodega, "fecha" | "secuencial"> & Partial<ConAntiguedad>>(rows: readonly T[]): T[] {
+  const t = (r: T) => Date.parse(fechaDeAntiguedad({ ...r, estado: r.estado ?? "pendiente" }));
+  return [...rows].sort((a, b) => t(a) - t(b) || a.secuencial.localeCompare(b.secuencial));
 }
 
 /**
@@ -259,14 +277,14 @@ export function lineaDePendientesCorta(rows: readonly Pick<PedidoBodega, "fecha"
  * `singular`/`plural` son el nombre del estado en minúscula.
  */
 export function lineaDeLaPestana(
-  rows: readonly Pick<PedidoBodega, "fecha" | "estado">[],
+  rows: readonly ConAntiguedad[],
   estado: string,
   nombre: { singular: string; plural: string },
   hoy: string,
 ): string {
   const del = rows.filter((r) => r.estado === estado);
   if (del.length === 0) return `Sin pedidos ${nombre.plural}`;
-  const masViejo = del.reduce((m, r) => (r.fecha < m ? r.fecha : m), del[0].fecha);
+  const masViejo = del.map(fechaDeAntiguedad).reduce((m, f) => (Date.parse(f) < Date.parse(m) ? f : m));
   const n = `${del.length} ${del.length === 1 ? nombre.singular : nombre.plural}`;
   return del.length === 1 ? `${n} · ${haceDiasCorto(masViejo, hoy)}` : `${n} · el más viejo, ${haceDiasCorto(masViejo, hoy)}`;
 }

@@ -7,8 +7,8 @@
 // 🔴 Solo para las personas de la lista; el resto sigue con las pestañas.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { diasDesde, type PedidoBodega } from "@/lib/guias/pedidos-bodega";
-import { diasEnPreparado, ESTADOS_FLUJO_SIMPLE, PESTANA_FLUJO_SIMPLE, type EstadoFlujoSimple } from "@/lib/guias/pedidos-flujo-simple";
+import { diasDesde, fechaDeAntiguedad, type PedidoBodega } from "@/lib/guias/pedidos-bodega";
+import { ESTADOS_FLUJO_SIMPLE, PESTANA_FLUJO_SIMPLE, type EstadoFlujoSimple } from "@/lib/guias/pedidos-flujo-simple";
 
 export const PEDIDOS_TARJETAS_2026_11 = true;
 
@@ -34,23 +34,15 @@ export interface TarjetaPedidos {
 
 type Fila = Pick<PedidoBodega, "estado" | "fecha" | "en_preparacion_en" | "preparado_en">;
 
-/**
- * Cuánto lleva el pedido en su estado. Pendiente: la misma antigüedad de la
- * fila (día de Panamá del pedido). En preparación y Preparado: desde su firma
- * (`diasEnPreparado`); sin firma, desde la fecha del pedido.
- */
-function diasEnElEstado(p: Fila, hoy: string, ahoraIso: string): number {
-  if (p.estado === "en_preparacion") return diasEnPreparado(p.en_preparacion_en ?? p.fecha, ahoraIso);
-  if (p.estado === "preparado") return diasEnPreparado(p.preparado_en ?? p.fecha, ahoraIso);
-  return diasDesde(p.fecha, hoy);
-}
+/** La MISMA antigüedad de la fila y la línea de arriba (`fechaDeAntiguedad`, día de Panamá). */
+const diasEnElEstado = (p: Fila, hoy: string): number => diasDesde(fechaDeAntiguedad(p), hoy);
 
-export function tarjetasDePedidos(rows: readonly Fila[], hoy: string, ahoraIso: string): TarjetaPedidos[] {
+export function tarjetasDePedidos(rows: readonly Fila[], hoy: string): TarjetaPedidos[] {
   return ESTADOS_FLUJO_SIMPLE.map((estado) => {
     const del = rows.filter((p) => p.estado === estado);
     const masViejoDias = estado === "recibido" || del.length === 0
       ? null
-      : Math.max(...del.map((p) => diasEnElEstado(p, hoy, ahoraIso)));
+      : Math.max(...del.map((p) => diasEnElEstado(p, hoy)));
     return {
       estado,
       rotulo: PESTANA_FLUJO_SIMPLE[estado],
