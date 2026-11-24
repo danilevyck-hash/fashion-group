@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, type SessionPayload } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   PEDIDOS_BODEGA_2026_10,
   PEDIDOS_BODEGA_ROLES,
@@ -125,16 +126,33 @@ async function leerEstadoPrevio(empresa: string, id: number): Promise<EstadoDeBo
   return (sin.data as unknown as EstadoDeBodega | null) ?? null;
 }
 
+/** 🩸 Una sola lectura PAGINADA (`db-max-rows` = 1000 corta en silencio): llave (empresa_key, pedido_switch_id). */
+const leerEstadoCon = (cols: string) =>
+  leerTodoPaginado<EstadoDeBodega>("pedidos_bodega_estado", (pedirCount, from, to) =>
+    supabaseServer
+      .from("pedidos_bodega_estado")
+      .select(cols, pedirCount ? { count: "exact" } : {})
+      .order("empresa_key", { ascending: true })
+      .order("pedido_switch_id", { ascending: true })
+      .range(from, to),
+  );
+
 async function leerEstadoDeBodega(): Promise<{ data: EstadoDeBodega[] | null; error: unknown }> {
-  if (PEDIDOS_FLUJO_SIMPLE_2026_10) {
-    const simple = await supabaseServer.from("pedidos_bodega_estado").select(COLUMNAS_FLUJO_SIMPLE).limit(5000);
-    if (!simple.error) return { data: simple.data as unknown as EstadoDeBodega[], error: null };
-  } else if (BULTOS_ACTIVO) {
-    const con = await supabaseServer.from("pedidos_bodega_estado").select(COLUMNAS_CON_FIRMAS).limit(5000);
-    if (!con.error) return { data: con.data as unknown as EstadoDeBodega[], error: null };
+  // Falla ABIERTA igual que antes: si faltan columnas nuevas, se baja a las de siempre.
+  const intentos = PEDIDOS_FLUJO_SIMPLE_2026_10
+    ? [COLUMNAS_FLUJO_SIMPLE, COLUMNAS_BASE]
+    : BULTOS_ACTIVO
+      ? [COLUMNAS_CON_FIRMAS, COLUMNAS_BASE]
+      : [COLUMNAS_BASE];
+  let error: unknown = null;
+  for (const cols of intentos) {
+    try {
+      return { data: await leerEstadoCon(cols), error: null };
+    } catch (e) {
+      error = e;
+    }
   }
-  const sin = await supabaseServer.from("pedidos_bodega_estado").select(COLUMNAS_BASE).limit(5000);
-  return { data: sin.data as unknown as EstadoDeBodega[] | null, error: sin.error };
+  return { data: null, error };
 }
 
 /**
