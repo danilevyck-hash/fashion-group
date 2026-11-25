@@ -118,6 +118,12 @@ export const GUIA_AGREGAR_TRASLADO_2026_10 = true;
  *  `false` = el panel como estaba (cliente + «Buscar factura» aparte). */
 export const ETIQUETAS_BUSCADOR_UNICO_2026_11 = true;
 
+/** 🔴 ETIQUETAS › EL BUSCADOR DE LA LISTA TAMBIÉN ETIQUETA (25-nov-2026, Daniel: «sí, los tres»).
+ *  Escribir una factura trae la de Switch (mismas reglas de Nuevo envío) arriba de la
+ *  lista: «Etiquetar» abre el envío con ella marcada; si ya tiene etiqueta, «Ver envío».
+ *  `false` = el buscador solo filtra los envíos ya etiquetados, como antes. */
+export const ETIQUETAS_BUSCA_PARA_ETIQUETAR_2026_11 = true;
+
 /** 🔴 ETIQUETAS › NUEVO ENVÍO: LAS FACTURAS EN UNA LISTA, CON SU FECHA (14-nov-2026, propuesta).
  *  Sin días que abrir: todas las facturas en una lista, la más reciente
  *  arriba, cada una con su fecha al lado («Factura 3370 · 12 nov»; el año solo

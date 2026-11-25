@@ -83,6 +83,43 @@ export function abreEnMuestras(userName: string | null | undefined, role: string
   return role === "vendedor" && empresasDeMuestrasDe(u, role).length > 0;
 }
 
+/**
+ * 🔴 MUESTRAS EN EL ORDEN DE PEDIDOS (25-nov-2026, Daniel: «sí, los tres»).
+ * Banda por empresa y una fila por pedido; todo lo por mandar viene MARCADO y
+ * UN «Enviar N muestras» pide una sola guía o comentario para varios pedidos.
+ * Angel (bodega) mira la lista sin enviar. `false` = la pantalla anterior.
+ */
+export const MUESTRAS_COMO_PEDIDOS_2026_11 = true;
+
+/**
+ * Quién MIRA la lista sin mandar nada (bodega), ESCRITO A MANO: Angel, todas
+ * las empresas del grupo menos Vistana (Daniel, 25-nov-2026). Ahí marca «No llegó».
+ */
+export const MIRAN_MUESTRAS_SIN_ENVIAR: Readonly<Record<string, readonly string[]>> = {
+  angel: B2B_EMPRESA_KEYS.filter((e) => e !== "vistana"),
+};
+
+/** Lo que se le ve en la lista enviado, para que bodega pueda reclamarlo. */
+export const DIAS_ENVIADAS_A_LA_VISTA = 7;
+
+/** Las empresas cuya lista ve esta persona: las que manda, o las que solo mira. */
+export function empresasQueVenMuestras(userName: string | null | undefined, role: string | null | undefined): readonly string[] {
+  const propias = empresasDeMuestrasDe(userName, role);
+  if (propias.length > 0 || !MUESTRAS_COMO_PEDIDOS_2026_11 || role !== "bodega") return propias;
+  return MIRAN_MUESTRAS_SIN_ENVIAR[(userName ?? "").trim().toLowerCase()] ?? [];
+}
+
+/** ¿Mira la lista sin poder mandar? (Angel). Ve también lo enviado de los últimos días. */
+export function soloMiraMuestras(userName: string | null | undefined, role: string | null | undefined): boolean {
+  return empresasDeMuestrasDe(userName, role).length === 0 && empresasQueVenMuestras(userName, role).length > 0;
+}
+
+/** ¿Una enviada sigue a la vista de quien solo mira? Las de los últimos `DIAS_ENVIADAS_A_LA_VISTA` días. */
+export function enviadaALaVista(enviadaEn: string | null | undefined, ahoraIso: string): boolean {
+  if (!enviadaEn) return false;
+  return Date.parse(ahoraIso) - Date.parse(enviadaEn) <= DIAS_ENVIADAS_A_LA_VISTA * 86_400_000;
+}
+
 /** ¿Ve la sección «Muestras»? El vendedor asignado y admin. */
 export function veSeccionMuestras(userName: string | null | undefined, role: string | null | undefined): boolean {
   return MUESTRAS_2026_11 && empresasDeMuestrasDe(userName, role).length > 0;
@@ -262,13 +299,15 @@ export interface PedidoDeMuestras {
   pedido_switch_id: number;
   secuencial: string;
   cliente_nombre: string;
+  /** El vendedor del pedido en Switch (25-nov-2026). */
+  vendedor_nombre?: string | null;
   muestras: MuestraLeida[];
 }
 
 /** La lista del vendedor, agrupada por pedido, del pedido con la muestra más vieja al más nuevo. */
 export function agruparPorPedido(
   muestras: readonly MuestraLeida[],
-  pedidos: ReadonlyMap<string, { secuencial: string; cliente_nombre: string }>,
+  pedidos: ReadonlyMap<string, { secuencial: string; cliente_nombre: string; vendedor_nombre?: string | null }>,
 ): PedidoDeMuestras[] {
   const grupos = new Map<string, PedidoDeMuestras>();
   const orden = [...muestras].sort((a, b) => a.pedida_en.localeCompare(b.pedida_en) || a.id - b.id);

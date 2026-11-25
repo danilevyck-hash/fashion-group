@@ -116,6 +116,8 @@ interface DespachoFormProps {
   pendingFirma2?: string | null;
   onFirma1Change?: (v: string | null) => void;
   onFirma2Change?: (v: string | null) => void;
+  /** 25-nov-2026: «Falta amarrar …» (facturas sin Switch ni Traslado). Vacío = nada. */
+  faltaAmarre?: string;
 }
 
 /** Campo de texto: 44 px de alto con el dedo, denso solo cuando hay mouse, y
@@ -131,6 +133,7 @@ export default function DespachoForm({
   juegos = [], onUsarJuego,
   bSaving, onConfirmar,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
+  faltaAmarre = "",
 }: DespachoFormProps) {
   /** El ancla del desplegable de juegos. Ver `DesplegableFlotante`. */
   const receptorRef = useRef<HTMLInputElement>(null);
@@ -202,7 +205,8 @@ export default function DespachoForm({
     tieneFirma2: !!pendingFirma2,
     despachadoPor,
   });
-  const puedeDespachar = faltantes.length === 0;
+  // 🔴 25-nov-2026: sin amarre a Switch no se despacha (el servidor dice lo mismo).
+  const puedeDespachar = faltantes.length === 0 && !faltaAmarre;
 
   function handleConfirmar() {
     if (bSaving) return;
@@ -451,7 +455,7 @@ export default function DespachoForm({
         </button>
         {!puedeDespachar && (!v2 || intentado) && (
           <p role={v2 ? "alert" : undefined} className="mt-2 text-sm font-medium text-amber-700 text-center">
-            {textoFalta(faltantes)}
+            {faltantes.length > 0 ? textoFalta(faltantes) : faltaAmarre}
           </p>
         )}
       </div>

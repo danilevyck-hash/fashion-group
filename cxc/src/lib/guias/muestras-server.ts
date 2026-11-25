@@ -7,6 +7,7 @@ import {
   ESTADOS_POR_MANDAR,
   agruparPorPedido,
   cambioDeEspera,
+  enviadaALaVista,
   muestraSigueViva,
   type MuestraLeida,
   type PedidoDeMuestras,
@@ -33,25 +34,30 @@ export async function leerMuestrasDelPedido(empresa: string, pedido: number): Pr
  * 🔴 Un pedido recibido o que Switch ya sacó de la lista (facturado) se cae
  * solo de aquí: se decide al LEER, sin cron.
  */
-export async function leerPorMandar(empresas: readonly string[]): Promise<PedidoDeMuestras[]> {
+export async function leerPorMandar(
+  empresas: readonly string[],
+  { conEnviadas = false }: { conEnviadas?: boolean } = {},
+): Promise<PedidoDeMuestras[]> {
   if (empresas.length === 0) return [];
   // ponytail: sin paginar; lo pendiente son decenas, nunca 1.000.
   const { data, error } = await supabaseServer
     .from("pedidos_muestras")
     .select(COLUMNAS_MUESTRA)
     .in("empresa_key", [...empresas])
-    .in("estado", [...ESTADOS_POR_MANDAR])
+    .in("estado", conEnviadas ? [...ESTADOS_POR_MANDAR, "enviada"] : [...ESTADOS_POR_MANDAR])
     .eq("deleted", false)
     .limit(1000);
   if (error) throw new Error(`pedidos_muestras: ${error.message}`);
-  const muestras = (data ?? []) as MuestraLeida[];
+  // Quien solo mira (Angel) ve además lo enviado de los últimos días, para reclamarlo.
+  const ahora = new Date().toISOString();
+  const muestras = ((data ?? []) as MuestraLeida[]).filter((m) => m.estado !== "enviada" || enviadaALaVista(m.enviada_en, ahora));
   if (muestras.length === 0) return [];
   const ids = [...new Set(muestras.map((m) => m.pedido_switch_id))];
   const emps = [...new Set(muestras.map((m) => m.empresa_key))];
   const [ped, est] = await Promise.all([
     supabaseServer
       .from("switch_pedidos")
-      .select("empresa_key, pedido_switch_id, secuencial, cliente_nombre")
+      .select("empresa_key, pedido_switch_id, secuencial, cliente_nombre, vendedor_nombre")
       .in("empresa_key", emps)
       .in("pedido_switch_id", ids),
     supabaseServer
@@ -63,10 +69,10 @@ export async function leerPorMandar(empresas: readonly string[]): Promise<Pedido
   if (ped.error) throw new Error(`switch_pedidos: ${ped.error.message}`);
   if (est.error) throw new Error(`pedidos_bodega_estado: ${est.error.message}`);
   const estado = new Map((est.data ?? []).map((e) => [`${e.empresa_key}:${e.pedido_switch_id}`, e.estado as string]));
-  const vivos = new Map<string, { secuencial: string; cliente_nombre: string }>();
+  const vivos = new Map<string, { secuencial: string; cliente_nombre: string; vendedor_nombre: string | null }>();
   for (const p of ped.data ?? []) {
     const k = `${p.empresa_key}:${p.pedido_switch_id}`;
-    if (muestraSigueViva(true, estado.get(k))) vivos.set(k, { secuencial: p.secuencial, cliente_nombre: p.cliente_nombre });
+    if (muestraSigueViva(true, estado.get(k))) vivos.set(k, { secuencial: p.secuencial, cliente_nombre: p.cliente_nombre, vendedor_nombre: p.vendedor_nombre ?? null });
   }
   return agruparPorPedido(muestras, vivos);
 }
