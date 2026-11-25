@@ -24,6 +24,7 @@
 // `hasModuleAccess`), y nada se le abre de más. Con el interruptor en `false`
 // son las seis de siempre. Un `?tab=` viejo cae en Inicio.
 
+import { CLASE_FILA_PESTANAS } from "@/lib/ui/fila-pestanas";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -100,7 +101,7 @@ export function BostonShell() {
       <div className={barra ? "hidden" : "max-w-6xl mx-auto px-2 lg:px-4 pt-2"}>
         <div
           data-pestanas="boston"
-          className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto"
+          className={CLASE_FILA_PESTANAS}
         >
           {pestanas.map(({ key, label }) => (
             <button
@@ -108,7 +109,7 @@ export function BostonShell() {
               type="button"
               onClick={() => setTab(key)}
               aria-current={tab === key ? "page" : undefined}
-              className={`min-h-[44px] min-w-[44px] px-1 lg:px-3 text-xs lg:text-sm whitespace-nowrap border-b-2 -mb-px transition
+              className={`min-h-[44px] min-w-[44px] px-1 lg:px-3 text-xs lg:text-sm whitespace-nowrap border-b-2 transition
                           ${
                             tab === key
                               ? "border-gray-900 text-gray-900 font-medium"

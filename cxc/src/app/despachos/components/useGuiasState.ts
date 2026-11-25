@@ -45,18 +45,20 @@ export function useGuiasState() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const loadGuias = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // `fondo` = releer sin «Cargando…» (al volver a la ventana o a la pestaña):
+  // la lista, el filtro y el scroll se quedan; si falla, queda lo que había.
+  const loadGuias = useCallback(async (fondo = false) => {
+    if (!fondo) setLoading(true);
+    if (!fondo) setError(null);
     try {
-      const res = await fetch("/api/guias");
+      const res = await fetch("/api/guias", { cache: "no-store" });
       if (!res.ok) throw new Error();
       const data = await res.json();
       setGuias(data);
     } catch {
-      setError("Error al cargar guías");
+      if (!fondo) setError("Error al cargar guías");
     } finally {
-      setLoading(false);
+      if (!fondo) setLoading(false);
     }
   }, []);
 

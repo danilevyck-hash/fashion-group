@@ -1,6 +1,7 @@
 "use client";
 
 // 🔴 Los nombres se MUESTRAN capitalizados; lo guardado sigue en mayúsculas.
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { TODAS_LAS_EMPRESAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
@@ -88,14 +89,16 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
-  const recargar = useCallback(async () => {
-    setLoading(true);
+  // `fondo` = al volver a la ventana: sin «Cargando…» ni aviso si falla.
+  const recargar = useCallback(async (fondo = false) => {
+    if (!fondo) setLoading(true);
     try {
-      const res = await fetch("/api/prestamos/empleados");
+      const res = await fetch("/api/prestamos/empleados", { cache: "no-store" });
       if (res.ok) setDatos(await res.json());
-    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
-    setLoading(false);
+    } catch { if (!fondo) showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
+    if (!fondo) setLoading(false);
   }, []);
+  useReleerAlVolver(() => void recargar(true), authChecked);
 
   const initialLoadRef = useRef(true);
   useEffect(() => {

@@ -1,5 +1,7 @@
 "use client";
 
+import { CLASE_FILA_PESTANAS } from "@/lib/ui/fila-pestanas";
+import { RELEER_AL_VOLVER_2026_11, useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { PESTANAS_A_LA_IZQUIERDA } from "@/lib/ui/revision-110-ajustes";
 import { ROLES_CAMBIAR_BULTOS } from "@/lib/ui/revision-110-61";
 import { useEffect, useRef, useState } from "react";
@@ -230,6 +232,10 @@ export default function GuiasPage() {
   }
   function cambiarVista(v: Vista) {
     setVista(v);
+    // 🔴 25-nov-2026: la lista de guías vive en la página y solo se leía al
+    // entrar; volver a su pestaña la relee de la BASE en segundo plano.
+    if (RELEER_AL_VOLVER_2026_11 && v === "guias") void s.loadGuias(true);
+    if (RELEER_AL_VOLVER_2026_11 && v === "muestras") void muestras.recargar();
     const params = new URLSearchParams(window.location.search);
     if (v === "guias" && !hayPedidos) params.delete("vista");
     else params.set("vista", v);
@@ -295,11 +301,18 @@ export default function GuiasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
 
+  // Al volver a la ventana: la lista de guías y el número de Muestras (las
+  // pestañas Pedidos y Etiquetas se releen solas). Solo la BASE, nunca Switch.
+  useReleerAlVolver(() => {
+    if (vista === "guias") void s.loadGuias(true);
+    void muestras.recargar();
+  }, authChecked);
+
   if (!authChecked) return null;
 
   // ── LIST VIEW ── (única vista en /guias; crear/editar/imprimir están en rutas dedicadas)
   return (
-    <PullToRefresh onRefresh={s.loadGuias}>
+    <PullToRefresh onRefresh={() => s.loadGuias()}>
       <div>
         <AppHeader module="Despachos" tituloEnLaPantalla={barra} />
         <ProveedorBarraCelular activo={barra} activa={vista}>
@@ -319,14 +332,14 @@ export default function GuiasPage() {
           // Revisión 110 · ajustes (9): el mismo ancho y borde que el contenido
           // (max-w-6xl, px-6), no una columna angosta centrada.
           <div className={PESTANAS_A_LA_IZQUIERDA ? "max-w-6xl mx-auto px-4 sm:px-6 pt-3" : "max-w-3xl mx-auto px-4 pt-3"}>
-            <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto">
+            <div data-pestanas="despachos" className={CLASE_FILA_PESTANAS}>
               {pestanas.map(([v, label]) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => cambiarVista(v)}
                   aria-current={vista === v ? "page" : undefined}
-                  className={`-mb-px min-h-[44px] whitespace-nowrap border-b-2 px-2.5 text-sm transition active:scale-[0.97] ${
+                  className={`min-h-[44px] whitespace-nowrap border-b-2 px-2.5 text-sm transition active:scale-[0.97] ${
                     vista === v
                       ? "border-gray-900 font-medium text-gray-900"
                       : "border-transparent text-gray-400 hover:text-gray-600"

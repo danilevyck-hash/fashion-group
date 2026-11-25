@@ -25,6 +25,7 @@
 // (`EtiquetasView.tsx`), que no se tocó.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { BULTOS_EN_EL_PEDIDO, notaBultosDelPedido } from "@/lib/ui/revision-110-61";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
@@ -151,9 +152,10 @@ export default function EtiquetasPorEnvio() {
   const [reimprimiendo, setReimprimiendo] = useState<Envio | null>(null);
   const [anulando, setAnulando] = useState<Envio | null>(null);
 
-  const cargar = useCallback(async () => {
-    setCargando(true);
-    setErrorLista(null);
+  // `fondo` = al volver a la ventana: sin «Cargando…» y, si falla, se queda lo que hay.
+  const cargar = useCallback(async (fondo = false) => {
+    if (!fondo) setCargando(true);
+    if (!fondo) setErrorLista(null);
     try {
       const r = await fetch("/api/guias/etiquetas", { cache: "no-store" });
       const d = (await r.json()) as { etiquetas?: EtiquetaFila[]; sinTabla?: boolean; error?: string };
@@ -161,14 +163,17 @@ export default function EtiquetasPorEnvio() {
       setEtiquetas(Array.isArray(d.etiquetas) ? d.etiquetas : []);
       setSinTabla(d.sinTabla === true);
     } catch {
+      if (fondo) return;
       setEtiquetas([]);
       setErrorLista("No se pudieron cargar las etiquetas. Intenta de nuevo en unos segundos.");
     } finally {
-      setCargando(false);
+      if (!fondo) setCargando(false);
     }
   }, []);
 
   useEffect(() => { void cargar(); }, [cargar]);
+  // 🔴 Al volver a la ventana se relee la BASE (nunca Switch).
+  useReleerAlVolver(() => void cargar(true));
 
   const envios = useMemo(() => agruparEnEnvios(etiquetas), [etiquetas]);
   const pendientes = envios.filter((v) => v.guia_numero === null).length;
