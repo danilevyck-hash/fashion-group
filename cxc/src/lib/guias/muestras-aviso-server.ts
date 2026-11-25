@@ -12,7 +12,7 @@ import type { AvisoDeMuestras } from "./muestras-aviso";
 
 const CONTACTO_VAPID = "mailto:notificaciones@fashiongr.com";
 
-/** Manda el aviso a todos los aparatos del usuario. Devuelve cuántos salieron. */
+/** Manda el aviso a todos los aparatos de cada usuario. Devuelve cuántos salieron. */
 export async function mandarAvisoDeMuestras(aviso: AvisoDeMuestras | null): Promise<number> {
   if (!aviso) return 0;
   const pub = process.env.VAPID_PUBLIC_KEY;
@@ -25,7 +25,7 @@ export async function mandarAvisoDeMuestras(aviso: AvisoDeMuestras | null): Prom
     const { data, error } = await supabaseServer
       .from(TABLA_SUSCRIPCIONES_USUARIO)
       .select("id, endpoint, p256dh, auth")
-      .eq("usuario", aviso.usuario);
+      .in("usuario", [...aviso.usuarios]);
     if (error) throw new Error(error.message);
     webpush.setVapidDetails(CONTACTO_VAPID, pub, priv);
     const cuerpo = JSON.stringify({ title: aviso.title, body: aviso.body, url: aviso.url, tag: aviso.tag });

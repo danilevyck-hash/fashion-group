@@ -60,12 +60,32 @@ export function nombreDelVendedor(usuario: string): string {
   return u ? u[0].toUpperCase() + u.slice(1) : u;
 }
 
-/** Las empresas cuyas muestras manda esta persona. Admin: las 6. Nadie más: ninguna. */
+/**
+ * Quién MANDA muestras además del vendedor, POR USUARIO y sin mirar el rol
+ * (Daniel, 25-nov-2026): Angel —bodega en el sistema— las manda igual que Rey,
+ * en todas las del grupo menos Vistana. Su rol NO cambia.
+ */
+export const MANDAN_MUESTRAS_ADEMAS: Readonly<Record<string, readonly string[]>> = {
+  angel: B2B_EMPRESA_KEYS.filter((e) => e !== "vistana"),
+};
+
+/** Las empresas cuyas muestras manda esta persona. Admin: las 6. */
 export function empresasDeMuestrasDe(userName: string | null | undefined, role: string | null | undefined): readonly string[] {
   if (role === "admin") return B2B_EMPRESA_KEYS;
   const u = (userName ?? "").trim().toLowerCase();
-  if (role !== "vendedor" || !u) return [];
+  if (!u) return [];
+  const ademas = MUESTRAS_COMO_PEDIDOS_2026_11 ? MANDAN_MUESTRAS_ADEMAS[u] : undefined;
+  if (ademas) return ademas;
+  if (role !== "vendedor") return [];
   return B2B_EMPRESA_KEYS.filter((e) => vendedorDeMuestra(e) === u);
+}
+
+/** Todos los que mandan las muestras de una empresa (sin admin): el vendedor y los de `MANDAN_MUESTRAS_ADEMAS`. */
+export function quienesMandanMuestras(empresaKey: string): readonly string[] {
+  const extra = MUESTRAS_COMO_PEDIDOS_2026_11
+    ? Object.keys(MANDAN_MUESTRAS_ADEMAS).filter((u) => MANDAN_MUESTRAS_ADEMAS[u].includes(empresaKey))
+    : [];
+  return [...extra, vendedorDeMuestra(empresaKey)];
 }
 
 /**
@@ -87,20 +107,12 @@ export function abreEnMuestras(userName: string | null | undefined, role: string
  * 🔴 MUESTRAS EN EL ORDEN DE PEDIDOS (25-nov-2026, Daniel: «sí, los tres»).
  * Banda por empresa y una fila por pedido; todo lo por mandar viene MARCADO y
  * UN «Enviar N muestras» pide una sola guía o comentario para varios pedidos.
- * Angel (bodega) mira la lista sin enviar. `false` = la pantalla anterior.
+ * Angel (bodega) manda como Rey, sin Vistana. `false` = la pantalla anterior.
  */
 export const MUESTRAS_COMO_PEDIDOS_2026_11 = true;
 
-/**
- * Quién MIRA la lista sin mandar nada (bodega), ESCRITO A MANO: Angel, todas
- * las empresas del grupo menos Vistana (Daniel, 25-nov-2026). Ahí marca «No llegó».
- */
-export const MIRAN_MUESTRAS_SIN_ENVIAR: Readonly<Record<string, readonly string[]>> = {
-  angel: B2B_EMPRESA_KEYS.filter((e) => e !== "vistana"),
-};
-
-/** Lo que se le ve en la lista enviado, para que bodega pueda reclamarlo. */
-export const DIAS_ENVIADAS_A_LA_VISTA = 7;
+/** Quién MIRA la lista sin mandar nada. Hoy nadie: Angel pasó a mandar (Daniel, 25-nov-2026). */
+export const MIRAN_MUESTRAS_SIN_ENVIAR: Readonly<Record<string, readonly string[]>> = {};
 
 /** Las empresas cuya lista ve esta persona: las que manda, o las que solo mira. */
 export function empresasQueVenMuestras(userName: string | null | undefined, role: string | null | undefined): readonly string[] {
@@ -109,16 +121,11 @@ export function empresasQueVenMuestras(userName: string | null | undefined, role
   return MIRAN_MUESTRAS_SIN_ENVIAR[(userName ?? "").trim().toLowerCase()] ?? [];
 }
 
-/** ¿Mira la lista sin poder mandar? (Angel). Ve también lo enviado de los últimos días. */
+/** ¿Mira la lista sin poder mandar? (Angel). Ve solo lo por mandar, como el vendedor. */
 export function soloMiraMuestras(userName: string | null | undefined, role: string | null | undefined): boolean {
   return empresasDeMuestrasDe(userName, role).length === 0 && empresasQueVenMuestras(userName, role).length > 0;
 }
 
-/** ¿Una enviada sigue a la vista de quien solo mira? Las de los últimos `DIAS_ENVIADAS_A_LA_VISTA` días. */
-export function enviadaALaVista(enviadaEn: string | null | undefined, ahoraIso: string): boolean {
-  if (!enviadaEn) return false;
-  return Date.parse(ahoraIso) - Date.parse(enviadaEn) <= DIAS_ENVIADAS_A_LA_VISTA * 86_400_000;
-}
 
 /** ¿Ve la sección «Muestras»? El vendedor asignado y admin. */
 export function veSeccionMuestras(userName: string | null | undefined, role: string | null | undefined): boolean {
