@@ -11,7 +11,7 @@ const fa = (empresa: string, codigo: string, cliente: string, subtotal: number, 
   empresa, codigo, cliente, tipo, subtotal,
 });
 
-describe("🧾 facturas de hoy", () => {
+describe("🧾 ventas de hoy", () => {
   it("resta las NC, las dice aparte y agrupa por empresa y cliente (por CÓDIGO)", () => {
     const t = bloqueFacturas([
       fa("fashion_wear", "D-118", "Outlet Duty Free N3, S.A.", 19696),
@@ -23,8 +23,8 @@ describe("🧾 facturas de hoy", () => {
     ]);
     expect(t).toBe(
       [
-        "🧾 Facturas de hoy · $27,615 · 4 facturas (ya restadas 2 notas de crédito · $12,438)",
-        "Fashion Wear · $27,027\n• Outlet Duty Free N3, S.A. · $27,315\n• Bouti, S.A. · −$288",
+        "🧾 Ventas de hoy · $27,615 · 4 facturas (ya restadas 2 notas de crédito · $12,438)",
+        "Fashion Wear · $27,027\n• Outlet Duty Free N3, S.A. · $27,315 (con nota de crédito −$33)\n• Bouti, S.A. · −$288 (con nota de crédito −$12,405)",
         "Vistana · $588\n• City Moda Chorrera · $588",
       ].join("\n\n"),
     );
@@ -36,8 +36,22 @@ describe("🧾 facturas de hoy", () => {
       fa("fashion_wear", "D-108", "Multi Fashion Holding", 50),
       fa("vistana", "D-26", "City Moda Chorrera", 588),
     ])!;
-    expect(t.split("\n")[0]).toBe("🧾 Facturas de hoy · $588 · 1 factura");
+    expect(t.split("\n")[0]).toBe("🧾 Ventas de hoy · $588 · 1 factura");
     expect(t).not.toMatch(/VENTAS|Multi Fashion/);
+  });
+
+  it("el cliente con solo notas de crédito se dice por nombre, nunca un negativo suelto", () => {
+    const t = bloqueFacturas([
+      fa("fashion_shoes", "D-35", "City Shoes", 1662),
+      fa("fashion_shoes", "D-104", "Millenium Sports", 1161, "Nota de Crédito"),
+    ])!;
+    expect(t).toContain("• Millenium Sports · nota de crédito −$1,161");
+    expect(t).toContain("• City Shoes · $1,662\n");
+    const dos = bloqueFacturas([
+      fa("vistana", "D-1", "X", 10, "Nota de Crédito"),
+      fa("vistana", "D-1", "X", 5, "Nota de Crédito"),
+    ])!;
+    expect(dos).toContain("• X · notas de crédito −$15");
   });
 
   it("sin facturas no hay bloque; un tipo desconocido no cuenta", () => {
