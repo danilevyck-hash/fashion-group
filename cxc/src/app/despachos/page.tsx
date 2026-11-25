@@ -2,7 +2,7 @@
 
 import { PESTANAS_A_LA_IZQUIERDA } from "@/lib/ui/revision-110-ajustes";
 import { ROLES_CAMBIAR_BULTOS } from "@/lib/ui/revision-110-61";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { BarraDeControles, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
@@ -29,6 +29,7 @@ import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import { puedeMarcarPedidos, puedeRecibirPedidos, puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
 import { PEDIDOS_FLUJO_SIMPLE_2026_10 } from "@/lib/guias/pedidos-flujo-simple";
 import MuestrasView, { useMuestrasPorMandar } from "./components/MuestrasView";
+import { abreEnMuestras } from "@/lib/guias/muestras";
 
 // LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
 // celular y la configuración es de admin/secretaria — su JS solo se descarga
@@ -187,6 +188,19 @@ export default function GuiasPage() {
   // muestras (edwin, rey) y admin. Lo decide el SERVIDOR: con 403 no hay sección.
   const muestras = useMuestrasPorMandar(authChecked && (role === "vendedor" || role === "admin"));
   const hayMuestras = muestras.visible;
+  // 🔴 Edwin, Angel y Rey ABREN en «Muestras» (25-nov-2026, `abreEnMuestras`):
+  // la sección llega después de leer, así que se decide cuando aparece, y solo
+  // si la dirección no pidió otra pestaña.
+  const yaAbrioEnMuestras = useRef(false);
+  useEffect(() => {
+    if (!hayMuestras || yaAbrioEnMuestras.current) return;
+    yaAbrioEnMuestras.current = true;
+    const q = new URLSearchParams(window.location.search);
+    let usuario: string | null = null;
+    try { usuario = sessionStorage.getItem("fg_user_name"); } catch { /* sin storage: abre como siempre */ }
+    if (!q.get("vista") && !hayFiltroPendientes() && abreEnMuestras(usuario, role)) setVista("muestras");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hayMuestras]);
   /** La pestaña que dice la dirección (al entrar y al volver con el gesto). */
   function vistaDeLaUrl(): Vista | null {
     const v = new URLSearchParams(window.location.search).get("vista");

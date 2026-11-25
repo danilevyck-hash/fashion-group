@@ -4,7 +4,7 @@
  *   GET   ?empresa_key=&pedido_switch_id=  → { muestras }  (las de UN pedido, para bodega)
  *   GET                                     → { pedidos, total } (lo que el vendedor tiene por mandar)
  *   POST  { empresa_key, pedido_switch_id, codigos[] } → bodega pide las muestras
- *   PATCH { accion: "enviada" | "no_llego" | "quitar", ids[], guia? }  (guía: solo «enviada», opcional)
+ *   PATCH { accion: "enviada" | "no_llego" | "quitar", ids[], guia }  (guía o comentario: OBLIGATORIO en «enviada»)
  *
  * 🔴 El SERVIDOR decide quién hace qué (`muestras.ts`): pide y reclama bodega
  * o admin; «Enviada» solo el vendedor asignado o admin; cada uno ve sus
@@ -130,7 +130,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
   }
   const guia = accion === "enviada" ? limpiarGuia(body?.guia) : null;
-  if (guia === undefined) return NextResponse.json({ error: "Revisa el N.° de guía: máximo 40 caracteres" }, { status: 400 });
+  if (accion === "enviada" && !guia) return NextResponse.json({ error: "Escribe el N.° de guía o un comentario (máximo 120 caracteres)" }, { status: 400 });
   const { data, error: lErr } = await supabaseServer
     .from("pedidos_muestras")
     .select("id, empresa_key, pedido_switch_id, codigo, estado")

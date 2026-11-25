@@ -177,11 +177,11 @@ describe("el vendedor las manda", () => {
   it("«Enviada» solo la marca el vendedor asignado (o admin)", async () => {
     const ck = muestras().find((m) => m.codigo === "CK001")!.id;
     como("vendedor", "rey");
-    expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck] }))).status).toBe(403);
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck], guia: "G1" }))).status).toBe(403);
     como("bodega", "julio");
-    expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck] }))).status).toBe(403);
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck], guia: "G1" }))).status).toBe(403);
     como("vendedor", "edwin");
-    expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck] }))).status).toBe(200);
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck], guia: "G1" }))).status).toBe(200);
     expect(muestras().find((m) => m.id === ck)).toMatchObject({ estado: "enviada", enviada_por: "edwin" });
   });
 
@@ -189,7 +189,7 @@ describe("el vendedor las manda", () => {
     como("vendedor", "rey");
     const ids = (await listaDe()).pedidos[0].muestras.map((m) => m.id);
     expect(espera("fashion_shoes", 2228)).not.toBeNull();
-    expect((await PATCH(req("PATCH", { accion: "enviada", ids }))).status).toBe(200);
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids, guia: "G1" }))).status).toBe(200);
     expect((await listaDe()).total).toBe(0);
     expect(espera("fashion_shoes", 2228)).toBeNull();
     expect(logs.some((l) => l[1] === "muestra_enviada")).toBe(true);
@@ -199,26 +199,25 @@ describe("el vendedor las manda", () => {
     como("admin", "daniel");
     const todas = muestras().map((m) => m.id as number);
     como("vendedor", "rey");
-    expect((await PATCH(req("PATCH", { accion: "enviada", ids: todas }))).status).toBe(403);
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids: todas, guia: "G1" }))).status).toBe(403);
     expect(muestras().every((m) => m.estado === "falta")).toBe(true);
   });
 
-  it("«Enviar todas» con N.° de guía: la misma guía en todas; vacía = sin guía; larga = 400", async () => {
+  it("«Enviar todas» exige N.° de guía o comentario: el mismo en todas; vacío o > 120 = 400", async () => {
     como("vendedor", "rey");
     const ids = muestras().filter((m) => m.empresa_key === "fashion_shoes").map((m) => m.id as number);
-    expect((await PATCH(req("PATCH", { accion: "enviada", ids, guia: "x".repeat(41) }))).status).toBe(400);
-    expect((await PATCH(req("PATCH", { accion: "enviada", ids, guia: " 998877 " }))).status).toBe(200);
-    expect(muestras().filter((m) => ids.includes(m.id as number)).map((m) => m.guia_envio)).toEqual(["998877", "998877"]);
-    como("vendedor", "edwin");
-    const ck = muestras().find((m) => m.codigo === "CK001")!.id as number;
-    expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck], guia: "" }))).status).toBe(200);
-    expect(muestras().find((m) => m.id === ck)!.guia_envio).toBeNull();
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids }))).status).toBe(400);
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids, guia: "   " }))).status).toBe(400);
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids, guia: "x".repeat(121) }))).status).toBe(400);
+    expect(muestras().filter((m) => ids.includes(m.id as number)).every((m) => m.estado === "falta")).toBe(true);
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids, guia: " Uno  Express 998877 " }))).status).toBe(200);
+    expect(muestras().filter((m) => ids.includes(m.id as number)).map((m) => m.guia_envio)).toEqual(["Uno Express 998877", "Uno Express 998877"]);
   });
   it("«No llegó» la devuelve a la lista del vendedor y vuelve a prender la espera", async () => {
     como("vendedor", "rey");
     const tw = muestras().find((m) => m.codigo === "TWLENILA140")!.id as number;
     const fm = muestras().find((m) => m.codigo === "FM0FM05393YBS")!.id as number;
-    await PATCH(req("PATCH", { accion: "enviada", ids: [tw, fm] }));
+    await PATCH(req("PATCH", { accion: "enviada", ids: [tw, fm], guia: "G1" }));
     expect(espera("fashion_shoes", 2228)).toBeNull();
     // el vendedor no reclama
     expect((await PATCH(req("PATCH", { accion: "no_llego", ids: [tw] }))).status).toBe(403);

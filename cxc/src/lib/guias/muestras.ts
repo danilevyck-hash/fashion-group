@@ -68,6 +68,21 @@ export function empresasDeMuestrasDe(userName: string | null | undefined, role: 
   return B2B_EMPRESA_KEYS.filter((e) => vendedorDeMuestra(e) === u);
 }
 
+/**
+ * Despachos ABRE en «Muestras» para estos usuarios (25-nov-2026, Daniel:
+ * «Edwin, Angel y Rey»). Los vendedores salen de la MISMA regla de quién ve
+ * la lista; Angel (bodega) se agrega a mano. ⚠️ Sin la sección (hoy bodega no
+ * tiene lista de Muestras) no cambia nada: abre en Pedidos como siempre.
+ */
+export const ABREN_EN_MUESTRAS_A_MANO: readonly string[] = ["angel"];
+
+export function abreEnMuestras(userName: string | null | undefined, role: string | null | undefined): boolean {
+  const u = (userName ?? "").trim().toLowerCase();
+  if (!MUESTRAS_2026_11 || !u) return false;
+  if (ABREN_EN_MUESTRAS_A_MANO.includes(u)) return true;
+  return role === "vendedor" && empresasDeMuestrasDe(u, role).length > 0;
+}
+
 /** ¿Ve la sección «Muestras»? El vendedor asignado y admin. */
 export function veSeccionMuestras(userName: string | null | undefined, role: string | null | undefined): boolean {
   return MUESTRAS_2026_11 && empresasDeMuestrasDe(userName, role).length > 0;
@@ -120,20 +135,18 @@ export function puedeAccionMuestra(
   return esPorMandar(m.estado) ? { ok: true } : { ok: false, error: "Una muestra enviada no se quita: si no llegó, reclámala" };
 }
 
-// ─── N.° de guía del envío (25-nov-2026, Daniel: opcional, UNA por caja) ────
+// ─── N.° de guía o comentario del envío (25-nov-2026, Daniel: obligatorio, UNO por caja) ─
 
-export const MAX_GUIA = 40;
+export const MAX_GUIA = 120;
 
 /**
- * Lo escrito en «N.° de guía»: recortado, vacío = `null` (es opcional).
- * `undefined` = no vale (no es texto o pasa de `MAX_GUIA`).
+ * Lo escrito en «N.° de guía o comentario» (25-nov-2026, Daniel: OBLIGATORIO).
+ * Recortado; `null` = no vale (vacío, no es texto o pasa de `MAX_GUIA`).
  */
-export function limpiarGuia(v: unknown): string | null | undefined {
-  if (v == null) return null;
-  if (typeof v !== "string") return undefined;
+export function limpiarGuia(v: unknown): string | null {
+  if (typeof v !== "string") return null;
   const g = v.trim().replace(/\s+/g, " ");
-  if (!g) return null;
-  return g.length > MAX_GUIA ? undefined : g;
+  return g && g.length <= MAX_GUIA ? g : null;
 }
 
 /** Las columnas que escribe cada acción. La guía va en TODAS las enviadas de la misma acción. */
@@ -215,7 +228,7 @@ export interface MuestraLeida {
   enviada_en: string | null;
   reclamada_por: string | null;
   reclamada_en: string | null;
-  /** N.° de guía del envío (opcional). */
+  /** N.° de guía o comentario del envío. */
   guia_envio?: string | null;
 }
 
@@ -225,10 +238,10 @@ export function diaMes(iso: string): string {
   return `${Number(d)}-${MESES_CORTOS[Number(m) - 1]}`;
 }
 
-/** «Enviada · Guía 123456 · 25-nov» (sin guía: «Enviada · 25-nov»). */
+/** «Enviada · 123456 · 25-nov» (sin texto, las de antes: «Enviada · 25-nov»). */
 export function lineaEnviada(m: Pick<MuestraLeida, "enviada_en" | "pedida_en" | "guia_envio">): string {
   const guia = m.guia_envio?.trim();
-  return ["Enviada", guia ? `Guía ${guia}` : null, diaMes(m.enviada_en ?? m.pedida_en)].filter(Boolean).join(" · ");
+  return ["Enviada", guia || null, diaMes(m.enviada_en ?? m.pedida_en)].filter(Boolean).join(" · ");
 }
 
 /** La línea que ve BODEGA bajo la referencia, sin botones. */
