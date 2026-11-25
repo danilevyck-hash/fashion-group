@@ -67,6 +67,7 @@ import { CODIGOS_RETIRADOS_DE_GUIAS } from "@/lib/guias/american-classics";
 import ClientePicker from "@/components/ClientePicker";
 import { GUIAS_ATAJOS_NUEVOS } from "@/lib/guias/atajos-facturas";
 import { ScrollableTable } from "@/components/ui";
+import { AmarreDelRenglon, useFacturasDeLaGuia } from "./AmarreDeFacturas";
 import { EMPRESAS_CANONICAS, claveCampo, faltaParaGuardar, filaTieneDatos, opcionesEmpresa, textoFaltaAlGuardar } from "./guia-form-logic";
 import DetalleDeEnvio from "./DetalleDeEnvio";
 import { entregadoPorElegido, nombreDespachadoPor } from "@/lib/guias/despachado-por";
@@ -373,6 +374,8 @@ export default function GuiaForm({
    * etiquetas». Editar una guía sigue con la tabla de siempre.
    */
   const tablaUnica = GUIA_NUEVA_2026_10 && atajosDeLaGuiaNueva;
+  /** 🔴 25-nov-2026: cada factura del renglón se ve amarrada a Switch (o en rojo). Frena al despachar, no al guardar. */
+  const facturasGuia = useFacturasDeLaGuia(items);
   /**
    * 🔴 1-oct-2026 («Propuesta estilo Apple», prendida: Daniel aprobó las capturas, «aprobado»): la MISMA guía
    * nueva, con tarjetas y una barra fija abajo. Solo al crear; `false` = la
@@ -836,6 +839,14 @@ export default function GuiaForm({
           className={ctrl(err || sep || fmt)}
         />
         {err && <ErrorCampo />}
+        {!soloCorregible && (
+          <AmarreDelRenglon
+            item={item}
+            porCliente={facturasGuia.porCliente}
+            onCambiar={(v) => { onUpdateItem(idx, "facturas", v); marcarTocado(clave); }}
+            onActualizar={() => void facturasGuia.actualizar()}
+          />
+        )}
         {sep && <ErrorCampo>Separar con coma y espacio (ej: FA-001, FA-002)</ErrorCampo>}
         {fmt && !sep && <ErrorCampo>Mín. 4 dígitos por factura</ErrorCampo>}
       </>

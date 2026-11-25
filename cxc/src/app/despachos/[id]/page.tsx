@@ -57,6 +57,8 @@ import EdicionGuia from "../components/EdicionGuia";
 import ListaEnvios from "../components/ListaEnvios";
 import FirmasPlegadas from "../components/FirmasPlegadas";
 import { useDespachoGuia } from "../components/useDespachoGuia";
+import { sinAmarre, useFacturasDeLaGuia } from "../components/AmarreDeFacturas";
+import { textoSinAmarre } from "@/lib/guias/amarre-facturas";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import {
   ETIQUETA_TIPO_DESPACHO,
@@ -121,6 +123,9 @@ export default function GuiaPage() {
 
   // 🔴 Hooks ANTES de cualquier return condicional (regla de React).
   const s = useDespachoGuia(authChecked ? id : null);
+  // 🔴 25-nov-2026: antes de despachar, cada factura amarrada a Switch o «Traslado» (la misma regla del servidor).
+  const pendiente = !!s.guia && s.guia.estado !== "Completada";
+  const amarre = useFacturasDeLaGuia(pendiente ? s.guia?.guia_items ?? [] : []);
 
   /**
    * ¿La edición está abierta? Se abre con el botón «Editar» y se cierra al
@@ -276,6 +281,8 @@ export default function GuiaPage() {
    * botón, y lo que se muestra mientras carga es el esqueleto DEL FORMULARIO.
    */
   const enEdicion = editando && puedeEditar;
+  const faltanAmarrar = pendiente ? sinAmarre(items, amarre.porCliente) : [];
+  const textoFaltaAmarre = faltanAmarrar.length === 0 ? "" : textoSinAmarre(faltanAmarrar) + (enEdicion ? "" : " Toca «Editar» para corregirlo.");
   /** Lo que falta en una guía que ya salió: se DICE, no se puede completar acá. */
   const faltaEnLaDespachada = g ? textoFaltantesDespachada(g) : "";
 
@@ -368,6 +375,7 @@ export default function GuiaPage() {
       pendingFirma2={s.pendingFirma2}
       onFirma1Change={s.setPendingFirma1}
       onFirma2Change={s.setPendingFirma2}
+      faltaAmarre={textoFaltaAmarre}
     />
   ) : (
     <p className="text-sm text-gray-500">

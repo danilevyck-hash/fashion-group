@@ -29,7 +29,7 @@ import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import { puedeMarcarPedidos, puedeRecibirPedidos, puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
 import { PEDIDOS_FLUJO_SIMPLE_2026_10 } from "@/lib/guias/pedidos-flujo-simple";
 import MuestrasView, { useMuestrasPorMandar } from "./components/MuestrasView";
-import { abreEnMuestras } from "@/lib/guias/muestras";
+import { MUESTRAS_COMO_PEDIDOS_2026_11, abreEnMuestras } from "@/lib/guias/muestras";
 
 // LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
 // celular y la configuración es de admin/secretaria — su JS solo se descarga
@@ -186,7 +186,8 @@ export default function GuiasPage() {
   const hayEtiquetas = puedeEtiquetar(role);
   // 🔴 «Muestras» (24-nov-2026): la sección la ve el vendedor que manda las
   // muestras (edwin, rey) y admin. Lo decide el SERVIDOR: con 403 no hay sección.
-  const muestras = useMuestrasPorMandar(authChecked && (role === "vendedor" || role === "admin"));
+  // 25-nov-2026: también bodega (Angel la MIRA, sin enviar; al resto el servidor le dice 403).
+  const muestras = useMuestrasPorMandar(authChecked && (role === "vendedor" || role === "admin" || (MUESTRAS_COMO_PEDIDOS_2026_11 && role === "bodega")));
   const hayMuestras = muestras.visible;
   // 🔴 Edwin, Angel y Rey ABREN en «Muestras» (25-nov-2026, `abreEnMuestras`):
   // la sección llega después de leer, así que se decide cuando aparece, y solo

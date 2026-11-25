@@ -177,6 +177,8 @@ const PERMITIDOS: Record<string, string> = {
     "El motor de búsqueda que usa ese selector. No dibuja ningún control.",
   "app/despachos/page.tsx":
     "Lee el directorio UNA vez y se lo pasa al selector de la ventana de atar; no dibuja control propio.",
+  "app/despachos/components/HallazgosParaEtiquetar.tsx":
+    "Etiquetas › el buscador de la lista (25-nov-2026, Daniel aprobó): con el motor del selector único ofrece el cliente para ABRIR «Nuevo envío» con él; no guarda ni ata nada por sí solo.",
 
   // ── Otro universo de clientes: los de Switch, por empresa, con "Contado" ──
   "components/catalogo/ClienteSwitchPicker.tsx":

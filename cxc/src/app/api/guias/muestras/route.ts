@@ -2,7 +2,8 @@
  * Despachos › Pedidos › «Muestras» (24-nov-2026, `MUESTRAS_2026_11`).
  *
  *   GET   ?empresa_key=&pedido_switch_id=  → { muestras }  (las de UN pedido, para bodega)
- *   GET                                     → { pedidos, total } (lo que el vendedor tiene por mandar)
+ *   GET                                     → { pedidos, total, soloLectura } (lo que el vendedor tiene por mandar;
+ *                                             Angel lo mira sin enviar, con lo enviado de 7 días)
  *   POST  { empresa_key, pedido_switch_id, codigos[] } → bodega pide las muestras
  *   PATCH { accion: "enviada" | "no_llego" | "quitar", ids[], guia }  (guía o comentario: OBLIGATORIO en «enviada»)
  *
@@ -23,7 +24,8 @@ import {
   codigosAPedir,
   columnasDeAccion,
   limpiarGuia,
-  empresasDeMuestrasDe,
+  empresasQueVenMuestras,
+  soloMiraMuestras,
   puedeAccionMuestra,
   puedePedirMuestra,
   type AccionMuestra,
@@ -53,10 +55,14 @@ export async function GET(req: NextRequest) {
       if (!veLaEmpresa(empresa, auth.userName, auth.role)) return noExiste();
       return NextResponse.json({ muestras: await leerMuestrasDelPedido(empresa, id) });
     }
-    const empresas = empresasDeMuestrasDe(auth.userName, auth.role);
+    // 25-nov-2026: el vendedor ve las suyas; Angel (bodega) MIRA las del grupo
+    // menos Vistana, con lo enviado de los últimos días para reclamarlo.
+    const empresas = empresasQueVenMuestras(auth.userName, auth.role);
     if (empresas.length === 0) return NextResponse.json({ error: "Las muestras las ve el vendedor que las manda" }, { status: 403 });
-    const pedidos = await leerPorMandar(empresas);
-    return NextResponse.json({ pedidos, total: pedidos.reduce((s, p) => s + p.muestras.length, 0), empresas });
+    const soloMira = soloMiraMuestras(auth.userName, auth.role);
+    const pedidos = await leerPorMandar(empresas, { conEnviadas: soloMira });
+    const total = pedidos.reduce((s, p) => s + p.muestras.filter((m) => m.estado !== "enviada").length, 0);
+    return NextResponse.json({ pedidos, total, empresas, soloLectura: soloMira });
   } catch (e) {
     console.error("[guias/muestras] GET:", e instanceof Error ? e.message : String(e));
     return NextResponse.json({ error: "No se pudieron leer las muestras" }, { status: 500 });

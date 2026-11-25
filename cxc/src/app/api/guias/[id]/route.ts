@@ -24,6 +24,28 @@ import { entregadoPorElegido } from "@/lib/guias/despachado-por";
 import { textoGuiaDespachada } from "@/lib/guias/aviso-despachada";
 import { guiaYaDespachada } from "@/lib/guias/modo-despacho";
 import { RESUMEN_DEL_DIA_2026_11 } from "@/lib/alertas/resumen-del-dia";
+import { textoSinAmarre, type RenglonParaAmarrar } from "@/lib/guias/amarre-facturas";
+import { atarEtiquetasAlCompletar, faltaAmarrarAlCompletar } from "@/lib/guias/amarre-facturas-server";
+
+/**
+ * 🔴 25-nov-2026 (`GUIA_AMARRE_FACTURAS_2026_11`): para COMPLETAR, cada factura
+ * de cada renglón es una de Switch (misma empresa y cliente) o «Traslado».
+ * `null` = se puede. Lee los renglones guardados si el cuerpo no trae otros.
+ */
+async function frenoDelAmarre(guiaId: string, items?: unknown): Promise<NextResponse | null> {
+  let renglones = Array.isArray(items) ? (items as RenglonParaAmarrar[]) : null;
+  if (!renglones) {
+    const { data } = await supabaseServer
+      .from("guia_items")
+      .select("id, cliente, cliente_codigo, empresa, facturas")
+      .eq("guia_id", guiaId)
+      .eq("deleted", false)
+      .order("orden");
+    renglones = (data ?? []) as RenglonParaAmarrar[];
+  }
+  const faltan = await faltaAmarrarAlCompletar(renglones);
+  return faltan.length > 0 ? NextResponse.json({ error: textoSinAmarre(faltan), sinAmarre: faltan }, { status: 400 }) : null;
+}
 
 /** 🔴 1-oct-2026: lo que contesta el servidor si se completa sin «Despachado por». */
 const FALTA_DESPACHADO_POR = "Despachado por requerido";
@@ -195,6 +217,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         return NextResponse.json({ error: FALTA_DESPACHADO_POR }, { status: 400 });
       }
     }
+    const freno = await frenoDelAmarre(id, items);
+    if (freno) return freno;
   }
 
   const { data: previous, error: prevErr } = await supabaseServer
@@ -459,6 +483,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (estado === "Completada" && previous?.estado !== "Completada" && data) {
     await notifyGuiaDespachada(data as GuiaForNotify);
   }
+  // 🔴 25-nov-2026: las etiquetas de sus facturas pasan solas a «ya salió».
+  if (estado === "Completada" && previous?.estado !== "Completada") {
+    const atadas = await atarEtiquetasAlCompletar(id);
+    if (atadas > 0) await logActivity(session?.role || "unknown", "guia_etiquetas_al_completar", "guias", { guiaId: id, atadas }, session?.userName);
+  }
 
   return NextResponse.json(data);
 }
@@ -510,6 +539,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     ) {
       return NextResponse.json({ error: FALTA_DESPACHADO_POR }, { status: 400 });
     }
+    if (body.estado === "Completada") {
+      const freno = await frenoDelAmarre(params.id);
+      if (freno) return freno;
+    }
   }
 
   const session = getSession(req);
@@ -545,6 +578,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .eq("id", params.id)
       .single();
     if (guia) await notifyGuiaDespachada(guia as GuiaForNotify);
+    // 🔴 25-nov-2026: las etiquetas de sus facturas pasan solas a «ya salió».
+    const atadas = await atarEtiquetasAlCompletar(params.id);
+    if (atadas > 0) await logActivity(session?.role || "unknown", "guia_etiquetas_al_completar", "guias", { guiaId: params.id, atadas }, session?.userName);
   }
 
   return NextResponse.json({ ok: true });

@@ -82,8 +82,9 @@ import {
   type Envio,
 } from "@/lib/guias/etiquetas-por-envio";
 import { abrirPdfEnPestana } from "@/lib/guias/pdf-en-pestana";
-import { ETIQUETAS_2026_10, ETIQUETAS_BUSCADOR_UNICO_2026_11, ETIQUETAS_FACTURAS_LISTA_2026_11, ETIQUETAS_TRASLADO_2026_10 } from "@/lib/guias/guias-2026-10";
+import { ETIQUETAS_2026_10, ETIQUETAS_BUSCADOR_UNICO_2026_11, ETIQUETAS_BUSCA_PARA_ETIQUETAR_2026_11, ETIQUETAS_FACTURAS_LISTA_2026_11, ETIQUETAS_TRASLADO_2026_10 } from "@/lib/guias/guias-2026-10";
 import ResultadosDocumento, { type DocumentoHallado } from "./ResultadosDocumento";
+import HallazgosParaEtiquetar from "./HallazgosParaEtiquetar";
 import { TEXTO_TRASLADO } from "@/lib/guias/atajos-facturas";
 import { B2B_EMPRESA_KEYS, mapEmpresaName } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -127,6 +128,9 @@ function pdfDelEnvio(filas: readonly EtiquetaFila[], formato: FormatoEtiquetas, 
 }
 
 type ColEnvio = "facturas" | "cliente" | "destino" | "bultos" | "estado" | "fecha";
+/** 25-nov-2026: el buscador de la lista también trae la factura para etiquetar. */
+const BUSCA_PARA_ETIQUETAR = ETIQUETAS_BUSCA_PARA_ETIQUETAR_2026_11;
+
 const COLS_ENVIO: readonly (readonly [ColEnvio, string])[] = [
   ["facturas", "Facturas"], ["cliente", "Cliente"], ["destino", "Destino"], ["bultos", "Bultos"], ["estado", "Estado"], ["fecha", "Fecha"],
 ];
@@ -140,6 +144,8 @@ export default function EtiquetasPorEnvio() {
   const [filtro, setFiltro] = useState<"pendientes" | "todas">("pendientes");
   const [buscar, setBuscar] = useState("");
   const [panel, setPanel] = useState(false);
+  /** 25-nov-2026: lo que se tocó en el buscador de la lista (factura o cliente). */
+  const [inicial, setInicial] = useState<{ doc?: DocumentoHallado; cliente?: { nombre: string; codigo: string } } | null>(null);
   // «Nuevo envío» suma una entrada: el gesto de volver lo cierra (`useAtrasCierra`).
   const volverDelPanel = useAtrasCierra(panel, () => setPanel(false));
   const [reimprimiendo, setReimprimiendo] = useState<Envio | null>(null);
@@ -235,6 +241,7 @@ export default function EtiquetasPorEnvio() {
           onCerrar={() => volverDelPanel()}
           onListo={async (mensaje) => { setToast(mensaje); await cargar(); }}
           onRecargar={cargar}
+          inicial={inicial}
           onVer={(secuencial) => volverDelPanel(() => { setFiltro("todas"); setBuscar(facturaParaMostrar(secuencial)); })}
         />
       ) : (
@@ -247,14 +254,14 @@ export default function EtiquetasPorEnvio() {
               {barra ? (
                 <>
                   {lineaResumen && <div className="mb-3">{lineaResumen}</div>}
-                  <EnLaBarra accion={sinTabla ? null : { rotulo: "Nuevo envío", onClick: () => setPanel(true), sobreLaBarra: true }} />
+                  <EnLaBarra accion={sinTabla ? null : { rotulo: "Nuevo envío", onClick: () => { setInicial(null); setPanel(true); }, sobreLaBarra: true }} />
                 </>
               ) : (
                 <div className="flex items-center justify-end mb-6 flex-wrap gap-4">
                   {lineaResumen}
                   <button
                     type="button"
-                    onClick={() => setPanel(true)}
+                    onClick={() => { setInicial(null); setPanel(true); }}
                     disabled={sinTabla}
                     className="text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40"
                   >
@@ -278,8 +285,8 @@ export default function EtiquetasPorEnvio() {
                 envoltorio={BUSCADOR_IZQUIERDA_LLENA_2026_11 ? "flex-1 min-w-[150px]" : "flex-1 min-w-[150px] sm:max-w-sm"}
                 value={buscar}
                 onChange={(ev) => setBuscar(ev.target.value)}
-                placeholder="Buscar factura, cliente o destino"
-                aria-label="Buscar factura, cliente o destino"
+                placeholder={BUSCA_PARA_ETIQUETAR ? "Factura o cliente para etiquetar" : "Buscar factura, cliente o destino"}
+                aria-label={BUSCA_PARA_ETIQUETAR ? "Factura o cliente para etiquetar" : "Buscar factura, cliente o destino"}
               />
             ) : (
             <input
@@ -311,6 +318,19 @@ export default function EtiquetasPorEnvio() {
             </div>
           </div>
 
+          {BUSCA_PARA_ETIQUETAR && (
+          <HallazgosParaEtiquetar
+            consulta={buscar}
+            etiquetas={etiquetas}
+            onEtiquetar={(d) => { setInicial({ doc: d }); setPanel(true); }}
+            onCliente={(c) => { setInicial({ cliente: { nombre: c.nombre, codigo: c.codigo } }); setPanel(true); }}
+            onVer={(sec) => { setFiltro("todas"); setBuscar(facturaParaMostrar(sec)); }}
+          />
+          )}
+          {BUSCA_PARA_ETIQUETAR && buscar.trim() && <p className="mb-2 text-sm font-semibold text-gray-900">Envíos ya etiquetados</p>}
+          {BUSCA_PARA_ETIQUETAR && buscar.trim() && !cargando && visibles.length === 0 ? (
+            <p className="text-sm text-gray-500">Ningún envío etiquetado coincide.</p>
+          ) : (
           <div className="overflow-x-auto border border-gray-200 rounded-lg">
             {apple && (
               <ul data-envios-tarjetas className="md:hidden divide-y divide-gray-100">
@@ -419,13 +439,16 @@ export default function EtiquetasPorEnvio() {
             </table>
             {!cargando && visibles.length === 0 && (
               <p className="px-4 py-7 text-center text-sm text-gray-400">
-                {filtro === "pendientes"
+                {BUSCA_PARA_ETIQUETAR && buscar.trim()
+                  ? "Ningún envío etiquetado coincide."
+                  : filtro === "pendientes"
                   ? "Nada pendiente. Todo lo etiquetado ya salió en una guía."
                   : "Todavía no se ha etiquetado ningún envío."}
               </p>
             )}
             {cargando && <p className="px-4 py-7 text-center text-sm text-gray-400">Cargando…</p>}
           </div>
+          )}
         </>
       )}
 
@@ -472,6 +495,8 @@ interface PanelProps {
   onRecargar: () => Promise<void> | void;
   /** Ver en la lista el envío de una factura ya etiquetada (buscador único). */
   onVer?: (secuencial: string) => void;
+  /** 25-nov-2026: abre con esa factura (o ese cliente) ya puesto, desde el buscador de la lista. */
+  inicial?: { doc?: DocumentoHallado; cliente?: { nombre: string; codigo: string } } | null;
 }
 
 /** Lo que contesta `facturas-cliente?factura=`: una por empresa. */
@@ -501,7 +526,7 @@ async function pedirPedidos(hallados: Map<string, string | null>, empresa: strin
   } catch { /* sin conexión: el campo queda para escribirlo */ }
 }
 
-function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, onVer }: PanelProps) {
+function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, onVer, inicial }: PanelProps) {
   const [cliente, setCliente] = useState<{ nombre: string; codigo: string } | null>(null);
   const [facturas, setFacturas] = useState<Factura[] | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -779,6 +804,16 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
     setCoincidencias([]);
     setNumeroFactura("");
   }
+
+  // 25-nov-2026: llega desde el buscador de la lista con la factura ya elegida.
+  const yaInicial = useRef(false);
+  useEffect(() => {
+    if (yaInicial.current || !inicial) return;
+    yaInicial.current = true;
+    if (inicial.doc) elegirFacturaHallada(inicial.doc);
+    else if (inicial.cliente) elegirCliente(inicial.cliente.nombre, inicial.cliente.codigo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function elegirEmpresa(key: string) {
     // Volver a la MISMA empresa (desde «Traslado») no borra lo marcado.
