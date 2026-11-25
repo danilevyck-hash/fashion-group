@@ -60,6 +60,7 @@ import {
   validarBulto,
   type LineaPedido,
 } from "@/lib/guias/pedidos-bultos";
+import { CeldaDeMuestra, LineaDeMuestra, fondoDeLaFila, type ControlMuestras } from "./MuestrasDelPedido";
 
 export interface PedidoDelDetalle {
   empresa_key: string;
@@ -88,8 +89,11 @@ export default function PedidoBultos({
   ocultarBulto = false,
   volverEnElTitulo = false,
   paso = null,
+  muestras = null,
   onVolver,
 }: {
+  /** «Muestras» (24-nov-2026): las marcas por referencia; `null` = el detalle de antes. */
+  muestras?: ControlMuestras | null;
   /** ux-04: el estado del pedido y su paso siguiente (el mismo de la fila); `null` = nada. */
   paso?: { linea: string; accion: { rotulo: string; onClick: () => void } | null } | null;
   pedido: PedidoDelDetalle;
@@ -360,6 +364,7 @@ export default function PedidoBultos({
             </p>
           )}
           {ocultarBulto && piezas && <p className="text-xs text-gray-500">{piezas}</p>}
+          {muestras?.lineaDelPedido && <p className="w-full text-xs font-medium text-amber-700">{muestras.lineaDelPedido}</p>}
         </div>
         {/* 🔴 UN SOLO BOTÓN «Imprimir» (Daniel, 6-oct-2026): al tocarlo
             aparecen las dos formas. Antes estaban las dos a la vista y pesaban
@@ -455,11 +460,12 @@ export default function PedidoBultos({
                     Daniel): cantidad × precio no aporta nada al trabajo de
                     esta pantalla, para NINGÚN rol. */}
                 {conPlata && <th className="hidden px-3 py-2 text-right sm:table-cell sm:w-32">{COLUMNAS_DETALLE[4]}</th>}
+                {muestras?.activo && <th className="w-14 py-2 pr-1 text-center sm:w-20 sm:px-3">Muestra</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 align-top">
               {lineas.map((l) => (
-                <tr key={l.codigo_barra_id} className={marcadas.has(l.codigo_barra_id) ? "bg-gray-50" : undefined}>
+                <tr key={l.codigo_barra_id} className={marcadas.has(l.codigo_barra_id) ? "bg-gray-50" : muestras ? fondoDeLaFila(muestras, l.codigo) : undefined}>
                   {puedePonerAqui && (
                     <td className="py-2 pl-1.5 sm:pl-2">
                       <label className="flex h-11 w-9 items-center justify-center">
@@ -479,11 +485,19 @@ export default function PedidoBultos({
                   <td className="break-words py-2 pl-1 pr-1 font-medium text-gray-900 sm:px-3">
                     {descripcionCompleta(l)}
                     <span className="block tabular-nums text-xs font-normal text-gray-500 sm:hidden">{l.codigo}</span>
+                    {muestras && <LineaDeMuestra c={muestras} codigo={l.codigo} />}
                   </td>
                   <td className="whitespace-nowrap px-1 py-2 text-right tabular-nums text-gray-700 sm:px-3">{l.cantidad}</td>
                   {conPlata && (
                     <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-700 sm:table-cell">
                       ${fmt(l.precio ?? 0)}
+                    </td>
+                  )}
+                  {muestras?.activo && (
+                    <td className="py-0.5 pr-1 sm:px-3">
+                      <div className="flex justify-center">
+                        <CeldaDeMuestra c={muestras} codigo={l.codigo} descripcion={descripcionCompleta(l)} />
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -499,8 +513,23 @@ export default function PedidoBultos({
         <p className="pt-2 text-xs text-gray-500">Pedido verificado · los bultos ya no se cambian</p>
       )}
 
+      {muestras?.hoja}
+      {/* «Muestras»: con referencias elegidas, la acción principal es pedirlas. */}
+      {muestras?.rotuloPedir && (barraCelular ? (
+        <BarraAccionFija rotulo={muestras.rotuloPedir} onClick={() => void muestras.pedir()} sobreLaBarra />
+      ) : (
+        <div className="flex justify-end pt-6">
+          <button
+            type="button"
+            onClick={() => void muestras.pedir()}
+            className="min-h-[44px] rounded-md bg-black px-5 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
+          >
+            {muestras.rotuloPedir}
+          </button>
+        </div>
+      ))}
       {/* ux-04 (15-nov-2026): el paso del pedido abajo, el mismo de la fila. */}
-      {paso && (
+      {paso && !muestras?.rotuloPedir && (
         <div data-paso-del-pedido className="flex flex-wrap items-center justify-center gap-3 pt-6 sm:justify-end">
           <p className="text-sm text-gray-500">{paso.linea}</p>
           {paso.accion && !barraCelular && (
@@ -514,7 +543,7 @@ export default function PedidoBultos({
           )}
         </div>
       )}
-      {paso?.accion && barraCelular && (
+      {paso?.accion && barraCelular && !muestras?.rotuloPedir && (
         <BarraAccionFija rotulo={paso.accion.rotulo} onClick={paso.accion.onClick} sobreLaBarra />
       )}
 
