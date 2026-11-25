@@ -1,31 +1,44 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Resumen diario de cobros (6-oct-2026, aprobado por Daniel). Módulo PURO; el
-// I/O vive en `app/api/cron/cobros-del-dia/route.ts`.
+// I/O vive en `app/api/cron/cobros-del-dia/route.ts` y `cobros-del-dia-io.ts`.
+// Sin cobros devuelve `null`: no se manda nada.
 //
-// Una línea por cliente y empresa con lo que pagó hoy y lo que le queda a
-// +90 días DESPUÉS del pago, con la MISMA cuenta de CxC (91-120 + 121 y más,
-// `saldoMas90`). Sin cobros devuelve `null`: no se manda nada.
+// 🔒 Formato (24-nov-2026, Daniel; reemplaza el del 7-oct, que agrupaba por
+// empresa): POR CLIENTE, por código, con su total del día, y debajo un renglón
+// por empresa donde pagó. Se cuentan clientes, no pagos:
+//   💰 Cobros de hoy · $79,305 · 3 clientes
 //
-// Formato dictado por Daniel (7-oct-2026), al pie de la letra:
-//   💰 Cobros de hoy · $47,095 · 2 pagos
+//   City Mall David · $78,245
+//     • Fashion Wear $50,885 · le quedan +90 d $106,152
+//     • Vistana $16,314 · al día ✓
+// Sin +90 = «al día ✓», sin tramo intermedio (Daniel, 7-oct-2026).
 //
-//   Fashion Shoes
-//   • Outlet Duty Free N3, S.A. · $43,095 · al día ✓
-//   • Sport Fashion · $4,000 · le quedan +90 d $21,494
-// Son los cobros reales de ese día: Outlet Duty Free tenía $67,593 en 31-90 y él
-// lo escribió «al día ✓». Sin +90 = «al día ✓», sin tramo intermedio.
-//
-// 🔴 La cartera es una FOTO (el estado de cuenta de las 4:10 p.m.). Un pago
-// registrado DESPUÉS de esa foto todavía no la movió, así que se le resta a su
-// +90 días.
-// ponytail: se asume que el pago baja lo más viejo primero; si en Switch se
-// aplicó a facturas nuevas, el +90 de ese cliente sale más bajo hasta la foto
-// siguiente.
+// 🔴 EL +90 ES EL DE SWITCH, NUNCA UNA CUENTA PROPIA (24-nov-2026). Hasta ese
+// día se le restaba el pago a la foto de las 4:10 p. m. cuando el recibo era
+// posterior, y a otros no: dos criterios mezclados. City Mall David en Fashion
+// Wear salió $55,267 y Switch decía $106,152 (el pago quedó sin aplicar). Ahora
+// el cron le pregunta a Switch al momento, solo por los clientes y empresas que
+// pagaron hoy (`cobros-del-dia-io.ts`); si no contesta, «+90 sin actualizar».
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { cuadreDeSwitch } from "@/lib/switch-api/estadocuenta-cuadre";
 
-/** Pagos listados como mucho; el resto va como «y N más». */
+/** Suma de los tramos de Switch que empiezan en 91 días o más. `null` si no vino el aging. */
+export function mas90DeLaRespuesta(respuesta: unknown): number | null {
+  const saldos = cuadreDeSwitch(respuesta).saldos;
+  if (!saldos) return null;
+  let suma = 0;
+  for (const t of saldos as Array<{ desde?: unknown; saldo?: unknown }>) {
+    const desde = Number(t?.desde);
+    const saldo = Number(t?.saldo);
+    if (!Number.isFinite(desde) || !Number.isFinite(saldo)) return null;
+    if (desde >= 91) suma += saldo;
+  }
+  return suma;
+}
+
+/** Clientes listados como mucho; el resto va como «y N más». */
 export const MAX_COBROS_EN_AVISO = 15;
 export const URL_CXC = "https://www.fashiongr.com/cxc";
 
@@ -42,60 +55,57 @@ export interface CobroDelDia {
   codigo: string;
   cliente: string;
   monto: number;
-  /** `switch_recibos.fecha_creacion`: hora de PANAMÁ guardada con «+00:00». */
-  creado: string | null;
 }
 
 /** `$12,300` — pesos enteros: es un resumen, no un estado de cuenta. */
 const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
-/** ¿El recibo se registró después de la foto de la cartera de su empresa? */
-function despuesDeLaFoto(creado: string | null, corte: string | null | undefined): boolean {
-  if (!creado || !corte) return true;
-  return Date.parse(`${creado.slice(0, 19)}-05:00`) > Date.parse(corte);
-}
+/** `empresa|codigo` — la llave del +90 de Switch. */
+export const llaveMas90 = (empresa: string, codigo: string): string => `${empresa}|${codigo.trim()}`;
+
+/** Lo que quedó fuera del aviso por código (mostrador, empresas del grupo). */
+export const cobroCuenta = (c: CobroDelDia): boolean => !CLIENTES_FUERA.includes(c.codigo.trim().toUpperCase());
 
 /**
- * @param mas90 `empresa|codigo` → saldo a +90 días de la cartera (la foto).
- * @param corte empresa → ISO de cuándo se leyó esa foto.
+ * @param mas90 `empresa|codigo` → saldo a +90 días que Switch dice AHORA (sus
+ *   tramos de 91 días en adelante). `null` o ausente = no se pudo leer.
  */
 export function mensajeCobrosDelDia(
   cobros: readonly CobroDelDia[],
-  mas90: ReadonlyMap<string, number>,
-  corte: Readonly<Record<string, string | null>>,
+  mas90: ReadonlyMap<string, number | null>,
 ): string | null {
-  const porCliente = new Map<string, { empresa: string; cliente: string; monto: number; sinReflejar: number; key: string }>();
-  for (const c of cobros) {
-    if (CLIENTES_FUERA.includes(c.codigo.trim().toUpperCase())) continue;
-    const key = `${c.empresa}|${c.codigo}`;
-    const fila = porCliente.get(key) ?? { empresa: c.empresa, cliente: c.cliente.trim(), monto: 0, sinReflejar: 0, key };
-    fila.monto += c.monto;
-    if (despuesDeLaFoto(c.creado, corte[c.empresa])) fila.sinReflejar += c.monto;
-    porCliente.set(key, fila);
+  type Fila = { empresa: string; monto: number };
+  type Cliente = { cliente: string; codigo: string; filas: Map<string, Fila> };
+  const porCliente = new Map<string, Cliente>();
+  for (const c of cobros.filter(cobroCuenta)) {
+    const codigo = c.codigo.trim();
+    const g = porCliente.get(codigo) ?? { cliente: c.cliente.trim() || codigo, codigo, filas: new Map<string, Fila>() };
+    const f = g.filas.get(c.empresa) ?? { empresa: c.empresa, monto: 0 };
+    f.monto += c.monto;
+    g.filas.set(c.empresa, f);
+    porCliente.set(codigo, g);
   }
-  const filas = [...porCliente.values()].sort((a, b) => b.monto - a.monto || a.cliente.localeCompare(b.cliente));
-  const total = filas.reduce((s, f) => s + f.monto, 0);
+  const totalDe = (g: Cliente) => [...g.filas.values()].reduce((s, f) => s + f.monto, 0);
+  const clientes = [...porCliente.values()].sort((a, b) => totalDe(b) - totalDe(a) || a.cliente.localeCompare(b.cliente));
+  const total = clientes.reduce((s, g) => s + totalDe(g), 0);
   // Sin cobros, o con lo cobrado y lo devuelto cancelándose, no se manda nada
   // (Daniel, 6-oct-2026: «si el total queda en cero, no se manda nada»).
-  if (filas.length === 0 || Math.round(total) === 0) return null;
+  if (clientes.length === 0 || Math.round(total) === 0) return null;
 
-  const n = filas.length;
-  const visibles = filas.slice(0, MAX_COBROS_EN_AVISO);
-
-  // Empresas en el orden de lo cobrado en cada una (Map conserva la inserción).
-  const grupos = new Map<string, typeof visibles>();
-  const totalEmpresa = (k: string) => filas.filter((f) => f.empresa === k).reduce((s, f) => s + f.monto, 0);
-  for (const f of [...visibles].sort((a, b) => totalEmpresa(b.empresa) - totalEmpresa(a.empresa) || b.monto - a.monto)) {
-    grupos.set(f.empresa, [...(grupos.get(f.empresa) ?? []), f]);
-  }
-
-  const linea = (f: (typeof filas)[number]) => {
-    const queda = Math.max(0, (mas90.get(f.key) ?? 0) - f.sinReflejar);
-    return `• ${f.cliente} · ${usd(f.monto)} · ${Math.round(queda) > 0 ? `le quedan +90 d ${usd(queda)}` : "al día ✓"}`;
+  const renglon = (codigo: string, f: Fila) => {
+    const q = mas90.get(llaveMas90(f.empresa, codigo));
+    const estado = q == null ? "+90 sin actualizar" : Math.round(q) > 0 ? `le quedan +90 d ${usd(q)}` : "al día ✓";
+    return `  • ${nombreCortoEmpresa(f.empresa)} ${usd(f.monto)} · ${estado}`;
   };
+  const n = clientes.length;
   return [
-    `💰 Cobros de hoy · ${usd(total)} · ${n} ${n === 1 ? "pago" : "pagos"}`,
-    ...[...grupos].map(([k, fs]) => [nombreCortoEmpresa(k), ...fs.map(linea)].join("\n")),
+    `💰 Cobros de hoy · ${usd(total)} · ${n} ${n === 1 ? "cliente" : "clientes"}`,
+    ...clientes.slice(0, MAX_COBROS_EN_AVISO).map((g) =>
+      [
+        `${g.cliente} · ${usd(totalDe(g))}`,
+        ...[...g.filas.values()].sort((a, b) => b.monto - a.monto).map((f) => renglon(g.codigo, f)),
+      ].join("\n"),
+    ),
     ...(n > MAX_COBROS_EN_AVISO ? [`y ${n - MAX_COBROS_EN_AVISO} más · Ver en CxC ${URL_CXC}`] : []),
   ].join("\n\n");
 }

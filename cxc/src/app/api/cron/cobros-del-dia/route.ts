@@ -4,15 +4,21 @@
 // Daniel, 7-oct-2026: «Los cobros de Telegram deben llegar a Alertas, no a Negocio.»
 //
 // 00:00 UTC = 7:00 p.m. de Panamá, 45 min después del último `sync-recibos`
-// del día (23:15 UTC). No toca Switch —lee solo Supabase—, así que la
-// separación de 15 min no le aplica. Sin cobros NO manda nada.
+// del día (23:15 UTC). 🔴 Desde el 24-nov-2026 SÍ toca Switch: lee el +90 al
+// momento de los clientes que pagaron hoy (`cobros-del-dia-io.ts`), así que
+// está en `SWITCH_CRON_ENTRADAS` con la separación de 15 min. Sin nada que
+// contar NO manda nada.
 //
 // 🔴 SOLO FASHION GROUP: las 6 empresas del grupo (`CXC_GRUPO_EMPRESA_KEYS`, la
-// misma lista y la misma cartera —la MV de CxC— del módulo). Daniel, 6-oct-2026:
+// misma lista del módulo). Daniel, 6-oct-2026:
 // Boston y Multifashion quedan FUERA. Afuera también el mostrador y las empresas
 // del grupo como clientes (`CLIENTES_FUERA`).
 // ⚠️ Un recibo registrado después de las 6:15 p.m. no sale ni hoy ni mañana.
 // El texto: `lib/cxc/cobros-del-dia.ts`.
+//
+// 🔒 24-nov-2026 (Daniel): con `RESUMEN_DEL_DIA_2026_11` este mismo cron manda
+// UN solo mensaje — 🧾 Facturas · 🚚 Despachos · 💰 Cobros de hoy — y el aviso
+// por guía despachada se apaga. Ver `lib/alertas/resumen-del-dia.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -22,7 +28,16 @@ import { verifySession } from "@/lib/session-cookie";
 import { enviarNegocioPrivado } from "@/lib/alertas/canal";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
-import { mensajeCobrosDelDia, type CobroDelDia } from "@/lib/cxc/cobros-del-dia";
+import { cobroCuenta, llaveMas90, mensajeCobrosDelDia, type CobroDelDia } from "@/lib/cxc/cobros-del-dia";
+import { leerMas90DeSwitch } from "@/lib/cxc/cobros-del-dia-io";
+import {
+  RESUMEN_DEL_DIA_2026_11,
+  bloqueDespachos,
+  bloqueFacturas,
+  partirParaTelegram,
+  resumenDelDia,
+} from "@/lib/alertas/resumen-del-dia";
+import { leerDespachosDelDia, leerFacturasDelDia } from "@/lib/alertas/resumen-del-dia-io";
 
 const CRON_NAME = "cobros-del-dia";
 
@@ -61,45 +76,32 @@ export async function GET(req: NextRequest) {
         codigo: r.cliente_codigo,
         cliente: r.cliente_nombre ?? r.cliente_codigo,
         monto: Number(r.total) || 0,
-        creado: r.fecha_creacion,
       }));
 
-    const codigos = [...new Set(cobros.map((c) => c.codigo))];
-    const empresas = [...new Set(cobros.map((c) => c.empresa))];
+    // 🔴 El +90 es el de Switch AL MOMENTO (24-nov-2026), solo de quien pagó hoy.
+    const pares = [...new Map(cobros.filter(cobroCuenta).map((c) => [llaveMas90(c.empresa, c.codigo), c])).values()];
+    const mas90 = pares.length ? await leerMas90DeSwitch(pares) : new Map<string, number | null>();
 
-    const [mv, ...cortes] = await Promise.all([
-      codigos.length
-        ? supabaseServer
-            .from("switch_estadocuenta_aging_mv")
-            .select("company_key, codigo, d91_120, d121_180, d181_270, d271_365, mas_365")
-            .in("company_key", CXC_GRUPO_EMPRESA_KEYS)
-            .in("codigo", codigos)
-            .limit(1000)
-        : Promise.resolve({ data: [], error: null }),
-      ...empresas.map((e) =>
-        supabaseServer.from("switch_estadocuenta").select("synced_at").eq("empresa_key", e).order("synced_at", { ascending: false }).limit(1),
-      ),
-    ]);
-    const err = mv.error ?? cortes.find((c) => c.error)?.error;
-    if (err) throw new Error(err.message);
-
-    // +90 días = 91-120 + 121 y más, la cuenta de CxC (`saldoMas90`).
-    const mas90 = new Map<string, number>();
-    const sumar = (k: string, v: number) => mas90.set(k, (mas90.get(k) ?? 0) + v);
-    for (const r of (mv.data ?? []) as Record<string, number | string>[]) {
-      sumar(`${r.company_key}|${r.codigo}`, ["d91_120", "d121_180", "d181_270", "d271_365", "mas_365"].reduce((s, c) => s + (Number(r[c]) || 0), 0));
-    }
-    const corte = Object.fromEntries(empresas.map((e, i) => [e, (cortes[i].data?.[0]?.synced_at as string | undefined) ?? null]));
-
-    const mensaje = mensajeCobrosDelDia(cobros, mas90, corte);
+    const cobrosTexto = mensajeCobrosDelDia(cobros, mas90);
+    const mensaje = RESUMEN_DEL_DIA_2026_11
+      ? resumenDelDia([
+          bloqueFacturas(await leerFacturasDelDia(fecha)),
+          bloqueDespachos(await leerDespachosDelDia(fecha)),
+          cobrosTexto,
+        ])
+      : cobrosTexto;
+    const partes = mensaje ? partirParaTelegram(mensaje) : [];
     if (req.nextUrl.searchParams.get("test") === "true") {
-      return NextResponse.json({ fecha, cobros: cobros.length, mensaje: mensaje ?? "(no se mandaría nada)" });
+      return NextResponse.json({ fecha, cobros: cobros.length, mensajes: partes.length ? partes : ["(no se mandaría nada)"] });
     }
 
-    let enviado = false;
-    if (mensaje) {
-      enviado = await enviarNegocioPrivado(mensaje);
-      if (!enviado) await logCronError("cobros_del_dia_telegram_failed", "Telegram no aceptó el mensaje", null, { telegram: false });
+    // Varios mensajes seguidos si no cabe en uno (tope de Telegram); nunca se corta.
+    let enviado = partes.length > 0;
+    for (const parte of partes) {
+      if (!(await enviarNegocioPrivado(parte))) enviado = false;
+    }
+    if (partes.length && !enviado) {
+      await logCronError("cobros_del_dia_telegram_failed", "Telegram no aceptó el mensaje", null, { telegram: false });
     }
     await recordCronHeartbeat(CRON_NAME);
     return NextResponse.json({ ok: true, fecha, cobros: cobros.length, enviado });
