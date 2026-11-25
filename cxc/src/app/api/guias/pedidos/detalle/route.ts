@@ -19,6 +19,7 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
   PEDIDOS_BULTOS_2026_10,
+  PEDIDO_CON_EXISTENCIA_2026_11,
   ROLES_PREPARADO,
   resumenAsignacion,
   validarBulto,
@@ -28,6 +29,7 @@ import {
 import { PEDIDOS_VER_ROLES } from "@/lib/guias/pedidos-bodega";
 import {
   bajarLineas,
+  conExistencia,
   estadoDelPedido,
   hayQueBajar,
   leerLineas,
@@ -97,6 +99,7 @@ export async function GET(req: NextRequest) {
         /* se sigue con lo guardado */
       }
     }
+    if (PEDIDO_CON_EXISTENCIA_2026_11) detalle = { ...detalle, lineas: await conExistencia(claves.empresa, detalle.lineas) };
     return NextResponse.json({
       ...detalle,
       pedido,

@@ -124,6 +124,29 @@ export async function leerLineas(
   return { lineas, bajado, sinTabla: false };
 }
 
+/**
+ * 25-nov-2026: le pone a cada línea la existencia del artículo que ya está en
+ * la base (`switch_articulo_info`, empresa + código). 🔴 NO llama a Switch. Si
+ * la lectura falla, las líneas salen sin existencia («—»): nunca un 0.
+ */
+export async function conExistencia(empresaKey: string, lineas: readonly LineaPedido[]): Promise<LineaPedido[]> {
+  const codigos = [...new Set(lineas.map((l) => l.codigo))];
+  if (codigos.length === 0) return [...lineas];
+  // ponytail: un pedido trae decenas de códigos, nunca 1.000.
+  const { data, error } = await supabaseServer
+    .from("switch_articulo_info")
+    .select("codigo, existencia")
+    .eq("empresa_key", empresaKey)
+    .in("codigo", codigos);
+  const de = new Map<string, number>();
+  if (error) console.error("[pedidos/detalle] existencia:", error.message);
+  else for (const f of (data ?? []) as { codigo: string; existencia: number | string | null }[]) {
+    const n = f.existencia == null ? NaN : Number(f.existencia);
+    if (Number.isFinite(n)) de.set(f.codigo, n);
+  }
+  return lineas.map((l) => ({ ...l, existencia: de.get(l.codigo) ?? null }));
+}
+
 /** ¿Hay que volver a preguntarle a Switch? Sin líneas, o pasadas las 6 h. */
 export function hayQueBajar(d: Pick<DetalleDelPedido, "lineas" | "bajado">, ahora = Date.now()): boolean {
   if (d.lineas.length === 0 || !d.bajado) return true;

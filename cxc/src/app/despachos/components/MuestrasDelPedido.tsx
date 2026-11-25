@@ -7,7 +7,8 @@
 // (sin enviar), y «Cancelar». Las reglas son de `lib/guias/muestras.ts`; el
 // servidor decide igual.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { Check } from "lucide-react";
 import { ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ToastSystem";
@@ -134,6 +135,33 @@ export function useMuestrasDelPedido(
     rotuloPedir: sePuedePedir && elegidas.size > 0 && !guardando ? rotuloPedirMuestras(elegidas.size) : null,
     lineaDelPedido: lineaDeEsperaDelPedido(abiertas, estadoPedido),
     hoja,
+  };
+}
+
+/**
+ * 🔴 25-nov-2026 (Daniel): la muestra se marca tocando CUALQUIER parte del
+ * renglón, no solo el círculo. `false` = solo el círculo, como antes.
+ */
+export const MUESTRA_TOCANDO_LA_FILA_2026_11 = true;
+
+/** Lo que hace tocar el renglón: lo MISMO que su círculo (o su «···»). `null` = nada. */
+export function toqueDeLaFila(c: ControlMuestras, codigo: string): (() => void) | null {
+  if (!MUESTRA_TOCANDO_LA_FILA_2026_11 || !c.activo || !c.puedePedir) return null;
+  const k = codigo.trim();
+  const m = c.porCodigo.get(k);
+  return m ? () => c.abrirHoja(m) : () => c.alternar(k);
+}
+
+/** Las props del `<tr>`: el toque y el teclado (Enter / espacio). Un botón o campo de adentro hace lo suyo. */
+export function propsDeFilaDeMuestra(c: ControlMuestras, codigo: string) {
+  const accion = toqueDeLaFila(c, codigo);
+  if (!accion) return {};
+  return {
+    ...clicConTeclado(accion, { fila: true }),
+    onClick: (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest("button, input, a, label, select, textarea")) return;
+      accion();
+    },
   };
 }
 

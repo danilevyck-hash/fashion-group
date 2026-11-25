@@ -53,14 +53,16 @@ import {
   COLUMNAS_DETALLE,
   MAX_BULTO,
   MIN_BULTO,
+  PEDIDO_CON_EXISTENCIA_2026_11,
   descripcionCompleta,
   resumenAsignacion,
+  textoExistencia,
   textoUnidades,
   totalesDelPedido,
   validarBulto,
   type LineaPedido,
 } from "@/lib/guias/pedidos-bultos";
-import { CeldaDeMuestra, LineaDeMuestra, fondoDeLaFila, type ControlMuestras } from "./MuestrasDelPedido";
+import { CeldaDeMuestra, LineaDeMuestra, fondoDeLaFila, propsDeFilaDeMuestra, toqueDeLaFila, type ControlMuestras } from "./MuestrasDelPedido";
 
 export interface PedidoDelDetalle {
   empresa_key: string;
@@ -449,6 +451,13 @@ export default function PedidoBultos({
                 {!ocultarBulto && <th className="w-20 py-2 pl-1 pr-1 sm:px-3">{COLUMNAS_DETALLE[0]}</th>}
                 <th className="hidden px-3 py-2 sm:table-cell sm:w-44">{COLUMNAS_DETALLE[1]}</th>
                 <th className="py-2 pl-1 pr-1 sm:w-[26%] sm:px-3">{COLUMNAS_DETALLE[2]}</th>
+                {/* 25-nov-2026: cuántas hay, a la izquierda de lo pedido. Bodega la ve (no es plata). */}
+                {PEDIDO_CON_EXISTENCIA_2026_11 && (
+                  <th className="w-14 px-1 py-2 text-right sm:w-28 sm:px-3">
+                    <span className="sm:hidden">Exist.</span>
+                    <span className="hidden sm:inline">Existencia</span>
+                  </th>
+                )}
                 <th className="w-16 px-1 py-2 text-right sm:w-28 sm:px-3">
                   {/* En el celular, «Cant.» —la misma abreviatura del papel—:
                       «Cantidad» entero quedaba recortado contra el borde. */}
@@ -465,7 +474,11 @@ export default function PedidoBultos({
             </thead>
             <tbody className="divide-y divide-gray-100 align-top">
               {lineas.map((l) => (
-                <tr key={l.codigo_barra_id} className={marcadas.has(l.codigo_barra_id) ? "bg-gray-50" : muestras ? fondoDeLaFila(muestras, l.codigo) : undefined}>
+                <tr
+                  key={l.codigo_barra_id}
+                  className={`${marcadas.has(l.codigo_barra_id) ? "bg-gray-50" : muestras ? fondoDeLaFila(muestras, l.codigo) ?? "" : ""} ${muestras && toqueDeLaFila(muestras, l.codigo) ? "cursor-pointer" : ""}`}
+                  {...(muestras ? propsDeFilaDeMuestra(muestras, l.codigo) : {})}
+                >
                   {puedePonerAqui && (
                     <td className="py-2 pl-1.5 sm:pl-2">
                       <label className="flex h-11 w-9 items-center justify-center">
@@ -487,6 +500,11 @@ export default function PedidoBultos({
                     <span className="block tabular-nums text-xs font-normal text-gray-500 sm:hidden">{l.codigo}</span>
                     {muestras && <LineaDeMuestra c={muestras} codigo={l.codigo} />}
                   </td>
+                  {PEDIDO_CON_EXISTENCIA_2026_11 && (
+                    <td className={`whitespace-nowrap px-1 py-2 text-right tabular-nums sm:px-3 ${l.existencia == null ? "text-gray-400" : "text-gray-700"}`}>
+                      {textoExistencia(l.existencia)}
+                    </td>
+                  )}
                   <td className="whitespace-nowrap px-1 py-2 text-right tabular-nums text-gray-700 sm:px-3">{l.cantidad}</td>
                   {conPlata && (
                     <td className="hidden whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-700 sm:table-cell">
