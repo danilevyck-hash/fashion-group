@@ -28,6 +28,7 @@ import { aparatoDeQuienMira } from "@/lib/aparato";
 import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import { puedeMarcarPedidos, puedeRecibirPedidos, puedeVerPedidosBodega } from "@/lib/guias/pedidos-bodega";
 import { PEDIDOS_FLUJO_SIMPLE_2026_10 } from "@/lib/guias/pedidos-flujo-simple";
+import MuestrasView, { useMuestrasPorMandar } from "./components/MuestrasView";
 
 // LAZY, como los modos de Comisiones: bodega abre /guias todo el día desde el
 // celular y la configuración es de admin/secretaria — su JS solo se descarga
@@ -172,7 +173,7 @@ export default function GuiasPage() {
   // puede esconder una función nueva que Daniel aprobó aparte. La ven los
   // MISMOS tres que escriben una guía (admin · secretaria · bodega,
   // `ETIQUETAS_ROLES` derivado de `GUIAS_WRITE_ROLES`); el vendedor no.
-  type Vista = "pedidos" | "guias" | "config" | "etiquetas";
+  type Vista = "pedidos" | "muestras" | "guias" | "config" | "etiquetas";
   const [vista, setVista] = useState<Vista>("guias");
   // 🔴 «Pedidos» es la PRIMERA pestaña y el módulo ABRE AHÍ para todos los
   // que la ven (Daniel, 7-oct-2026: «el módulo Despachos debe abrir en
@@ -182,10 +183,14 @@ export default function GuiasPage() {
   const hayConfig =
     GUIAS_ATAJOS_NUEVOS && !!role && (CONFIG_GUIAS_ROLES as readonly string[]).includes(role);
   const hayEtiquetas = puedeEtiquetar(role);
+  // 🔴 «Muestras» (24-nov-2026): la sección la ve el vendedor que manda las
+  // muestras (edwin, rey) y admin. Lo decide el SERVIDOR: con 403 no hay sección.
+  const muestras = useMuestrasPorMandar(authChecked && (role === "vendedor" || role === "admin"));
+  const hayMuestras = muestras.visible;
   /** La pestaña que dice la dirección (al entrar y al volver con el gesto). */
   function vistaDeLaUrl(): Vista | null {
     const v = new URLSearchParams(window.location.search).get("vista");
-    if (v === "config" || v === "etiquetas") return v;
+    if (v === "config" || v === "etiquetas" || v === "muestras") return v;
     if (hayPedidos && v !== "guias" && !hayFiltroPendientes()) return "pedidos";
     return null;
   }
@@ -222,10 +227,12 @@ export default function GuiasPage() {
   const enConfig = hayConfig && vista === "config";
   const enEtiquetas = hayEtiquetas && vista === "etiquetas";
   const enPedidos = hayPedidos && vista === "pedidos";
+  const enMuestras = hayMuestras && vista === "muestras";
   /** Las pestañas que de verdad existen para este rol. Con una sola, no se dibuja la fila. */
   const pestanas: Array<[Vista, string]> = [
     // 🔴 Orden (12-nov-2026, Daniel): Pedidos · Etiquetas · Guías de despacho · Configuración.
     ...(hayPedidos ? ([["pedidos", "Pedidos"]] as Array<[Vista, string]>) : []),
+    ...(hayMuestras ? ([["muestras", "Muestras"]] as Array<[Vista, string]>) : []),
     // 🔴 «Bultos» (era «Etiquetas», 7-oct-2026): es el nombre del glosario de
     // `docs/nombres-erp.md` para esta pantalla (se escriben los bultos y
     // salen las hojas); la `key` de la pestaña («etiquetas») no cambia.
@@ -284,7 +291,7 @@ export default function GuiasPage() {
         {barra && !(PEDIDO_REGRESO_EN_EL_TITULO && enPedidos && pedidoAbierto) && (
           <BarraDeControles
             titulo="Despachos"
-            pestanas={pestanas.map(([value, label]) => ({ value, label }))}
+            pestanas={pestanas.map(([value, label]) => ({ value, label, ...(value === "muestras" && muestras.total > 0 ? { opcion: `Muestras ${muestras.total}` } : {}) }))}
             activa={vista}
             onPestana={(v) => cambiarVista(v as Vista)}
             periodo={GUIAS_LISTA_APPLE_2026_10 && vista === "guias" ? selectorPeriodo : undefined}
@@ -311,12 +318,17 @@ export default function GuiasPage() {
                   }`}
                 >
                   {label}
+                  {v === "muestras" && muestras.total > 0 && (
+                    <span className="ml-1.5 inline-flex min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">{muestras.total}</span>
+                  )}
                 </button>
               ))}
             </div>
           </div>
         )}
-        {enPedidos ? (
+        {enMuestras ? (
+          <MuestrasView control={muestras} />
+        ) : enPedidos ? (
           <PedidosView
             puedeMarcar={puedeMarcarPedidos(role)}
             // 🔴 «Recibido» (o «Verificado» con bultos) lo marca la secretaria

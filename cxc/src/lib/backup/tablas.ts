@@ -228,6 +228,9 @@ export const TABLAS_PERSONAS = [
   // a conseguir de ningún lado: Switch manda las líneas, pero no sabe nada de
   // bultos. Las líneas (`pedidos_lineas`) sí vuelven a bajar: van en `switch`.
   "pedidos_linea_bulto",
+  // 🔴 Las muestras por referencia (24-nov-2026): las pide bodega y las marca
+  // el vendedor —quién y cuándo—. Switch no sabe nada de muestras.
+  "pedidos_muestras",
   // 🔴 Las tallas y la curva de caja de los despachos del proveedor (13-nov-2026).
   // Salen de los correos de ASW, y el buzón solo guarda desde el 9-mar-2026: lo
   // que se cargó de un correo que ya no está no vuelve de ningún lado.

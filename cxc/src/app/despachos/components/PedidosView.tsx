@@ -37,6 +37,8 @@ import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe, hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import PedidoBultos, { type PedidoDelDetalle } from "./PedidoBultos";
+import PedidoAbierto from "./PedidoAbierto";
+import { MUESTRAS_2026_11 as MUESTRAS, lineaDeEsperaDelPedido } from "@/lib/guias/muestras";
 import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
 import { PEDIDOS_CONTEOS_2026_11 as CONTEOS, conteosPorEstado, lineaDeResumen, lineaMasViejo, textoMonto } from "@/lib/ui/pedidos-conteos-2026-11";
@@ -788,7 +790,9 @@ export default function PedidosView({
           </button>
         </div>
         <div className={fila}>
-          {/* Un solo motivo, un solo botón (Daniel, 9-oct-2026). */}
+          {/* Un solo motivo, un solo botón (Daniel, 9-oct-2026). 🔴 Con
+              «Muestras» (24-nov-2026) la espera es automática: sin botón. */}
+          {!MUESTRAS && (
           <button
             type="button"
             onClick={() => setPorMarcarMuestra({ pedido: p, poner: !enEspera })}
@@ -796,6 +800,7 @@ export default function PedidosView({
           >
             {enEspera ? "Quitar espera" : "En espera de muestra"}
           </button>
+          )}
           {deshacer("pendiente")}
         </div>
         </div>
@@ -900,6 +905,11 @@ export default function PedidosView({
    * nota si tiene. Lo ve todo el que ve Pedidos.
    */
   const avisoEsperaMuestra = (p: PedidoBodega) => {
+    // 🔴 «Muestras» (24-nov-2026): la cuenta de referencias manda, solo En preparación.
+    if (MUESTRAS) {
+      const linea = estadoFlujoSimpleLeido(p.estado) === "en_preparacion" ? lineaDeEsperaDelPedido(p.muestras_abiertas ?? 0, p.estado) : null;
+      return linea && <span className="mt-0.5 block text-xs font-medium text-amber-700">{linea}</span>;
+    }
     if (estadoFlujoSimpleLeido(p.estado) !== "en_preparacion" || !p.espera_muestra_desde) return null;
     const dias = diasEnPreparado(p.espera_muestra_desde, new Date().toISOString());
     return (
@@ -1308,7 +1318,9 @@ export default function PedidosView({
     return (
       <>
         {PEDIDO_CON_ACCION_EN_DETALLE && ventanas}
-        <PedidoBultos
+        <PedidoAbierto
+          puedePedirMuestras={puedeMarcar}
+          estadoPedido={(pedidos ?? []).find((p) => clave(p) === clave(abierto))?.estado ?? null}
           pedido={abierto}
           puedePoner={false}
           ocultarBulto

@@ -58,6 +58,8 @@ import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { aplicarAlias } from "@/lib/comisiones/alias";
 import { leerAliasOVacio } from "@/lib/comisiones/exclusiones-server";
 import { TIPO_FACTURA } from "@/lib/guias/atajos-facturas";
+import { MUESTRAS_2026_11 } from "@/lib/guias/muestras";
+import { contarAbiertasPorPedido, sincronizarEspera } from "@/lib/guias/muestras-server";
 import {
   BULTOS_EN_EL_PEDIDO,
   columnasSoloBultos,
@@ -214,6 +216,8 @@ export async function GET(req: NextRequest) {
     // pantalla no apaga nada ni inventa piezas, muestra «—».
     leerAsignacion([...empresas]),
   ]);
+  // «Muestras» (24-nov-2026): cuántas referencias esperan muestra. Falla ABIERTA.
+  const abiertas = MUESTRAS_2026_11 ? await contarAbiertasPorPedido([...empresas]) : new Map<string, number>();
   if (ped.error) return NextResponse.json({ error: "No se pudieron leer los pedidos" }, { status: 500 });
   if (est.error) return NextResponse.json({ error: "No se pudo leer el estado de bodega" }, { status: 500 });
 
@@ -270,6 +274,7 @@ export async function GET(req: NextRequest) {
       espera_muestra_desde: m?.espera_muestra_desde ?? null,
       espera_muestra_por: m?.espera_muestra_por ?? null,
       espera_muestra_nota: m?.espera_muestra_nota ?? null,
+      ...(MUESTRAS_2026_11 ? { muestras_abiertas: abiertas.get(`${p.empresa_key}:${p.pedido_switch_id}`) ?? 0 } : {}),
       ...(BULTOS_EN_EL_PEDIDO ? { facturado: facturados.has(`${p.empresa_key}:${p.pedido_switch_id}`) } : {}),
       // 🔴 La plata la decide el SERVIDOR: el campo solo existe para `daniel`.
       ...montoDelPedido(auth.userName, p.subtotal),
@@ -414,6 +419,12 @@ async function patchFlujoSimple(
     if (error?.code === "23505") return yaMovido();
     if (error) return NextResponse.json({ error: "No se pudo guardar el estado" }, { status: 500 });
   }
+  // 🔴 «Muestras»: al entrar a En preparación con muestras pendientes, la
+  // espera se prende sola (y el CHECK de la base la deja solo ahí).
+  if (MUESTRAS_2026_11 && estado === "en_preparacion") {
+    const cambio = await sincronizarEspera(empresa, id, quienFirma);
+    if (cambio === "poner") Object.assign(fila, { espera_muestra_desde: ahora, espera_muestra_por: quienFirma, espera_muestra_nota: null });
+  }
   // Rastro de cada paso, con la fila de ANTES: deshacer no borra quién lo había marcado.
   await logActivity(
     auth.role,
@@ -521,6 +532,8 @@ export async function PATCH(req: NextRequest) {
     return patchSoloBultos(auth, empresa, id, body.bultos);
   }
   if (PEDIDOS_FLUJO_SIMPLE_2026_10 && typeof body?.muestra === "boolean") {
+    // 🔴 «Muestras» (24-nov-2026): la espera la deciden las referencias, ya no se marca a mano.
+    if (MUESTRAS_2026_11) return NextResponse.json({ error: "La espera de muestra se marca sola con las muestras de cada referencia" }, { status: 409 });
     if (!(B2B_EMPRESA_KEYS as readonly string[]).includes(empresa) || !Number.isInteger(id)) {
       return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
     }

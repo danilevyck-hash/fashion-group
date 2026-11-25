@@ -162,6 +162,8 @@ export interface PedidoBodega {
   espera_muestra_desde?: string | null;
   espera_muestra_por?: string | null;
   espera_muestra_nota?: string | null;
+  /** «Muestras» (24-nov-2026): referencias en Falta muestra o No llegó. */
+  muestras_abiertas?: number;
   /** Revisión 110 · 61: un Recibido con factura ya no deja cambiar los bultos. */
   facturado?: boolean;
   /**
