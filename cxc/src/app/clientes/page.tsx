@@ -103,11 +103,14 @@ export default async function ClientesPage() {
   // default de esa puerta es «solo lo que se puede ofrecer», que es exactamente
   // lo que esta lista quiere desde el 5-sep-2026.
   // `null` = no se pudo leer: la pantalla lo dice, no muestra una lista vacía.
-  const filas = await leerClientesDelGrupo("").catch((e: unknown) => {
-    console.error("[clientes/lista] directorio:", e instanceof Error ? e.message : String(e));
-    return null;
-  });
-  const debe = await saldoPorCodigo();
+  // Las dos lecturas no dependen una de otra: van A LA VEZ (velocidad, 25-nov-2026).
+  const [filas, debe] = await Promise.all([
+    leerClientesDelGrupo("").catch((e: unknown) => {
+      console.error("[clientes/lista] directorio:", e instanceof Error ? e.message : String(e));
+      return null;
+    }),
+    saldoPorCodigo(),
+  ]);
   const errorLectura = filas === null
     ? AVISO_DIRECTORIO_NO_LEIDO
     : debe === null ? AVISO_SALDO_NO_LEIDO : null;

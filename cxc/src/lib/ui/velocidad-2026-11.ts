@@ -30,3 +30,10 @@ export const LOGIN_UNA_PASADA = true;
 
 /** Ventas › Resumen: la proyección se guarda hasta la próxima carga de facturas. */
 export const PROYECCION_EN_CACHE = true;
+
+/**
+ * Ventas › Resumen (25-nov-2026): el año anterior a los mismos días y el
+ * resumen de Multifashion se guardan 5 min, o hasta la próxima carga de Switch
+ * (`lib/ventas/guardado-hasta-carga.ts`). Ningún número cambia.
+ */
+export const VENTAS_LECTURAS_EN_CACHE = true;

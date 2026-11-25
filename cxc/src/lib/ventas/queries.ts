@@ -26,7 +26,20 @@ import {
 import { fmtDate } from "@/lib/format";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { leerProyeccionCierre, leerProyeccionCierreCacheada } from "@/lib/ventas/proyeccion-cache";
-import { PROYECCION_EN_CACHE } from "@/lib/ui/velocidad-2026-11";
+import { PROYECCION_EN_CACHE, VENTAS_LECTURAS_EN_CACHE } from "@/lib/ui/velocidad-2026-11";
+import { guardadoHastaLaProximaCarga } from "@/lib/ventas/guardado-hasta-carga";
+import type { SupabaseLikeError, SupabaseLikeResult } from "@/lib/supabase-retry";
+import type { PrevSamePeriodPayload } from "@/lib/ventas/prev-same-period";
+
+/** El año anterior a los mismos días, guardado (velocidad, 25-nov-2026). Un error no se guarda. */
+function leerPrevSamePeriodGuardado(year: number): Promise<SupabaseLikeResult<PrevSamePeriodPayload>> {
+  if (!VENTAS_LECTURAS_EN_CACHE) return leerPrevSamePeriod(year);
+  return guardadoHastaLaProximaCarga("ventas-prev-same-period", [year], async () => {
+    const r = await leerPrevSamePeriod(year);
+    if (r.error) throw r.error;
+    return r;
+  }).catch((error: SupabaseLikeError) => ({ data: null, error }));
+}
 import {
   aplicarCorteCosto, corteMasNuevo, type CorteCosto,
 } from "@/lib/ventas/margen-mes-en-curso";
@@ -116,7 +129,7 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // cortaba en UTC y una factura después de las 7 p.m. corría el corte un
     // día). La lectura, con su cadena de versiones, vive en
     // `prev-same-period.ts` y la comparten el Anual y Vista General.
-    leerPrevSamePeriod(year),
+    leerPrevSamePeriodGuardado(year),
     // 🔴 ACÁ VIVÍA `get_app_setting("multifashion_meta_anual_2026")`, UNA
     // CONSULTA POR CADA CARGA DE /ventas PARA UN NÚMERO QUE NO SE DIBUJA EN
     // NINGUNA PANTALLA. Viajaba como `kpis.metaAnualMultifashion` y nadie lo

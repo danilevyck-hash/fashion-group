@@ -177,7 +177,8 @@ describe("BARRIDO ESTÁTICO — nadie se hace su propia lista de clientes", () =
     // El candado exige que entre la puerta y el `sort` haya al menos un paso que
     // copie — nunca un `sort` directo sobre lo que devolvió la puerta.
     const src = leer("src/app/clientes/page.tsx");
-    const iPuerta = src.indexOf("await leerClientesDelGrupo(");
+    // 25-nov-2026: la puerta va dentro de un `Promise.all` (sin `await` delante).
+    const iPuerta = src.indexOf('leerClientesDelGrupo("")');
     const iCopia = Math.min(
       ...[".slice()", ".filter(", ".map("]
         .map((t) => src.indexOf(t, iPuerta))

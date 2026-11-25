@@ -6,6 +6,8 @@ import { lineaDeRechazos } from "@/lib/rechazos-de-switch";
 import { VentasShell } from "./VentasShell";
 import { verifySession } from "@/lib/session-cookie";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { VENTAS_LECTURAS_EN_CACHE } from "@/lib/ui/velocidad-2026-11";
+import { guardadoHastaLaProximaCarga } from "@/lib/ventas/guardado-hasta-carga";
 import { rangoValido } from "@/lib/ventas/rango-ventas";
 import { anioDelPeriodo, periodoAUrl, periodoDesdeUrl, ventanaParaClientes, PARAM_PERIODO_VENTAS } from "@/lib/ventas/periodo";
 
@@ -69,7 +71,12 @@ export default async function VentasPage({
       console.error("[ventas] clientes error", err);
       return null;
     }),
-    fetchMultifashion({ year, mes }).catch(err => {
+    // Velocidad (25-nov-2026): guardado 5 min o hasta la próxima carga de
+    // Switch; aquí solo alimenta el indicador de mayoreo. Un error no se guarda.
+    (VENTAS_LECTURAS_EN_CACHE
+      ? guardadoHastaLaProximaCarga("ventas-multifashion", [year, mes], () => fetchMultifashion({ year, mes }))
+      : fetchMultifashion({ year, mes })
+    ).catch(err => {
       console.error("[ventas] multifashion error", err);
       return null;
     }),
