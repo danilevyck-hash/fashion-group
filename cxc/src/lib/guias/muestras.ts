@@ -119,6 +119,14 @@ export const MUESTRAS_COMO_PEDIDOS_2026_11 = true;
 export const MUESTRAS_PARA_BODEGA_2026_11 = true;
 
 /**
+ * 🔴 PRENDIDO (25-nov-2026, Daniel aprobó el mockup con 4 cambios): el
+ * vendedor ve UNA lista a todo el ancho, sin bandas ni estado por renglón;
+ * «No llegó · reenviar» va arriba y después del pedido más viejo al más nuevo
+ * (`MuestrasDelVendedor`). `false` = la tabla con bandas por empresa.
+ */
+export const MUESTRAS_DEL_VENDEDOR_2026_11 = true;
+
+/**
  * Quién MIRA la lista sin mandar nada (bodega), POR USUARIO y sin tocar roles
  * (Daniel, 25-nov-2026): julio, todas; rodrigo y jorman, solo Vistana. Ven
  * «Por mandar» y «En camino», y en «En camino» reclaman «No llegó».
