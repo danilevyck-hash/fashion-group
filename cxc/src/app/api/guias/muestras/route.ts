@@ -28,6 +28,8 @@ import {
   type AccionMuestra,
 } from "@/lib/guias/muestras";
 import { COLUMNAS_MUESTRA, leerMuestrasDelPedido, leerPorMandar, sincronizarEspera } from "@/lib/guias/muestras-server";
+import { avisoDeMuestras } from "@/lib/guias/muestras-aviso";
+import { mandarAvisoDeMuestras } from "@/lib/guias/muestras-aviso-server";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +79,7 @@ export async function POST(req: NextRequest) {
   if (!veLaEmpresa(empresa, auth.userName, auth.role)) return noExiste();
 
   const [ped, est, lin, vivas] = await Promise.all([
-    supabaseServer.from("switch_pedidos").select("pedido_switch_id").eq("empresa_key", empresa).eq("pedido_switch_id", id).maybeSingle(),
+    supabaseServer.from("switch_pedidos").select("pedido_switch_id, secuencial, cliente_nombre").eq("empresa_key", empresa).eq("pedido_switch_id", id).maybeSingle(),
     supabaseServer.from("pedidos_bodega_estado").select("estado").eq("empresa_key", empresa).eq("pedido_switch_id", id).maybeSingle(),
     supabaseServer.from("pedidos_lineas").select("codigo, descripcion").eq("empresa_key", empresa).eq("pedido_switch_id", id),
     supabaseServer.from("pedidos_muestras").select("codigo").eq("empresa_key", empresa).eq("pedido_switch_id", id).eq("deleted", false),
@@ -104,6 +106,12 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: "No se pudieron pedir las muestras" }, { status: 500 });
   const espera = await sincronizarEspera(empresa, id, quien);
   await logActivity(auth.role, "pedir_muestras", "pedidos_muestras", { pedido: `${empresa}:${id}`, codigos, espera }, auth.userName);
+  // 🔔 UN aviso push al vendedor que las manda (`MUESTRAS_AVISO_PUSH_2026_11`).
+  // Nunca frena: lo guardado ya quedó; si falla, se registra y sigue.
+  const p = ped.data as { secuencial?: string | null; cliente_nombre?: string | null };
+  await mandarAvisoDeMuestras(
+    avisoDeMuestras({ empresa_key: empresa, pedido_switch_id: id, n: (creadas ?? filas).length, secuencial: p.secuencial, cliente: p.cliente_nombre }),
+  );
   return NextResponse.json({ ok: true, muestras: creadas ?? [] });
 }
 

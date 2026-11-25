@@ -10,6 +10,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
+import AvisoActivarAvisos from "@/app/marcacion/AvisoActivarAvisos";
+import { ofreceAvisoDeMuestras } from "@/lib/guias/muestras-aviso";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import {
   MUESTRAS_2026_11,
@@ -42,7 +44,7 @@ export function useMuestrasPorMandar(activo: boolean) {
   return { pedidos, setPedidos, error, recargar, total, visible: pedidos !== null };
 }
 
-export default function MuestrasView({ control }: { control: ReturnType<typeof useMuestrasPorMandar> }) {
+export default function MuestrasView({ control, role }: { control: ReturnType<typeof useMuestrasPorMandar>; role?: string | null }) {
   const { toast } = useToast();
   const { pedidos, setPedidos, error, recargar, total } = control;
   const ahora = new Date().toISOString();
@@ -75,6 +77,11 @@ export default function MuestrasView({ control }: { control: ReturnType<typeof u
   const empresas = [...new Set(pedidos.map((p) => nombreCortoEmpresa(p.empresa_key)))].join(" · ");
   return (
     <div className="mx-auto max-w-3xl pb-6 sm:px-6 sm:pt-4">
+      {ofreceAvisoDeMuestras(role) && (
+        <div className="px-4 pt-3 sm:px-0 sm:pt-0">
+          <AvisoActivarAvisos ruta="/api/guias/muestras/avisos" titulo="Avisos de muestras desactivados" />
+        </div>
+      )}
       <div className="flex items-baseline justify-between gap-3 px-4 py-2 sm:px-0">
         <p className="text-[15px] font-semibold text-gray-900">{total === 0 ? "Sin muestras por mandar" : lineaPorMandar(total)}</p>
         {empresas && <p className="truncate text-sm text-gray-500">{empresas}</p>}

@@ -10,6 +10,11 @@ const logs: unknown[][] = [];
 let sesion = { role: "bodega", userId: "u1", userName: "julio" };
 let proximoId = 1;
 
+const avisos: unknown[] = [];
+let avisoFalla = false;
+vi.mock("@/lib/guias/muestras-aviso-server", () => ({
+  mandarAvisoDeMuestras: vi.fn(async (a: unknown) => { avisos.push(a); return avisoFalla ? 0 : 1; }),
+}));
 vi.mock("@/lib/log-activity", () => ({ logActivity: vi.fn(async (...a: unknown[]) => { logs.push(a); }) }));
 vi.mock("@/lib/requireRole", async () => {
   const { NextResponse } = await import("next/server");
@@ -68,6 +73,8 @@ const espera = (empresa: string, id: number) => db.pedidos_bodega_estado.find((f
 beforeEach(() => {
   for (const k of Object.keys(db)) delete db[k];
   logs.length = 0;
+  avisos.length = 0;
+  avisoFalla = false;
   proximoId = 1;
   db.switch_pedidos = [
     { empresa_key: "fashion_shoes", pedido_switch_id: 2228, secuencial: "16-000002228", cliente_nombre: "City Mall Paso Canoa" },
@@ -91,6 +98,24 @@ async function pedir(empresa: string, id: number, codigos: string[]) {
 }
 
 describe("bodega pide las muestras", () => {
+  it("🔔 al pedir sale UN aviso por pedido al vendedor que las manda (rey · edwin)", async () => {
+    await pedir("fashion_shoes", 2228, ["TWLENILA140", "FM0FM05393YBS"]);
+    expect(avisos).toEqual([
+      expect.objectContaining({ usuario: "rey", title: "Muestras pedidas", body: "Bodega pidió 2 muestras · Pedido 16-000002228 · City Mall Paso Canoa", url: "/despachos?vista=muestras" }),
+    ]);
+    await pedir("vistana", 2483, ["CK001"]);
+    expect(avisos[1]).toMatchObject({ usuario: "edwin", body: "Bodega pidió 1 muestra · Pedido 16-000002483 · Golden Mall" });
+  });
+  it("🔔 si el aviso no sale, las muestras quedan guardadas igual", async () => {
+    avisoFalla = true;
+    expect((await pedir("fashion_shoes", 2228, ["TWLENILA140"])).status).toBe(200);
+    expect(muestras()).toHaveLength(1);
+  });
+  it("🔔 un pedido rechazado (409) no avisa", async () => {
+    await pedir("fashion_shoes", 2228, ["TWLENILA140"]);
+    await pedir("fashion_shoes", 2228, ["TWLENILA140"]);
+    expect(avisos).toHaveLength(1);
+  });
   it("pide 2 referencias con un botón, y el pedido En preparación queda En espera sola", async () => {
     const r = await pedir("fashion_shoes", 2228, ["TWLENILA140", "FM0FM05393YBS", "NO-EXISTE"]);
     expect(r.status).toBe(200);
@@ -130,6 +155,7 @@ describe("el vendedor las manda", () => {
     await pedir("fashion_shoes", 2228, ["TWLENILA140", "FM0FM05393YBS"]);
     await pedir("vistana", 2483, ["CK001"]);
     logs.length = 0;
+    avisos.length = 0;
   });
   const listaDe = async () => (await (await GET(req("GET"))).json()) as { pedidos: Array<{ secuencial: string; muestras: Array<{ id: number; codigo: string }> }>; total: number };
 
@@ -187,6 +213,7 @@ describe("el vendedor las manda", () => {
     expect((await PATCH(req("PATCH", { accion: "no_llego", ids: [tw] }))).status).toBe(403);
     como("bodega", "julio");
     expect((await PATCH(req("PATCH", { accion: "no_llego", ids: [tw] }))).status).toBe(200);
+    expect(avisos).toHaveLength(0); // «No llegó» no avisa
     expect(muestras().find((m) => m.id === tw)).toMatchObject({ estado: "no_llego", reclamada_por: "julio" });
     expect(espera("fashion_shoes", 2228)).not.toBeNull();
     como("vendedor", "rey");
