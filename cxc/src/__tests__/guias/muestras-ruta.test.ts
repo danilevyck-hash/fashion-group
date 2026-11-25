@@ -159,7 +159,7 @@ describe("el vendedor las manda", () => {
   });
   const listaDe = async () => (await (await GET(req("GET"))).json()) as { pedidos: Array<{ secuencial: string; muestras: Array<{ id: number; codigo: string }> }>; total: number };
 
-  it("cada vendedor ve solo lo suyo; bodega no tiene lista", async () => {
+  it("cada vendedor ve solo lo suyo; bodega sin lista (otro usuario) → 403", async () => {
     como("vendedor", "rey");
     expect((await listaDe()).total).toBe(2);
     como("vendedor", "edwin");
@@ -168,7 +168,7 @@ describe("el vendedor las manda", () => {
     expect(e.pedidos[0].secuencial).toBe("16-000002483");
     como("admin", "daniel");
     expect((await listaDe()).total).toBe(3);
-    como("bodega", "julio");
+    como("bodega", "bodega");
     expect((await GET(req("GET"))).status).toBe(403);
     como("vendedor", "reinaldo");
     expect((await GET(req("GET"))).status).toBe(403);
@@ -183,6 +183,34 @@ describe("el vendedor las manda", () => {
     como("vendedor", "edwin");
     expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck], guia: "G1" }))).status).toBe(200);
     expect(muestras().find((m) => m.id === ck)).toMatchObject({ estado: "enviada", enviada_por: "edwin" });
+  });
+
+  it("🔴 bodega (25-nov-2026): julio ve TODAS (con Vistana), rodrigo y jorman SOLO Vistana; lo enviado viene «En camino» y no cuenta", async () => {
+    const ck = muestras().find((m) => m.codigo === "CK001")!.id;
+    como("vendedor", "edwin");
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck], guia: "G9" }))).status).toBe(200);
+    como("bodega", "julio");
+    const j = (await (await GET(req("GET"))).json()) as { pedidos: Array<{ empresa_key: string; muestras: Array<{ estado: string }> }>; total: number; soloLectura: boolean };
+    expect(j.soloLectura).toBe(true);
+    expect(j.pedidos.map((p) => p.empresa_key).sort()).toEqual(["fashion_shoes", "vistana"]);
+    expect(j.pedidos.find((p) => p.empresa_key === "vistana")!.muestras[0].estado).toBe("enviada");
+    expect(j.total).toBe(2); // el número rojo: solo lo por mandar
+    for (const u of ["rodrigo", "jorman"]) {
+      como("bodega", u);
+      const r = (await (await GET(req("GET"))).json()) as { pedidos: Array<{ empresa_key: string }> };
+      expect(r.pedidos.map((p) => p.empresa_key)).toEqual(["vistana"]);
+    }
+  });
+
+  it("🔴 nadie de bodega marca «Enviada» (salvo Angel, que manda como Rey)", async () => {
+    const fs = muestras().filter((m) => m.empresa_key === "fashion_shoes").map((m) => m.id as number);
+    const ck = muestras().find((m) => m.codigo === "CK001")!.id;
+    for (const u of ["julio", "rodrigo", "jorman"]) {
+      como("bodega", u);
+      expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck], guia: "G1" }))).status).toBe(403);
+      expect((await PATCH(req("PATCH", { accion: "enviada", ids: fs, guia: "G1" }))).status).toBe(403);
+    }
+    expect(muestras().every((m) => m.estado === "falta")).toBe(true);
   });
 
   it("🔴 Angel (bodega) manda como Rey: sí Fashion Shoes, NO Vistana (25-nov-2026)", async () => {

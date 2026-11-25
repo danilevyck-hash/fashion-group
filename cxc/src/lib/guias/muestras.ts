@@ -111,17 +111,33 @@ export function abreEnMuestras(userName: string | null | undefined, role: string
  */
 export const MUESTRAS_COMO_PEDIDOS_2026_11 = true;
 
-/** Quién MIRA la lista sin mandar nada. Hoy nadie: Angel pasó a mandar (Daniel, 25-nov-2026). */
-export const MIRAN_MUESTRAS_SIN_ENVIAR: Readonly<Record<string, readonly string[]>> = {};
+/**
+ * 🔴 PRENDIDO (25-nov-2026, Daniel aprobó el mockup): bodega ve UNA lista de
+ * muestras —Por mandar arriba, En camino abajo— con «No llegó» como único
+ * toque (`MuestrasDeBodega`). `false` = bodega sin lista, como antes.
+ */
+export const MUESTRAS_PARA_BODEGA_2026_11 = true;
+
+/**
+ * Quién MIRA la lista sin mandar nada (bodega), POR USUARIO y sin tocar roles
+ * (Daniel, 25-nov-2026): julio, todas; rodrigo y jorman, solo Vistana. Ven
+ * «Por mandar» y «En camino», y en «En camino» reclaman «No llegó».
+ */
+export const MIRAN_MUESTRAS_SIN_ENVIAR: Readonly<Record<string, readonly string[]>> = {
+  julio: B2B_EMPRESA_KEYS,
+  rodrigo: ["vistana"],
+  jorman: ["vistana"],
+};
 
 /** Las empresas cuya lista ve esta persona: las que manda, o las que solo mira. */
 export function empresasQueVenMuestras(userName: string | null | undefined, role: string | null | undefined): readonly string[] {
   const propias = empresasDeMuestrasDe(userName, role);
   if (propias.length > 0 || !MUESTRAS_COMO_PEDIDOS_2026_11 || role !== "bodega") return propias;
+  if (!MUESTRAS_PARA_BODEGA_2026_11) return [];
   return MIRAN_MUESTRAS_SIN_ENVIAR[(userName ?? "").trim().toLowerCase()] ?? [];
 }
 
-/** ¿Mira la lista sin poder mandar? (Angel). Ve solo lo por mandar, como el vendedor. */
+/** ¿Mira la lista sin poder mandar? (bodega: julio, rodrigo, jorman). Ve también «En camino». */
 export function soloMiraMuestras(userName: string | null | undefined, role: string | null | undefined): boolean {
   return empresasDeMuestrasDe(userName, role).length === 0 && empresasQueVenMuestras(userName, role).length > 0;
 }

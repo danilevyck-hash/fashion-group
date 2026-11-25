@@ -14,6 +14,7 @@ import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
 import VentanaCentrada from "@/components/ui/VentanaCentrada";
 import { EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
+import MuestrasDeBodega from "./MuestrasDeBodega";
 import MuestrasViewAnterior from "./MuestrasViewAnterior";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -70,7 +71,32 @@ const masVieja = (p: Pedido) => p.muestras.reduce((a, m) => (m.pedida_en < a ? m
 
 export default function MuestrasView({ control }: { control: ReturnType<typeof useMuestrasPorMandar> }) {
   if (!MUESTRAS_COMO_PEDIDOS_2026_11) return <MuestrasViewAnterior control={control} />;
+  // 🔴 25-nov-2026: bodega (julio, rodrigo, jorman) ve UNA lista sin enviar nada.
+  if (control.soloLectura) return <MuestrasParaBodega control={control} />;
   return <MuestrasPorPedido control={control} />;
+}
+
+function MuestrasParaBodega({ control }: { control: ReturnType<typeof useMuestrasPorMandar> }) {
+  const { toast } = useToast();
+  const { pedidos, error, recargar } = control;
+  if (error && !pedidos) return <div className="mx-auto max-w-3xl px-4 py-6"><Aviso tono="error">No se pudieron leer las muestras. Intenta de nuevo.</Aviso></div>;
+  if (!pedidos) return <p className="py-10 text-center text-sm text-gray-500">Cargando…</p>;
+  async function noLlego(id: number) {
+    try {
+      const r = await fetch("/api/guias/muestras", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "no_llego", ids: [id] }),
+      });
+      const d = (await r.json().catch(() => null)) as { error?: string } | null;
+      if (!r.ok) throw new Error(d?.error ?? "No se pudo guardar. Intenta de nuevo.");
+      toast("Muestra reclamada", "success");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo guardar.", "error");
+    }
+    void recargar();
+  }
+  return <MuestrasDeBodega pedidos={pedidos} onNoLlego={(id) => void noLlego(id)} />;
 }
 
 function MuestrasPorPedido({ control }: { control: ReturnType<typeof useMuestrasPorMandar> }) {

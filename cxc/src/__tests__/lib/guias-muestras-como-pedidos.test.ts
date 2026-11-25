@@ -35,9 +35,9 @@ describe("🔴 Angel manda muestras como Rey (Daniel, 25-nov-2026)", () => {
     expect(puedeAccionMuestra("no_llego", { empresa_key: "fashion_shoes", estado: "enviada" }, q).ok).toBe(true);
   });
 
-  it("otro de bodega (Jorman) no ve ni manda", () => {
-    expect(empresasQueVenMuestras("jorman", "bodega")).toEqual([]);
-    expect(puedeAccionMuestra("enviada", { empresa_key: "fashion_shoes", estado: "falta" }, { role: "bodega", userName: "jorman" }).ok).toBe(false);
+  it("otro de bodega sin lista (Bodega genérico) no ve ni manda", () => {
+    expect(empresasQueVenMuestras("bodega", "bodega")).toEqual([]);
+    expect(puedeAccionMuestra("enviada", { empresa_key: "fashion_shoes", estado: "falta" }, { role: "bodega", userName: "bodega" }).ok).toBe(false);
   });
 
   it("Rey y Edwin siguen igual", () => {

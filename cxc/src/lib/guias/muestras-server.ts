@@ -35,6 +35,7 @@ export async function leerMuestrasDelPedido(empresa: string, pedido: number): Pr
  */
 export async function leerPorMandar(
   empresas: readonly string[],
+  { conEnviadas = false }: { conEnviadas?: boolean } = {},
 ): Promise<PedidoDeMuestras[]> {
   if (empresas.length === 0) return [];
   // ponytail: sin paginar; lo pendiente son decenas, nunca 1.000.
@@ -42,7 +43,7 @@ export async function leerPorMandar(
     .from("pedidos_muestras")
     .select(COLUMNAS_MUESTRA)
     .in("empresa_key", [...empresas])
-    .in("estado", [...ESTADOS_POR_MANDAR])
+    .in("estado", conEnviadas ? [...ESTADOS_POR_MANDAR, "enviada"] : [...ESTADOS_POR_MANDAR])
     .eq("deleted", false)
     .limit(1000);
   if (error) throw new Error(`pedidos_muestras: ${error.message}`);
