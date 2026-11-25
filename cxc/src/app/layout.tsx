@@ -17,6 +17,7 @@ import { OnlineProvider } from "@/lib/OnlineContext";
 import OfflineBanner from "@/components/OfflineBanner";
 import InstallPrompt from "@/components/InstallPrompt";
 import SWUpdater from "@/components/SWUpdater";
+import AvisosAlEntrar from "@/components/AvisosAlEntrar";
 import RegistroDeVisitas from "@/components/RegistroDeVisitas";
 import PantallaAnterior from "@/components/PantallaAnterior";
 import SWRProvider from "@/components/SWRProvider";
@@ -91,6 +92,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {/* «Instala Fashion Group» se retiró en todo lado (revisión 14-nov-2026). */}
             {!SIN_AVISO_INSTALAR_2026_11 && <InstallPrompt />}
             <SWUpdater />
+            {/* «Activa los avisos» al entrar, para todos (25-nov-2026, `AVISOS_AL_ENTRAR_2026_11`). */}
+            <AvisosAlEntrar />
             {/* No dibuja nada: anota en silencio qué módulo se abrió, como mucho
                 una vez cada 10 min por pestaña. Ver src/lib/visitas/registro.ts. */}
             <RegistroDeVisitas />

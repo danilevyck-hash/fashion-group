@@ -4,7 +4,7 @@
  *   GET   ?empresa_key=&pedido_switch_id=  → { muestras }  (las de UN pedido, para bodega)
  *   GET                                     → { pedidos, total } (lo que el vendedor tiene por mandar)
  *   POST  { empresa_key, pedido_switch_id, codigos[] } → bodega pide las muestras
- *   PATCH { accion: "enviada" | "no_llego" | "quitar", ids[] }
+ *   PATCH { accion: "enviada" | "no_llego" | "quitar", ids[], guia }  (guía o comentario: OBLIGATORIO en «enviada»)
  *
  * 🔴 El SERVIDOR decide quién hace qué (`muestras.ts`): pide y reclama bodega
  * o admin; «Enviada» solo el vendedor asignado o admin; cada uno ve sus
@@ -22,12 +22,15 @@ import {
   MUESTRAS_2026_11,
   codigosAPedir,
   columnasDeAccion,
+  limpiarGuia,
   empresasDeMuestrasDe,
   puedeAccionMuestra,
   puedePedirMuestra,
   type AccionMuestra,
 } from "@/lib/guias/muestras";
 import { COLUMNAS_MUESTRA, leerMuestrasDelPedido, leerPorMandar, sincronizarEspera } from "@/lib/guias/muestras-server";
+import { avisoDeMuestras } from "@/lib/guias/muestras-aviso";
+import { mandarAvisoDeMuestras } from "@/lib/guias/muestras-aviso-server";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +80,7 @@ export async function POST(req: NextRequest) {
   if (!veLaEmpresa(empresa, auth.userName, auth.role)) return noExiste();
 
   const [ped, est, lin, vivas] = await Promise.all([
-    supabaseServer.from("switch_pedidos").select("pedido_switch_id").eq("empresa_key", empresa).eq("pedido_switch_id", id).maybeSingle(),
+    supabaseServer.from("switch_pedidos").select("pedido_switch_id, secuencial, cliente_nombre").eq("empresa_key", empresa).eq("pedido_switch_id", id).maybeSingle(),
     supabaseServer.from("pedidos_bodega_estado").select("estado").eq("empresa_key", empresa).eq("pedido_switch_id", id).maybeSingle(),
     supabaseServer.from("pedidos_lineas").select("codigo, descripcion").eq("empresa_key", empresa).eq("pedido_switch_id", id),
     supabaseServer.from("pedidos_muestras").select("codigo").eq("empresa_key", empresa).eq("pedido_switch_id", id).eq("deleted", false),
@@ -104,6 +107,12 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: "No se pudieron pedir las muestras" }, { status: 500 });
   const espera = await sincronizarEspera(empresa, id, quien);
   await logActivity(auth.role, "pedir_muestras", "pedidos_muestras", { pedido: `${empresa}:${id}`, codigos, espera }, auth.userName);
+  // 🔔 UN aviso push al vendedor que las manda (`MUESTRAS_AVISO_PUSH_2026_11`).
+  // Nunca frena: lo guardado ya quedó; si falla, se registra y sigue.
+  const p = ped.data as { secuencial?: string | null; cliente_nombre?: string | null };
+  await mandarAvisoDeMuestras(
+    avisoDeMuestras({ empresa_key: empresa, pedido_switch_id: id, n: (creadas ?? filas).length, secuencial: p.secuencial, cliente: p.cliente_nombre }),
+  );
   return NextResponse.json({ ok: true, muestras: creadas ?? [] });
 }
 
@@ -120,6 +129,8 @@ export async function PATCH(req: NextRequest) {
   if (!ACCIONES.includes(accion) || ids.length === 0 || ids.length > 200) {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
   }
+  const guia = accion === "enviada" ? limpiarGuia(body?.guia) : null;
+  if (accion === "enviada" && !guia) return NextResponse.json({ error: "Escribe el N.° de guía o un comentario (máximo 120 caracteres)" }, { status: 400 });
   const { data, error: lErr } = await supabaseServer
     .from("pedidos_muestras")
     .select("id, empresa_key, pedido_switch_id, codigo, estado")
@@ -134,7 +145,7 @@ export async function PATCH(req: NextRequest) {
     if (!v.ok) return NextResponse.json({ error: v.error }, { status: 403 });
   }
   const ahora = new Date().toISOString();
-  const cols = columnasDeAccion(accion, quien, ahora);
+  const cols = columnasDeAccion(accion, quien, ahora, guia);
   // El UPDATE exige el estado leído: si otro la movió entretanto, no se pisa.
   const hechas: number[] = [];
   for (const estado of [...new Set(muestras.map((m) => m.estado))]) {

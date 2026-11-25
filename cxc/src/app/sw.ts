@@ -103,7 +103,7 @@ self.addEventListener("activate", (event) => {
 // El aviso llega por web push (VAPID) desde /api/recordatorios-marcacion
 // con `{ title, body, url }`. Tocarlo abre (o trae al frente) /marcacion.
 self.addEventListener("push", (event) => {
-  let datos: { title?: string; body?: string; url?: string } = {};
+  let datos: { title?: string; body?: string; url?: string; tag?: string } = {};
   try {
     datos = event.data?.json() ?? {};
   } catch {
@@ -114,7 +114,8 @@ self.addEventListener("push", (event) => {
       body: datos.body || "",
       icon: "/icon-192.png",
       badge: "/icon-192.png",
-      tag: "marcacion",
+      // Muestras (25-nov-2026) trae su propio `tag`, uno por pedido.
+      tag: datos.tag || "marcacion",
       data: { url: datos.url || "/marcacion" },
     }),
   );

@@ -21,6 +21,7 @@
 
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { veLaEmpresa, type Veredicto } from "./pedidos-bultos";
+import { MESES_CORTOS, fechaPanamaDe } from "@/lib/fecha-panama";
 
 /**
  * 🔴 PRENDIDO con el «sí» de Daniel (24-nov-2026). `false` = lo de antes: sin
@@ -65,6 +66,21 @@ export function empresasDeMuestrasDe(userName: string | null | undefined, role: 
   const u = (userName ?? "").trim().toLowerCase();
   if (role !== "vendedor" || !u) return [];
   return B2B_EMPRESA_KEYS.filter((e) => vendedorDeMuestra(e) === u);
+}
+
+/**
+ * Despachos ABRE en «Muestras» para estos usuarios (25-nov-2026, Daniel:
+ * «Edwin, Angel y Rey»). Los vendedores salen de la MISMA regla de quién ve
+ * la lista; Angel (bodega) se agrega a mano. ⚠️ Sin la sección (hoy bodega no
+ * tiene lista de Muestras) no cambia nada: abre en Pedidos como siempre.
+ */
+export const ABREN_EN_MUESTRAS_A_MANO: readonly string[] = ["angel"];
+
+export function abreEnMuestras(userName: string | null | undefined, role: string | null | undefined): boolean {
+  const u = (userName ?? "").trim().toLowerCase();
+  if (!MUESTRAS_2026_11 || !u) return false;
+  if (ABREN_EN_MUESTRAS_A_MANO.includes(u)) return true;
+  return role === "vendedor" && empresasDeMuestrasDe(u, role).length > 0;
 }
 
 /** ¿Ve la sección «Muestras»? El vendedor asignado y admin. */
@@ -119,9 +135,23 @@ export function puedeAccionMuestra(
   return esPorMandar(m.estado) ? { ok: true } : { ok: false, error: "Una muestra enviada no se quita: si no llegó, reclámala" };
 }
 
-/** Las columnas que escribe cada acción. */
-export function columnasDeAccion(accion: AccionMuestra, quien: string, ahora: string): Record<string, unknown> {
-  if (accion === "enviada") return { estado: "enviada", enviada_por: quien, enviada_en: ahora };
+// ─── N.° de guía o comentario del envío (25-nov-2026, Daniel: obligatorio, UNO por caja) ─
+
+export const MAX_GUIA = 120;
+
+/**
+ * Lo escrito en «N.° de guía o comentario» (25-nov-2026, Daniel: OBLIGATORIO).
+ * Recortado; `null` = no vale (vacío, no es texto o pasa de `MAX_GUIA`).
+ */
+export function limpiarGuia(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const g = v.trim().replace(/\s+/g, " ");
+  return g && g.length <= MAX_GUIA ? g : null;
+}
+
+/** Las columnas que escribe cada acción. La guía va en TODAS las enviadas de la misma acción. */
+export function columnasDeAccion(accion: AccionMuestra, quien: string, ahora: string, guia: string | null = null): Record<string, unknown> {
+  if (accion === "enviada") return { estado: "enviada", enviada_por: quien, enviada_en: ahora, guia_envio: guia };
   if (accion === "no_llego") return { estado: "no_llego", reclamada_por: quien, reclamada_en: ahora };
   return { deleted: true, deleted_por: quien, deleted_en: ahora };
 }
@@ -198,12 +228,26 @@ export interface MuestraLeida {
   enviada_en: string | null;
   reclamada_por: string | null;
   reclamada_en: string | null;
+  /** N.° de guía o comentario del envío. */
+  guia_envio?: string | null;
+}
+
+/** «25-nov», en hora de Panamá. */
+export function diaMes(iso: string): string {
+  const [, m, d] = fechaPanamaDe(iso).split("-");
+  return `${Number(d)}-${MESES_CORTOS[Number(m) - 1]}`;
+}
+
+/** «Enviada · 123456 · 25-nov» (sin texto, las de antes: «Enviada · 25-nov»). */
+export function lineaEnviada(m: Pick<MuestraLeida, "enviada_en" | "pedida_en" | "guia_envio">): string {
+  const guia = m.guia_envio?.trim();
+  return ["Enviada", guia || null, diaMes(m.enviada_en ?? m.pedida_en)].filter(Boolean).join(" · ");
 }
 
 /** La línea que ve BODEGA bajo la referencia, sin botones. */
 export function lineaParaBodega(m: MuestraLeida, ahoraIso: string): string {
   const quien = nombreDelVendedor(vendedorDeMuestra(m.empresa_key));
-  if (m.estado === "enviada") return `Muestra enviada · ${haceTiempo(m.enviada_en ?? m.pedida_en, ahoraIso)}`;
+  if (m.estado === "enviada") return lineaEnviada(m);
   if (m.estado === "no_llego") return `No llegó · reclamada a ${quien} ${haceTiempo(m.reclamada_en ?? m.pedida_en, ahoraIso)}`;
   return `Falta muestra · esperando a ${quien}`;
 }

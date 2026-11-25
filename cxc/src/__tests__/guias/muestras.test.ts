@@ -10,6 +10,9 @@ import {
   haceTiempo,
   lineaDeEsperaDelPedido,
   lineaParaBodega,
+  limpiarGuia,
+  abreEnMuestras,
+  columnasDeAccion,
   lineaReclamada,
   muestraSigueViva,
   muestraVieja,
@@ -135,7 +138,10 @@ describe("al recibirse o facturarse, desaparece de la lista", () => {
 describe("textos", () => {
   it("lo que ve bodega", () => {
     expect(lineaParaBodega(m(), AHORA)).toBe("Falta muestra · esperando a Rey");
-    expect(lineaParaBodega(m({ estado: "enviada", enviada_en: "2026-11-24T18:00:00Z" }), AHORA)).toBe("Muestra enviada · hace 2 h");
+    expect(lineaParaBodega(m({ estado: "enviada", enviada_en: "2026-11-24T18:00:00Z" }), AHORA)).toBe("Enviada · 24-nov");
+    expect(lineaParaBodega(m({ estado: "enviada", enviada_en: "2026-11-25T18:00:00Z", guia_envio: "123456" }), AHORA)).toBe("Enviada · 123456 · 25-nov");
+    // Día de PANAMÁ: las 2:00 UTC del 26 son todavía el 25 en Panamá.
+    expect(lineaParaBodega(m({ estado: "enviada", enviada_en: "2026-11-26T02:00:00Z" }), AHORA)).toBe("Enviada · 25-nov");
     expect(lineaParaBodega(m({ estado: "no_llego", reclamada_en: "2026-11-24T19:00:00Z" }), AHORA)).toBe("No llegó · reclamada a Rey hace 1 h");
     expect(lineaParaBodega(m({ empresa_key: "vistana" }), AHORA)).toBe("Falta muestra · esperando a Edwin");
   });
@@ -154,5 +160,29 @@ describe("textos", () => {
   });
   it("solo se piden referencias del pedido, sin repetir ni las que ya tienen muestra", () => {
     expect(codigosAPedir(["A", " B ", "A", "X", 7, "C"], ["A", "B", "C"], ["C"])).toEqual(["A", "B"]);
+  });
+});
+
+describe("N.° de guía o comentario (obligatorio, uno por caja)", () => {
+  it("obligatorio: vacío, no-texto o más de 120 no valen; se recorta", () => {
+    expect(limpiarGuia(undefined)).toBeNull();
+    expect(limpiarGuia("   ")).toBeNull();
+    expect(limpiarGuia(123)).toBeNull();
+    expect(limpiarGuia("x".repeat(121))).toBeNull();
+    expect(limpiarGuia("x".repeat(120))).toHaveLength(120);
+    expect(limpiarGuia(" 123  456 ")).toBe("123 456");
+  });
+  it("Despachos abre en Muestras para Edwin, Rey y Angel; el resto no", () => {
+    expect(abreEnMuestras("edwin", "vendedor")).toBe(true);
+    expect(abreEnMuestras("Rey", "vendedor")).toBe(true);
+    expect(abreEnMuestras("angel", "bodega")).toBe(true);
+    expect(abreEnMuestras("julio", "bodega")).toBe(false);
+    expect(abreEnMuestras("daniel", "admin")).toBe(false);
+    expect(abreEnMuestras("otro", "vendedor")).toBe(false);
+  });
+  it("solo «Enviada» escribe la guía", () => {
+    expect(columnasDeAccion("enviada", "rey", "t", "G1")).toMatchObject({ estado: "enviada", guia_envio: "G1" });
+    expect(columnasDeAccion("enviada", "rey", "t")).toMatchObject({ guia_envio: null });
+    expect(columnasDeAccion("no_llego", "julio", "t")).not.toHaveProperty("guia_envio");
   });
 });

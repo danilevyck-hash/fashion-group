@@ -67,6 +67,8 @@ export const TABLAS_PERSONAS = [
   // desde su teléfono; sin copia, cada quien tendría que volver a prenderlos.
   "marcacion_recordatorios",
   "marcacion_push_suscripciones",
+  // Avisos push por usuario (25-nov-2026): «Muestras pedidas» a Rey y Edwin.
+  "push_suscripciones_usuario",
   // El singleton con TODA la parametrización del cálculo (id = 1).
   "asistencia_reglas",
   "asistencia_planilla_manual",
