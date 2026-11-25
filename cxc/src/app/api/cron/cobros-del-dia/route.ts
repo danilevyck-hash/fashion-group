@@ -17,7 +17,7 @@
 // El texto: `lib/cxc/cobros-del-dia.ts`.
 //
 // 🔒 24-nov-2026 (Daniel): con `RESUMEN_DEL_DIA_2026_11` este mismo cron manda
-// UN solo mensaje — 🧾 Facturas · 🚚 Despachos · 💰 Cobros de hoy — y el aviso
+// UN solo mensaje — 🧾 Ventas · 🚚 Despachos · 💰 Cobros de hoy — y el aviso
 // por guía despachada se apaga. Ver `lib/alertas/resumen-del-dia.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 

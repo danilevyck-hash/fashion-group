@@ -4,7 +4,7 @@
 // 7:00 p. m. de Panamá, al chat privado (`enviarNegocioPrivado`).
 //
 // UN solo mensaje con tres bloques, en este orden, y el vacío no sale:
-//   🧾 Facturas de hoy — las 6 de Fashion Group, sin ITBMS (`subtotal_descuento`,
+//   🧾 Ventas de hoy — las 6 de Fashion Group, sin ITBMS (`subtotal_descuento`,
 //      la MISMA columna y los MISMOS signos de Ventas › Resumen), NC restadas.
 //   🚚 Despachos de hoy — guías que pasaron a «Completada» hoy.
 //   💰 Cobros de hoy — `lib/cxc/cobros-del-dia.ts` (por cliente, +90 de Switch al momento).
@@ -31,7 +31,7 @@ const usd = (n: number) => {
 };
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
-// ── 🧾 Facturas ──────────────────────────────────────────────────────────────
+// ── 🧾 Ventas ────────────────────────────────────────────────────────────────
 
 export interface FacturaDelDia {
   empresa: string; // empresa_key
@@ -41,8 +41,21 @@ export interface FacturaDelDia {
   subtotal: number; // subtotal_descuento (sin ITBMS), siempre positivo
 }
 
+/**
+ * 🔒 24-nov-2026 (Daniel): la nota de crédito se DICE, nunca un negativo suelto.
+ *   solo NC        → «• Millenium Sports · nota de crédito −$1,161»
+ *   factura y NC   → «• Bouti, S.A. · −$288 (con nota de crédito −$12,405)»
+ *   solo facturas  → «• City Shoes · $1,662»
+ */
+function lineaCliente(c: { nombre: string; total: number; nc: number; nNC: number; nFa: number }): string {
+  const nc = c.nNC === 1 ? "nota de crédito" : "notas de crédito";
+  if (c.nNC === 0) return `• ${c.nombre} · ${usd(c.total)}`;
+  if (c.nFa === 0) return `• ${c.nombre} · ${nc} ${usd(c.nc)}`;
+  return `• ${c.nombre} · ${usd(c.total)} (con ${nc} ${usd(c.nc)})`;
+}
+
 export function bloqueFacturas(facturas: readonly FacturaDelDia[]): string | null {
-  type Cli = { nombre: string; total: number };
+  type Cli = { nombre: string; total: number; nc: number; nNC: number; nFa: number };
   const porEmpresa = new Map<string, Map<string, Cli>>();
   let total = 0;
   let nFacturas = 0;
@@ -61,15 +74,19 @@ export function bloqueFacturas(facturas: readonly FacturaDelDia[]): string | nul
     } else nFacturas += 1;
     const clientes = porEmpresa.get(f.empresa) ?? new Map<string, Cli>();
     const llave = codigo || `?${f.cliente ?? ""}`;
-    const c = clientes.get(llave) ?? { nombre: (f.cliente ?? "").trim() || codigo || "Sin cliente", total: 0 };
+    const c = clientes.get(llave) ?? { nombre: (f.cliente ?? "").trim() || codigo || "Sin cliente", total: 0, nc: 0, nNC: 0, nFa: 0 };
     c.total += monto;
+    if (signo < 0) {
+      c.nc += monto;
+      c.nNC += 1;
+    } else c.nFa += 1;
     clientes.set(llave, c);
     porEmpresa.set(f.empresa, clientes);
   }
   if (nFacturas + nNC === 0) return null;
 
   const encabezado =
-    `🧾 Facturas de hoy · ${usd(total)} · ${plural(nFacturas, "factura", "facturas")}` +
+    `🧾 Ventas de hoy · ${usd(total)} · ${plural(nFacturas, "factura", "facturas")}` +
     (nNC ? ` (ya restadas ${plural(nNC, "nota de crédito", "notas de crédito")} · ${usd(montoNC)})` : "");
   const suma = (m: Map<string, Cli>) => [...m.values()].reduce((s, c) => s + c.total, 0);
   const empresas = [...porEmpresa].sort((a, b) => suma(b[1]) - suma(a[1]));
@@ -80,7 +97,7 @@ export function bloqueFacturas(facturas: readonly FacturaDelDia[]): string | nul
         `${nombreCortoEmpresa(emp)} · ${usd(suma(clientes))}`,
         ...[...clientes.values()]
           .sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre))
-          .map((c) => `• ${c.nombre} · ${usd(c.total)}`),
+          .map(lineaCliente),
       ].join("\n"),
     ),
   ].join("\n\n");
