@@ -37,6 +37,7 @@
 // (`cerrarPlanillaRoles()`); acá solo se dibujan o no los botones y el enlace a
 // los movimientos, para no ofrecer algo que va a contestar 403.
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { BUSCADOR_EN_LA_FILA } from "@/lib/ui/revision-110-ajustes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -198,8 +199,8 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
   const [descargaAbierta, setDescargaAbierta] = useState(false);
   const [descargando, setDescargando] = useState(false);
 
-  const cargar = useCallback(async () => {
-    setCargando(true);
+  const cargar = useCallback(async (fondo = false) => {
+    if (!fondo) setCargando(true);
     try {
       const q = new URLSearchParams({ desde, hasta });
       const r = await fetch(`/api/asistencia/prestamos-deuda?${q}`, { cache: "no-store" });
@@ -209,14 +210,17 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
       setFichas(filtrarPorEmpresa(j.fichas ?? [], props.empresa));
       setPuedeAnotar(!!j.puedeAnotar);
     } catch {
+      if (fondo) return;
       toast("No se pudo leer la deuda. Intenta de nuevo.", "error");
       setFichas([]);
     } finally {
-      setCargando(false);
+      if (!fondo) setCargando(false);
     }
   }, [desde, hasta, toast, props.empresa]);
 
   useEffect(() => { void cargar(); }, [cargar]);
+  // 🔴 Al volver a verse (ventana o pestaña) relee la BASE en segundo plano.
+  useReleerAlVolver(() => void cargar(true));
 
   const movForm = useMovimientoForm({
     onSuccess: () => { setPersonaElegida(null); setDatosModulo(null); void cargar(); },

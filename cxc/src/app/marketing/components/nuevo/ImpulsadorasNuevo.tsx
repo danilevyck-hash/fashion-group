@@ -11,6 +11,7 @@
 // Un mes sin comprobante no tiene gasto, así que no entra al cobro.
 // ============================================================================
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { useEffect, useState } from "react";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { etiquetaMes } from "@/lib/marketing/meses";
@@ -67,6 +68,7 @@ export default function ImpulsadorasNuevo({
   const [lista, setLista] = useState<ImpulsadoraConEstado[] | null>(null);
   const [subiendo, setSubiendo] = useState<{ imp: ImpulsadoraConEstado; mes: string } | null>(null);
   const [refresh, setRefresh] = useState(0);
+  useReleerAlVolver(() => setRefresh((k) => k + 1));
 
   useEffect(() => {
     let cancelado = false;

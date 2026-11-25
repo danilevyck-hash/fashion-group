@@ -17,6 +17,7 @@
 // ConfiguracionTab). Meter una ventana en el medio para un formulario de tres
 // campos es la fricción que este módulo viene sacando.
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { useCallback, useEffect, useState } from "react";
 import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
 import { useToast } from "@/components/ToastSystem";
@@ -93,6 +94,7 @@ export default function VacacionesTab() {
     setNoIncluyeAntes(d.noIncluyeAntes ?? NO_INCLUYE_ANTES);
   }, []);
   useEffect(() => { void cargar(); }, [cargar]);
+  useReleerAlVolver(() => void cargar().catch(() => {}));
 
   const nombreDe = (cod: string) =>
     etiquetaPersona(cod, personas.find((p) => p.codigo === cod)?.nombre);

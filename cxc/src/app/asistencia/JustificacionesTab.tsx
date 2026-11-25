@@ -6,6 +6,7 @@
 //
 // Se guarda por RANGO: unas vacaciones son UNA fila, no diez.
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { useCallback, useEffect, useState } from "react";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import { PESTANA_FICHAS } from "@/lib/asistencia/persona-en-el-centro";
@@ -74,6 +75,7 @@ export default function JustificacionesTab() {
     setAvisoHoras(dj.avisoMigracionHoras ?? null);
   }, [motivo]);
   useEffect(() => { void cargar(); }, [cargar]);
+  useReleerAlVolver(() => void cargar().catch(() => {}));
 
   // El nombre de quien ya tiene una justificación cargada. Si no está en la
   // lista (ficha borrada, código viejo) se muestra el código, nunca un blanco.

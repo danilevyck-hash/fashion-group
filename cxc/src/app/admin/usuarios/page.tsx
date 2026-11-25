@@ -1,5 +1,6 @@
 "use client";
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
 import { BarraDeControles, EnLaBarra, ProveedorBarraCelular, useBarraCelular } from "@/components/celular/BarraDeControles";
@@ -173,28 +174,31 @@ function UsuariosPageInner() {
   const [errorForm, setErrorForm] = useState<string | null>(null);
   useEffect(() => { setErrorForm(null); }, [uName, uPassword, uRole, uCompany, customPerms, uModules, uMarca, showUserModal]);
 
-  const loadSessions = useCallback(async () => {
-    setLoadingSessions(true);
+  // `fondo` = al volver a la ventana: sin «Cargando…» ni aviso si falla.
+  const loadSessions = useCallback(async (fondo = false) => {
+    if (!fondo) setLoadingSessions(true);
     try {
-      const res = await fetch("/api/admin/sessions");
+      const res = await fetch("/api/admin/sessions", { cache: "no-store" });
       if (res.ok) setSessions(await res.json());
-    } catch { showToast("Error al cargar sesiones"); }
-    setLoadingSessions(false);
+    } catch { if (!fondo) showToast("Error al cargar sesiones"); }
+    if (!fondo) setLoadingSessions(false);
   }, []);
 
-  const loadFgUsers = useCallback(async () => {
-    setLoadingUsers(true);
+  const loadFgUsers = useCallback(async (fondo = false) => {
+    if (!fondo) setLoadingUsers(true);
     try {
       const res = await fetch("/api/admin/users");
       if (res.status === 401) { sessionStorage.clear(); window.location.href = "/"; return; }
       if (res.ok) setFgUsers(await res.json());
       const rc = await fetch("/api/admin/users/colaboradores");
       if (rc.ok) setColaboradores(await rc.json());
-    } catch { showToast("Error al cargar usuarios"); }
-    setLoadingUsers(false);
+    } catch { if (!fondo) showToast("Error al cargar usuarios"); }
+    if (!fondo) setLoadingUsers(false);
   }, []);
 
   useEffect(() => { if (authChecked) { loadFgUsers(); loadSessions(); } }, [authChecked, loadFgUsers, loadSessions]);
+  // 🔴 Al volver a la ventana relee usuarios y sesiones; con el formulario abierto, no.
+  useReleerAlVolver(() => { void loadFgUsers(true); void loadSessions(true); }, authChecked && !showUserModal);
 
   // Última actividad por usuario (max last_seen entre todas sus sesiones).
   const lastSeenByUser = useMemo(() => {
@@ -788,7 +792,7 @@ function UsuariosPageInner() {
                         <Chip variant="neutral" active={sessionRange === "30d"} onClick={() => setSessionRange("30d")}>30 días</Chip>
                         <Chip variant="neutral" active={sessionRange === "all"} onClick={() => setSessionRange("all")}>Todas</Chip>
                       </div>
-                      <button onClick={loadSessions} className="text-xs text-gray-400 hover:text-gray-700 transition">Actualizar</button>
+                      <button onClick={() => loadSessions()} className="text-xs text-gray-400 hover:text-gray-700 transition">Actualizar</button>
                     </div>
 
                     {loadingSessions ? (

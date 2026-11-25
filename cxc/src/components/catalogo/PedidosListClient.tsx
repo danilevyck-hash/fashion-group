@@ -31,6 +31,7 @@
 // administra — y el SERVIDOR ya se los negaba con 403 antes de este cambio.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
@@ -55,17 +56,20 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
     setRole(r);
   }, [router]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // `fondo` = al volver a la ventana: sin «Cargando…».
+  const load = useCallback(async (fondo = false) => {
+    if (!fondo) setLoading(true);
     try {
-      const r = await fetch(`${theme.api}/orders`);
+      const r = await fetch(`${theme.api}/orders`, { cache: "no-store" });
       if (r.ok) setPedidos(filasDeOrders((await r.json()) as FilaDeOrders[]));
     } catch { /* la lista queda como estaba */ }
-    setLoading(false);
+    if (!fondo) setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  // 🔴 25-nov-2026: al volver a la ventana relee los comprobantes (la BASE).
+  useReleerAlVolver(() => void load(true));
 
   // 🩸 Cosmética, no candado: el servidor ya responde 403 a quien no está acá.
   const puedeAdministrar = (CATALOGO_ADMIN_ROLES as readonly string[]).includes(String(role ?? ""));
@@ -91,7 +95,7 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
         <ComprobantesPanel
           marca={marca}
           pedidos={pedidos}
-          onRefresh={load}
+          onRefresh={() => load()}
           showToast={(m, tono) => toast(m, tono)}
           puedeAdministrar={puedeAdministrar}
           puedeEditar={puedeEditar}

@@ -33,6 +33,7 @@
 // respuesta en el mismo request, que es justo lo que acá no se puede hacer.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Info, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ToastSystem";
@@ -138,6 +139,7 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
   useEffect(() => {
     void cargar();
   }, [cargar]);
+  useReleerAlVolver(() => void cargar());
 
   // 🔴 TODOS los relojes se siguen LEYENDO y siguiendo (el pedido en el aire es
   // por dispositivo): la empresa solo decide cuáles se DIBUJAN.

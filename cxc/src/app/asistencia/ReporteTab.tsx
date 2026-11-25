@@ -6,6 +6,7 @@
 // Todo en MINUTOS, nunca horas decimales: "295 minutos" se le discute a una
 // persona, "4,92 horas" no le dice nada a nadie.
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { ACCESIBILIDAD_2026_11 } from "@/lib/ui/accesibilidad-2026-11";
 import { NOMBRE_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
@@ -405,11 +406,12 @@ export default function ReporteTab({ empresa = "", opcionesEmpresa, onEmpresa }:
   const [marcasTelefono, setMarcasTelefono] = useState<Record<string, MarcaTelefonoUI[]>>({});
   const [verFotos, setVerFotos] = useState<FotoParaVer[] | null>(null);
 
-  const cargar = useCallback(async (silenciosa = false) => {
+  const cargar = useCallback(async (silenciosa = false, fondo = false) => {
     // 🔑 Con el interruptor apagado, TODA recarga vuelve a ser la de antes.
-    if (silenciosa && ASISTENCIA_GUARDAR_SIN_SALTO) setRefrescando(true);
+    if (fondo) { /* al volver a verse: sin indicador */ }
+    else if (silenciosa && ASISTENCIA_GUARDAR_SIN_SALTO) setRefrescando(true);
     else setCargando(true);
-    setError(null);
+    if (!fondo) setError(null);
     try {
       const p = new URLSearchParams({ desde, hasta });
       if (q.trim()) p.set("q", q.trim());
@@ -432,12 +434,15 @@ export default function ReporteTab({ empresa = "", opcionesEmpresa, onEmpresa }:
       setDiaEnCurso(data.diaEnCurso ?? null);
       setMarcasTelefono(data.marcasTelefono ?? {});
     } catch (e) {
+      if (fondo) return; // en segundo plano: se queda lo que hay
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setPersonas(null);
-    } finally { setCargando(false); setRefrescando(false); }
+    } finally { if (!fondo) { setCargando(false); setRefrescando(false); } }
   }, [desde, hasta, q, empresa]);
 
   useEffect(() => { void cargar(); }, [cargar]);
+  // 🔴 Al volver a verse (ventana o pestaña) relee la BASE en segundo plano.
+  useReleerAlVolver(() => void cargar(true, true));
 
   // ── 🔴 DECIDIR LAS HORAS EXTRA DESDE ACÁ (19-sep-2026) ────────────────────
   //
