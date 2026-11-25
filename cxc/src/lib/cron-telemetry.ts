@@ -870,6 +870,9 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync facturas", hhmmUtc: "2230", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   { cron: "switch-sync facturas", hhmmUtc: "2300", empresas: CRON_EMPRESAS_VENTAS, origen: ORIGEN_PG_CRON },
   { cron: "sync-recibos", hhmmUtc: "2315", empresas: CRON_EMPRESAS_RECIBOS },
+  // El resumen de las 7:00 p. m. lee al momento el +90 de Switch de quien pagó
+  // hoy (24-nov-2026): a 45 min de los recibos y 60 de las facturas de las 23:00.
+  { cron: "cobros-del-dia", hhmmUtc: "0000", empresas: CRON_EMPRESAS_PEDIDOS },
   { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"], origen: ORIGEN_PG_CRON },
   // Carga de facturas de la NOCHE de Multifashion (1-nov-2026): 22:00 Panamá,
   // justo antes del resumen de las 22:15. La tienda factura después de las 7
@@ -941,6 +944,8 @@ export const SYNC_TYPES_POR_CRON: Readonly<Record<string, readonly string[]>> = 
   // de `SWITCH_CRON_ENTRADAS` también se retiró. Reactivar las tres líneas
   // juntas el día que Yulissa retome Switch.
   "acs-fidelizacion": [],
+  // Solo LEE el +90 de Switch de quien pagó hoy; no registra corrida.
+  "cobros-del-dia": [],
   "tommy-catalogo": ["catalogo_tommy"],
   "calvin-catalogo": ["catalogo_calvin"],
   "reebok-catalogo": ["catalogo_reebok"],

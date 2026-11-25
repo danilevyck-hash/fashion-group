@@ -7,8 +7,7 @@
 //   🧾 Facturas de hoy — las 6 de Fashion Group, sin ITBMS (`subtotal_descuento`,
 //      la MISMA columna y los MISMOS signos de Ventas › Resumen), NC restadas.
 //   🚚 Despachos de hoy — guías que pasaron a «Completada» hoy.
-//   💰 Cobros de hoy — el bloque de siempre (`lib/cxc/cobros-del-dia.ts`), sin
-//      cambiar su texto.
+//   💰 Cobros de hoy — `lib/cxc/cobros-del-dia.ts` (por cliente, +90 de Switch al momento).
 //
 // `RESUMEN_DEL_DIA_2026_11 = false` = lo de antes: un mensaje por guía al
 // despacharla y el cron manda solo los cobros.
