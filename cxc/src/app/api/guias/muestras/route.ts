@@ -4,7 +4,7 @@
  *   GET   ?empresa_key=&pedido_switch_id=  → { muestras }  (las de UN pedido, para bodega)
  *   GET                                     → { pedidos, total } (lo que el vendedor tiene por mandar)
  *   POST  { empresa_key, pedido_switch_id, codigos[] } → bodega pide las muestras
- *   PATCH { accion: "enviada" | "no_llego" | "quitar", ids[] }
+ *   PATCH { accion: "enviada" | "no_llego" | "quitar", ids[], guia? }  (guía: solo «enviada», opcional)
  *
  * 🔴 El SERVIDOR decide quién hace qué (`muestras.ts`): pide y reclama bodega
  * o admin; «Enviada» solo el vendedor asignado o admin; cada uno ve sus
@@ -22,6 +22,7 @@ import {
   MUESTRAS_2026_11,
   codigosAPedir,
   columnasDeAccion,
+  limpiarGuia,
   empresasDeMuestrasDe,
   puedeAccionMuestra,
   puedePedirMuestra,
@@ -128,6 +129,8 @@ export async function PATCH(req: NextRequest) {
   if (!ACCIONES.includes(accion) || ids.length === 0 || ids.length > 200) {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
   }
+  const guia = accion === "enviada" ? limpiarGuia(body?.guia) : null;
+  if (guia === undefined) return NextResponse.json({ error: "Revisa el N.° de guía: máximo 40 caracteres" }, { status: 400 });
   const { data, error: lErr } = await supabaseServer
     .from("pedidos_muestras")
     .select("id, empresa_key, pedido_switch_id, codigo, estado")
@@ -142,7 +145,7 @@ export async function PATCH(req: NextRequest) {
     if (!v.ok) return NextResponse.json({ error: v.error }, { status: 403 });
   }
   const ahora = new Date().toISOString();
-  const cols = columnasDeAccion(accion, quien, ahora);
+  const cols = columnasDeAccion(accion, quien, ahora, guia);
   // El UPDATE exige el estado leído: si otro la movió entretanto, no se pisa.
   const hechas: number[] = [];
   for (const estado of [...new Set(muestras.map((m) => m.estado))]) {

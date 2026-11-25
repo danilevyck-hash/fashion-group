@@ -18,9 +18,7 @@ export function AvisoDeAvisos({
   ocupado,
   error,
   onActivar,
-  titulo = "Avisos de marcación desactivados",
 }: {
-  titulo?: string;
   estado: EstadoDelAviso | null;
   ocupado?: boolean;
   error?: string | null;
@@ -31,7 +29,7 @@ export function AvisoDeAvisos({
     <div role="status" className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
       {estado === "falta" && (
         <>
-          <p className="text-[15px] text-gray-900">{titulo}</p>
+          <p className="text-[15px] text-gray-900">Avisos de marcación desactivados</p>
           <button
             type="button"
             disabled={ocupado}
@@ -49,14 +47,7 @@ export function AvisoDeAvisos({
   );
 }
 
-/**
- * `ruta`: GET da `{ clavePublica }` y PUT recibe `{ suscripcion }`. Marcación
- * por defecto; Despachos › Muestras usa `/api/guias/muestras/avisos` (25-nov-2026).
- */
-export default function AvisoActivarAvisos({
-  ruta = "/api/marcacion/recordatorios",
-  titulo,
-}: { ruta?: string; titulo?: string } = {}) {
+export default function AvisoActivarAvisos() {
   const [estado, setEstado] = useState<EstadoDelAviso | null>(null);
   const [clave, setClave] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -69,7 +60,7 @@ export default function AvisoActivarAvisos({
       if (!vivo || !e) return;
       setEstado(e);
       if (e !== "falta") return;
-      const j = await fetch(ruta, { cache: "no-store" })
+      const j = await fetch("/api/marcacion/recordatorios", { cache: "no-store" })
         .then((r) => r.json())
         .catch(() => null);
       if (vivo) setClave(j?.clavePublica ?? null);
@@ -77,7 +68,7 @@ export default function AvisoActivarAvisos({
     return () => {
       vivo = false;
     };
-  }, [ruta]);
+  }, []);
 
   async function activar() {
     setError(null);
@@ -89,7 +80,7 @@ export default function AvisoActivarAvisos({
         if (typeof Notification !== "undefined" && Notification.permission === "denied") return setEstado("bloqueado");
         return setError(sub === TEXTO_INSTALAR_EN_IPHONE ? TEXTO_ABRE_DESDE_EL_ICONO : sub);
       }
-      const res = await fetch(ruta, {
+      const res = await fetch("/api/marcacion/recordatorios", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ suscripcion: sub }),
@@ -103,5 +94,5 @@ export default function AvisoActivarAvisos({
     }
   }
 
-  return <AvisoDeAvisos estado={estado} ocupado={ocupado || (estado === "falta" && !clave)} error={error} onActivar={activar} titulo={titulo} />;
+  return <AvisoDeAvisos estado={estado} ocupado={ocupado || (estado === "falta" && !clave)} error={error} onActivar={activar} />;
 }

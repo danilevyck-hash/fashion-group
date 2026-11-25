@@ -203,6 +203,17 @@ describe("el vendedor las manda", () => {
     expect(muestras().every((m) => m.estado === "falta")).toBe(true);
   });
 
+  it("«Enviar todas» con N.° de guía: la misma guía en todas; vacía = sin guía; larga = 400", async () => {
+    como("vendedor", "rey");
+    const ids = muestras().filter((m) => m.empresa_key === "fashion_shoes").map((m) => m.id as number);
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids, guia: "x".repeat(41) }))).status).toBe(400);
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids, guia: " 998877 " }))).status).toBe(200);
+    expect(muestras().filter((m) => ids.includes(m.id as number)).map((m) => m.guia_envio)).toEqual(["998877", "998877"]);
+    como("vendedor", "edwin");
+    const ck = muestras().find((m) => m.codigo === "CK001")!.id as number;
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck], guia: "" }))).status).toBe(200);
+    expect(muestras().find((m) => m.id === ck)!.guia_envio).toBeNull();
+  });
   it("«No llegó» la devuelve a la lista del vendedor y vuelve a prender la espera", async () => {
     como("vendedor", "rey");
     const tw = muestras().find((m) => m.codigo === "TWLENILA140")!.id as number;

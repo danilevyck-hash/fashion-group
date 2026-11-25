@@ -49,8 +49,3 @@ export function avisoDeMuestras(a: {
     tag: `muestras-${a.empresa_key}-${a.pedido_switch_id}`,
   };
 }
-
-/** ¿Se le ofrece «Activa los avisos» en Muestras? Solo al vendedor que las manda. */
-export function ofreceAvisoDeMuestras(role: string | null | undefined): boolean {
-  return MUESTRAS_AVISO_PUSH_2026_11 && role === "vendedor";
-}

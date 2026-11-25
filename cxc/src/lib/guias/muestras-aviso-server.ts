@@ -1,5 +1,5 @@
-// El I/O del aviso push de Muestras (25-nov-2026): guarda el aparato del
-// vendedor y le manda el aviso. Mismo mecanismo que los recordatorios de
+// El I/O del aviso push de Muestras (25-nov-2026): le manda el aviso al
+// vendedor. El aparato lo guarda «Activa los avisos» al entrar (`/api/avisos`). Mismo mecanismo que los recordatorios de
 // Marcación (web-push + VAPID, `/api/recordatorios-marcacion`); la tabla es
 // `push_suscripciones_usuario` porque Rey y Edwin no tienen ficha de colaborador.
 //
@@ -7,26 +7,10 @@
 // error se registra y se devuelve 0.
 import webpush from "web-push";
 import { supabaseServer } from "@/lib/supabase-server";
-import type { SuscripcionPush } from "@/lib/marcacion/recordatorios-server";
+import { TABLA_SUSCRIPCIONES_USUARIO } from "@/lib/avisos/suscripciones-server";
 import type { AvisoDeMuestras } from "./muestras-aviso";
 
-export const TABLA_SUSCRIPCIONES_USUARIO = "push_suscripciones_usuario";
 const CONTACTO_VAPID = "mailto:notificaciones@fashiongr.com";
-
-/** Un aparato = una fila por `endpoint`; si cambia de dueño, queda con el último. */
-export async function guardarSuscripcionDeUsuario(usuario: string, s: SuscripcionPush): Promise<void> {
-  const { error } = await supabaseServer.from(TABLA_SUSCRIPCIONES_USUARIO).upsert(
-    {
-      usuario: usuario.trim().toLowerCase(),
-      endpoint: s.endpoint,
-      p256dh: s.keys.p256dh,
-      auth: s.keys.auth,
-      actualizado_en: new Date().toISOString(),
-    },
-    { onConflict: "endpoint" },
-  );
-  if (error) throw new Error(error.message);
-}
 
 /** Manda el aviso a todos los aparatos del usuario. Devuelve cuántos salieron. */
 export async function mandarAvisoDeMuestras(aviso: AvisoDeMuestras | null): Promise<number> {

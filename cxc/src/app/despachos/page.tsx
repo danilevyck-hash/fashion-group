@@ -327,7 +327,7 @@ export default function GuiasPage() {
           </div>
         )}
         {enMuestras ? (
-          <MuestrasView control={muestras} role={role} />
+          <MuestrasView control={muestras} />
         ) : enPedidos ? (
           <PedidosView
             puedeMarcar={puedeMarcarPedidos(role)}

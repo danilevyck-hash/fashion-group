@@ -38,7 +38,7 @@ export function colateralDayStartIso(earlyUtcRun: boolean, now: Date = new Date(
   return new Date(`${hoyPanama(now)}T00:00:00-05:00`).toISOString();
 }
 
-const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+export const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 /**
  * 🔴 «hoy» · «ayer» · «19 sep» · «19 sep 2025» (29-sep-2026, 8a del audit

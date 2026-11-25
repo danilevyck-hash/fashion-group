@@ -10,10 +10,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
-import AvisoActivarAvisos from "@/app/marcacion/AvisoActivarAvisos";
-import { ofreceAvisoDeMuestras } from "@/lib/guias/muestras-aviso";
+import VentanaCentrada from "@/components/ui/VentanaCentrada";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import {
+  MAX_GUIA,
   MUESTRAS_2026_11,
   edadEnDias,
   lineaPorMandar,
@@ -44,12 +44,18 @@ export function useMuestrasPorMandar(activo: boolean) {
   return { pedidos, setPedidos, error, recargar, total, visible: pedidos !== null };
 }
 
-export default function MuestrasView({ control, role }: { control: ReturnType<typeof useMuestrasPorMandar>; role?: string | null }) {
+export default function MuestrasView({ control }: { control: ReturnType<typeof useMuestrasPorMandar> }) {
   const { toast } = useToast();
   const { pedidos, setPedidos, error, recargar, total } = control;
   const ahora = new Date().toISOString();
+  // «Enviada» / «Enviar todas» abren «N.° de guía» (opcional, UNA por caja):
+  // la guía queda en todas las referencias de esa misma acción (25-nov-2026).
+  const [porEnviar, setPorEnviar] = useState<number[] | null>(null);
+  const [guia, setGuia] = useState("");
+  const abrir = (ids: number[]) => { setGuia(""); setPorEnviar(ids); };
 
-  async function enviar(ids: number[]) {
+  async function enviar(ids: number[], guiaEnvio: string) {
+    setPorEnviar(null);
     const antes = pedidos;
     // Optimista: sale de la lista al tocar; si falla, vuelve.
     setPedidos((ps) =>
@@ -59,7 +65,7 @@ export default function MuestrasView({ control, role }: { control: ReturnType<ty
       const r = await fetch("/api/guias/muestras", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accion: "enviada", ids }),
+        body: JSON.stringify({ accion: "enviada", ids, guia: guiaEnvio.trim() || null }),
       });
       const d = (await r.json().catch(() => null)) as { error?: string } | null;
       if (!r.ok) throw new Error(d?.error ?? "No se pudo guardar. Intenta de nuevo.");
@@ -77,11 +83,6 @@ export default function MuestrasView({ control, role }: { control: ReturnType<ty
   const empresas = [...new Set(pedidos.map((p) => nombreCortoEmpresa(p.empresa_key)))].join(" · ");
   return (
     <div className="mx-auto max-w-3xl pb-6 sm:px-6 sm:pt-4">
-      {ofreceAvisoDeMuestras(role) && (
-        <div className="px-4 pt-3 sm:px-0 sm:pt-0">
-          <AvisoActivarAvisos ruta="/api/guias/muestras/avisos" titulo="Avisos de muestras desactivados" />
-        </div>
-      )}
       <div className="flex items-baseline justify-between gap-3 px-4 py-2 sm:px-0">
         <p className="text-[15px] font-semibold text-gray-900">{total === 0 ? "Sin muestras por mandar" : lineaPorMandar(total)}</p>
         {empresas && <p className="truncate text-sm text-gray-500">{empresas}</p>}
@@ -98,7 +99,7 @@ export default function MuestrasView({ control, role }: { control: ReturnType<ty
                 {p.muestras.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => void enviar(p.muestras.map((m) => m.id))}
+                    onClick={() => abrir(p.muestras.map((m) => m.id))}
                     className="min-h-[44px] shrink-0 rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 transition active:scale-[0.97]"
                   >
                     Enviar todas
@@ -123,7 +124,7 @@ export default function MuestrasView({ control, role }: { control: ReturnType<ty
                       </div>
                       <button
                         type="button"
-                        onClick={() => void enviar([m.id])}
+                        onClick={() => abrir([m.id])}
                         className="min-h-[44px] shrink-0 rounded-md bg-black px-4 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]"
                       >
                         Enviada
@@ -136,6 +137,42 @@ export default function MuestrasView({ control, role }: { control: ReturnType<ty
           ))}
         </div>
       )}
+      <VentanaCentrada
+        open={porEnviar !== null}
+        onClose={() => setPorEnviar(null)}
+        title={porEnviar && porEnviar.length > 1 ? `Enviar ${porEnviar.length} muestras` : "Enviar muestra"}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setPorEnviar(null)} className="min-h-[44px] rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 active:scale-[0.97]">
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => porEnviar && void enviar(porEnviar, guia)}
+              className="min-h-[44px] rounded-md bg-black px-4 text-sm font-medium text-white active:scale-[0.97]"
+            >
+              {porEnviar && porEnviar.length > 1 ? "Marcar enviadas" : "Marcar enviada"}
+            </button>
+          </div>
+        }
+      >
+        <form
+          className="px-5 py-4"
+          onSubmit={(e) => { e.preventDefault(); if (porEnviar) void enviar(porEnviar, guia); }}
+        >
+          <label htmlFor="guia-envio" className="block text-sm font-medium text-gray-900">N.° de guía <span className="font-normal text-gray-500">(opcional)</span></label>
+          <input
+            id="guia-envio"
+            value={guia}
+            onChange={(e) => setGuia(e.target.value)}
+            maxLength={MAX_GUIA}
+            autoComplete="off"
+            inputMode="text"
+            className="mt-1.5 w-full rounded-md border border-gray-300 px-3 py-2.5 text-[16px] tabular-nums focus:border-black focus:outline-none"
+          />
+          <p className="mt-1.5 text-sm text-gray-500">Puedes dejarlo vacío.</p>
+        </form>
+      </VentanaCentrada>
     </div>
   );
 }

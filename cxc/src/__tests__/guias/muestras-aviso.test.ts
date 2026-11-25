@@ -6,7 +6,6 @@ import { empresasDeMuestrasDe } from "@/lib/guias/muestras";
 import {
   MUESTRAS_AVISO_PUSH_2026_11,
   avisoDeMuestras,
-  ofreceAvisoDeMuestras,
   textoAvisoMuestras,
 } from "@/lib/guias/muestras-aviso";
 
@@ -29,10 +28,5 @@ describe("aviso de muestras", () => {
   it("sin referencias no hay aviso; uno por pedido (tag)", () => {
     expect(avisoDeMuestras({ empresa_key: "vistana", pedido_switch_id: 1, n: 0 })).toBeNull();
     expect(avisoDeMuestras({ empresa_key: "vistana", pedido_switch_id: 9, n: 2 })!.tag).toBe("muestras-vistana-9");
-  });
-  it("«Activa los avisos» solo al vendedor, no a Daniel ni a bodega", () => {
-    expect(ofreceAvisoDeMuestras("vendedor")).toBe(true);
-    expect(ofreceAvisoDeMuestras("admin")).toBe(false);
-    expect(ofreceAvisoDeMuestras("bodega")).toBe(false);
   });
 });

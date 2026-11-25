@@ -13,7 +13,7 @@ import {
 } from "./muestras";
 
 export const COLUMNAS_MUESTRA =
-  "id, empresa_key, pedido_switch_id, codigo, descripcion, estado, pedida_por, pedida_en, enviada_por, enviada_en, reclamada_por, reclamada_en";
+  "id, empresa_key, pedido_switch_id, codigo, descripcion, estado, pedida_por, pedida_en, enviada_por, enviada_en, reclamada_por, reclamada_en, guia_envio";
 
 /** Las muestras vivas de UN pedido (todas: falta, enviada y no llegó). */
 export async function leerMuestrasDelPedido(empresa: string, pedido: number): Promise<MuestraLeida[]> {
