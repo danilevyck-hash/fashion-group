@@ -15,6 +15,7 @@ import { Aviso } from "@/components/ui/Aviso";
 import VentanaCentrada from "@/components/ui/VentanaCentrada";
 import { EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import MuestrasDeBodega from "./MuestrasDeBodega";
+import MuestrasDelVendedor from "./MuestrasDelVendedor";
 import MuestrasViewAnterior from "./MuestrasViewAnterior";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -23,6 +24,7 @@ import {
   MAX_GUIA,
   MUESTRAS_2026_11,
   MUESTRAS_COMO_PEDIDOS_2026_11,
+  MUESTRAS_DEL_VENDEDOR_2026_11,
   esPorMandar,
   lineaReclamada,
   nombreDelVendedor,
@@ -142,6 +144,7 @@ function MuestrasPorPedido({ control }: { control: ReturnType<typeof useMuestras
 
   if (error && !pedidos) return <div className="mx-auto max-w-6xl px-4 py-6"><Aviso tono="error">No se pudieron leer las muestras. Intenta de nuevo.</Aviso></div>;
   if (!pedidos) return <p className="py-10 text-center text-sm text-gray-500">Cargando…</p>;
+  if (MUESTRAS_DEL_VENDEDOR_2026_11 && !soloLectura) return <MuestrasDelVendedor pedidos={pedidos} onEnviar={(ids, g) => void enviar(ids, g)} />;
 
   const pedidosMarcados = new Set((pedidos ?? []).filter((p) => p.muestras.some((m) => marcadas.includes(m.id))).map((p) => p.pedido_switch_id)).size;
   const linea = porMandar.length === 0 ? "Sin muestras por mandar" : `${porMandar.length} por mandar`;
