@@ -16,6 +16,14 @@ import { textoUnidades } from "@/lib/guias/pedidos-bultos";
 
 export const PEDIDOS_CONTEOS_2026_11 = true;
 
+/**
+ * 🔴 25-nov-2026 (Daniel: «¿por qué "Todas las empresas" no está al lado de
+ * Imprimir? Así nos ahorramos una línea»): en la COMPUTADORA el selector de
+ * empresa va en la fila de los estados, a la derecha, junto a «Imprimir». En
+ * el celular sigue donde estaba (no cabe). Filtra lo mismo. `false` = debajo.
+ */
+export const PEDIDOS_EMPRESA_JUNTO_A_IMPRIMIR = true;
+
 /** Usuarios (`fg_users.name`, de la cookie FIRMADA) a quienes el servidor les manda los montos. */
 export const USUARIOS_VEN_MONTOS: readonly string[] = ["daniel"];
 

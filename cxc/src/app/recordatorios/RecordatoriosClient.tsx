@@ -63,6 +63,7 @@
  * buscador como única puerta a lo depositado, y el aviso de las 9:00.
  */
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
@@ -194,18 +195,15 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
     chequesLenRef.current = cheques.length;
   }, [cheques]);
 
-  const loadCheques = useCallback(async () => {
+  const loadCheques = useCallback(async (fondo = false) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
-    setLoading(true);
+    if (!fondo) setLoading(true);
     try {
-      const res = await fetch("/api/cheques");
-      if (res.ok) {
-        const d = await res.json();
-        setCheques(Array.isArray(d) ? d : []);
-      }
+      const res = await fetch("/api/cheques", { cache: "no-store" });
+      if (res.ok) { const d = await res.json(); setCheques(Array.isArray(d) ? d : []); }
     } catch {
-      // Sin red: mantener lo que ya está en pantalla y avisar.
+      if (fondo) return; // Sin red: se queda lo que hay; al volver a la ventana, sin aviso.
       if (chequesLenRef.current > 0) showToast("No se pudo actualizar. Verifica tu conexión.");
       else setError("No se pudieron cargar los cheques. Recarga la página.");
     } finally {
@@ -238,6 +236,7 @@ function Pantalla({ initialData }: { initialData: ChequesInitialData }) {
     loadCheques();
     loadRecordatorios();
   }, [authChecked, loadCheques, loadRecordatorios]);
+  useReleerAlVolver(() => { void loadCheques(true); void loadRecordatorios(); }, authChecked);
 
   // ESC cierra el modal del día
   useEffect(() => {

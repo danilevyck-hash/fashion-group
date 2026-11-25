@@ -9,6 +9,7 @@
 
 import { NBSP, TEXTOS_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { ROTULO_TODAS } from "@/lib/ventas/rotulo-empresas";
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Check, Pencil, Printer, Undo2 } from "lucide-react";
 import { ConfirmModal } from "@/components/ui";
@@ -41,7 +42,7 @@ import PedidoAbierto from "./PedidoAbierto";
 import { MUESTRAS_2026_11 as MUESTRAS, lineaDeEsperaDelPedido } from "@/lib/guias/muestras";
 import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
-import { PEDIDOS_CONTEOS_2026_11 as CONTEOS, conteosPorEstado, lineaDeResumen, lineaMasViejo, textoMonto } from "@/lib/ui/pedidos-conteos-2026-11";
+import { PEDIDOS_CONTEOS_2026_11 as CONTEOS, PEDIDOS_EMPRESA_JUNTO_A_IMPRIMIR, conteosPorEstado, lineaDeResumen, lineaMasViejo, textoMonto } from "@/lib/ui/pedidos-conteos-2026-11";
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
 import {
   PEDIDOS_BULTOS_2026_10 as BULTOS,
@@ -210,6 +211,8 @@ export default function PedidosView({
     }
   }
   useEffect(() => { void cargar(); }, []);
+  // 🔴 Al volver a la ventana se relee la BASE en segundo plano (nunca Switch).
+  useReleerAlVolver(() => void cargar(true));
   // 🔴 Revisión 110 · n.º 65 (Daniel, 14-nov-2026): la lista se vuelve a leer
   // SOLA cada 5 minutos mientras está abierta y a la vista. Lee la BASE
   // (`GET /api/guias/pedidos`), NUNCA Switch: entrar a Despachos sigue sin
@@ -484,6 +487,8 @@ export default function PedidosView({
   // línea de resumen va al lado del filtro de empresa. Para TODOS.
   const conConteos = SIMPLE && CONTEOS;
   const conteos = conteosPorEstado(deLaEmpresa);
+  // 25-nov-2026: en la computadora la empresa sube a la fila de los estados, junto a «Imprimir».
+  const empresaJuntoAImprimir = conConteos && !barra && PEDIDOS_EMPRESA_JUNTO_A_IMPRIMIR && NUEVO && hayQueElegirEmpresa;
 
   // 🩸 Con TRES chips de estado, el de «Empresa» quedaba aplastado a «E. ⌄» en
   // el celular: el grupo de estados no se encoge y el que sobraba era el otro.
@@ -514,8 +519,13 @@ export default function PedidosView({
       </div>
       {/* Con `PEDIDOS_CELULAR_2026_11` la empresa del celular va en su propia fila. */}
       {NUEVO && hayQueElegirEmpresa && !(barra && PEDIDOS_CELULAR) && !conConteos && <ChipSelector rotulo="Empresa" soloValor={PEDIDOS_EMPRESA_SIN_PREFIJO} valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
+      {empresaJuntoAImprimir && (
+        <span data-empresa-junto-a-imprimir className="ml-auto flex shrink-0">
+          <ChipSelector rotulo="Empresa" sinRotulo valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />
+        </span>
+      )}
       {POR_EMPRESA && !barra && (
-        <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={`${CLASE_BOTON_TEXTO} gap-1.5 ${conConteos ? "ml-auto" : ""}`}>
+        <button type="button" onClick={() => void imprimir()} disabled={sinNadaQueImprimir} className={`${CLASE_BOTON_TEXTO} gap-1.5 ${conConteos && !empresaJuntoAImprimir ? "ml-auto" : ""}`}>
           <Printer size={15} strokeWidth={1.8} aria-hidden /> Imprimir
         </button>
       )}
@@ -1373,8 +1383,20 @@ export default function PedidosView({
       {conConteos ? (
         <div data-resumen-pedidos className="mb-3">
           {!barra && <div className="mb-3">{chips}</div>}
+          {empresaJuntoAImprimir ? (
+            // 25-nov-2026: con la empresa arriba, el resumen, «el más viejo» y la frescura van en UNA línea.
+            <div data-una-linea className="flex min-w-0 items-baseline justify-between gap-3">
+              <p data-linea-resumen className="min-w-0 text-base font-semibold leading-snug text-gray-900">
+                {pedidos ? partesSinPartir(lineaDeArriba) : NBSP}
+                <span className="ml-3 text-xs font-normal text-gray-500">
+                  {partesSinPartir([pedidos ? lineaMasViejo(deLaEmpresa, filtro, hoy) : null, visibles.some((p) => typeof p.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · "))}
+                </span>
+              </p>
+              {frescura}
+            </div>
+          ) : (<>
           <div className={`flex min-w-0 items-center justify-between ${barra ? "gap-1.5" : "gap-2"}`}>
-            {NUEVO && hayQueElegirEmpresa ? (
+            {NUEVO && hayQueElegirEmpresa && !empresaJuntoAImprimir ? (
               // Celular (24-nov-2026): la cápsula más chica para que el resumen quepa en UN renglón a 360 px.
               <span className={barra ? "flex shrink-0 [&_[data-chip-selector]]:!h-8 [&_[data-chip-selector]]:!px-1.5 [&_[data-chip-selector]]:!text-[12px]" : "shrink-0"}>
                 <ChipSelector rotulo="Empresa" sinRotulo valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />
@@ -1390,6 +1412,7 @@ export default function PedidosView({
             </span>
             {frescura}
           </div>
+          </>)}
         </div>
       ) : (
       <div className={pedidosCelular ? "mb-2" : "mb-3 flex flex-wrap items-center justify-between gap-3"}>

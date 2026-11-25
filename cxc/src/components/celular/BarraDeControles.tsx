@@ -87,6 +87,8 @@ export const CLASE_TOQUE_44 = "relative before:absolute before:inset-x-0 before:
 const BASE_BOTON_TEXTO =
   `inline-flex h-9 items-center gap-0.5 rounded-full border border-gray-300 bg-white px-2.5 text-[13px] font-medium text-gray-900 active:bg-gray-100 disabled:opacity-40 ${CLASE_TOQUE_44}`;
 export const CLASE_BOTON_TEXTO = `${BASE_BOTON_TEXTO} shrink-0`;
+/** La cápsula con algo elegido: negra. Con «!» porque pisa el blanco de la base. */
+export const CLASE_CHIP_PUESTO = "!border-gray-900 !bg-gray-900 !text-white";
 /** Todo control segmentado del celular: 36 px a la vista, 44 al tocar, letra de 13 px. */
 export const CLASE_SEGMENTADO_BARRA =
   "h-9 shrink-0 [&>button]:relative [&>button]:min-h-0 [&>button]:px-2.5 [&>button]:py-0 [&>button]:text-[13px] [&>button]:before:absolute [&>button]:before:inset-x-0 [&>button]:before:-inset-y-1.5 [&>button]:before:content-['']";
@@ -413,10 +415,13 @@ export function ChipSelector({
 }) {
   const elegida = opciones.find((o) => o.valor === valor)?.etiqueta ?? valor;
   const puesto = opciones.length > 0 && valor !== opciones[0].valor;
+  // 🩸 25-nov-2026: sin «!», el CSS final pone `bg-white` y `text-white` DESPUÉS
+  // de `bg-gray-900`: con una empresa elegida la cápsula salía BLANCO SOBRE
+  // BLANCO (vacía). Bodega tenía «Active Shoes» y no se veía. `CLASE_CHIP_PUESTO`.
   return (
     <span
       data-chip-selector
-      className={`${BASE_BOTON_TEXTO} ${sinRotulo ? "shrink-0" : "min-w-0"} ${puesto ? "border-gray-900 bg-gray-900 text-white" : ""}`}
+      className={`${BASE_BOTON_TEXTO} ${sinRotulo ? "shrink-0" : "min-w-0"} ${puesto ? CLASE_CHIP_PUESTO : ""}`}
     >
       <span className="min-w-0 truncate">
         {/* «Todas las empresas» ya dice qué filtra: sin «Empresa:» delante (14-nov-2026). */}
