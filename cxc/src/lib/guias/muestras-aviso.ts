@@ -2,12 +2,13 @@
 // (25-nov-2026, Daniel: «a los que ven muestras vendedores, actívales la
 // notificación para que les llegue cuando bodega las pide»). Puro.
 //
-// 🔴 A QUIÉN: la MISMA regla que decide quién ve la lista (`vendedorDeMuestra`):
-// Vistana → edwin; las otras 5 → rey. Admin ve la lista pero NO recibe aviso.
+// 🔴 A QUIÉN (25-nov-2026, Daniel): a todos los que MANDAN las muestras de esa
+// empresa (`quienesMandanMuestras`): Vistana → edwin; las otras 5 → angel Y rey.
+// Admin ve la lista pero NO recibe aviso.
 // 🔴 CUÁNDO: solo al PEDIR (uno por pedido, aunque sean varias referencias).
 // «No llegó» no avisa.
 
-import { MUESTRAS_2026_11, vendedorDeMuestra } from "./muestras";
+import { MUESTRAS_2026_11, quienesMandanMuestras } from "./muestras";
 
 /** 🔴 PRENDIDO (25-nov-2026). `false` = sin aviso y sin «Activa los avisos». */
 export const MUESTRAS_AVISO_EN_CODIGO = true;
@@ -17,7 +18,7 @@ export const TITULO_AVISO_MUESTRAS = "Muestras pedidas";
 export const URL_AVISO_MUESTRAS = "/despachos?vista=muestras";
 
 export interface AvisoDeMuestras {
-  usuario: string;
+  usuarios: readonly string[];
   title: string;
   body: string;
   url: string;
@@ -41,7 +42,7 @@ export function avisoDeMuestras(a: {
 }): AvisoDeMuestras | null {
   if (!MUESTRAS_AVISO_PUSH_2026_11 || a.n < 1) return null;
   return {
-    usuario: vendedorDeMuestra(a.empresa_key),
+    usuarios: quienesMandanMuestras(a.empresa_key),
     title: TITULO_AVISO_MUESTRAS,
     body: textoAvisoMuestras(a.n, a.secuencial, a.cliente),
     url: URL_AVISO_MUESTRAS,

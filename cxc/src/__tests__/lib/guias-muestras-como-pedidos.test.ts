@@ -7,48 +7,64 @@ import { describe, it, expect } from "vitest";
 import {
   MUESTRAS_COMO_PEDIDOS_2026_11,
   empresasQueVenMuestras,
-  enviadaALaVista,
+  ESTADOS_POR_MANDAR,
   puedeAccionMuestra,
   soloMiraMuestras,
 } from "@/lib/guias/muestras";
 
-describe("🔴 quién ve la lista de Muestras", () => {
+describe("🔴 Angel manda muestras como Rey (Daniel, 25-nov-2026)", () => {
   it("el interruptor está PRENDIDO", () => expect(MUESTRAS_COMO_PEDIDOS_2026_11).toBe(true));
 
-  it("Angel: las 5 del grupo, sin Vistana, y solo mira", () => {
+  it("ve y manda las 5 del grupo, sin Vistana, y ya no es solo lectura", () => {
     const e = empresasQueVenMuestras("Angel", "bodega");
-    expect(e).not.toContain("vistana");
     expect([...e].sort()).toEqual(["active_shoes", "active_wear", "fashion_shoes", "fashion_wear", "joystep"]);
-    expect(soloMiraMuestras("angel", "bodega")).toBe(true);
+    expect(soloMiraMuestras("angel", "bodega")).toBe(false);
   });
 
-  it("otro de bodega (Jorman) no ve la lista", () => {
+  const q = { role: "bodega", userName: "angel" };
+  for (const e of ["fashion_wear", "fashion_shoes", "active_wear", "active_shoes", "joystep"]) {
+    it(`«Enviada» en ${e} → sí`, () => {
+      expect(puedeAccionMuestra("enviada", { empresa_key: e, estado: "falta" }, q).ok).toBe(true);
+    });
+  }
+  it("«Enviada» en Vistana → NO (la manda Edwin)", () => {
+    const v = puedeAccionMuestra("enviada", { empresa_key: "vistana", estado: "falta" }, q);
+    expect(v).toEqual({ ok: false, error: "Esa muestra la manda Edwin" });
+  });
+  it("sigue siendo bodega: reclama «No llegó»", () => {
+    expect(puedeAccionMuestra("no_llego", { empresa_key: "fashion_shoes", estado: "enviada" }, q).ok).toBe(true);
+  });
+
+  it("otro de bodega (Jorman) no ve ni manda", () => {
     expect(empresasQueVenMuestras("jorman", "bodega")).toEqual([]);
-    expect(soloMiraMuestras("jorman", "bodega")).toBe(false);
+    expect(puedeAccionMuestra("enviada", { empresa_key: "fashion_shoes", estado: "falta" }, { role: "bodega", userName: "jorman" }).ok).toBe(false);
   });
 
-  it("el vendedor y admin siguen igual: ven y mandan", () => {
+  it("Rey y Edwin siguen igual", () => {
     expect(empresasQueVenMuestras("edwin", "vendedor")).toEqual(["vistana"]);
-    expect(empresasQueVenMuestras("daniel", "admin")).toContain("vistana");
+    expect(empresasQueVenMuestras("rey", "vendedor")).not.toContain("vistana");
     expect(soloMiraMuestras("rey", "vendedor")).toBe(false);
   });
 });
 
-describe("🔴 Angel NO envía; sí reclama «No llegó»", () => {
-  const q = { role: "bodega", userName: "angel" };
-  it("«Enviada» → no", () => {
-    expect(puedeAccionMuestra("enviada", { empresa_key: "fashion_shoes", estado: "falta" }, q).ok).toBe(false);
+describe("🔴 la lista (Angel y vendedor) lleva SOLO lo por mandar", () => {
+  it("una enviada no es «por mandar»: sale de la lista y del conteo", () => {
+    expect(ESTADOS_POR_MANDAR).not.toContain("enviada");
   });
-  it("«No llegó» de una enviada → sí", () => {
-    expect(puedeAccionMuestra("no_llego", { empresa_key: "fashion_shoes", estado: "enviada" }, q).ok).toBe(true);
-  });
-});
-
-describe("lo enviado se le ve 7 días, para reclamarlo", () => {
-  const ahora = "2026-11-25T15:00:00.000Z";
-  it("hace 2 días sí, hace 8 no, sin fecha no", () => {
-    expect(enviadaALaVista("2026-11-23T15:00:00.000Z", ahora)).toBe(true);
-    expect(enviadaALaVista("2026-11-17T15:00:00.000Z", ahora)).toBe(false);
-    expect(enviadaALaVista(null, ahora)).toBe(false);
+  it("la lectura de la lista pide solo esos estados, para todos", async () => {
+    const { vi } = await import("vitest");
+    const pedidos: unknown[] = [];
+    vi.doMock("@/lib/supabase-server", () => {
+      const c: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "limit"]) c[m] = () => c;
+      c.in = (col: string, v: unknown) => { if (col === "estado") pedidos.push(v); return c; };
+      c.then = (ok: (r: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok);
+      return { supabaseServer: { from: () => c } };
+    });
+    vi.resetModules();
+    const { leerPorMandar } = await import("@/lib/guias/muestras-server");
+    await leerPorMandar(["fashion_shoes"]);
+    expect(pedidos).toEqual([[...ESTADOS_POR_MANDAR]]);
+    vi.doUnmock("@/lib/supabase-server");
   });
 });

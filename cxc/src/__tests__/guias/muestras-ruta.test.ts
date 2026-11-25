@@ -98,13 +98,13 @@ async function pedir(empresa: string, id: number, codigos: string[]) {
 }
 
 describe("bodega pide las muestras", () => {
-  it("🔔 al pedir sale UN aviso por pedido al vendedor que las manda (rey · edwin)", async () => {
+  it("🔔 al pedir sale UN aviso por pedido (FS → angel y rey · Vistana → edwin)", async () => {
     await pedir("fashion_shoes", 2228, ["TWLENILA140", "FM0FM05393YBS"]);
     expect(avisos).toEqual([
-      expect.objectContaining({ usuario: "rey", title: "Muestras pedidas", body: "Bodega pidió 2 muestras · Pedido 16-000002228 · City Mall Paso Canoa", url: "/despachos?vista=muestras" }),
+      expect.objectContaining({ usuarios: ["angel", "rey"], title: "Muestras pedidas", body: "Bodega pidió 2 muestras · Pedido 16-000002228 · City Mall Paso Canoa", url: "/despachos?vista=muestras" }),
     ]);
     await pedir("vistana", 2483, ["CK001"]);
-    expect(avisos[1]).toMatchObject({ usuario: "edwin", body: "Bodega pidió 1 muestra · Pedido 16-000002483 · Golden Mall" });
+    expect(avisos[1]).toMatchObject({ usuarios: ["edwin"], body: "Bodega pidió 1 muestra · Pedido 16-000002483 · Golden Mall" });
   });
   it("🔔 si el aviso no sale, las muestras quedan guardadas igual", async () => {
     avisoFalla = true;
@@ -183,6 +183,16 @@ describe("el vendedor las manda", () => {
     como("vendedor", "edwin");
     expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck], guia: "G1" }))).status).toBe(200);
     expect(muestras().find((m) => m.id === ck)).toMatchObject({ estado: "enviada", enviada_por: "edwin" });
+  });
+
+  it("🔴 Angel (bodega) manda como Rey: sí Fashion Shoes, NO Vistana (25-nov-2026)", async () => {
+    const ck = muestras().find((m) => m.codigo === "CK001")!.id;
+    const fs = muestras().filter((m) => m.empresa_key === "fashion_shoes").map((m) => m.id as number);
+    como("bodega", "angel");
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids: [ck], guia: "G1" }))).status).toBe(403);
+    expect(muestras().find((m) => m.id === ck)).toMatchObject({ estado: "falta" });
+    expect((await PATCH(req("PATCH", { accion: "enviada", ids: fs, guia: "G2" }))).status).toBe(200);
+    expect(muestras().filter((m) => fs.includes(m.id as number)).every((m) => m.estado === "enviada" && m.enviada_por === "angel")).toBe(true);
   });
 
   it("«Enviar todas» las del pedido: salen de la lista y la espera se apaga sola", async () => {

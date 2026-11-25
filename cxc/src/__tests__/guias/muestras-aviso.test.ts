@@ -13,13 +13,19 @@ describe("aviso de muestras", () => {
   it("prendido (lo publicado)", () => {
     expect(MUESTRAS_AVISO_PUSH_2026_11).toBe(true);
   });
-  it("cada empresa avisa a quien ve sus muestras: Vistana → edwin, las otras 5 → rey", () => {
-    for (const e of B2B_EMPRESA_KEYS) {
-      const a = avisoDeMuestras({ empresa_key: e, pedido_switch_id: 1, n: 1 })!;
-      expect(empresasDeMuestrasDe(a.usuario, "vendedor")).toContain(e);
+  it("🔴 FW, FS, AW, AS y Joystep → Angel Y Rey (Daniel, 25-nov-2026)", () => {
+    for (const e of ["fashion_wear", "fashion_shoes", "active_wear", "active_shoes", "joystep"]) {
+      expect([...avisoDeMuestras({ empresa_key: e, pedido_switch_id: 1, n: 1 })!.usuarios].sort()).toEqual(["angel", "rey"]);
     }
-    expect(avisoDeMuestras({ empresa_key: "vistana", pedido_switch_id: 1, n: 1 })!.usuario).toBe("edwin");
-    expect(avisoDeMuestras({ empresa_key: "fashion_shoes", pedido_switch_id: 1, n: 1 })!.usuario).toBe("rey");
+  });
+  it("🔴 Vistana → SOLO Edwin", () => {
+    expect(avisoDeMuestras({ empresa_key: "vistana", pedido_switch_id: 1, n: 1 })!.usuarios).toEqual(["edwin"]);
+  });
+  it("todas las empresas del grupo avisan a alguien que manda sus muestras", () => {
+    for (const e of B2B_EMPRESA_KEYS) {
+      const us = avisoDeMuestras({ empresa_key: e, pedido_switch_id: 1, n: 1 })!.usuarios;
+      expect(us.some((u) => empresasDeMuestrasDe(u, "vendedor").includes(e))).toBe(true);
+    }
   });
   it("el texto", () => {
     expect(textoAvisoMuestras(3, "16-1234", "Cliente X")).toBe("Bodega pidió 3 muestras · Pedido 16-1234 · Cliente X");

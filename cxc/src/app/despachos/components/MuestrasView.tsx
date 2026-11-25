@@ -23,7 +23,6 @@ import {
   MUESTRAS_2026_11,
   MUESTRAS_COMO_PEDIDOS_2026_11,
   esPorMandar,
-  lineaEnviada,
   lineaReclamada,
   nombreDelVendedor,
   vendedorDeMuestra,
@@ -115,21 +114,6 @@ function MuestrasPorPedido({ control }: { control: ReturnType<typeof useMuestras
     }
   }
 
-  async function noLlego(m: MuestraLeida) {
-    try {
-      const r = await fetch("/api/guias/muestras", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accion: "no_llego", ids: [m.id] }),
-      });
-      if (!r.ok) throw new Error();
-      toast("Muestra reclamada", "success");
-      void recargar();
-    } catch {
-      toast("No se pudo guardar. Intenta de nuevo.", "error");
-    }
-  }
-
   if (error && !pedidos) return <div className="mx-auto max-w-6xl px-4 py-6"><Aviso tono="error">No se pudieron leer las muestras. Intenta de nuevo.</Aviso></div>;
   if (!pedidos) return <p className="py-10 text-center text-sm text-gray-500">Cargando…</p>;
 
@@ -193,7 +177,6 @@ function MuestrasPorPedido({ control }: { control: ReturnType<typeof useMuestras
                           soloLectura={soloLectura}
                           marcada={!desmarcadas.has(m.id)}
                           onMarcar={(v) => alternar([m.id], v)}
-                          onNoLlego={() => void noLlego(m)}
                         />
                       ))}
                     </ul>
@@ -279,15 +262,13 @@ function MuestrasPorPedido({ control }: { control: ReturnType<typeof useMuestras
   );
 }
 
-function Referencia({ m, ahora, soloLectura, marcada, onMarcar, onNoLlego }: {
+function Referencia({ m, ahora, soloLectura, marcada, onMarcar }: {
   m: MuestraLeida; ahora: string; soloLectura: boolean; marcada: boolean;
-  onMarcar: (v: boolean) => void; onNoLlego: () => void;
+  onMarcar: (v: boolean) => void;
 }) {
   const abierta = esPorMandar(m.estado);
   const reclamada = lineaReclamada(m, ahora);
-  const estado = m.estado === "enviada"
-    ? <span className="text-emerald-700">{lineaEnviada(m)}</span>
-    : reclamada
+  const estado = reclamada
       ? <span className="font-medium text-red-700">{reclamada}</span>
       : <span className="text-amber-700">{soloLectura ? `Por mandar · ${nombreDelVendedor(vendedorDeMuestra(m.empresa_key))}` : "Por mandar"}</span>;
   return (
@@ -309,9 +290,6 @@ function Referencia({ m, ahora, soloLectura, marcada, onMarcar, onNoLlego }: {
         </p>
         <p className="shrink-0 text-xs sm:text-sm">
           {estado}
-          {soloLectura && m.estado === "enviada" && (
-            <button type="button" onClick={onNoLlego} className="ml-3 font-medium text-blue-600 hover:text-blue-800">No llegó</button>
-          )}
         </p>
       </div>
     </li>

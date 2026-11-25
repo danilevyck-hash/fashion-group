@@ -7,7 +7,6 @@ import {
   ESTADOS_POR_MANDAR,
   agruparPorPedido,
   cambioDeEspera,
-  enviadaALaVista,
   muestraSigueViva,
   type MuestraLeida,
   type PedidoDeMuestras,
@@ -36,7 +35,6 @@ export async function leerMuestrasDelPedido(empresa: string, pedido: number): Pr
  */
 export async function leerPorMandar(
   empresas: readonly string[],
-  { conEnviadas = false }: { conEnviadas?: boolean } = {},
 ): Promise<PedidoDeMuestras[]> {
   if (empresas.length === 0) return [];
   // ponytail: sin paginar; lo pendiente son decenas, nunca 1.000.
@@ -44,13 +42,11 @@ export async function leerPorMandar(
     .from("pedidos_muestras")
     .select(COLUMNAS_MUESTRA)
     .in("empresa_key", [...empresas])
-    .in("estado", conEnviadas ? [...ESTADOS_POR_MANDAR, "enviada"] : [...ESTADOS_POR_MANDAR])
+    .in("estado", [...ESTADOS_POR_MANDAR])
     .eq("deleted", false)
     .limit(1000);
   if (error) throw new Error(`pedidos_muestras: ${error.message}`);
-  // Quien solo mira (Angel) ve además lo enviado de los últimos días, para reclamarlo.
-  const ahora = new Date().toISOString();
-  const muestras = ((data ?? []) as MuestraLeida[]).filter((m) => m.estado !== "enviada" || enviadaALaVista(m.enviada_en, ahora));
+  const muestras = (data ?? []) as MuestraLeida[];
   if (muestras.length === 0) return [];
   const ids = [...new Set(muestras.map((m) => m.pedido_switch_id))];
   const emps = [...new Set(muestras.map((m) => m.empresa_key))];
