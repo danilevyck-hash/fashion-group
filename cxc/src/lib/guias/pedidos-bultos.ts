@@ -284,6 +284,20 @@ export interface LineaPedido {
   total: number | null;
   /** El bulto donde quedó, o `null` si todavía no se asignó. */
   bulto: number | null;
+  /**
+   * 25-nov-2026: la existencia del ARTÍCULO en la base (`switch_articulo_info`,
+   * por empresa y código, la del barrido de cada noche; la misma de Consulta
+   * de artículos). Sin dato = `null`, se dibuja «—». Solo la trae la pantalla.
+   */
+  existencia?: number | null;
+}
+
+/** 🔴 PRENDIDO (25-nov-2026). `false` = el pedido sin la columna «Existencia». */
+export const PEDIDO_CON_EXISTENCIA_2026_11 = true;
+
+/** «12», o «—» sin dato: nunca un 0 inventado. */
+export function textoExistencia(v: number | null | undefined): string {
+  return typeof v === "number" && Number.isFinite(v) ? String(v) : "—";
 }
 
 /** «-» y «» son el «no tengo dato» de Switch: no se dibujan. */
