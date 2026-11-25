@@ -55,13 +55,14 @@ export async function GET(req: NextRequest) {
       if (!veLaEmpresa(empresa, auth.userName, auth.role)) return noExiste();
       return NextResponse.json({ muestras: await leerMuestrasDelPedido(empresa, id) });
     }
-    // 25-nov-2026: el vendedor ve las suyas; Angel (bodega) MIRA las del grupo
-    // menos Vistana. Los dos, SOLO lo por mandar («No llegó» va en Pedidos).
+    // 25-nov-2026: el vendedor (y Angel) ve lo que tiene por mandar; bodega
+    // (julio, rodrigo, jorman) MIRA además lo enviado de pedidos aún abiertos:
+    // «En camino». El número de la pestaña cuenta SOLO lo por mandar.
     const empresas = empresasQueVenMuestras(auth.userName, auth.role);
     if (empresas.length === 0) return NextResponse.json({ error: "Las muestras las ve el vendedor que las manda" }, { status: 403 });
     const soloMira = soloMiraMuestras(auth.userName, auth.role);
-    const pedidos = await leerPorMandar(empresas);
-    const total = pedidos.reduce((s, p) => s + p.muestras.length, 0);
+    const pedidos = await leerPorMandar(empresas, { conEnviadas: soloMira });
+    const total = pedidos.reduce((s, p) => s + p.muestras.filter((m) => m.estado !== "enviada").length, 0);
     return NextResponse.json({ pedidos, total, empresas, soloLectura: soloMira });
   } catch (e) {
     console.error("[guias/muestras] GET:", e instanceof Error ? e.message : String(e));
