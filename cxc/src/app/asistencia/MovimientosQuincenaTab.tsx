@@ -1,4 +1,5 @@
 "use client";
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { Aviso } from "@/components/ui/Aviso";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 
@@ -84,9 +85,9 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
   const [filas, setFilas] = useState<FilaMovimiento[] | null>(null);
   const [error, setError] = useState(false);
 
-  const cargar = useCallback(async () => {
-    setFilas(null);
-    setError(false);
+  const cargar = useCallback(async (fondo = false) => {
+    if (!fondo) setFilas(null);
+    if (!fondo) setError(false);
     const { desde, hasta } = ventanaDeLaQuincena(quincena);
     try {
       const q = new URLSearchParams({ desde, hasta });
@@ -96,6 +97,7 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
       setFilas(j.filas ?? []);
     } catch {
       // 🔑 Una lectura caída se DICE; nunca se disfraza de «no hay nada».
+      if (fondo) return; // en segundo plano: se queda lo que hay
       toast("No se pudieron leer los movimientos. Intenta de nuevo.", "error");
       setError(true);
       setFilas([]);
@@ -103,6 +105,8 @@ export default function MovimientosQuincenaTab(props: { empresa?: string }) {
   }, [quincena, toast]);
 
   useEffect(() => { void cargar(); }, [cargar]);
+  // 🔴 Al volver a verse (ventana o pestaña) relee la BASE en segundo plano.
+  useReleerAlVolver(() => void cargar(true));
 
   // 🔴 El filtro de empresa de arriba recorta las filas ANTES de sumar: el pie
   // sigue a lo que se ve.

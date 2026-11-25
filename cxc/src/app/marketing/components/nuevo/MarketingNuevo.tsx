@@ -16,6 +16,7 @@
 // comprobante» ni editar (`escribe`).
 // ============================================================================
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUrlState } from "@/lib/hooks/useUrlState";
@@ -57,6 +58,9 @@ export default function MarketingNuevo({ role, marcas }: { role: string; marcas:
   const [refresh, setRefresh] = useState(0);
   const [registrando, setRegistrando] = useState(false);
   const refrescar = useCallback(() => setRefresh((k) => k + 1), []);
+  // 🔴 25-nov-2026: al volver a la ventana relee la BASE; los datos se quedan
+  // en pantalla hasta que llega lo nuevo (sin «Cargando…»).
+  useReleerAlVolver(refrescar);
 
   useEffect(() => {
     let cancelado = false;

@@ -37,7 +37,8 @@
  * Toda la regla vive en `lib/asistencia/marcaciones-por-dia.ts`, que es puro.
  * ────────────────────────────────────────────────────────────────────────── */
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
 // 🔴 El encabezado de la tabla se pega DEBAJO del de la app (29-sep-2026): la
 // única forma de hacerlo es esta clase (`lib/ui/barra-pegajosa.ts`).
@@ -220,10 +221,17 @@ function PorDia({ empresa }: { empresa: string }) {
 
   const [abierta, setAbierta] = useState<FotoParaVer[] | null>(null);
 
+  // 🔴 Al volver a verse (ventana o pestaña) relee la BASE en segundo plano.
+  const [vuelta, setVuelta] = useState(0);
+  const enFondo = useRef(false);
+  useReleerAlVolver(() => { enFondo.current = true; setVuelta((v) => v + 1); });
+
   useEffect(() => {
     let vivo = true;
-    setCargando(true);
-    setError("");
+    const fondo = enFondo.current;
+    enFondo.current = false;
+    if (!fondo) setCargando(true);
+    if (!fondo) setError("");
     const q = new URLSearchParams({ desde, hasta });
     const emp = empresaParaPedir(empresa);
     if (emp) q.set("empresa", emp);
@@ -237,6 +245,7 @@ function PorDia({ empresa }: { empresa: string }) {
         };
         if (!vivo) return;
         if (!r.ok) {
+          if (fondo) return;
           setError(j.error || "No se pudieron leer las marcaciones.");
           setMarcas([]);
           return;
@@ -244,7 +253,7 @@ function PorDia({ empresa }: { empresa: string }) {
         setMarcas(j.marcas ?? []);
         setHayColumnasNuevas(j.hayColumnasNuevas !== false);
       } catch {
-        if (vivo) {
+        if (vivo && !fondo) {
           setError("No se pudieron leer las marcaciones. Intenta de nuevo en unos segundos.");
           setMarcas([]);
         }
@@ -253,7 +262,7 @@ function PorDia({ empresa }: { empresa: string }) {
       }
     })();
     return () => { vivo = false; };
-  }, [desde, hasta, empresa]);
+  }, [desde, hasta, empresa, vuelta]);
 
   const gente = useMemo(() => colaboradoresDeLasMarcas(marcas), [marcas]);
   const filtradas = useMemo(

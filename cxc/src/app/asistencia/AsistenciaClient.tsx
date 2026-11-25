@@ -64,6 +64,7 @@
 //
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
+import { PestanaVisible } from "@/lib/hooks/useReleerAlVolver";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { FILTRO_6_ASISTENCIA_CONFIG, FILTRO_7_ASISTENCIA_APROBACIONES } from "@/lib/ui/revision-110-filtros";
 import { BuscarEnLaBarra, EnLaBarra } from "@/components/celular/BarraDeControles";
@@ -280,6 +281,8 @@ function AsistenciaInner() {
   // `?tab=justificaciones` en Reporte. La regla vive en `pestanaQueSeAbre`;
   // nadie se queda mirando una pantalla en blanco por un enlace viejo.
   const tab: Tab = pestanaQueSeAbre(tabRaw, visibles);
+  /** ¿Esta pestaña se ve ahora? (ni la ayuda ni ⚙ encima). */
+  const seVe = (k: Tab) => !ayuda && !config && !seEsconde(k, tab);
 
   // 🔴 5a — ⚙ solo para quien ve Colaboradores (o la Configuración vieja).
   const veConfig = PERSONA_EN_EL_CENTRO && visibles.some(([k]) => k === "colaboradores" || k === "configuracion");
@@ -593,15 +596,17 @@ function AsistenciaInner() {
           )}
           {/* 🔴 Con la ayuda (o ⚙) abierta las pestañas se ESCONDEN, no se
               desarman: cerrar tiene que devolver la pantalla donde estaba. */}
+          {/* 🔴 25-nov-2026: cada pestaña sabe si se ve (`PestanaVisible`); al
+              volver a verse relee la BASE en segundo plano (`useReleerAlVolver`). */}
           <div hidden={ayuda || !!config} className={ayuda || config ? "hidden" : undefined}>
             {monta("planilla") && (
               <div hidden={seEsconde("planilla", tab)} className={escondida("planilla")}>
-                <PlanillaTab empresa={empresa} />
+                <PestanaVisible.Provider value={seVe("planilla")}><PlanillaTab empresa={empresa} /></PestanaVisible.Provider>
               </div>
             )}
             {monta("prestamos") && (
               <div hidden={seEsconde("prestamos", tab)} className={escondida("prestamos")}>
-                <PrestamosTab empresa={empresa} />
+                <PestanaVisible.Provider value={seVe("prestamos")}><PrestamosTab empresa={empresa} /></PestanaVisible.Provider>
               </div>
             )}
             {/* «Reporte» se llama «Asistencia» desde el 10-sep-2026; la clave
@@ -613,22 +618,22 @@ function AsistenciaInner() {
                 hidden={seEsconde("reporte", tab) && seEsconde("asistencia", tab)}
                 className={seEsconde("reporte", tab) && seEsconde("asistencia", tab) ? "hidden" : undefined}
               >
-                <ReporteTab empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} />
+                <PestanaVisible.Provider value={(seVe("reporte") || seVe("asistencia"))}><ReporteTab empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} /></PestanaVisible.Provider>
               </div>
             )}
             {monta("justificaciones") && (
               <div hidden={seEsconde("justificaciones", tab)} className={escondida("justificaciones")}>
-                <JustificacionesTab />
+                <PestanaVisible.Provider value={seVe("justificaciones")}><JustificacionesTab /></PestanaVisible.Provider>
               </div>
             )}
             {monta("vacaciones") && (
               <div hidden={seEsconde("vacaciones", tab)} className={escondida("vacaciones")}>
-                <VacacionesTab />
+                <PestanaVisible.Provider value={seVe("vacaciones")}><VacacionesTab /></PestanaVisible.Provider>
               </div>
             )}
             {monta("aprobaciones") && (
               <div hidden={seEsconde("aprobaciones", tab)} className={escondida("aprobaciones")}>
-                <AprobacionesTab empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} />
+                <PestanaVisible.Provider value={seVe("aprobaciones")}><AprobacionesTab empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} /></PestanaVisible.Provider>
               </div>
             )}
             {/* 🔴 «COLABORADORES» ES LA MISMA PANTALLA, EN MODO LISTA. Daniel:
@@ -640,12 +645,12 @@ function AsistenciaInner() {
                 🔴 Horarios, Feriados y Reglas se mudaron a ⚙ el 29-sep-2026. */}
             {monta("colaboradores") && (
               <div hidden={seEsconde("colaboradores", tab)} className={escondida("colaboradores")}>
-                <ConfiguracionTab personaEnElCentro empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} />
+                <PestanaVisible.Provider value={seVe("colaboradores")}><ConfiguracionTab personaEnElCentro empresa={empresa} opcionesEmpresa={opciones} onEmpresa={elegirEmpresa} /></PestanaVisible.Provider>
               </div>
             )}
             {monta("configuracion") && (
               <div hidden={seEsconde("configuracion", tab)} className={escondida("configuracion")}>
-                <ConfiguracionTab />
+                <PestanaVisible.Provider value={seVe("configuracion")}><ConfiguracionTab /></PestanaVisible.Provider>
               </div>
             )}
             {/* 🔴 SOLO SE MIRA: la pestaña no tiene un botón que corrija, borre
@@ -653,7 +658,7 @@ function AsistenciaInner() {
                 lee la MISMA lista que la ruta. */}
             {monta("marcaciones") && (
               <div hidden={seEsconde("marcaciones", tab)} className={escondida("marcaciones")}>
-                <MarcacionesTab empresa={empresa} />
+                <PestanaVisible.Provider value={seVe("marcaciones")}><MarcacionesTab empresa={empresa} /></PestanaVisible.Provider>
               </div>
             )}
           </div>

@@ -4,6 +4,7 @@
 // persona: si el 3 de noviembre hubiera que justificarlo uno a uno,
 // aparecerían 32 ausencias.
 
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -42,6 +43,7 @@ export default function FeriadosTab() {
     setLista(d.feriados ?? []);
   }, [anio]);
   useEffect(() => { void cargar(); }, [cargar]);
+  useReleerAlVolver(() => void cargar().catch(() => {}));
 
   // Agregar y cambiar el tipo son el MISMO upsert por fecha.
   async function guardar(f: Feriado): Promise<boolean> {

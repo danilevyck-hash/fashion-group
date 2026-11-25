@@ -1,4 +1,5 @@
 "use client";
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { Capsula, LineaBuscarYCapsulas } from "@/components/filtros/FiltroA";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
@@ -484,15 +485,17 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   const [form, setForm] = useState<FormReglas | null>(null);
   const [guardandoReglas, setGuardandoReglas] = useState(false);
 
-  const cargar = useCallback(async () => {
-    setError(null);
+  // `fondo` = al volver a verse: solo la lista; el formulario de reglas no se toca.
+  const cargar = useCallback(async (fondo = false) => {
+    if (!fondo) setError(null);
     try {
       const res = await fetch("/api/asistencia/configuracion", { cache: "no-store" });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "No se pudo cargar");
       setDatos(d as Datos);
-      setForm(reglasAForm(d.reglas));
+      if (!fondo) setForm(reglasAForm(d.reglas));
     } catch (e) {
+      if (fondo) return;
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setDatos(null);
     }
@@ -502,6 +505,8 @@ export default function ConfiguracionTab({ personaEnElCentro = false, empresa = 
   useEffect(() => {
     if (necesitaDatos) void cargar();
   }, [cargar, necesitaDatos]);
+  // 🔴 Al volver a verse relee la lista; con una ficha abierta (`abierta`), no.
+  useReleerAlVolver(() => void cargar(true), necesitaDatos && abierta === null);
 
   function abrir(p: Persona) {
     if (abierta === p.codigo) {

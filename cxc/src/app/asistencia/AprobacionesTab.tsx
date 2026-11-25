@@ -1,4 +1,5 @@
 "use client";
+import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { BUSCADOR_PRIMERO_APROBACIONES } from "@/lib/ui/revision-110-vivo";
 import { BUSCADOR_IZQUIERDA_LLENA_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { ASIS_PENDIENTES_CON_UNIDAD_R110, colaColaboradores } from "@/lib/ui/revision-110-asistencia";
@@ -178,9 +179,9 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
     setAbiertos((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   }, []);
 
-  const cargar = useCallback(async (silenciosa = false) => {
+  const cargar = useCallback(async (silenciosa = false, fondo = false) => {
     if (!silenciosa) setCargando(true);
-    setError(null);
+    if (!fondo) setError(null);
     try {
       const p = new URLSearchParams({ desde, hasta, aprobaciones: "1" });
       const emp = empresaParaPedir(empresa);
@@ -193,6 +194,7 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
       setAvisoMigracion(j.avisos?.faltaMigracionAprobaciones ?? null);
       setAvisoAprobador(j.avisos?.faltaMigracionAprobador ?? null);
     } catch (e) {
+      if (fondo) return; // en segundo plano: se queda lo que hay
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setDias(null);
     } finally {
@@ -201,6 +203,8 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
   }, [desde, hasta, empresa]);
 
   useEffect(() => { void cargar(); }, [cargar]);
+  // 🔴 Al volver a verse (ventana o pestaña) relee la BASE en segundo plano.
+  useReleerAlVolver(() => void cargar(true, true));
 
   // ── Los dos agrupamientos, de la MISMA fuente ─────────────────────────────
   const personas = useMemo(() => agruparPorColaborador(dias ?? []), [dias]);
