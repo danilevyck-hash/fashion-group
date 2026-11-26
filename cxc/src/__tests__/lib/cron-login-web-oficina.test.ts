@@ -102,6 +102,9 @@ const PUERTAS_LOGIN_WEB = [
   "syncAllIngresos",
   "buscarPedidosDeFacturas",
   "llenarPedidosGuardados",
+  // Estado de cuenta de los lunes (27-nov-2026): el PDF de Switch al buzón info@.
+  "pedirASwitch",
+  "asegurarPdfs",
 ];
 
 /**
@@ -243,6 +246,11 @@ describe("C. quién importa web-client", () => {
       // es responsable de hacerlo en la madrugada de Panamá y de mirar el
       // calendario, porque no hay ningún cron que se lo haga cumplir.
       path.join("app", "api", "diag", "egresos-varios", "route.ts"),
+      // ESTADO DE CUENTA DE LOS LUNES (27-nov-2026): el botón «Email» del panel
+      // de Switch manda su PDF al buzón info@. Lo llama el cron
+      // `estado-cuenta-switch`, lunes 10:50 y 11:20 UTC (madrugada de Panamá),
+      // y su `?prueba=<código>` a mano. No es colateral de la reconciliación.
+      path.join("lib", "cxc", "estado-cuenta-pdf-switch-io.ts"),
       // 🔴 NO es un cron (12-nov-2026): Despachos › Etiquetas › Nuevo envío
       // busca el N.° de pedido de las facturas marcadas EN EL MOMENTO, con un
       // login por empresa y por búsqueda. Daniel aceptó que lo saque del panel.
@@ -384,6 +392,7 @@ describe("E. un cron que abre el login web NO corre en horario de oficina", () =
   it("los cuatro que abren el login web son los esperados", () => {
     expect(cronsConLoginWeb()).toEqual([
       "boston-cartera",
+      "estado-cuenta-switch", // 27-nov-2026: lunes 10:50 y 11:20 UTC
       "sync-egresos-varios",
       "sync-ingresos-mercancia",
       "sync-utilidad",

@@ -980,3 +980,36 @@ export async function leerFacturaMostrar(session: WebSession, facturaId: number)
   }
   return bytes;
 }
+
+/**
+ * El botón «Email» de la ficha del cliente en el panel (26-nov-2026): Switch
+ * arma SU estado de cuenta PENDIENTE y lo manda por correo a `destino`, desde
+ * noreply@switch-soft.com, con el PDF adjunto («<clienteId>_<hora>.pdf»).
+ * `clienteId` es el `cliente_switch_id` de `switch_clientes`. Lo usa el envío de
+ * los lunes (`lib/cxc/estado-cuenta-pdf-switch-io.ts`); destino = buzón intermedio.
+ */
+export async function enviarEstadoCuentaPendiente(
+  session: WebSession,
+  clienteId: number,
+  destino: string,
+): Promise<void> {
+  const q = new URLSearchParams({
+    clienteId: String(clienteId),
+    clienteEmail: destino,
+    tipoEstadoCuenta: "Regular",
+    detalleEstadocuentaCliente: "P",
+    fechaDesde: "",
+  });
+  const { res, text } = await webFetch(`${session.baseUrl}/clientes/enviarestadodecuenta?${q}`, session.cookies, {
+    headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+  });
+  let ok = false;
+  try {
+    ok = (JSON.parse(text) as { response?: unknown }).response === true;
+  } catch {
+    ok = false;
+  }
+  if (res.status !== 200 || !ok) {
+    throw new SwitchWebError(session.empresaKey, "enviarestadodecuenta", `status ${res.status}: ${text.slice(0, 120)}`);
+  }
+}
