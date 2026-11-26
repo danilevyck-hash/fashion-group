@@ -17,8 +17,9 @@
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { CLIENTES_FUERA } from "@/lib/cxc/cobros-del-dia";
 
-/** Interruptor. `false` = el cron contesta sin hacer nada. */
-export const ESTADO_CUENTA_AUTOMATICO_2026_11 = true;
+/** Interruptor. `false` = el lunes no sale nada a clientes (test y prueba siguen).
+ * APAGADO el 26-nov-2026: Daniel quiere el PDF que genera Switch, no uno regenerado. */
+export const ESTADO_CUENTA_AUTOMATICO_2026_11 = false;
 
 export const REMITENTE_AUTOMATICO = "Fashion Group <info@fashiongr.com>";
 export const RESPONDER_A_AUTOMATICO = "info@fashiongr.com";
