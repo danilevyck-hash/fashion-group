@@ -22,8 +22,23 @@ import { inflateSync } from "node:zlib";
 import { fichaFiscal } from "@/lib/cxc/empresa-fiscal";
 import { escapeHtml, money, sanitizeFilenamePart } from "@/lib/cxc/estado-cuenta-email";
 
-/** El buzón al que Switch manda el PDF (y que el sistema lee). Nunca daniel@. */
-export const BUZON_INTERMEDIO = "info@fashiongr.com";
+/** El buzón intermedio si no se configura otro. */
+export const BUZON_POR_DEFECTO = "info@fashiongr.com";
+
+/**
+ * El buzón al que Switch manda el PDF (y que el sistema lee por Graph). Su
+ * dirección se IMPRIME en el PDF («Email:»), así que el cliente la ve.
+ * Se cambia sin código con la variable `ESTADO_CUENTA_BUZON` en Vercel
+ * (p. ej. un buzón compartido estadosdecuenta@fashiongr.com). Solo vale un
+ * buzón de @fashiongr.com y NUNCA el de una persona como daniel@: cualquier
+ * otro valor cae al de por defecto.
+ */
+export function buzonIntermedio(valor: string | undefined = process.env.ESTADO_CUENTA_BUZON): string {
+  const v = (valor ?? "").trim().toLowerCase();
+  return /^[a-z0-9._-]+@fashiongr\.com$/.test(v) && !v.startsWith("daniel@") ? v : BUZON_POR_DEFECTO;
+}
+
+export const BUZON_INTERMEDIO = buzonIntermedio();
 export const REMITENTE_SWITCH = "noreply@switch-soft.com";
 /** A dónde va el correo del modo prueba (`?prueba=<código>`). */
 export const DESTINO_PRUEBA = "daniel@fashiongr.com";

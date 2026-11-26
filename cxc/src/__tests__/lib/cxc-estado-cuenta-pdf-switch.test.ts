@@ -8,6 +8,7 @@ import { deflateSync } from "node:zlib";
 import {
   BUZON_INTERMEDIO,
   DESTINO_PRUEBA,
+  buzonIntermedio,
   elegirIdSwitch,
   empresaDelAsunto,
   idDelAdjunto,
@@ -57,6 +58,12 @@ describe("de quién es cada correo de Switch", () => {
 
   it("el buzón intermedio es info@ y la prueba va SOLO a daniel@", () => {
     expect(BUZON_INTERMEDIO).toBe("info@fashiongr.com");
+    // Se cambia por la variable ESTADO_CUENTA_BUZON, solo a un buzón del dominio y nunca daniel@.
+    expect(buzonIntermedio("EstadosDeCuenta@fashiongr.com")).toBe("estadosdecuenta@fashiongr.com");
+    expect(buzonIntermedio("daniel@fashiongr.com")).toBe("info@fashiongr.com");
+    expect(buzonIntermedio("alguien@gmail.com")).toBe("info@fashiongr.com");
+    expect(buzonIntermedio("")).toBe("info@fashiongr.com");
+    expect(buzonIntermedio(undefined)).toBe("info@fashiongr.com");
     expect(DESTINO_PRUEBA).toBe("daniel@fashiongr.com");
     expect(inicioDeLaSemanaUtc("2026-11-30")).toBe("2026-11-30T05:00:00Z");
   });
