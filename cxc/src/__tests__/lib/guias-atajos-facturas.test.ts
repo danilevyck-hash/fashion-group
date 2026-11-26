@@ -111,6 +111,16 @@ describe("normalización exacta, nunca por parecido", () => {
     expect(numerosDeFacturas(" 2535 ,, 02536 ")).toEqual(["2535", "2536"]);
     expect(numerosDeFacturas(null)).toEqual([]);
   });
+
+  it("numerosDeFacturas expande rangos, con tope, sin romper el largo de Switch", () => {
+    expect(numerosDeFacturas("3171-3172")).toEqual(["3171", "3172"]);
+    expect(numerosDeFacturas("3171 - 3172")).toEqual(["3171", "3172"]);
+    expect(numerosDeFacturas("3185 a 3187")).toEqual(["3185", "3186", "3187"]);
+    expect(numerosDeFacturas("3185 al 3187, 3200")).toEqual(["3185", "3186", "3187", "3200"]);
+    expect(numerosDeFacturas("11-000003171-3172")).toEqual(["3171", "3172"]);
+    expect(numerosDeFacturas("11-000002534")).toEqual(["2534"]);
+    expect(numerosDeFacturas("1000-1200")).toEqual(["1200"]); // pasa el tope: no se expande
+  });
 });
 
 describe("🔴 la agrupación es POR DÍA CON FACTURA, no por días de calendario (fechas fijas, borde Panamá)", () => {

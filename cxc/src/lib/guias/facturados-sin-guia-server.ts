@@ -6,7 +6,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { TIPO_FACTURA } from "@/lib/guias/atajos-facturas";
-import { DIAS_FACTURADOS, entraEnFacturados, estaEnGuia, indiceEnGuia } from "@/lib/guias/facturados-sin-guia";
+import { DIAS_FACTURADOS, entraEnFacturados, esCobroSuelto, estaEnGuia, indiceEnGuia } from "@/lib/guias/facturados-sin-guia";
 
 export interface FacturadoLeido {
   empresa_key: string;
@@ -27,6 +27,8 @@ interface FilaFactura {
   subtotal: number | string | null;
   cliente_switch_id: number | null;
   cliente_nombre: string | null;
+  pedido_referencia: string | null;
+  pedido_leido_en: string | null;
 }
 
 function desdeIso(hoy: string): string {
@@ -56,7 +58,7 @@ export async function leerFacturadosSinGuia(empresas: readonly string[]): Promis
     leerTodoPaginado<FilaFactura>("switch_facturas (facturados)", (pedirCount, desde, hasta) =>
       supabaseServer
         .from("switch_facturas")
-        .select("id, empresa_key, secuencial, fecha, subtotal, cliente_switch_id, cliente_nombre", pedirCount ? { count: "exact" } : {})
+        .select("id, empresa_key, secuencial, fecha, subtotal, cliente_switch_id, cliente_nombre, pedido_referencia, pedido_leido_en", pedirCount ? { count: "exact" } : {})
         .in("empresa_key", [...empresas])
         .eq("tipo_comprobante", TIPO_FACTURA)
         .gte("fecha", desdeIso(hoyPanama()))
@@ -66,7 +68,7 @@ export async function leerFacturadosSinGuia(empresas: readonly string[]): Promis
     leerRenglonesVivos(),
   ]);
   const indice = indiceEnGuia(renglones);
-  const sinGuia = facturas.filter((f) => !estaEnGuia(indice, f.empresa_key, f.secuencial));
+  const sinGuia = facturas.filter((f) => !esCobroSuelto(f) && !estaEnGuia(indice, f.empresa_key, f.secuencial));
   if (sinGuia.length === 0) return [];
 
   // El CÓDIGO del cliente sale del puente por ID, nunca del nombre.

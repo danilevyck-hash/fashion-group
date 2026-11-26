@@ -141,8 +141,25 @@ export interface ClienteElegido {
 export function numerosDeFacturas(facturas: string | null | undefined): string[] {
   return (facturas ?? "")
     .split(",")
-    .map(claveDeFactura)
+    .flatMap(clavesDeUnaParte)
     .filter((n) => n !== "");
+}
+
+/** Tope de facturas que expande UN rango («3171-3172»); más que eso se trata como texto. */
+export const TOPE_RANGO_FACTURAS = 50;
+const RANGO_CON_SERIE = /^\d{1,3}-(\d+)\s*(?:-|a|al)\s*(\d+)$/i;
+const RANGO_PELADO = /^(\d+)\s*(?:-|a|al)\s*(\d+)$/i;
+const SECUENCIAL_SWITCH = /^\d{1,3}-\d{5,}$/;
+
+/** Una parte entre comas → sus claves; «3171-3172», «3185 a 3190», «11-000003171-3172» se expanden. */
+function clavesDeUnaParte(parte: string): string[] {
+  const t = parte.trim();
+  const m = RANGO_CON_SERIE.exec(t) ?? (SECUENCIAL_SWITCH.test(t) ? null : RANGO_PELADO.exec(t));
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (b > a && b - a < TOPE_RANGO_FACTURAS) return Array.from({ length: b - a + 1 }, (_, i) => claveDeFactura(String(a + i)));
+  }
+  return [claveDeFactura(t)];
 }
 
 /**

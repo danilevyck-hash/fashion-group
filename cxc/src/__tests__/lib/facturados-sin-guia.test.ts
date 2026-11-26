@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { empresasDelRenglon, entraEnFacturados, estaEnGuia, indiceEnGuia } from "@/lib/guias/facturados-sin-guia";
+import { empresasDelRenglon, entraEnFacturados, esCobroSuelto, estaEnGuia, indiceEnGuia } from "@/lib/guias/facturados-sin-guia";
 
 describe("Facturados sin guía", () => {
   it("normaliza el texto sucio de la empresa", () => {
@@ -24,5 +24,18 @@ describe("Facturados sin guía", () => {
     expect(entraEnFacturados("D-108")).toBe(false);
     expect(entraEnFacturados("TCKCTA")).toBe(false);
     expect(entraEnFacturados("D-25")).toBe(true);
+  });
+});
+
+describe("cobros sueltos", () => {
+  it("pedido leído y vacío = cobro suelto; sin leer o con pedido = se queda", () => {
+    expect(esCobroSuelto({ pedido_referencia: null, pedido_leido_en: "2026-11-26T10:00:00Z" })).toBe(true);
+    expect(esCobroSuelto({ pedido_referencia: " ", pedido_leido_en: "2026-11-26T10:00:00Z" })).toBe(true);
+    expect(esCobroSuelto({ pedido_referencia: null, pedido_leido_en: null })).toBe(false);
+    expect(esCobroSuelto({ pedido_referencia: "16-000002463", pedido_leido_en: "2026-11-26T10:00:00Z" })).toBe(false);
+  });
+  it("un rango en la guía cubre sus facturas", () => {
+    const i = indiceEnGuia([{ empresa: "Vistana", facturas: "3171-3172" }]);
+    expect(estaEnGuia(i, "vistana", "11-000003171")).toBe(true);
   });
 });
