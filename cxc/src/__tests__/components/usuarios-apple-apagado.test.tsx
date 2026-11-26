@@ -28,6 +28,8 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/hooks/useAuth", () => ({ useAuth: () => ({ authChecked: true, role: "admin", isOwner: true }) }));
 vi.mock("@/components/AppHeader", () => ({ default: () => <div data-testid="encabezado" /> }));
+// «Pausar Switch» (26-nov-2026) es una sección nueva, ajena al interruptor: fuera de la comparación.
+vi.mock("@/app/admin/usuarios/PausarSwitch", () => ({ default: () => null }));
 
 import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
 import UsuariosPage from "@/app/admin/usuarios/page";

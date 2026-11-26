@@ -77,6 +77,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { respuestaSiSwitchEnPausa } from "@/lib/switch-api/pausa-cron";
 import {
   syncAllIngresos,
   INGRESOS_EMPRESA_KEYS,
@@ -99,6 +100,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if ((req.headers.get("authorization") ?? "") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // 🔴 «Pausar Switch»: en pausa termina aquí, sin fila ni alerta (ni éxito ni fallo).
+  const enPausa = await respuestaSiSwitchEnPausa("sync-ingresos-mercancia");
+  if (enPausa) return enPausa;
 
   const sp = req.nextUrl.searchParams;
   const pedidas = sp.get("empresas")?.split(",").map((s) => s.trim()).filter(Boolean);

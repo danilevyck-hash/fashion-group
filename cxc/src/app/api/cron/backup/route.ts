@@ -389,6 +389,9 @@ const DATASETS: Dataset[] = [
   // 🔴 Quién hizo qué. No es una bitácora de máquina: es el único registro de
   // las acciones de la gente y no se regenera.
   { table: "activity_logs" },
+  // «Pausar Switch» (26-nov-2026): quién pausó y los pedidos que esperaron.
+  { table: "switch_pausas" },
+  { table: "switch_pausa_pedidos" },
   // Mayor contable — módulo RETIRADO el 13-ago-2026. Las tablas no se borran y
   // su sync ya no existe: sin esta copia, no vuelven. (Mismo criterio que
   // multifashion_tickets: cuando se decida borrarlas, salen de acá en el MISMO

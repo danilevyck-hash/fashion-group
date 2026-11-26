@@ -23,6 +23,7 @@
  */
 
 import { resolveSwitchEnvKey } from "./empresas";
+import { frenoDePausaSwitch } from "./pausa-io";
 // El reconocedor del CSV de egresos vive con SU parser, no acá: acá solo se
 // baja el archivo. Una segunda copia de "¿esto es el CSV bueno?" es una que
 // alguien corrige y otra que se queda vieja.
@@ -114,6 +115,9 @@ async function webFetch(
   jar: Map<string, string>,
   init: RequestInit & { followRedirects?: number; binario?: boolean } = {},
 ): Promise<{ res: Response; text: string; bytes: Uint8Array }> {
+  // 🔴 «Pausar Switch»: en pausa no se abre el panel (ni el login con
+  // changesession=SI, que expulsa a Daniel). Lanza SwitchEnPausaError.
+  await frenoDePausaSwitch();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {

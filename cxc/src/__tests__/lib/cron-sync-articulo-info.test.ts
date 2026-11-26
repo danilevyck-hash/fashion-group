@@ -40,6 +40,8 @@ vi.mock("@/lib/switch-api/client", () => ({
 vi.mock("@/lib/switch-api/alert-policy", () => ({
   alertSwitchCronErrors: vi.fn(async () => {}),
 }));
+// «Pausar Switch»: sin pausa, el cron sigue de largo.
+vi.mock("@/lib/switch-api/pausa-cron", () => ({ respuestaSiSwitchEnPausa: () => null }));
 vi.mock("@/lib/cron-telemetry", async (orig) => {
   const real = await (orig() as Promise<Record<string, unknown>>);
   return { ...real, recordCronHeartbeat: vi.fn(async () => {}) };

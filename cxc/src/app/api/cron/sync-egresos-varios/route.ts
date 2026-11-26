@@ -64,6 +64,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { respuestaSiSwitchEnPausa } from "@/lib/switch-api/pausa-cron";
 import {
   syncAllEgresos,
   verificarBaseDeEgresos,
@@ -89,6 +90,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if ((req.headers.get("authorization") ?? "") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // 🔴 «Pausar Switch»: en pausa termina aquí, sin fila ni alerta (ni éxito ni fallo).
+  const enPausa = await respuestaSiSwitchEnPausa("sync-egresos-varios");
+  if (enPausa) return enPausa;
 
   // ANTES de tocar Switch. Ver el encabezado.
   try {

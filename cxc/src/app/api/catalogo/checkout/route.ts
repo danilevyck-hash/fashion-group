@@ -27,6 +27,7 @@ import {
   listarVendedores,
   parsearVendedorSwitchId,
   vendedorDelUsuario,
+  vendedorAsignadoEnEmpresa,
 } from "@/lib/catalogo/vendedor-switch";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
@@ -36,6 +37,7 @@ import { enviarEnSegundoPlano, entregarAWaitUntil } from "@/lib/catalogo/envio-e
 import { PEDIDO_A_SWITCH_EN_SEGUNDO_PLANO } from "@/lib/ui/velocidad-2026-11";
 import { normalizarDocumento } from "@/lib/catalogo/documento-switch";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
+import { esErrorDePausa, sinMarca } from "@/lib/switch-api/pausa";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -104,11 +106,24 @@ async function handleCheckout(req: NextRequest, estado: { segundoPlano: boolean 
         if (!v) return NextResponse.json({ error: errorVendedorNoExiste(cfg) }, { status: 404 });
         vendedorId = v.id;
         vendedorNombre = v.nombre;
-      } catch {
-        return NextResponse.json(
-          { error: "No se pudo leer la lista de vendedores de Switch. Intenta de nuevo en unos segundos." },
-          { status: 502 },
-        );
+      } catch (e) {
+        // «Pausar Switch»: la lista viva no se puede leer. Vale un vendedor
+        // ya ASIGNADO a un usuario en esta empresa (lista escrita en Usuarios);
+        // otro cualquiera espera a que termine la pausa.
+        const enPausa = esErrorDePausa(e) ? await vendedorAsignadoEnEmpresa(cfg.empresaKey, elegido.id) : null;
+        if (enPausa) {
+          vendedorId = enPausa.id;
+          vendedorNombre = enPausa.nombre;
+        } else {
+          return NextResponse.json(
+            {
+              error: esErrorDePausa(e)
+                ? `${sinMarca((e as Error).message)}: por ahora elige un vendedor asignado en Usuarios, o espera a que termine.`
+                : "No se pudo leer la lista de vendedores de Switch. Intenta de nuevo en unos segundos.",
+            },
+            { status: 502 },
+          );
+        }
       }
     }
   }
@@ -242,6 +257,8 @@ async function handleCheckout(req: NextRequest, estado: { segundoPlano: boolean 
       return NextResponse.json({ ...base, switch: { ok: false, error: result.error, ambiguo: true } });
     case "switch_caido":
       return NextResponse.json({ ...base, switch: { ok: false, error: result.error } });
+    case "en_pausa":
+      return NextResponse.json({ ...base, switch: { ok: null, enEspera: true, mensaje: result.mensaje } });
     case "preorders":
       return NextResponse.json({ ...base, switch: { ok: false, error: "Productos en preventa" } });
     case "carrera":

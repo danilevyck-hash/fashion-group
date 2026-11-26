@@ -279,6 +279,7 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
           onActualizar={() => pedirATodos(puedenPedir.map((r) => r.dispositivo))}
           actualizando={esperando && !relojes.every((r) => r.pedidoSinRespuesta)}
           deshabilitado={puedenPedir.length === 0}
+          sinSwitch
         />
       );
       // 🔴 Revisión 14-nov-2026 (filtro-a-6): el aviso GRIS de los relojes y
@@ -294,6 +295,7 @@ export default function EstadoReloj({ onLlegaron, resumen = false, empresa = nul
           onActualizar: () => pedirATodos(puedenPedir.map((r) => r.dispositivo)),
           actualizando: esperando && !relojes.every((r) => r.pedidoSinRespuesta),
           deshabilitado: puedenPedir.length === 0,
+          sinSwitch: true,
         };
         return (
           <div data-relojes-y-frescura className="flex w-full min-w-0 flex-nowrap items-center gap-x-1 whitespace-nowrap text-[12px] text-gray-500 [&_[data-frescura]]:!text-[12px] [&_[data-frescura]_span]:!text-[12px]">

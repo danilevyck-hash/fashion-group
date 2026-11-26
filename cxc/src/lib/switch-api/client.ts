@@ -40,6 +40,7 @@ import {
   SwitchVendedoresData,
 } from "./types";
 import { resolveSwitchEnvKey } from "./empresas";
+import { frenoDePausaSwitch } from "./pausa-io";
 
 // ─── Errores ─────────────────────────────────────────────────────────────────
 
@@ -176,6 +177,9 @@ async function rawCall(
   cfg: EmpresaConfig,
   opts: CallOptions,
 ): Promise<CallResult> {
+  // 🔴 «Pausar Switch» (26-nov-2026): en pausa NADA sale hacia Switch, ni el
+  // login (/autenticacion) ni una lectura con token. Lanza SwitchEnPausaError.
+  await frenoDePausaSwitch();
   const url = `${cfg.url}${opts.endpoint}`;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";

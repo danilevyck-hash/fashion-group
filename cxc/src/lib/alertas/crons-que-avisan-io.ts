@@ -60,14 +60,20 @@ export async function yaAvisadoPorCron(
  *
  * No lanza: un fallo mirando los heartbeats no puede tumbar la reconciliación.
  */
-export async function revisarCronsQueAvisan(ahoraMs: number = Date.now()): Promise<string[]> {
+export async function revisarCronsQueAvisan(
+  ahoraMs: number = Date.now(),
+  /** «Pausar Switch»: durante la pausa y su gracia no se mira a estos. */
+  ignorar?: (cronName: string) => boolean,
+): Promise<string[]> {
   let caidos: CronCaido[] = [];
   try {
     const { data, error } = await supabaseServer
       .from("cron_heartbeats")
       .select("cron_name, last_success_at");
     if (error) throw new Error(error.message);
-    caidos = cronsQueAvisanCaidos((data ?? []) as HeartbeatRow[], ahoraMs);
+    caidos = cronsQueAvisanCaidos((data ?? []) as HeartbeatRow[], ahoraMs).filter(
+      (c) => !ignorar?.(c.cronName),
+    );
   } catch (err) {
     console.error(
       `[crons-que-avisan] no pude leer los heartbeats: ${err instanceof Error ? err.message : String(err)}`,

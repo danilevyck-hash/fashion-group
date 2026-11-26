@@ -227,8 +227,8 @@ describe("1) los crons cuya caída no deja rastro en ningún dato", () => {
   it("🔴 NO estrena una entrada de cron: cuelga de la reconciliación que ya corre", () => {
     // La llamada tiene que estar EN EL FLUJO, no solo importada: se exige la
     // sentencia que la ejecuta, no que la palabra aparezca en algún lado.
-    expect(RECON).toContain("const cronsSinAvisar = await checkCronsQueAvisan();");
-    expect(RECON).toContain("return await revisarCronsQueAvisan();");
+    expect(RECON).toContain("const cronsSinAvisar = await checkCronsQueAvisan(enGraciaDePausa);");
+    expect(RECON).toContain("return await revisarCronsQueAvisan(");
     const paths = VERCEL.crons.map((c) => c.path);
     expect(paths.some((p) => p.includes("crons-que-avisan"))).toBe(false);
     expect(paths.filter((p) => p.startsWith("/api/cron/switch-reconciliacion")).length).toBe(3);

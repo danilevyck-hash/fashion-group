@@ -18,6 +18,7 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import VendedorSwitchSection from "./VendedorSwitchSection";
 import NovedadesTab from "./NovedadesTab";
 import VisitasTab from "./VisitasTab";
+import PausarSwitch from "./PausarSwitch";
 import IconButton from "@/components/IconButton";
 import { getDefaultModulesForRole, grupoDeModulo } from "@/lib/modules";
 import { modulosOfrecibles, moduloOfrecible } from "@/lib/modulos-ofrecibles";
@@ -406,6 +407,9 @@ function UsuariosPageInner() {
         <div className={USUARIOS_NUEVO_EN_EL_TITULO_2026_11 && barra && esAdmin ? "hidden" : USUARIOS_APPLE_2026_10 ? "mb-4 flex justify-end sm:hidden" : "mb-8 flex items-end justify-end gap-4 flex-wrap"}>
           {botonNuevoUsuario}
         </div>
+
+        {/* «Pausar Switch» (26-nov-2026): solo admin. */}
+        {esAdmin && <PausarSwitch />}
 
         {/* ══ Usuarios del sistema ══ */}
         <section className="mb-10">

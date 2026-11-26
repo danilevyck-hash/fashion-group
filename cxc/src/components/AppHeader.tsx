@@ -7,6 +7,7 @@ import FGLogo from "@/components/FGLogo";
 import { CATALOGOS_APPLE_2026_10_B } from "@/lib/catalogo/catalogos-2026-10-b";
 import SearchBar, { SEARCH_ROLES } from "@/components/SearchBar";
 import NotificationCenter from "@/components/NotificationCenter";
+import AvisoPausaSwitch from "@/components/shared/AvisoPausaSwitch";
 import { getModuleColor, getModuleColorByKey } from "@/lib/moduleColors";
 import { ALL_MODULES, getVisibleGroups, type AppGroup } from "@/lib/modules";
 import { casaDelRol, yaEstaEnSuCasa } from "@/lib/navegacion/casa-del-rol";
@@ -482,6 +483,8 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           🔴 1-oct-2026: apagada (`NOVEDADES_AVISO = false`). Daniel: «elimina lo
           de novedades, así nadie lo lee». */}
       {NOVEDADES_AVISO && <NovedadesAviso moduloKey={moduloDeRuta(pathname, ALL_MODULES)} />}
+      {/* «Pausar Switch» (26-nov-2026): solo el admin ve la línea con «Reanudar». */}
+      {userRole === "admin" && <AvisoPausaSwitch />}
       </>)}
 
       {hayAvatar && <AvatarDelUsuario flotante nombre={userName} rol={userRole} extra={hayTabBar && !BARRA_SIN_MAS_2026_11 ? undefined : acciones} />}
