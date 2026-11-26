@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { empresasDelRenglon, entraEnFacturados, esCobroSuelto, estaEnGuia, indiceEnGuia } from "@/lib/guias/facturados-sin-guia";
+import { FACTURADOS_CORTE_DIAS_2026_11, FACTURADOS_DIAS_HABILES, ROTULO_VENTANA_FACTURADOS, empresasDelRenglon, entraEnFacturados, primerDiaDeFacturados, esCobroSuelto, estaEnGuia, indiceEnGuia } from "@/lib/guias/facturados-sin-guia";
 
 describe("Facturados sin guía", () => {
   it("normaliza el texto sucio de la empresa", () => {
@@ -37,5 +37,19 @@ describe("cobros sueltos", () => {
   it("un rango en la guía cubre sus facturas", () => {
     const i = indiceEnGuia([{ empresa: "Vistana", facturas: "3171-3172" }]);
     expect(estaEnGuia(i, "vistana", "11-000003171")).toBe(true);
+  });
+
+  it("corte: la factura sale sola pasados 3 días hábiles (lunes a viernes)", () => {
+    expect(FACTURADOS_CORTE_DIAS_2026_11).toBe(true);
+    expect(FACTURADOS_DIAS_HABILES).toBe(3);
+    expect(ROTULO_VENTANA_FACTURADOS).toBe("últimos 3 días hábiles");
+    // Jueves 26-nov: se ven las del lunes 23 en adelante (mar, mié, jue = 3 hábiles).
+    expect(primerDiaDeFacturados("2026-11-26")).toBe("2026-11-23");
+    // Lunes 23-nov: desde el miércoles 18 (jue, vie, lun); el fin de semana no cuenta.
+    expect(primerDiaDeFacturados("2026-11-23")).toBe("2026-11-18");
+    // Sábado 28-nov: desde el martes 24 (mié, jue, vie).
+    expect(primerDiaDeFacturados("2026-11-28")).toBe("2026-11-24");
+    // Apagado = los 30 días de antes.
+    expect(primerDiaDeFacturados("2026-11-26", false)).toBe("2026-10-27");
   });
 });

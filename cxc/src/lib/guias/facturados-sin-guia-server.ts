@@ -1,12 +1,12 @@
 // «Facturados» (26-nov-2026): lee de la BASE —nunca de Switch— las facturas del
-// grupo de los últimos 30 días que todavía no entraron a ninguna guía viva.
+// grupo de la ventana (3 días hábiles; `primerDiaDeFacturados`) que todavía no entraron a ninguna guía viva.
 // Solo LEE. La regla pura vive en `facturados-sin-guia.ts`.
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { TIPO_FACTURA } from "@/lib/guias/atajos-facturas";
-import { DIAS_FACTURADOS, entraEnFacturados, esCobroSuelto, estaEnGuia, indiceEnGuia } from "@/lib/guias/facturados-sin-guia";
+import { entraEnFacturados, primerDiaDeFacturados, esCobroSuelto, estaEnGuia, indiceEnGuia } from "@/lib/guias/facturados-sin-guia";
 
 export interface FacturadoLeido {
   empresa_key: string;
@@ -31,11 +31,8 @@ interface FilaFactura {
   pedido_leido_en: string | null;
 }
 
-function desdeIso(hoy: string): string {
-  const d = new Date(`${hoy}T00:00:00-05:00`);
-  d.setUTCDate(d.getUTCDate() - DIAS_FACTURADOS);
-  return d.toISOString();
-}
+// La ventana sale de UN solo lugar (`primerDiaDeFacturados`): 3 días hábiles con el corte.
+const desdeIso = (hoy: string) => new Date(`${primerDiaDeFacturados(hoy)}T00:00:00-05:00`).toISOString();
 
 async function leerRenglonesVivos(): Promise<Array<{ empresa: string | null; facturas: string | null }>> {
   const guias = await leerTodoPaginado<{ guia_items: Array<{ empresa: string | null; facturas: string | null; deleted: boolean | null }> | null }>(
