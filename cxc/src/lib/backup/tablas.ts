@@ -195,6 +195,7 @@ export const TABLAS_PERSONAS = [
   "cxc_favorites",
   "cxc_contact_log",
   "cxc_emails_enviados",
+  "cxc_estado_cuenta_automatico",
   "clientes_master",
 
   // ── Cheques / Recordatorios

@@ -381,6 +381,7 @@ const DATASETS: Dataset[] = [
   // toda su historia y su ruta se retiró (ver `lib/backup/tablas.ts`). La tabla
   // NO se dropea.
   { table: "cxc_emails_enviados" },
+  { table: "cxc_estado_cuenta_automatico" },
   // El mapeo usuario↔vendedor de Switch (sin él los pedidos no pueden salir) y
   // el orden de módulos por usuario.
   { table: "fg_user_switch_vendedor" },

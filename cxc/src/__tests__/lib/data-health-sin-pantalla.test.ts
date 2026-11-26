@@ -180,7 +180,9 @@ describe("🔴 la medición no se tocó", () => {
     // mudaron a pg_cron (migración 20270118130100) con los mismos minutos UTC;
     // el cronograma completo es vercel.json ∪ pg_cron (fixtures/cronograma-
     // programado.ts) y ahí siguen siendo 95. Ver `cron-calendario.test.ts`.
-    expect(vercel.crons).toHaveLength(80);
+    // ⚠️ 26-nov-2026: suben a 81 — `estado-cuenta-semanal` (el estado de cuenta
+    // a los clientes, lunes 13:00 UTC). Ver `cxc-estado-cuenta-automatico.test.ts`.
+    expect(vercel.crons).toHaveLength(81);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el
