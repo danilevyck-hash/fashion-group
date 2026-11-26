@@ -44,6 +44,9 @@ import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
 import { PEDIDOS_CONTEOS_2026_11 as CONTEOS, PEDIDOS_EMPRESA_JUNTO_A_IMPRIMIR, conteosPorEstado, lineaDeResumen, lineaMasViejo, textoMonto } from "@/lib/ui/pedidos-conteos-2026-11";
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
+import { DIAS_FACTURADOS, PEDIDOS_PIPELINE_2026_11 } from "@/lib/guias/facturados-sin-guia";
+import PipelinePedidos from "./PipelinePedidos";
+import FacturadosLista, { type Facturado } from "./FacturadosLista";
 import {
   PEDIDOS_BULTOS_2026_10 as BULTOS,
   ESTADOS_BULTOS,
@@ -92,7 +95,7 @@ import {
   type PedidoBodega,
 } from "@/lib/guias/pedidos-bodega";
 
-type Filtro = EstadoPedido | EstadoBultos | EstadoFlujoSimple;
+type Filtro = EstadoPedido | EstadoBultos | EstadoFlujoSimple | "facturado";
 /**
  * 🔴 Con el flujo SIMPLIFICADO (7-oct-2026) son CUATRO chips: Pendiente →
  * Preparado → Facturado → Despachado. Con bultos (lo de hoy) son tres:
@@ -175,6 +178,9 @@ export default function PedidosView({
   const [susEmpresas, setSusEmpresas] = useState<readonly string[]>(B2B_EMPRESA_KEYS);
   const [error, setError] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>("pendiente");
+  // «Facturados» (26-nov-2026): facturas sin guía. null = todavía no se leyó.
+  const [facturados, setFacturados] = useState<Facturado[] | null>(null);
+  const [errorFacturados, setErrorFacturados] = useState(false);
   // v2: filtro simple; abre SIEMPRE en «Todas» y no se acota por persona (Daniel, 5-oct-2026).
   const [empresa, setEmpresa] = useState("todas");
   // La fecha exacta se ve al pasar el mouse (title) o al tocar la celda.
@@ -191,7 +197,22 @@ export default function PedidosView({
    */
   const [porConfirmar, setPorConfirmar] = useState<{ pedido: PedidoBodega; destino: EstadoBultos } | null>(null);
 
+  async function cargarFacturados() {
+    if (!PIPELINE) return;
+    try {
+      const r = await fetch("/api/guias/pedidos/facturados", { cache: "no-store" });
+      if (!r.ok) throw new Error(String(r.status));
+      const d = (await r.json()) as { facturados: Facturado[] };
+      setFacturados(d.facturados);
+      setErrorFacturados(false);
+    } catch {
+      setErrorFacturados(true);
+    }
+  }
+
   async function cargar(fondo = false) {
+    // Sin esperar: la lista de pedidos no depende de las facturas.
+    void cargarFacturados();
     try {
       const r = await fetch("/api/guias/pedidos", { cache: "no-store" });
       if (!r.ok) throw new Error(String(r.status));
@@ -487,6 +508,15 @@ export default function PedidosView({
   // línea de resumen va al lado del filtro de empresa. Para TODOS.
   const conConteos = SIMPLE && CONTEOS;
   const conteos = conteosPorEstado(deLaEmpresa);
+  // 🔴 Pipeline (26-nov-2026): los cuatro pasos del pedido + «Facturados».
+  const PIPELINE = PEDIDOS_PIPELINE_2026_11 && conConteos;
+  const esFacturados = PIPELINE && filtro === "facturado";
+  const facturadosVisibles = (facturados ?? []).filter((f) => !NUEVO || empresa === "todas" || f.empresa_key === empresa);
+  const pasos = [
+    ...CHIPS.map((c) => ({ valor: c.value, rotulo: c.label, cuenta: pedidos ? conteos[c.value as EstadoFlujoSimple] : null })),
+    { valor: "facturado", rotulo: "Facturados", cuenta: facturados ? facturadosVisibles.length : null },
+  ];
+  const elegirPaso = (v: string) => { setFiltro(v as Filtro); void cargar(); };
   // 25-nov-2026: en la computadora la empresa sube a la fila de los estados, junto a «Imprimir».
   const empresaJuntoAImprimir = conConteos && !barra && PEDIDOS_EMPRESA_JUNTO_A_IMPRIMIR && NUEVO && hayQueElegirEmpresa;
 
@@ -496,6 +526,11 @@ export default function PedidosView({
   // recortar un rótulo hasta dejarlo sin sentido.
   const chips = (
     <div className="-mx-4 flex min-w-0 items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0">
+      {PIPELINE ? (
+        <div className="min-w-0 flex-1">
+          <PipelinePedidos pasos={pasos} elegido={filtro} onElegir={elegirPaso} />
+        </div>
+      ) : (
       <div role="group" aria-label="Estado" className="flex shrink-0 gap-1.5">
         {CHIPS.map((c) => (
           <button
@@ -517,6 +552,7 @@ export default function PedidosView({
           </button>
         ))}
       </div>
+      )}
       {/* Con `PEDIDOS_CELULAR_2026_11` la empresa del celular va en su propia fila. */}
       {NUEVO && hayQueElegirEmpresa && !(barra && PEDIDOS_CELULAR) && !conConteos && <ChipSelector rotulo="Empresa" soloValor={PEDIDOS_EMPRESA_SIN_PREFIJO} valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />}
       {empresaJuntoAImprimir && (
@@ -539,7 +575,11 @@ export default function PedidosView({
   //   · "dos-por-dos"= cuatro botones iguales en dos filas de dos.
   // La empresa va en su propia fila, debajo (`filaEmpresaCelular`).
   const dosPorDos = ESTADOS_CELULAR === "dos-por-dos";
-  const segmentadoCelular = (
+  const segmentadoCelular = PIPELINE ? (
+    <div className="flex w-full min-w-0 shrink grow basis-full">
+      <PipelinePedidos celular pasos={pasos} elegido={filtro} onElegir={elegirPaso} />
+    </div>
+  ) : (
     <div
       role="group"
       aria-label="Estado"
@@ -586,11 +626,20 @@ export default function PedidosView({
     />
   );
   const vacioDelCentro = `Sin pedidos ${CHIPS.find((c) => c.value === filtro)?.label.toLowerCase() ?? ""}`.trim();
-  const lineaDeArriba = conConteos
+  const etiquetadas = facturadosVisibles.filter((f) => f.bultos).length;
+  const lineaDeArriba = esFacturados
+    ? (facturadosVisibles.length === 0 ? "Sin facturas pendientes de guía" : `${facturadosVisibles.length} ${facturadosVisibles.length === 1 ? "factura sin guía" : "facturas sin guía"}${etiquetadas ? ` · ${etiquetadas} ${etiquetadas === 1 ? "etiquetada" : "etiquetadas"}` : ""}`)
+    : conConteos
     ? lineaDeResumen(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple], { corta: barra })
     : SIMPLE && PEDIDOS_LINEA_DE_LA_PESTANA
     ? lineaDeLaPestana(deLaEmpresa, filtro, NOMBRE_DE_LA_PESTANA[filtro as EstadoFlujoSimple], hoy)
     : CIRCULO ? lineaDePendientesCorta(deLaEmpresa, hoy) : lineaDePendientes(deLaEmpresa, hoy);
+  const masViejaFacturada = facturadosVisibles.length
+    ? facturadosVisibles.map((f) => f.fecha).reduce((m, f) => (f < m ? f : m))
+    : null;
+  const segundaLinea = esFacturados
+    ? [masViejaFacturada ? `la más vieja, ${haceDiasCorto(masViejaFacturada, hoy)}` : null, `últimos ${DIAS_FACTURADOS} días`, facturadosVisibles.some((f) => typeof f.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · ")
+    : lineaMasViejo(deLaEmpresa, filtro, hoy);
   const filaEmpresaCelular = pedidosCelular && NUEVO && hayQueElegirEmpresa && !conConteos ? (
     <div data-fila-empresa className="mb-2 flex">
       <ChipSelector rotulo="Empresa" soloValor={PEDIDOS_EMPRESA_SIN_PREFIJO} valor={empresa} opciones={OPCIONES_EMPRESA} onCambiar={setEmpresa} />
@@ -1389,7 +1438,7 @@ export default function PedidosView({
               <p data-linea-resumen className="min-w-0 text-base font-semibold leading-snug text-gray-900">
                 {pedidos ? partesSinPartir(lineaDeArriba) : NBSP}
                 <span className="ml-3 text-xs font-normal text-gray-500">
-                  {partesSinPartir([pedidos ? lineaMasViejo(deLaEmpresa, filtro, hoy) : null, visibles.some((p) => typeof p.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · "))}
+                  {partesSinPartir([pedidos ? segundaLinea : null, visibles.some((p) => typeof p.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · "))}
                 </span>
               </p>
               {frescura}
@@ -1408,7 +1457,7 @@ export default function PedidosView({
           </div>
           <div className={`mt-1 flex min-w-0 items-center justify-between gap-2 text-gray-500 ${barra ? "text-[12px]" : "text-xs"}`}>
             <span className={barra ? "min-w-0 truncate whitespace-nowrap" : "min-w-0"}>
-              {(barra ? (t: string) => t : partesSinPartir)([pedidos ? lineaMasViejo(deLaEmpresa, filtro, hoy) : null, visibles.some((p) => typeof p.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · "))}
+              {(barra ? (t: string) => t : partesSinPartir)([pedidos ? segundaLinea : null, visibles.some((p) => typeof p.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · "))}
             </span>
             {frescura}
           </div>
@@ -1435,7 +1484,15 @@ export default function PedidosView({
       </div>
       )}
 
-      {error ? (
+      {esFacturados ? (
+        errorFacturados && !facturados ? (
+          <Aviso tono="error">No se pudieron leer las facturas. Intenta de nuevo.</Aviso>
+        ) : !facturados ? (
+          <p className="py-10 text-center text-sm text-gray-500">Cargando…</p>
+        ) : facturadosVisibles.length === 0 ? null : (
+          <FacturadosLista filas={facturadosVisibles} hoy={hoy} />
+        )
+      ) : error ? (
         <Aviso tono="error">No se pudieron leer los pedidos. Intenta de nuevo.</Aviso>
       ) : !pedidos ? (
         <p className="py-10 text-center text-sm text-gray-500">Cargando…</p>
