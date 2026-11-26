@@ -79,3 +79,11 @@ export function estaEnGuia(indice: ReadonlySet<string>, empresaKey: string, secu
   const c = claveDeFactura(secuencial);
   return c !== "" && indice.has(`${empresaKey}|${c}`);
 }
+
+/**
+ * Cobro suelto (flete, ajuste): su pedido YA se leyó de Switch y vino vacío → nunca va en una guía.
+ * Sin lectura (`pedido_leido_en` nulo) no se sabe: se queda en la lista.
+ */
+export function esCobroSuelto(f: { pedido_referencia: string | null; pedido_leido_en: string | null }): boolean {
+  return (f.pedido_referencia ?? "").trim() === "" && f.pedido_leido_en != null;
+}
