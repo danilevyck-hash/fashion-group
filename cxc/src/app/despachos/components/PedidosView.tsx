@@ -44,7 +44,7 @@ import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
 import { PEDIDOS_CONTEOS_2026_11 as CONTEOS, PEDIDOS_EMPRESA_JUNTO_A_IMPRIMIR, conteosPorEstado, lineaDeResumen, lineaMasViejo, textoMonto } from "@/lib/ui/pedidos-conteos-2026-11";
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
-import { DIAS_FACTURADOS, PEDIDOS_PIPELINE_2026_11 } from "@/lib/guias/facturados-sin-guia";
+import { DIAS_FACTURADOS, PEDIDOS_PIPELINE_2026_11, PEDIDOS_PIPELINE_CELULAR } from "@/lib/guias/facturados-sin-guia";
 import PipelinePedidos from "./PipelinePedidos";
 import FacturadosLista, { type Facturado } from "./FacturadosLista";
 import {
@@ -513,7 +513,7 @@ export default function PedidosView({
   const esFacturados = PIPELINE && filtro === "facturado";
   const facturadosVisibles = (facturados ?? []).filter((f) => !NUEVO || empresa === "todas" || f.empresa_key === empresa);
   const pasos = [
-    ...CHIPS.map((c) => ({ valor: c.value, rotulo: c.label, cuenta: pedidos ? conteos[c.value as EstadoFlujoSimple] : null })),
+    ...CHIPS.map((c) => ({ valor: c.value, rotulo: c.label, corto: c.value === "en_preparacion" ? "Preparación" : undefined, cuenta: pedidos ? conteos[c.value as EstadoFlujoSimple] : null })),
     { valor: "facturado", rotulo: "Facturados", cuenta: facturados ? facturadosVisibles.length : null },
   ];
   const elegirPaso = (v: string) => { setFiltro(v as Filtro); void cargar(); };
@@ -577,7 +577,7 @@ export default function PedidosView({
   const dosPorDos = ESTADOS_CELULAR === "dos-por-dos";
   const segmentadoCelular = PIPELINE ? (
     <div className="flex w-full min-w-0 shrink grow basis-full">
-      <PipelinePedidos celular pasos={pasos} elegido={filtro} onElegir={elegirPaso} />
+      <PipelinePedidos celular={PEDIDOS_PIPELINE_CELULAR} pasos={pasos} elegido={filtro} onElegir={elegirPaso} />
     </div>
   ) : (
     <div
@@ -638,7 +638,7 @@ export default function PedidosView({
     ? facturadosVisibles.map((f) => f.fecha).reduce((m, f) => (f < m ? f : m))
     : null;
   const segundaLinea = esFacturados
-    ? [masViejaFacturada ? `la más vieja, ${haceDiasCorto(masViejaFacturada, hoy)}` : null, `últimos ${DIAS_FACTURADOS} días`, facturadosVisibles.some((f) => typeof f.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · ")
+    ? [masViejaFacturada ? `la más vieja, ${haceDiasCorto(masViejaFacturada, hoy)}` : null, `últimos ${DIAS_FACTURADOS} días`, !barra && facturadosVisibles.some((f) => typeof f.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · ")
     : lineaMasViejo(deLaEmpresa, filtro, hoy);
   const filaEmpresaCelular = pedidosCelular && NUEVO && hayQueElegirEmpresa && !conConteos ? (
     <div data-fila-empresa className="mb-2 flex">
@@ -1490,7 +1490,7 @@ export default function PedidosView({
         ) : !facturados ? (
           <p className="py-10 text-center text-sm text-gray-500">Cargando…</p>
         ) : facturadosVisibles.length === 0 ? null : (
-          <FacturadosLista filas={facturadosVisibles} hoy={hoy} />
+          <FacturadosLista filas={facturadosVisibles} hoy={hoy} celular={barra} />
         )
       ) : error ? (
         <Aviso tono="error">No se pudieron leer los pedidos. Intenta de nuevo.</Aviso>

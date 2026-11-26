@@ -25,6 +25,8 @@ export interface Facturado {
 interface Props {
   filas: readonly Facturado[];
   hoy: string;
+  /** Celular: tarjetas de dos líneas en vez de tabla. */
+  celular?: boolean;
 }
 
 /** Más de dos semanas sin guía se pinta en ámbar (aviso). */
@@ -32,13 +34,55 @@ const DIAS_AVISO = 14;
 
 const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
-export default function FacturadosLista({ filas, hoy }: Props) {
+function Accion({ f, alta }: { f: Facturado; alta?: boolean }) {
+  const h = alta ? "h-11 px-3.5 text-[14px]" : "h-7 px-2.5 text-xs";
+  return f.bultos ? (
+    <a href="/despachos/nueva" className={`inline-flex shrink-0 items-center rounded-full border border-gray-900 bg-gray-900 font-medium text-white transition active:scale-[0.97] ${h}`}>Crear guía</a>
+  ) : (
+    <a href="/despachos?vista=etiquetas" className={`inline-flex shrink-0 items-center rounded-full border border-gray-300 bg-white font-medium text-gray-900 transition active:scale-[0.97] ${h}`}>Etiquetar</a>
+  );
+}
+
+export default function FacturadosLista({ filas, hoy, celular }: Props) {
   const conMonto = filas.some((f) => typeof f.monto === "number");
   const grupos = B2B_EMPRESA_KEYS.map((k) => ({
     k,
     filas: filas.filter((f) => f.empresa_key === k).sort((a, b) => a.fecha.localeCompare(b.fecha) || a.secuencial.localeCompare(b.secuencial)),
   })).filter((g) => g.filas.length > 0);
   const columnas = conMonto ? 5 : 4;
+
+  if (celular) {
+    // Tarjeta de dos líneas: cliente + monto arriba; factura · antigüedad · bultos abajo; la acción a la derecha.
+    return (
+      <div className="-mx-4 border-y border-gray-200 bg-white">
+        {grupos.map((g) => (
+          <section key={g.k}>
+            <h3 className="bg-gray-50 px-4 py-2 text-[13px] font-semibold text-gray-900">{nombreCortoEmpresa(g.k)} · {g.filas.length}</h3>
+            <ul className="divide-y divide-gray-100">
+              {g.filas.map((f) => {
+                const viejo = diasDesde(f.fecha, hoy) > DIAS_AVISO;
+                return (
+                  <li key={f.empresa_key + f.secuencial} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline gap-2">
+                        <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-gray-900">{f.cliente_nombre}</span>
+                        {typeof f.monto === "number" && <span className="shrink-0 text-[14px] tabular-nums text-gray-700">{usd(f.monto)}</span>}
+                      </div>
+                      <p className="mt-0.5 truncate text-[13px] text-gray-500">
+                        Factura {facturaParaMostrar(f.secuencial)} · <span className={viejo ? "font-medium text-amber-700" : ""}>{haceDiasCorto(f.fecha, hoy)}</span>
+                        {f.bultos ? ` · ${f.bultos} ${f.bultos === 1 ? "bulto" : "bultos"}` : ""}
+                      </p>
+                    </div>
+                    <Accion f={f} alta />
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="-mx-4 overflow-x-auto border-y border-gray-200 bg-white sm:mx-0 sm:rounded-lg sm:border-x">
@@ -84,11 +128,7 @@ export default function FacturadosLista({ filas, hoy }: Props) {
                     {f.bultos ? f.bultos : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="whitespace-nowrap py-1.5 pl-0.5 pr-3 text-right sm:px-3">
-                    {f.bultos ? (
-                      <a href="/despachos/nueva" className="inline-flex h-7 items-center rounded-full border border-gray-900 bg-gray-900 px-2.5 text-xs font-medium text-white transition active:scale-[0.97]">Crear guía</a>
-                    ) : (
-                      <a href="/despachos?vista=etiquetas" className="inline-flex h-7 items-center rounded-full border border-gray-300 bg-white px-2.5 text-xs font-medium text-gray-900 transition active:scale-[0.97]">Etiquetar</a>
-                    )}
+                    <Accion f={f} />
                   </td>
                 </tr>
               );

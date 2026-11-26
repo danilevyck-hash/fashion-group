@@ -21,10 +21,13 @@ import { numerosDeFacturas } from "@/lib/guias/atajos-facturas";
  */
 export const PEDIDOS_PIPELINE_2026_11 = true;
 
+/** El pipeline en el celular: "pista" (segmentado de iOS, cabe sin deslizar) o "deslizable". */
+export const PEDIDOS_PIPELINE_CELULAR: "pista" | "deslizable" = "pista";
+
 /** Cuántos días atrás se buscan facturas sin guía. */
 export const DIAS_FACTURADOS = 30;
 
-export const EMPRESAS_DEL_GRUPO =["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"] as const;
+export const EMPRESAS_DEL_GRUPO = ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"] as const;
 
 const POR_TEXTO: Record<string, readonly string[]> = {
   "fashion wear": ["fashion_wear"],
