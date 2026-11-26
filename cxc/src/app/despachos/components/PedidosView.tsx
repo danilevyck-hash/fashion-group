@@ -44,7 +44,7 @@ import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
 import { PEDIDOS_CONTEOS_2026_11 as CONTEOS, PEDIDOS_EMPRESA_JUNTO_A_IMPRIMIR, conteosPorEstado, lineaDeResumen, lineaMasViejo, textoMonto } from "@/lib/ui/pedidos-conteos-2026-11";
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
-import { DIAS_FACTURADOS, PEDIDOS_PIPELINE_2026_11, PEDIDOS_PIPELINE_CELULAR } from "@/lib/guias/facturados-sin-guia";
+import { DIAS_FACTURADOS, PEDIDOS_PIPELINE_2026_11 } from "@/lib/guias/facturados-sin-guia";
 import PipelinePedidos from "./PipelinePedidos";
 import FacturadosLista, { type Facturado } from "./FacturadosLista";
 import {
@@ -577,7 +577,7 @@ export default function PedidosView({
   const dosPorDos = ESTADOS_CELULAR === "dos-por-dos";
   const segmentadoCelular = PIPELINE ? (
     <div className="flex w-full min-w-0 shrink grow basis-full">
-      <PipelinePedidos celular={PEDIDOS_PIPELINE_CELULAR} pasos={pasos} elegido={filtro} onElegir={elegirPaso} />
+      <PipelinePedidos celular pasos={pasos} elegido={filtro} onElegir={elegirPaso} />
     </div>
   ) : (
     <div
@@ -1058,6 +1058,42 @@ export default function PedidosView({
     </div>
   );
 
+  // 🔴 Celular con el pipeline (26-nov-2026): la MISMA tarjeta de dos líneas
+  // que «Facturados» en los cinco pasos —cliente arriba; pedido · antigüedad ·
+  // vendedor abajo; los controles a la derecha—. La firma y los avisos, si los
+  // hay, debajo, chicos.
+  const listaCelular = (
+    <div className="-mx-4 border-y border-gray-200 bg-white">
+      {agruparPorEmpresa(visibles).map((g) => (
+        <section key={g.empresa_key}>
+          <h3 className="bg-gray-50 px-4 py-2 text-[13px] font-semibold text-gray-900">{nombreCortoEmpresa(g.empresa_key)} · {g.pedidos.length}</h3>
+          <ul className="divide-y divide-gray-100">
+            {ordenarGrupo(g.pedidos).map((p) => {
+              const firma = firmaParaLeer(ultimaFirmaFlujoSimple(firmasSimpleDe(p)));
+              const vendedor = vendedorEnPantalla(p.vendedor_nombre);
+              return (
+                <li key={clave(p)} className="flex items-center gap-3 px-4 py-2.5">
+                  <button type="button" onClick={() => setAbierto(detalleDe(p))} className="min-w-0 flex-1 text-left">
+                    <span className="block truncate text-[15px] font-medium text-gray-900">{p.cliente_nombre}</span>
+                    <span className="mt-0.5 block truncate text-[13px] text-gray-500">
+                      {p.secuencial} · {haceDiasCorto(fechaDeAntiguedad(p), hoy)}{vendedor ? ` · ${vendedor}` : ""}
+                    </span>
+                    {firma && <span className="block truncate text-xs text-gray-500">{firma}</span>}
+                    {avisoEsperaMuestra(p)}
+                  </button>
+                  <div className="shrink-0 text-right">
+                    {controlSimple(p)}
+                    {avisoPreparadoViejo(p)}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+
   // 🔴 CADA LISTA MUESTRA UN SOLO TIPO DE CONTROL, porque se filtra por UN
   // estado: en «Pendientes» va el círculo a la izquierda, como hoy; en
   // «Terminados» y «Recibidos» va la columna Estado a la derecha, donde cabe
@@ -1411,7 +1447,8 @@ export default function PedidosView({
       {barra && (
         <EnLaBarra
           pestana="pedidos"
-          filaIzq={pedidosCelular && dosPorDos ? null : pedidosCelular && ESTADOS_CELULAR === "una-linea" ? segmentadoCelular : chips}
+          // El pipeline de íconos es más alto que el renglón de 44 px de la barra: va en la página.
+          filaIzq={PIPELINE || (pedidosCelular && dosPorDos) ? null : pedidosCelular && ESTADOS_CELULAR === "una-linea" ? segmentadoCelular : chips}
           // n.º 60: el «···» tenía UNA opción; la impresora (ícono de línea) va directo al título.
           iconos={POR_EMPRESA && PEDIDOS_IMPRESORA_EN_EL_TITULO && !sinNadaQueImprimir ? (
             <IconoBarra etiqueta="Imprimir" onClick={() => void imprimir()}>
@@ -1427,7 +1464,7 @@ export default function PedidosView({
       )}
 
       {/* Dos por dos no cabe en el renglón de 44 px de la barra: va arriba de la página. */}
-      {pedidosCelular && dosPorDos && <div className="mb-2 flex">{segmentadoCelular}</div>}
+      {barra && (PIPELINE || (pedidosCelular && dosPorDos)) && <div className="mb-2 flex">{segmentadoCelular}</div>}
       {filaEmpresaCelular}
       {conConteos ? (
         <div data-resumen-pedidos className="mb-3">
@@ -1503,7 +1540,7 @@ export default function PedidosView({
         <p className="py-10 text-center text-sm text-gray-500">{vacioDelCentro}</p>
         )
       ) : SIMPLE ? (
-        tablaSimple
+        barra && PIPELINE ? listaCelular : tablaSimple
       ) : NUEVO ? (
         POR_EMPRESA ? tabla : tablaV2
       ) : barra ? (
