@@ -306,6 +306,10 @@
       "schedule": "0 14 * * 1"
     },
     {
+      "path": "/api/cron/estado-cuenta-semanal",
+      "schedule": "0 13 * * 1"
+    },
+    {
       "path": "/api/cron/despachos-correo",
       "schedule": "45 23 * * *"
     },

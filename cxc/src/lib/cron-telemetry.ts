@@ -56,6 +56,9 @@ export const CRON_STALE_HOURS_POR_CRON: Record<string, number> = {
   // entre dos éxitos es 7 días, y 8 lo cubren con jitter. Mismo número y mismo
   // motivo que el resumen semanal de fotos.
   "reclamos-viejos": 8 * 24,
+  // El estado de cuenta a los clientes corre los LUNES (13:00 UTC): mismo
+  // número y mismo motivo que `reclamos-viejos`.
+  "estado-cuenta-semanal": 8 * 24,
   // Tres pasadas TODOS los días (15:00, 20:00 y 22:15 UTC): entre la última de
   // una noche y la primera de la mañana siguiente pasan 16h45 (22:15 → 15:00 del
   // día siguiente). El umbral de siempre (26h) le sigue quedando holgado —9h15
@@ -537,6 +540,12 @@ export const SEED_TOLERANT_CRONS = [
   // entra a `CRONS_CUYO_TRABAJO_ES_UN_MENSAJE` (su producto ES el mensaje, pero
   // ese vigía es fail-CLOSED ante una fila ausente y hoy la fila no existe).
   "reclamos-viejos",
+  // Estado de cuenta a cada cliente con saldo (LUNES 13:00 UTC = 8:00 a. m.
+  // Panamá, 26-nov-2026). Semanal: seed-tolerante hasta que siembre su fila,
+  // umbral de 8 días. 🔴 No toca Switch. Promover a CRONS_FAIL_CLOSED (y a
+  // `CRONS_CUYO_TRABAJO_ES_UN_MENSAJE`) cuando lleve semanas corriendo, como
+  // `reclamos-viejos`.
+  "estado-cuenta-semanal",
   // Tallas de los despachos de ASW desde el correo (23:45 UTC = 6:45 p. m.
   // Panamá, 13-nov-2026). Prendido el 13-nov-2026; apagado no siembra latido,
   // por eso seed-tolerante. No toca Switch. Promover a CRONS_FAIL_CLOSED cuando lleve
