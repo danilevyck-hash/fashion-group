@@ -272,8 +272,8 @@ export default function GuiasPage() {
   // (medido 3-sep, docs/estado-actual.md). Antes aquí se disparaba
   // `POST /api/guias/facturas-hoy` al montar. Ahora la pantalla muestra lo
   // último sincronizado (`LineaDeFrescura`) y las facturas de hoy llegan por
-  // los crons de switch-sync o con el botón «Actualizar» (cooldown 10 min del
-  // server). Candado: src/__tests__/components/despachos-sin-switch-al-entrar.test.tsx
+  // los crons de switch-sync o con el botón «Actualizar» (en vivo, sin freno
+  // de 10 min desde el 26-nov-2026). Candado: src/__tests__/components/despachos-sin-switch-al-entrar.test.tsx
 
   // Los clientes más usados EN GUÍAS, para que atar una línea vieja no obligue
   // a teclear. Se piden una sola vez y solo cuando hay sesión. Si falla, el

@@ -20,12 +20,12 @@
 // (/api/cron/sync-articulo-info, 04:30-04:50 UTC); este botón SE QUEDA para
 // cuando se quiere el dato del momento antes de comprar.
 //
-// 🔴 ACELERADOR (el de Guías, `SYNC_NOW_COOLDOWN_MIN` = 10 min): si esa empresa
-// ya trajo su catálogo hace menos del cooldown, se contesta `omitido: "fresca"`
-// SIN tocar Switch. El lock de `switch_sync_log` frena las corridas
-// SIMULTÁNEAS; esto frena las CONSECUTIVAS, que es el caso real — dos toques
-// seguidos abrían dos sesiones, y la sesión de Switch es una por usuario: cada
-// login extra expulsa al anterior y puede tumbar el cron de esa empresa.
+// 🔴 EN VIVO (26-nov-2026, Daniel: «si pongo Actualizar, lo quiero en vivo»):
+// se retiró el acelerador de 10 min (`omitido: "fresca"`) — el toque SIEMPRE
+// lee de Switch. Lo que frenaba (dos toques seguidos = dos sesiones) lo cubre
+// el botón deshabilitado mientras corre; a Daniel no le importa que lo saque
+// del panel. Si la empresa ya tiene una corrida viva, se ESPERA a que termine
+// (y se une a ella si es del catálogo) en vez de abrir otra sesión encima.
 //
 // El `finally` cierra las sesiones de Switch abiertas por este proceso
 // (logoutAllSwitchSessions) — sin eso el token queda vivo ~60 min y tumba el
@@ -34,31 +34,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { supabaseServer } from "@/lib/supabase-server";
 import { syncArticuloInfo } from "@/lib/switch-api/sync-articulo-info";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
-import { isRunningLockConflict } from "@/lib/switch-api/sync-log";
-import { SYNC_NOW_COOLDOWN_MIN } from "@/lib/switch-api/sync-now";
+import { esperarCorridaEnCurso, isRunningLockConflict } from "@/lib/switch-api/sync-log";
 import { REFERENCIA_EMPRESA_KEYS, REFERENCIA_ROLES } from "@/lib/ventas/referencia";
 
-/**
- * ¿El catálogo de esta empresa ya se trajo hace menos del cooldown?
- *
- * Fail-open a propósito: si la consulta falla, se refresca. Un error de lectura
- * no puede convertirse en "no actualizo nunca más".
- */
-async function catalogoFresco(empresaKey: string): Promise<boolean> {
-  const corte = new Date(Date.now() - SYNC_NOW_COOLDOWN_MIN * 60_000).toISOString();
-  const { data, error } = await supabaseServer
-    .from("switch_sync_log")
-    .select("id")
-    .eq("empresa_key", empresaKey)
-    .eq("sync_type", "articulo_info")
-    .eq("status", "success")
-    .gte("finished_at", corte)
-    .limit(1);
-  if (error) return false;
-  return (data ?? []).length > 0;
+function enCurso(): NextResponse {
+  return NextResponse.json(
+    { error: "Switch está actualizando esta empresa en este momento. Toca Actualizar de nuevo en un minuto." },
+    { status: 409 },
+  );
 }
 
 export const dynamic = "force-dynamic";
@@ -83,12 +68,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // El acelerador va ANTES de tocar Switch: dos toques seguidos no abren dos
-    // sesiones. La pantalla trata `omitido` como un éxito (los datos ya están
-    // frescos), así que no hay un mensaje nuevo que leer.
-    if (await catalogoFresco(empresa)) {
-      return NextResponse.json({ ok: true, empresa, omitido: "fresca" });
-    }
+    // Hasta 60 s: el barrido más grande tarda ~204 s contra un techo de 300.
+    const espera = await esperarCorridaEnCurso(empresa, "articulo_info", { maxMs: 60_000 });
+    if (espera.estado === "ocupado") return enCurso();
+    if (espera.unida) return NextResponse.json({ ok: true, empresa, syncedAt: espera.unida.finished_at });
     const r = await syncArticuloInfo(empresa, "manual");
     if (!r.tablaLista) {
       return NextResponse.json(
@@ -109,12 +92,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (isRunningLockConflict(err) || /Ya hay una corrida/.test(msg)) {
-      return NextResponse.json(
-        { error: "Ya hay una actualización de esta empresa en curso — espera a que termine." },
-        { status: 409 },
-      );
-    }
+    if (isRunningLockConflict(err) || /Ya hay una corrida/.test(msg)) return enCurso();
     console.error("[api/ventas/referencia/actualizar]", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   } finally {

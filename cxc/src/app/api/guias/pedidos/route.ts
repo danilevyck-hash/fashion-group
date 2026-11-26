@@ -185,6 +185,20 @@ async function leerCuentaDeBultos(empresas: string[]): Promise<Map<string, numbe
   return new Map([...cuenta].map(([k, v]) => [k, v.size]));
 }
 
+/** Último success del sync de pedidos entre las empresas que ve. Falla a null. */
+async function ultimaLecturaDePedidos(empresas: string[]): Promise<string | null> {
+  const { data, error } = await supabaseServer
+    .from("switch_sync_log")
+    .select("finished_at")
+    .eq("sync_type", "pedidos")
+    .eq("status", "success")
+    .in("empresa_key", empresas)
+    .order("finished_at", { ascending: false })
+    .limit(1);
+  if (error) return null;
+  return (data?.[0]?.finished_at as string | undefined) ?? null;
+}
+
 export async function GET(req: NextRequest) {
   if (!PEDIDOS_BODEGA_2026_10) return apagado();
   // VER: los de Guías (con v2); MARCAR (PATCH): solo admin y bodega.
@@ -227,9 +241,14 @@ export async function GET(req: NextRequest) {
         (ped.data ?? []).filter((p) => marca.get(`${p.empresa_key}:${p.pedido_switch_id}`)?.estado === "recibido"),
       )
     : new Set<string>();
-  let actualizado: string | null = null;
+  // 🔴 26-nov-2026: «Actualizado hace…» es la hora de la última LECTURA de
+  // Switch (switch_sync_log), no el synced_at de las filas: sin pedidos nuevos
+  // la fila no cambia y la línea se quedaba en «hace 8 min» tras Actualizar.
+  // Sin log legible, cae a la fila más nueva (como antes).
+  let actualizado: string | null = await ultimaLecturaDePedidos([...empresas]);
+  const sinLog = actualizado === null;
   const pedidos: PedidoBodega[] = (ped.data ?? []).map((p) => {
-    if (!actualizado || p.synced_at > actualizado) actualizado = p.synced_at;
+    if (sinLog && (!actualizado || p.synced_at > actualizado)) actualizado = p.synced_at;
     const m = marca.get(`${p.empresa_key}:${p.pedido_switch_id}`);
     return {
       empresa_key: p.empresa_key,

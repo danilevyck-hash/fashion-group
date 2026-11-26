@@ -639,7 +639,12 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
     actualizandoRef.current = true;
     setActualizando(true);
     try {
-      await fetch("/api/guias/facturas-hoy", { method: "POST" }).catch(() => {});
+      // Al abrir (silencioso) con el freno de 10 min del servidor; el toque, en vivo.
+      await fetch("/api/guias/facturas-hoy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ automatico: silencioso }),
+      }).catch(() => {});
       if (clienteActual.current) await cargarFacturas(clienteActual.current, silencioso);
       setRonda((n) => n + 1);
     } finally {

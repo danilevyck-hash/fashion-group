@@ -88,7 +88,7 @@ const ESTADOCUENTA_KEYS = [
  * actividad, estadocuenta → recibos → facturas (cada módulo solo en las
  * empresas de su universo — ej. joystep no tiene recibos) y clientes-master
  * como paso final (datos fiscales/contacto). Sin empresas activas queda solo
- * clientes-master. Se consume con `secuencial` + `engancharRunning`.
+ * clientes-master. Se consume con `secuencial`.
  */
 export function opcionesFichaCliente(empresasActivas: string[]): SyncNowOpcion[] {
   const en = (universo: readonly string[]) => empresasActivas.filter((k) => universo.includes(k));

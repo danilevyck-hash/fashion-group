@@ -58,7 +58,7 @@ import { variantesDeContrasena } from "@/lib/login-variantes";
 import { enviarEnSegundoPlano, entregarAWaitUntil, motivoSinEnvio } from "@/lib/catalogo/envio-en-segundo-plano";
 import { leerProyeccionCierre, leerProyeccionCierreCacheada, llaveProyeccion } from "@/lib/ventas/proyeccion-cache";
 import { POST as facturasHoy } from "@/app/api/guias/facturas-hoy/route";
-import SyncNowButton from "@/components/shared/SyncNowButton";
+import SyncNowButton, { avisoDeSecuencia } from "@/components/shared/SyncNowButton";
 import CatalogoPublicoPage, { productosDelPaquete } from "@/components/catalogo/CatalogoPublicoPage";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import * as V from "@/lib/ui/velocidad-2026-11";
@@ -119,7 +119,7 @@ describe("«Actualizar» en paralelo pide las 6 empresas A LA VEZ y cuenta igual
     await waitFor(() => expect(pedidas).toHaveLength(6));
     expect(new Set(pedidas)).toEqual(new Set(B2B_EMPRESA_KEYS));
     await act(async () => { pendientes.forEach((r) => r()); });
-    await waitFor(() => expect(screen.getByText("6 empresas actualizadas")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("6 empresas al día")).toBeTruthy());
   });
 
   it("sin `paralelo`, una por una (lo de antes)", async () => {
@@ -132,7 +132,19 @@ describe("«Actualizar» en paralelo pide las 6 empresas A LA VEZ y cuenta igual
       await act(async () => { pendientes[i](); });
       await waitFor(() => expect(pedidas.length).toBe(Math.min(i + 2, 6)));
     }
-    await waitFor(() => expect(screen.getByText("6 empresas actualizadas")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("6 empresas al día")).toBeTruthy());
+  });
+});
+
+describe("🔴 el aviso al terminar: nunca «omitidas» (26-nov-2026)", () => {
+  it("éxito: cuántas empresas, o lo que pide la pantalla con la cantidad", () => {
+    expect(avisoDeSecuencia({ actualizadas: 6, cantidad: 0, fallidas: [] })).toBe("6 empresas al día");
+    expect(avisoDeSecuencia({ actualizadas: 6, cantidad: 42, fallidas: [], resumenExito: (n) => `${n} pedidos al día` })).toBe("42 pedidos al día");
+  });
+  it("error: dice cuál falló y qué hacer", () => {
+    const t = avisoDeSecuencia({ actualizadas: 5, cantidad: 0, fallidas: ["Joystep"] });
+    expect(t).toBe("5 empresas al día · No se pudo leer de Switch: Joystep. Toca Actualizar para intentarlo de nuevo.");
+    expect(t).not.toMatch(/omitid/);
   });
 });
 

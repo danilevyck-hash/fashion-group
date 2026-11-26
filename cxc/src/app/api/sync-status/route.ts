@@ -58,35 +58,42 @@ interface SyncStatusResponse {
 // Resuelve "cuándo se sincronizó por última vez" para una empresa esperada.
 // Fuente depende de la tabla — ver header del archivo para por qué la
 // asimetría es necesaria.
-async function lastSyncForEmpresa(tabla: Tabla, empresa: string): Promise<string | null> {
-  if (tabla === "facturas") {
-    // switch_sync_log: última corrida exitosa del sync para esa empresa.
-    const r = await supabaseServer
-      .from("switch_sync_log")
-      .select("finished_at")
-      .eq("sync_type", "facturas")
-      .eq("status", "success")
-      .eq("empresa_key", empresa)
-      .order("finished_at", { ascending: false })
-      .limit(1);
-    if (r.error) {
-      console.error(`[sync-status] switch_sync_log ${empresa}:`, r.error.message);
-      return null;
-    }
-    return (r.data?.[0]?.finished_at as string | undefined) ?? null;
-  }
-  // estadocuenta: synced_at de switch_estadocuenta sí refleja el último run.
+/** Último success de un sync_type para la empresa, en switch_sync_log. */
+async function ultimoExito(syncType: string, empresa: string): Promise<string | null> {
   const r = await supabaseServer
-    .from("switch_estadocuenta")
-    .select("synced_at")
+    .from("switch_sync_log")
+    .select("finished_at")
+    .eq("sync_type", syncType)
+    .eq("status", "success")
     .eq("empresa_key", empresa)
-    .order("synced_at", { ascending: false })
+    .order("finished_at", { ascending: false })
     .limit(1);
   if (r.error) {
-    console.error(`[sync-status] switch_estadocuenta ${empresa}:`, r.error.message);
+    console.error(`[sync-status] switch_sync_log ${syncType}/${empresa}:`, r.error.message);
     return null;
   }
-  return (r.data?.[0]?.synced_at as string | undefined) ?? null;
+  return (r.data?.[0]?.finished_at as string | undefined) ?? null;
+}
+
+async function lastSyncForEmpresa(tabla: Tabla, empresa: string): Promise<string | null> {
+  // 🩸 26-nov-2026: antes solo `facturas` iba al log y las demás tablas
+  // (cobros, CxP, Consulta de artículos) caían a la hora del ESTADO DE CUENTA.
+  if (tabla !== "estadocuenta") return ultimoExito(tabla, empresa);
+  // estadocuenta: la más nueva entre la fila (synced_at) y la corrida exitosa
+  // — así «Actualizar» dice la hora de la lectura aunque no cambiara nada.
+  const [corrida, r] = await Promise.all([
+    ultimoExito("estadocuenta", empresa),
+    supabaseServer
+      .from("switch_estadocuenta")
+      .select("synced_at")
+      .eq("empresa_key", empresa)
+      .order("synced_at", { ascending: false })
+      .limit(1),
+  ]);
+  if (r.error) console.error(`[sync-status] switch_estadocuenta ${empresa}:`, r.error.message);
+  const fila = (r.data?.[0]?.synced_at as string | undefined) ?? null;
+  if (!corrida || !fila) return corrida ?? fila;
+  return new Date(corrida) > new Date(fila) ? corrida : fila;
 }
 
 export async function GET(req: NextRequest) {

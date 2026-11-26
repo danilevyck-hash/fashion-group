@@ -19,7 +19,7 @@
 //
 // 409 del candado: "running" (sync corriendo YA) NO se muestra — el botón se
 // engancha al sync en curso (syncConEnganche, ver syncNowClient.ts) y refresca
-// al terminar. El cooldown directo sí muestra su detalle tal cual.
+// al terminar. Sin freno de 10 min: el toque siempre lee de Switch (26-nov-2026).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -103,9 +103,6 @@ export default function CatalogoSyncNow({ catalogo, onSuccess, className, forma 
         showToast(r.resumen ? `Catálogo actualizado. ${r.resumen}` : "Catálogo actualizado", false);
         await fetchStatus();
         await onSuccess?.();
-      } else if (r.tipo === "fresco") {
-        showToast(r.detalle, true);
-        await fetchStatus();
       } else {
         showToast(r.mensaje, true);
       }

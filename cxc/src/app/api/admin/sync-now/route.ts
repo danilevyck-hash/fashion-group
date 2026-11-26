@@ -9,22 +9,21 @@
  * active_shoes / joystep / fashion_shoes; refresh-vistas es DB-only — RPCs de
  * MVs de Ventas, sin Switch).
  *
- * Candado de 2 capas ANTES de disparar (ver lib/switch-api/sync-now.ts):
- *   a) running (fila 'running' fresca de esa EMPRESA en switch_sync_log — del
- *      mismo tipo o de CUALQUIER otro sync_type, ej. un cron corriendo YA; el
- *      lock REAL es el índice único parcial switch_sync_log_running_lock —
- *      DDL 20260723150000, manual; mientras no corra, queda el pre-check),
- *   b) cooldown (último success hace < 10 min).
+ * 🔴 EN VIVO (26-nov-2026): sin freno de 10 min — el toque siempre lee de
+ * Switch. Si la EMPRESA ya tiene una corrida viva (cron u otro toque, cualquier
+ * sync_type: sesión única de Switch), se ESPERA a que termine y, si era del
+ * mismo tipo y salió bien, se responde con ELLA (`esperarCorridaEnCurso`). El
+ * lock REAL sigue siendo el índice único parcial switch_sync_log_running_lock.
  *
  * La ventana "cron-proximo" se ELIMINÓ (jul-2026): el clic siempre actualiza.
  * Trade-off aceptado: un manual pegado a la ventana de un cron de la MISMA
  * empresa puede matarle el token al otro (sesión única, code 0006) — el que
  * pierda falla limpio y switch-reconciliacion lo recupera (ambos fail-safe).
  *
- * Respuestas: 200 {ok, duracionMs, resumen} · 409 {motivo, detalle} ·
- * 400 body inválido · 401/403 sin permiso · 500 error del sync.
- * El 409 motivo "running" NO se muestra al usuario: SyncNowButton se engancha
- * al sync en curso (re-intenta cada ~5s) y refresca la vista al terminar.
+ * Respuestas: 200 {ok, duracionMs, resumen, cantidad?} · 409 {motivo:"running"}
+ * (la espera pasó de 4 min, o la raza del índice único) · 400 body inválido ·
+ * 401/403 sin permiso · 500 error del sync. El 409 NO se muestra: SyncNowButton
+ * vuelve a preguntar cada ~5 s y el servidor se une a la corrida.
  *
  * Ejecuta la lib correspondiente IN-PROCESS con triggeredBy:'manual' y cierra
  * las sesiones Switch abiertas al final (higiene de sesión única, igual que
@@ -52,12 +51,15 @@ import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
 import { syncCatalogoTommy } from "@/lib/switch-api/sync-catalogo-tommy";
 import { syncCatalogoCalvin } from "@/lib/switch-api/sync-catalogo-calvin";
 import { avisarNuevosSinFoto } from "@/lib/catalogos/fotos-nuevos";
-import { clearStaleRunning, isRunningLockConflict } from "@/lib/switch-api/sync-log";
+import {
+  clearStaleRunning,
+  esperarCorridaEnCurso,
+  isRunningLockConflict,
+} from "@/lib/switch-api/sync-log";
 import {
   isSyncNowModulo,
   moduloConfig,
   lockKeyDe,
-  precheckSyncNow,
   nombreEmpresa,
   rolesSyncNow,
   type SyncNowModulo,
@@ -89,76 +91,9 @@ function panamaDate(offsetDays = 0): string {
  *  que el pre-check no alcanzó a ver). */
 function respuestaLockOcupado(): NextResponse {
   return NextResponse.json(
-    {
-      motivo: "running",
-      detalle: "Ya hay una actualización en curso (empezó hace un momento).",
-    },
+    { motivo: "running", detalle: "Switch está actualizando esta empresa en este momento." },
     { status: 409 },
   );
-}
-
-/** Corridas 'running' de la EMPRESA (cualquier sync_type), separadas en la del
- *  módulo pedido vs. cualquier otra (cron corriendo YA — sesión única Switch).
- *  La frescura (<30 min) la evalúa precheckSyncNow; acá solo se consulta. */
-async function fetchRunningDeEmpresa(
-  empresaKey: string,
-  syncType: string,
-): Promise<{ mismo: string | null; otro: string | null }> {
-  const { data, error } = await supabaseServer
-    .from("switch_sync_log")
-    .select("started_at, sync_type")
-    .eq("empresa_key", empresaKey)
-    .eq("status", "running")
-    .order("started_at", { ascending: false })
-    .limit(10);
-  if (error) {
-    // Fail-open del pre-check: el lock real (índice único) sigue protegiendo.
-    console.error(`[sync-now] no pude leer running de ${empresaKey}: ${error.message}`);
-    return { mismo: null, otro: null };
-  }
-  const rows = (data ?? []) as { started_at: string; sync_type: string }[];
-  return {
-    mismo: rows.find((r) => r.sync_type === syncType)?.started_at ?? null,
-    otro: rows.find((r) => r.sync_type !== syncType)?.started_at ?? null,
-  };
-}
-
-async function fetchLastSuccessFinishedAt(
-  empresaKey: string | null,
-  syncType: string | null,
-  cooldownHeartbeats: readonly string[] | undefined,
-): Promise<string | null> {
-  if (empresaKey && syncType) {
-    const { data, error } = await supabaseServer
-      .from("switch_sync_log")
-      .select("finished_at")
-      .eq("empresa_key", empresaKey)
-      .eq("sync_type", syncType)
-      .eq("status", "success")
-      .order("finished_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) {
-      console.error(`[sync-now] no pude leer último success de ${empresaKey}/${syncType}: ${error.message}`);
-      return null;
-    }
-    return (data as { finished_at: string } | null)?.finished_at ?? null;
-  }
-  // Módulos sin switch_sync_log (clientes-master, refresh-vistas) → cooldown
-  // por heartbeat(s) de cron_heartbeats: manda el más reciente.
-  if (!cooldownHeartbeats || cooldownHeartbeats.length === 0) return null;
-  const { data, error } = await supabaseServer
-    .from("cron_heartbeats")
-    .select("last_success_at")
-    .in("cron_name", cooldownHeartbeats as string[])
-    .order("last_success_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    console.error(`[sync-now] no pude leer heartbeats ${cooldownHeartbeats.join(", ")}: ${error.message}`);
-    return null;
-  }
-  return (data as { last_success_at: string } | null)?.last_success_at ?? null;
 }
 
 /** Refresca la MV de aging de CXC tras un estadocuenta manual (espejo del cron
@@ -175,7 +110,7 @@ async function refreshAgingMv(): Promise<void> {
 async function ejecutar(
   modulo: SyncNowModulo,
   empresa: string | null,
-): Promise<{ resumen: string } | { error: string }> {
+): Promise<{ resumen: string; cantidad?: number } | { error: string }> {
   switch (modulo) {
     case "estadocuenta": {
       const r = await syncEmpresaEstadoCuenta(empresa as EmpresaKey, {
@@ -222,7 +157,10 @@ async function ejecutar(
     case "pedidos": {
       const r = await syncEmpresaPedidos(empresa as EmpresaKey, "manual");
       if (!r.ok) return { error: r.error ?? "sync de pedidos falló" };
-      return { resumen: `${nombreEmpresa(r.empresaKey)}: ${r.pedidos} pedidos sin facturar` };
+      return {
+        resumen: `${nombreEmpresa(r.empresaKey)}: ${r.pedidos} pedidos sin facturar`,
+        cantidad: r.pedidos,
+      };
     }
     case "refresh-vistas": {
       // DB-only: rollup mensual + vw de clientes (paso final de la secuencia
@@ -323,34 +261,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       auth.userName,
     ).catch(() => {});
 
-  const ahora = new Date();
-
-  // ── Candado de 2 capas (running + cooldown) ────────────────────────────────
+  // ── Sesión única de Switch: esperar (o unirse a) la corrida en curso ──────
   const lock = lockKeyDe(modulo, empresa);
   if (lock) {
-    // Limpia huérfanos (>30 min) para que ni el pre-check ni el índice único
-    // se queden trancados con un run que murió sin finalizar.
+    // Limpia huérfanos (>30 min) para que ni la espera ni el índice único se
+    // queden trancados con un run que murió sin finalizar.
     await clearStaleRunning(lock.empresaKey, lock.syncType);
-  }
-  const [running, lastSuccessFinishedAt] = await Promise.all([
-    lock
-      ? fetchRunningDeEmpresa(lock.empresaKey, lock.syncType)
-      : Promise.resolve({ mismo: null, otro: null }),
-    fetchLastSuccessFinishedAt(
-      lock?.empresaKey ?? null,
-      lock?.syncType ?? null,
-      cfg.cooldownHeartbeats,
-    ),
-  ]);
-  const bloqueo = precheckSyncNow({
-    ahora,
-    runningStartedAt: running.mismo,
-    runningOtroStartedAt: running.otro,
-    lastSuccessFinishedAt,
-  });
-  if (bloqueo) {
-    await registrar(bloqueo.motivo);
-    return NextResponse.json(bloqueo, { status: 409 });
+    const espera = await esperarCorridaEnCurso(lock.empresaKey, lock.syncType);
+    if (espera.estado === "ocupado") {
+      await registrar("running");
+      return respuestaLockOcupado();
+    }
+    if (espera.unida) {
+      // La corrida que estaba en curso ES la lectura en vivo: se responde con ella.
+      await registrar("ok", "unida a la corrida en curso");
+      return NextResponse.json({
+        ok: true,
+        duracionMs: 0,
+        resumen: `${nombreEmpresa(lock.empresaKey)}: al día`,
+        ...(modulo === "pedidos" ? { cantidad: espera.unida.records_updated ?? 0 } : {}),
+      });
+    }
   }
 
   // ── Disparo in-process ─────────────────────────────────────────────────────
@@ -371,7 +302,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
     await registrar("ok", r.resumen);
-    return NextResponse.json({ ok: true, duracionMs: Date.now() - t0, resumen: r.resumen });
+    return NextResponse.json({
+      ok: true,
+      duracionMs: Date.now() - t0,
+      resumen: r.resumen,
+      ...(r.cantidad !== undefined ? { cantidad: r.cantidad } : {}),
+    });
   } catch (err) {
     if (isRunningLockConflict(err)) {
       await registrar("running");

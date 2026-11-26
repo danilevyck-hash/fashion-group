@@ -4,18 +4,12 @@
 // Cliente compartido de /api/admin/sync-now (lo usan SyncNowButton y
 // CatalogoSyncNow — regla GLOBAL de todos los botones "Actualizar ahora").
 //
-// syncConEnganche: dispara UNA opción y, si hay un sync de esa empresa
-// corriendo YA (409 motivo "running" — manual o cron), NO reporta nada al
-// usuario: se engancha al sync en curso re-intentando el POST cada ~5s hasta
-// que termine.
-//   - running → success: el re-intento cae en cooldown → se trata como éxito
-//     (la data quedó fresca, como si el clic la hubiera actualizado).
-//   - running → error: el re-intento adquiere el lock libre y corre el sync
-//     manual (reintento automático único); si ese también falla, recién ahí
-//     se devuelve error.
-// Cero mensajes tipo "espera al sync de las HH:MM" en todo el sistema.
-// El 409 cooldown DIRECTO (primer intento) se devuelve como "fresco" con su
-// detalle ("Ya se actualizó hace X min…") para mostrarse tal cual.
+// syncConEnganche: dispara UNA opción. Desde el 26-nov-2026 (Daniel: «si
+// pongo Actualizar, lo quiero en vivo») no hay freno de 10 min: el servidor
+// siempre lee de Switch, y si la empresa ya tiene una corrida viva, la ESPERA
+// (y se une a ella si es del mismo tipo). Solo si esa espera pasa de 4 min
+// contesta 409 "running"; aquí se vuelve a preguntar cada ~5 s, sin mostrarle
+// nada al usuario. Cero mensajes tipo "espera al sync de las HH:MM".
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface SyncNowRequest {
@@ -26,15 +20,17 @@ export interface SyncNowRequest {
 interface SyncApiJson {
   ok?: boolean;
   resumen?: string;
+  /** Pedidos: cuántos quedaron al día en esa empresa. */
+  cantidad?: number;
   motivo?: string;
   detalle?: string;
   error?: string;
 }
 
-// Re-intento cada 5s, tope 8 min (los syncs largos —catálogo Reebok ~3 min,
-// cron tipo=all— caben; RUNNING_STALE server-side es 30 min).
+// Re-intento cada 5s, tope 12 min (el servidor ya espera hasta 4 min por
+// pregunta; los syncs largos —catálogo Tommy ~8 min— caben).
 const ENGANCHE_POLL_MS = 5_000;
-const ENGANCHE_MAX_MS = 8 * 60_000;
+const ENGANCHE_MAX_MS = 12 * 60_000;
 
 export const MSG_ERROR_GENERICO = "No se pudo actualizar. Intenta de nuevo en unos segundos.";
 const MSG_ERROR_RED = "No se pudo actualizar. Revisa tu conexión e intenta de nuevo.";
@@ -55,14 +51,11 @@ export async function postSyncNow(
 }
 
 export type ResultadoSync =
-  | { tipo: "ok"; resumen?: string }
-  /** Cooldown directo al PRIMER intento: la data ya estaba fresca. */
-  | { tipo: "fresco"; detalle: string }
+  | { tipo: "ok"; resumen?: string; cantidad?: number }
   | { tipo: "error"; mensaje: string };
 
 export async function syncConEnganche(opcion: SyncNowRequest): Promise<ResultadoSync> {
   const t0 = Date.now();
-  let primerIntento = true;
   for (;;) {
     let status: number;
     let json: SyncApiJson | null;
@@ -71,18 +64,11 @@ export async function syncConEnganche(opcion: SyncNowRequest): Promise<Resultado
     } catch {
       return { tipo: "error", mensaje: MSG_ERROR_RED };
     }
-    if (status === 200 && json?.ok) return { tipo: "ok", resumen: json.resumen };
+    if (status === 200 && json?.ok) return { tipo: "ok", resumen: json.resumen, cantidad: json.cantidad };
     if (status === 409 && json?.motivo === "running") {
       if (Date.now() - t0 > ENGANCHE_MAX_MS) return { tipo: "error", mensaje: MSG_ERROR_GENERICO };
       await sleep(ENGANCHE_POLL_MS);
-      primerIntento = false;
       continue;
-    }
-    if (status === 409 && json?.motivo === "cooldown") {
-      // Tras esperar un running = ese sync terminó bien → éxito. Directo al
-      // primer intento = la data ya estaba fresca → se informa el detalle.
-      if (primerIntento) return { tipo: "fresco", detalle: json.detalle ?? "Los datos ya están frescos." };
-      return { tipo: "ok" };
     }
     return { tipo: "error", mensaje: json?.error || json?.detalle || MSG_ERROR_GENERICO };
   }

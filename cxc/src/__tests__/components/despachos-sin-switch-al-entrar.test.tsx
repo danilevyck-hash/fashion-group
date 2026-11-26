@@ -5,7 +5,7 @@
 // (medido 3-sep, docs/estado-actual.md). Hasta hoy, abrir /despachos y
 // /despachos/nueva disparaba `POST /api/guias/facturas-hoy` (que entra a Switch).
 // Ahora las facturas de hoy llegan por los crons de switch-sync o con el botón
-// «Actualizar» de `LineaDeFrescura`, que sigue con el freno de 10 min del server.
+// «Actualizar» de `LineaDeFrescura`, en vivo (sin freno de 10 min desde el 26-nov-2026).
 //
 // La lista /despachos está cubierta en guias-eliminar-en-la-fila.test.tsx
 // (abrirla = 100% lectura, todos los roles). Acá: /despachos/nueva al montar,
@@ -75,7 +75,7 @@ describe("🔴 entrar a Despachos no llama a Switch", () => {
   });
 });
 
-describe("🔑 «Actualizar» sí trae las facturas de hoy, con el freno de 10 min", () => {
+describe("🔑 «Actualizar» sí trae las facturas de hoy, en vivo", () => {
   const req = () => new NextRequest("http://x/api/guias/facturas-hoy", { method: "POST" });
 
   it("sin sync reciente, entra a Switch por cada empresa", async () => {
@@ -84,10 +84,19 @@ describe("🔑 «Actualizar» sí trae las facturas de hoy, con el freno de 10 m
     expect(r.resultados.every((x: { resultado: string }) => x.resultado === "ok")).toBe(true);
   });
 
-  it("con sync de hace < 10 min, NO entra a Switch", async () => {
+  it("la lectura AUTOMÁTICA al abrir Etiquetas conserva su freno de 10 min", async () => {
     estado.frescas = true;
-    const r = await (await POST(req())).json();
+    const auto = new NextRequest("http://x/api/guias/facturas-hoy", { method: "POST", body: JSON.stringify({ automatico: true }) });
+    const r = await (await POST(auto)).json();
     expect(sync).not.toHaveBeenCalled();
     expect(r.resultados.every((x: { resultado: string }) => x.resultado === "fresca")).toBe(true);
+  });
+
+  it("dos toques seguidos: los dos entran a Switch (no hay freno de 10 min)", async () => {
+    await POST(req());
+    const antes = sync.mock.calls.length;
+    const r = await (await POST(req())).json();
+    expect(sync.mock.calls.length).toBe(antes * 2);
+    expect(r.resultados.every((x: { resultado: string }) => x.resultado === "ok")).toBe(true);
   });
 });

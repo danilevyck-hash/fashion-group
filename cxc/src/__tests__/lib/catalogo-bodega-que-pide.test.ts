@@ -7,11 +7,11 @@ import { readFileSync } from "fs";
 // «Actualizar datos de Switch» del catálogo (19-nov-2026, Daniel: «sí»).
 describe("Actualizar datos de Switch en el catálogo, para quien pide", () => {
   const leer = (p: string) => readFileSync(p, "utf8");
-  it("sync-status, el disparo y el botón leen puedePedir; el freno de 10 min no cambia", () => {
+  it("sync-status, el disparo y el botón leen puedePedir; sin freno de 10 min (en vivo, 26-nov-2026)", () => {
     expect(leer("src/app/api/catalogo/[marca]/sync-status/route.ts")).toContain("requirePedido(req)");
     expect(leer("src/app/api/admin/sync-now/route.ts")).toContain('modulo.startsWith("catalogo-") && puedePedir(auth)');
     expect(leer("src/components/shared/CatalogoSyncNow.tsx")).toContain("puedePedir({ role, userName: usuarioDelNavegador() })");
-    expect(leer("src/lib/switch-api/sync-now.ts")).toContain("export const SYNC_NOW_COOLDOWN_MIN = 10;");
+    expect(leer("src/lib/switch-api/sync-now.ts")).not.toContain("SYNC_NOW_COOLDOWN_MIN =");
   });
 });
 

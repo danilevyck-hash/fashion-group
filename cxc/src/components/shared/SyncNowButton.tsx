@@ -12,30 +12,24 @@
 //   - 2+ opciones → botón que abre un menú (elige empresa / módulo).
 //   - 2+ opciones + secuencial → SIN menú: un clic dispara TODAS las opciones
 //     EN SECUENCIA (nunca 2 a la vez — sesión única Switch), con progreso
-//     "Actualizando… (N/8)" y UN toast resumen al final. Los 409 individuales
-//     (running/cooldown) no abortan: esa empresa se salta y se acumula como
-//     omitida.
+//     "Actualizando… (N/8)" y UN toast resumen al final.
 //   - disabledReason → deshabilitado con tooltip (ej. "Elige una empresa").
 //
-// Mientras corre: spinner + disabled. Tras éxito: toast "Listo, actualizado",
+// Mientras corre: spinner + disabled. Tras éxito: aviso con lo que quedó al día,
 // se dispara un evento focus (SyncStatus y los fetchers SWR revalidan solos en
 // focus) y se llama onSuccess (reload de datos de la página, si lo expone).
 //
-// 409 motivo "running" (sync de esa empresa corriendo YA — manual o cron): NO
-// se muestra nada. El botón queda en "Actualizando…" y SE ENGANCHA al sync en
-// curso re-intentando el POST cada ~5s:
-//   - si el running termina en success → el re-intento cae en cooldown → se
-//     trata como éxito (la data quedó fresca) y se refresca la vista;
-//   - si el running termina en error → el re-intento adquiere el lock y corre
-//     el sync manual (reintento automático único) antes de mostrar error.
-// Cero mensajes tipo "espera al sync de las HH:MM" en todo el sistema.
-// El 409 cooldown DIRECTO (primer intento) sí muestra su detalle tal cual.
+// 🔴 EN VIVO (26-nov-2026, Daniel: «si pongo Actualizar, lo quiero en vivo»):
+// cada toque lee de Switch en ese momento — ya no hay freno de 10 min ni
+// empresas «omitidas». Si una empresa ya se está actualizando (cron u otro
+// toque), el servidor espera a esa corrida y se une a ella; el botón solo
+// queda en «Actualizando…» (deshabilitado: el único anti-doble-toque).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import { RefreshCw } from "lucide-react";
-import { postSyncNow, syncConEnganche } from "./syncNowClient";
+import { syncConEnganche } from "./syncNowClient";
 // 🔴 Los DOS textos del botón salen de un solo lugar desde el 18-sep-2026:
 // «Actualizar ahora» es la palabra de la casa y Guías tenía otras dos. Ver
 // `lib/ui/actualizar-ahora.ts`.
@@ -63,15 +57,10 @@ interface SyncNowButtonProps {
    *  vendedor) sin abrir los demás botones. El permiso real por módulo lo
    *  valida el server igual (rolesSyncNow → 403). */
   roles?: string[];
-  /** En secuencia: cada paso usa syncConEnganche — un 409 "running" NO salta
-   *  el paso, se ENGANCHA al sync en curso y sigue cuando termina (ficha de
-   *  cliente: pocas opciones, todas de la misma empresa). El cooldown directo
-   *  sí se salta y acumula como omitida. */
-  engancharRunning?: boolean;
-  /** Toast de éxito TOTAL de la secuencia (fallidas=0), en vez del conteo de
-   *  empresas (ej. "Listo, cliente actualizado" — los pasos son módulos, no
-   *  empresas). Las omitidas por cooldown cuentan como éxito: data fresca. */
-  resumenExito?: string;
+  /** Aviso de éxito TOTAL de la secuencia, en vez del conteo de empresas (ej.
+   *  «Cliente actualizado»). Como función recibe la suma de `cantidad` de las
+   *  respuestas (Pedidos: «42 pedidos al día»). */
+  resumenExito?: string | ((cantidad: number) => string);
   /** Si viene, el botón queda deshabilitado con este tooltip. */
   disabledReason?: string | null;
   /** Sub-texto bajo el label (ej. "tarda ~3 min" en Reebok). */
@@ -103,6 +92,31 @@ interface SyncNowButtonProps {
 
 const ROLES_DEFAULT = ["admin", "secretaria"];
 
+/** El aviso al terminar una secuencia. Nunca «omitidas»: o se actualizó, o se
+ *  dice cuál falló y qué hacer. */
+export function avisoDeSecuencia({
+  actualizadas,
+  cantidad,
+  fallidas,
+  resumenExito,
+}: {
+  actualizadas: number;
+  cantidad: number;
+  fallidas: readonly string[];
+  resumenExito?: string | ((cantidad: number) => string);
+}): string {
+  if (fallidas.length === 0) {
+    if (typeof resumenExito === "function") return resumenExito(cantidad);
+    if (resumenExito) return resumenExito;
+    if (actualizadas === 0) return "Datos al día";
+    return actualizadas === 1 ? "1 empresa al día" : `${actualizadas} empresas al día`;
+  }
+  const al = actualizadas > 0
+    ? `${actualizadas === 1 ? "1 empresa" : `${actualizadas} empresas`} al día · `
+    : "";
+  return `${al}No se pudo leer de Switch: ${fallidas.join(", ")}. Toca Actualizar para intentarlo de nuevo.`;
+}
+
 /** El botón-texto de `LineaDeFrescura`: el mismo con `SyncNowButton` y con una
  *  acción propia. 44 px con el dedo; en la computadora, del alto del texto. */
 export const CLASE_BOTON_LINEA =
@@ -113,7 +127,6 @@ export default function SyncNowButton({
   secuencial,
   paralelo,
   roles,
-  engancharRunning,
   resumenExito,
   disabledReason,
   subtext,
@@ -186,15 +199,8 @@ export default function SyncNowButton({
       // terminó — sin toasts de "espera".
       const r = await syncConEnganche(opcion);
       if (r.tipo === "ok") {
-        showToast(r.resumen ? `Datos actualizados. ${r.resumen}` : "Datos actualizados", false);
+        showToast(r.resumen ?? "Datos al día", false);
         await refrescarVista();
-      } else if (r.tipo === "fresco") {
-        // 🩸 "Fresco" NO es un error: significa que la BASE ya está al día. Lo
-        // que faltaba era traerlo a la pantalla — antes se mostraba en rojo y
-        // sin refrescar, o sea el mensaje decía "los datos están frescos"
-        // mientras la tabla seguía mostrando los viejos.
-        await refrescarVista();
-        showToast(r.detalle, false);
       } else {
         showToast(r.mensaje, true);
       }
@@ -203,44 +209,33 @@ export default function SyncNowButton({
     }
   };
 
-  // Modo secuencial (Ventas): un clic recorre TODAS las opciones, una por una
-  // (sesión única Switch — nunca 2 a la vez). Un 409 (running/cooldown) NO
-  // aborta: esa empresa se salta (quedará fresca por el sync que ya corre o
-  // recién corrió) y se acumula como omitida. Al final, UN toast resumen.
+  // Modo secuencial (Ventas, Pedidos, CXC…): un clic recorre TODAS las
+  // opciones (en serie, o a la vez con `paralelo` si cada una es otra
+  // empresa). Cada paso usa syncConEnganche: una empresa que ya se está
+  // actualizando se espera, nunca se omite. Al final, UN aviso.
   //
   // Los pasos SIN empresa (finales técnicos como refresh-vistas o
-  // clientes-master) no entran al conteo de "empresas actualizadas": su 409
-  // (cooldown = ya está fresco) es silencioso; solo un ERROR suma a fallidas.
+  // clientes-master) no entran al conteo de empresas; su error sí se dice.
   const dispararSecuencia = async () => {
     setRunning(true);
     let actualizadas = 0;
-    let omitidas = 0;
-    let fallidas = 0;
-    // Un paso = una opción. Cuenta en las variables de arriba; nunca lanza.
+    let cantidad = 0;
+    const fallidas: string[] = [];
     let hechos = 0;
+    // Un paso = una opción. Cuenta en las variables de arriba; nunca lanza.
     const paso = async (i: number) => {
-      const esEmpresa = !!opciones[i].empresa;
+      const o = opciones[i];
       try {
-        if (engancharRunning) {
-          // Enganche por paso: un "running" ajeno no se salta — se espera a
-          // que termine (o se corre al liberarse el lock) antes de seguir.
-          const r = await syncConEnganche(opciones[i]);
-          if (r.tipo === "ok") {
-            if (esEmpresa) actualizadas++;
-          } else if (r.tipo === "fresco") {
-            if (esEmpresa) omitidas++;
-          } else fallidas++;
-        } else {
-          const { status, json } = await postSyncNow(opciones[i]);
-          if (status === 200 && json?.ok) {
-            if (esEmpresa) actualizadas++;
-          } else if (status === 409) {
-            if (esEmpresa) omitidas++;
-          } else fallidas++;
+        const r = await syncConEnganche(o);
+        if (r.tipo === "ok") {
+          if (o.empresa) actualizadas++;
+          cantidad += r.cantidad ?? 0;
+          return;
         }
       } catch {
-        fallidas++;
+        /* cae abajo como error */
       }
+      fallidas.push(o.label ?? o.empresa ?? o.modulo);
     };
     try {
       if (paralelo) {
@@ -259,23 +254,7 @@ export default function SyncNowButton({
           await paso(i);
         }
       }
-      const partes: string[] = [];
-      if (fallidas === 0 && resumenExito) {
-        partes.push(resumenExito);
-      } else if (omitidas === 0 && fallidas === 0) {
-        partes.push(
-          actualizadas === 1
-            ? "1 empresa actualizada"
-            : actualizadas === 0
-              ? "Datos actualizados"
-              : `${actualizadas} empresas actualizadas`,
-        );
-      } else {
-        partes.push(`${actualizadas} actualizadas`);
-        if (omitidas > 0) partes.push(`${omitidas} omitidas (en espera o recién actualizadas)`);
-        if (fallidas > 0) partes.push(`${fallidas} con error`);
-      }
-      showToast(partes.join(" · "), fallidas > 0);
+      showToast(avisoDeSecuencia({ actualizadas, cantidad, fallidas, resumenExito }), fallidas.length > 0);
       await refrescarVista();
     } finally {
       setProgreso(null);
