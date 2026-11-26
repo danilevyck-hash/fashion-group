@@ -1,5 +1,5 @@
 // Despachos › Pedidos › «Facturados» (26-nov-2026): las facturas del grupo de
-// los últimos 30 días que todavía no están en una guía viva. Solo LEE la base;
+// la ventana de `primerDiaDeFacturados` (3 días hábiles) que todavía no están en una guía viva. Solo LEE la base;
 // nunca llama a Switch. Las empresas las recorta el SERVIDOR, como en Pedidos.
 
 import { NextRequest, NextResponse } from "next/server";

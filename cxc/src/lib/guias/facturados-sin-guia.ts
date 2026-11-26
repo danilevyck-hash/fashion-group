@@ -21,8 +21,44 @@ import { numerosDeFacturas } from "@/lib/guias/atajos-facturas";
  */
 export const PEDIDOS_PIPELINE_2026_11 = true;
 
-/** Cuántos días atrás se buscan facturas sin guía. */
+/** Cuántos días atrás se buscan facturas sin guía (con el corte apagado). */
 export const DIAS_FACTURADOS = 30;
+
+/**
+ * 🔴 Corte (Daniel, 26-nov-2026: «B»): una factura sale sola de «Facturados»
+ * pasados FACTURADOS_DIAS_HABILES días hábiles (lunes a viernes) desde que se
+ * facturó — la que retira el cliente o la que la guía escribió mal no se queda
+ * para siempre. Medido 20-may→18-nov-2026 (620 facturas que sí salieron en guía,
+ * `scripts/_estudio-facturados-corte.ts`): mediana 1 día hábil, p90 2, p95 3.
+ * Con 3 hábiles se ve el 95 % de lo que de verdad va a salir. `false` = 30 días.
+ */
+export const FACTURADOS_CORTE_DIAS_2026_11 = true;
+export const FACTURADOS_DIAS_HABILES = 3;
+
+const esHabil = (d: Date) => d.getUTCDay() !== 0 && d.getUTCDay() !== 6;
+
+/**
+ * El día (YYYY-MM-DD, Panamá) de la factura más vieja que todavía se muestra:
+ * una factura del día `d` se ve si entre `d` (sin contar) y `hoy` hay como mucho
+ * FACTURADOS_DIAS_HABILES días hábiles. Sin corte, los últimos DIAS_FACTURADOS.
+ */
+export function primerDiaDeFacturados(hoy: string, conCorte = FACTURADOS_CORTE_DIAS_2026_11): string {
+  const d = new Date(`${hoy}T12:00:00Z`);
+  if (!conCorte) {
+    d.setUTCDate(d.getUTCDate() - DIAS_FACTURADOS);
+    return d.toISOString().slice(0, 10);
+  }
+  for (let n = 0; ; d.setUTCDate(d.getUTCDate() - 1)) {
+    const suma = esHabil(d) ? 1 : 0;
+    if (n + suma > FACTURADOS_DIAS_HABILES) return d.toISOString().slice(0, 10);
+    n += suma;
+  }
+}
+
+/** El rótulo discreto de la ventana: «últimos 3 días hábiles». */
+export const ROTULO_VENTANA_FACTURADOS = FACTURADOS_CORTE_DIAS_2026_11
+  ? `últimos ${FACTURADOS_DIAS_HABILES} días hábiles`
+  : `últimos ${DIAS_FACTURADOS} días`;
 
 export const EMPRESAS_DEL_GRUPO = ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"] as const;
 

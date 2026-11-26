@@ -44,7 +44,7 @@ import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
 import { PEDIDOS_CONTEOS_2026_11 as CONTEOS, PEDIDOS_EMPRESA_JUNTO_A_IMPRIMIR, conteosPorEstado, lineaDeResumen, lineaMasViejo, textoMonto } from "@/lib/ui/pedidos-conteos-2026-11";
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
-import { DIAS_FACTURADOS, PEDIDOS_PIPELINE_2026_11 } from "@/lib/guias/facturados-sin-guia";
+import { PEDIDOS_PIPELINE_2026_11, ROTULO_VENTANA_FACTURADOS } from "@/lib/guias/facturados-sin-guia";
 import PipelinePedidos from "./PipelinePedidos";
 import FacturadosLista, { type Facturado } from "./FacturadosLista";
 import {
@@ -638,7 +638,7 @@ export default function PedidosView({
     ? facturadosVisibles.map((f) => f.fecha).reduce((m, f) => (f < m ? f : m))
     : null;
   const segundaLinea = esFacturados
-    ? [masViejaFacturada ? `la más vieja, ${haceDiasCorto(masViejaFacturada, hoy)}` : null, `últimos ${DIAS_FACTURADOS} días`, !barra && facturadosVisibles.some((f) => typeof f.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · ")
+    ? [masViejaFacturada ? `la más vieja, ${haceDiasCorto(masViejaFacturada, hoy)}` : null, ROTULO_VENTANA_FACTURADOS, !barra && facturadosVisibles.some((f) => typeof f.monto === "number") ? "montos sin ITBMS" : null].filter(Boolean).join(" · ")
     : lineaMasViejo(deLaEmpresa, filtro, hoy);
   const filaEmpresaCelular = pedidosCelular && NUEVO && hayQueElegirEmpresa && !conConteos ? (
     <div data-fila-empresa className="mb-2 flex">
