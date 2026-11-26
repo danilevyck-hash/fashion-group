@@ -13,6 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { respuestaSiSwitchEnPausa } from "@/lib/switch-api/pausa-cron";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncArticulosDiario, type ArticulosSyncResult } from "@/lib/switch-api/sync-articulos";
 import { syncArticuloMarca, type ArticuloMarcaSyncResult } from "@/lib/switch-api/sync-articulo-marca";
@@ -42,6 +43,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   if ((req.headers.get("authorization") ?? "") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // 🔴 «Pausar Switch»: en pausa termina aquí, sin fila ni alerta (ni éxito ni fallo).
+  const enPausa = await respuestaSiSwitchEnPausa("switch-articulos");
+  if (enPausa) return enPausa;
 
   const sp = req.nextUrl.searchParams;
   const desde = sp.get("desde") ?? panamaDate(-3);

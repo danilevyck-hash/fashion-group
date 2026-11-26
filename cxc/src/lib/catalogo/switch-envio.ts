@@ -51,6 +51,9 @@ import {
   type SwitchPedidoLineaInput,
 } from "@/lib/switch-api/client";
 import { enParalelo } from "@/lib/switch-api/en-paralelo";
+import { leerPausaSwitch } from "@/lib/switch-api/pausa-io";
+import { textoPausa } from "@/lib/switch-api/pausa";
+import { encolarPedidoEnEspera } from "./pedidos-en-espera";
 import { type AvisoEnvio, hayQueDetenerse, textosDeAvisos } from "./switch-prevalidacion";
 import {
   DOCUMENTO_POR_DEFECTO,
@@ -176,6 +179,9 @@ export type EnvioResult =
   | { kind: "preorders"; count: number }
   | { kind: "ya_enviado"; detalle: string }
   | { kind: "switch_caido"; error: string }
+  // «Pausar Switch»: no se llamó a Switch ni se escribió envío. El pedido quedó
+  // en espera (`switch_pausa_pedidos`) y sale solo al terminar la pausa.
+  | { kind: "en_pausa"; mensaje: string }
   // `lineas` viaja también acá: la pantalla de problema muestra los errores
   // ARRIBA y debajo las líneas que sí cruzaron, para poder ver el pedido entero
   // sin volver a consultar Switch.
@@ -210,6 +216,24 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
     .maybeSingle();
   if (existing) {
     return { kind: "ya_enviado", detalle: String(existing.numero_interno || existing.estado) };
+  }
+
+  // ── 🔴 «Pausar Switch» (26-nov-2026): ni pre-validación ni envío. El pedido
+  //    no se pierde ni queda en «error»: queda EN ESPERA y lo manda la puesta
+  //    al día (`enviarPedidosEnEspera`) por este MISMO motor, con el MISMO
+  //    candado at-most-once. Una vista previa (`dry`) no deja nada en espera.
+  const pausa = await leerPausaSwitch({ fresca: true });
+  if (pausa) {
+    if (!p.dry) {
+      await encolarPedidoEnEspera({
+        enviosTable: p.enviosTable,
+        orderId: p.orderId,
+        orderNumber: p.orderNumber,
+        documento,
+        auto: p.auto === true,
+      });
+    }
+    return { kind: "en_pausa", mensaje: `${textoPausa(pausa)}. El pedido quedó en espera y se envía solo al terminar la pausa.` };
   }
 
   // ── Pre-validación VIVA contra Switch: sku → artículo (precio + codigoBarraId) ──

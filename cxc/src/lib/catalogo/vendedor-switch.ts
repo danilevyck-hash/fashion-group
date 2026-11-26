@@ -168,6 +168,26 @@ export async function vendedorDelUsuario(
   return { id, nombre: (data.vendedor_nombre as string | null) ?? null };
 }
 
+/**
+ * Un vendedor de Switch ya ASIGNADO a algún usuario en esta empresa. Lo usa el
+ * checkout cuando «Pausar Switch» no deja leer la lista viva de vendedores.
+ */
+export async function vendedorAsignadoEnEmpresa(
+  empresaKey: string,
+  id: number,
+): Promise<VendedorMapeado | null> {
+  const { supabaseServer } = await import("@/lib/supabase-server");
+  const { data, error } = await supabaseServer
+    .from("fg_user_switch_vendedor")
+    .select("vendedor_id, vendedor_nombre")
+    .eq("empresa_key", empresaKey)
+    .eq("vendedor_id", id)
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return { id: Number(data.vendedor_id), nombre: (data.vendedor_nombre as string | null) ?? null };
+}
+
 /** Lo que un pedido guarda de su vendedor (el id manda; el nombre acompaña). */
 export interface VendedorDePedido {
   vendedor_switch_id: number | null;

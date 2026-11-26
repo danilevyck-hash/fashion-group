@@ -20,7 +20,11 @@ import { requirePedido } from "@/lib/catalogo/require-pedido";
 import { leerCategoriaYBulto } from "./bulto-productos";
 import { supabaseServer } from "@/lib/supabase-server";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
-import { enviarPedidoSwitch, type EnvioItem, type EnvioResult } from "@/lib/catalogo/switch-envio";
+import { enviarPedidoSwitch, type EnvioItem, type EnvioParams, type EnvioResult } from "@/lib/catalogo/switch-envio";
+import { pedidoEnEspera } from "@/lib/catalogo/pedidos-en-espera";
+import { leerPausaSwitch } from "@/lib/switch-api/pausa-io";
+import { textoPausa } from "@/lib/switch-api/pausa";
+import type { DocumentoSwitch } from "@/lib/catalogo/documento-switch";
 import { resolvePublicoSwitchActor } from "@/lib/catalogo/publico-switch-actor";
 import { tieneClienteElegido } from "@/lib/catalogo/cliente-elegido";
 import { normalizarDocumento } from "@/lib/catalogo/documento-switch";
@@ -104,14 +108,21 @@ export async function handleGetEnvio(req: NextRequest, marca: string, orderId: s
     console.error(`[enviar-switch ${marca}] envío de ${orderId}:`, error.message);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
-  return NextResponse.json({ envio: data ?? null });
+  // «Pausar Switch»: sin envío y anotado en espera → la confirmación lo dice
+  // («se envía solo al terminar la pausa») en vez de ofrecer «Enviar».
+  let enEspera: string | null = null;
+  if (!data && (await pedidoEnEspera(cfg.enviosTable, orderId).catch(() => false))) {
+    const pausa = await leerPausaSwitch();
+    enEspera = pausa
+      ? `${textoPausa(pausa)}. El pedido está en espera y se envía solo al terminar la pausa.`
+      : "En espera: se está enviando a Switch.";
+  }
+  return NextResponse.json({ envio: data ?? null, ...(enEspera ? { enEspera } : {}) });
 }
 
 export async function handlePostEnvio(req: NextRequest, marca: string, orderId: string): Promise<NextResponse> {
   const auth = requirePedido(req);
   if (auth instanceof NextResponse) return auth;
-  const cfg = MARCAS_CONFIG[marca];
-  const db = await cfg.db();
 
   // dry:true  = solo pre-validar (preview, cero escrituras)
   // auto:true = pre-validar y crear EN EL MISMO VIAJE si no hay nada que
@@ -132,19 +143,39 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
     documento = normalizarDocumento(body?.documento);
   } catch { /* body vacío = envío real */ }
 
+  const armado = await armarEnvioDePedido(marca, orderId, { dry, auto, documento });
+  if ("respuesta" in armado) return armado.respuesta;
+  return envioResultToResponse(await enviarPedidoSwitch(armado.params));
+}
+
+/**
+ * Arma el envío de un pedido YA GUARDADO (cliente, vendedor, bultos), con sus
+ * candados. Lo usan el «Enviar» de la pantalla y la puesta al día de los
+ * pedidos que esperaron una pausa de Switch: un solo camino.
+ */
+export async function armarEnvioDePedido(
+  marca: string,
+  orderId: string,
+  opts: { dry?: boolean; auto?: boolean; documento: DocumentoSwitch },
+): Promise<{ params: EnvioParams } | { respuesta: NextResponse }> {
+  const { dry = false, auto = false, documento } = opts;
+  const cfg = MARCAS_CONFIG[marca];
+  const db = await cfg.db();
+  const r = (body: unknown, status: number) => ({ respuesta: NextResponse.json(body, { status }) });
+
   let order: OrderRow | null;
   try {
     order = await fetchOrder(marca, orderId);
   } catch (e) {
     console.error(`[enviar-switch ${marca}]`, e);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+    return r({ error: "Error interno" }, 500);
   }
-  if (!order) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+  if (!order) return r({ error: "Pedido no encontrado" }, 404);
   if (order.status !== "confirmado") {
-    return NextResponse.json({ error: "Solo se pueden enviar a Switch pedidos confirmados" }, { status: 400 });
+    return r({ error: "Solo se pueden enviar a Switch pedidos confirmados" }, 400);
   }
   if (!order.items.length) {
-    return NextResponse.json({ error: "El pedido no tiene productos" }, { status: 400 });
+    return r({ error: "El pedido no tiene productos" }, 400);
   }
 
   // ── 🔴 EL CANDADO: sin cliente elegido a propósito, no sale ──
@@ -167,10 +198,8 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
   // definición del mismo `if` se separaría de la pantalla y volveríamos a tener
   // un botón verde con un servidor que rechaza (o peor, al revés).
   if (!tieneClienteElegido(order)) {
-    return NextResponse.json(
-      { error: "Este pedido no tiene cliente. Selecciona el cliente antes de enviarlo a Switch." },
-      { status: 422 },
-    );
+    return r(
+      { error: "Este pedido no tiene cliente. Selecciona el cliente antes de enviarlo a Switch." }, 422);
   }
 
   // Cliente: SIEMPRE el del pedido — el candado de arriba ya garantizó que hay
@@ -181,10 +210,8 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
   if (clienteId == null || vendedorId == null) {
     const resuelto = await resolvePublicoSwitchActor(supabaseServer, cfg.empresaKey);
     if (!resuelto.ok) {
-      return NextResponse.json(
-        { error: `El pedido no tiene cliente/vendedor de Switch asignados — ${resuelto.motivo}` },
-        { status: 422 },
-      );
+      return r(
+        { error: `El pedido no tiene cliente/vendedor de Switch asignados — ${resuelto.motivo}` }, 422);
     }
     clienteId = clienteId ?? resuelto.actor.clienteId;
     vendedorId = vendedorId ?? resuelto.actor.vendedorId;
@@ -219,7 +246,7 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
     order.items.map((i) => i.product_id),
   );
 
-  const result = await enviarPedidoSwitch({
+  const params: EnvioParams = {
     empresaKey: cfg.empresaKey,
     enviosTable: cfg.enviosTable,
     db,
@@ -241,9 +268,8 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
     // agujero de los 15 pedidos a nombre de "Contado" volvería a estar abierto,
     // solo que con otro nombre.
     documento,
-  });
-
-  return envioResultToResponse(result);
+  };
+  return { params };
 }
 
 export function envioResultToResponse(r: EnvioResult): NextResponse {
@@ -259,6 +285,9 @@ export function envioResultToResponse(r: EnvioResult): NextResponse {
       return NextResponse.json({ error: "Este pedido ya tiene un envío en curso" }, { status: 409 });
     case "switch_caido":
       return NextResponse.json({ error: r.error }, { status: 502 });
+    case "en_pausa":
+      // 202: no falló; quedó en espera y sale solo al terminar la pausa.
+      return NextResponse.json({ enEspera: true, mensaje: r.mensaje }, { status: 202 });
     case "prevalidacion":
       // `avisos` (con código) y `lineas` viajan para que la pantalla de
       // problema pueda mostrar los errores arriba y el pedido resuelto abajo.

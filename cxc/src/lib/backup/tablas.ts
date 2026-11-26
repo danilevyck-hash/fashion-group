@@ -215,6 +215,10 @@ export const TABLAS_PERSONAS = [
   "guia_transporte",
   "guia_items",
   "guias_destino_cliente",
+  // «Pausar Switch» (26-nov-2026): la escribe Daniel, y la cola de pedidos
+  // que esperaron la pausa no se puede volver a conseguir.
+  "switch_pausas",
+  "switch_pausa_pedidos",
   // La lista general de destinos que ofrece el campo Dirección (7-sep-2026).
   // La escriben personas —Angela y Andrea al armar una guía— y NO se puede
   // volver a conseguir: antes vivía en el localStorage de cada navegador.

@@ -21,7 +21,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState, type ReactNode } from "react";
-import SyncNowButton, { CLASE_BOTON_LINEA, type SyncNowOpcion } from "./SyncNowButton";
+import SyncNowButton, { AvisoPausaEnBoton, CLASE_BOTON_LINEA, type SyncNowOpcion } from "./SyncNowButton";
+import { usePausaSwitch } from "./usePausaSwitch";
 import { useEstadoSync, type SyncTable } from "./useEstadoSync";
 import { haceCuantoFrescura, horaDeFrescura } from "@/lib/ui/frescura";
 import { TEXTO_ACTUALIZANDO } from "@/lib/ui/actualizar-ahora";
@@ -62,6 +63,8 @@ type Toque =
       onActualizar: () => void | Promise<void>;
       /** La pantalla sigue ocupada aunque la promesa ya volvió (el reloj). */
       actualizando?: boolean;
+      /** La acción NO lee de Switch (el reloj de asistencia): no se apaga en una pausa. */
+      sinSwitch?: boolean;
       deshabilitado?: boolean;
       opciones?: never;
     }
@@ -95,6 +98,7 @@ function Giro({ girando, grande = false }: { girando: boolean; grande?: boolean 
 
 function Linea(props: LineaDeFrescuraProps & { iso: string | null }) {
   const { iso, forma, className } = props;
+  const pausa = usePausaSwitch();
   // «hace 5 min» se mueve solo, sin volver a preguntar.
   const [ahora, setAhora] = useState(() => new Date());
   useEffect(() => {
@@ -165,6 +169,9 @@ function Linea(props: LineaDeFrescuraProps & { iso: string | null }) {
         sinPermiso={sinToque}
       />
     );
+  } else if (props.onActualizar && pausa?.activa && !props.sinSwitch) {
+    // «Pausar Switch»: la acción propia también lee de Switch (Guías, Caja…).
+    toque = <AvisoPausaEnBoton texto={pausa.texto ?? "Switch en pausa"} variante="linea" />;
   } else if (props.onActualizar) {
     toque = (
       <BotonPropio

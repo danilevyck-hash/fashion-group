@@ -35,6 +35,7 @@ import { syncConEnganche } from "./syncNowClient";
 // `lib/ui/actualizar-ahora.ts`.
 import { TEXTO_ACTUALIZANDO, TEXTO_ACTUALIZAR_AHORA } from "@/lib/ui/actualizar-ahora";
 import { vidrioSobre } from "@/lib/ui/vidrio";
+import { usePausaSwitch } from "./usePausaSwitch";
 
 export interface SyncNowOpcion {
   /** Módulo del endpoint: estadocuenta | facturas | recibos | clientes-master |
@@ -174,7 +175,17 @@ export default function SyncNowButton({
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
 
+  // 🔴 «Pausar Switch» (26-nov-2026): mientras dure, ningún «Actualizar» lee de
+  // Switch. El botón dice hasta cuándo y queda apagado. Los módulos sin Switch
+  // (refresh-vistas, clientes-master) siguen funcionando.
+  const pausa = usePausaSwitch();
+  const tocaSwitch = opciones.some((o) => o.modulo !== "refresh-vistas" && o.modulo !== "clientes-master");
+
   if (!visible) return <>{sinPermiso}</>;
+
+  if (pausa?.activa && tocaSwitch) {
+    return <AvisoPausaEnBoton texto={pausa.texto ?? "Switch en pausa"} variante={variante} className={className} />;
+  }
 
   const showToast = (msg: string, error: boolean) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -328,5 +339,31 @@ export default function SyncNowButton({
         </EnLaPilaDeAvisos>
       )}
     </div>
+  );
+}
+
+/** Lo que ocupa el lugar de «Actualizar» mientras Switch está en pausa. */
+export function AvisoPausaEnBoton({
+  texto,
+  variante = "boton",
+  className,
+}: {
+  texto: string;
+  variante?: "boton" | "linea";
+  className?: string;
+}) {
+  return (
+    <span
+      role="status"
+      data-switch-pausa
+      title="Switch está en pausa desde Usuarios. Al terminar, todo se actualiza solo."
+      className={
+        variante === "linea"
+          ? `inline-flex min-h-[44px] items-center text-left text-amber-700 md:[@media(pointer:fine)]:min-h-0 ${className ?? ""}`
+          : `inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-800 ${className ?? ""}`
+      }
+    >
+      {texto}
+    </span>
   );
 }

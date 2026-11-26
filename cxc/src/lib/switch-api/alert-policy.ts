@@ -103,6 +103,7 @@
  * empresa_key+sync_type en switch_sync_log; ese log es la fuente del streak.
  */
 
+import { esErrorDePausa } from "./pausa";
 import { supabaseServer } from "@/lib/supabase-server";
 import { shortError } from "@/lib/telegram";
 import { enviarSistema } from "@/lib/alertas/canal";
@@ -434,7 +435,8 @@ export async function evaluateSwitchEscalation(
       console.error(`[alert-policy] no pude leer switch_sync_log (${empresaKey}/${syncType}): ${error?.message ?? "vacío"}`);
       return { escalate: true, streak: 0, sinceIso: null, motivo: "lectura-fallo" };
     }
-    const rows = data as SyncLogStreakRow[];
+    // Una corrida cortada por «Pausar Switch» no es un fallo: no entra a la racha.
+    const rows = (data as SyncLogStreakRow[]).filter((r) => !esErrorDePausa(r.error_message ?? ""));
     if (rows.length === 0) {
       // El par no tiene UNA sola corrida registrada: su logging está roto de
       // raíz y la racha nunca va a poder medir. Fail-open, o el silencio sería
@@ -583,7 +585,8 @@ export async function alertSwitchCronErrors(
   const nota = opts?.nota ? `\n${opts.nota}` : "";
 
   const evaluados: ErrorEscalado[] = [];
-  for (const e of errores) {
+  // 🔴 «Pausar Switch»: lo que cortó la pausa no es una avería. Nada de 🔧 SISTEMA.
+  for (const e of errores.filter((x) => !esErrorDePausa(x.error))) {
     // LICENCIA no espera una segunda corrida: el proveedor nos cortó el
     // servicio y ninguna corrida siguiente lo va a arreglar.
     const escalacion: EscalationSwitch = alertaInmediataSiempre(e.error)

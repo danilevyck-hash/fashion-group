@@ -3,6 +3,7 @@
 // del `switch-sync all` de las 05:40 y a 50 del `sync-utilidad` de las 07:00.
 // Con `PEDIDOS_BODEGA_2026_10 = false` no abre Switch: contesta y sale.
 import { NextRequest, NextResponse } from "next/server";
+import { respuestaSiSwitchEnPausa } from "@/lib/switch-api/pausa-cron";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncAllPedidos } from "@/lib/switch-api/sync-pedidos";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
@@ -20,6 +21,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   if ((req.headers.get("authorization") ?? "") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // 🔴 «Pausar Switch»: en pausa termina aquí, sin fila ni alerta (ni éxito ni fallo).
+  const enPausa = await respuestaSiSwitchEnPausa("sync-pedidos");
+  if (enPausa) return enPausa;
   if (!PEDIDOS_BODEGA_2026_10) return NextResponse.json({ ok: true, apagado: true });
 
   const results = await syncAllPedidos("cron");

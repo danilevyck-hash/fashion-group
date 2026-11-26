@@ -10,6 +10,7 @@
  * dentro de la ventana.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { respuestaSiSwitchEnPausa } from "@/lib/switch-api/pausa-cron";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import {
   syncEmpresaRecibos,
@@ -34,6 +35,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   if ((req.headers.get("authorization") ?? "") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // 🔴 «Pausar Switch»: en pausa termina aquí, sin fila ni alerta (ni éxito ni fallo).
+  const enPausa = await respuestaSiSwitchEnPausa("sync-recibos");
+  if (enPausa) return enPausa;
 
   const sp = req.nextUrl.searchParams;
   const hasParams = [...sp.keys()].length > 0;

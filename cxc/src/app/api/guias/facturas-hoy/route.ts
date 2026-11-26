@@ -30,6 +30,8 @@
 // nada, y sin él cada vez que se abre la pantalla entraría a Switch.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { leerPausaSwitch } from "@/lib/switch-api/pausa-io";
+import { textoPausa } from "@/lib/switch-api/pausa";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/require-auth";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -80,6 +82,10 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as { automatico?: unknown } | null;
   const automatico = body?.automatico === true;
   const resultados: ResultadoEmpresa[] = [];
+  // 🔴 «Pausar Switch»: ni el toque ni el refresco automático de Etiquetas
+  // entran a Switch. Se despacha con lo que hay en la base.
+  const pausa = await leerPausaSwitch();
+  if (pausa) return NextResponse.json({ ok: true, hoy, resultados, enPausa: textoPausa(pausa) });
 
   // Una empresa: nunca lanza, devuelve su resultado.
   const una = async (empresa: string): Promise<ResultadoEmpresa> => {

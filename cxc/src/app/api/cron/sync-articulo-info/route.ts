@@ -38,6 +38,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { respuestaSiSwitchEnPausa } from "@/lib/switch-api/pausa-cron";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { EMPRESAS_ARTICULO_INFO, syncArticuloInfo, type ArticuloInfoSyncResult } from "@/lib/switch-api/sync-articulo-info";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
@@ -65,6 +66,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   if ((req.headers.get("authorization") ?? "") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // 🔴 «Pausar Switch»: en pausa termina aquí, sin fila ni alerta (ni éxito ni fallo).
+  const enPausa = await respuestaSiSwitchEnPausa("sync-articulo-info");
+  if (enPausa) return enPausa;
 
   const crudas = (req.nextUrl.searchParams.get("empresas") ?? "")
     .split(",")

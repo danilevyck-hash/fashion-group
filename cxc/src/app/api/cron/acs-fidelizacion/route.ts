@@ -18,6 +18,7 @@
 // 17 min de margen antes de las 17:00.
 
 import { NextRequest, NextResponse } from "next/server";
+import { respuestaSiSwitchEnPausa } from "@/lib/switch-api/pausa-cron";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { runAcsFidelizacionSync } from "@/lib/switch-api/sync-acs-fidelizacion";
 import {
@@ -41,6 +42,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   if (auth !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // 🔴 «Pausar Switch»: en pausa termina aquí, sin fila ni alerta (ni éxito ni fallo).
+  const enPausa = await respuestaSiSwitchEnPausa("acs-fidelizacion");
+  if (enPausa) return enPausa;
 
   // Segunda oportunidad (jul-2026): el cron tiene 2 entradas (11:30 y 16:30
   // UTC). Si la 1ª ya registró success HOY (día UTC), la 2ª no repite el

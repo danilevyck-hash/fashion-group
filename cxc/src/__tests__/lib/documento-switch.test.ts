@@ -237,10 +237,17 @@ describe("🔴 la advertencia y la elección viven en UN solo lugar", () => {
     // Si el 422 quedara después de resolver la salida, una cotización podría
     // colarse por un camino que el pedido no tiene. El orden es el candado.
     const src = sinComentarios(SRC("src/lib/catalogo/enviar-switch-route.ts"));
+    // Desde «Pausar Switch» (26-nov-2026) el pedido se ARMA en
+    // `armarEnvioDePedido` (lo reusa el envío de los que esperaron la pausa):
+    // el candado vive adentro, y la ruta arma ANTES de llamar al motor.
+    const armar = src.indexOf("export async function armarEnvioDePedido(");
     const candado = src.indexOf("tieneClienteElegido(order)");
-    const motor = src.indexOf("enviarPedidoSwitch({");
-    expect(candado).toBeGreaterThan(-1);
-    expect(motor).toBeGreaterThan(candado);
+    const llamaArmar = src.indexOf("await armarEnvioDePedido(");
+    const motor = src.indexOf("enviarPedidoSwitch(armado.params)");
+    expect(armar).toBeGreaterThan(-1);
+    expect(candado).toBeGreaterThan(armar);
+    expect(llamaArmar).toBeGreaterThan(-1);
+    expect(motor).toBeGreaterThan(llamaArmar);
   });
 });
 

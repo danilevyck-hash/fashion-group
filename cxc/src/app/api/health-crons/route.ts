@@ -58,6 +58,8 @@
 // el monitor externo alarme por lo que no es. Ver el bloque de AUTH en el GET.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { switchEnPausaOGracia } from "@/lib/switch-api/pausa-io";
+import { esCronDeSwitch } from "@/lib/switch-api/pausa";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -305,6 +307,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // Los hallazgos van SIEMPRE en el cuerpo (stale[]); el 503 se reserva para lo
   // que el watchdog Telegram interno no puede reportar por sí mismo. Ver el
   // bloque "Veredicto del vigía EXTERNO" en cron-telemetry.ts.
+  // 🔴 «Pausar Switch»: durante la pausa y su gracia los crons de Switch no
+  //    corren a propósito. No cuentan para el 503 (ni para la caída masiva);
+  //    se informan aparte en `enPausaSwitch`.
+  const enPausaSwitch: typeof stale = [];
+  if (await switchEnPausaOGracia()) {
+    for (let i = stale.length - 1; i >= 0; i--) {
+      if (esCronDeSwitch(stale[i].cron)) enPausaSwitch.unshift(...stale.splice(i, 1));
+    }
+  }
   const veredicto = veredictoVigiaExterno({ stale: stale.map((s) => s.cron) });
   const ok = stale.length === 0;
   return NextResponse.json(
@@ -327,6 +338,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       slotsUnseeded,
       slotsCubiertosCount: slotsCubiertos.length,
       slotsCubiertos,
+      enPausaSwitch,
     },
     { status: veredicto.http },
   );

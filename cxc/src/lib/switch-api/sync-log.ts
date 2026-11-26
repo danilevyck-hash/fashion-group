@@ -23,6 +23,7 @@ export type SwitchSyncTriggeredBy = "cron" | "manual" | "backfill";
 // correr. Se re-exportan acá porque este es el archivo que los usa.
 export { SYNC_LOG_TYPES, type SyncLogType } from "./sync-log-tipos";
 import type { SyncLogType } from "./sync-log-tipos";
+import { frenoDePausaSwitch } from "./pausa-io";
 
 // ─── Lock de corrida en curso (índice único parcial) ─────────────────────────
 // DDL 20260723150000_switch_sync_running_lock.sql (manual): índice único
@@ -261,6 +262,10 @@ export async function createSwitchSyncLog(opts: {
   rangeFrom?: string | null;
   rangeTo?: string | null;
 }): Promise<string | null> {
+  // 🔴 «Pausar Switch»: en pausa no nace ninguna fila (ni 'running' ni
+  // 'error'). La corrida no cuenta para la regla de 2 fallos ni para la
+  // frescura: simplemente no ocurrió. Lanza SwitchEnPausaError.
+  await frenoDePausaSwitch();
   try {
     // Auto-sana huérfanos antes del insert: con el índice único de 'running'
     // una fila atascada bloquearía este insert para siempre.

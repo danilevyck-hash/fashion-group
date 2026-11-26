@@ -1532,3 +1532,25 @@ Dos corridas a la vez en la misma empresa expulsan la sesión de Switch, así qu
 4. Al día siguiente, mirar que el latido `switch-sync:facturas-1150` tenga la fecha de hoy y `cron.job_run_details` 15 corridas `succeeded`.
 
 Si la solicitud entrara DESPUÉS de las 11:50 UTC con la migración ya aplicada, los dos relojes dispararían a la vez: **no hacerlo**. Volver atrás: `select cron.unschedule(jobname) from cron.job where jobname like 'fg-switch-sync-facturas-%';` y revertir la solicitud.
+
+## «Pausar Switch» (26-nov-2026)
+
+**Por qué.** Daniel entra al panel de Switch con el MISMO usuario (`daniel`) que usa el sistema, y Switch admite una sola sesión por usuario: cada cron, cada «Actualizar» y cada envío de pedido lo sacaba del panel. Aprobó un control en **Usuarios** (solo admin): escribe las horas (entero o decimal, **máximo 24**, sugiere 1) y tiene «Reanudar ahora». Mientras dura, el encabezado le muestra al admin «Switch en pausa hasta las 3:00 p. m. · Reanudar».
+
+**Dónde vive.**
+- Reglas y textos: `src/lib/switch-api/pausa.ts` (puro). Base y caché de 15 s: `pausa-io.ts` (falla ABIERTA: si la base no contesta, sigue sin pausa). Crons y pedidos en espera: `pausa-cron.ts`. API: `/api/switch-pausa` (GET con sesión, POST solo admin). Rastro en `activity_logs` (`switch_pausar`, `switch_reanudar`, `switch_pausa_pedidos_enviados`).
+- Tablas (migración `20270128120000_switch_pausa.sql`, aplicada): `switch_pausas` (quién, desde, hasta, reanudada_en/por; CHECK de 24 h) y `switch_pausa_pedidos` (la cola de pedidos en espera). Las dos son `personas` en el respaldo.
+
+**El freno, en UN lugar.** `frenoDePausaSwitch()` corre al principio de `rawCall` (API con token: el login `/autenticacion` y toda lectura) y de `webFetch` (panel web: el login con `changesession=SI`). Son las únicas funciones que hacen `fetch` a Switch; `switch-pausa.test.ts` barre que nadie más lea las URL ni haga login. `createSwitchSyncLog` también frena antes de escribir: en pausa no nace ninguna fila en `switch_sync_log`.
+
+**Los crons.** Los 18 de `CRONS_DE_SWITCH` llaman `respuestaSiSwitchEnPausa("<cron>")` tras validar el secreto: en pausa contestan 200 `{ enPausa: true }` y nada más — ni éxito ni fallo, ni heartbeat. No cuentan para:
+- la regla de 2 fallos seguidos (no hay fila; si la pausa empieza a media corrida, `alertSwitchCronErrors` y la racha descartan el error por su marca `SWITCH_EN_PAUSA`),
+- dato viejo (+24 h), el silencio A/B y los crons de Switch de `crons-que-avisan`: la reconciliación los calla durante la pausa y **26 h después** (`GRACIA_TRAS_PAUSA_HORAS`), tiempo en que la primera corrida diaria se pone al día,
+- `/api/health-crons`: los heartbeats de Switch viejos por la pausa salen de `stale` (no dan 503 ni «caída masiva») y se informan en `enPausaSwitch`.
+El vigía del reloj (`asistencia-vigia`) no toca Switch y no cambia. `cobros-del-dia` no se frena: si Switch no contesta, ya dice «+90 sin actualizar».
+
+**«Actualizar».** `SyncNowButton` y `LineaDeFrescura` preguntan `/api/switch-pausa` (una vez por minuto por pestaña) y, en pausa, ponen en su lugar «Switch en pausa hasta las …». El reloj de asistencia (`sinSwitch`) no se apaga. El servidor también frena: `/api/admin/sync-now` contesta 423 y `/api/guias/facturas-hoy` (incluido el refresco automático de Etiquetas) no entra.
+
+**Pedidos del catálogo.** En pausa el motor (`enviarPedidoSwitch`) no pre-valida ni envía: anota el pedido en `switch_pausa_pedidos` (con su documento, pedido o cotización) y devuelve `en_pausa`. Sin fila «error» ni 🔧 SISTEMA; la confirmación dice «Switch en pausa hasta las … El pedido está en espera y se envía solo al terminar la pausa». Salen solos: al tocar «Reanudar» (en el acto) o, si la pausa vence por tiempo, al arrancar el primer cron de Switch después (facturas corre cada hora). Cada fila se toma con un update condicional de `tomado_en` y sale por el MISMO camino del checkout en segundo plano (`armarEnvioDePedido` + `enviarEnSegundoPlano`): el candado at-most-once (fila `pendiente` + índice único parcial) no cambió. En pausa, un vendedor distinto al del usuario vale solo si ya está asignado en Usuarios (la lista viva no se puede leer).
+
+**Al terminar.** Nada que hacer: cada cron se pone al día en su corrida siguiente y la reconciliación (10/14/18 UTC) re-ejecuta los turnos de `switch-sync` perdidos. ⚠️ Un cron semanal (`sync-clientes-boston`, domingo) que caiga dentro de la pausa espera al domingo siguiente.

@@ -37,6 +37,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { respuestaSiSwitchEnPausa } from "@/lib/switch-api/pausa-cron";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import {
@@ -100,6 +101,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   if ((req.headers.get("authorization") ?? "") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // 🔴 «Pausar Switch»: en pausa termina aquí, sin fila ni alerta (ni éxito ni fallo).
+  const enPausa = await respuestaSiSwitchEnPausa("switch-sync");
+  if (enPausa) return enPausa;
 
   const sp = req.nextUrl.searchParams;
 

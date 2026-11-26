@@ -30,6 +30,8 @@
  * los crons).
  */
 
+import { leerPausaSwitch } from "@/lib/switch-api/pausa-io";
+import { textoPausa } from "@/lib/switch-api/pausa";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { puedePedir } from "@/lib/catalogo/roles";
@@ -237,6 +239,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const cfg = moduloConfig(modulo);
+  // 🔴 «Pausar Switch»: «Actualizar» no entra a Switch mientras dure la pausa.
+  if (cfg.tocaSwitch) {
+    const pausa = await leerPausaSwitch();
+    if (pausa) return NextResponse.json({ error: `${textoPausa(pausa)}.`, motivo: "pausa" }, { status: 423 });
+  }
   let empresa: string | null = null;
   if (cfg.empresas) {
     empresa = typeof body.empresa === "string" ? body.empresa : "";

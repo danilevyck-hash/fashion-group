@@ -47,6 +47,9 @@ export function motivoSinEnvio(r: EnvioResult): string | null {
       return `No pasó la pre-validación de Switch: ${r.errores.join(" · ")}`;
     case "switch_caido":
       return r.error;
+    case "en_pausa":
+      // «Pausar Switch»: quedó en espera, no es un fallo. Sin fila ni aviso.
+      return null;
     case "preorders":
       return `El pedido tiene ${r.count} producto(s) en preventa — no se pueden enviar a Switch`;
     default:
@@ -57,17 +60,21 @@ export function motivoSinEnvio(r: EnvioResult): string | null {
   }
 }
 
-/** Corre el envío completo; nunca lanza. Cierra SOLO la sesión de su empresa. */
-export async function enviarEnSegundoPlano(p: EnvioParams): Promise<void> {
+/** Corre el envío completo; nunca lanza. Cierra SOLO la sesión de su empresa.
+ *  Devuelve el desenlace (`kind`, o «error» si el motor lanzó). */
+export async function enviarEnSegundoPlano(p: EnvioParams): Promise<string> {
   let motivo: string | null = null;
+  let kind = "error";
   try {
-    motivo = motivoSinEnvio(await enviarPedidoSwitch(p));
+    const r = await enviarPedidoSwitch(p);
+    kind = r.kind;
+    motivo = motivoSinEnvio(r);
   } catch (e) {
     motivo = `Error inesperado al enviar: ${e instanceof Error ? e.message : String(e)}`;
   } finally {
     await logoutSwitchSessions([p.empresaKey]);
   }
-  if (!motivo) return;
+  if (!motivo) return kind;
   try {
     // Solo si no quedó una fila viva (una 'pendiente' a medias manda: no se
     // tapa con un error que invitaría a reintentar algo que pudo salir).
@@ -94,4 +101,5 @@ export async function enviarEnSegundoPlano(p: EnvioParams): Promise<void> {
   await enviarSistema(
     `🚨 Envío a Switch NO SALIÓ — ${p.marcaLabel} ${p.orderNumber}: ${shortError(motivo)} (se puede reintentar desde la confirmación)`,
   ).catch((e) => console.error("[envio-segundo-plano] aviso:", e));
+  return kind;
 }

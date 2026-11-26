@@ -44,6 +44,8 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
   const cfg = { catalogHref: theme.catalogoHref, api: theme.api };
   const [order, setOrder] = useState<Order | null>(null);
   const [envio, setEnvio] = useState<Envio | null | undefined>(undefined);
+  // «Pausar Switch»: el pedido quedó en espera y sale solo al terminar la pausa.
+  const [enEspera, setEnEspera] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [retryMsg, setRetryMsg] = useState<string | null>(null);
   // 🔴 EL ROL DECIDE A DÓNDE LLEVA EL BOTÓN DE LA LISTA. Esta pantalla la ven
@@ -61,6 +63,7 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
     ]);
     setOrder(oRes);
     setEnvio(eRes?.envio ?? null);
+    setEnEspera(eRes?.envio ? null : eRes?.enEspera ?? null);
   }, [cfg.api, orderId]);
 
   useEffect(() => { load(); }, [load]);
@@ -73,7 +76,7 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
   useEffect(() => {
     try { setEsperandoEnvio(new URLSearchParams(window.location.search).get("enviando") === "1"); } catch { /* */ }
   }, []);
-  const enCurso = envio?.estado === "pendiente" || (esperandoEnvio && envio === null);
+  const enCurso = envio?.estado === "pendiente" || (esperandoEnvio && envio === null && !enEspera);
   const [vencido, setVencido] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setVencido(true), 120_000);
@@ -114,7 +117,7 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
   // (estado error): decir "no se completó" sin intento previo confunde
   // (diagnóstico del piloto 4-jul).
   const sinIntento = envio === null;
-  const puedeReintentar = !enviando && (sinIntento || envio?.estado === "error");
+  const puedeReintentar = !enviando && !enEspera && (sinIntento || envio?.estado === "error");
   // Qué hay en Switch. Envío viejo o DDL pendiente = pedido, que es lo único
   // que este sistema sabía crear antes del 24-ago-2026.
   const documento = normalizarDocumento(envio?.documento);
@@ -153,6 +156,8 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
                 Switch no respondió al enviar — el pedido pudo o no haberse creado allá.
                 Revisa el panel de Switch antes de reintentar.
               </p>
+            ) : enEspera ? (
+              <p className="mt-1 text-sm text-amber-800" role="status">{enEspera}</p>
             ) : enviando ? (
               <p className="mt-1 text-sm text-gray-600" role="status">Enviando a Switch…</p>
             ) : sinIntento ? (

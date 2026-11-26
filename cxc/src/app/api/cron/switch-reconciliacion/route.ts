@@ -46,6 +46,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import { respuestaSiSwitchEnPausa } from "@/lib/switch-api/pausa-cron";
+import { switchEnPausaOGracia } from "@/lib/switch-api/pausa-io";
+import { esCronDeSwitch } from "@/lib/switch-api/pausa";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
@@ -789,9 +792,9 @@ async function checkStaleCrons(): Promise<string[]> {
  *
  * No lanza: un fallo mirando los heartbeats no puede tumbar la reconciliación.
  */
-async function checkCronsQueAvisan(): Promise<string[]> {
+async function checkCronsQueAvisan(enGraciaDePausa: boolean): Promise<string[]> {
   try {
-    return await revisarCronsQueAvisan();
+    return await revisarCronsQueAvisan(Date.now(), enGraciaDePausa ? esCronDeSwitch : undefined);
   } catch (err) {
     console.error(
       `[crons-que-avisan] no pude revisarlo: ${err instanceof Error ? err.message : String(err)}`,
@@ -992,6 +995,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   if ((req.headers.get("authorization") ?? "") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  // 🔴 «Pausar Switch»: en pausa termina aquí, sin fila ni alerta (ni éxito ni fallo).
+  const enPausa = await respuestaSiSwitchEnPausa("switch-reconciliacion");
+  if (enPausa) return enPausa;
 
   const startedMs = Date.now();
   const elapsed = () => Date.now() - startedMs;
@@ -1037,13 +1043,18 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const staleCrons = await checkStaleCrons();
   // 0b-bis-0. Las tareas cuyo PRODUCTO es el mensaje: si no corren, el fallo es
   //           el silencio mismo y no hay dato viejo que lo delate.
-  const cronsSinAvisar = await checkCronsQueAvisan();
+  // 🔴 «Pausar Switch»: en las horas que siguen a una pausa los datos están
+  //    viejos A PROPÓSITO y se están poniendo al día. Dato viejo, el silencio
+  //    (A/B) y los crons de Switch que avisan se callan durante la gracia
+  //    (`GRACIA_TRAS_PAUSA_HORAS`). La regla de 2 fallos NO se calla.
+  const enGraciaDePausa = await switchEnPausaOGracia();
+  const cronsSinAvisar = await checkCronsQueAvisan(enGraciaDePausa);
   // 0b-bis. REGLA 1: la única alerta de datos — cartera/ventas con más de 24 h.
-  const datosViejos = await checkDatosViejos();
+  const datosViejos = enGraciaDePausa ? [] : await checkDatosViejos();
   // 0b-ter. Las dos alertas del SILENCIO: un sync que trajo cero donde siempre
   //         trae cientos (A) y una tabla de negocio que dejó de recibir
   //         escrituras (B). Van juntas y mandan UN mensaje por módulo.
-  const silencioDeDatos = await checkSilencioDeDatos();
+  const silencioDeDatos = enGraciaDePausa ? [] : await checkSilencioDeDatos();
   // 0b-quater. El cuadre de costo: lo que el Resumen muestra por mes cerrado
   //            contra el total de ventas por día de Switch (que trae las ND).
   const cuadreCosto = await checkCuadreCosto();
