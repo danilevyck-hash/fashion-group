@@ -125,8 +125,8 @@ export function ReferenciaView() {
   // Va POR EMPRESA porque el catálogo de Switch se trae por empresa; lo normal
   // es una sola (un código vive en una), y cuando el modelo aparece en dos van
   // EN SERIE: la sesión de Switch es una por usuario y dos logins simultáneos
-  // se tumban entre sí. El acelerador de 10 min vive en el SERVIDOR, así que
-  // dos toques seguidos no abren dos sesiones aunque la pantalla se recargue.
+  // se tumban entre sí. Sin freno de 10 min (26-nov-2026): cada toque lee de
+  // Switch; mientras corre, el botón queda deshabilitado.
   const empresasDeLaBusqueda = useMemo(
     () => [...new Set((resp?.articulos ?? []).map((a) => a.empresa))],
     [resp],

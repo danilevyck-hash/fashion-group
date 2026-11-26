@@ -580,7 +580,7 @@ export default function PedidosView({
       opciones={susEmpresas.map((empresa) => ({ modulo: "pedidos", empresa, label: nombreCortoEmpresa(empresa) }))}
       secuencial
       paralelo={PEDIDOS_ACTUALIZAR_EN_PARALELO}
-      engancharRunning
+      resumenExito={(n) => `${n === 1 ? "1 pedido" : `${n} pedidos`} al día`}
       roles={[...PEDIDOS_BODEGA_ROLES]}
       onSuccess={cargar}
     />

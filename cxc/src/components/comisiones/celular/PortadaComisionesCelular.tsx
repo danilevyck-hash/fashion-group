@@ -171,7 +171,7 @@ export function PortadaComisionesCelular({
   ) : conDescarga ? (
     <LineaDeFrescura
       forma="celular"
-      tabla="facturas"
+      tabla="recibos"
       empresas={B2B_EMPRESA_KEYS}
       opciones={SYNC_NOW_RECIBOS_COMISIONES}
       onSuccess={onActualizado}

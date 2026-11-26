@@ -1,8 +1,7 @@
 /**
- * Candado del sync manual "Actualizar ahora" (/api/admin/sync-now):
- *   - los 2 motivos de 409 (running —mismo tipo o cross-type— / cooldown) y su
- *     orden. La ventana "cron-proximo" se ELIMINÓ (jul-2026): el clic siempre
- *     actualiza; la concurrencia real la cubre el running cross-type.
+ * Candado del sync manual "Actualizar" (/api/admin/sync-now):
+ *   - 🔴 EN VIVO (26-nov-2026): no hay freno de 10 min; con una corrida viva de
+ *     la empresa se ESPERA y se une a ella (`esperarCorridaEnCurso`).
  *   - el cronograma espejo de vercel.json (proximoCronParaEmpresa, que queda
  *     en cron-telemetry para telemetría),
  *   - la llave de lock por módulo (lockKeyDe) y la detección del conflicto
@@ -22,113 +21,61 @@ vi.mock("@/lib/telegram", () => ({
 }));
 
 import { proximoCronParaEmpresa } from "@/lib/cron-telemetry";
+import * as syncNow from "@/lib/switch-api/sync-now";
 import {
-  precheckSyncNow,
   lockKeyDe,
   isSyncNowModulo,
   moduloConfig,
   rolesSyncNow,
   SYNC_NOW_MODULOS,
-  SYNC_NOW_COOLDOWN_MIN,
 } from "@/lib/switch-api/sync-now";
-import { isRunningLockConflict } from "@/lib/switch-api/sync-log";
+import { isRunningLockConflict, esperarCorridaEnCurso } from "@/lib/switch-api/sync-log";
+import { supabaseServer } from "@/lib/supabase-server";
 
-const minAntes = (base: Date, min: number) => new Date(base.getTime() - min * 60_000).toISOString();
+/** Doble de la base: cada `.limit()` entrega la siguiente lista de corridas vivas;
+ *  `.maybeSingle()` entrega la fila final de la corrida unida. */
+function baseConCorridas(vueltas: { id: number; sync_type: string }[][], final: unknown) {
+  let i = 0;
+  const q: Record<string, unknown> = {};
+  for (const m of ["select", "eq", "gte"]) q[m] = () => q;
+  q.limit = async () => ({ data: vueltas[Math.min(i++, vueltas.length - 1)], error: null });
+  q.maybeSingle = async () => ({ data: final, error: null });
+  vi.mocked(supabaseServer.from).mockImplementation(() => q as never);
+}
 
-// 12:00 UTC = 7:00 Panamá — instante de referencia arbitrario para los tests
-// de running/cooldown (el precheck ya no mira el cronograma de crons).
-const AHORA = new Date("2026-07-23T12:00:00Z");
-
-describe("precheckSyncNow — motivo running (mismo tipo)", () => {
-  it("409 running con corrida fresca (<30 min), con el 'hace X min' en el detalle", () => {
-    const r = precheckSyncNow({
-      ahora: AHORA,
-      runningStartedAt: minAntes(AHORA, 5),
-      lastSuccessFinishedAt: null,
-    });
-    expect(r?.motivo).toBe("running");
-    expect(r?.detalle).toContain("actualización en curso");
-    expect(r?.detalle).toContain("hace 5 min");
-    // El cliente se engancha al running: el detalle NO trae instrucciones de
-    // esperar ("espera", "sync de las HH:MM").
-    expect(r?.detalle.toLowerCase()).not.toContain("espera");
-  });
-
-  it("una fila running huérfana (>30 min) NO bloquea", () => {
-    const r = precheckSyncNow({
-      ahora: AHORA,
-      runningStartedAt: minAntes(AHORA, 45),
-      lastSuccessFinishedAt: null,
-    });
-    expect(r).toBeNull();
-  });
-
-  it("running gana sobre cooldown (orden de capas)", () => {
-    const r = precheckSyncNow({
-      ahora: AHORA,
-      runningStartedAt: minAntes(AHORA, 2),
-      lastSuccessFinishedAt: minAntes(AHORA, 3),
-    });
-    expect(r?.motivo).toBe("running");
+describe("🔴 «Actualizar» en vivo: sin freno de 10 min (26-nov-2026)", () => {
+  it("ya no existe el cooldown ni el pre-check que lo aplicaba", () => {
+    expect("SYNC_NOW_COOLDOWN_MIN" in syncNow).toBe(false);
+    expect("precheckSyncNow" in syncNow).toBe(false);
   });
 });
 
-describe("precheckSyncNow — running cross-type (misma empresa, otro sync_type)", () => {
-  it("409 running si OTRO sync_type de la empresa corre fresco (ej. cron tipo=all)", () => {
-    const r = precheckSyncNow({
-      ahora: AHORA,
-      runningStartedAt: null,
-      runningOtroStartedAt: minAntes(AHORA, 3),
-      lastSuccessFinishedAt: null,
-    });
-    expect(r?.motivo).toBe("running");
-    expect(r?.detalle).toContain("actualización en curso");
+describe("esperarCorridaEnCurso — esperar o unirse, nunca omitir", () => {
+  it("sin corrida viva: libre, sin unirse (se lee de Switch)", async () => {
+    baseConCorridas([[]], null);
+    expect(await esperarCorridaEnCurso("vistana", "pedidos", { pollMs: 0 })).toEqual({ estado: "libre", unida: null });
   });
 
-  it("un running cross-type huérfano (>30 min) NO bloquea", () => {
-    const r = precheckSyncNow({
-      ahora: AHORA,
-      runningStartedAt: null,
-      runningOtroStartedAt: minAntes(AHORA, 40),
-      lastSuccessFinishedAt: null,
-    });
-    expect(r).toBeNull();
-  });
-});
-
-describe("precheckSyncNow — la cercanía de un cron YA NO bloquea (Ajuste 3, jul-2026)", () => {
-  it("con un cron a 25 min (vistana 15:45 → estadocuenta 16:10) el precheck deja pasar", () => {
-    // El precheck ya ni conoce el cronograma: solo running + cooldown. Se fija
-    // acá con un instante que ANTES caía dentro de la ventana de 40 min.
-    const ahora = new Date("2026-07-23T15:45:00Z");
-    expect(proximoCronParaEmpresa("vistana", ahora)?.enMinutos).toBe(25);
-    const r = precheckSyncNow({
-      ahora,
-      runningStartedAt: null,
-      lastSuccessFinishedAt: null,
-    });
-    expect(r).toBeNull();
-  });
-});
-
-describe("precheckSyncNow — motivo cooldown", () => {
-  it("409 si el último success fue hace menos de 10 min", () => {
-    const r = precheckSyncNow({
-      ahora: AHORA,
-      runningStartedAt: null,
-      lastSuccessFinishedAt: minAntes(AHORA, SYNC_NOW_COOLDOWN_MIN - 2),
-    });
-    expect(r?.motivo).toBe("cooldown");
-    expect(r?.detalle).toContain("hace 8 min");
+  it("corrida viva del MISMO tipo que termina bien: se une a ella", async () => {
+    const fin = { status: "success", finished_at: "2026-11-26T15:00:00Z", records_inserted: 0, records_updated: 7 };
+    baseConCorridas([[{ id: 1, sync_type: "pedidos" }], []], fin);
+    const r = await esperarCorridaEnCurso("vistana", "pedidos", { pollMs: 0 });
+    expect(r).toEqual({ estado: "libre", unida: fin });
   });
 
-  it("no bloquea pasado el cooldown", () => {
-    const r = precheckSyncNow({
-      ahora: AHORA,
-      runningStartedAt: null,
-      lastSuccessFinishedAt: minAntes(AHORA, SYNC_NOW_COOLDOWN_MIN + 1),
-    });
-    expect(r).toBeNull();
+  it("corrida del mismo tipo que termina con ERROR: libre sin unirse (corre la suya)", async () => {
+    baseConCorridas([[{ id: 1, sync_type: "pedidos" }], []], { status: "error" });
+    expect(await esperarCorridaEnCurso("vistana", "pedidos", { pollMs: 0 })).toEqual({ estado: "libre", unida: null });
+  });
+
+  it("corrida de OTRO tipo (sesión única): espera y luego corre la suya", async () => {
+    baseConCorridas([[{ id: 2, sync_type: "facturas" }], []], null);
+    expect(await esperarCorridaEnCurso("vistana", "pedidos", { pollMs: 0 })).toEqual({ estado: "libre", unida: null });
+  });
+
+  it("si sigue corriendo pasado el tope: ocupado", async () => {
+    baseConCorridas([[{ id: 1, sync_type: "pedidos" }]], null);
+    expect(await esperarCorridaEnCurso("vistana", "pedidos", { pollMs: 0, maxMs: 0 })).toEqual({ estado: "ocupado" });
   });
 });
 
@@ -157,7 +104,7 @@ describe("proximoCronParaEmpresa — espejo de vercel.json", () => {
   });
 
   it("empresa desconocida → null", () => {
-    expect(proximoCronParaEmpresa("no_existe", AHORA)).toBeNull();
+    expect(proximoCronParaEmpresa("no_existe", new Date("2026-07-23T12:00:00Z"))).toBeNull();
   });
 });
 
@@ -197,14 +144,12 @@ describe("lockKeyDe / config por módulo", () => {
     expect(moduloConfig("estadocuenta").empresas).not.toContain("confecciones_boston");
   });
 
-  it("refresh-vistas: DB-only — sin empresa, sin Switch, sin lock; cooldown por heartbeats", () => {
+  it("refresh-vistas: DB-only — sin empresa, sin Switch, sin lock", () => {
     expect(isSyncNowModulo("refresh-vistas")).toBe(true);
     const cfg = moduloConfig("refresh-vistas");
     expect(cfg.empresas).toBeNull();
     expect(cfg.tocaSwitch).toBe(false);
     expect(lockKeyDe("refresh-vistas", null)).toBeNull();
-    // Cooldown mira el heartbeat manual Y el del cron de las 07:35.
-    expect(cfg.cooldownHeartbeats).toEqual(["sync-now-refresh-vistas", "refresh-clientes-views"]);
   });
 
   it("proveedores: por empresa (universo empresasConCxp = 6 B2B + Multifashion, sin Boston)", () => {

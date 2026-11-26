@@ -368,7 +368,6 @@ export default function ClienteDetail({
               actualizado={cliente.last_synced_at}
               opciones={opcionesSync}
               secuencial
-              engancharRunning
               roles={ROLES_SYNC_FICHA_CLIENTE}
               resumenExito="Cliente actualizado"
               onSuccess={() => router.refresh()}

@@ -355,11 +355,10 @@ describe("🔴 sincronizar y no refrescar es peor que no sincronizar", () => {
     expect(boton).toContain("await onSuccess();");
   });
 
-  it('"ya está fresco" REFRESCA la vista y NO es un error', () => {
-    const rama = /r\.tipo === "fresco"[\s\S]*?\} else \{/.exec(boton)?.[0] ?? "";
+  it("el éxito REFRESCA la vista; ya no existe la rama «fresco» (en vivo, 26-nov-2026)", () => {
+    const rama = /r\.tipo === "ok"[\s\S]*?\} else \{/.exec(boton)?.[0] ?? "";
     expect(rama).toContain("await refrescarVista()");
-    expect(rama).toContain("showToast(r.detalle, false)"); // false = verde, 3s
-    expect(rama).not.toContain("showToast(r.detalle, true)");
+    expect(boton).not.toContain('"fresco"');
   });
 
   it("Comisiones recarga la tabla al terminar", () => {

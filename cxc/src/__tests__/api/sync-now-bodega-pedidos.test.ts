@@ -29,6 +29,7 @@ vi.mock("@/lib/telegram", () => ({ sendTelegramAlert: vi.fn(), shortError: (s: s
 vi.mock("@/lib/switch-api/client", () => ({ logoutAllSwitchSessions: vi.fn(async () => {}), logoutSwitchSessions: vi.fn(async () => {}) }));
 vi.mock("@/lib/switch-api/sync-log", () => ({
   clearStaleRunning: vi.fn(async () => {}),
+  esperarCorridaEnCurso: vi.fn(async () => ({ estado: "libre", unida: null })),
   isRunningLockConflict: () => false,
 }));
 vi.mock("@/lib/switch-api/sync-pedidos", () => ({ syncEmpresaPedidos }));

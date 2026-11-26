@@ -19,7 +19,8 @@
  *    esta ruta: tres copias a mano fue justo lo que dejó el POST en `["admin"]`
  *    mientras la pantalla se abría a vendedor y bodega.
  * 3. 🔴 SIN AVISO: nada de «esto te saca del panel de Switch».
- * 4. El ACELERADOR (el de Guías): dos toques seguidos no abren dos sesiones.
+ * 4. 🔴 EN VIVO (26-nov-2026): sin acelerador de 10 min — cada toque lee de
+ *    Switch; con una corrida viva de la empresa, se espera y se une a ella.
  * 5. Lo que la ruta ya hacía sigue: higiene de sesión en el `finally` y el
  *    candado de una corrida a la vez (409).
  */
@@ -52,7 +53,7 @@ const syncSpy = vi.fn(async () => ({
   syncedAt: "2026-09-04T00:00:00.000Z",
 }));
 const logoutSpy = vi.fn(async () => {});
-/** Filas que devuelve la consulta del cooldown. Vacío = no está fresca. */
+/** Corridas vivas de la empresa en switch_sync_log. Vacío = nadie corre. */
 let corridasRecientes: { id: string }[] = [];
 
 vi.mock("@/lib/switch-api/sync-articulo-info", () => ({
@@ -179,28 +180,19 @@ describe("🔴 lo toca todo el que ve la pantalla, no solo admin", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 el acelerador: dos toques seguidos no abren dos sesiones", () => {
-  it("con una corrida exitosa reciente NO se llama a Switch", async () => {
-    corridasRecientes = [{ id: "corrida-de-hace-2-min" }];
-    const res = await POST(pedir("admin"));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, omitido: "fresca" });
-    expect(syncSpy).not.toHaveBeenCalled();
-  });
-
-  it("sin corrida reciente sí se llama (el acelerador no apaga el botón para siempre)", async () => {
+describe("🔴 en vivo: cada toque lee de Switch (26-nov-2026)", () => {
+  it("dos toques seguidos: los dos llaman a Switch", async () => {
     corridasRecientes = [];
-    const res = await POST(pedir("admin"));
-    expect(res.status).toBe(200);
-    expect(syncSpy).toHaveBeenCalledTimes(1);
+    expect((await POST(pedir("admin"))).status).toBe(200);
+    expect((await POST(pedir("admin"))).status).toBe(200);
+    expect(syncSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("el cooldown es el MISMO de Guías, no un número nuevo", () => {
+  it("ya no hay acelerador; con una corrida viva se espera y se une a ella", () => {
     const src = sinComentarios(RUTA_POST);
-    expect(src).toContain("SYNC_NOW_COOLDOWN_MIN");
-    expect(src).toMatch(/sync_type[^\n]*articulo_info|eq\("sync_type", "articulo_info"\)/);
-    // Fail-open: si la consulta del cooldown falla, se refresca igual.
-    expect(src).toContain("if (error) return false;");
+    expect(src).not.toContain("SYNC_NOW_COOLDOWN_MIN");
+    expect(src).not.toContain("omitido");
+    expect(src).toContain('esperarCorridaEnCurso(empresa, "articulo_info"');
   });
 });
 
@@ -209,8 +201,8 @@ describe("lo que la ruta ya hacía sigue en pie", () => {
   it("cierra las sesiones de Switch en el finally, pase lo que pase", async () => {
     await POST(pedir("admin"));
     expect(logoutSpy).toHaveBeenCalledTimes(1);
-    // También cuando se omite por el acelerador.
-    corridasRecientes = [{ id: "x" }];
+    // También cuando falla.
+    syncSpy.mockRejectedValueOnce(new Error("Switch no contesta"));
     await POST(pedir("admin"));
     expect(logoutSpy).toHaveBeenCalledTimes(2);
   });

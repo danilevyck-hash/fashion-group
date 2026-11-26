@@ -163,7 +163,7 @@ export function ComisionesComputadoraV2({
           </div>
           <LineaDeFrescura
             forma="computadora"
-            tabla="facturas"
+            tabla="recibos"
             empresas={empresasFrescura}
             opciones={SYNC_NOW_RECIBOS_COMISIONES}
             onSuccess={onActualizado}

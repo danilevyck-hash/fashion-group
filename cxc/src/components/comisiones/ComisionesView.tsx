@@ -459,7 +459,7 @@ export function ComisionesView({
           <LineaDeFrescura
             forma="computadora"
             className="ml-auto"
-            tabla="facturas"
+            tabla="recibos"
             empresas={EMPRESAS}
             opciones={SYNC_NOW_RECIBOS_COMISIONES}
             onSuccess={() => setRefreshKey((k) => k + 1)}

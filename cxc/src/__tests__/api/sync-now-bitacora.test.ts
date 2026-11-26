@@ -6,9 +6,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
-const { logActivity, syncEmpresaProveedores } = vi.hoisted(() => ({
+const { logActivity, syncEmpresaProveedores, esperarCorridaEnCurso } = vi.hoisted(() => ({
   logActivity: vi.fn(async (..._a: unknown[]) => {}),
   syncEmpresaProveedores: vi.fn(),
+  esperarCorridaEnCurso: vi.fn(async (..._a: unknown[]): Promise<unknown> => ({ estado: "libre", unida: null })),
 }));
 
 vi.mock("@/lib/log-activity", () => ({ logActivity }));
@@ -26,6 +27,7 @@ vi.mock("@/lib/telegram", () => ({ sendTelegramAlert: vi.fn(), shortError: (s: s
 vi.mock("@/lib/switch-api/client", () => ({ logoutAllSwitchSessions: vi.fn(async () => {}), logoutSwitchSessions: vi.fn(async () => {}) }));
 vi.mock("@/lib/switch-api/sync-log", () => ({
   clearStaleRunning: vi.fn(async () => {}),
+  esperarCorridaEnCurso,
   isRunningLockConflict: () => false,
 }));
 vi.mock("@/lib/switch-api/sync-proveedores", () => ({ syncEmpresaProveedores }));
@@ -77,5 +79,32 @@ describe("sync-now registra en activity_logs", () => {
       expect.objectContaining({ resultado: "error", detalle: "Switch caído" }),
       "Yulissa",
     );
+  });
+
+  it("🔴 en vivo: con una corrida en curso de la empresa, se une a ella y NO abre otra", async () => {
+    syncEmpresaProveedores.mockClear();
+    esperarCorridaEnCurso.mockResolvedValueOnce({
+      estado: "libre",
+      unida: { finished_at: "2026-11-26T15:00:00Z", records_inserted: 0, records_updated: 3 },
+    });
+    const res = (await pedir()) as NextResponse;
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { resumen: string }).resumen).toContain("al día");
+    expect(syncEmpresaProveedores).not.toHaveBeenCalled();
+  });
+
+  it("🔴 en vivo: sin corrida en curso, SIEMPRE lee de Switch (no hay freno de 10 min)", async () => {
+    syncEmpresaProveedores.mockClear();
+    syncEmpresaProveedores.mockResolvedValueOnce({ ok: true, empresaKey: "vistana", proveedores: 3 });
+    const res = (await pedir()) as NextResponse;
+    expect(res.status).toBe(200);
+    expect(syncEmpresaProveedores).toHaveBeenCalledTimes(1);
+  });
+
+  it("la espera pasó de su tope: 409 running (el botón vuelve a preguntar)", async () => {
+    esperarCorridaEnCurso.mockResolvedValueOnce({ estado: "ocupado" });
+    const res = (await pedir()) as NextResponse;
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { motivo: string }).motivo).toBe("running");
   });
 });

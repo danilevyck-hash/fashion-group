@@ -450,7 +450,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
   }, [cliente?.codigo, cargarFacturas]);
 
   /** 🔴 «ACTUALIZAR AHORA» reusa la MISMA ruta de siempre: nada de un camino
-   *  nuevo a Switch. Trae solo el día de hoy, con su cooldown de 10 min y su
+   *  nuevo a Switch. Trae solo el día de hoy, en vivo (sin freno de 10 min) y con su
    *  cierre de sesiones en el `finally` del servidor.
    *
    *  🔄 18-sep-2026: el botón decía «Traer de Switch ahora», estrenado ayer.

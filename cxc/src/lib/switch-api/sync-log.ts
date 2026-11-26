@@ -115,6 +115,65 @@ export function cutoffAtascado(ahora: Date = new Date()): string {
   return new Date(ahora.getTime() - RUNNING_STALE_MIN * 60 * 1000).toISOString();
 }
 
+/** La corrida en curso a la que se unió un «Actualizar» manual, ya terminada bien. */
+export interface CorridaUnida {
+  finished_at: string | null;
+  records_inserted: number | null;
+  records_updated: number | null;
+}
+
+export type EsperaCorrida =
+  | { estado: "libre"; unida: CorridaUnida | null }
+  | { estado: "ocupado" };
+
+/**
+ * «ACTUALIZAR» EN VIVO (26-nov-2026, Daniel: «si pongo Actualizar, lo quiero en
+ * vivo»). Si la empresa ya tiene una corrida viva en Switch (cron o el toque de
+ * otra persona, de cualquier `sync_type` — la sesión de Switch es UNA por
+ * usuario), el toque manual NO la omite ni abre otra sesión encima: ESPERA a
+ * que termine. Si era del MISMO tipo y terminó bien, el toque se UNE a ella
+ * (`unida`): ese dato se acaba de leer de Switch. Si no (otro tipo, o terminó
+ * con error), queda `libre` sin `unida` y quien llama corre la suya.
+ *
+ * `ocupado` = pasó `maxMs` y sigue corriendo (el cliente vuelve a preguntar).
+ * Falla ABIERTA: si no se puede leer el log, se da por libre (el índice único
+ * de 'running' sigue protegiendo).
+ */
+export async function esperarCorridaEnCurso(
+  empresaKey: string,
+  syncType: string,
+  { maxMs = 4 * 60_000, pollMs = 3_000 }: { maxMs?: number; pollMs?: number } = {},
+): Promise<EsperaCorrida> {
+  const t0 = Date.now();
+  let mismaId: string | number | null = null;
+  for (;;) {
+    const { data, error } = await supabaseServer
+      .from("switch_sync_log")
+      .select("id, sync_type")
+      .eq("empresa_key", empresaKey)
+      .eq("status", "running")
+      .gte("started_at", cutoffAtascado())
+      .limit(10);
+    if (error) {
+      console.error(`[sync-log ${empresaKey}] no pude leer corridas en curso: ${error.message}`);
+      break;
+    }
+    const filas = (data ?? []) as { id: string | number; sync_type: string }[];
+    if (filas.length === 0) break;
+    mismaId ??= filas.find((f) => f.sync_type === syncType)?.id ?? null;
+    if (Date.now() - t0 >= maxMs) return { estado: "ocupado" };
+    await new Promise((r) => setTimeout(r, pollMs));
+  }
+  if (mismaId == null) return { estado: "libre", unida: null };
+  const { data } = await supabaseServer
+    .from("switch_sync_log")
+    .select("status, finished_at, records_inserted, records_updated")
+    .eq("id", mismaId)
+    .maybeSingle();
+  const fila = data as (CorridaUnida & { status: string }) | null;
+  return { estado: "libre", unida: fila?.status === "success" ? fila : null };
+}
+
 /**
  * Cierra las filas 'running' huérfanas (> RUNNING_STALE_MIN) de un (empresa,
  * tipo). CRÍTICO con el índice único: sin esta limpieza, una corrida que murió

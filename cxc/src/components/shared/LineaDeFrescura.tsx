@@ -52,8 +52,7 @@ type Toque =
       opciones: SyncNowOpcion[];
       secuencial?: boolean;
       paralelo?: boolean;
-      engancharRunning?: boolean;
-      resumenExito?: string;
+      resumenExito?: string | ((cantidad: number) => string);
       roles?: string[];
       disabledReason?: string | null;
       onSuccess: () => void | Promise<void>;
@@ -158,7 +157,6 @@ function Linea(props: LineaDeFrescuraProps & { iso: string | null }) {
         opciones={props.opciones}
         secuencial={props.secuencial}
         paralelo={props.paralelo}
-        engancharRunning={props.engancharRunning}
         resumenExito={props.resumenExito}
         roles={props.roles}
         disabledReason={props.disabledReason}
