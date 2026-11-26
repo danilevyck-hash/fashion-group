@@ -83,9 +83,9 @@ describe("a lo sumo una vez por semana: la llave es el lunes de Panamá", () => 
 });
 
 describe("correo", () => {
-  it("sale de info@ y el interruptor está prendido", () => {
+  it("sale de info@ y el interruptor está APAGADO (26-nov: PDF de Switch)", () => {
     expect(REMITENTE_AUTOMATICO).toBe("Fashion Group <info@fashiongr.com>");
-    expect(ESTADO_CUENTA_AUTOMATICO_2026_11).toBe(true);
+    expect(ESTADO_CUENTA_AUTOMATICO_2026_11).toBe(false);
   });
 
   it("direcciones: separa, valida y no repite", () => {

@@ -183,8 +183,6 @@ export async function GET(req: NextRequest) {
   if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!ESTADO_CUENTA_AUTOMATICO_2026_11) return NextResponse.json({ ok: true, apagado: true });
-
   const sp = req.nextUrl.searchParams;
   const test = sp.get("test") === "true";
   const pruebaCrudo = (sp.get("prueba") ?? "").trim();
@@ -197,6 +195,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "codigos solo con test o prueba" }, { status: 400 });
   }
   const real = !test && !prueba.length;
+  if (real && !ESTADO_CUENTA_AUTOMATICO_2026_11) return NextResponse.json({ ok: true, apagado: true });
 
   const RESEND_KEY = process.env.RESEND_API_KEY;
   if (!test && !RESEND_KEY) {
