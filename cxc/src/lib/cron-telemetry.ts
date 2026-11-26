@@ -59,6 +59,8 @@ export const CRON_STALE_HOURS_POR_CRON: Record<string, number> = {
   // El estado de cuenta a los clientes corre los LUNES (13:00 UTC): mismo
   // número y mismo motivo que `reclamos-viejos`.
   "estado-cuenta-semanal": 8 * 24,
+  // Paso 1 del mismo envío (le pide los PDF a Switch), LUNES 10:50 y 11:20 UTC.
+  "estado-cuenta-switch": 8 * 24,
   // Tres pasadas TODOS los días (15:00, 20:00 y 22:15 UTC): entre la última de
   // una noche y la primera de la mañana siguiente pasan 16h45 (22:15 → 15:00 del
   // día siguiente). El umbral de siempre (26h) le sigue quedando holgado —9h15
@@ -546,6 +548,10 @@ export const SEED_TOLERANT_CRONS = [
   // `CRONS_CUYO_TRABAJO_ES_UN_MENSAJE`) cuando lleve semanas corriendo, como
   // `reclamos-viejos`.
   "estado-cuenta-semanal",
+  // Paso 1 del mismo envío (LUNES 10:50 y 11:20 UTC, 27-nov-2026): le pide a
+  // Switch el PDF de cada cliente al buzón info@. Semanal y nacido apagado:
+  // seed-tolerante, umbral de 8 días. SÍ toca Switch (ver SWITCH_CRON_ENTRADAS).
+  "estado-cuenta-switch",
   // Tallas de los despachos de ASW desde el correo (23:45 UTC = 6:45 p. m.
   // Panamá, 13-nov-2026). Prendido el 13-nov-2026; apagado no siembra latido,
   // por eso seed-tolerante. No toca Switch. Promover a CRONS_FAIL_CLOSED cuando lleve
@@ -799,6 +805,14 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // `SEED_TOLERANT_CRONS`.
   // La reconciliación puede recuperar pares faltantes de CUALQUIER empresa.
   { cron: "switch-reconciliacion", hhmmUtc: "1000", empresas: CRON_EMPRESAS_TODAS },
+  // ESTADO DE CUENTA DE LOS LUNES, paso 1 (27-nov-2026): el botón «Email» del
+  // panel de Switch, una sesión web por empresa (changesession=SI, usuario
+  // daniel), para los ~160 PDF de las 6 del grupo — ~5 min. 5:50 y 6:20 a. m. de
+  // Panamá: 50 min tras la reconciliación de las 10:00 (techo 740 s → 10:12),
+  // 15 del hueco de 10:35 que se guarda para `sync-egresos-varios` si vuelve, y
+  // 30 antes de las facturas de las 11:50. La segunda solo pide lo que faltó.
+  { cron: "estado-cuenta-switch", hhmmUtc: "1050", diaSemana: 1, empresas: CRON_EMPRESAS_PEDIDOS },
+  { cron: "estado-cuenta-switch", hhmmUtc: "1120", diaSemana: 1, empresas: CRON_EMPRESAS_PEDIDOS },
   { cron: "acs-fidelizacion", hhmmUtc: "1130", empresas: ["american_classic"] },
   // Ventas de la mañana temprana (06:50 Panamá): quien entra a trabajar a las
   // 8 a.m. ya no ve el dato de la madrugada. Ver CRON_EMPRESAS_VENTAS.

@@ -140,6 +140,9 @@ describe("C. barrido: todo camino a Switch pasa por el freno", () => {
       (f) =>
         !PUERTAS.includes(f.rel) &&
         f.rel !== "lib/switch-api/types.ts" &&
+        // Solo NOMBRA al remitente de los correos de Switch (noreply@…) para
+        // buscarlos en el buzón; no habla con Switch (27-nov-2026).
+        f.rel !== "lib/cxc/estado-cuenta-pdf-switch.ts" &&
         /process\.env\[`SWITCH_\$\{[^}]+\}_(API_URL|WEB_USER|API_USER)`\]|["'`]\/autenticacion["'`]|["'`][^"'`]*\/users\/login["'`]|switch-soft\.com/.test(f.txt),
     );
     expect(fuera.map((f) => f.rel)).toEqual([]);

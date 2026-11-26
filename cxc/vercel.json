@@ -306,6 +306,14 @@
       "schedule": "0 14 * * 1"
     },
     {
+      "path": "/api/cron/estado-cuenta-switch",
+      "schedule": "50 10 * * 1"
+    },
+    {
+      "path": "/api/cron/estado-cuenta-switch",
+      "schedule": "20 11 * * 1"
+    },
+    {
       "path": "/api/cron/estado-cuenta-semanal",
       "schedule": "0 13 * * 1"
     },

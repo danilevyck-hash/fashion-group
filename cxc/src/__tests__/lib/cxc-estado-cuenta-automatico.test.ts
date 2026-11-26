@@ -77,8 +77,10 @@ describe("a lo sumo una vez por semana: la llave es el lunes de Panamá", () => 
     expect(sql).not.toMatch(/\b(DROP TABLE|DELETE FROM|TRUNCATE)\b/i);
     const ruta = fs.readFileSync(path.join(process.cwd(), "src/app/api/cron/estado-cuenta-semanal/route.ts"), "utf8");
     expect(ruta.indexOf("reservar(c, semana)")).toBeGreaterThan(-1);
-    expect(ruta.indexOf("reservar(c, semana)")).toBeLessThan(ruta.indexOf("mandarUno(c, correos)"));
-    expect(ruta).toContain("Idempotency-Key");
+    expect(ruta.indexOf("reservar(c, semana)")).toBeLessThan(ruta.indexOf("mandarUno(c)"));
+    expect(ruta).toContain("idempotencia: `estado-cuenta-semanal/${semana}/${c.codigo}`");
+    const correo = fs.readFileSync(path.join(process.cwd(), "src/lib/cxc/estado-cuenta-correo-switch.ts"), "utf8");
+    expect(correo).toContain("Idempotency-Key");
   });
 });
 
