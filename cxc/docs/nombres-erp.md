@@ -81,7 +81,7 @@ Cuando Daniel corrija un nombre («eso no se dice así»), para que quede atrapa
 | Cerrar el cobro de una marca (Marketing) | Descargar ZIP · Cerrar (dos acciones separadas) · Cerrar cobro · Cobro cerrado · Cobros anteriores | Un solo botón que descarga y cierra |
 | Dejar un gasto fuera de un cierre (Marketing) | Excluir · Incluir · «Excluido de este cierre» | — |
 | Proveedor que el lector de facturas no reconoce (Marketing) | Proveedor nuevo | — |
-| Pestañas de Despachos › Pedidos | Pendientes · En preparación · Preparados · Recibidos (botones: «Recibir» · «Marcar recibido» · «Marcar en espera» · «Volver a Pendiente / En preparación / Preparado») | Verificado (estado retirado el 7-oct-2026) |
+| Pestañas de Despachos › Pedidos | Pendientes · En preparación · Preparados · Recibidos · Facturados (botones: «Recibir» · «Marcar recibido» · «Marcar en espera» · «Volver a Pendiente / En preparación / Preparado») | Verificado (estado retirado el 7-oct-2026) |
 | Grupos de fecha de Guías de despacho (7-oct-2026) | Hoy · Ayer · Esta semana · Semana pasada · Historial; distintivo «Pendiente» en la guía sin despachar | Este mes, Mes pasado |
 | Papel del pedido con o sin montos | Con precios · Sin precios | — |
 | Usuario que además marca asistencia (Usuarios, 9-oct-2026) | Marca asistencia (interruptor de «Nuevo usuario» y «Editar usuario») · Nuevo colaborador | — |
