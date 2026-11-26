@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextRequest } from "next/server";
-import { AVISOS_AL_ENTRAR_2026_11, queOfrecer, rutaSinAviso } from "@/lib/avisos/al-entrar";
+import { AVISOS_AL_ENTRAR_2026_11, decididoReciente, queOfrecer, rutaSinAviso } from "@/lib/avisos/al-entrar";
 
 const guardadas: Array<[string, string, string]> = [];
 let sesion: { role: string; userId: string; userName: string } | null = null;
@@ -40,6 +40,25 @@ describe("qué se le ofrece a este aparato", () => {
   it("«Ahora no» no insiste en la sesión; el que ya está activo se guarda a su nombre", () => {
     expect(queOfrecer({ estado: "falta", iphoneSinInstalar: false, yaDecidido: true })).toBe("nada");
     expect(queOfrecer({ estado: "activo", iphoneSinInstalar: false, yaDecidido: false })).toBe("sincronizar");
+  });
+  it("computadora o iPad: ni pedir ni instalar, pero sí sincronizar", () => {
+    expect(queOfrecer({ estado: "falta", iphoneSinInstalar: false, yaDecidido: false, esComputadora: true })).toBe("nada");
+    expect(queOfrecer({ estado: "no-puede", iphoneSinInstalar: true, yaDecidido: false, esComputadora: true })).toBe("nada");
+    expect(queOfrecer({ estado: "activo", iphoneSinInstalar: false, yaDecidido: true, esComputadora: true })).toBe("sincronizar");
+  });
+  it("ya activado o bloqueado: nunca la ventana", () => {
+    expect(queOfrecer({ estado: "activo", iphoneSinInstalar: false, yaDecidido: false, esComputadora: false })).toBe("sincronizar");
+    expect(queOfrecer({ estado: "bloqueado", iphoneSinInstalar: true, yaDecidido: false, esComputadora: false })).toBe("nada");
+  });
+  it("«Ahora no» vale 7 días; después vuelve; lo ilegible no cuenta", () => {
+    const ahora = Date.UTC(2026, 10, 26);
+    const dia = 86_400_000;
+    expect(decididoReciente(String(ahora - 6 * dia), ahora)).toBe(true);
+    expect(decididoReciente(String(ahora - 7 * dia), ahora)).toBe(false);
+    expect(decididoReciente(null, ahora)).toBe(false);
+    expect(decididoReciente("1", ahora)).toBe(false);
+    expect(decididoReciente("basura", ahora)).toBe(false);
+    expect(decididoReciente(String(ahora + dia), ahora)).toBe(false);
   });
   it("ni en el login ni en Marcación (que trae su propio aviso)", () => {
     expect(rutaSinAviso("/")).toBe(true);

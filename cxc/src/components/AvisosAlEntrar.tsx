@@ -10,15 +10,25 @@ import { usePathname } from "next/navigation";
 import VentanaCentrada from "@/components/ui/VentanaCentrada";
 import { esIphoneSinInstalar, leerEstadoDelAviso, suscribirEsteAparato } from "@/lib/marcacion/push-cliente";
 import { TEXTO_INSTALAR_EN_IPHONE } from "@/lib/marcacion/recordatorios";
-import { LLAVE_AVISOS_DECIDIDO, queOfrecer, rutaSinAviso, AVISOS_AL_ENTRAR_2026_11 } from "@/lib/avisos/al-entrar";
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import { LLAVE_AVISOS_DECIDIDO, decididoReciente, queOfrecer, rutaSinAviso, AVISOS_AL_ENTRAR_2026_11 } from "@/lib/avisos/al-entrar";
 
 const RUTA = "/api/avisos";
 
 function leer(k: string): string | null {
   try { return sessionStorage.getItem(k); } catch { return null; }
 }
+function leerDecidido(): string | null {
+  try { return localStorage.getItem(LLAVE_AVISOS_DECIDIDO); } catch { return null; }
+}
 function decidir() {
-  try { sessionStorage.setItem(LLAVE_AVISOS_DECIDIDO, "1"); } catch { /* sin storage: vuelve a ofrecer */ }
+  try { localStorage.setItem(LLAVE_AVISOS_DECIDIDO, String(Date.now())); } catch { /* sin storage: vuelve a ofrecer */ }
+}
+/** Computadora o iPad (el iPad moderno se anuncia como Mac con pantalla táctil). */
+function esComputadora(): boolean {
+  if (aparatoDeQuienMira() === "computadora") return true;
+  const ua = navigator.userAgent;
+  return /iPad/.test(ua) || (/Mac/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1);
 }
 
 async function guardar(sub: PushSubscriptionJSON): Promise<void> {
@@ -92,7 +102,7 @@ export default function AvisosAlEntrar() {
     (async () => {
       const estado = await leerEstadoDelAviso().catch(() => null);
       if (!vivo || !estado) return;
-      const que = queOfrecer({ estado, iphoneSinInstalar: esIphoneSinInstalar(), yaDecidido: leer(LLAVE_AVISOS_DECIDIDO) === "1" });
+      const que = queOfrecer({ estado, iphoneSinInstalar: esIphoneSinInstalar(), yaDecidido: decididoReciente(leerDecidido(), Date.now()), esComputadora: esComputadora() });
       if (que === "sincronizar") {
         // Una vez por sesión: el aparato queda a nombre de este usuario.
         if (leer("fg_avisos_guardado") === "1") return;
