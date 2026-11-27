@@ -182,9 +182,9 @@ describe("🔴 la medición no se tocó", () => {
     // programado.ts) y ahí siguen siendo 95. Ver `cron-calendario.test.ts`.
     // ⚠️ 26-nov-2026: suben a 81 — `estado-cuenta-semanal` (el estado de cuenta
     // a los clientes, lunes 13:00 UTC). Ver `cxc-estado-cuenta-automatico.test.ts`.
-    // ⚠️ 27-nov-2026: suben a 83 — `estado-cuenta-switch` (lunes 10:50 y 11:20
-    // UTC), el paso que le pide a Switch su PDF.
-    expect(vercel.crons).toHaveLength(83);
+    // ⚠️ 27-nov-2026: suben a 82 — `estado-cuenta-semanal` pasa a lunes 10:50 y
+    // 11:20 UTC (imprime el papel de Switch) y deja las 13:00.
+    expect(vercel.crons).toHaveLength(82);
   });
 
   // Mismo motivo que la allowlist de checks: `cron-telemetry.ts` construye el

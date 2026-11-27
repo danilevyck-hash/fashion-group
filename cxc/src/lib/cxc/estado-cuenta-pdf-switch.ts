@@ -1,65 +1,27 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// EL PDF DE SWITCH, INTACTO, EN EL CORREO DE LOS LUNES (26-nov-2026, Daniel:
-// «te dije que era de switch que quiero el pdf, no uno regenerado por ti»).
-// Módulo PURO: cómo se reconoce cada correo de Switch y qué dice su PDF.
+// EL PDF DE SWITCH EN EL CORREO DE LOS LUNES (27-nov-2026, Daniel: «te dije que
+// era de switch que quiero el pdf, no uno regenerado por ti»). Módulo PURO.
 //
-// El camino (I/O en `estado-cuenta-pdf-switch-io.ts`):
-//   1. El botón «Email» del panel de Switch (GET `/clientes/enviarestadodecuenta`,
-//      solo pendiente) manda el PDF a `BUZON_INTERMEDIO` desde noreply@switch-soft.com.
-//   2. El sistema lo lee por Microsoft Graph (Mail.Read) y lo reenvía al cliente
-//      desde info@ por Resend, UN correo con todos sus PDF. El PDF no se toca:
-//      solo cambia el NOMBRE del archivo.
+// El camino (I/O en `estado-cuenta-pdf-switch-io.ts`), el mismo que hace Daniel:
+//   1. En el panel de Switch: la ficha del cliente → «Pendientes» → «Imprimir»
+//      (`leerEstadoCuentaParaImprimir` en `switch-api/web-client.ts`).
+//   2. Ese papel se guarda a PDF con Chromium sin cabeza, sin tocarle nada.
+//   3. UN correo por cliente desde info@ por Resend, con un PDF por empresa.
 //
-// 🔴 Cómo se sabe de quién es cada correo, sin adivinar:
-//   · la EMPRESA sale del asunto: «<NOMBRE LEGAL> le ha enviado el estado de
-//     cuenta solicitado» (el nombre legal es el de `empresa-fiscal.ts`);
-//   · el CLIENTE sale del adjunto: «<id de Switch>_<MMDDhhmmss>.pdf»;
-//   · y antes de mandar, el «Código:» IMPRESO en el PDF tiene que ser el del
-//     cliente. Si no lo es, o no se puede leer, ese cliente NO se manda.
+// 🔴 EL CANDADO, antes de mandar (`veredictoDelPapel`): en CADA empresa, el
+//   · «Código:» impreso tiene que ser el del cliente (igualdad exacta);
+//   · «Total General» tiene que ser, AL CENTAVO, el saldo que Switch da en ese
+//     momento por su API (`/apicliente/estadocuenta` › `saldoTotal`);
+//   · y el papel tiene que traer los MISMOS documentos que esa respuesta
+//     (si salió la historia completa en vez de los pendientes, no cuadra).
+//   Si una empresa no cuadra, ese cliente NO se manda: queda 'error' y va en el
+//   resumen del Telegram privado.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { inflateSync } from "node:zlib";
-import { fichaFiscal } from "@/lib/cxc/empresa-fiscal";
 import { escapeHtml, money, sanitizeFilenamePart } from "@/lib/cxc/estado-cuenta-email";
 
-/** El buzón intermedio si no se configura otro. */
-export const BUZON_POR_DEFECTO = "info@fashiongr.com";
-
-/**
- * El buzón al que Switch manda el PDF (y que el sistema lee por Graph). Su
- * dirección se IMPRIME en el PDF («Email:»), así que el cliente la ve.
- * Se cambia sin código con la variable `ESTADO_CUENTA_BUZON` en Vercel
- * (p. ej. un buzón compartido estadosdecuenta@fashiongr.com). Solo vale un
- * buzón de @fashiongr.com y NUNCA el de una persona como daniel@: cualquier
- * otro valor cae al de por defecto.
- */
-export function buzonIntermedio(valor: string | undefined = process.env.ESTADO_CUENTA_BUZON): string {
-  const v = (valor ?? "").trim().toLowerCase();
-  return /^[a-z0-9._-]+@fashiongr\.com$/.test(v) && !v.startsWith("daniel@") ? v : BUZON_POR_DEFECTO;
-}
-
-export const BUZON_INTERMEDIO = buzonIntermedio();
-export const REMITENTE_SWITCH = "noreply@switch-soft.com";
-/** A dónde va el correo del modo prueba (`?prueba=<código>`). */
+/** La prueba (`?prueba=<código>`) va SOLO aquí, nunca al cliente. */
 export const DESTINO_PRUEBA = "daniel@fashiongr.com";
-
-const COLA_DEL_ASUNTO = " le ha enviado el estado de cuenta solicitado";
-
-/** La empresa de un correo de Switch, por su asunto. `null` = no es de las pedidas. */
-export function empresaDelAsunto(asunto: string, empresas: readonly string[]): string | null {
-  const a = asunto.trim().toUpperCase();
-  for (const key of empresas) {
-    const legal = fichaFiscal(key, "").legal.trim().toUpperCase();
-    if (legal && a === `${legal}${COLA_DEL_ASUNTO}`.toUpperCase()) return key;
-  }
-  return null;
-}
-
-/** El id de Switch del cliente, por el nombre del adjunto («13_1126171058.pdf»). */
-export function idDelAdjunto(nombre: string): number | null {
-  const m = nombre.trim().match(/^(\d+)_\d+\.pdf$/i);
-  return m ? Number(m[1]) : null;
-}
 
 export interface FilaIdSwitch {
   cliente_switch_id: number | null;
@@ -74,52 +36,46 @@ export function elegirIdSwitch(filas: readonly FilaIdSwitch[]): number | null {
   return candidatos.length === 1 ? Number(candidatos[0].cliente_switch_id) : null;
 }
 
-/** Los textos del PDF (dompdf: `[(texto)] TJ` dentro de streams deflate), en orden. */
-export function textosDelPdf(bytes: Uint8Array): string[] {
-  const buf = Buffer.from(bytes);
-  const s = buf.toString("latin1");
-  const textos: string[] = [];
-  const re = /stream\r?\n/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(s))) {
-    const inicio = m.index + m[0].length;
-    const fin = s.indexOf("endstream", inicio);
-    if (fin < 0) break;
-    let plano: string;
-    try {
-      plano = inflateSync(buf.subarray(inicio, fin)).toString("latin1");
-    } catch {
-      continue; // imagen u otro stream que no es texto
-    }
-    for (const t of plano.matchAll(/\[\(((?:[^()\\]|\\.)*)\)\]\s*TJ/g)) {
-      textos.push(t[1].replace(/\\(.)/g, "$1"));
-    }
-  }
-  return textos;
-}
-
-export interface LecturaPdf {
+export interface LecturaDelPapel {
   codigo: string | null;
-  /** «Total General» del papel; `null` si no se pudo leer. */
+  /** «Total General»; `null` si no se pudo leer. */
   total: number | null;
+  /** Renglones de documento (los que empiezan con una fecha). */
+  documentos: number;
 }
 
-/** Lo que el PDF de Switch dice de sí mismo: el código del cliente y el total. */
-export function leerPdfSwitch(bytes: Uint8Array): LecturaPdf {
-  const t = textosDelPdf(bytes);
-  const despuesDe = (prefijo: string) => {
-    const i = t.findIndex((x) => x.trim().startsWith(prefijo));
-    return i >= 0 && i + 1 < t.length ? t[i + 1].trim() : null;
-  };
-  const codigo = despuesDe("Código:");
-  const totalTxt = despuesDe("Total General:");
-  const total = totalTxt != null && /^-?[\d,]+(\.\d+)?$/.test(totalTxt) ? Number(totalTxt.replace(/,/g, "")) : null;
-  return { codigo: codigo || null, total };
+/** Lo que dice de sí mismo el papel que imprime Switch (su HTML de «Imprimir»). */
+export function leerPapelSwitch(html: string): LecturaDelPapel {
+  const codigo = html.match(/C(?:&oacute;|ó)digo:\s*<\/span>\s*([^<]*?)\s*<\/td>/i)?.[1]?.trim() || null;
+  const t = html.match(/Total General:\s*<\/span>\s*(-?[\d,]+(?:\.\d+)?)\s*</i)?.[1];
+  const documentos = (html.match(/<tr>\s*<td[^>]*class="rowBody">\d\d-\d\d-\d{4}<\/td>/g) ?? []).length;
+  return { codigo, total: t ? Number(t.replace(/,/g, "")) : null, documentos };
 }
 
-/** ¿El PDF es de este cliente? Igualdad EXACTA del código, nunca por parecido. */
-export function pdfEsDelCliente(lectura: LecturaPdf, codigo: string): boolean {
-  return !!lectura.codigo && lectura.codigo.trim().toUpperCase() === codigo.trim().toUpperCase();
+/** Lo que Switch dice por su API en el mismo momento. */
+export interface SaldoDeSwitch {
+  saldo: number | null;
+  documentos: number | null;
+}
+
+export type Veredicto = { ok: true; total: number } | { ok: false; motivo: string };
+
+const centavos = (n: number) => Math.round(n * 100);
+
+/** 🔴 El candado: ¿este papel se puede mandar como el estado de cuenta de `codigo`? */
+export function veredictoDelPapel(papel: LecturaDelPapel, codigo: string, switchDice: SaldoDeSwitch): Veredicto {
+  if (!papel.codigo || papel.codigo.toUpperCase() !== codigo.trim().toUpperCase()) {
+    return { ok: false, motivo: `el papel dice código ${papel.codigo ?? "ilegible"}, no ${codigo}` };
+  }
+  if (papel.total == null) return { ok: false, motivo: "no se pudo leer el total del papel" };
+  if (switchDice.saldo == null) return { ok: false, motivo: "Switch no dio el saldo para comprobar" };
+  if (centavos(papel.total) !== centavos(switchDice.saldo)) {
+    return { ok: false, motivo: `el papel suma ${money(papel.total)} y Switch dice ${money(switchDice.saldo)}` };
+  }
+  if (switchDice.documentos != null && papel.documentos !== switchDice.documentos) {
+    return { ok: false, motivo: `el papel trae ${papel.documentos} documentos y Switch tiene ${switchDice.documentos} pendientes` };
+  }
+  return { ok: true, total: papel.total };
 }
 
 /** El cuadrito del correo: cada empresa con el «Total General» de SU PDF, y la suma. */
@@ -131,12 +87,7 @@ export function resumenPdfsHtml(filas: readonly { empresa: string; total: number
   return `<table style="border-collapse:collapse;margin:8px 0 16px">${rows}<tr><td style="${td};border-top:1px solid #d1d5db"><b>Total</b></td><td style="${num};border-top:1px solid #d1d5db"><b>${money(total)}</b></td></tr></table>`;
 }
 
-/** Nombre del archivo que ve el cliente; el contenido es el de Switch, sin tocar. */
+/** Nombre del archivo que ve el cliente; el contenido es el papel de Switch. */
 export function nombreDelPdf(empresa: string, cliente: string, fechaDDMMAAAA: string): string {
   return `${sanitizeFilenamePart(`Estado de cuenta ${empresa} - ${cliente} - ${fechaDDMMAAAA}`)}.pdf`;
-}
-
-/** Desde cuándo vale un PDF para la semana: el lunes 00:00 de Panamá (05:00 UTC). */
-export function inicioDeLaSemanaUtc(semana: string): string {
-  return `${semana}T05:00:00Z`;
 }

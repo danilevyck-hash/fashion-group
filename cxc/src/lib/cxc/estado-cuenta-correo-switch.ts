@@ -1,10 +1,10 @@
-// El correo de UN cliente con sus PDF de Switch (27-nov-2026). Lo usan el envío
-// de los lunes (`/api/cron/estado-cuenta-semanal`) y la prueba
-// (`/api/cron/estado-cuenta-switch?prueba=<código>`). No toca Switch: los PDF ya
-// están en el buzón intermedio.
+// El correo de UN cliente con sus PDF de Switch (27-nov-2026). Lo usa el envío
+// de los lunes (`/api/cron/estado-cuenta-semanal`), también en su prueba
+// (`?prueba=<código>`). Los PDF ya vienen impresos y comprobados
+// (`imprimirEstadosDeCuenta`).
 //
-// 🔴 Antes de mandar, el «Código:» impreso en CADA PDF tiene que ser el del
-// cliente. Si falta un PDF, no se lee o no es suyo, lanza y NO sale nada.
+// 🔴 Si el papel de UNA empresa donde debe no está o no cuadró, lanza y NO sale
+// nada: el cliente no se manda incompleto.
 
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { buildCuentasHtml, buildFirma, composeEmailHtml, escapeHtml } from "@/lib/cxc/estado-cuenta-email";
@@ -16,14 +16,8 @@ import {
   asuntoAutomatico,
   cuerpoAutomatico,
 } from "@/lib/cxc/estado-cuenta-automatico";
-import { DESTINO_PRUEBA, leerPdfSwitch, nombreDelPdf, pdfEsDelCliente, resumenPdfsHtml } from "@/lib/cxc/estado-cuenta-pdf-switch";
-import {
-  archivarCorreoSwitch,
-  bajarPdf,
-  llavePar,
-  type ClienteConCorreo,
-  type PdfEnBuzon,
-} from "@/lib/cxc/estado-cuenta-pdf-switch-io";
+import { DESTINO_PRUEBA, nombreDelPdf, resumenPdfsHtml } from "@/lib/cxc/estado-cuenta-pdf-switch";
+import { llave, type ClienteConCorreo, type Papel } from "@/lib/cxc/estado-cuenta-pdf-switch-io";
 
 /** Tope del correo YA codificado de Resend (40 MB), con aire. */
 const TOPE_ADJUNTOS_BASE64 = 38 * 1024 * 1024;
@@ -63,30 +57,17 @@ interface PdfDelCliente {
   nombreEmpresa: string;
   total: number;
   bytes: Uint8Array;
-  mensajeId: string;
 }
 
-/** Los PDF de Switch de un cliente, verificados. Lanza si falta uno o no es suyo. */
-async function pdfsDelCliente(
-  token: string,
-  c: ClienteConCorreo,
-  ids: Map<string, number>,
-  indice: Map<string, PdfEnBuzon>,
-): Promise<PdfDelCliente[]> {
+/** Los PDF de un cliente, ya comprobados. Lanza si falta uno o no cuadró. */
+function pdfsDelCliente(c: ClienteConCorreo, papeles: Map<string, Papel>): PdfDelCliente[] {
   const out: PdfDelCliente[] = [];
   for (const e of c.empresas) {
     const nombreEmpresa = nombreCortoEmpresa(e);
-    const id = ids.get(`${e}:${c.codigo}`);
-    if (id == null) throw new Error(`sin id único de Switch en ${nombreEmpresa}`);
-    const pdf = indice.get(llavePar(e, id));
-    if (!pdf) throw new Error(`falta el PDF de Switch de ${nombreEmpresa}`);
-    const bytes = await bajarPdf(token, pdf);
-    const lectura = leerPdfSwitch(bytes);
-    if (!pdfEsDelCliente(lectura, c.codigo)) {
-      throw new Error(`el PDF de ${nombreEmpresa} dice código ${lectura.codigo ?? "ilegible"}, no ${c.codigo}`);
-    }
-    if (lectura.total == null) throw new Error(`no se pudo leer el total del PDF de ${nombreEmpresa}`);
-    if (lectura.total > 0) out.push({ empresa: e, nombreEmpresa, total: lectura.total, bytes, mensajeId: pdf.mensajeId });
+    const papel = papeles.get(llave(e, c.codigo));
+    if (!papel) throw new Error(`sin el estado de cuenta de Switch de ${nombreEmpresa}`);
+    if (!papel.ok) throw new Error(`${nombreEmpresa}: ${papel.motivo}`);
+    if (papel.total > 0) out.push({ empresa: e, nombreEmpresa, total: papel.total, bytes: papel.pdf });
   }
   if (!out.length) throw new Error("Switch ya no muestra saldo pendiente");
   return out;
@@ -103,22 +84,19 @@ export interface Enviado {
 
 /**
  * Arma y manda el correo de un cliente. `prueba` = va SOLO a daniel@ con
- * «[PRUEBA]». Lanza si no salió (el correo de Switch se queda para el reintento);
- * si salió, mueve los correos de Switch a su carpeta.
+ * «[PRUEBA]». Lanza si no salió.
  */
 export async function mandarCorreoDelCliente(o: {
   resendKey: string;
-  token: string;
   cliente: ClienteConCorreo;
-  ids: Map<string, number>;
-  indice: Map<string, PdfEnBuzon>;
+  papeles: Map<string, Papel>;
   fecha: string;
   fechaArchivo: string;
   prueba: boolean;
   idempotencia: string | null;
 }): Promise<Enviado> {
   const c = o.cliente;
-  const pdfs = await pdfsDelCliente(o.token, c, o.ids, o.indice);
+  const pdfs = pdfsDelCliente(c, o.papeles);
   const saldo = Math.round(pdfs.reduce((s, p) => s + p.total, 0) * 100) / 100;
   const adjuntos = pdfs.map((p) => ({
     filename: nombreDelPdf(p.nombreEmpresa, c.nombre, o.fechaArchivo),
@@ -148,8 +126,6 @@ export async function mandarCorreoDelCliente(o: {
     o.idempotencia,
   );
   if (!envio.ok) throw new Error(envio.motivo);
-  // Ya salió: el correo de Switch se va a su carpeta (si falló, se queda para el reintento).
-  for (const p of pdfs) await archivarCorreoSwitch(o.token, p.mensajeId);
   return { resendId: envio.id, empresas: pdfs.map((p) => p.empresa), saldo, asunto, pdfs: pdfs.length, a: destino };
 }
 
