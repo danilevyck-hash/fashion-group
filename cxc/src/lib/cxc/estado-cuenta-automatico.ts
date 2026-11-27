@@ -18,8 +18,10 @@ import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { CLIENTES_FUERA } from "@/lib/cxc/cobros-del-dia";
 
 /** Interruptor. `false` = el lunes no sale nada a clientes (test y prueba siguen).
- * APAGADO el 26-nov-2026: Daniel quiere el PDF que genera Switch, no uno regenerado. */
-export const ESTADO_CUENTA_AUTOMATICO_2026_11 = false;
+ * APAGADO el 26-nov-2026: Daniel quiere el PDF que genera Switch, no uno regenerado.
+ * PRENDIDO el 27-nov-2026 (Daniel aprobó el envío): la prueba con D-24 en producción
+ * cuadró al centavo en las 5 empresas con el papel «Imprimir» de Switch. */
+export const ESTADO_CUENTA_AUTOMATICO_2026_11 = true;
 
 export const REMITENTE_AUTOMATICO = "Fashion Group <info@fashiongr.com>";
 export const RESPONDER_A_AUTOMATICO = "info@fashiongr.com";
