@@ -39,16 +39,16 @@ describe("cobros sueltos", () => {
     expect(estaEnGuia(i, "vistana", "11-000003171")).toBe(true);
   });
 
-  it("corte: la factura sale sola pasados 3 días hábiles (lunes a viernes)", () => {
+  it("corte: la factura sale sola pasados 5 días hábiles (lunes a viernes)", () => {
     expect(FACTURADOS_CORTE_DIAS_2026_11).toBe(true);
-    expect(FACTURADOS_DIAS_HABILES).toBe(3);
-    expect(ROTULO_VENTANA_FACTURADOS).toBe("últimos 3 días hábiles");
-    // Jueves 26-nov: se ven las del lunes 23 en adelante (mar, mié, jue = 3 hábiles).
-    expect(primerDiaDeFacturados("2026-11-26")).toBe("2026-11-23");
-    // Lunes 23-nov: desde el miércoles 18 (jue, vie, lun); el fin de semana no cuenta.
-    expect(primerDiaDeFacturados("2026-11-23")).toBe("2026-11-18");
-    // Sábado 28-nov: desde el martes 24 (mié, jue, vie).
-    expect(primerDiaDeFacturados("2026-11-28")).toBe("2026-11-24");
+    expect(FACTURADOS_DIAS_HABILES).toBe(5);
+    expect(ROTULO_VENTANA_FACTURADOS).toBe("últimos 5 días hábiles");
+    // Jueves 26-nov: se ven las del jueves 19 en adelante (vie, lun, mar, mié, jue = 5 hábiles).
+    expect(primerDiaDeFacturados("2026-11-26")).toBe("2026-11-19");
+    // Lunes 23-nov: desde el lunes 16 (mar a vie, lun); el fin de semana no cuenta.
+    expect(primerDiaDeFacturados("2026-11-23")).toBe("2026-11-16");
+    // Sábado 28-nov: desde el viernes 20 (lun a vie).
+    expect(primerDiaDeFacturados("2026-11-28")).toBe("2026-11-20");
     // Apagado = los 30 días de antes.
     expect(primerDiaDeFacturados("2026-11-26", false)).toBe("2026-10-27");
   });

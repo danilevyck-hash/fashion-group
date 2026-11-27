@@ -30,10 +30,11 @@ export const DIAS_FACTURADOS = 30;
  * facturó — la que retira el cliente o la que la guía escribió mal no se queda
  * para siempre. Medido 20-may→18-nov-2026 (620 facturas que sí salieron en guía,
  * `scripts/_estudio-facturados-corte.ts`): mediana 1 día hábil, p90 2, p95 3.
- * Con 3 hábiles se ve el 95 % de lo que de verdad va a salir. `false` = 30 días.
+ * Eran 3 (p95); Daniel lo subió a 5 el 26-nov-2026: con 5 quedan fuera 14 de
+ * 620 (2,3 %) en vez de 31 (5 %). `false` = 30 días.
  */
 export const FACTURADOS_CORTE_DIAS_2026_11 = true;
-export const FACTURADOS_DIAS_HABILES = 3;
+export const FACTURADOS_DIAS_HABILES = 5;
 
 const esHabil = (d: Date) => d.getUTCDay() !== 0 && d.getUTCDay() !== 6;
 
@@ -55,7 +56,7 @@ export function primerDiaDeFacturados(hoy: string, conCorte = FACTURADOS_CORTE_D
   }
 }
 
-/** El rótulo discreto de la ventana: «últimos 3 días hábiles». */
+/** El rótulo discreto de la ventana: «últimos 5 días hábiles». */
 export const ROTULO_VENTANA_FACTURADOS = FACTURADOS_CORTE_DIAS_2026_11
   ? `últimos ${FACTURADOS_DIAS_HABILES} días hábiles`
   : `últimos ${DIAS_FACTURADOS} días`;

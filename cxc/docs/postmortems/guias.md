@@ -2708,7 +2708,7 @@ Daniel aprobó el mockup «HOY vs RECOMENDACIÓN» (`~/Desktop/pedido-bultos-eti
 - **Etiquetas › Nuevo envío, el destino (Daniel, 14-nov-2026):** autollenado con «el de siempre» se ve como TEXTO con «Cambiar» (que abre el campo de antes); vacío, el campo sale directo. Medido: 135 envíos, 0 destinos cambiados. Elegir una factura o pedido llena igual (el de siempre de su cliente).
 - **Etiquetas › Nuevo envío, las facturas (Daniel, 14-nov-2026):** lista plana con fecha al lado («Factura 3322 · 15 oct», el año solo si no es el actual), la más reciente arriba, sin días que abrir; las de más de 30 días (fecha de factura, Panamá) plegadas en «Ver más (N)». En la búsqueda por número igual, pero si todas son viejas se muestran. `ETIQUETAS_FACTURAS_LISTA_2026_11`, `separarRecientes`; candado `etiquetas-facturas-lista`.
 
-## Facturados: el corte de 3 días hábiles (26-nov-2026)
+## Facturados: el corte de días hábiles (26-nov-2026; 3 → 5 el mismo día)
 
 **Problema.** «Facturados» (Despachos › Pedidos) listaba 30 días de facturas sin guía. Las que nunca tendrán guía —el cliente las retira (City Moda) o la guía escribió mal el número— se quedaban ahí para siempre. Daniel eligió «B»: la factura sale sola después de N días, y pidió estudiar N.
 
@@ -2723,5 +2723,7 @@ Acumulado en hábiles: 0 → 48,2 % · 1 → 80,3 % · 2 → 92,1 % · 3 → 95,
 
 **Decisión.** N = **3 días hábiles** (lunes a viernes; el fin de semana no cuenta): cubre el 95 % de lo que sí sale en guía; en calendario haría falta 4 y castiga el fin de semana. Medido el 26-nov-2026: la lista pasa de **18 a 5** facturas.
 
-**Cómo.** `FACTURADOS_CORTE_DIAS_2026_11` (prendido) y `FACTURADOS_DIAS_HABILES = 3` en `lib/guias/facturados-sin-guia.ts`; `primerDiaDeFacturados(hoy)` es la ÚNICA ventana (la lee la ruta del servidor) y `ROTULO_VENTANA_FACTURADOS` el texto («últimos 3 días hábiles»). La cuenta del paso es la misma lista. No se escribe nada en la base; apagado = los 30 días de antes. Feriados: no se descuentan (cuentan como hábiles), a propósito. Candado: `facturados-sin-guia.test.ts` › «corte».
+**Ajuste del mismo día (Daniel): de 3 a 5 días hábiles.** De las 620, tardaron más de 3 días hábiles **31 (5 %)** y más de 5 **14 (2,3 %)**; promedio 1,1 hábiles (1,4 calendario), mínimo 0, p99 8 hábiles (12 calendario). El máximo (63 hábiles / 87 calendario: Fashion Shoes 2531 y 2532 del 31-ago en una guía del 26-nov) es casi seguro un número mal escrito o un pareo por los 4 dígitos; sin él el máximo es 12 hábiles / 18 calendario. Con 5 hábiles la lista del 26-nov-2026 queda en **6** facturas (eran 18 con los 30 días).
+
+**Cómo.** `FACTURADOS_CORTE_DIAS_2026_11` (prendido) y `FACTURADOS_DIAS_HABILES = 5` en `lib/guias/facturados-sin-guia.ts`; `primerDiaDeFacturados(hoy)` es la ÚNICA ventana (la lee la ruta del servidor) y `ROTULO_VENTANA_FACTURADOS` el texto («últimos 5 días hábiles»). La cuenta del paso es la misma lista. No se escribe nada en la base; apagado = los 30 días de antes. Feriados: no se descuentan (cuentan como hábiles), a propósito. Candado: `facturados-sin-guia.test.ts` › «corte».
 

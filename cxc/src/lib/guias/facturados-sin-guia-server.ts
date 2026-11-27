@@ -1,5 +1,5 @@
 // «Facturados» (26-nov-2026): lee de la BASE —nunca de Switch— las facturas del
-// grupo de la ventana (3 días hábiles; `primerDiaDeFacturados`) que todavía no entraron a ninguna guía viva.
+// grupo de la ventana (5 días hábiles; `primerDiaDeFacturados`) que todavía no entraron a ninguna guía viva.
 // Solo LEE. La regla pura vive en `facturados-sin-guia.ts`.
 
 import { supabaseServer } from "@/lib/supabase-server";
@@ -31,7 +31,7 @@ interface FilaFactura {
   pedido_leido_en: string | null;
 }
 
-// La ventana sale de UN solo lugar (`primerDiaDeFacturados`): 3 días hábiles con el corte.
+// La ventana sale de UN solo lugar (`primerDiaDeFacturados`): 5 días hábiles con el corte.
 const desdeIso = (hoy: string) => new Date(`${primerDiaDeFacturados(hoy)}T00:00:00-05:00`).toISOString();
 
 async function leerRenglonesVivos(): Promise<Array<{ empresa: string | null; facturas: string | null }>> {
