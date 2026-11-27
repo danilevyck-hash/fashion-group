@@ -282,7 +282,10 @@ function AdminDashboardInner() {
   // agrega —el saldo exacto, el último pago y «Ver los documentos ›»— viaja
   // SOLO cuando la abrió el celular, así que la computadora queda idéntica.
   const [cobrarDesdeCelular, setCobrarDesdeCelular] = useState(false);
-  const abrirCobrarCelular = useCallback((client: ConsolidatedClient) => { setCobrarClient(client); setCobrarDesdeCelular(true); }, []);
+  const [enviarAlAbrir, setEnviarAlAbrir] = useState(false);
+  const abrirCobrarCelular = useCallback((client: ConsolidatedClient) => { setEnviarAlAbrir(false); setCobrarClient(client); setCobrarDesdeCelular(true); }, []);
+  // Deslizar a la derecha (`GESTOS_IPHONE_2026_11`): la MISMA hoja, ya en «Enviar estado de cuenta».
+  const abrirEnviarCelular = useCallback((client: ConsolidatedClient) => { setEnviarAlAbrir(true); setCobrarClient(client); setCobrarDesdeCelular(true); }, []);
   // 🔴 En el celular la hoja del cliente suma una entrada: el gesto de volver la cierra.
   const volverDeCobrar = useAtrasCierra(!!cobrarClient && cobrarDesdeCelular, () => setCobrarClient(null), ATRAS_CIERRA_2026_11 && cobrarDesdeCelular);
 
@@ -784,6 +787,7 @@ function AdminDashboardInner() {
           companyFilter={companyFilter}
           setCompanyFilter={setCompanyFilter}
           onCobrar={abrirCobrarCelular}
+          onEnviarEstado={abrirEnviarCelular}
           diasSinPagarDe={diasSinPagarDe}
           canExport={canExport}
           onDescargar={descargar}
@@ -1014,6 +1018,7 @@ function AdminDashboardInner() {
         companyFilter={companyFilter}
         onClose={() => volverDeCobrar()}
         onCerrarAlSalir={() => setCobrarClient(null)}
+        salidasAlAbrir={enviarAlAbrir}
         onProgramarCorreo={programarCorreo}
         onWhatsApp={openWhatsApp}
         onCopiar={copyMessage}

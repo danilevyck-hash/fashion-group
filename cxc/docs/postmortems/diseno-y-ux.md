@@ -100,3 +100,42 @@ porqué, las mediciones y las citas.
 **Verificado** en local con datos falsos (Supabase falso, nunca producción), viewport de iPhone 13: abrir el pedido → volver = Pedidos; «‹ Pedidos» = Pedidos; Pedidos → Etiquetas → Nuevo envío → volver cierra el envío → volver = Pedidos; «Cómo se usa» (hoja) → volver la cierra sin salir de Despachos.
 
 Candado: `src/__tests__/lib/atras-cierra.test.tsx`.
+
+
+## Gestos del iPhone (27-nov-2026, `GESTOS_IPHONE_2026_11`)
+
+Daniel: *«Deslice hacia abajo y no hace nada. Como apple quiero. En lugares de eliminar que sea como el barril de iphone. Desliza y elimina.»* Después aprobó cuatro gestos más y los llevó a más pantallas. Solo teléfono; en la computadora no cambia nada. `false` = lo de antes.
+
+**🩸 Por qué «deslizar hacia abajo» no hacía nada (publicado en #894).** `empiezaEnLaPagina` se negaba si encontraba cualquier `[aria-modal="true"]` en el DOM, y el menú del celular (`HojaMenu`) está SIEMPRE montado, cerrado y oculto, con `aria-modal`. Así que el gesto se negaba en todas las pantallas. Ahora solo cuenta una capa ABIERTA de verdad: visible (`getClientRects`) y no dentro de `aria-hidden`. La ruedita es la de iOS: se llena rayo por rayo al estirar y gira mientras corre el MISMO «Actualizar». Candado: `deslizar-para-actualizar.test.tsx`.
+
+**Deslizar a la izquierda = Eliminar**
+- Un deslizamiento corto muestra «Eliminar» en rojo; uno largo (55 % del ancho) elimina, como en Mail.
+- Siempre lleva «Deshacer» de 5 s y pasa por el MISMO borrado de cada pantalla: soft delete, permisos y servidor iguales.
+- Pieza única: `SwipeableRow` con `eliminar` (`components/ui.tsx`).
+- Pantallas: Reclamos (admin), Caja menuda (gasto de un período abierto), Comprobantes de catálogos (quien administra) y Marketing › Mobiliario (admin).
+- Donde había `ConfirmDeleteModal`, el botón del modal sigue en la computadora; en el teléfono, deslizar borra con «Deshacer».
+- Candado: `borrar-al-deslizar.test.tsx`.
+
+**Deslizar a la derecha = la acción principal**, por la misma ruta y la misma regla de rol. Si el rol no puede, el gesto no se ofrece.
+- Despachos › Pedidos: avanza un paso con «Deshacer» 5 s (`pasoAlDeslizar`). Bodega marca En preparación y Preparado; la secretaria, Recibido. «Preparado» abre los bultos y no avanza solo.
+- Asistencia › Aprobaciones: derecha = Sí, izquierda = No, a lo pendiente de una persona, con «Deshacer» 5 s. El POST es el mismo y al aprobar manda el servidor.
+- Recordatorios: el cheque queda «Depositado» (la misma `depositar`, con su «Deshacer»).
+- CxC: abre la hoja ya en «Estado de cuenta». **No envía.**
+- Reclamos: abre el reclamo con «Cobrar» y el total puesto. No se ofrece en los cobrados. **No cobra.**
+
+**Mantener presionado (~500 ms) = tarjeta de resumen** (`TarjetaResumen`)
+- Solo con lo que ya está en pantalla: ninguna lectura nueva, y lo que no hay no se pone.
+- Tocar la tarjeta abre lo mismo que el renglón; tocar afuera la cierra.
+- Pantallas:
+  - CxC: saldo por empresa.
+  - Clientes: saldo y compras del año. Última compra y último pago no salen porque la lista no los trae.
+  - Despachos › Guías: facturas, bultos y transportista.
+  - Ventas › Clientes: el año contra el mismo período anterior.
+  - Proveedores: los cuatro tramos y «Por pagar», nunca «vencido».
+  - Comisiones: venta, cobro y comisión. En «Todas las empresas» no sale, porque esas filas no traen venta ni cobro.
+
+**Volver desde el borde izquierdo** (primeros 20 px, en pantallas de detalle): la pantalla sigue al dedo y suelta en `router.back()`. No choca con renglones ni con tablas desplazadas.
+
+**Tocar el encabezado** sube suave al principio, también en pantallas con scroll propio.
+
+Candados: `gestos-iphone.test.tsx` y `gestos-tarjetas-resumen.test.tsx`.

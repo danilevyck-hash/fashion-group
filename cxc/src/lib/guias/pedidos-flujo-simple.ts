@@ -399,3 +399,19 @@ export function validarCantidadBultos(v: unknown): Veredicto & { valor?: number 
   }
   return { ok: true, valor: n };
 }
+
+/**
+ * Deslizar a la derecha en el celular (27-nov-2026, `GESTOS_IPHONE_2026_11`):
+ * el paso SIGUIENTE, con la misma regla de quién marca qué que los botones
+ * (bodega: En preparación y Preparado; la secretaria: Recibido; el servidor
+ * decide igual con `puedeMoverFlujoSimple`). `null` = el gesto no se ofrece.
+ */
+export function pasoAlDeslizar(
+  estado: EstadoFlujoSimple,
+  { puedeMarcar, puedeRecibir }: { puedeMarcar: boolean; puedeRecibir: boolean },
+): Exclude<EstadoFlujoSimple, "pendiente"> | null {
+  if (estado === "pendiente") return puedeMarcar ? "en_preparacion" : null;
+  if (estado === "en_preparacion") return puedeMarcar ? "preparado" : null;
+  if (estado === "preparado") return puedeRecibir ? "recibido" : null;
+  return null;
+}

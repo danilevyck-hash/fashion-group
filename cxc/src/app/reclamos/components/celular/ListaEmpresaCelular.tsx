@@ -32,7 +32,7 @@ import { facturasDe } from "@/lib/reclamos/facturas";
 import { diasDesde } from "@/lib/reclamos/dias";
 import { filtrarPorEstado, ordenarReclamos, ordenDesdeUrl, type FiltroEstado } from "@/lib/reclamos/orden";
 import { botonMandar, lineaCobrado, lineaReclamo, montoCel, tituloSeleccion } from "@/lib/reclamos/celular";
-import { calcSub, empresaKeyDeReclamo, reclamoTaxes } from "../constants";
+import { calcSub, empresaKeyDeReclamo, esPendiente, reclamoTaxes } from "../constants";
 import { bajar, pedirLote, mandarAlProveedor, textoDelEnvio, type Descarga } from "../descargas";
 import type { Contacto, Reclamo } from "../types";
 import { BotonMas, Casilla, CtaFija, FilaCel, Visto } from "./piezas";
@@ -42,6 +42,7 @@ import { RECLAMOS_APPLE_2026_10, lineaPendientes } from "@/lib/reclamos/apple-20
 import { resumenViejos } from "@/lib/reclamos/viejos";
 import { estaReclamado } from "@/lib/reclamos/reclamado";
 import { CLASE_TITULO_BARRA } from "@/components/celular/BarraDeControles";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR } from "@/components/celular/CabeceraCompacta";
 
 interface Props {
@@ -56,6 +57,10 @@ interface Props {
   onNewReclamo: () => void;
   onLoadDetail: (id: string) => void;
   onDeleteSelected: (ids: string[]) => void;
+  /** Deslizar para eliminar: el MISMO borrado con «Deshacer» 5 s de la pantalla. */
+  onDeleteReclamo?: (id: string) => void;
+  /** Deslizar a la derecha: abre «Cobrar» con el total puesto (no cobra). */
+  onCobrarReclamo?: (id: string) => void;
   onReload: () => void;
   /** `RECLAMOS_APPLE_2026_10` (5-oct-2026). Las pruebas lo fuerzan. */
   apple?: boolean;
@@ -64,7 +69,7 @@ interface Props {
 export default function ListaEmpresaCelular({
   role, activeEmpresa, reclamos, contactos,
   selectionMode, setSelectionMode, selectedIds, setSelectedIds,
-  onNewReclamo, onLoadDetail, onDeleteSelected, onReload,
+  onNewReclamo, onLoadDetail, onDeleteSelected, onReload, onDeleteReclamo, onCobrarReclamo,
   apple: appleProp = RECLAMOS_APPLE_2026_10,
 }: Props) {
   const hoy = hoyPanama();
@@ -254,6 +259,16 @@ export default function ListaEmpresaCelular({
                   selectionMode ? <Casilla marcada={elegidos.includes(r.id)} /> : cobrado ? <Visto /> : null
                 }
                 onClick={() => (selectionMode ? alternar(r.id) : onLoadDetail(r.id))}
+                eliminar={
+                  GESTOS_IPHONE_2026_11 && esAdmin && !selectionMode && onDeleteReclamo
+                    ? { alEliminar: () => onDeleteReclamo(r.id), mensaje: "Reclamo eliminado", deshacerPropio: true }
+                    : undefined
+                }
+                deslizarDerecha={
+                  GESTOS_IPHONE_2026_11 && !selectionMode && !cobrado && esPendiente(r) && onCobrarReclamo
+                    ? { label: "Cobro", color: "bg-emerald-600", onAction: () => onCobrarReclamo(r.id) }
+                    : undefined
+                }
               />
             );
           })}

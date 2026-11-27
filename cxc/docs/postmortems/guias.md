@@ -2746,3 +2746,8 @@ Acumulado en hábiles: 0 → 48,2 % · 1 → 80,3 % · 2 → 92,1 % · 3 → 95,
 ⚠️ **El chip «Traslado» de Etiquetas NO se quitó**: está tejido por todo `EtiquetasPorEnvio.tsx` (≈12 puntos de `ETIQUETAS_TRASLADO_2026_10`, la validación del POST y la barra fija); quitarlo no es un cambio chico. Queda pendiente si Daniel lo pide.
 
 **Candados:** `guias-envio-sin-factura` (lib y componente) · `guias-agregar-traslado` (la pantalla de antes, con el interruptor apagado) · `revisar-nombres` («Qué lleva» anotado como rótulo aprobado).
+
+
+## Pedidos al deslizar (27-nov-2026)
+
+En el teléfono, deslizar un pedido a la derecha avanza un paso con «Deshacer» 5 s (Daniel lo aprobó), por la misma ruta y la misma regla de rol. «Preparado» abre los bultos. En Guías de despacho, mantener presionado muestra facturas, bultos y transportista. 📄 diseno-y-ux.md › «Gestos del iPhone».

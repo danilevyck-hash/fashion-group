@@ -30,6 +30,7 @@ import { PROVEEDORES_APPLE_2026_10, lineaCartera, nombreProveedorEnPantalla } fr
 import { TEXTOS_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { capitalizarNombre } from "@/lib/cxc/estado-cuenta-switch";
 import TramosApple, { tonoApple } from "./TramosApple";
+import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
 
 /** v2: el nombre del proveedor con la función común de nombres. */
 const nombreApple = (n: string) => nombreProveedorEnPantalla(n, capitalizarNombre);
@@ -525,12 +526,16 @@ function TarjetaEmpresa({
   apple?: boolean;
 }) {
   const frase = frasePartida(empresa.saldo, fmt);
+  const [tarjeta, setTarjeta] = useState(false);
+  const mantener = useMantenerPresionado(apple ? null : () => setTarjeta(true));
   if (apple) return <TarjetaEmpresaApple empresa={empresa} abierta={abierta} onAlternar={onAlternar} onProveedor={onProveedor} onEmpresa={onEmpresa} frase={frase} />;
   return (
     <li className="border-b border-gray-100">
+      {tarjeta && <TarjetaTramos empresa={empresa} onAbrir={() => { setTarjeta(false); onAlternar(); }} onCerrar={() => setTarjeta(false)} />}
       <button
         type="button"
         onClick={onAlternar}
+        {...mantener}
         aria-expanded={abierta}
         className="flex min-h-[44px] w-full items-baseline justify-between gap-2 px-1 py-3 text-left active:bg-gray-50"
       >
@@ -642,6 +647,22 @@ function SinSaldoCelular({
   );
 }
 
+/** Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): lo por pagar
+ *  de la empresa por tramo de EDAD, con los mismos números de la fila abierta
+ *  (sin leer nada). Un solo tono, como siempre: es edad, no mora. */
+function TarjetaTramos({ empresa, onAbrir, onCerrar }: { empresa: EmpresaCxp; onAbrir: () => void; onCerrar: () => void }) {
+  return (
+    <TarjetaResumen
+      titulo={empresa.nombre}
+      subtitulo="Por pagar por antigüedad"
+      filas={TRAMOS.map((t) => ({ rotulo: t.label, valor: textoDeMonto(empresa.tramos[t.key], fmt) }))}
+      pie={{ rotulo: "Por pagar", valor: textoDeMonto(empresa.saldo.por_pagar, fmt) }}
+      onAbrir={onAbrir}
+      onCerrar={onCerrar}
+    />
+  );
+}
+
 /** La › de las filas (Apple). Abierta, gira y apunta abajo. */
 function Flecha({ abierta }: { abierta?: boolean }) {
   return (
@@ -672,11 +693,15 @@ function TarjetaEmpresaApple({
 }) {
   const n = empresa.proveedores.length;
   const viejo = empresa.tramos.tMas365;
+  const [tarjeta, setTarjeta] = useState(false);
+  const mantener = useMantenerPresionado(() => setTarjeta(true));
   return (
     <li className="border-b border-gray-100">
+      {tarjeta && <TarjetaTramos empresa={empresa} onAbrir={() => { setTarjeta(false); onAlternar(); }} onCerrar={() => setTarjeta(false)} />}
       <button
         type="button"
         onClick={onAlternar}
+        {...mantener}
         aria-expanded={abierta}
         className="flex min-h-[56px] w-full items-center gap-3 px-1 py-2.5 text-left active:bg-gray-50"
       >

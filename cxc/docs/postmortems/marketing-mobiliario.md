@@ -52,3 +52,8 @@
 > **Medición de los 3 anchos** (`BASE=… node scripts/_medir-mobiliario-piezas-bultos.mjs`, solo lectura): **390 · 834 · 1440 → 0 arrastre y 0 recortado** en Mobiliario (lista y modal de producto) y en el formulario de entrega, con todos los controles nuevos ≥44 px. Quedan dos desbordes en el detalle del proyecto —5 px a 390 dentro del scroller de la tabla y 15 px a 834 en la tira de navegación de `/marketing`— **medidos IDÉNTICOS contra `origin/main`: son PRE-EXISTENTES**, no los trajo este cambio.
 >
 > Verificaciones read-only contra producción: `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-foto-nota-entrega.ts` (la foto firma, baja y es una imagen de verdad: 200, `image/jpeg`, 15,4 KB, magic JPEG) y `…/_verif-nota-entrega-con-fotos.ts` (las 5 fotos se DIBUJAN en el papel — se cuentan las colocaciones `/I<n> Do`, no los XObject, porque jsPDF deduplica imágenes idénticas).
+
+
+## Eliminar al deslizar (27-nov-2026)
+
+En el teléfono: deslizar a la derecha = Editar; a la izquierda = Eliminar (admin), con «Deshacer» 5 s y el mismo DELETE. 📄 diseno-y-ux.md › «Gestos del iPhone».

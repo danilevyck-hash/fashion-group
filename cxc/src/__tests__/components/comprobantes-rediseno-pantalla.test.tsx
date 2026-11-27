@@ -148,7 +148,8 @@ function abrirMeses(c: HTMLElement) {
 const filaDe = (c: HTMLElement, clave: string) =>
   c.querySelector(`tbody tr[data-pedido="${clave}"]`) as HTMLElement;
 const fichas = (c: HTMLElement) =>
-  [...c.querySelectorAll("div.lg\\:hidden > div[data-pedido]")] as HTMLElement[];
+  // Con «deslizar para eliminar» (27-nov-2026) la ficha va dentro del renglón que se desliza.
+  [...c.querySelectorAll("div.lg\\:hidden > div[data-pedido], div.lg\\:hidden > .swipeable-row > [data-contenido-deslizar] > div[data-pedido]")] as HTMLElement[];
 
 function abrirMenu(f: HTMLElement): string[] {
   const kebab = [...f.querySelectorAll("button")].find(

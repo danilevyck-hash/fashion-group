@@ -33,7 +33,7 @@ import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
 import { exportUtilidadToExcel, type UtilidadClienteResponse, type UtilidadClienteRow } from "@/lib/ventas/utilidad-cliente";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { opcionesEmpresaClientes, ROTULO_TODAS, VALOR_TODAS } from "@/lib/ventas/rotulo-empresas";
-import { rotuloCompras, rotuloVs, ventanaParaClientes, type PeriodoVentas } from "@/lib/ventas/periodo";
+import { etiquetaPeriodo, rotuloCompras, rotuloVs, ventanaParaClientes, type PeriodoVentas } from "@/lib/ventas/periodo";
 import { ROTULO_DESCARGAR_EXCEL, anotarDescarga } from "@/lib/ventas/descarga";
 import { textoFrescura } from "@/lib/ventas/frescura";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
@@ -645,6 +645,10 @@ export function ClientesView({
           ordenar={ordenarCelular}
           unaLista={UNA_LISTA}
           utilidadDe={conUtilidad ? (c) => utilidadMapa.get(c.id) : undefined}
+          rotulosTarjeta={{
+            actual: etiquetaPeriodo(periodoServido),
+            anterior: textoComparativo(anioComparativo, periodoServido).replace(/^vs m/, "M"),
+          }}
           frescura={FRESCURA_VISIBLE_2026_10 ? <FrescuraVentasCel soloHora={UNA_LISTA} onActualizado={() => { void reloadData(); onReloadData?.(); }} /> : undefined}
           accion={
             <MenuVentasCelular

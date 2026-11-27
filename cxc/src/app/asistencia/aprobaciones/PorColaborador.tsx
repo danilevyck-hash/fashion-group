@@ -26,6 +26,8 @@ import {
 import { BotonesSiNo, ChipTipo, Flecha } from "./BotonesSiNo";
 import { useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
+import { SwipeableRow } from "@/components/ui";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 
 export interface PropsVista {
   /** Decide sobre esos días (el POST va detrás, optimista). */
@@ -88,8 +90,13 @@ export function DiasDePersona({
 }
 
 export default function PorColaborador({
-  personas, onDecidir, enVuelo, bloqueado, abiertos, onAbrir, personaResaltada, refResaltada,
-}: PropsVista & { personas: readonly PersonaAprobacion[] }) {
+  personas, onDecidir, enVuelo, bloqueado, abiertos, onAbrir, personaResaltada, refResaltada, onDecidirConDeshacer,
+}: PropsVista & {
+  personas: readonly PersonaAprobacion[];
+  /** Deslizar en el celular (`GESTOS_IPHONE_2026_11`): derecha = Sí, izquierda = No,
+   *  con «Deshacer» 5 s; el POST es el MISMO de los botones. */
+  onDecidirConDeshacer?: (items: ToqueAprobacion[], decision: Decision, etiqueta: string) => void;
+}) {
   const barra = useHayBarraCelular();
   return (
     <div data-testid="vista-colaborador">
@@ -110,6 +117,14 @@ export default function PorColaborador({
               // 🔴 Barra del celular v2 (2-oct-2026): el NOMBRE COMPLETO arriba y,
               // debajo en gris, «8 días · 7:50 h»; Sí/No a la derecha, centrados.
               // 🩸 En una sola línea el nombre salía cortado («Angel Pi…»).
+              <SwipeableRow
+                leftAction={GESTOS_IPHONE_2026_11 && onDecidirConDeshacer && !bloqueado && !viajaAlguno
+                  ? { label: "Sí", color: "bg-emerald-600", onAction: () => onDecidirConDeshacer(toquesDePersona(p, true), "si", p.etiqueta) }
+                  : undefined}
+                rightAction={GESTOS_IPHONE_2026_11 && onDecidirConDeshacer && !bloqueado && !viajaAlguno
+                  ? { label: "No", color: "bg-red-600", onAction: () => onDecidirConDeshacer(toquesDePersona(p, true), "no", p.etiqueta) }
+                  : undefined}
+              >
               <div className="flex min-h-[60px] items-center gap-3 px-3.5 py-2 tabular-nums">
                 <button
                   type="button"
@@ -130,6 +145,7 @@ export default function PorColaborador({
                   onDecidir={(dec) => onDecidir(toquesDePersona(p, true), dec)}
                 />
               </div>
+              </SwipeableRow>
             ) : (
             <div className="flex min-h-[56px] flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-1 tabular-nums">
               <button

@@ -84,3 +84,8 @@ Candado: `caja-papel-cinco-columnas.test.tsx` (12).
 - 🔴 **VUELVE «RESTAURAR», y el aviso deja de mentir.** 🩸 Se había retirado el 7-sep por cero usos, pero el aviso de eliminar siguió prometiendo *«Podrás restaurarlo desde Gastos eliminados si es un error»* y esa pantalla quedó de solo lectura: la promesa fue falsa cuatro días. Daniel, textual: *«a) vuelve Restaurar»*. El soft delete ya existía (`deleted`, `deleted_by`, `deleted_at`); se agregó el botón por fila y su rama en el servidor — 🔴 en **su propia rama**, nunca por `ALLOWED_FIELDS`, y **solo con el período ABIERTO**: devolver un gasto a un período cerrado le cambiaría el total a algo que ya se imprimió.
 - Candados: `caja-y-marketing-defectos.test.ts` (20) · `caja-periodo-cerrado-fotos.test.tsx` (3, de conducta). `caja-columnas-retiradas` cambió de dirección con nota fechada: «Restaurar» sale de la lista de lo retirado, con el CONTROL de que vuelve SOLO en la lista de eliminados.
 
+
+
+## Eliminar al deslizar (27-nov-2026)
+
+En el teléfono, el gasto de un período abierto se elimina deslizando, con «Deshacer» 5 s y el mismo DELETE. 📄 diseno-y-ux.md › «Gestos del iPhone».

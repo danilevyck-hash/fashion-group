@@ -45,6 +45,8 @@ interface Props {
   setEditGasto: (g: Partial<CajaGasto>) => void;
   onSaveEdit: () => void;
   onDeleteGasto: (id: string) => void;
+  /** Deslizar la tarjeta para eliminar: el MISMO borrado, con «Deshacer» 5 s. */
+  onBorrarGastoDeUna?: (id: string) => Promise<boolean>;
   recentlyAddedIds?: Set<string>;
   /** Callback para abrir el Drawer inline de nuevo gasto (único camino de alta). */
   onNuevoGasto?: () => void;
@@ -145,6 +147,7 @@ export default function GastoTable({
   setEditGasto,
   onSaveEdit,
   onDeleteGasto,
+  onBorrarGastoDeUna,
   recentlyAddedIds = new Set(),
   onNuevoGasto,
   onQuickCategoria,
@@ -356,6 +359,7 @@ export default function GastoTable({
                 onCancelar={() => setEditingGastoId(null)}
                 onGuardar={onSaveEdit}
                 onEliminar={() => onDeleteGasto(g.id)}
+                onEliminarDeUna={onBorrarGastoDeUna ? () => onBorrarGastoDeUna(g.id) : undefined}
                 resaltado={recentlyAddedIds.has(g.id)}
               />
             ))}

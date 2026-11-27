@@ -9,6 +9,8 @@ import ZonaFotos from "./ZonaFotos";
 import { centavos } from "@/lib/caja/dinero";
 import { accionesDelGasto, fotosSoloVer } from "@/lib/caja/menu-del-gasto";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { SwipeableRow } from "@/components/ui";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 
 /**
  * UN GASTO EN PANTALLA ANGOSTA — la ficha (celular e iPad, por debajo de
@@ -39,6 +41,8 @@ interface Props {
   onCancelar: () => void;
   onGuardar: () => void;
   onEliminar: () => void;
+  /** Deslizar a la izquierda para eliminar (`GESTOS_IPHONE_2026_11`). */
+  onEliminarDeUna?: () => Promise<boolean>;
   resaltado?: boolean;
 }
 
@@ -65,6 +69,7 @@ export default function FichaGasto({
   onCancelar,
   onGuardar,
   onEliminar,
+  onEliminarDeUna,
   resaltado = false,
 }: Props) {
   const [verFotos, setVerFotos] = useState(false);
@@ -166,7 +171,7 @@ export default function FichaGasto({
   const nota = (g.descripcion || g.nombre || "").trim();
   const encabezado = nota || g.proveedor || "—";
 
-  return (
+  const tarjeta = (
     <div
       data-gasto-fila={g.id}
       className={`rounded-lg p-4 ${resaltado ? "new-row-highlight" : ""}`}
@@ -215,5 +220,14 @@ export default function FichaGasto({
         </div>
       )}
     </div>
+  );
+  // Solo con el período abierto: la misma regla que el «···» (y el servidor).
+  if (!GESTOS_IPHONE_2026_11 || !onEliminarDeUna || !accionesDelGasto(isOpen).includes("eliminar")) {
+    return tarjeta;
+  }
+  return (
+    <SwipeableRow className="rounded-lg" eliminar={{ alEliminar: onEliminarDeUna, mensaje: "Gasto eliminado" }}>
+      {tarjeta}
+    </SwipeableRow>
   );
 }

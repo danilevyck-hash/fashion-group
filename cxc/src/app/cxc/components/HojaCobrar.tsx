@@ -124,6 +124,9 @@ interface Props {
   desglose?: RenglonEmpresaCliente[] | null;
   /** Cerrar al irse a otra pantalla por un enlace (sin tocar el historial). Sin él, `onClose`. */
   onCerrarAlSalir?: () => void;
+  /** Abrir ya en «Enviar estado de cuenta» (deslizar a la derecha, `GESTOS_IPHONE_2026_11`).
+   *  Solo ABRE las salidas: enviar sigue siendo tocar una (con su «Deshacer»). */
+  salidasAlAbrir?: boolean;
 }
 
 export default function HojaCobrar({
@@ -140,6 +143,7 @@ export default function HojaCobrar({
   companyFilter,
   desglose = null,
   onCerrarAlSalir,
+  salidasAlAbrir = false,
 }: Props) {
   const abierto = !!client;
   const codigo = client ? codigoDe(client) : null;
@@ -151,7 +155,7 @@ export default function HojaCobrar({
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [salidasAbiertas, setSalidasAbiertas] = useState(false);
-  useEffect(() => { setSalidasAbiertas(false); }, [client]);
+  useEffect(() => { setSalidasAbiertas(salidasAlAbrir); }, [client]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!abierto || !codigo) return;

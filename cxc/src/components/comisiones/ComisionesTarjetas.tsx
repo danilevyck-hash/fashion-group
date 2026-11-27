@@ -48,7 +48,8 @@
 
 import { DESGLOSE_DEBAJO } from "@/lib/ui/revision-110-vivo";
 import { DESGLOSE_EN_DOS_LINEAS } from "@/lib/ui/revision-110-vivo2";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
 import { fmtMoney } from "@/lib/ventas/format";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_NO_SE_PAGA, ROTULO_VER_MENOS, rotuloVerNoSePagan } from "@/lib/comisiones/sin-pago";
@@ -670,8 +671,29 @@ function FilasPorEmpresaV2({
   onVerNoSePagan,
   onDetalle,
 }: Omit<PropsPorEmpresa, "total" | "v2">) {
+  // 🔴 Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): venta,
+  // cobro y comisión del vendedor, los MISMOS campos y el MISMO `fmtMoney` de
+  // la fila (sin leer nada). Un gancho para la lista; la fila se anota al apoyar.
+  const [tarjeta, setTarjeta] = useState<FilaPorEmpresa | null>(null);
+  const tocada = useRef<FilaPorEmpresa | null>(null);
+  const mantener = useMantenerPresionado(() => setTarjeta(tocada.current));
   return (
     <div data-filas-v2 className="space-y-2 lg:hidden">
+      {tarjeta && (
+        <TarjetaResumen
+          titulo={nombreVendedorEnPantalla(tarjeta.vendedor)}
+          filas={[
+            { rotulo: "Ventas", valor: fmtMoney(tarjeta.base) },
+            { rotulo: "Comisión por venta", valor: fmtMoney(tarjeta.comision) },
+            { rotulo: "Cobros", valor: fmtMoney(tarjeta.base_cobro) },
+            { rotulo: "Comisión por cobro", valor: fmtMoney(tarjeta.comision_cobro) },
+            ...((tarjeta.descuento ?? 0) > 0 ? [{ rotulo: "Descuentos", valor: fmtMoney(-(tarjeta.descuento ?? 0)) }] : []),
+          ]}
+          pie={{ rotulo: "Comisión total", valor: fmtMoney(tarjeta.comision_total) }}
+          onAbrir={() => { const v = tarjeta; setTarjeta(null); onDetalle(v.vendedor); }}
+          onCerrar={() => setTarjeta(null)}
+        />
+      )}
       <ul className={`${CLASE_GRUPO_V2} divide-y divide-gray-100`}>
         {activos.map((v) => {
           const gris = v.se_paga === false;
@@ -680,6 +702,8 @@ function FilasPorEmpresaV2({
               <button
                 type="button"
                 onClick={() => onDetalle(v.vendedor)}
+                {...mantener}
+                onTouchStart={mantener.onTouchStart ? (e) => { tocada.current = v; mantener.onTouchStart!(e); } : undefined}
                 className="flex min-h-[44px] w-full items-center gap-3 px-3 py-2.5 text-left active:bg-gray-50"
               >
                 <span className="min-w-0 flex-1">

@@ -489,12 +489,12 @@ export default function MobiliarioPage() {
     await aplicarGuardarProducto();
   };
 
-  const ejecutarBorrarProducto = async () => {
-    if (!deleteProd) return;
+  // El MISMO borrado para la confirmación y para deslizar (devuelve si se borró).
+  const borrarProducto = async (prod: MkInventarioProducto): Promise<boolean> => {
     setDeleting(true);
     try {
       const res = await fetch(
-        `/api/marketing/inventario/productos/${deleteProd.id}`,
+        `/api/marketing/inventario/productos/${prod.id}`,
         { method: "DELETE" },
       );
       if (!res.ok) {
@@ -504,12 +504,19 @@ export default function MobiliarioPage() {
       toast("Producto eliminado", "success");
       setDeleteProd(null);
       cargar();
+      return true;
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
+      return false;
     } finally {
       setDeleting(false);
     }
   };
+  const ejecutarBorrarProducto = async () => {
+    if (!deleteProd) return;
+    await borrarProducto(deleteProd);
+  };
+
 
   const descargarExcel = async (proyectoId?: string) => {
     const id = proyectoId ?? "global";
@@ -573,6 +580,7 @@ export default function MobiliarioPage() {
           esAdmin={role === "admin"}
           onEditar={abrirEditarProducto}
           onBorrar={setDeleteProd}
+          onBorrarDeUna={borrarProducto}
           onNuevo={abrirNuevoProducto}
           onExcel={() => descargarExcel()}
           onProductoAbierto={setProductoAbierto}

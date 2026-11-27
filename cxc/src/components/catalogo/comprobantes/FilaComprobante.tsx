@@ -37,6 +37,8 @@ import AccionesComprobante from "./AccionesComprobante";
 import { BLANCO_CASILLA, CATALOGO_ORDEN_CELULAR } from "@/lib/catalogo/orden-celular";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { COMPROBANTES_CELULAR_2026_11 } from "@/lib/catalogo/reebok-catalogo-2026-11";
+import { SwipeableRow } from "@/components/ui";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 
 /** La etiqueta de origen. Los DOS nombres viven en `origen-comprobante.ts`. */
 export function OrigenBadge({
@@ -165,6 +167,8 @@ export interface PropsFila {
   onDuplicar: () => void;
   onReenviarCorreo: () => void;
   onEliminar: () => void;
+  /** Deslizar la ficha para eliminar (celular): el MISMO borrado, con «Deshacer» 5 s. */
+  onEliminarDeUna?: () => Promise<boolean>;
   showToast: (msg: string, tono?: "error" | "success") => void;
 }
 
@@ -288,6 +292,14 @@ function LineasCortas(p: PropsFila) {
 
 /** La FICHA — por debajo de `lg`. Nada se arrastra de costado. */
 export function FichaFila(p: PropsFila) {
+  const ficha = <FichaFilaCuerpo {...p} />;
+  if (!GESTOS_IPHONE_2026_11 || !p.puedeAdministrar || !p.onEliminarDeUna) return ficha;
+  return (
+    <SwipeableRow eliminar={{ alEliminar: p.onEliminarDeUna, mensaje: "Pedido eliminado" }}>{ficha}</SwipeableRow>
+  );
+}
+
+function FichaFilaCuerpo(p: PropsFila) {
   return (
     <div
       data-pedido={p.pedido.numero_pedido ?? p.pedido.id_natural}

@@ -14,6 +14,9 @@ import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
 import { useAccionDelGesto } from "@/components/shared/DeslizarParaActualizar";
 import { DESLIZAR_ACTUALIZA_CON_SWITCH } from "@/lib/ui/deslizar-para-actualizar";
+import { GESTOS_IPHONE_2026_11, FRACCION_BORRAR_DE_UNA, BORDE_VOLVER_PX } from "@/lib/ui/gestos-iphone-2026-11";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import UndoToast from "@/components/UndoToast";
 
 export { Avatar } from "./ui/Avatar";
 export type { AvatarProps } from "./ui/Avatar";
@@ -1174,7 +1177,11 @@ export function BottomSheet({
   );
 }
 
-// ── SwipeableRow: iOS Mail-style swipe-to-action on mobile ──
+// ── SwipeableRow: deslizar el renglón, como en Mail del iPhone ──
+// 🔴 `eliminar` (27-nov-2026, `GESTOS_IPHONE_2026_11`): a la izquierda
+// aparece «Eliminar» en rojo; tocarlo o deslizar hasta el final esconde el
+// renglón y deja «Deshacer» 5 s. Pasado el plazo corre `alEliminar` — el MISMO
+// borrado de la pantalla. Si devuelve `false` o falla, el renglón vuelve.
 export interface SwipeAction {
   label: string;
   icon?: ReactNode;
@@ -1183,17 +1190,30 @@ export interface SwipeAction {
   onAction: () => void;
 }
 
+export interface EliminarAlDeslizar {
+  /** El borrado de la pantalla, sin su confirmación. `false` = no se borró. */
+  alEliminar: () => unknown | Promise<unknown>;
+  /** Lo que dice el aviso de «Deshacer», p. ej. «Reclamo eliminado». */
+  mensaje: string;
+  /** La pantalla ya tiene su «Deshacer» de 5 s (y saca el renglón): se le
+   *  pasa el borrado al instante y el renglón no pone otro aviso. */
+  deshacerPropio?: boolean;
+}
+
 export function SwipeableRow({
   children,
   leftAction,
   rightAction,
+  eliminar,
   className = "",
   threshold = 60,
-  executeThreshold = 150,
+  executeThreshold,
 }: {
   children: ReactNode;
   leftAction?: SwipeAction;   // revealed when swiping RIGHT
   rightAction?: SwipeAction;  // revealed when swiping LEFT
+  /** Deslizar a la izquierda = Eliminar (gana sobre `rightAction`). */
+  eliminar?: EliminarAlDeslizar;
   className?: string;
   threshold?: number;
   executeThreshold?: number;
@@ -1204,29 +1224,64 @@ export function SwipeableRow({
   const currentX = useRef(0);
   const isDragging = useRef(false);
   const isHorizontal = useRef<boolean | null>(null);
+  const movio = useRef(false);
+  const offsetInicial = useRef(0);
   const [offset, setOffset] = useState(0);
   const [transitioning, setTransitioning] = useState(false);
-  const [executed, setExecuted] = useState(false);
+  const [oculto, setOculto] = useState(false);
+  const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
 
   const reset = useCallback(() => {
     setTransitioning(true);
     setOffset(0);
-    setExecuted(false);
     setTimeout(() => setTransitioning(false), 300);
   }, []);
 
+  const conEliminar = GESTOS_IPHONE_2026_11 && !!eliminar;
+  const ultimoEliminar = useRef(eliminar);
+  ultimoEliminar.current = eliminar;
+  const borrar = useCallback(() => {
+    const e = ultimoEliminar.current;
+    if (!e) return;
+    if (e.deshacerPropio) {
+      void e.alEliminar();
+      return;
+    }
+    scheduleAction({
+      id: "deslizar",
+      message: e.mensaje,
+      onOptimistic: () => setOculto(true),
+      onRevert: () => {
+        setOculto(false);
+        setOffset(0);
+      },
+      execute: async () => {
+        if ((await e.alEliminar()) === false) throw new Error("no se borró");
+      },
+    });
+  }, [scheduleAction]);
+  const derecha: SwipeAction | undefined = conEliminar
+    ? { label: "Eliminar", color: "bg-red-600", onAction: borrar }
+    : rightAction;
+
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    // Don't interfere with inputs, buttons, etc.
+    // Lo que se escribe no se desliza; un botón sí (el renglón entero suele serlo).
     const tag = (e.target as HTMLElement).tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON") return;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    // El borde izquierdo es de «volver» (`VolverDesdeElBorde`), no del renglón.
+    if (GESTOS_IPHONE_2026_11 && e.touches[0].clientX <= BORDE_VOLVER_PX) return;
     setTransitioning(false);
-    setExecuted(false);
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
-    currentX.current = 0;
+    currentX.current = offset;
+    offsetInicial.current = offset;
+    movio.current = false;
     isDragging.current = true;
     isHorizontal.current = null;
-  }, []);
+  }, [offset]);
+
+  const ancho = () => containerRef.current?.clientWidth || 360;
+  const umbralDeUna = () => executeThreshold ?? Math.round(ancho() * FRACCION_BORRAR_DE_UNA);
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isDragging.current) return;
@@ -1241,45 +1296,39 @@ export function SwipeableRow({
           isDragging.current = false;
           return;
         }
+        movio.current = true;
       } else {
         return;
       }
     }
 
-    // Limit swipe direction based on available actions
-    let clampedDx = dx;
+    // Desde donde quedó (abierto o cerrado), solo hacia donde hay acción.
+    let clampedDx = offsetInicial.current + dx;
     if (!leftAction && clampedDx > 0) clampedDx = 0;
-    if (!rightAction && clampedDx < 0) clampedDx = 0;
-
-    // Apply resistance past executeThreshold
-    const max = executeThreshold + 40;
-    if (Math.abs(clampedDx) > max) {
-      clampedDx = clampedDx > 0 ? max : -max;
-    }
+    if (!derecha && clampedDx < 0) clampedDx = 0;
+    const max = ancho();
+    if (Math.abs(clampedDx) > max) clampedDx = clampedDx > 0 ? max : -max;
 
     currentX.current = clampedDx;
     setOffset(clampedDx);
-  }, [leftAction, rightAction, executeThreshold]);
+  }, [leftAction, derecha]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onTouchEnd = useCallback(() => {
     if (!isDragging.current) return;
     isDragging.current = false;
+    if (!movio.current) return;
     const dx = currentX.current;
     const absDx = Math.abs(dx);
 
-    // Auto-execute if past executeThreshold
-    if (absDx >= executeThreshold) {
-      setExecuted(true);
+    // Hasta el final: se ejecuta de una (como en Mail).
+    if (absDx >= umbralDeUna()) {
       setTransitioning(true);
-      // Slide fully off before executing
-      setOffset(dx > 0 ? 300 : -300);
-      const action = dx > 0 ? leftAction : rightAction;
+      setOffset(dx > 0 ? ancho() : -ancho());
+      const action = dx > 0 ? leftAction : derecha;
       setTimeout(() => {
         action?.onAction();
-        // Reset after action
         setTimeout(() => {
           setOffset(0);
-          setExecuted(false);
           setTimeout(() => setTransitioning(false), 50);
         }, 150);
       }, 200);
@@ -1289,15 +1338,25 @@ export function SwipeableRow({
     // Snap open if past threshold
     if (absDx >= threshold) {
       setTransitioning(true);
-      const snapTo = dx > 0 ? threshold + 20 : -(threshold + 20);
-      setOffset(snapTo);
+      const abierto = conEliminar && dx < 0 ? 88 : threshold + 20;
+      setOffset(dx > 0 ? abierto : -abierto);
       setTimeout(() => setTransitioning(false), 300);
       return;
     }
 
     // Spring back
     reset();
-  }, [threshold, executeThreshold, leftAction, rightAction, reset]);
+  }, [threshold, leftAction, derecha, conEliminar, reset]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tras deslizar, el toque no abre el renglón; abierto, tocarlo lo cierra.
+  const alClicCaptura = useCallback((e: React.MouseEvent) => {
+    if (movio.current || offset !== 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      movio.current = false;
+      if (offset !== 0) reset();
+    }
+  }, [offset, reset]);
 
   // Close on outside tap
   useEffect(() => {
@@ -1314,41 +1373,60 @@ export function SwipeableRow({
   const actionWidth = Math.max(Math.abs(offset), threshold);
   const showRight = offset < -10;
   const showLeft = offset > 10;
+  const tocarAccion = (a: SwipeAction) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    reset();
+    a.onAction();
+  };
+
+  const aviso = pendingUndo ? (
+    <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />
+  ) : null;
+  if (oculto) return aviso;
 
   return (
     <div ref={containerRef} className={`swipeable-row relative overflow-hidden ${className}`}>
       {/* Right action (revealed on swipe left) */}
-      {rightAction && (
-        <div
-          className={`absolute inset-y-0 right-0 flex items-center justify-center ${rightAction.color} ${rightAction.textColor || "text-white"}`}
+      {derecha && (
+        <button
+          type="button"
+          data-accion-deslizar={conEliminar ? "eliminar" : undefined}
+          tabIndex={-1}
+          onClick={tocarAccion(derecha)}
+          className={`absolute inset-y-0 right-0 flex min-h-[44px] items-center justify-end ${derecha.color} ${derecha.textColor || "text-white"}`}
           style={{
             width: `${actionWidth}px`,
             opacity: showRight ? 1 : 0,
-            transition: transitioning ? "opacity 0.15s" : "none",
+            pointerEvents: showRight ? "auto" : "none",
+            transition: transitioning ? "opacity 0.15s, width 0.3s" : "none",
           }}
         >
-          <div className="flex flex-col items-center gap-0.5 px-3">
-            {rightAction.icon}
-            <span className="text-xs font-medium whitespace-nowrap">{rightAction.label}</span>
-          </div>
-        </div>
+          <span className="flex w-[88px] shrink-0 flex-col items-center gap-0.5 px-3">
+            {derecha.icon}
+            <span className="text-sm font-medium whitespace-nowrap">{derecha.label}</span>
+          </span>
+        </button>
       )}
 
       {/* Left action (revealed on swipe right) */}
       {leftAction && (
-        <div
-          className={`absolute inset-y-0 left-0 flex items-center justify-center ${leftAction.color} ${leftAction.textColor || "text-white"}`}
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={tocarAccion(leftAction)}
+          className={`absolute inset-y-0 left-0 flex min-h-[44px] items-center justify-start ${leftAction.color} ${leftAction.textColor || "text-white"}`}
           style={{
             width: `${actionWidth}px`,
             opacity: showLeft ? 1 : 0,
-            transition: transitioning ? "opacity 0.15s" : "none",
+            pointerEvents: showLeft ? "auto" : "none",
+            transition: transitioning ? "opacity 0.15s, width 0.3s" : "none",
           }}
         >
-          <div className="flex flex-col items-center gap-0.5 px-3">
+          <span className="flex w-[88px] shrink-0 flex-col items-center gap-0.5 px-3">
             {leftAction.icon}
-            <span className="text-xs font-medium whitespace-nowrap">{leftAction.label}</span>
-          </div>
-        </div>
+            <span className="text-sm font-medium whitespace-nowrap">{leftAction.label}</span>
+          </span>
+        </button>
       )}
 
       {/* Main content */}
@@ -1356,15 +1434,20 @@ export function SwipeableRow({
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+        onClickCapture={alClicCaptura}
+        data-contenido-deslizar=""
         className="relative bg-white"
         style={{
           transform: `translateX(${offset}px)`,
           transition: transitioning ? "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)" : "none",
           willChange: isDragging.current ? "transform" : "auto",
+          touchAction: "pan-y",
         }}
       >
         {children}
       </div>
+      {aviso}
     </div>
   );
 }
