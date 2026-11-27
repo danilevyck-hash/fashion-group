@@ -138,7 +138,7 @@ export default function MarketingNuevo({ role, marcas }: { role: string; marcas:
           </Aviso>
         )}
 
-        {tab === "por-cobrar" && <PorCobrarNuevo datos={datos} escribe={escribe} onCambio={refrescar} />}
+        {tab === "por-cobrar" && <PorCobrarNuevo datos={datos} marcas={marcas} escribe={escribe} onCambio={refrescar} />}
         {tab === "gastos" && (
           <GastosNuevo
             datos={datos}

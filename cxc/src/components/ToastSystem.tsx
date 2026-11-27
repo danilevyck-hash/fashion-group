@@ -4,6 +4,7 @@ import { duracionToastMs } from '@/lib/ui/toast-duracion'
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { useBackdropDismiss, useEscapeClose } from '@/lib/hooks/useModalDismiss'
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos, type ToastType } from '@/components/CajaAviso'
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 interface Toast {
   id: number
@@ -73,7 +74,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Confirm modal */}
       {confirmState && (
         <div {...backdropConfirm} className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100] animate-in fade-in duration-150">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className={`bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200 ${cabe(PANEL_CABE, "")}`}>
             <p className="text-sm text-gray-800 mb-5">{confirmState.message}</p>
             <div className="flex gap-2 justify-end">
               <button onClick={confirmState.onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-800 transition">Cancelar</button>

@@ -25,6 +25,7 @@ import { ChipSelector } from "@/components/celular/BarraDeControles";
 import NuevoMovimientoModal from "./components/NuevoMovimientoModal";
 import ElegirPersonaModal from "./components/ElegirPersonaModal";
 import { descargarHistorialPrestamos, type AmbitoHistorial } from "@/lib/prestamos-descargar-historial";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 export type PrestamosInitialData = DatosPrestamos;
 
@@ -426,7 +427,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
       {showMovModal && personaElegida?.fichaId && (
         <div {...movModal.backdrop} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div ref={movModal.panelRef} className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div ref={movModal.panelRef} className={`bg-white rounded-lg p-6 max-w-md w-full ${cabe(PANEL_CABE, "max-h-[90vh] overflow-y-auto")}`}>
             <NuevoMovimientoModal
               nombre={personaElegida.nombre}
               empleadoId={personaElegida.fichaId}
@@ -456,7 +457,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           papeles distintos y elegir por él sería adivinar. */}
       {preguntaExcel && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setPreguntaExcel(false)}>
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+          <div className={`bg-white rounded-lg p-6 max-w-sm w-full ${cabe(PANEL_CABE, "")}`} onClick={(e) => e.stopPropagation()}>
             <h2 className="font-medium mb-1">Descargar historial</h2>
             <p className="mb-5 text-sm text-gray-500">Solo los colaboradores con saldo, o todos con su historial completo.</p>
             <div className="space-y-2">

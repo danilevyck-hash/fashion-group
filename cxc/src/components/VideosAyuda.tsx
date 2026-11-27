@@ -437,6 +437,7 @@ export default function VideosAyuda({
   }
   return (
     <EnElCuerpo>
+      {/* modal-cabe: panel lateral de alto completo (inset-y-0) con su propio scroll; ya cabe en la ventana. */}
       <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Cómo se usa">
         <div className="absolute inset-0 bg-black/30" onClick={onClose} />
         <aside className="absolute inset-y-0 right-0 w-[420px] max-w-full overflow-y-auto border-l border-gray-200 bg-white px-5 pt-4">

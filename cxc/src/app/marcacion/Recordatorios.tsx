@@ -90,7 +90,9 @@ export default function Recordatorios({ open, onClose }: { open: boolean; onClos
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-white" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+    // modal-cabe: pantalla completa del teléfono con su propio scroll; ya ocupa el alto de la ventana.
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-white" style
+={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
       <div className="mx-auto w-full max-w-md px-4 pb-10">
         <button type="button" onClick={onClose} className="-ml-1 min-h-[44px] px-1 text-[16px] text-blue-600">
           ‹ Marcación

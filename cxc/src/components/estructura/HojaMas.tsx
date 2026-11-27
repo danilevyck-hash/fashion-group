@@ -91,7 +91,9 @@ export default function HojaMas({
   return (
     <>
       {abierta && createPortal(
-        <div data-hoja-mas-modulos role="dialog" aria-modal="true" aria-label="Más" className="fixed inset-0 z-[60] flex flex-col justify-end sm:hidden">
+        // modal-cabe: la hoja ya tiene alto fijo (ALTO_HOJA_MAS = 70dvh), cabecera shrink-0 y lista con scroll.
+        <div data-hoja-mas-modulos
+ role="dialog" aria-modal="true" aria-label="Más" className="fixed inset-0 z-[60] flex flex-col justify-end sm:hidden">
           <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/25" />
           <div
             className={`relative mx-2 mb-2 flex flex-col overflow-hidden ${CLASE_VIDRIO} ${RADIO_VIDRIO}`}

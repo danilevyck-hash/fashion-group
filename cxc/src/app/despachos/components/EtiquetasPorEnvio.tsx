@@ -108,6 +108,7 @@ import { diaPanama } from "@/lib/guias/pendientes-aviso";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { ETIQUETAS_FILA_LIMPIA } from "@/lib/ui/revision-110-despachos";
 import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 /**
  * 🔴 EL PDF DEL ENVÍO, en pestaña nueva (la MISMA puerta que la pantalla de
@@ -461,7 +462,7 @@ export default function EtiquetasPorEnvio() {
       {reimprimiendo && <ModalReimprimirEnvio envio={reimprimiendo} onCerrar={() => setReimprimiendo(null)} />}
       {anulando && (
         <ModalOverlay onBackdropClick={() => setAnulando(null)}>
-          <div className="relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg">
+          <div className={`relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg ${cabe(PANEL_CABE, "")}`}>
             <h3 className="mb-1 text-base font-semibold">Anular el envío</h3>
             <p className="mb-1 text-sm text-gray-600">
               Se anulan las {anulando.total} etiquetas de {anulando.filas.length === 1 ? "la factura" : "las facturas"}{" "}
@@ -1567,7 +1568,7 @@ function ModalReimprimirEnvio({ envio, onCerrar }: { envio: Envio; onCerrar: () 
 
   return (
     <ModalOverlay onBackdropClick={onCerrar}>
-      <div className="relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg">
+      <div className={`relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg ${cabe(PANEL_CABE, "")}`}>
         <h3 className="mb-1 text-base font-semibold">Reimprimir el envío</h3>
         <p className="mb-4 text-sm text-gray-600">
           {envio.cliente_nombre} · {envio.empresa} · {envio.destino} · {envio.total} bultos

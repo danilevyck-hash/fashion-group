@@ -71,6 +71,7 @@ import {
 } from "@/lib/comisiones/exclusiones-en-palabras";
 import { COMISIONES_EXCLUSIONES_FILTROS } from "@/lib/ui/revision-110-ventas";
 import { ChevronDown } from "lucide-react";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 interface ListaExclusiones {
   exclusiones: ExclusionActiva[];
@@ -607,7 +608,7 @@ export function ClientesQueNoComisionan({ onSaved, v2 = false }: { onSaved: (msg
           className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center"
         >
           <button type="button" aria-label="Cerrar" onClick={() => setEditando(null)} className="absolute inset-0 bg-black/30" />
-          <div className="relative m-2 w-full max-w-sm rounded-2xl bg-white p-4">
+          <div className={`relative m-2 w-full max-w-sm rounded-2xl bg-white p-4 ${cabe(PANEL_CABE, "")}`}>
             <p className="mb-1 text-sm font-medium text-gray-900">{editando.clienteNombre}</p>
             <p className="mb-3 text-xs text-gray-500">{editando.vendedor} · {editando.chipsEmpresas.join(" · ")}</p>
             <span className="mb-1.5 block text-[11px] uppercase tracking-wide text-gray-500">{PREGUNTA_DEL_ALTA}</span>

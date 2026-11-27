@@ -12,6 +12,7 @@
 // ============================================================================
 
 import { useEffect } from "react";
+import { PANEL_CABE, cabe } from "@/lib/ui/modal-cabe-2026-11";
 import { createPortal } from "react-dom";
 import type { OverflowMenuItem } from "@/components/ui/OverflowMenu";
 import { vidrioSobre } from "@/lib/ui/vidrio";
@@ -41,7 +42,7 @@ export default function HojaDeAcciones({ titulo, opciones, onCerrar }: Props) {
         onClick={onCerrar}
         className="absolute inset-0 bg-black/40"
       />
-      <div className="relative mx-2 mb-2">
+      <div className={`relative mx-2 mb-2 ${cabe(PANEL_CABE, "")}`}>
         <div className={vidrioSobre("overflow-hidden rounded-[14px] bg-white/95 backdrop-blur")}>
           {titulo && (
             <div className="border-b border-gray-200 px-4 py-3 text-center text-[13px] text-gray-500">

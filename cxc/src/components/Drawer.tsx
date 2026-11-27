@@ -61,7 +61,7 @@ export default function Drawer({ open, onClose, title, children, footer, ancho =
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay. modal-cabe: panel lateral de alto completo (top-0 h-full, flex-col) con su propio scroll; ya cabe en la ventana. */}
       <div
         onClick={onClose}
         aria-hidden="true"

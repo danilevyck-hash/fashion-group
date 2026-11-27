@@ -158,6 +158,7 @@ export default function VisorFoto({ src, alt, onClose }: Props) {
   }
 
   return createPortal(
+    // modal-cabe: visor de foto a pantalla completa; ya ocupa el alto de la ventana.
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
     >

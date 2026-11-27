@@ -6,6 +6,7 @@ import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { fmt } from "@/lib/format";
 import { montoEnPantalla, reposicionDelPeriodo, saldoDelPeriodo, saldoEsNegativo } from "@/lib/caja/dinero";
 import { diferenciaDeCaja, hayDescuadre, leerConteo, mensajeDeDiferencia } from "@/lib/caja/conteo-cierre";
+import { cabe, PANEL_CABE_COLUMNA, CUERPO_CON_SCROLL } from "@/lib/ui/modal-cabe-2026-11";
 
 interface Props {
   open: boolean;
@@ -70,8 +71,9 @@ export default function CerrarPeriodoModal({ open, onClose, onConfirm, fondo, ga
 
   return (
     <ModalOverlay onBackdropClick={onClose}>
-      <div className="skin-caja bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
-        <h3 className="text-base font-medium mb-4">Cerrar período</h3>
+      <div className={`skin-caja bg-white sm:rounded-lg rounded-t-2xl max-w-sm w-full mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE_COLUMNA, "p-6")}`}>
+        <h3 className={`text-base font-medium mb-4 ${cabe("shrink-0 px-6 pt-6", "")}`}>Cerrar período</h3>
+        <div className={cabe(`${CUERPO_CON_SCROLL} px-6`, "")}>
         <div className="mb-2 space-y-2.5">
           {filas.map((f) => (
             <div key={f.label} className="flex items-baseline justify-between gap-4 text-sm">
@@ -155,8 +157,9 @@ export default function CerrarPeriodoModal({ open, onClose, onConfirm, fondo, ga
             </p>
           )}
         </div>
+        </div>
 
-        <div className="flex gap-3 mt-5">
+        <div className={`flex gap-3 mt-5 ${cabe("shrink-0 px-6 pb-6", "")}`}>
           <button
             onClick={confirmar}
             disabled={contado === null}

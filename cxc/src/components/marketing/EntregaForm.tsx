@@ -37,6 +37,7 @@
 // ============================================================================
 
 import { AlertTriangle } from "lucide-react";
+import { PANEL_CABE, PIE_FIJO, cabe } from "@/lib/ui/modal-cabe-2026-11";
 import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
 import { useEffect, useMemo, useState } from "react";
 import BloqueDatosDelGasto from "@/app/marketing/components/BloqueDatosDelGasto";
@@ -695,7 +696,7 @@ export default function EntregaForm({
       <div className="absolute inset-0 bg-black/40" {...backdrop} />
       <div
         ref={panelRef}
-        className="relative bg-white rounded-lg max-w-2xl w-full border border-gray-200 max-h-[90vh] overflow-y-auto"
+        className={`relative bg-white rounded-lg max-w-2xl w-full border border-gray-200 ${cabe(PANEL_CABE, "max-h-[90vh] overflow-y-auto")}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
@@ -1147,7 +1148,7 @@ export default function EntregaForm({
             </>
           )}
 
-          <div className="space-y-2 pt-2">
+          <div className={`space-y-2 pt-2 ${cabe(`${PIE_FIJO} -mx-6 px-6 pb-3 -mb-6`, "")}`}>
           {/* El botón apagado dice POR QUÉ está apagado, en la pantalla y no en
               un globito del mouse (en el iPhone no hay `title=`). Va en su
               propia línea, a lo ancho: en 390 px la lista completa no entra al

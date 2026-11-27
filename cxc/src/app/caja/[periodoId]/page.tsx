@@ -20,6 +20,7 @@ import { CAJA_NUEVO_GASTO_EN_PORTADA } from "@/lib/ui/uso-2026-11";
 import "../skin.css";
 import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
 import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeControles";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 export default function PeriodoDetailPage() {
   const router = useRouter();
@@ -207,7 +208,7 @@ export default function PeriodoDetailPage() {
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" {...deleteBackdrop}>
           {/* El cuadro ya no necesita stopPropagation: el hook solo cierra si el
               mousedown Y el click cayeron sobre el fondo mismo. */}
-          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
+          <div className={`bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE, "")}`}>
             <h3 className="text-base font-medium mb-3">¿Eliminar este gasto?</h3>
             <p className="text-sm text-gray-800 mb-2">
               {/* 🔴 El recibo se nombra por su PROVEEDOR: la nota es opcional

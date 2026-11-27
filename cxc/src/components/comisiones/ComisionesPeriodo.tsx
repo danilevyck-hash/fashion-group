@@ -212,6 +212,7 @@ export function ComisionesPeriodo({ mes, year, availableYears, onChange, classNa
 
       {open && (
         <>
+          {/* modal-cabe: fondo invisible que cierra el selector de período; no es un panel. */}
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
           <div
             ref={panelRef}

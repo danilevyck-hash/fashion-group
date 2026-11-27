@@ -51,6 +51,31 @@ function mapProyecto(row: Record<string, unknown>): MkProyecto {
   };
 }
 
+/**
+ * 🩸 EDITAR BORRABA LA TIENDA (27-nov-2026). `mapFactura` armaba la factura a
+ * mano y dejaba afuera las columnas del rediseño: `tienda_codigo`, `nota`,
+ * `se_reporta` y `pct_a_la_marca`. La ficha de edición abría con la tienda
+ * vacía («Sin tienda — buscar…») y al guardar mandaba `tiendaCodigo: null`.
+ * Se copian TAL CUAL vienen de la base, solo si la columna existe.
+ */
+export const COLUMNAS_DEL_GASTO_LEIDAS = [
+  "tienda_codigo",
+  "nota",
+  "se_reporta",
+  "pct_a_la_marca",
+  "grupo_legacy",
+  "impulsadora_id",
+  "impulsadora_mes",
+  "periodo_desde",
+  "periodo_hasta",
+] as const;
+
+export function columnasDelGastoLeidas(row: Record<string, unknown>): Partial<MkFactura> {
+  const out: Record<string, unknown> = {};
+  for (const c of COLUMNAS_DEL_GASTO_LEIDAS) if (c in row) out[c] = row[c] ?? null;
+  return out as Partial<MkFactura>;
+}
+
 function mapFactura(row: Record<string, unknown>): MkFactura {
   return {
     id: String(row.id),
@@ -70,6 +95,7 @@ function mapFactura(row: Record<string, unknown>): MkFactura {
     anulado_motivo: (row.anulado_motivo as string | null) ?? null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
+    ...columnasDelGastoLeidas(row),
   };
 }
 

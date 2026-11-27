@@ -1,6 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
+import { PANEL_CABE, cabe } from "@/lib/ui/modal-cabe-2026-11";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
@@ -258,7 +259,7 @@ export default function RegistrarPagoModal({
       <div className="absolute inset-0 bg-black/40" {...backdrop} />
       <div
         ref={panelRef}
-        className="relative bg-white w-full sm:max-w-lg rounded-lg max-h-[90vh] overflow-y-auto border border-gray-200"
+        className={`relative bg-white w-full sm:max-w-lg rounded-lg border border-gray-200 ${cabe(PANEL_CABE, "max-h-[90vh] overflow-y-auto")}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-white border-b border-gray-100 pl-6 pr-2 py-2.5 flex items-center justify-between gap-3">

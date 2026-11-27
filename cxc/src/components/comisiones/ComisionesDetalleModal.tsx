@@ -100,6 +100,7 @@ import {
   rotuloFactura,
   tituloDelDetalle,
 } from "@/lib/comisiones/detalle-v3";
+import { cabe, PANEL_CABE, PANEL_CABE_COLUMNA, CUERPO_CON_SCROLL, CABECERA_FIJA, MODAL_CABE_2026_11 } from "@/lib/ui/modal-cabe-2026-11";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -780,9 +781,9 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           /* Al abrirse debajo de la fila, el encabezado pegajoso no lo tapa. */
           style={{ scrollMarginTop: "calc(var(--fg-altura-encabezado, 0px) + 12px)" }}
           ref={(el) => { if (el && inline) el.scrollIntoView?.({ block: "nearest", behavior: "smooth" }); }}
-          className={`rounded-lg border border-gray-200 bg-white print:hidden ${inline ? "" : "my-6 w-full max-w-3xl shadow-lg"}`}
+          className={`rounded-lg border border-gray-200 bg-white print:hidden ${inline ? "" : `w-full max-w-3xl shadow-lg ${cabe(PANEL_CABE, "my-6")}`}`}
         >
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 p-4">
+          <div className={`flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 p-4 ${inline ? "" : cabe(CABECERA_FIJA, "")}`}>
             <div className="min-w-0">
               <p className="text-sm text-gray-500">
                 {tituloDelDetalle(nombreVendedorEnPantalla(vendedor), empresaNombre, etiquetaPeriodo(year, mes))}
@@ -970,8 +971,10 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
     );
     return (
       <>
+        {/* modal-cabe: la hoja de arriba lleva PANEL_CABE y su cabecera fija cuando no va en línea. */}
         {inline ? hoja : (
-          <ModalOverlay align="start" backdropClassName="bg-black/40" className="overflow-y-auto p-4 print:hidden">{hoja}</ModalOverlay>
+          <ModalOverlay align="start"
+ backdropClassName="bg-black/40" className="overflow-y-auto p-4 print:hidden">{hoja}</ModalOverlay>
         )}
         {laHojaDeMandar}
         {pendingUndo && <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />}
@@ -1000,10 +1003,19 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
       <ModalOverlay align="start" backdropClassName="bg-black/40" className="overflow-y-auto p-4 print:hidden">
         <div
           data-comision-detalle="modal"
-          className="my-6 w-full max-w-3xl rounded-lg border border-gray-200 bg-white shadow-lg"
+          className={`w-full max-w-3xl rounded-lg border border-gray-200 bg-white shadow-lg ${cabe(PANEL_CABE_COLUMNA, "my-6")}`}
         >
-          {encabezado}
-          {cuerpo}
+          {MODAL_CABE_2026_11 ? (
+            <>
+              <div className="shrink-0">{encabezado}</div>
+              <div className={CUERPO_CON_SCROLL}>{cuerpo}</div>
+            </>
+          ) : (
+            <>
+              {encabezado}
+              {cuerpo}
+            </>
+          )}
         </div>
       </ModalOverlay>
       {laHojaDeMandar}

@@ -25,6 +25,30 @@ import { MKT_GASTOS_TABLA_CABE_2026_11 } from "@/lib/ui/revision-110-marketing";
 import { BuscadorConFiltros } from "@/components/filtros/FiltroA";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { FILTRO_A_2026_11 } from "@/lib/ui/revision-110-2026-11";
+import { SwipeableRow } from "@/components/ui";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import { ACCION_ANULAR, MKT_ANULAR_EN_LA_LISTA_2026_11, MOTIVO_ANULADO_DESDE_GASTOS } from "@/lib/ui/marketing-gastos-2026-11";
+
+/**
+ * 🔴 «ANULAR» EN LA LISTA (27-nov-2026, `MKT_ANULAR_EN_LA_LISTA_2026_11`). Se
+ * anula lo que la ficha de la tienda anula: facturas y pagos de impulsadora,
+ * por la MISMA ruta (`POST …/facturas/[id]/anular`, soft delete firmado). Una
+ * entrega de mobiliario no se anula: se elimina desde su ficha y devuelve el
+ * stock. Solo quien escribe (admin y secretaria; el servidor lo vuelve a mirar).
+ */
+export function seAnulaDesdeLaLista(g: Pick<GastoDeLaLista, "tipo">, escribe: boolean): boolean {
+  return MKT_ANULAR_EN_LA_LISTA_2026_11 && escribe && g.tipo !== "mobiliario";
+}
+
+/** El mismo POST que la ficha de la tienda. `false` = no se anuló (la fila vuelve). */
+export async function anularGasto(id: string): Promise<boolean> {
+  const res = await fetch(`/api/marketing/facturas/${id}/anular`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ motivo: MOTIVO_ANULADO_DESDE_GASTOS }),
+  });
+  return res.ok;
+}
 
 /** «Buscar proveedor o factura» (revisión 14-nov-2026): sin acentos ni mayúsculas. */
 export function coincideGasto(g: Pick<GastoDeLaLista, "proveedor" | "numero">, q: string): boolean {
@@ -116,7 +140,7 @@ export function pctDe(g: Pick<GastoDeLaLista, "monto" | "aCobrar" | "estado">): 
   return Math.round((g.aCobrar / g.monto) * 100);
 }
 
-function aFila(g: GastoDeLaLista): FilaDeTienda {
+export function aFila(g: GastoDeLaLista): FilaDeTienda {
   return {
     id: g.id,
     tipo: g.tipo === "mobiliario" ? "mueble" : g.tipo,
@@ -262,6 +286,7 @@ export default function GastosNuevo({
               <th className="text-right font-medium px-2 py-2">Se cobra</th>
               <th className="text-right font-medium px-2 py-2">Monto a cobrar</th>
               {conEstado && <th className="text-left font-medium px-4 py-2">Estado</th>}
+              {MKT_ANULAR_EN_LA_LISTA_2026_11 && escribe && <th className="w-12"><span className="sr-only">Acciones</span></th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -294,6 +319,16 @@ export default function GastosNuevo({
                     )}
                   </td>
                   )}
+                  {MKT_ANULAR_EN_LA_LISTA_2026_11 && escribe && (
+                    <td className="px-2 py-1 text-right" onClick={(e) => e.stopPropagation()}>
+                      {seAnulaDesdeLaLista(g, escribe) && (
+                        <OverflowMenu
+                          ariaLabel={`Más opciones de ${g.proveedor}`}
+                          items={[{ label: ACCION_ANULAR, destructive: true, onClick: () => setAccion({ tipo: "anular", fila: aFila(g) }) }]}
+                        />
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -308,7 +343,22 @@ export default function GastosNuevo({
           const pct = pctDe(g);
           return (
             <li key={`${g.tipo}:${g.id}`}>
-              <button type="button" onClick={() => abrir(g)} className="w-full text-left px-4 py-3 min-h-[44px] flex items-start gap-3">
+              <SwipeableRow
+                {...(seAnulaDesdeLaLista(g, escribe)
+                  ? {
+                      eliminar: {
+                        rotulo: ACCION_ANULAR,
+                        mensaje: g.tipo === "impulsadora" ? "Pago anulado" : "Gasto anulado",
+                        alEliminar: async () => {
+                          const ok = await anularGasto(g.id);
+                          if (ok) onCambio();
+                          return ok;
+                        },
+                      },
+                    }
+                  : {})}
+              >
+              <button type="button" onClick={() => abrir(g)} className="w-full text-left px-4 py-3 min-h-[44px] flex items-start gap-3 bg-white">
                 <span className="flex-1 min-w-0">
                   <span className="block text-sm text-gray-900 truncate">{g.proveedor}</span>
                   <span className="block text-xs text-gray-500 truncate">
@@ -323,6 +373,7 @@ export default function GastosNuevo({
                   <span className="block text-xs text-gray-500">{pct === null ? ROTULO_ESTADO[g.estado] : `${pct} %`}</span>
                 </span>
               </button>
+              </SwipeableRow>
             </li>
           );
         })}

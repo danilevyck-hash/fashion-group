@@ -30,6 +30,8 @@
 // ============================================================================
 
 /** 🔴 El interruptor. APAGADO hasta que Daniel lo vea y diga «sí». */
+import { MKT_SIN_TIENDA_AL_REGISTRAR_2026_11 } from "@/lib/ui/marketing-gastos-2026-11";
+
 export const MKT_SOLO_COBRABLE_2026_10 = false;
 
 // ─── 1 · REGISTRAR ──────────────────────────────────────────────────────────
@@ -65,6 +67,11 @@ export interface DestinoDelCargo {
   tienda: TiendaDelCargo;
   /** `null` = todavía no se eligió. Nace en `PCT_AL_REGISTRAR`. `0` = no recuperable. */
   pct: SeCobraAlRegistrar | null;
+  /**
+   * 🔴 «Sin tienda» (27-nov-2026, `MKT_SIN_TIENDA_AL_REGISTRAR_2026_11`): se
+   * eligió a propósito no poner tienda. Se cobra a la marca y va a «General».
+   */
+  sinTienda?: boolean;
 }
 
 /**
@@ -80,7 +87,9 @@ export function faltaEnElDestino(
   // No recuperable: ni marca ni tienda; las observaciones son opcionales.
   if (d.pct === NO_RECUPERABLE) return [];
   if (d.marcaId.trim() === "") out.push("la marca");
-  if (d.tienda === null) out.push("la tienda");
+  if (d.tienda === null) {
+    if (!(MKT_SIN_TIENDA_AL_REGISTRAR_2026_11 && d.sinTienda)) out.push("la tienda");
+  }
   else if (esTiendaPropia(d.tienda.codigo)) {
     out.push("una tienda cobrable (Multi Fashion es tienda propia)");
   }

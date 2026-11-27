@@ -102,7 +102,8 @@ describe("solo lo cobrable · registrar, en el orden del trabajo", () => {
     expect(texto).not.toContain("A cargo de la empresa");
     expect(texto).not.toContain("Se reporta a la marca");
     expect(texto).not.toContain("Varias tiendas");
-    expect(texto).not.toContain("Sin tienda");
+    // «Sin tienda» volvió el 27-nov-2026 como botón (aprobado 1a): va a «General».
+    expect(screen.getByTestId("boton-sin-tienda").textContent).toBe("Sin tienda");
     expect(pantalla.querySelector(".text-red-500")).toBeNull();
     // El comprobante se pide UNA vez.
     expect(screen.queryByText("Sube el PDF de la factura")).toBeNull();

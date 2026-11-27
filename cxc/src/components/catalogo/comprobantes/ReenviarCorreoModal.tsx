@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 export default function ReenviarCorreoModal({
   numero,
@@ -47,7 +48,7 @@ export default function ReenviarCorreoModal({
 
   return (
     <ModalOverlay onBackdropClick={() => !enviando && onCancel()} align="center">
-      <div className="bg-white rounded-lg border border-gray-200 w-full max-w-sm p-5">
+      <div className={`bg-white rounded-lg border border-gray-200 w-full max-w-sm p-5 ${cabe(PANEL_CABE, "")}`}>
         <h3 className="text-base font-semibold text-gray-900">Reenviar correo</h3>
         <p className="text-sm text-gray-500 mt-1">
           {numero ? `${numero} · ` : ""}

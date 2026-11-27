@@ -88,6 +88,7 @@ import {
 } from "@/lib/guias/etiquetas";
 import { abrirPdfEnPestana } from "@/lib/guias/pdf-en-pestana";
 import { Aviso } from "@/components/ui/Aviso";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 /**
  * 🔴 EL PDF SE ABRE EN PESTAÑA NUEVA, NO SE BAJA (18-sep-2026). Daniel: *«abrir
@@ -360,7 +361,7 @@ function EtiquetasUnaALaVez() {
       )}
       {borrando && (
         <ModalOverlay onBackdropClick={() => setBorrando(null)}>
-          <div className="relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg">
+          <div className={`relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg ${cabe(PANEL_CABE, "")}`}>
             <h3 className="mb-1 text-base font-semibold">Eliminar etiquetas</h3>
             <p className="mb-1 text-sm text-gray-600">
               Se quitan las {borrando.cajas} etiquetas de la factura {borrando.secuencial}. Esa factura
@@ -811,7 +812,7 @@ function ModalReimprimir({
 
   return (
     <ModalOverlay onBackdropClick={onCerrar}>
-      <div className="relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg">
+      <div className={`relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg ${cabe(PANEL_CABE, "")}`}>
         <h3 className="mb-1 text-base font-semibold">Reimprimir · {etiqueta.secuencial}</h3>
         <p className="mb-4 text-sm text-gray-600">
           {etiqueta.cliente_nombre} · {etiqueta.empresa} · {etiqueta.cajas} bultos
@@ -922,7 +923,7 @@ function ModalCorregir({
 
   return (
     <ModalOverlay onBackdropClick={onCerrar}>
-      <div className="relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg">
+      <div className={`relative w-full max-w-sm rounded-t-2xl border border-gray-200 bg-white p-6 sm:rounded-lg ${cabe(PANEL_CABE, "")}`}>
         <h3 className="mb-1 text-base font-semibold">Corregir bultos</h3>
         <p className="mb-4 text-sm text-gray-600">
           {etiqueta.secuencial} · {etiqueta.cliente_nombre}. Al guardar se abre la reimpresión del juego completo.

@@ -20,6 +20,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useAutofocusPrimerCampo } from "@/lib/hooks/useAutofocusPrimerCampo";
+import { cabe, PANEL_CABE_COLUMNA, CUERPO_CON_SCROLL } from "@/lib/ui/modal-cabe-2026-11";
 
 interface VentanaCentradaProps {
   open: boolean;
@@ -60,8 +61,8 @@ export default function VentanaCentrada({ open, onClose, title, children, footer
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="absolute inset-0 bg-black/40" aria-hidden="true" onClick={onClose} />
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={title} className={CLASE_VENTANA}>
-        <div className="border-b border-gray-100 pl-5 pr-2 py-2.5 flex items-center justify-between gap-3">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={title} className={cabe(`relative bg-white w-full sm:max-w-2xl rounded-lg ${PANEL_CABE_COLUMNA} border border-gray-200`, CLASE_VENTANA)}>
+        <div className={`border-b border-gray-100 pl-5 pr-2 py-2.5 flex items-center justify-between gap-3 ${cabe("shrink-0", "")}`}>
           <h2 className="text-base font-semibold text-gray-900">{title}</h2>
           <button
             type="button"
@@ -72,10 +73,10 @@ export default function VentanaCentrada({ open, onClose, title, children, footer
             <span aria-hidden="true" className="text-xl leading-none">&times;</span>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className={cabe(CUERPO_CON_SCROLL, "flex-1 overflow-y-auto")}>{children}</div>
         {footer && (
           <div
-            className="border-t border-gray-100 px-5 py-3 bg-white rounded-b-lg"
+            className={`border-t border-gray-100 px-5 py-3 bg-white rounded-b-lg ${cabe("shrink-0", "")}`}
             style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
           >
             {footer}

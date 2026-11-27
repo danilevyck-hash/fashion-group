@@ -30,6 +30,11 @@ import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import type { GastoDeLaLista, LineaDelCobro, MarketingDelCobro, ResumenDelCobro } from "@/lib/marketing/zip-marca";
 import { useDescargasPeriodo } from "../useDescargasPeriodo";
+import type { MkMarca } from "@/lib/marketing/types";
+import FichaTiendaAcciones, { type AccionDeFila } from "../../tienda/[codigo]/FichaTiendaAcciones";
+import { aFila } from "./GastosNuevo";
+import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
+import { MKT_EDITAR_DESDE_EL_COBRO_2026_11 } from "@/lib/ui/marketing-gastos-2026-11";
 import { MKT_COBROS_ANTERIORES_2026_11 } from "@/lib/ui/revision-110-marketing";
 
 const claveDeLinea = (l: Pick<LineaDelCobro, "tipo" | "documentoId">) => `${l.tipo}:${l.documentoId ?? ""}`;
@@ -42,10 +47,12 @@ export const BOTON_SECUNDARIO =
 
 export default function PorCobrarNuevo({
   datos,
+  marcas = [],
   escribe,
   onCambio,
 }: {
   datos: MarketingDelCobro | null;
+  marcas?: MkMarca[];
   escribe: boolean;
   onCambio: () => void;
 }) {
@@ -58,7 +65,9 @@ export default function PorCobrarNuevo({
       <DetalleDelCobro
         resumen={abierto}
         gastos={datos.gastos}
+        marcas={marcas}
         escribe={escribe}
+        onCambio={onCambio}
         onVolver={() => setCobro("")}
         onCerrado={() => {
           setCobro("");
@@ -168,16 +177,38 @@ function desdeDe(r: ResumenDelCobro): string {
 function DetalleDelCobro({
   resumen,
   gastos,
+  marcas,
   escribe,
+  onCambio,
   onVolver,
   onCerrado,
 }: {
   resumen: ResumenDelCobro;
   gastos: GastoDeLaLista[];
+  marcas: MkMarca[];
   escribe: boolean;
+  /** Se guardó una edición: se vuelve a leer y el cobro se queda abierto. */
+  onCambio: () => void;
   onVolver: () => void;
   onCerrado: () => void;
 }) {
+  // 🔴 EDITAR DESDE EL COBRO (27-nov-2026, `MKT_EDITAR_DESDE_EL_COBRO_2026_11`):
+  // tocar la fila abre lo MISMO que en Gastos (`FichaTiendaAcciones`): «Editar
+  // factura», o la entrega de muebles con su formulario. Solo quien escribe.
+  const [accion, setAccion] = useState<AccionDeFila>(null);
+  const [tiendaDeLaAccion, setTiendaDeLaAccion] = useState("");
+  const gastoDeLinea = useMemo(() => {
+    const m = new Map<string, GastoDeLaLista>();
+    for (const g of gastos) m.set(`${g.tipo === "mobiliario" ? "entrega" : "factura"}:${g.id}`, g);
+    return m;
+  }, [gastos]);
+  const editable = (l: LineaDelCobro) => MKT_EDITAR_DESDE_EL_COBRO_2026_11 && escribe && gastoDeLinea.has(claveDeLinea(l));
+  const editar = (l: LineaDelCobro) => {
+    const g = gastoDeLinea.get(claveDeLinea(l));
+    if (!g || !editable(l)) return;
+    setTiendaDeLaAccion(g.tiendaNombre);
+    setAccion({ tipo: "editar", fila: aFila(g) });
+  };
   const { bajando, bajarZipMarca } = useDescargasPeriodo();
   const [excluidos, setExcluidos] = useState<Set<string>>(new Set());
   const [confirmando, setConfirmando] = useState(false);
@@ -255,8 +286,9 @@ function DetalleDelCobro({
                 return (
                   <li
                     key={claveDeLinea(l)}
-                    className={`flex items-center gap-3 px-4 py-2 min-h-[44px] text-sm ${fuera ? "text-gray-400" : ""}`}
+                    className={`flex items-center gap-3 px-4 py-2 min-h-[44px] text-sm ${fuera ? "text-gray-400" : ""} ${editable(l) ? "cursor-pointer hover:bg-gray-50" : ""}`}
                     data-testid="linea-del-cobro"
+                    {...(editable(l) ? { onClick: () => editar(l), ...clicConTeclado(() => editar(l), { fila: true }) } : {})}
                   >
                     <span className="hidden sm:block w-24 shrink-0 text-gray-500">{formatearFecha(l.fecha)}</span>
                     <span className="flex-1 min-w-0">
@@ -275,7 +307,11 @@ function DetalleDelCobro({
                     {escribe && (
                       <button
                         type="button"
-                        onClick={() => alternar(l)}
+                        onClick={(e) => {
+                          // «Excluir» no abre la edición de la fila.
+                          e.stopPropagation();
+                          alternar(l);
+                        }}
                         className="text-blue-600 hover:text-blue-800 min-h-[44px] w-16 text-right"
                         aria-label={fuera ? "Incluir en este cierre" : "Excluir de este cierre"}
                       >
@@ -289,6 +325,17 @@ function DetalleDelCobro({
           </section>
         );
       })}
+
+      <FichaTiendaAcciones
+        accion={accion}
+        marcas={marcas}
+        tiendaNombre={tiendaDeLaAccion}
+        onCerrar={() => setAccion(null)}
+        onCambio={() => {
+          setAccion(null);
+          onCambio();
+        }}
+      />
 
       <p className="text-xs text-gray-500">
         Descargar ZIP lleva todo lo abierto · al cerrar, el ZIP del cierre lleva solo lo incluido

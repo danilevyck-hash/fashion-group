@@ -118,12 +118,14 @@ describe("7-oct-2026 · editar ya no es un asistente", () => {
     expect(screen.queryByRole("button", { name: "Tienda" })).toBeNull();
   });
 
-  it("deja la marca de siempre (100%) cuando no se toca «Se cobra a»", async () => {
+  // 🩸 27-nov-2026: lo que no se toca NO viaja (editar borraba la tienda y
+  // devolvía el % a 100). La marca sí: es su propio PUT.
+  it("deja la marca de siempre cuando no se toca «Se cobra a» (y no manda el %)", async () => {
     const onSubmit = abrirEdicion();
     fireEvent.click(screen.getByText("Guardar factura"));
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalled());
     const [data] = onSubmit.mock.calls[0];
     expect(data.marcasSeleccionadas).toEqual([{ marcaId: TOMMY.id, porcentaje: 100 }]);
-    expect(data.pctALaMarca).toBe(100);
+    expect(data.pctALaMarca).toBeUndefined();
   });
 });

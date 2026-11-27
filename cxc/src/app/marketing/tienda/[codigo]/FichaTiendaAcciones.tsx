@@ -35,6 +35,7 @@ import { DIAS_PARA_BORRAR_ANULADOS } from "@/lib/marketing/periodo-manda";
 import { useSoloCobrable } from "@/lib/marketing/solo-cobrable-contexto";
 import { adjuntarPdfDeFactura } from "../../components/uploadHelpers";
 import ConfirmarEliminar from "./ConfirmarEliminar";
+import { CUERPO_CON_SCROLL, MODAL_CABE_2026_11, PANEL_CABE_COLUMNA } from "@/lib/ui/modal-cabe-2026-11";
 import type {
   EntregaConItems,
   FacturaConAdjuntos,
@@ -181,12 +182,18 @@ function EditarFactura({
   );
 
   return (
-    <ModalOverlay onBackdropClick={onCerrar} align="start">
+    <ModalOverlay onBackdropClick={onCerrar} align={MODAL_CABE_2026_11 ? "middle" : "start"}>
       <div
-        className="relative bg-white sm:rounded-lg rounded-t-2xl p-5 max-w-2xl w-full mx-0 sm:mx-4 border border-gray-200 max-h-[92vh] overflow-y-auto"
+        className={
+          MODAL_CABE_2026_11
+            ? `relative bg-white sm:rounded-lg rounded-lg max-w-2xl w-full mx-2 sm:mx-4 border border-gray-200 ${PANEL_CABE_COLUMNA}`
+            : "relative bg-white sm:rounded-lg rounded-t-2xl p-5 max-w-2xl w-full mx-0 sm:mx-4 border border-gray-200 max-h-[92vh] overflow-y-auto"
+        }
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-3">
+        {/* 🔴 EL MODAL CABE (27-nov-2026): cabecera fija, cuerpo con scroll y el
+            pie «Cancelar · Guardar factura» siempre a la vista (`pieFijo`). */}
+        <div className={MODAL_CABE_2026_11 ? "shrink-0 flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100" : "flex items-center justify-between mb-3"}>
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-gray-900">
               Editar factura {factura?.numero_factura ?? fila.numero ?? ""}
@@ -204,12 +211,14 @@ function EditarFactura({
             Cancelar
           </button>
         </div>
+        <div className={MODAL_CABE_2026_11 ? `${CUERPO_CON_SCROLL} px-5 pt-4` : ""}>
         {error ? (
-          <p className="text-sm text-red-700">{error}</p>
+          <p className="text-sm text-red-700 pb-4">{error}</p>
         ) : !factura || marcasIniciales === null ? (
-          <div className="h-40 rounded-lg bg-gray-100 animate-pulse" />
+          <div className="h-40 mb-4 rounded-lg bg-gray-100 animate-pulse" />
         ) : (
           <FacturaForm
+            pieFijo={MODAL_CABE_2026_11}
             key={factura.id}
             proyecto={{ id: factura.proyecto_id ?? "", marcas: [] }}
             marcasCatalogo={marcas}
@@ -221,6 +230,7 @@ function EditarFactura({
             onCancel={onCerrar}
           />
         )}
+        </div>
       </div>
     </ModalOverlay>
   );

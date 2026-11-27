@@ -2,6 +2,7 @@
 
 import type { MouseEvent } from "react";
 import { fmt } from "@/lib/format";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 /**
  * Confirmación de "este gasto deja el fondo en negativo".
@@ -56,7 +57,7 @@ export default function AvisoSaldoNegativo({
       {/* Sin stopPropagation: el hook del fondo solo cierra si el mousedown Y
           el click cayeron sobre el fondo mismo. */}
       <div
-        className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4"
+        className={`bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 ${cabe(PANEL_CABE, "")}`}
         style={{ border: "1px solid var(--caja-border-default)" }}
       >
         <h3 className="text-base font-medium mb-3" style={{ color: "var(--caja-fg-strong)" }}>
