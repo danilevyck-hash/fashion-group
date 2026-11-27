@@ -10,7 +10,7 @@
 //
 //   <b>City Mall David · $78,245</b>
 //   – Fashion Wear · $50,885 · le quedan +90 d $106,152
-//   – Vistana · $16,314 · al día ✓
+//   – Vistana · $16,314   (al día: solo el monto)
 // Sin +90 = «al día ✓», sin tramo intermedio (Daniel, 7-oct-2026).
 //
 // 🔴 EL +90 ES EL DE SWITCH, NUNCA UNA CUENTA PROPIA (24-nov-2026). Hasta ese
@@ -97,8 +97,9 @@ export function mensajeCobrosDelDia(
 
   const renglon = (codigo: string, f: Fila) => {
     const q = mas90.get(llaveMas90(f.empresa, codigo));
-    const estado = q == null ? "+90 sin actualizar" : Math.round(q) > 0 ? `le quedan +90 d ${usd(q)}` : "al día ✓";
-    return `– ${nombreCortoEmpresa(f.empresa)} · ${usd(f.monto)} · ${estado}`;
+    // 26-nov-2026 (Daniel): al día = solo el monto, sin «· al día ✓».
+    const estado = q == null ? "+90 sin actualizar" : Math.round(q) > 0 ? `le quedan +90 d ${usd(q)}` : "";
+    return `– ${nombreCortoEmpresa(f.empresa)} · ${usd(f.monto)}${estado ? ` · ${estado}` : ""}`;
   };
   const n = clientes.length;
   return [

@@ -8,10 +8,14 @@ import {
   RESUMEN_DEL_DIA_2026_11,
   bloqueDespachos,
   bloqueFacturas,
+  fechaDelTitulo,
   partirParaTelegram,
   resumenDelDia,
 } from "./resumen-del-dia";
 import { leerDespachosDelDia, leerFacturasDelDia } from "./resumen-del-dia-io";
+
+/** Sección sin nada: igual sale su mensaje, con una línea (26-nov-2026, Daniel). */
+const sinNada = (titulo: string, fecha: string, texto: string) => `<b>${titulo} · ${fechaDelTitulo(fecha)}</b>\n${texto}`;
 
 export async function armarResumenDelDia(fecha: string): Promise<{ cobros: number; mensajes: string[] }> {
   // Mismo filtro que «Últimos pagos»: sin retenciones ni recibos en cero.
@@ -39,9 +43,9 @@ export async function armarResumenDelDia(fecha: string): Promise<{ cobros: numbe
   const cobrosTexto = mensajeCobrosDelDia(cobros, mas90);
   const secciones = RESUMEN_DEL_DIA_2026_11
     ? resumenDelDia([
-        bloqueFacturas(await leerFacturasDelDia(fecha), fecha),
-        bloqueDespachos(await leerDespachosDelDia(fecha), fecha),
-        cobrosTexto,
+        bloqueFacturas(await leerFacturasDelDia(fecha), fecha) ?? sinNada("🧾 Ventas", fecha, "Sin ventas hoy"),
+        bloqueDespachos(await leerDespachosDelDia(fecha), fecha) ?? sinNada("🚚 Despachos", fecha, "Sin despachos hoy"),
+        cobrosTexto ?? sinNada("💰 Cobros", fecha, "Sin cobros hoy"),
       ])
     : cobrosTexto
       ? [cobrosTexto]
