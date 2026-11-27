@@ -30,7 +30,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { compartirArchivo, descargarArchivo } from "@/lib/compartir-archivo";
+import { compartirArchivo, verPdf } from "@/lib/compartir-archivo";
 import type { EntregaMueblePdfData } from "@/lib/marketing/pdf-entrega-mueble";
 
 // velocidad-2026-11: la herramienta de PDF (~100 kB) baja junto con los DATOS,
@@ -107,22 +107,19 @@ export default function NotaEntregaAcciones({ entregaId }: Props) {
     }
   };
 
-  const imprimir = () => {
+  const imprimir = async () => {
     if (!datos || !pdf) return;
     try {
-      const doc = pdf.buildComprobanteEntregaDoc(datos, { incluirBultos: true });
-      // `autoPrint` deja el PDF pidiendo el diálogo de impresión al abrirse.
-      doc.autoPrint();
-      const url = doc.output("bloburl") as unknown as string;
-      const ventana = window.open(url, "_blank");
-      if (!ventana) {
-        // Pestaña bloqueada: que igual se lleve el papel.
-        const blob = doc.output("blob");
-        descargarArchivo(
-          new File([blob], nombreArchivo(datos), { type: "application/pdf" }),
-        );
-        toast("Nota descargada — ábrela para imprimir", "success");
-      }
+      // Sin `await` antes de `verPdf`: el archivo se arma acá, en el gesto.
+      // Con el dedo va a la hoja de compartir (que trae «Imprimir»); en la
+      // computadora abre pestaña y pide el diálogo de impresión.
+      const blob = pdf.buildComprobanteEntregaDoc(datos, { incluirBultos: true }).output("blob");
+      const archivo = new File([blob], nombreArchivo(datos), { type: "application/pdf" });
+      const r = await verPdf(archivo, {
+        imprimir: true,
+        title: `Nota de entrega ${pdf.numeroComprobante(datos)}`,
+      });
+      if (r === "descargado") toast("Nota descargada — ábrela para imprimir", "success");
     } catch {
       toast("No se pudo preparar la nota. Intenta de nuevo.", "error");
     }
@@ -149,7 +146,7 @@ export default function NotaEntregaAcciones({ entregaId }: Props) {
         type="button"
         onClick={(ev) => {
           ev.stopPropagation();
-          imprimir();
+          void imprimir();
         }}
         disabled={!listo}
         className="text-xs rounded-md border border-gray-300 bg-white text-gray-700 px-3 min-h-[44px] inline-flex items-center hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-50"

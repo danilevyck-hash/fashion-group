@@ -39,10 +39,6 @@ const PERMITIDOS: Record<string, string> = {
   "components/catalogo/RevisarPedidoPublico.tsx": "navega a la página del pedido público",
   "app/marketing/tienda/[codigo]/FichaTienda.tsx": "URL firmada del storage, otro dominio",
   "app/marketing/components/ZipsBajados.tsx": "URL firmada del storage, otro dominio",
-  // ⚠️ PENDIENTE: `imprimir` abre un blob en pestaña nueva (la trampa). No se
-  // tocó el 27-nov-2026 porque otro trabajo tenía Marketing abierto; va por
-  // `verPdf(archivo, { imprimir: true })` y sale de esta lista.
-  "components/marketing/NotaEntregaAcciones.tsx": "PENDIENTE: pasar a verPdf",
 };
 
 function archivos(dir: string): string[] {
