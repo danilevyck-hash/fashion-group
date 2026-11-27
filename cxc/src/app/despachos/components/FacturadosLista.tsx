@@ -8,6 +8,13 @@
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { facturaParaMostrar } from "@/lib/guias/numero-factura";
 import { diasDesde, haceDias, haceDiasCorto } from "@/lib/guias/pedidos-bodega";
+import { useState } from "react";
+import { SwipeableRow } from "@/components/ui";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import { fmtDate } from "@/lib/format";
+import { horaPanama } from "@/lib/guias/pedidos-bultos";
+import { nombreConMayuscula } from "@/lib/ui/revision-110-despachos";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 
 export interface Facturado {
   empresa_key: string;
@@ -22,8 +29,25 @@ export interface Facturado {
   monto?: number | null;
 }
 
+/** Una factura quitada a mano (`FACTURADOS_QUITAR_2026_11`). */
+export interface FacturadoQuitado extends Facturado {
+  quitada_id: number;
+  quitada_por: string;
+  quitada_en: string;
+}
+
+/** «Quitada por Andrea · 27 nov 2026 3:15 p. m.», día y hora de Panamá. */
+export function lineaQuitada(q: Pick<FacturadoQuitado, "quitada_por" | "quitada_en">): string {
+  const dia = new Date(q.quitada_en).toLocaleDateString("en-CA", { timeZone: "America/Panama" });
+  return `Quitada por ${nombreConMayuscula(q.quitada_por)} · ${fmtDate(dia)} ${horaPanama(q.quitada_en)}`;
+}
+
 interface Props {
   filas: readonly Facturado[];
+  /** Solo admin y secretaria (lo decide el servidor): «Quitar» en la fila. */
+  onQuitar?: (f: Facturado) => void;
+  quitadas?: readonly FacturadoQuitado[];
+  onDevolver?: (q: FacturadoQuitado) => void;
   hoy: string;
   /** Celular: tarjetas de dos líneas en vez de tabla. */
   celular?: boolean;
@@ -43,7 +67,40 @@ function Accion({ f, alta }: { f: Facturado; alta?: boolean }) {
   );
 }
 
-export default function FacturadosLista({ filas, hoy, celular }: Props) {
+/** «Ver quitadas (N)» al final de la lista: factura, cliente, quién y cuándo, y «Devolver». */
+function VerQuitadas({ quitadas, onDevolver, celular }: { quitadas: readonly FacturadoQuitado[]; onDevolver?: (q: FacturadoQuitado) => void; celular?: boolean }) {
+  const [abierto, setAbierto] = useState(false);
+  if (quitadas.length === 0) return null;
+  return (
+    <div className={celular ? "mt-3" : "mt-4"}>
+      <button type="button" onClick={() => setAbierto((x) => !x)} aria-expanded={abierto} className="min-h-[44px] text-sm font-medium text-gray-600 hover:text-gray-900 sm:min-h-0">
+        {abierto ? "Ocultar quitadas" : `Ver quitadas (${quitadas.length})`}
+      </button>
+      {abierto && (
+        <ul className={`mt-1 divide-y divide-gray-100 border-y border-gray-200 bg-white ${celular ? "-mx-4" : "sm:rounded-lg sm:border-x"}`}>
+          {quitadas.map((q) => (
+            <li key={q.quitada_id} className="flex items-center gap-3 px-4 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-medium text-gray-900 sm:text-sm">{q.cliente_nombre}</p>
+                <p className="mt-0.5 truncate text-[13px] text-gray-500 sm:text-xs">
+                  {nombreCortoEmpresa(q.empresa_key)} · Factura {facturaParaMostrar(q.secuencial)}
+                </p>
+                <p className="mt-0.5 text-[13px] text-gray-500 sm:text-xs">{lineaQuitada(q)}</p>
+              </div>
+              {onDevolver && (
+                <button type="button" onClick={() => onDevolver(q)} className="inline-flex h-11 shrink-0 items-center rounded-full border border-gray-300 bg-white px-3.5 text-[14px] font-medium text-gray-900 transition active:scale-[0.97] sm:h-7 sm:px-2.5 sm:text-xs">
+                  Devolver
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export default function FacturadosLista({ filas, hoy, celular, onQuitar, quitadas = [], onDevolver }: Props) {
   const conMonto = filas.some((f) => typeof f.monto === "number");
   const grupos = B2B_EMPRESA_KEYS.map((k) => ({
     k,
@@ -54,6 +111,7 @@ export default function FacturadosLista({ filas, hoy, celular }: Props) {
   if (celular) {
     // Tarjeta de dos líneas: cliente + monto arriba; factura · antigüedad · bultos abajo; la acción a la derecha.
     return (
+      <>
       <div className="-mx-4 border-y border-gray-200 bg-white">
         {grupos.map((g) => (
           <section key={g.k}>
@@ -61,8 +119,13 @@ export default function FacturadosLista({ filas, hoy, celular }: Props) {
             <ul className="divide-y divide-gray-100">
               {g.filas.map((f) => {
                 const viejo = diasDesde(f.fecha, hoy) > DIAS_AVISO;
+                const quitar = GESTOS_IPHONE_2026_11 && onQuitar
+                  ? { label: "Quitar", color: "bg-red-600", onAction: () => onQuitar(f) }
+                  : undefined;
                 return (
-                  <li key={f.empresa_key + f.secuencial} className="flex items-center gap-3 px-4 py-2.5">
+                  <li key={f.empresa_key + f.secuencial}>
+                  <SwipeableRow rightAction={quitar}>
+                  <div className="flex items-center gap-3 px-4 py-2.5">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline gap-2">
                         <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-gray-900">{f.cliente_nombre}</span>
@@ -74,6 +137,8 @@ export default function FacturadosLista({ filas, hoy, celular }: Props) {
                       </p>
                     </div>
                     <Accion f={f} alta />
+                  </div>
+                  </SwipeableRow>
                   </li>
                 );
               })}
@@ -81,10 +146,13 @@ export default function FacturadosLista({ filas, hoy, celular }: Props) {
           </section>
         ))}
       </div>
+      <VerQuitadas quitadas={quitadas} onDevolver={onDevolver} celular />
+      </>
     );
   }
 
   return (
+    <>
     <div className="-mx-4 overflow-x-auto border-y border-gray-200 bg-white sm:mx-0 sm:rounded-lg sm:border-x">
       <table className="w-full text-left text-xs sm:text-sm">
         <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
@@ -128,7 +196,10 @@ export default function FacturadosLista({ filas, hoy, celular }: Props) {
                     {f.bultos ? f.bultos : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="whitespace-nowrap py-1.5 pl-0.5 pr-3 text-right sm:px-3">
-                    <Accion f={f} />
+                    <span className="inline-flex items-center gap-1">
+                      <Accion f={f} />
+                      {onQuitar && <OverflowMenu ariaLabel={`Más opciones de la factura ${facturaParaMostrar(f.secuencial)}`} items={[{ label: "Quitar", destructive: true, onClick: () => onQuitar(f) }]} />}
+                    </span>
                   </td>
                 </tr>
               );
@@ -137,5 +208,7 @@ export default function FacturadosLista({ filas, hoy, celular }: Props) {
         ))}
       </table>
     </div>
+    <VerQuitadas quitadas={quitadas} onDevolver={onDevolver} />
+    </>
   );
 }

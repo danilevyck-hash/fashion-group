@@ -238,6 +238,9 @@ export const TABLAS_PERSONAS = [
   // 🔴 Las muestras por referencia (24-nov-2026): las pide bodega y las marca
   // el vendedor —quién y cuándo—. Switch no sabe nada de muestras.
   "pedidos_muestras",
+  // 🔴 Facturas quitadas a mano de «Facturados» (27-nov-2026): quién y cuándo
+  // las sacó o las devolvió. Lo decide una persona; no se puede reconstruir.
+  "guias_facturas_quitadas",
   // 🔴 Las tallas y la curva de caja de los despachos del proveedor (13-nov-2026).
   // Salen de los correos de ASW, y el buzón solo guarda desde el 9-mar-2026: lo
   // que se cargó de un correo que ya no está no vuelve de ningún lado.

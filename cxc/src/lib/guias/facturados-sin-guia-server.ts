@@ -7,6 +7,7 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { TIPO_FACTURA } from "@/lib/guias/atajos-facturas";
 import { entraEnFacturados, primerDiaDeFacturados, esCobroSuelto, estaEnGuia, indiceEnGuia } from "@/lib/guias/facturados-sin-guia";
+import { FACTURADOS_QUITAR_2026_11, claveQuitada, separarQuitadas } from "@/lib/ui/facturados-quitar-2026-11";
 
 export interface FacturadoLeido {
   empresa_key: string;
@@ -17,6 +18,22 @@ export interface FacturadoLeido {
   cliente_nombre: string | null;
   /** Bultos de sus etiquetas vivas; null = sin etiquetar. */
   bultos: number | null;
+}
+
+/** Una factura quitada a mano de Facturados (`guias_facturas_quitadas`). */
+export interface QuitadaLeida extends FacturadoLeido {
+  quitada_id: number;
+  quitada_por: string;
+  quitada_en: string;
+}
+
+interface FilaQuitada {
+  id: number;
+  empresa_key: string;
+  secuencial: string;
+  fecha_factura: string;
+  quitada_por: string;
+  quitada_en: string;
 }
 
 interface FilaFactura {
@@ -47,6 +64,37 @@ async function leerRenglonesVivos(): Promise<Array<{ empresa: string | null; fac
   );
   // guia_items tiene su PROPIO `deleted`: filtrar solo la cabecera deja pasar renglones borrados.
   return guias.flatMap((g) => (g.guia_items ?? []).filter((it) => !it.deleted));
+}
+
+/** Las quitadas activas de la ventana (solo con `FACTURADOS_QUITAR_2026_11`). */
+async function leerQuitadas(empresas: readonly string[]): Promise<FilaQuitada[]> {
+  if (!FACTURADOS_QUITAR_2026_11) return [];
+  return leerTodoPaginado<FilaQuitada>("guias_facturas_quitadas", (pedirCount, desde, hasta) =>
+    supabaseServer
+      .from("guias_facturas_quitadas")
+      .select("id, empresa_key, secuencial, fecha_factura, quitada_por, quitada_en", pedirCount ? { count: "exact" } : {})
+      .in("empresa_key", [...empresas])
+      .eq("deleted", false)
+      .gte("fecha_factura", primerDiaDeFacturados(hoyPanama()))
+      .order("id", { ascending: true })
+      .range(desde, hasta),
+  );
+}
+
+/** Facturados y, aparte, las que se quitaron a mano (para «Ver quitadas»). */
+export async function leerFacturadosYQuitadas(
+  empresas: readonly string[],
+): Promise<{ facturados: FacturadoLeido[]; quitadas: QuitadaLeida[] }> {
+  const [filas, quitadas] = await Promise.all([leerFacturadosSinGuia(empresas), empresas.length ? leerQuitadas(empresas) : []]);
+  const porClave = new Map(quitadas.map((q) => [claveQuitada({ ...q, fecha: q.fecha_factura }), q]));
+  const partes = separarQuitadas(filas, new Set(porClave.keys()));
+  return {
+    facturados: partes.visibles,
+    quitadas: partes.quitadas.map((f) => {
+      const q = porClave.get(claveQuitada(f))!;
+      return { ...f, quitada_id: q.id, quitada_por: q.quitada_por, quitada_en: q.quitada_en };
+    }),
+  };
 }
 
 export async function leerFacturadosSinGuia(empresas: readonly string[]): Promise<FacturadoLeido[]> {

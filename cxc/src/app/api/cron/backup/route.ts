@@ -354,6 +354,8 @@ const DATASETS: Dataset[] = [
   { table: "pedidos_linea_bulto" },
   // Las muestras por referencia (24-nov-2026): quién las pidió, mandó y reclamó.
   { table: "pedidos_muestras" },
+  // Facturas quitadas a mano de «Facturados» (27-nov-2026): quién y cuándo.
+  { table: "guias_facturas_quitadas" },
   // Tallas y curva de caja de los despachos del proveedor (13-nov-2026): salen de
   // correos que el buzón no guarda para siempre.
   { table: "despacho_tallas" },

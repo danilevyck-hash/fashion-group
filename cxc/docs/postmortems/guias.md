@@ -2756,3 +2756,17 @@ En el teléfono, deslizar un pedido a la derecha avanza un paso con «Deshacer»
 
 - **Pedidos en el teléfono**: el vendedor va UNA vez, como subtítulo bajo la empresa («Edwin · 2», `porVendedor`, en el orden de la lista), y cada pedido dice «Antigüedad: N días» completo (`antiguedadCompleta`). El encabezado «Antig.» de las tablas angostas pasa a «Antigüedad». La computadora no cambia.
 - **Número rojo en el ícono (solo bodega)**: `navigator.setAppBadge` con los Pendientes que ESA persona ve (`/api/guias/pedidos/globito`, `empresasQueVe`: Jorman solo Vistana = 4 el 27-nov). Se pone al abrir la app, al volver a primer plano, al marcar un pedido en la lista y con cada aviso push que llega (el service worker pregunta la misma ruta). Con 0 se borra; sin soporte, nada. Otro rol recibe `null` y no se toca.
+
+
+## Quitar de Facturados (27-nov-2026, `FACTURADOS_QUITAR_2026_11`)
+
+Daniel lo aprobó sin mockup: en Despachos › Pedidos › Facturados se puede QUITAR a mano una factura que ya se fue sin guía (la retiró el cliente, la guía la escribió mal), sin esperar el corte de 5 días hábiles.
+
+- **Gesto**: en el teléfono, deslizar a la izquierda muestra «Quitar» en rojo y deslizar hasta el final la quita de una (el mismo `SwipeableRow` de `GESTOS_IPHONE_2026_11`, con `rightAction`). En la computadora, «···» → «Quitar» en la fila (`OverflowMenu`). **Sin motivo.**
+- **Deshacer 5 s**: la fila sale al instante (UI optimista) y el servidor se entera recién al vencer el plazo (`useUndoAction`); si falla, vuelve con un aviso.
+- **Quién**: admin y secretaria (`ROLES_QUITAR_FACTURADOS`). `POST`/`PATCH /api/guias/pedidos/facturados/quitadas` contestan 403 al resto; el GET de Facturados manda `puedeQuitar` y las quitadas solo a ellas.
+- **Qué escribe**: una fila en `guias_facturas_quitadas` (`empresa_key`, `secuencial`, `fecha_factura`, `quitada_por`, `quitada_en`). **No toca `switch_facturas`.** Identidad = empresa + secuencial completo + día de la factura (el secuencial se repite entre eras); índice único parcial: una sola activa por factura. RLS sin políticas (solo service_role). Migración `20270131120000_guias_facturas_quitadas.sql`, **aplicada** el 27-nov-2026. En el respaldo (`personas`).
+- **Devolver**: «Ver quitadas (N)» al final de la lista (factura, cliente, «Quitada por X · fecha hora») con «Devolver»: `deleted = true` + `devuelta_por/_en` (CHECK: devuelta = firmada). Nunca DELETE.
+- Si una quitada entra después a una guía, simplemente deja de ser pendiente (el filtro de guía corre antes). Las quitadas solo se listan dentro de la ventana de Facturados.
+
+**Candado:** `guias-facturados-quitar-route` (bodega y vendedor 403 sin escribir nada, soft delete firmado, la quitada no reaparece y la misma factura de otra empresa no se esconde).
