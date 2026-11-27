@@ -12,6 +12,8 @@ import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { aparatoDeQuienMira } from "@/lib/aparato";
 import { ATRAS_CIERRA_2026_11 } from "@/lib/ui/atras-cierra-2026-11";
 import { CajaAviso, CLASE_AVISO_EN_PILA, EnLaPilaDeAvisos } from "@/components/CajaAviso";
+import { useAccionDelGesto } from "@/components/shared/DeslizarParaActualizar";
+import { DESLIZAR_ACTUALIZA_CON_SWITCH } from "@/lib/ui/deslizar-para-actualizar";
 
 export { Avatar } from "./ui/Avatar";
 export type { AvatarProps } from "./ui/Avatar";
@@ -765,6 +767,10 @@ export function PullToRefresh({
   const [refreshing, setRefreshing] = useState(false);
   const pulling = useRef(false);
   const threshold = 60;
+  // 🔴 Con `DESLIZAR_ACTUALIZA_CON_SWITCH` el gesto es UNO para toda la app
+  // (`DeslizarParaActualizar`): aquí solo se inscribe la recarga de la
+  // pantalla, que vale si la pantalla no tiene «Actualizar».
+  useAccionDelGesto("recarga", containerRef, true, onRefresh);
 
   const isAtTop = useCallback(() => {
     return window.scrollY <= 0;
@@ -787,6 +793,7 @@ export function PullToRefresh({
   }, []);
 
   useEffect(() => {
+    if (DESLIZAR_ACTUALIZA_CON_SWITCH) return;
     let isTouchDevice = false;
     const checkTouch = () => { isTouchDevice = true; };
     window.addEventListener("touchstart", checkTouch, { once: true, passive: true });
