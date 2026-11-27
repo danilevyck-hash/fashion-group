@@ -6,11 +6,11 @@
 // 🔒 Formato (24-nov-2026, Daniel; reemplaza el del 7-oct, que agrupaba por
 // empresa): POR CLIENTE, por código, con su total del día, y debajo un renglón
 // por empresa donde pagó. Se cuentan clientes, no pagos:
-//   💰 Cobros de hoy · $79,305 · 3 clientes
+//   <b>💰 Cobros · $79,305</b>   (26-nov-2026: HTML, renglones con «– »)
 //
-//   City Mall David · $78,245
-//     • Fashion Wear $50,885 · le quedan +90 d $106,152
-//     • Vistana $16,314 · al día ✓
+//   <b>City Mall David · $78,245</b>
+//   – Fashion Wear · $50,885 · le quedan +90 d $106,152
+//   – Vistana · $16,314 · al día ✓
 // Sin +90 = «al día ✓», sin tramo intermedio (Daniel, 7-oct-2026).
 //
 // 🔴 EL +90 ES EL DE SWITCH, NUNCA UNA CUENTA PROPIA (24-nov-2026). Hasta ese
@@ -57,6 +57,9 @@ export interface CobroDelDia {
   monto: number;
 }
 
+/** Escapa el texto para el parse_mode HTML de Telegram. */
+export const escHtml = (t: string): string => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 /** `$12,300` — pesos enteros: es un resumen, no un estado de cuenta. */
 const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
@@ -95,14 +98,14 @@ export function mensajeCobrosDelDia(
   const renglon = (codigo: string, f: Fila) => {
     const q = mas90.get(llaveMas90(f.empresa, codigo));
     const estado = q == null ? "+90 sin actualizar" : Math.round(q) > 0 ? `le quedan +90 d ${usd(q)}` : "al día ✓";
-    return `  • ${nombreCortoEmpresa(f.empresa)} ${usd(f.monto)} · ${estado}`;
+    return `– ${nombreCortoEmpresa(f.empresa)} · ${usd(f.monto)} · ${estado}`;
   };
   const n = clientes.length;
   return [
-    `💰 Cobros de hoy · ${usd(total)} · ${n} ${n === 1 ? "cliente" : "clientes"}`,
+    `<b>💰 Cobros · ${usd(total)}</b>`,
     ...clientes.slice(0, MAX_COBROS_EN_AVISO).map((g) =>
       [
-        `${g.cliente} · ${usd(totalDe(g))}`,
+        `<b>${escHtml(g.cliente)} · ${usd(totalDe(g))}</b>`,
         ...[...g.filas.values()].sort((a, b) => b.monto - a.monto).map((f) => renglon(g.codigo, f)),
       ].join("\n"),
     ),

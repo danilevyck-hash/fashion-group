@@ -64,9 +64,11 @@ describe("resumen del día (24-nov-2026)", () => {
   });
   it("el cron de cobros arma el resumen solo con el interruptor prendido", () => {
     const s = src("app/api/cron/cobros-del-dia/route.ts");
-    expect(s).toMatch(/RESUMEN_DEL_DIA_2026_11\s*\?\s*resumenDelDia\(/);
-    expect(s).toMatch(/:\s*cobrosTexto;/);
-    expect(s).toMatch(/partirParaTelegram\(mensaje\)/);
+    expect(s).toMatch(/armarResumenDelDia\(fecha\)/);
+    const a = src("lib/alertas/resumen-del-dia-armar.ts");
+    expect(a).toMatch(/RESUMEN_DEL_DIA_2026_11\s*\?\s*resumenDelDia\(/);
+    expect(a).toMatch(/partirParaTelegram\(s\)/);
+    expect(s).toMatch(/enviarNegocioPrivado\(parte, "HTML"\)/);
   });
   it("el interruptor está prendido", async () => {
     const { RESUMEN_DEL_DIA_2026_11 } = await import("@/lib/alertas/resumen-del-dia");

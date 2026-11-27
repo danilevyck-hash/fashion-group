@@ -17,27 +17,16 @@
 // El texto: `lib/cxc/cobros-del-dia.ts`.
 //
 // 🔒 24-nov-2026 (Daniel): con `RESUMEN_DEL_DIA_2026_11` este mismo cron manda
-// UN solo mensaje — 🧾 Ventas · 🚚 Despachos · 💰 Cobros de hoy — y el aviso
+// TRES mensajes (26-nov-2026, HTML) — 🧾 Ventas · 🚚 Despachos · 💰 Cobros — y el aviso
 // por guía despachada se apaga. Ver `lib/alertas/resumen-del-dia.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
 import { enviarNegocioPrivado } from "@/lib/alertas/canal";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
-import { cobroCuenta, llaveMas90, mensajeCobrosDelDia, type CobroDelDia } from "@/lib/cxc/cobros-del-dia";
-import { leerMas90DeSwitch } from "@/lib/cxc/cobros-del-dia-io";
-import {
-  RESUMEN_DEL_DIA_2026_11,
-  bloqueDespachos,
-  bloqueFacturas,
-  partirParaTelegram,
-  resumenDelDia,
-} from "@/lib/alertas/resumen-del-dia";
-import { leerDespachosDelDia, leerFacturasDelDia } from "@/lib/alertas/resumen-del-dia-io";
+import { armarResumenDelDia } from "@/lib/alertas/resumen-del-dia-armar";
 
 const CRON_NAME = "cobros-del-dia";
 
@@ -60,51 +49,21 @@ export async function GET(req: NextRequest) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return NextResponse.json({ error: "fecha inválida" }, { status: 400 });
 
   try {
-    // Mismo filtro que «Últimos pagos»: sin retenciones ni recibos en cero.
-    const rec = await supabaseServer
-      .from("switch_recibos")
-      .select("empresa_key, cliente_codigo, cliente_nombre, total, fecha_creacion")
-      .eq("fecha", fecha)
-      .in("empresa_key", CXC_GRUPO_EMPRESA_KEYS)
-      .eq("es_retencion", false)
-      .neq("total", 0)
-      .not("cliente_codigo", "is", null)
-      .limit(1000);
-    if (rec.error) throw new Error(rec.error.message);
-    const cobros: CobroDelDia[] = (rec.data ?? []).map((r) => ({
-        empresa: r.empresa_key,
-        codigo: r.cliente_codigo,
-        cliente: r.cliente_nombre ?? r.cliente_codigo,
-        monto: Number(r.total) || 0,
-      }));
-
-    // 🔴 El +90 es el de Switch AL MOMENTO (24-nov-2026), solo de quien pagó hoy.
-    const pares = [...new Map(cobros.filter(cobroCuenta).map((c) => [llaveMas90(c.empresa, c.codigo), c])).values()];
-    const mas90 = pares.length ? await leerMas90DeSwitch(pares) : new Map<string, number | null>();
-
-    const cobrosTexto = mensajeCobrosDelDia(cobros, mas90);
-    const mensaje = RESUMEN_DEL_DIA_2026_11
-      ? resumenDelDia([
-          bloqueFacturas(await leerFacturasDelDia(fecha)),
-          bloqueDespachos(await leerDespachosDelDia(fecha)),
-          cobrosTexto,
-        ])
-      : cobrosTexto;
-    const partes = mensaje ? partirParaTelegram(mensaje) : [];
+    const { cobros, mensajes: partes } = await armarResumenDelDia(fecha);
     if (req.nextUrl.searchParams.get("test") === "true") {
-      return NextResponse.json({ fecha, cobros: cobros.length, mensajes: partes.length ? partes : ["(no se mandaría nada)"] });
+      return NextResponse.json({ fecha, cobros, mensajes: partes.length ? partes : ["(no se mandaría nada)"] });
     }
 
     // Varios mensajes seguidos si no cabe en uno (tope de Telegram); nunca se corta.
     let enviado = partes.length > 0;
     for (const parte of partes) {
-      if (!(await enviarNegocioPrivado(parte))) enviado = false;
+      if (!(await enviarNegocioPrivado(parte, "HTML"))) enviado = false;
     }
     if (partes.length && !enviado) {
       await logCronError("cobros_del_dia_telegram_failed", "Telegram no aceptó el mensaje", null, { telegram: false });
     }
     await recordCronHeartbeat(CRON_NAME);
-    return NextResponse.json({ ok: true, fecha, cobros: cobros.length, enviado });
+    return NextResponse.json({ ok: true, fecha, cobros, enviado });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await logCronError("cobros_del_dia_failed", msg, null, { telegram: false });

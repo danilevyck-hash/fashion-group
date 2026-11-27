@@ -84,6 +84,7 @@ export async function leerDespachosDelDia(fecha: string): Promise<GuiaDespachada
   if (error) throw new Error(`guia_transporte (despachos del día): ${error.message}`);
   type Item = { orden: number; empresa: string | null; cliente: string | null; cliente_codigo: string | null; facturas: string | null; bultos: number | null; deleted: boolean | null };
   return (data ?? []).map((g) => ({
+    numero: g.numero,
     transportista: transportistaLabel(g as Parameters<typeof transportistaLabel>[0]) || "—",
     renglones: ((g.guia_items ?? []) as Item[])
       .filter((i) => !i.deleted)

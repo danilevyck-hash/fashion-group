@@ -3,7 +3,7 @@
 // vive en `resumen-del-dia-io.ts` y lo manda el cron `cobros-del-dia` a las
 // 7:00 p. m. de Panamá, al chat privado (`enviarNegocioPrivado`).
 //
-// UN solo mensaje con tres bloques, en este orden, y el vacío no sale:
+// TRES mensajes (26-nov-2026; eran uno), en este orden, y el vacío no sale:
 //   🧾 Ventas de hoy — las 6 de Fashion Group, sin ITBMS (`subtotal_descuento`,
 //      la MISMA columna y los MISMOS signos de Ventas › Resumen), NC restadas.
 //   🚚 Despachos de hoy — guías que pasaron a «Completada» hoy.
@@ -13,10 +13,9 @@
 // despacharla y el cron manda solo los cobros.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { nombreCortoEmpresa, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
-import { CLIENTES_FUERA } from "@/lib/cxc/cobros-del-dia";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { CLIENTES_FUERA, escHtml } from "@/lib/cxc/cobros-del-dia";
 import { signoVenta } from "@/lib/ventas/tipos-comprobante";
-import { facturasParaMostrar } from "@/lib/guias/numero-factura";
 import { nombreSinGritar } from "@/lib/cxc/nombre-cliente";
 
 export const RESUMEN_DEL_DIA_2026_11 = true;
@@ -31,6 +30,14 @@ const usd = (n: number) => {
 };
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
+const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+/** `2026-11-26` → `jue 26 nov`. */
+export function fechaDelTitulo(ymd: string): string {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  return `${DIAS[d.getUTCDay()]} ${d.getUTCDate()} ${MESES[d.getUTCMonth()]}`;
+}
+
 // ── 🧾 Ventas ────────────────────────────────────────────────────────────────
 
 export interface FacturaDelDia {
@@ -42,25 +49,15 @@ export interface FacturaDelDia {
 }
 
 /**
- * 🔒 24-nov-2026 (Daniel): la nota de crédito se DICE, nunca un negativo suelto.
- *   solo NC        → «• Millenium Sports · nota de crédito −$1,161»
- *   factura y NC   → «• Bouti, S.A. · −$288 (con nota de crédito −$12,405)»
- *   solo facturas  → «• City Shoes · $1,662»
+ * 🔒 26-nov-2026 (Daniel): tres mensajes, sin números de factura, títulos en
+ * negrita (HTML) y renglones con «– ». El cliente va por su NETO del día (factura
+ * y nota de crédito ya restadas); el que queda en $0 no sale; los negativos, tal cual.
  */
-function lineaCliente(c: { nombre: string; total: number; nc: number; nNC: number; nFa: number }): string {
-  const nc = c.nNC === 1 ? "nota de crédito" : "notas de crédito";
-  if (c.nNC === 0) return `• ${c.nombre} · ${usd(c.total)}`;
-  if (c.nFa === 0) return `• ${c.nombre} · ${nc} ${usd(c.nc)}`;
-  return `• ${c.nombre} · ${usd(c.total)} (con ${nc} ${usd(c.nc)})`;
-}
-
-export function bloqueFacturas(facturas: readonly FacturaDelDia[]): string | null {
-  type Cli = { nombre: string; total: number; nc: number; nNC: number; nFa: number };
+export function bloqueFacturas(facturas: readonly FacturaDelDia[], fecha: string): string | null {
+  type Cli = { nombre: string; total: number };
   const porEmpresa = new Map<string, Map<string, Cli>>();
   let total = 0;
-  let nFacturas = 0;
-  let nNC = 0;
-  let montoNC = 0;
+  let n = 0;
   for (const f of facturas) {
     const signo = signoVenta(f.tipo);
     if (signo === 0) continue;
@@ -68,36 +65,31 @@ export function bloqueFacturas(facturas: readonly FacturaDelDia[]): string | nul
     if (CLIENTES_FUERA.includes(codigo.toUpperCase())) continue;
     const monto = signo * (Number(f.subtotal) || 0);
     total += monto;
-    if (signo < 0) {
-      nNC += 1;
-      montoNC += -monto;
-    } else nFacturas += 1;
+    n += 1;
     const clientes = porEmpresa.get(f.empresa) ?? new Map<string, Cli>();
     const llave = codigo || `?${f.cliente ?? ""}`;
-    const c = clientes.get(llave) ?? { nombre: (f.cliente ?? "").trim() || codigo || "Sin cliente", total: 0, nc: 0, nNC: 0, nFa: 0 };
+    const c = clientes.get(llave) ?? { nombre: (f.cliente ?? "").trim() || codigo || "Sin cliente", total: 0 };
     c.total += monto;
-    if (signo < 0) {
-      c.nc += monto;
-      c.nNC += 1;
-    } else c.nFa += 1;
     clientes.set(llave, c);
     porEmpresa.set(f.empresa, clientes);
   }
-  if (nFacturas + nNC === 0) return null;
+  if (n === 0) return null;
 
-  const encabezado =
-    `🧾 Ventas de hoy · ${usd(total)} · ${plural(nFacturas, "factura", "facturas")}` +
-    (nNC ? ` (ya restadas ${plural(nNC, "nota de crédito", "notas de crédito")} · ${usd(montoNC)})` : "");
-  const suma = (m: Map<string, Cli>) => [...m.values()].reduce((s, c) => s + c.total, 0);
-  const empresas = [...porEmpresa].sort((a, b) => suma(b[1]) - suma(a[1]));
+  const grupos = [...porEmpresa]
+    .map(([emp, m]) => {
+      const vivos = [...m.values()].filter((c) => Math.round(c.total) !== 0);
+      return { emp, vivos, suma: [...m.values()].reduce((s, c) => s + c.total, 0) };
+    })
+    .filter((g) => g.vivos.length > 0)
+    .sort((a, b) => b.suma - a.suma);
   return [
-    encabezado,
-    ...empresas.map(([emp, clientes]) =>
+    `<b>🧾 Ventas · ${fechaDelTitulo(fecha)}</b>\n<b>${usd(total)}</b>`,
+    ...grupos.map((g) =>
       [
-        `${nombreCortoEmpresa(emp)} · ${usd(suma(clientes))}`,
-        ...[...clientes.values()]
+        `<b>${escHtml(nombreCortoEmpresa(g.emp))} · ${usd(g.suma)}</b>`,
+        ...g.vivos
           .sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre))
-          .map(lineaCliente),
+          .map((c) => `– ${escHtml(c.nombre)} · ${usd(c.total)}`),
       ].join("\n"),
     ),
   ].join("\n\n");
@@ -113,61 +105,43 @@ export interface RenglonDespacho {
   bultos: number | null;
 }
 export interface GuiaDespachada {
+  numero: string | number | null;
   transportista: string; // `transportistaLabel` («Entrega directa» o el nombre)
   renglones: readonly RenglonDespacho[];
 }
 
-const CLAVE_DE_NOMBRE = new Map(Object.entries(EMPRESA_KEY_TO_NAME).map(([k, v]) => [v.toLowerCase(), k]));
-const empresaCorta = (nombre: string | null) => {
-  const n = (nombre ?? "").trim();
-  const k = CLAVE_DE_NOMBRE.get(n.toLowerCase());
-  return k ? nombreCortoEmpresa(k) : n || "Sin empresa";
-};
-
-export function bloqueDespachos(guias: readonly GuiaDespachada[]): string | null {
-  type Cli = { nombre: string; transp: string; facturas: string[]; bultos: number };
-  const porEmpresa = new Map<string, Map<string, Cli>>();
-  let bultos = 0;
-  for (const g of guias) {
-    for (const r of g.renglones) {
-      const b = Number(r.bultos) || 0;
-      bultos += b;
-      const emp = empresaCorta(r.empresa);
-      const clientes = porEmpresa.get(emp) ?? new Map<string, Cli>();
-      const llave = `${(r.codigo ?? "").trim() || `?${r.cliente ?? ""}`}|${g.transportista}`;
-      const c = clientes.get(llave) ?? { nombre: nombreSinGritar(r.cliente) || "Sin cliente", transp: g.transportista || "—", facturas: [], bultos: 0 };
-      const fs = facturasParaMostrar(r.facturas).split(",").map((s) => s.trim()).filter(Boolean);
-      c.facturas = [...c.facturas, ...fs.filter((x) => !c.facturas.includes(x))];
-      c.bultos += b;
-      clientes.set(llave, c);
-      porEmpresa.set(emp, clientes);
-    }
-  }
+export function bloqueDespachos(guias: readonly GuiaDespachada[], fecha: string): string | null {
   if (guias.length === 0) return null;
-  const suma = (m: Map<string, Cli>) => [...m.values()].reduce((s, c) => s + c.bultos, 0);
-  return [
-    `🚚 Despachos de hoy · ${plural(guias.length, "guía", "guías")} · ${plural(bultos, "bulto", "bultos")}`,
-    ...[...porEmpresa]
-      .sort((a, b) => suma(b[1]) - suma(a[1]))
-      .map(([emp, clientes]) =>
-        [
-          `${emp} · ${plural(suma(clientes), "bulto", "bultos")}`,
-          ...[...clientes.values()]
-            .sort((a, b) => b.bultos - a.bultos || a.nombre.localeCompare(b.nombre))
-            .map((c) =>
-              [`• ${c.nombre}`, c.facturas.join(", "), plural(c.bultos, "bulto", "bultos"), c.transp].filter(Boolean).join(" · "),
-            ),
-        ].join("\n"),
-      ),
-  ].join("\n\n");
+  let bultos = 0;
+  const bloques = [...guias]
+    .sort((a, b) => Number(a.numero) - Number(b.numero))
+    .map((g) => {
+      const porCliente = new Map<string, { nombre: string; bultos: number }>();
+      let suma = 0;
+      for (const r of g.renglones) {
+        const b = Number(r.bultos) || 0;
+        suma += b;
+        const llave = (r.codigo ?? "").trim() || `?${r.cliente ?? ""}`;
+        const c = porCliente.get(llave) ?? { nombre: nombreSinGritar(r.cliente) || "Sin cliente", bultos: 0 };
+        c.bultos += b;
+        porCliente.set(llave, c);
+      }
+      bultos += suma;
+      return [
+        `<b>Guía ${escHtml(String(g.numero ?? "—"))} · ${escHtml(g.transportista || "—")} · ${plural(suma, "bulto", "bultos")}</b>`,
+        ...[...porCliente.values()]
+          .sort((a, b) => b.bultos - a.bultos || a.nombre.localeCompare(b.nombre))
+          .map((c) => `– ${escHtml(c.nombre)} · ${c.bultos}`),
+      ].join("\n");
+    });
+  return [`<b>🚚 Despachos · ${fechaDelTitulo(fecha)}</b>\n${plural(guias.length, "guía", "guías")} · ${plural(bultos, "bulto", "bultos")}`, ...bloques].join("\n\n");
 }
 
 // ── Unir y partir ────────────────────────────────────────────────────────────
 
-/** Los bloques que tengan algo, separados por una línea en blanco doble. */
-export function resumenDelDia(bloques: readonly (string | null)[]): string | null {
-  const vivos = bloques.filter((b): b is string => !!b);
-  return vivos.length ? vivos.join("\n\n\n") : null;
+/** Las secciones que tengan algo, cada una como SU mensaje y en su orden. */
+export function resumenDelDia(bloques: readonly (string | null)[]): string[] {
+  return bloques.filter((b): b is string => !!b);
 }
 
 /**
