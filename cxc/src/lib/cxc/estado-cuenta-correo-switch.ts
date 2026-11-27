@@ -52,7 +52,7 @@ export async function mandarPorResend(
   return { ok: false, motivo: "sin respuesta" };
 }
 
-interface PdfDelCliente {
+export interface PdfDelCliente {
   empresa: string;
   nombreEmpresa: string;
   total: number;
@@ -60,7 +60,7 @@ interface PdfDelCliente {
 }
 
 /** Los PDF de un cliente, ya comprobados. Lanza si falta uno o no cuadró. */
-function pdfsDelCliente(c: ClienteConCorreo, papeles: Map<string, Papel>): PdfDelCliente[] {
+export function pdfsDelCliente(c: ClienteConCorreo, papeles: Map<string, Papel>): PdfDelCliente[] {
   const out: PdfDelCliente[] = [];
   for (const e of c.empresas) {
     const nombreEmpresa = nombreCortoEmpresa(e);

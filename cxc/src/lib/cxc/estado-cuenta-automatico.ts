@@ -140,7 +140,7 @@ export function mensajeDelLunes(r: ResumenCorrida): string {
     `📧 Estados de cuenta del lunes: ${r.enviados} enviados · ${r.sinCorreo.length} clientes sin correo (deben ${dinero(deuda)})`,
   ];
   if (r.sinCorreo.length) {
-    lineas.push("", "Sin correo:");
+    lineas.push("", "Sin correo (sus PDF quedan listos para WhatsApp en Cuentas por cobrar):");
     const orden = [...r.sinCorreo].sort((a, b) => b.saldo - a.saldo);
     for (const c of orden.slice(0, TOPE_LISTA)) lineas.push(`· ${c.nombre} — ${dinero(c.saldo)}`);
     if (orden.length > TOPE_LISTA) lineas.push(`y ${orden.length - TOPE_LISTA} más · Ver en CxC`);

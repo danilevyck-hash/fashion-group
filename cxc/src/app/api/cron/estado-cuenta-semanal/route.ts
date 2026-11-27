@@ -45,7 +45,14 @@ import {
   type Papel,
   type Par,
 } from "@/lib/cxc/estado-cuenta-pdf-switch-io";
-import { fechaDelArchivo, mandarCorreoDelCliente } from "@/lib/cxc/estado-cuenta-correo-switch";
+import { fechaDelArchivo, mandarCorreoDelCliente, pdfsDelCliente } from "@/lib/cxc/estado-cuenta-correo-switch";
+import { nombreDelPdf } from "@/lib/cxc/estado-cuenta-pdf-switch";
+import {
+  BUCKET_ESTADOS_CUENTA,
+  ESTADO_CUENTA_WHATSAPP_2026_11,
+  rutaDelPdf,
+  type PdfGuardado,
+} from "@/lib/cxc/estado-cuenta-whatsapp";
 
 const CRON_NAME = "estado-cuenta-semanal";
 const TABLA = "cxc_estado_cuenta_automatico";
@@ -101,6 +108,25 @@ async function reservar(c: ClienteConCorreo, semana: string): Promise<boolean> {
     .select("id");
   if (upd.error) throw new Error(`${TABLA}: ${upd.error.message}`);
   return (upd.data ?? []).length > 0;
+}
+
+/** Sube los PDF comprobados de un cliente sin correo al bucket privado. Lanza si falta uno. */
+async function guardarParaWhatsApp(
+  c: ClienteConCorreo,
+  papeles: Map<string, Papel>,
+  semana: string,
+  fechaArchivo: string,
+): Promise<PdfGuardado[]> {
+  const out: PdfGuardado[] = [];
+  for (const p of pdfsDelCliente(c, papeles)) {
+    const path = rutaDelPdf(semana, c.codigo, p.empresa);
+    const { error } = await supabaseServer.storage
+      .from(BUCKET_ESTADOS_CUENTA)
+      .upload(path, p.bytes, { contentType: "application/pdf", upsert: true });
+    if (error) throw new Error(`no se pudo guardar el PDF de ${p.nombreEmpresa}: ${error.message}`);
+    out.push({ empresa: p.empresa, nombreEmpresa: p.nombreEmpresa, total: p.total, path, archivo: nombreDelPdf(p.nombreEmpresa, c.nombre, fechaArchivo) });
+  }
+  return out;
 }
 
 async function anotar(codigo: string, semana: string, campos: Record<string, unknown>): Promise<void> {
@@ -188,18 +214,35 @@ export async function GET(req: NextRequest) {
       const porHacer = clientes.filter((c) => !resueltos.has(c.codigo));
       r.yaEnviados = clientes.length - porHacer.length;
 
-      // Sin correo: se anota y no se imprime nada.
-      for (const c of porHacer.filter((x) => !x.correos.length)) {
-        if (!(await reservar(c, semana))) continue;
-        r.sinCorreo.push({ nombre: c.nombre, saldo: c.saldo });
-        await anotar(c.codigo, semana, { estado: "sin_correo" });
-      }
-
       const conCorreo = porHacer.filter((c) => c.correos.length);
+      const sinCorreo = porHacer.filter((c) => !c.correos.length);
+      // 🔴 Los sin correo también se imprimen (WhatsApp, 27-nov-2026), DESPUÉS de
+      // los que tienen correo: si el tiempo no alcanza, cae lo de WhatsApp y no el correo.
+      const aImprimir = ESTADO_CUENTA_WHATSAPP_2026_11 ? [...conCorreo, ...sinCorreo] : conCorreo;
       const papeles = new Map<string, Papel>();
-      const ids = await idsDeSwitch(conCorreo.map((c) => c.codigo), CXC_GRUPO_EMPRESA_KEYS);
-      const pares = paresDe(conCorreo, ids, papeles);
+      const ids = await idsDeSwitch(aImprimir.map((c) => c.codigo), CXC_GRUPO_EMPRESA_KEYS);
+      const pares = paresDe(aImprimir, ids, papeles);
       for (const [k, v] of await imprimirEstadosDeCuenta(pares, inicio + PRESUPUESTO_IMPRIMIR_MS)) papeles.set(k, v);
+
+      for (const c of sinCorreo) {
+        if (!(await reservar(c, semana))) continue;
+        if (!ESTADO_CUENTA_WHATSAPP_2026_11) {
+          r.sinCorreo.push({ nombre: c.nombre, saldo: c.saldo });
+          await anotar(c.codigo, semana, { estado: "sin_correo" });
+          continue;
+        }
+        try {
+          const pdfs = await guardarParaWhatsApp(c, papeles, semana, fechaDelArchivo(hoy));
+          const saldo = Math.round(pdfs.reduce((s, p) => s + p.total, 0) * 100) / 100;
+          r.sinCorreo.push({ nombre: c.nombre, saldo });
+          await anotar(c.codigo, semana, { estado: "sin_correo", pdfs, empresas: pdfs.map((p) => p.empresa), saldo, detalle: null });
+        } catch (err) {
+          // No cuadró o no se imprimió: queda 'error', no se ofrece y las 11:20 lo reintentan.
+          const motivo = err instanceof Error ? err.message : String(err);
+          r.fallaron.push({ nombre: c.nombre, motivo: `WhatsApp: ${motivo}` });
+          await anotar(c.codigo, semana, { estado: "error", pdfs: null, detalle: motivo });
+        }
+      }
 
       for (let i = 0; i < conCorreo.length; i += 1) {
         const c = conCorreo[i];
