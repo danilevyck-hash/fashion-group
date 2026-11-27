@@ -195,6 +195,10 @@ export default function PedidosView({
   // «Quitar» (27-nov-2026, `FACTURADOS_QUITAR_2026_11`): lo dice el SERVIDOR.
   const [quitadas, setQuitadas] = useState<FacturadoQuitado[]>([]);
   const [puedeQuitar, setPuedeQuitar] = useState(false);
+  // «Ver quitadas» arranca SIEMPRE plegado (Daniel, 27-nov-2026): cada lectura
+  // de la lista —entrar, cambiar de paso, volver, «Actualizar», deslizar— lo
+  // vuelve a plegar. No se recuerda en ningún lado; solo el botón lo abre.
+  const [plegarQuitadas, setPlegarQuitadas] = useState(0);
   // v2: filtro simple; abre SIEMPRE en «Todas» y no se acota por persona (Daniel, 5-oct-2026).
   const [empresa, setEmpresa] = useState("todas");
   // La fecha exacta se ve al pasar el mouse (title) o al tocar la celda.
@@ -226,7 +230,8 @@ export default function PedidosView({
     }
   }
 
-  async function cargar(fondo = false) {
+  async function cargar(fondo = false, sinPlegar = false) {
+    if (!sinPlegar) setPlegarQuitadas((n) => n + 1);
     // Sin esperar: la lista de pedidos no depende de las facturas.
     void cargarFacturados();
     try {
@@ -257,7 +262,8 @@ export default function PedidosView({
   useEffect(() => {
     if (!PEDIDOS_REFRESCO_AUTOMATICO) return;
     const t = setInterval(() => {
-      if (document.visibilityState === "visible") void cargar(true);
+      // El relevo de cada 5 min no pliega lo que la persona abrió.
+      if (document.visibilityState === "visible") void cargar(true, true);
     }, PEDIDOS_REFRESCO_MS);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -718,7 +724,7 @@ export default function PedidosView({
       paralelo={PEDIDOS_ACTUALIZAR_EN_PARALELO}
       resumenExito={(n) => `${n === 1 ? "1 pedido" : `${n} pedidos`} al día`}
       roles={[...PEDIDOS_BODEGA_ROLES]}
-      onSuccess={cargar}
+      onSuccess={() => cargar()}
     />
   );
   const vacioDelCentro = `Sin pedidos ${CHIPS.find((c) => c.value === filtro)?.label.toLowerCase() ?? ""}`.trim();
@@ -1657,6 +1663,7 @@ export default function PedidosView({
             onQuitar={puedeQuitar ? quitarFacturado : undefined}
             quitadas={quitadasVisibles}
             onDevolver={puedeQuitar ? devolverFacturado : undefined}
+            plegarClave={plegarQuitadas}
           />
         )
       ) : error ? (
