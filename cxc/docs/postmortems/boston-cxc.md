@@ -1703,3 +1703,13 @@ Daniel, 26-nov-2026: *«te dije que era de switch que quiero el pdf, no uno rege
 **Prendido el 27-nov-2026** (Daniel aprobó el envío): la prueba en producción con D-24 imprimió las 5 empresas en 18,6 s y todas cuadraron al centavo con el API — Vistana $76.058,15 · Fashion Wear $180.150,18 · Fashion Shoes $28.247,37 · Active Shoes $26.835,48 · Active Wear $9.897,37 = $321.188,55. El primer envío a clientes es el lunes 30-nov-2026 a las 10:50 UTC.
 
 **Candados**: `cxc-estado-cuenta-pdf-switch.test.ts` (lectura del papel, el candado al centavo y por documentos, el API después de cerrar la sesión web, el correo no sale si una empresa no cuadró), `cron-login-web-oficina.test.ts` (madrugada), `cron-calendario.test.ts` (separación), `switch-pausa.test.ts`.
+
+## 27-nov-2026 — Estados de cuenta por WhatsApp (los sin correo)
+
+Daniel aprobó el mockup «HOY vs RECOMENDACIÓN»: los clientes con saldo y SIN correo (22 el 27-nov, unos $984.700) reciben el MISMO PDF de Switch, pero por WhatsApp y a mano. Daniel: «ella todo lo tiene, en los sistemas no están bien cargados ni correos ni teléfonos» — por eso no se usa el teléfono guardado: la secretaria elige el chat.
+
+- **El lunes**: `estado-cuenta-semanal` imprime también a los sin correo, DESPUÉS de los que tienen correo (si el tiempo no alcanza cae lo de WhatsApp, no el correo), con el mismo candado al centavo (`pdfsDelCliente`). Los PDF van al bucket PRIVADO `estados-cuenta` (`<semana>/<código>/<empresa>.pdf`) y la fila `sin_correo` guarda `pdfs` = [{empresa, nombreEmpresa, total, path, archivo}]. Lo que no cuadra queda `error`, no se ofrece y lo reintentan las 11:20; va en el Telegram privado con «WhatsApp: …».
+- **En `/cxc`** (`EstadosPorWhatsApp.tsx`, datos por `/api/cxc/whatsapp`): la fila «Semana del … · N clientes sin correo · $X · X de N» abre la lista Pendientes / Enviados. Los PDF se bajan al abrir la lista (iOS exige compartir sin un `await` de red en medio). Teléfono: `compartirArchivos` con el texto (cuadro de saldos por empresa y total; además queda copiado) y los PDF; se marca solo si se compartió. Computadora: se descargan los PDF y se abre WhatsApp Web con el texto.
+- **Marcado**: `whatsapp_por` · `whatsapp_en` + una fila `canal = whatsapp` en `cxc_emails_enviados` (la marca gris «Le enviaste…»). El POST sale a los 5 s; «Deshacer» lo cancela.
+- **Quién**: admin y secretaria (`ROLES_WHATSAPP`), en la pantalla y en la ruta; ni vendedor ni la gerencia de Boston, y en la cartera de Boston no se dibuja.
+- **Migración** `20270129120000_cxc_estado_cuenta_whatsapp.sql` (aditiva: tres columnas + el bucket), aplicada el 27-nov-2026. Candado `cxc-estado-cuenta-whatsapp.test.ts`.

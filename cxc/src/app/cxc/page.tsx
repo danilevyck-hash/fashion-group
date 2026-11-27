@@ -50,6 +50,8 @@ import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import UndoToast from "@/components/UndoToast";
+import EstadosPorWhatsApp from "./components/EstadosPorWhatsApp";
+import { ESTADO_CUENTA_WHATSAPP_2026_11, puedeMandarPorWhatsApp } from "@/lib/cxc/estado-cuenta-whatsapp";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { nombreDeCliente } from "@/lib/cxc/nombre-cliente";
 import { CXC_BUSCAR_SIN_FILTRO_ESCONDIDO, CLASE_BOTON_DESCARGAR, CXC_EMPRESA_BAJO_EL_TITULO, CXC_BOSTON_COMO_GRUPO_CELULAR } from "@/lib/ui/revision-110-cxc";
@@ -734,6 +736,8 @@ function AdminDashboardInner() {
   // con la lista en la mano. La lista de roles se DERIVA de `veCxc()`, la misma
   // que abre la pantalla: quien entra, descarga.
   const canExport = veCxc(userRole);
+  // Solo el grupo: en la cartera de Boston no se dibuja (el envío es de las 6).
+  const conWhatsApp = ESTADO_CUENTA_WHATSAPP_2026_11 && puedeMandarPorWhatsApp(userRole) && !esCarteraBoston;
 
   return (
     <PullToRefresh onRefresh={loadData}>
@@ -787,6 +791,7 @@ function AdminDashboardInner() {
           onSyncedNow={() => loadData()}
           avisoMontos={avisoMontos}
           onBoston={pestanasCxc(userRole).some((p) => p.key === "boston") ? () => setTab("boston") : null}
+          whatsapp={conWhatsApp}
         />
       ) : (
       <PanelCxcMobile
@@ -815,6 +820,9 @@ function AdminDashboardInner() {
       )}
 
       <div className="hidden lg:block max-w-6xl mx-auto px-6 py-8">
+
+      {/* Estados de cuenta por WhatsApp de la semana (27-nov-2026): admin y secretaria. */}
+      {conWhatsApp && <EstadosPorWhatsApp celular={false} />}
 
       {/* Apple (4-oct-2026, apagado): el total y lo de +90 días primero, con
           la frescura a la derecha. Reemplaza la frescura y «Actualizar ahora»

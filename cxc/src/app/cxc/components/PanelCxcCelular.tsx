@@ -67,6 +67,7 @@ import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { CLASE_TITULO_BARRA, IconoBarra, TextoQueCabe } from "@/components/celular/BarraDeControles";
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR, SegmentadoCelular } from "@/components/celular/CabeceraCompacta";
 import { CXC_APPLE_2026_10, opcionesActualizarCxc, partirPorAtencion, saldoMas90 } from "@/lib/cxc/apple-2026-10";
+import EstadosPorWhatsApp from "./EstadosPorWhatsApp";
 
 const CLAVE_ORDEN_CELULAR = "fg_orden_cxc_celular";
 /** Las mismas columnas de la computadora que tienen sentido en una lista: los tramos ya son los chips. */
@@ -119,6 +120,8 @@ export interface PanelCxcCelularProps {
   empresasDelGrupo?: Company[];
   /** Las empresas cuya frescura se dice. Por defecto, las 6 del grupo. */
   empresasFrescura?: readonly string[];
+  /** Estados de cuenta por WhatsApp de la semana (admin y secretaria, solo el grupo). */
+  whatsapp?: boolean;
 }
 
 export default function PanelCxcCelular({
@@ -144,6 +147,7 @@ export default function PanelCxcCelular({
   onGrupo = null,
   empresasDelGrupo = [],
   empresasFrescura = CXC_GRUPO_EMPRESA_KEYS,
+  whatsapp = false,
 }: PanelCxcCelularProps) {
   const enBoston = cartera === "boston";
   // n.º 13: la cartera se elige en el título; Boston es una opción aparte al final.
@@ -451,6 +455,7 @@ export default function PanelCxcCelular({
         </div>
       ) : secciones && secciones.atencion.length > 0 ? (
         <>
+          {whatsapp && !enBoston && <EstadosPorWhatsApp celular />}
           <SeccionClientes titulo="Clientes +90 días" clientes={secciones.atencion} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} />
           {secciones.resto.length > 0 && (
             <SeccionClientes titulo="Otros clientes" clientes={secciones.resto} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} />

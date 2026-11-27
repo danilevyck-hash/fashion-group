@@ -36,6 +36,35 @@ export function puedeCompartirArchivos(archivo: File): boolean {
   }
 }
 
+/**
+ * Lo mismo con VARIOS archivos (los PDF de un estado de cuenta, uno por
+ * empresa) y un texto. Sin hoja de compartir, se descargan todos.
+ */
+export async function compartirArchivos(
+  archivos: File[],
+  datos?: { title?: string; text?: string },
+): Promise<ResultadoCompartir> {
+  const nav = typeof navigator === "undefined" ? null : (navigator as Navigator & { canShare?: (d: ShareData) => boolean });
+  let puede = false;
+  try {
+    puede = !!nav && typeof nav.share === "function" && typeof nav.canShare === "function" && nav.canShare({ files: archivos });
+  } catch {
+    puede = false;
+  }
+  if (!puede) {
+    archivos.forEach(descargarArchivo);
+    return "descargado";
+  }
+  try {
+    await navigator.share({ files: archivos, ...datos });
+    return "compartido";
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") return "cancelado";
+    archivos.forEach(descargarArchivo);
+    return "descargado";
+  }
+}
+
 /** Descarga el archivo (escritorio, o navegador sin hoja de compartir). */
 export function descargarArchivo(archivo: File): void {
   const url = URL.createObjectURL(archivo);
