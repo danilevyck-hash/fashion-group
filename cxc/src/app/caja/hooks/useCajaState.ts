@@ -242,20 +242,29 @@ export function useCajaState(opts?: UseCajaOptions) {
   async function doDeleteGasto() {
     if (!current || !pendingDeleteGasto) return;
     const gastoId = pendingDeleteGasto.id;
-    const periodoId = current.id;
     setPendingDeleteGasto(null);
+    await borrarGasto(gastoId);
+  }
+
+  // El MISMO borrado para la confirmación y para deslizar la tarjeta en el
+  // celular (devuelve si se borró).
+  async function borrarGasto(gastoId: string): Promise<boolean> {
+    if (!current) return false;
+    const periodoId = current.id;
     try {
       const res = await fetch(`/api/caja/gastos/${gastoId}`, { method: "DELETE" });
       if (!res.ok) {
         const payload = await res.json().catch(() => null);
         const backendMsg = payload && typeof payload.error === "string" ? payload.error : null;
         setError(backendMsg || "Error al eliminar gasto");
-        return;
+        return false;
       }
       await loadDetail(periodoId);
       loadPeriodos();
+      return true;
     } catch {
       setError("Error al eliminar gasto");
+      return false;
     }
   }
 
@@ -341,7 +350,7 @@ export function useCajaState(opts?: UseCajaOptions) {
     requestClosePeriodo, doClosePeriodo,
     requestDeletePeriodo, doDeletePeriodo,
     requestDeleteGasto, saveEditGasto, quickUpdateCategoria, exportExcel,
-    pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
+    pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto, borrarGasto,
     mutateDetail,
   };
 }

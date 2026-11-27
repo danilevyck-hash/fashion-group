@@ -29,6 +29,8 @@
 import { VENTAS_CLIENTES_EMPRESA_EN_LA_BARRA_2026_11 as EMPRESA_EN_LA_BARRA } from "@/lib/ui/celular-optimizar-2026-11";
 import { BuscarEnLaBarra, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
+import { useRef, useState } from "react";
+import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
 import type { Cliente } from "../types";
 import {
   SIN_CODIGO_EN_SWITCH,
@@ -79,6 +81,9 @@ interface Props {
   unaLista?: boolean;
   /** Revisión 110 (rec-c): la utilidad del cliente, si hay (solo año completo). */
   utilidadDe?: (c: Cliente) => UtilidadDelCliente | undefined;
+  /** Mantener presionado: cómo se llaman el período en pantalla y su
+   *  comparativo («Año 2026» · «Mismo período de 2025»). Sin esto, no hay tarjeta. */
+  rotulosTarjeta?: { actual: string; anterior: string };
 }
 
 export function ClientesCelular({
@@ -97,7 +102,14 @@ export function ClientesCelular({
   pie,
   unaLista = false,
   utilidadDe,
+  rotulosTarjeta,
 }: Props) {
+  // 🔴 Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): la tarjeta
+  // con las compras del período contra el comparativo, de lo que ya trae la
+  // fila (sin leer nada). Un gancho para la lista; la fila se anota al apoyar.
+  const [tarjeta, setTarjeta] = useState<Cliente | null>(null);
+  const tocada = useRef<Cliente | null>(null);
+  const mantener = useMantenerPresionado(rotulosTarjeta ? () => setTarjeta(tocada.current) : null);
   // 🔴 v2 de la barra del celular: la lupa se abre EN la barra y la empresa es
   // un ícono de la misma barra; la línea gris dice cuál está puesta.
   const hayBarra = useHayBarraCelular();
@@ -118,6 +130,18 @@ export function ClientesCelular({
 
   return (
     <PantallaVentas>
+      {tarjeta && rotulosTarjeta && (
+        <TarjetaResumen
+          titulo={tarjeta.nombre}
+          filas={[
+            { rotulo: rotulosTarjeta.actual, valor: montoDeLaTabla(tarjeta.ytd) },
+            { rotulo: rotulosTarjeta.anterior, valor: montoDeLaTabla(tarjeta.prev) },
+          ]}
+          pie={{ rotulo: "Variación", valor: porcentajeDelCliente(tarjeta.delta).texto }}
+          onAbrir={() => { const c = tarjeta; setTarjeta(null); onTocarCliente(c); }}
+          onCerrar={() => setTarjeta(null)}
+        />
+      )}
       {hayBarra && ordenar && (unaLista ? (
         <EnLaBarra filaIzq={<>{chipEmpresa}{ordenar}</>} filaDer={frescura} />
       ) : (
@@ -182,6 +206,8 @@ export function ClientesCelular({
               type="button"
               data-fila-cliente={`${c.empresaKey}|${c.id}`}
               onClick={() => onTocarCliente(c)}
+              {...mantener}
+              onTouchStart={mantener.onTouchStart ? (e) => { tocada.current = c; mantener.onTouchStart!(e); } : undefined}
               className="flex w-full min-h-[64px] items-center gap-3 border-t border-gray-100 px-4 py-2.5 text-left first:border-t-0 active:bg-gray-50"
             >
               <span className="min-w-0 flex-1">

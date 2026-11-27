@@ -407,27 +407,35 @@ export default function ComprobantesPanel({
   async function handleDelete() {
     if (!deleting) return;
     setDeleteLoading(true);
+    const ok = await borrarPedido(deleting, () => {
+      setDeleteLoading(false);
+      setDeleting(null);
+    });
+    if (!ok) setDeleteLoading(false);
+  }
+
+  // El MISMO borrado para la ventana y para deslizar la fila en el celular.
+  async function borrarPedido(pedido: FilaComprobante, alBorrar: () => void = () => {}): Promise<boolean> {
     // Borrado SOFT por tabla física. Ninguno toca Switch.
-    const url = isOrdersRow(deleting)
-      ? `${theme.api}/orders/${deleting.id_natural}`
-      : `${theme.api}/pedidos-publicos/${deleting.id_natural}`;
+    const url = isOrdersRow(pedido)
+      ? `${theme.api}/orders/${pedido.id_natural}`
+      : `${theme.api}/pedidos-publicos/${pedido.id_natural}`;
     try {
       const res = await fetch(url, { method: "DELETE" });
       if (!res.ok) {
-        setDeleteLoading(false);
         showToast("No se pudo eliminar el pedido. Intenta de nuevo.", "error");
-        return;
+        return false;
       }
     } catch {
-      setDeleteLoading(false);
       showToast("No se pudo eliminar. Revisa tu conexión e intenta de nuevo.", "error");
-      return;
+      return false;
     }
-    setDeleteLoading(false);
-    setDeleting(null);
+    alBorrar();
     showToast("Pedido eliminado", "success");
     await onRefresh();
+    return true;
   }
+
 
   const isMesOpen = (k: string) => openMeses[k] ?? k === mesAbierto;
   const rowKey = (p: FilaComprobante) => `${p.fuente ?? p.origen}-${p.id_natural}`;
@@ -522,6 +530,7 @@ export default function ComprobantesPanel({
     onDuplicar: () => setDupTarget(pedido),
     onReenviarCorreo: () => abrirCorreo(pedido),
     onEliminar: () => setDeleting(pedido),
+    onEliminarDeUna: () => borrarPedido(pedido),
     showToast,
   });
 

@@ -399,7 +399,7 @@ export function PantallaQueSube({
       className="fixed inset-0 z-[55] overflow-y-auto bg-fondo-celular"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
-      <div className="sticky top-0 z-10 bg-fondo-celular/95 px-2 py-1 backdrop-blur">
+      <div data-sube-al-inicio className="sticky top-0 z-10 bg-fondo-celular/95 px-2 py-1 backdrop-blur">
         <button
           type="button"
           onClick={onCerrar}

@@ -13,6 +13,7 @@ import { ATRIBUTO_BARRA_FIJA, ATRIBUTO_SOBRE_LA_BARRA } from "@/lib/navegacion/b
 import { BARRA_EN_LISTAS_2026_11 } from "@/lib/ui/revision-110-2026-11";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio } from "@/lib/ui/vidrio";
+import { SwipeableRow, type EliminarAlDeslizar, type SwipeAction } from "@/components/ui";
 
 export function Visto() {
   return (
@@ -33,6 +34,8 @@ export function FilaCel({
   chevron,
   onClick,
   marca,
+  eliminar,
+  deslizarDerecha,
 }: {
   titulo: ReactNode;
   sub?: ReactNode;
@@ -44,6 +47,10 @@ export function FilaCel({
   chevron?: boolean;
   onClick?: () => void;
   marca?: string;
+  /** Deslizar a la izquierda para eliminar (`GESTOS_IPHONE_2026_11`). */
+  eliminar?: EliminarAlDeslizar;
+  /** Deslizar a la derecha: la acción principal (p. ej. abrir «Cobrar»). */
+  deslizarDerecha?: SwipeAction;
 }) {
   const cuerpo = (
     <>
@@ -63,7 +70,17 @@ export function FilaCel({
   );
   return (
     <li data-fila={marca} className="border-t border-gray-100 first:border-t-0">
-      {onClick ? (
+      {onClick && (eliminar || deslizarDerecha) ? (
+        <SwipeableRow eliminar={eliminar} leftAction={deslizarDerecha}>
+          <button
+            type="button"
+            onClick={onClick}
+            className="flex min-h-[56px] w-full items-center gap-3 px-4 py-3 text-left active:bg-gray-50"
+          >
+            {cuerpo}
+          </button>
+        </SwipeableRow>
+      ) : onClick ? (
         <button
           type="button"
           onClick={onClick}

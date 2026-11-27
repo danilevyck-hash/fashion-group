@@ -13,6 +13,10 @@ import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Check, Pencil, Printer, Undo2 } from "lucide-react";
 import { ConfirmModal } from "@/components/ui";
+import { SwipeableRow, type SwipeAction } from "@/components/ui";
+import UndoToast from "@/components/UndoToast";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 import { AJUSTES_APPLE_6_2026_10 as CIRCULO } from "@/lib/ajustes-apple-6-2026-10";
 import { ESTADOS_CELULAR_2026_11 as ESTADOS_CELULAR, PEDIDOS_CELULAR_2026_11 as PEDIDOS_CELULAR } from "@/lib/ui/celular-optimizar-2026-11";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
@@ -67,6 +71,7 @@ import {
   MAX_NOTA_MUESTRA,
   lineaEsperaMuestra,
   estadoFlujoSimpleLeido,
+  pasoAlDeslizar,
   ultimaFirmaFlujoSimple,
   diasEnPreparado,
   preparadoViejo,
@@ -363,6 +368,33 @@ export default function PedidosView({
       toast(msg, "error");
     }
   }
+
+  // ── 🔴 Deslizar a la derecha = el paso siguiente (27-nov-2026, `GESTOS_IPHONE_2026_11`) ──
+  // Como marcar «leído» en Mail. El paso sale de `pasoAlDeslizar` (la misma
+  // regla de los botones) y viaja por `moverSimple` (la misma ruta) recién a
+  // los 5 s: mientras, se ve movido y «Deshacer» lo devuelve sin tocar nada.
+  // «Preparado» exige los bultos: abre su ventana, no avanza solo.
+  const deshacerPaso = useUndoAction();
+  const deslizarAvanza = (p: PedidoBodega): SwipeAction | undefined => {
+    if (!GESTOS_IPHONE_2026_11) return undefined;
+    const destino = pasoAlDeslizar(estadoFlujoSimpleLeido(p.estado), { puedeMarcar, puedeRecibir });
+    if (!destino) return undefined;
+    const onAction = destino === "preparado"
+      ? () => { setPorPreparar(p); setBultosTexto(""); setErrorBultos(null); }
+      : () => {
+          const antes = p.estado;
+          const poner = (estado: PedidoBodega["estado"]) =>
+            setPedidos((xs) => (xs ?? []).map((x) => (clave(x) === clave(p) ? { ...x, estado } : x)));
+          deshacerPaso.scheduleAction({
+            id: clave(p),
+            message: `Pedido ${p.secuencial} · ${ROTULO_ESTADO_FLUJO_SIMPLE[destino]}`,
+            onOptimistic: () => poner(destino),
+            onRevert: () => poner(antes),
+            execute: () => moverSimple(p, destino),
+          });
+        };
+    return { label: ROTULO_ESTADO_FLUJO_SIMPLE[destino], color: destino === "recibido" ? "bg-emerald-600" : "bg-blue-600", onAction };
+  };
 
   // ── 🔴 13-nov-2026 (propuesta): «Preparado» pide los bultos ─────────────
   // Un toque abre la ventana con UN número, obligatorio. El botón no se apaga:
@@ -1072,7 +1104,9 @@ export default function PedidosView({
               const firma = firmaParaLeer(ultimaFirmaFlujoSimple(firmasSimpleDe(p)));
               const vendedor = vendedorEnPantalla(p.vendedor_nombre);
               return (
-                <li key={clave(p)} className="flex items-center gap-3 px-4 py-2.5">
+                <li key={clave(p)}>
+                <SwipeableRow leftAction={deslizarAvanza(p)}>
+                <div className="flex items-center gap-3 px-4 py-2.5">
                   <button type="button" onClick={() => setAbierto(detalleDe(p))} className="min-w-0 flex-1 text-left">
                     <span className="block truncate text-[15px] font-medium text-gray-900">{p.cliente_nombre}</span>
                     <span className="mt-0.5 block truncate text-[13px] text-gray-500">
@@ -1085,6 +1119,8 @@ export default function PedidosView({
                     {controlSimple(p)}
                     {avisoPreparadoViejo(p)}
                   </div>
+                </div>
+                </SwipeableRow>
                 </li>
               );
             })}
@@ -1278,6 +1314,10 @@ export default function PedidosView({
   // Las ventanas de confirmar son las MISMAS en la lista y en el pedido abierto (ux-04).
   const ventanas = (
     <>
+    {deshacerPaso.pendingUndo && (
+      <UndoToast message={deshacerPaso.pendingUndo.message} startedAt={deshacerPaso.pendingUndo.startedAt} onUndo={deshacerPaso.undoAction} />
+    )}
+    <>
       {/* 🔴 Cambiar de estado pide confirmar (7-oct-2026). La MISMA ventana del
           sistema (`ConfirmModal`), nunca una propia. */}
       {confirmacion && (
@@ -1385,6 +1425,7 @@ export default function PedidosView({
           )}
         </ConfirmModal>
       )}
+    </>
     </>
   );
 

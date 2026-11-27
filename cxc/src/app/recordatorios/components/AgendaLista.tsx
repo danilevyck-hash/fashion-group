@@ -29,6 +29,8 @@
  * se enteraría hasta verla en producción.
  */
 
+import { SwipeableRow } from "@/components/ui";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 import { clicConTeclado } from "@/lib/ui/clic-con-teclado";
 import { Bell } from "lucide-react";
 import { ICONOS_DE_LINEA_EN_TODO } from "@/lib/ui/revision-110-ajustes";
@@ -77,7 +79,13 @@ function FilaCheque({
   const c = item.cheque;
   const ve = item.ve;
   const abierto = ve === "pendiente" || ve === "vencido";
+  // Deslizar a la derecha = «Confirmar depósito» (`GESTOS_IPHONE_2026_11`): la
+  // MISMA acción del botón, con su «Deshacer» de 5 s.
   return (
+    <SwipeableRow
+      className="rounded-lg"
+      leftAction={GESTOS_IPHONE_2026_11 && abierto ? { label: "Depositado", color: "bg-emerald-600", onAction: () => onDepositar(c.id) } : undefined}
+    >
     <div
       data-cheque-fila={c.id}
       className={`border border-gray-200 rounded-lg ${bordeCheque(ve)} ${ve === "depositado" ? "opacity-60" : ""}`}
@@ -145,6 +153,7 @@ function FilaCheque({
         )}
       </div>
     </div>
+    </SwipeableRow>
   );
 }
 

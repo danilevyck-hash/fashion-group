@@ -84,6 +84,9 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
   const [globalSearch, setGlobalSearch] = useState("");
   const [settleOpen, setSettleOpen] = useState(false);
+  // Deslizar a la derecha en el celular: el reclamo abre con «Cobrar» ya abierto.
+  const [cobrarAlAbrir, setCobrarAlAbrir] = useState(false);
+  useEffect(() => { if (view !== "detail") setCobrarAlAbrir(false); }, [view]);
   const [settling, setSettling] = useState(false);
   // Form state (Nuevo reclamo). La fecha del reclamo (`fecha_reclamo`) ya no se
   // teclea: es el día en que se crea; la que importa es la FECHA DE FACTURA.
@@ -413,7 +416,11 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
 
   function confirmDelete() {
     if (!pendingDelete || pendingDelete.length === 0) return;
-    const ids = pendingDelete;
+    borrarConDeshacer(pendingDelete);
+  }
+
+  // El MISMO borrado para la confirmación y para deslizar el renglón en el celular.
+  function borrarConDeshacer(ids: string[]) {
     setPendingDelete(null);
     setSelectionMode(false); setSelectedIds([]);
     if (current && ids.includes(current.id)) { setCurrent(null); setView("list"); }
@@ -585,9 +592,11 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
               selectedIds={selectedIds}
               setSelectedIds={setSelectedIds}
               onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
-              onLoadDetail={(id) => { setEditMode(false); setView("detail", id); loadDetail(id); }}
+              onLoadDetail={(id) => { setCobrarAlAbrir(false); setEditMode(false); setView("detail", id); loadDetail(id); }}
               onDeleteSelected={requestDeleteSelected}
               onReload={loadReclamos}
+              onDeleteReclamo={(id) => borrarConDeshacer([id])}
+              onCobrarReclamo={(id) => { setCobrarAlAbrir(true); setEditMode(false); setView("detail", id); loadDetail(id); }}
             />
           </div>
         )}
@@ -681,6 +690,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
             onAddNota={addNota}
             onVolverAPorCobrar={() => changeEstado("Creado")}
             onCobrar={(filas, comprobante) => { void submitSettlement(filas, comprobante); }}
+            abrirCobro={cobrarAlAbrir}
             cobrando={settling}
             onUploadFoto={uploadFoto}
             uploadingFoto={uploadingDetailFoto}

@@ -50,7 +50,7 @@ export default function PeriodoDetailPage() {
     loadDetail,
     requestClosePeriodo, doClosePeriodo,
     requestDeleteGasto, saveEditGasto, quickUpdateCategoria, exportExcel,
-    pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
+    pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto, borrarGasto,
   } = useCajaState({ authReady: authChecked, onPeriodoDeleted: () => router.push("/caja") });
 
   useEffect(() => {
@@ -154,6 +154,7 @@ export default function PeriodoDetailPage() {
             setEditGasto={setEditGasto}
             onSaveEdit={saveEditGasto}
             onDeleteGasto={requestDeleteGasto}
+            onBorrarGastoDeUna={borrarGasto}
             onNuevoGasto={detailIsOpen ? openGastoDrawer : undefined}
             onQuickCategoria={quickUpdateCategoria}
             apple={apple}

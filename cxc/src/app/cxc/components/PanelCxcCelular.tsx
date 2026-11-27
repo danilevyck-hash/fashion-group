@@ -68,6 +68,9 @@ import { CLASE_TITULO_BARRA, IconoBarra, TextoQueCabe } from "@/components/celul
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR, SegmentadoCelular } from "@/components/celular/CabeceraCompacta";
 import { CXC_APPLE_2026_10, opcionesActualizarCxc, partirPorAtencion, saldoMas90 } from "@/lib/cxc/apple-2026-10";
 import EstadosPorWhatsApp from "./EstadosPorWhatsApp";
+import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
+import { SwipeableRow } from "@/components/ui";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 
 const CLAVE_ORDEN_CELULAR = "fg_orden_cxc_celular";
 /** Las mismas columnas de la computadora que tienen sentido en una lista: los tramos ya son los chips. */
@@ -98,6 +101,8 @@ export interface PanelCxcCelularProps {
   setCompanyFilter: (v: string) => void;
   /** Abre la hoja «Cobrar» — la MISMA de la computadora. */
   onCobrar: (client: ConsolidatedClient) => void;
+  /** Deslizar a la derecha: la hoja ya abierta en «Enviar estado de cuenta» (no envía). */
+  onEnviarEstado?: (client: ConsolidatedClient) => void;
   /** Días desde el último pago real (`null` = nunca pagó). */
   diasSinPagarDe: (client: ConsolidatedClient) => number | null;
   canExport: boolean;
@@ -135,6 +140,7 @@ export default function PanelCxcCelular({
   companyFilter,
   setCompanyFilter,
   onCobrar,
+  onEnviarEstado,
   diasSinPagarDe,
   canExport,
   onDescargar,
@@ -456,9 +462,9 @@ export default function PanelCxcCelular({
       ) : secciones && secciones.atencion.length > 0 ? (
         <>
           {whatsapp && !enBoston && <EstadosPorWhatsApp celular />}
-          <SeccionClientes titulo="Clientes +90 días" clientes={secciones.atencion} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} />
+          <SeccionClientes titulo="Clientes +90 días" clientes={secciones.atencion} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} onEnviarEstado={onEnviarEstado} />
           {secciones.resto.length > 0 && (
-            <SeccionClientes titulo="Otros clientes" clientes={secciones.resto} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} />
+            <SeccionClientes titulo="Otros clientes" clientes={secciones.resto} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} onEnviarEstado={onEnviarEstado} />
           )}
         </>
       ) : (
@@ -516,18 +522,20 @@ function SeccionClientes({
   clientes,
   diasSinPagarDe,
   onCobrar,
+  onEnviarEstado,
 }: {
   titulo: string;
   clientes: ConsolidatedClient[];
   diasSinPagarDe: (client: ConsolidatedClient) => number | null;
   onCobrar: (client: ConsolidatedClient) => void;
+  onEnviarEstado?: (client: ConsolidatedClient) => void;
 }) {
   return (
     <section data-seccion-cxc={titulo}>
       <h2 className={ACCESIBILIDAD_2026_11 ? "px-8 pt-5 pb-1.5 text-sm font-semibold text-gray-600" : "px-8 pt-5 pb-1.5 text-xs font-medium uppercase tracking-wide text-gray-400"}>{titulo}</h2>
       <ul data-lista="cxc-celular" className="mx-4 overflow-hidden rounded-2xl bg-white">
         {clientes.map((c) => (
-          <FilaCliente key={c.nombre_normalized} client={c} dias={diasSinPagarDe(c)} onAbrir={() => onCobrar(c)} />
+          <FilaCliente key={c.nombre_normalized} client={c} dias={diasSinPagarDe(c)} onAbrir={() => onCobrar(c)} onEnviar={onEnviarEstado ? () => onEnviarEstado(c) : undefined} />
         ))}
       </ul>
     </section>
@@ -542,23 +550,45 @@ function FilaCliente({
   client,
   dias,
   onAbrir,
+  onEnviar,
 }: {
   client: ConsolidatedClient;
   dias: number | null;
   onAbrir: () => void;
+  onEnviar?: () => void;
 }) {
   const tramo = tramoDominante(client);
   const urge = loQueUrge(client, dias);
   const rojo = urgeEnRojo(client, dias);
   // Al que tiene saldo a favor no se le cobra: su fila no abre la hoja de cobro.
   const cobrable = seLeCobra(client.total);
+  // 🔴 Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): la tarjeta
+  // con el saldo por empresa, de lo que ya está en pantalla (sin leer nada).
+  const [tarjeta, setTarjeta] = useState(false);
+  const mantener = useMantenerPresionado(() => setTarjeta(true));
 
   return (
     <li className="border-t border-gray-100 first:border-t-0">
+      {tarjeta && (
+        <TarjetaSaldoPorEmpresa
+          client={client}
+          onCerrar={() => setTarjeta(false)}
+          onAbrir={cobrable ? () => { setTarjeta(false); onAbrir(); } : undefined}
+        />
+      )}
+      <SwipeableRow
+        leftAction={
+          GESTOS_IPHONE_2026_11 && cobrable && onEnviar
+            ? { label: "Estado de cuenta", color: "bg-blue-600", onAction: onEnviar }
+            : undefined
+        }
+      >
       <button
         type="button"
-        onClick={onAbrir}
-        disabled={!cobrable}
+        onClick={cobrable ? onAbrir : undefined}
+        {...mantener}
+        disabled={!cobrable && !mantener.onTouchStart}
+        aria-disabled={!cobrable || undefined}
         className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-gray-50 disabled:active:bg-transparent"
       >
         <span
@@ -579,6 +609,33 @@ function FilaCliente({
           {montoExacto(client.total)}
         </span>
       </button>
+      </SwipeableRow>
     </li>
+  );
+}
+
+/** La tarjeta del cliente (mantener presionado): saldo por empresa y el total. */
+function TarjetaSaldoPorEmpresa({
+  client,
+  onCerrar,
+  onAbrir,
+}: {
+  client: ConsolidatedClient;
+  onCerrar: () => void;
+  onAbrir?: () => void;
+}) {
+  const filas = Object.entries(client.companies)
+    .filter(([, c]) => Math.round(c.total ?? 0) !== 0)
+    .sort((a, b) => (b[1].total ?? 0) - (a[1].total ?? 0))
+    .map(([key, c]) => ({ rotulo: EMPRESA_KEY_TO_NAME[key] ?? key, valor: montoExacto(c.total) }));
+  return (
+    <TarjetaResumen
+      titulo={nombreDeCliente(client)}
+      subtitulo="Saldo por empresa"
+      filas={filas}
+      pie={{ rotulo: "Total", valor: montoExacto(client.total) }}
+      onAbrir={onAbrir}
+      onCerrar={onCerrar}
+    />
   );
 }

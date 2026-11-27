@@ -3658,3 +3658,8 @@ Daniel, sobre el mockup «solo el administrador»: solo ÉL debe saber qué lleg
 - «Compartir › Descargar PDF» sigue igual: baja todo lo filtrado.
 
 **Candado:** `src/__tests__/catalogo-seleccionar-para-pdf.test.tsx` (solo los marcados, subtítulo, singular, lo filtrado afuera, sin selección = el de siempre, el público no lo ofrece).
+
+
+## Comprobantes: eliminar al deslizar (27-nov-2026)
+
+En el teléfono, quien administra elimina un comprobante deslizando, con «Deshacer» 5 s y el mismo soft delete. 📄 diseno-y-ux.md › «Gestos del iPhone».

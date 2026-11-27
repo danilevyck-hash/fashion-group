@@ -36,6 +36,7 @@ import { useEffect, useState } from "react";
 import { MOBILIARIO_UN_ENCABEZADO_2026_11 } from "@/lib/ui/celopt-restos-2026-11";
 import { useRouter } from "next/navigation";
 import { SwipeableRow } from "@/components/ui";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { montoCelular, subtituloProductoCelular, subtituloTiendaMobiliarioCelular } from "@/lib/marketing/celular";
 import type { MkInventarioProducto, MkMarca } from "@/lib/marketing/types";
@@ -74,6 +75,8 @@ interface Props {
   esAdmin: boolean;
   onEditar: (p: MkInventarioProducto) => void;
   onBorrar: (p: MkInventarioProducto) => void;
+  /** Deslizar para eliminar: el MISMO borrado, sin la confirmación (lleva «Deshacer»). */
+  onBorrarDeUna?: (p: MkInventarioProducto) => Promise<boolean>;
   onNuevo: () => void;
   onExcel: () => void;
   /** La ficha de la tienda, para que cada renglón del resumen lleve a ella. */
@@ -103,6 +106,7 @@ export default function MobiliarioCelular({
   esAdmin,
   onEditar,
   onBorrar,
+  onBorrarDeUna,
   onNuevo,
   onExcel,
   hrefDeTienda,
@@ -250,6 +254,20 @@ export default function MobiliarioCelular({
             );
             if (!escribe) return <span key={p.id}>{fila}</span>;
             return (
+              GESTOS_IPHONE_2026_11 ? (
+                // Como en el iPhone: a la izquierda «Eliminar» (rojo), a la derecha «Editar».
+                <SwipeableRow
+                  key={p.id}
+                  leftAction={{ label: "Editar", color: "bg-blue-600", onAction: () => onEditar(p) }}
+                  eliminar={
+                    esAdmin && onBorrarDeUna
+                      ? { alEliminar: () => onBorrarDeUna(p), mensaje: "Producto eliminado" }
+                      : undefined
+                  }
+                >
+                  {fila}
+                </SwipeableRow>
+              ) :
               <SwipeableRow
                 key={p.id}
                 rightAction={{ label: "Editar", color: "bg-blue-600", onAction: () => onEditar(p) }}

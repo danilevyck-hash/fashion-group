@@ -39,6 +39,7 @@ import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, HojaMenu } from "@/components/celul
 import { CLIENTES_LISTA_DESPLEGABLES as LISTA_DESPLEGABLES } from "@/lib/ui/revision-110-cxc";
 import { CORREO_ENTERO, FRESCURA_SIN_DESBORDE } from "@/lib/ui/revision-110-ajustes";
 import { Aviso } from "@/components/ui/Aviso";
+import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
 import {
   contarChips,
   contarClientes,
@@ -351,9 +352,11 @@ export default function ClientesListClient({
                 {visibles.map((c) => {
                   const contacto = comoContactarlo(c);
                   return (
-                    <li
+                    <FilaConTarjeta
                       key={c.id}
-                      onClick={() => router.push(`/clientes/${encodeURIComponent(c.codigo)}`)}
+                      c={c}
+                      anio={anio}
+                      onAbrir={() => router.push(`/clientes/${encodeURIComponent(c.codigo)}`)}
                       className="flex items-center gap-3 border-b border-gray-100 px-1 py-2.5 active:bg-gray-50 cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
@@ -385,7 +388,7 @@ export default function ClientesListClient({
                         </div>
                       </div>
                       <span aria-hidden className="shrink-0 text-gray-300">›</span>
-                    </li>
+                    </FilaConTarjeta>
                   );
                 })}
               </ul>
@@ -394,9 +397,11 @@ export default function ClientesListClient({
                 {visibles.map((c) => {
                   const contacto = comoContactarlo(c);
                   return (
-                    <li
+                    <FilaConTarjeta
                       key={c.id}
-                      onClick={() => router.push(`/clientes/${encodeURIComponent(c.codigo)}`)}
+                      c={c}
+                      anio={anio}
+                      onAbrir={() => router.push(`/clientes/${encodeURIComponent(c.codigo)}`)}
                       className="border-b border-gray-100 px-1 py-3 active:bg-gray-50 cursor-pointer"
                     >
                       <div className="flex items-baseline justify-between gap-2">
@@ -421,7 +426,7 @@ export default function ClientesListClient({
                       <div className="mt-1 text-xs">
                         <Contacto c={contacto} nombre={c.nombre} tocable />
                       </div>
-                    </li>
+                    </FilaConTarjeta>
                   );
                 })}
               </ul>
@@ -436,6 +441,50 @@ export default function ClientesListClient({
         </main>
       </PullToRefresh>
     </div>
+  );
+}
+
+/**
+ * El renglón del celular. 🔴 Mantener presionado (27-nov-2026,
+ * `GESTOS_IPHONE_2026_11`): la tarjeta con el saldo y lo comprado en el año,
+ * de lo que ya trae la fila (sin leer nada). Última compra y último pago no
+ * viajan en la lista: no se ponen.
+ */
+function FilaConTarjeta({
+  c,
+  anio,
+  onAbrir,
+  className,
+  children,
+}: {
+  c: Cliente & { compras?: number };
+  anio: number;
+  onAbrir: () => void;
+  className: string;
+  children: React.ReactNode;
+}) {
+  const [tarjeta, setTarjeta] = useState(false);
+  const mantener = useMantenerPresionado(() => setTarjeta(true));
+  const filas = [
+    { rotulo: "Saldo", valor: c.debe === 0 ? "Sin saldo" : c.debe < 0 ? `Saldo a favor ${dinero(Math.abs(c.debe))}` : dinero(c.debe) },
+    ...(c.compras === undefined ? [] : [{ rotulo: `Compras ${anio}`, valor: dinero(c.compras) }]),
+  ];
+  return (
+    <>
+      {/* Fuera del <li>: el portal burbujea sus toques por el árbol de React. */}
+      {tarjeta && (
+        <TarjetaResumen
+          titulo={c.nombre}
+          subtitulo={c.codigo}
+          filas={filas}
+          onAbrir={() => { setTarjeta(false); onAbrir(); }}
+          onCerrar={() => setTarjeta(false)}
+        />
+      )}
+      <li onClick={onAbrir} {...mantener} className={className}>
+        {children}
+      </li>
+    </>
   );
 }
 

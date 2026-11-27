@@ -6,6 +6,7 @@ import { ASIS_PENDIENTES_CON_UNIDAD_R110, colaColaboradores } from "@/lib/ui/rev
 import { Aviso } from "@/components/ui/Aviso";
 import { APROBAR_LOTE_CON_DESHACER, avisoLoteAprobado, rotuloLoteConCuantos } from "@/lib/ui/uso-2026-11";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import { capitalizarNombre } from "@/lib/nombre-en-pantalla";
 import UndoToast from "@/components/UndoToast";
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -356,6 +357,23 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
       execute: async () => { loteEnEspera.current = false; await decidir(items, "si", previo); },
     });
   }, [decidir, pendientes, porDecidirVistas.length, minutosVistos, scheduleAction]);
+  // 🔴 Deslizar en el celular (27-nov-2026, `GESTOS_IPHONE_2026_11`): Sí o No
+  // a lo pendiente de UNA persona, con «Deshacer» 5 s; el POST es el MISMO
+  // (`decidir`) y al aprobar manda el servidor.
+  const decidirConDeshacer = useCallback((items: ToqueAprobacion[], decision: Decision, etiqueta: string) => {
+    if (items.length === 0) return;
+    let previo: ReadonlyMap<string, Decision> = new Map();
+    scheduleAction({
+      id: `deslizar-${Date.now()}`,
+      message: `${decision === "si" ? "Aprobado" : "No aprobado"} · ${capitalizarNombre(etiqueta)}`,
+      onOptimistic: () => {
+        loteEnEspera.current = true;
+        setDias((d) => { previo = previoDe(d ?? [], items); return aplicarAprobacionLocal(d ?? [], items, decision); });
+      },
+      onRevert: () => { loteEnEspera.current = false; setDias((d) => revertirAprobacionLocal(d ?? [], previo)); },
+      execute: async () => { loteEnEspera.current = false; await decidir(items, decision, previo); },
+    });
+  }, [decidir, scheduleAction]);
   // 🔴 filtro-7 (revisión 110, aprobado 14-nov-2026): «Buscar colaborador» y
   // «Todas las empresas ▾» en UNA línea, arriba del período.
   const capsulaEmpresa = FILTRO_7_ASISTENCIA_APROBACIONES && opcionesEmpresa && opcionesEmpresa.length > 1 && onEmpresa ? (
@@ -588,6 +606,7 @@ export default function AprobacionesTab({ empresa = "", opcionesEmpresa, onEmpre
           <PorColaborador
             personas={porDecidirVistas}
             onDecidir={decidir}
+            onDecidirConDeshacer={decidirConDeshacer}
             enVuelo={enVuelo}
             bloqueado={bloqueado}
             abiertos={abiertos}

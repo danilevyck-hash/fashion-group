@@ -348,11 +348,11 @@ html[data-r110-ajustes] input[type="search"]:placeholder-shown::-webkit-search-c
   .swipeable-row {
     overflow: visible !important;
   }
-  .swipeable-row > div:last-child {
+  .swipeable-row > [data-contenido-deslizar] {
     transform: none !important;
     transition: none !important;
   }
-  .swipeable-row > div:not(:last-child) {
+  .swipeable-row > :not([data-contenido-deslizar]) {
     display: none !important;
   }
 }
@@ -621,4 +621,12 @@ html[data-a11y] :is(.text-\[9px\], .text-\[9\.5px\], .text-\[10px\], .text-\[10\
 html[data-deslizar],
 html[data-deslizar] body {
   overscroll-behavior-y: none;
+}
+
+/* La ruedita del iPhone (27-nov-2026): gira a pasos de 45°, como la de iOS. */
+@keyframes fg-ruedita-gira {
+  to { transform: rotate(360deg); }
+}
+.fg-ruedita-gira {
+  animation: fg-ruedita-gira 0.8s steps(8) infinite;
 }

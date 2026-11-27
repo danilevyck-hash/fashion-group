@@ -13,6 +13,7 @@ vi.mock("@/components/shared/syncNowClient", () => ({ syncConEnganche: (o: unkno
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { PullToRefresh } from "@/components/ui";
+import DeslizarParaActualizar from "@/components/shared/DeslizarParaActualizar";
 import {
   accionDelGesto,
   distanciaConResistencia,
@@ -112,5 +113,54 @@ describe("deslizar para actualizar", () => {
   it("el gesto está montado una vez en el layout", () => {
     const layout = readFileSync(join(process.cwd(), "src/app/layout.tsx"), "utf8");
     expect(layout).toContain("<DeslizarParaActualizar />");
+  });
+
+  // 🩸 27-nov-2026: en el iPhone no hacía nada. La hoja «Tu cuenta» del avatar
+  // vive SIEMPRE montada con `aria-modal="true"` (cerrada, `aria-hidden`), y el
+  // gesto la tomaba por una hoja abierta: se apagaba en TODAS las pantallas.
+  function jalar(dy: number) {
+    fireEvent.touchStart(document.body, { touches: [{ clientX: 100, clientY: 100 }] });
+    for (let y = 10; y <= dy; y += 10) {
+      fireEvent.touchMove(document.body, { touches: [{ clientX: 100, clientY: 100 + y }] });
+    }
+    fireEvent.touchEnd(document.body, { touches: [] });
+  }
+
+  it("una hoja CERRADA (como «Tu cuenta») no apaga el gesto", async () => {
+    const recarga = vi.fn().mockResolvedValue(undefined);
+    render(
+      <>
+        <div role="dialog" aria-modal="true" aria-hidden="true" className="hidden" />
+        <PullToRefresh onRefresh={recarga}><p>lista</p></PullToRefresh>
+        <DeslizarParaActualizar />
+      </>,
+    );
+    await act(async () => jalar(300));
+    await waitFor(() => expect(recarga).toHaveBeenCalledTimes(1));
+  });
+
+  it("con una hoja ABIERTA el gesto no hace nada", async () => {
+    const recarga = vi.fn().mockResolvedValue(undefined);
+    render(
+      <>
+        <div role="dialog" aria-modal="true" />
+        <PullToRefresh onRefresh={recarga}><p>lista</p></PullToRefresh>
+        <DeslizarParaActualizar />
+      </>,
+    );
+    await act(async () => jalar(300));
+    expect(recarga).not.toHaveBeenCalled();
+  });
+
+  it("un jalón corto (bajo el umbral) no actualiza", async () => {
+    const recarga = vi.fn().mockResolvedValue(undefined);
+    render(
+      <>
+        <PullToRefresh onRefresh={recarga}><p>lista</p></PullToRefresh>
+        <DeslizarParaActualizar />
+      </>,
+    );
+    await act(async () => jalar(60));
+    expect(recarga).not.toHaveBeenCalled();
   });
 });

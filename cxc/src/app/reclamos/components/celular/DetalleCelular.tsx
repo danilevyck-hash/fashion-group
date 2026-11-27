@@ -74,6 +74,8 @@ interface Props {
   onVolverAPorCobrar: () => void;
   /** Cobra: la MISMA firma del modal de la computadora. */
   onCobrar: (filas: FilaDeCobro[], comprobante: File | null) => void;
+  /** Abrir ya con la hoja de «Cobrar» (deslizar a la derecha en la lista). Solo ABRE. */
+  abrirCobro?: boolean;
   cobrando: boolean;
   onUploadFoto: (files: File[]) => void;
   uploadingFoto?: boolean;
@@ -88,11 +90,13 @@ interface Props {
 export default function DetalleCelular({
   current, role, contacto, nota, setNota,
   onStartEdit, onDeleteReclamo, onAddNota, onVolverAPorCobrar,
-  onCobrar, cobrando, onUploadFoto, uploadingFoto, onDeleteFoto, onReload,
+  onCobrar, abrirCobro = false, cobrando, onUploadFoto, uploadingFoto, onDeleteFoto, onReload,
   toast, showToast,
   apple = RECLAMOS_APPLE_2026_10,
 }: Props) {
-  const [hoja, setHoja] = useState<"mas" | "cobrar" | "correo" | "fotos" | "seguimiento" | null>(null);
+  const [hoja, setHoja] = useState<"mas" | "cobrar" | "correo" | "fotos" | "seguimiento" | null>(
+    abrirCobro && esPendiente(current) ? "cobrar" : null,
+  );
   const [verTodos, setVerTodos] = useState(false);
   const [verFacturas, setVerFacturas] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);

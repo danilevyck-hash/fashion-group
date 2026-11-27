@@ -21,6 +21,7 @@ import AvisosAlEntrar from "@/components/AvisosAlEntrar";
 import RegistroDeVisitas from "@/components/RegistroDeVisitas";
 import PantallaAnterior from "@/components/PantallaAnterior";
 import DeslizarParaActualizar from "@/components/shared/DeslizarParaActualizar";
+import { SubirAlInicio, VolverDesdeElBorde } from "@/components/shared/GestosIphone";
 import SWRProvider from "@/components/SWRProvider";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import PageTransition from "@/components/PageTransition";
@@ -100,6 +101,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <RegistroDeVisitas />
             <PantallaAnterior />
             <DeslizarParaActualizar />
+            <VolverDesdeElBorde />
+            <SubirAlInicio />
           </OnlineProvider>
         </SWRProvider>
         </SemillaSesionProvider>

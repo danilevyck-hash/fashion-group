@@ -34,6 +34,7 @@ import { cedulaParaMostrar } from "@/lib/guias/cedula";
 import { CHIP_SOLO_PENDIENTES, urlSinPendientes } from "@/lib/guias/filtro-pendientes";
 import { planParaLlegar } from "@/lib/guias/llegar-a-la-guia";
 import { Aviso } from "@/components/ui/Aviso";
+import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
 import { GUIAS_LISTA_APPLE_2026_10, enElPeriodo, resumenDeGuias, type PeriodoGuias } from "@/lib/guias/lista-apple-2026-10";
 import { GUIAS_GRUPOS_FECHA_2026_10 } from "@/lib/guias/grupos-fecha-2026-10";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -232,6 +233,12 @@ export default function GuiasList({
   // estado de la guía: una guía Completada sigue estando cerrada a edición y
   // esto no la edita — ver `api/guias/[id]/cliente/route.ts`.
   const puedeAtarCliente = Boolean(onAtarCliente) && !readOnly && DESPACHO_ROLES.includes(role || "");
+  // 🔴 Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): la tarjeta
+  // con facturas, bultos y transportista, de lo que ya trae la lista. Un solo
+  // gancho para la lista: la guía tocada se anota al apoyar el dedo.
+  const [tarjetaGuia, setTarjetaGuia] = useState<Guia | null>(null);
+  const guiaTocada = useRef<Guia | null>(null);
+  const mantener = useMantenerPresionado(() => setTarjetaGuia(guiaTocada.current));
 
   /**
    * El nombre que va a dibujar el chip de esta línea, o `""` si no va a dibujar
@@ -549,6 +556,23 @@ export default function GuiasList({
 
   return (
     <div>
+      {tarjetaGuia && (
+        <TarjetaResumen
+          titulo={clientesSummary(tarjetaGuia.guia_items || []) || "Sin cliente"}
+          subtitulo={`${fmtGuia(tarjetaGuia.numero)} · ${fmtDate(tarjetaGuia.fecha)}`}
+          filas={[
+            { rotulo: "Facturas", valor: (tarjetaGuia.guia_items || []).map((i) => facturasParaMostrar(i.facturas)).filter(Boolean).join(", ") },
+            { rotulo: "Bultos", valor: String(tarjetaGuia.total_bultos ?? "") },
+            { rotulo: "Transportista", valor: tarjetaGuia.transportista || "" },
+          ].filter((f) => f.valor)}
+          onAbrir={() => {
+            const g = tarjetaGuia;
+            setTarjetaGuia(null);
+            if (apple) onDespachar(g.id); else abrirFila(g.id);
+          }}
+          onCerrar={() => setTarjetaGuia(null)}
+        />
+      )}
       <div className={`max-w-6xl mx-auto px-4 sm:px-6 ${barra ? "pb-6 pt-3" : "py-6"}`}>
         {/* Sin título grande: "Guías de Despacho" ya lo dicen la barra sticky
             (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar
@@ -860,6 +884,8 @@ export default function GuiasList({
                           <div className="flex items-stretch">
                           <button
                             onClick={() => selectionMode ? toggleSelect(g.id) : apple ? onDespachar(g.id) /* la página de la guía */ : abrirFila(g.id)}
+                            {...(selectionMode ? {} : mantener)}
+                            onTouchStart={!selectionMode && mantener.onTouchStart ? (e) => { guiaTocada.current = g; mantener.onTouchStart!(e); } : undefined}
                             className="flex-1 min-w-0 text-left text-sm min-h-[44px]"
                           >
                             {/* ── Fila de escritorio (lg+) ─────────────────
