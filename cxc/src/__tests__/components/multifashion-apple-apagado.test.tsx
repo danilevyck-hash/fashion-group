@@ -29,6 +29,12 @@ vi.mock("@/lib/multifashion/apple", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/multifashion/apple")>()),
   MULTIFASHION_APPLE_2026_10: false,
 }));
+// La tarjeta mes a mes de Vendedoras (27-nov-2026) va detrás de SU interruptor:
+// apagado, la pantalla es la de siempre.
+vi.mock("@/lib/ui/gestos-iphone-2026-11", async (orig) => ({
+  ...(await orig<typeof import("@/lib/ui/gestos-iphone-2026-11")>()),
+  GESTOS_IPHONE_2026_11: false,
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => "/multifashion",

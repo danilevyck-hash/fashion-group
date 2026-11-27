@@ -26,6 +26,12 @@ vi.mock("@/lib/ui/revision-110-cxc", async (orig) => ({
   REFERENCIA_AGOTADO: false,
   REFERENCIA_RECEPCIONES_DOS_LINEAS: false,
 }));
+// La tarjeta mes a mes del celular (27-nov-2026) va detrás de SU interruptor:
+// apagado, la pantalla es la de siempre.
+vi.mock("@/lib/ui/gestos-iphone-2026-11", async (orig) => ({
+  ...(await orig<typeof import("@/lib/ui/gestos-iphone-2026-11")>()),
+  GESTOS_IPHONE_2026_11: false,
+}));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/referencia",
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),

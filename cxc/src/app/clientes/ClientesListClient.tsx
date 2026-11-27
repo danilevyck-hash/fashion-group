@@ -39,7 +39,10 @@ import { CLASE_BOTON_TEXTO, CLASE_FILA_MENU, HojaMenu } from "@/components/celul
 import { CLIENTES_LISTA_DESPLEGABLES as LISTA_DESPLEGABLES } from "@/lib/ui/revision-110-cxc";
 import { CORREO_ENTERO, FRESCURA_SIN_DESBORDE } from "@/lib/ui/revision-110-ajustes";
 import { Aviso } from "@/components/ui/Aviso";
-import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
+import { useMantenerPresionado } from "@/components/shared/GestosIphone";
+import { ERROR_TARJETA, TarjetaMesAMes, useLecturaDeTarjeta } from "@/components/shared/TarjetaMesAMes";
+import { tieneCodigoDeCliente } from "@/lib/ventas/celular";
+import { delClienteEnLaFila, mesEnCursoDelCorte, notaDelMesEnCurso, type AnualDelCliente } from "@/lib/ventas/mes-a-mes";
 import {
   contarChips,
   contarClientes,
@@ -446,9 +449,9 @@ export default function ClientesListClient({
 
 /**
  * El renglón del celular. 🔴 Mantener presionado (27-nov-2026,
- * `GESTOS_IPHONE_2026_11`): la tarjeta con el saldo y lo comprado en el año,
- * de lo que ya trae la fila (sin leer nada). Última compra y último pago no
- * viajan en la lista: no se ponen.
+ * `GESTOS_IPHONE_2026_11`): la MISMA tarjeta mes a mes de Ventas › Clientes —lo
+ * comprado en las 6 empresas del grupo mes a mes contra el mismo mes del año
+ * pasado (mismos días), de la MISMA ruta—, con el saldo arriba.
  */
 function FilaConTarjeta({
   c,
@@ -463,22 +466,32 @@ function FilaConTarjeta({
   className: string;
   children: React.ReactNode;
 }) {
-  const [tarjeta, setTarjeta] = useState(false);
-  const mantener = useMantenerPresionado(() => setTarjeta(true));
-  const filas = [
-    { rotulo: "Saldo", valor: c.debe === 0 ? "Sin saldo" : c.debe < 0 ? `Saldo a favor ${dinero(Math.abs(c.debe))}` : dinero(c.debe) },
-    ...(c.compras === undefined ? [] : [{ rotulo: `Compras ${anio}`, valor: dinero(c.compras) }]),
-  ];
+  const lectura = useLecturaDeTarjeta<Cliente, AnualDelCliente>((x) =>
+    tieneCodigoDeCliente(x.codigo) ? `/api/clientes/${encodeURIComponent(x.codigo)}/por-empresa-anual?year=${anio}` : null,
+  );
+  const mantener = useMantenerPresionado(() => lectura.abrir(c));
+  const t = lectura.tarjeta;
+  const datos = t?.estado.status === "listo" ? t.estado.datos : null;
+  const d = datos ? delClienteEnLaFila(datos, { empresaKey: "", empresas_count: Infinity }) : null;
+  const saldo = c.debe === 0 ? "Sin saldo" : c.debe < 0 ? `Saldo a favor ${dinero(Math.abs(c.debe))}` : `Saldo ${dinero(c.debe)}`;
+  const enCurso = datos ? notaDelMesEnCurso(anio, datos.corte) : null;
   return (
     <>
       {/* Fuera del <li>: el portal burbujea sus toques por el árbol de React. */}
-      {tarjeta && (
-        <TarjetaResumen
+      {t && (
+        <TarjetaMesAMes
           titulo={c.nombre}
-          subtitulo={c.codigo}
-          filas={filas}
-          onAbrir={() => { setTarjeta(false); onAbrir(); }}
-          onCerrar={() => setTarjeta(false)}
+          subtitulo={`${c.codigo} · ${saldo}`}
+          anio={anio}
+          meses={d?.meses ?? []}
+          total={d ? { actual: d.actual, previo: d.previo } : null}
+          rotuloTotal={`Compras ${anio}`}
+          mesEnCurso={datos ? mesEnCursoDelCorte(anio, datos.corte) : null}
+          nota={`Las 6 empresas del grupo.${enCurso ? ` ${enCurso}` : ""}`}
+          cargando={t.estado.status === "cargando"}
+          error={t.estado.status === "error" ? ERROR_TARJETA : null}
+          onAbrir={() => { lectura.cerrar(); onAbrir(); }}
+          onCerrar={lectura.cerrar}
         />
       )}
       <li onClick={onAbrir} {...mantener} className={className}>

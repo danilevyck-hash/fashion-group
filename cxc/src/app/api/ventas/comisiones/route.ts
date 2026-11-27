@@ -94,6 +94,20 @@ export async function GET(req: NextRequest) {
   }
 
   const data = porMes[porMes.length - 1].data!;
+  const neteados = porMes.map((r, i) =>
+    netearComisiones(r.data!.vendedores, totalPorVendedor(descuentosPorMes[i] ?? [], empresa)),
+  );
+  // 🔴 `?porMes=1` (27-nov-2026, la tarjeta «mes a mes» de mantener presionado):
+  // la comisión de CADA mes, ya neteada, de las MISMAS filas que suman el año.
+  const porMesResp =
+    sp.get("porMes") === "1"
+      ? {
+          por_mes: meses.map((m, i) => ({
+            mes: m,
+            vendedores: neteados[i].map((v) => ({ vendedor: v.vendedor, comision_total: v.comision_total })),
+          })),
+        }
+      : {};
   // `se_paga` se marca ACÁ, después de netear, y la pantalla solo lo lee:
   // DEFAULT y Daniel se calculan y se muestran, pero no entran al total a
   // pagar («no me autopago»). Ver lib/comisiones/sin-pago.
@@ -103,14 +117,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ...data,
     mes,
+    ...porMesResp,
     ...(descuentosPorMes.some((d) => d === null) ? { descuentos_no_leidos: true } : {}),
     vendedores: adjuntarClientesSinComision(
       marcarSePaga(
-        acumularVendedores(
-          porMes.map((r, i) =>
-            netearComisiones(r.data!.vendedores, totalPorVendedor(descuentosPorMes[i] ?? [], empresa)),
-          ),
-        ),
+        acumularVendedores(neteados),
       ),
       exclusiones,
       empresa,

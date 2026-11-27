@@ -24,8 +24,11 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useMantenerPresionado } from "@/components/shared/GestosIphone";
-import { TarjetaMesAMes } from "./TarjetaMesAMes";
-import { mesesDeSeries } from "@/lib/ventas/mes-a-mes";
+import { AvisoMesAMes, TarjetaMesAMes } from "@/components/shared/TarjetaMesAMes";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
+import { mesEnCursoDelCorte, mesesDeSeries, notaDelMesEnCurso, urlClientesDelMes } from "@/lib/ventas/mes-a-mes";
+import { useRouter } from "next/navigation";
+import { B2B_EMPRESA_KEYS, VENTAS_ID_TO_EMPRESA_KEY } from "@/lib/empresa-mapping";
 import type { VentasResumen, EmpresaMonthlySales } from "../types";
 import { MONTHS, fmtMoney, fmtPorcentaje } from "@/lib/ventas/format";
 import { variacionPct } from "@/lib/variacion";
@@ -379,6 +382,7 @@ function ResumenCelularPorPeriodo({
   // 🔴 Mantener presionada una empresa (27-nov-2026, `GESTOS_IPHONE_2026_11`):
   // su venta mes a mes del año, de las MISMAS series que esta tabla (sin leer
   // nada). Meses futuros no; el mes en curso ya va contra los mismos días.
+  const router = useRouter();
   const [tarjeta, setTarjeta] = useState<EmpresaMonthlySales | null>(null);
   const tocada = useRef<EmpresaMonthlySales | null>(null);
   const mantener = useMantenerPresionado(() => setTarjeta(tocada.current));
@@ -387,13 +391,25 @@ function ResumenCelularPorPeriodo({
   const th = "py-1.5 text-[9.5px] font-semibold uppercase tracking-wide text-gray-500";
   return (
     <PantallaVentas>
+      {GESTOS_IPHONE_2026_11 && <AvisoMesAMes />}
       {tarjeta && (
         <TarjetaMesAMes
           titulo={nombreEmpresaEnPantalla(tarjeta.empresa.id, tarjeta.empresa.nombre)}
+          subtitulo={`Ventas ${selectedYear} · vs ${anioPrevio}`}
           anio={selectedYear}
           meses={mesesDeSeries(tarjeta.ventas2026, tarjeta.ventas2025, hastaMes)}
           total={{ actual: delPeriodo(tarjeta.ventas2026, 0), previo: delPeriodo(tarjeta.ventas2025, 0) }}
-          corte={isClosedYear ? null : data.fecha_corte}
+          mesEnCurso={isClosedYear ? null : mesEnCursoDelCorte(selectedYear, data.fecha_corte)}
+          nota={isClosedYear ? null : notaDelMesEnCurso(selectedYear, data.fecha_corte)}
+          onTocarMes={
+            VENTAS_ID_TO_EMPRESA_KEY[tarjeta.empresa.id] && B2B_EMPRESA_KEYS.includes(VENTAS_ID_TO_EMPRESA_KEY[tarjeta.empresa.id] as never)
+              ? (m) => {
+                  const key = VENTAS_ID_TO_EMPRESA_KEY[tarjeta.empresa.id];
+                  setTarjeta(null);
+                  router.push(urlClientesDelMes(selectedYear, m, key, isClosedYear ? null : data.fecha_corte));
+                }
+              : undefined
+          }
           onAbrir={() => { const id = tarjeta.empresa.id; setTarjeta(null); onOpenEmpresa(id); }}
           onCerrar={() => setTarjeta(null)}
         />

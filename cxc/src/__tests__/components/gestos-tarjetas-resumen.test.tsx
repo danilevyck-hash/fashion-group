@@ -16,10 +16,8 @@ function trozo(src: string, desde: string, hasta: string): string {
 }
 
 const PANTALLAS = [
-  { nombre: "Clientes", archivo: "app/clientes/ClientesListClient.tsx", desde: "function FilaConTarjeta", hasta: "\nfunction " },
   { nombre: "Despachos › Guías", archivo: "app/despachos/components/GuiasList.tsx", desde: "{tarjetaGuia && (", hasta: "onCerrar=" },
   { nombre: "Proveedores", archivo: "app/proveedores/ProveedoresListClient.tsx", desde: "function TarjetaTramos", hasta: "\nfunction " },
-  { nombre: "Comisiones", archivo: "components/comisiones/ComisionesTarjetas.tsx", desde: "function FilasPorEmpresaV2", hasta: "\nfunction " },
 ];
 
 describe("mantener presionado: tarjeta de resumen en las listas del celular", () => {
@@ -54,5 +52,30 @@ describe("mantener presionado: tarjeta de resumen en las listas del celular", ()
 
   it("Despachos › Guías: sin SwipeableRow", () => {
     expect(leer("app/despachos/components/GuiasList.tsx")).not.toContain("SwipeableRow");
+  });
+
+  // 🔴 27-nov-2026: UNA sola tarjeta «mes a mes» para todas las pantallas, y
+  // cada una lee SOLO su ruta de siempre.
+  const MES_A_MES = [
+    { archivo: "components/ventas/celular/ResumenCelular.tsx", lee: [] as string[] },
+    { archivo: "components/ventas/celular/ClientesCelular.tsx", lee: ["/api/clientes/"] },
+    { archivo: "app/clientes/ClientesListClient.tsx", lee: ["/api/clientes/${encodeURIComponent(x.codigo)}/por-empresa-anual"] },
+    { archivo: "components/multifashion/celular/VendedorasCelular.tsx", lee: ["/api/multifashion/vendedoras?mesAMes=1"] },
+    { archivo: "components/comisiones/ComisionesTarjetas.tsx", lee: ["/api/ventas/comisiones?empresa="] },
+    { archivo: "components/referencia/ReferenciaModelo.tsx", lee: [] },
+  ];
+  for (const p of MES_A_MES) {
+    it(`mes a mes · ${p.archivo}: la tarjeta compartida`, () => {
+      const src = leer(p.archivo);
+      expect(src).toContain("<TarjetaMesAMes");
+      expect(src).toContain('from "@/components/shared/TarjetaMesAMes"');
+      for (const ruta of p.lee) expect(src).toContain(ruta);
+    });
+  }
+
+  it("Comisiones: la tarjeta mes a mes NO está en «Todas las empresas»", () => {
+    const src = leer("components/comisiones/ComisionesTarjetas.tsx");
+    expect(trozo(src, "function FilasConsolidadoV2", "\nfunction ")).not.toContain("TarjetaMesAMes");
+    expect(trozo(src, "function FilasPorEmpresaV2", "\nfunction ")).toContain("cambio={null}");
   });
 });

@@ -16,7 +16,11 @@
 // (±5 %) que la tabla de computadora. Acá no se calcula nada.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { useMantenerPresionado } from "@/components/shared/GestosIphone";
+import { ERROR_TARJETA, TarjetaMesAMes, useLecturaDeTarjeta } from "@/components/shared/TarjetaMesAMes";
+import { cambioDeVendedora, type VendedoraMesAMes } from "@/lib/multifashion/vendedora-mes-a-mes";
+import { mesEnCursoDelCorte, notaDelMesEnCurso, type CambioDelMes } from "@/lib/ventas/mes-a-mes";
 import useSWR from "swr";
 import { cn } from "@/lib/utils";
 import type { BonosMultifashion, VendedoraDetalle } from "@/components/ventas/types";
@@ -63,10 +67,33 @@ interface Props {
   deltas?: Map<string, DeltaAnioPasado>;
 }
 
+/** El % de la tarjeta con el MISMO color de la fila (`TONO_CLASE`). */
+function cambioEnPantalla(actual: number, previo: number | null | undefined): CambioDelMes {
+  const c = cambioDeVendedora(actual, previo);
+  return { ...c, clase: TONO_CLASE[c.tono === "up" ? "sube" : c.tono === "dn" ? "baja" : "neutro"] };
+}
+
+/** «Nueva» = no vendió ese mes de 2025 · «—» = base menor a $100 · y el mes en curso. */
+function notaDeVendedora(anio: number, corte: string | null): string {
+  const base = `«Nueva» = no vendió ese mes de ${anio - 1} · «—» = base menor a $100.`;
+  const enCurso = notaDelMesEnCurso(anio, corte);
+  return enCurso ? `${base} ${enCurso}` : base;
+}
+
 export function VendedorasCelular({
   vendedoras, ventasTotal, tiquetesTotal, rotuloDelta, anio, parcial, metaAbierta, onAbrirMeta, conMetas, bonos = null, pieBono = null, totalPersona = null, pie = null, deltas,
 }: Props) {
   const [abierta, setAbierta] = useState<string | null>(null);
+  // 🔴 Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): la venta de
+  // la vendedora MES A MES del año contra el mismo mes del año pasado, de la
+  // MISMA vista y por su nombre EXACTO (`lib/multifashion/vendedora-mes-a-mes.ts`).
+  const tocada = useRef<string | null>(null);
+  const lectura = useLecturaDeTarjeta<string, VendedoraMesAMes>(
+    (nombre) => `/api/multifashion/vendedoras?mesAMes=1&year=${anio}&vendedora=${encodeURIComponent(nombre)}`,
+  );
+  const mantener = useMantenerPresionado(() => { if (tocada.current) lectura.abrir(tocada.current); });
+  const t = lectura.tarjeta;
+  const datos = t?.estado.status === "listo" ? t.estado.datos : null;
 
   // La MISMA clave que `MetasSubtab`: SWR la comparte y no hay una segunda
   // petición. Sin metas instaladas, `metas` viene vacío y no se dibuja nada.
@@ -83,6 +110,21 @@ export function VendedorasCelular({
 
   return (
     <section data-celular="vendedoras" className="pb-4">
+      {t && (
+        <TarjetaMesAMes
+          titulo={nombreEnPantalla(t.item)}
+          subtitulo={`Ventas ${anio} · vs ${anio - 1}`}
+          anio={anio}
+          meses={datos?.meses ?? []}
+          total={datos ? datos.total : null}
+          cambio={cambioEnPantalla}
+          mesEnCurso={datos ? mesEnCursoDelCorte(anio, datos.corte) : null}
+          nota={datos ? notaDeVendedora(anio, datos.corte) : null}
+          cargando={t.estado.status === "cargando"}
+          error={t.estado.status === "error" ? ERROR_TARJETA : null}
+          onCerrar={lectura.cerrar}
+        />
+      )}
       <ul data-celular="vendedoras-lista" className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         {vendedoras.map((v) => {
           const delta = deltaCorto(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
@@ -95,6 +137,8 @@ export function VendedorasCelular({
                 data-vendedora={v.nombre}
                 aria-expanded={estaAbierta}
                 onClick={() => setAbierta(estaAbierta ? null : v.nombre)}
+                {...mantener}
+                onTouchStart={mantener.onTouchStart ? (e) => { tocada.current = v.nombre; mantener.onTouchStart!(e); } : undefined}
                 className="flex min-h-[60px] w-full items-center gap-3 px-4 py-3 text-left transition active:bg-gray-50"
               >
                 <span className="min-w-0 flex-1">

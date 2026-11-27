@@ -139,3 +139,5 @@ Daniel: *«Deslice hacia abajo y no hace nada. Como apple quiero. En lugares de 
 **Tocar el encabezado** sube suave al principio, también en pantallas con scroll propio.
 
 Candados: `gestos-iphone.test.tsx` y `gestos-tarjetas-resumen.test.tsx`.
+
+- **Tarjeta mes a mes, UNA sola** (27-nov-2026): `components/shared/TarjetaMesAMes.tsx` la usan Ventas (Resumen y Clientes), Clientes, Multifashion › Vendedoras, Comisiones (por empresa) y Consulta de artículos; aviso único «Mantén presionado para ver mes a mes» (`fg_aviso_mes_a_mes`). Detalle en [ventas-referencia.md](ventas-referencia.md) › «La segunda tanda».
