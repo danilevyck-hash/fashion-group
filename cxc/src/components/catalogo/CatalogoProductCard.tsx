@@ -17,6 +17,7 @@ import { supabaseThumb, estadoAlMontar } from "@/lib/image-thumb";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 import VisorFoto from "./VisorFoto";
 import { TECLADO_ENTERO } from "@/lib/ui/iphone-2026-11";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 interface CatalogoProductCardProps {
   marca: MarcaUiKey;
@@ -371,7 +372,7 @@ export default function CatalogoProductCard({
       {/* Qty input modal */}
       {showQtyInput && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]" onClick={() => setShowQtyInput(false)}>
-          <div className="bg-white rounded-xl p-5 w-56 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className={`bg-white rounded-xl p-5 w-56 shadow-2xl ${cabe(PANEL_CABE, "")}`} onClick={e => e.stopPropagation()}>
             <p className="text-sm text-gray-600 mb-3">Cantidad de bultos</p>
             <input {...TECLADO_ENTERO}
               type="number" min={0} autoFocus value={qtyInputVal}

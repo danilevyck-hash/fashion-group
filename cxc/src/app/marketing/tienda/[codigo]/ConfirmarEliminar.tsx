@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { useState } from "react";
+import { PANEL_CABE, cabe } from "@/lib/ui/modal-cabe-2026-11";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { PALABRA_PARA_ANULAR, confirmaEliminar } from "@/lib/marketing/periodo-manda";
 
@@ -56,7 +57,7 @@ export default function ConfirmarEliminar({
       <div className="absolute inset-0 bg-black/40" {...dismiss.backdrop} />
       <div
         ref={dismiss.panelRef}
-        className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
+        className={`relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE, "")}`}
         onClick={(e) => e.stopPropagation()}
         data-fg-confirmar-eliminar
       >

@@ -111,3 +111,16 @@ export function columnasQueVinieron(body: unknown): DelGastoEnElCuerpo {
 export function traeAlgoDelGasto(cols: DelGastoEnElCuerpo): boolean {
   return Object.keys(cols).length > 0;
 }
+
+/**
+ * 🩸 EDITAR NUNCA CAMBIA LO QUE NO SE TOCÓ (27-nov-2026). Daniel editó solo la
+ * marca y el % y la tienda quedó vacía: la ficha había abierto sin ella y el
+ * guardado mandó `tiendaCodigo: null`. Al EDITAR viaja solo lo que cambió
+ * contra lo que la ficha abrió (`antes`); sin `antes` (crear), todo.
+ */
+export function soloLoQueCambio<T extends object>(ahora: T, antes: T | null): Partial<T> {
+  if (!antes) return ahora;
+  const out: Partial<T> = {};
+  for (const k of Object.keys(ahora) as Array<keyof T>) if (ahora[k] !== antes[k]) out[k] = ahora[k];
+  return out;
+}

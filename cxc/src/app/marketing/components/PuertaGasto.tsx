@@ -36,6 +36,7 @@
 // ============================================================================
 
 import { useSoloCobrable } from "@/lib/marketing/solo-cobrable-contexto";
+import { CABECERA_FIJA, PANEL_CABE, PIE_FIJO, cabe, MODAL_CABE_2026_11 } from "@/lib/ui/modal-cabe-2026-11";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ToastSystem";
@@ -566,9 +567,9 @@ export default function PuertaGasto({
       <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
       <div
         ref={panelRef}
-        className="relative bg-white w-full sm:max-w-2xl rounded-lg max-h-[90vh] overflow-y-auto border border-gray-200"
+        className={`relative bg-white w-full sm:max-w-2xl rounded-lg border border-gray-200 ${cabe(PANEL_CABE, "max-h-[90vh] overflow-y-auto")}`}
       >
-        <div className="border-b border-gray-100 pl-5 pr-2 py-2.5 flex items-center justify-between gap-3">
+        <div className={`border-b border-gray-100 pl-5 pr-2 py-2.5 flex items-center justify-between gap-3 ${cabe(CABECERA_FIJA, "")}`}>
           <h2 className="text-base font-semibold text-gray-900">Registrar gasto</h2>
           <button
             type="button"
@@ -776,7 +777,7 @@ export default function PuertaGasto({
                 causa. La regla de qué falta NO cambió: es la misma
                 `queFaltaEnLaPuerta`. */}
             {enCelular ? (
-              <div className="border-t border-gray-100 px-4 py-4 space-y-3">
+              <div className={`border-t border-gray-100 px-4 py-4 space-y-3 ${cabe(PIE_FIJO, "")}`}>
                 {textoFalta && (
                   <span className="sr-only" data-testid="falta-para-continuar">
                     {textoFalta}
@@ -794,7 +795,7 @@ export default function PuertaGasto({
                 </button>
               </div>
             ) : (
-            <div className="border-t border-gray-100 px-5 py-4 flex items-center justify-end gap-3">
+            <div className={`border-t border-gray-100 px-5 py-4 flex items-center justify-end gap-3 ${cabe(PIE_FIJO, "")}`}>
               {textoFalta && verFalta && (
                 <span className="text-xs text-amber-700 mr-auto" data-testid="falta-para-continuar">
                   {textoFalta}
@@ -859,6 +860,7 @@ export default function PuertaGasto({
               {...(initialDeLaLectura(lectura) ? { initial: initialDeLaLectura(lectura) } : {})}
               marcaFija={marcaEfectiva}
               onSubmit={guardarFactura}
+              pieFijo={MODAL_CABE_2026_11}
               onCancel={onClose}
               historicoProveedores={historicoProveedores}
               onUploadPdfForIA={subirPdfParaIA}
@@ -899,6 +901,7 @@ export default function PuertaGasto({
               initialMarcas={marcaEfectiva ? [{ marcaId: marcaEfectiva.id, porcentaje: 100 }] : undefined}
               marcaFija={marcaEfectiva}
               onSubmit={guardarFactura}
+              pieFijo={MODAL_CABE_2026_11}
               onCancel={onClose}
               historicoProveedores={historicoProveedores}
               {...(MARKETING_PDF_EN_LA_PUERTA

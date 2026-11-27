@@ -27,6 +27,7 @@ import {
   type PersonaQuincena,
 } from "@/lib/prestamos-quincena";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { cabe } from "@/lib/ui/modal-cabe-2026-11";
 
 export default function AplicarQuincenaModal({
   open,
@@ -63,7 +64,26 @@ export default function AplicarQuincenaModal({
   const n = resumen?.elegibles.length ?? 0;
 
   return (
-    <Modal open={open} onClose={aplicando ? () => {} : onClose} title="Aplicar deducción quincenal">
+    <Modal open={open} onClose={aplicando ? () => {} : onClose} title="Aplicar deducción quincenal"
+      pie={
+        <div className={cabe("flex gap-3", "flex gap-3 mt-5")}>
+          <button
+            onClick={() => fechaValida && onAplicar(fecha)}
+            disabled={aplicando || !fechaValida || n === 0}
+            className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-black text-white hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
+          >
+            {aplicando ? "Aplicando..." : n > 0 ? `Aplicar a las ${n}` : "Aplicar"}
+          </button>
+          <button
+            onClick={onClose}
+            disabled={aplicando}
+            className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50 min-h-[44px]"
+          >
+            Cancelar
+          </button>
+        </div>
+      }
+    >
       <div>
         <label className="text-xs text-gray-400 uppercase tracking-wide">Fecha de pago</label>
         <div className="flex flex-wrap gap-2 mt-1.5 mb-2">
@@ -113,23 +133,6 @@ export default function AplicarQuincenaModal({
             </p>
           )}
           {!fechaValida && <p className="text-gray-500">Selecciona una fecha para ver el resumen.</p>}
-        </div>
-
-        <div className="flex gap-3 mt-5">
-          <button
-            onClick={() => fechaValida && onAplicar(fecha)}
-            disabled={aplicando || !fechaValida || n === 0}
-            className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-black text-white hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
-          >
-            {aplicando ? "Aplicando..." : n > 0 ? `Aplicar a las ${n}` : "Aplicar"}
-          </button>
-          <button
-            onClick={onClose}
-            disabled={aplicando}
-            className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50 min-h-[44px]"
-          >
-            Cancelar
-          </button>
         </div>
       </div>
     </Modal>

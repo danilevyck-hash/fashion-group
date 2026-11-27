@@ -30,6 +30,7 @@ import IconoMotivo from "./IconoMotivo";
 import { ModalOverlay } from "@/components/ui";
 import { useFormGuard } from "@/lib/hooks/useModalDismiss";
 import { MOTIVOS_EN_ORDEN, type Motivo } from "@/lib/recordatorios/motivos";
+import { cabe, PANEL_CABE_COLUMNA, CUERPO_CON_SCROLL } from "@/lib/ui/modal-cabe-2026-11";
 
 interface Props {
   open: boolean;
@@ -52,9 +53,9 @@ export default function PuertaRecordar({ open, onCerrar, onElegir }: Props) {
         aria-modal="true"
         aria-label="Nuevo recordatorio"
         data-puerta-recordar
-        className="bg-white sm:rounded-lg rounded-t-2xl w-full max-w-sm mx-0 sm:mx-4 border border-gray-200"
+        className={`bg-white sm:rounded-lg rounded-t-2xl w-full max-w-sm mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE_COLUMNA, "")}`}
       >
-        <header className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+        <header className={`flex items-center justify-between px-5 py-4 border-b border-gray-200 ${cabe("shrink-0", "")}`}>
           <h2 className="text-base font-medium">Nuevo recordatorio</h2>
           <button
             type="button"
@@ -66,7 +67,7 @@ export default function PuertaRecordar({ open, onCerrar, onElegir }: Props) {
           </button>
         </header>
 
-        <div className="px-5 py-4 flex flex-col gap-2">
+        <div className={`px-5 py-4 flex flex-col gap-2 ${cabe(CUERPO_CON_SCROLL, "")}`}>
           {MOTIVOS_EN_ORDEN.map((f) => (
             <button
               key={f.motivo}

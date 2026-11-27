@@ -79,6 +79,7 @@ import { useMovimientoForm } from "@/app/prestamos/components/useMovimientoForm"
 import { vidrioSobre } from "@/lib/ui/vidrio";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
 import CampoFecha from "@/components/ui/CampoFecha";
+import { cabe, PANEL_CABE_COLUMNA, CUERPO_CON_SCROLL, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 import { PRESTAMOS_APPLE_2026_10, conAtencionArriba, totalProximoDescuento } from "@/lib/prestamos-apple-2026-10";
 
 interface FichaDeuda {
@@ -411,7 +412,7 @@ function ListaDeDeuda(props: { desde?: string; hasta?: string; empresa?: string 
       />
       {personaElegida?.fichaId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setPersonaElegida(null)}>
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6" onClick={(e) => e.stopPropagation()}>
+          <div className={`w-full max-w-md rounded-lg bg-white p-6 ${cabe(PANEL_CABE, "max-h-[90vh] overflow-y-auto")}`} onClick={(e) => e.stopPropagation()}>
             <NuevoMovimientoModal
               nombre={personaElegida.nombre}
               empleadoId={personaElegida.fichaId}
@@ -715,11 +716,13 @@ function AbonoModal(props: {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
       role="dialog" aria-modal="true" aria-label={`Registrar abono de ${capitalizarNombre(ficha.nombre)}`}>
-      <div className="w-full max-w-md rounded-t-lg border border-gray-200 bg-white p-4 sm:rounded-lg">
+      <div className={`w-full max-w-md rounded-t-lg border border-gray-200 bg-white sm:rounded-lg ${cabe(PANEL_CABE_COLUMNA, "p-4")}`}>
+        <div className={cabe("shrink-0 px-4 pt-4", "")}>
         <h2 className="text-base font-medium text-gray-900">Registrar abono</h2>
         <p className="mt-0.5 text-sm text-gray-500">{capitalizarNombre(ficha.nombre)}</p>
+        </div>
 
-        <div className="mt-4 space-y-3">
+        <div className={`mt-4 space-y-3 ${cabe(`${CUERPO_CON_SCROLL} px-4`, "")}`}>
           {debeLasDos && (
             <label className="block text-sm">
               <span className="text-gray-600">Cuenta</span>
@@ -760,7 +763,7 @@ function AbonoModal(props: {
           </label>
         </div>
 
-        <div className="mt-5 flex gap-2">
+        <div className={`mt-5 flex gap-2 ${cabe("shrink-0 px-4 pb-4", "")}`}>
           <button type="button" onClick={props.onCerrar} disabled={guardando}
             className="min-h-[44px] flex-1 rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:opacity-40">
             Cancelar

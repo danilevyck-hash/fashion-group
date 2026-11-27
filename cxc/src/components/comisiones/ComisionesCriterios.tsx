@@ -58,6 +58,7 @@ export function ComisionesCriterios({ children, aviso, className }: Props) {
         )}
       </button>
 
+      {/* modal-cabe: fondo invisible que cierra el panel «Criterios»; no es un panel. */}
       {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />}
 
       {/* El panel se OCULTA con `hidden`, no se desmonta: adentro vive el

@@ -22,6 +22,7 @@ import { getCompanyDisplay } from "@/lib/companies";
 import { estadoVisible } from "@/lib/recordatorios/agenda";
 import type { Recordatorio } from "@/lib/recordatorios/recordatorio";
 import type { Cheque } from "../RecordatoriosClient";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 // ─── Detalle de un cheque ────────────────────────────────────────────────────
 
@@ -50,7 +51,39 @@ export function DetalleCheque({
   onEliminar: (id: string) => void;
 }) {
   return (
-    <Modal open={!!cheque} onClose={onCerrar} title="Detalle del cheque">
+    <Modal
+      open={!!cheque}
+      onClose={onCerrar}
+      title="Detalle del cheque"
+      pie={
+        cheque && (
+          <>
+          <div className={cabe("flex flex-wrap gap-3", "flex flex-wrap gap-3 mt-5")}>
+            <button
+              onClick={() => onEditar(cheque.id)}
+              className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition min-h-[44px]"
+            >
+              Editar
+            </button>
+            <button
+              onClick={onCerrar}
+              className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition min-h-[44px]"
+            >
+              Cerrar
+            </button>
+          </div>
+          {esAdmin && estadoVisible(cheque, hoy) !== "depositado" && (
+            <button
+              onClick={() => onEliminar(cheque.id)}
+              className={`${cabe("mt-1", "mt-3")} text-sm text-gray-400 hover:text-red-600 transition min-h-[44px] inline-flex items-center`}
+            >
+              Eliminar cheque
+            </button>
+          )}
+          </>
+        )
+      }
+    >
       {cheque &&
         (() => {
           const ve = estadoVisible(cheque, hoy);
@@ -72,28 +105,6 @@ export function DetalleCheque({
               {cheque.vendedor && <Fila label="Vendedor" value={cheque.vendedor} />}
               {cheque.notas && <Fila label="Observaciones" value={cheque.notas} />}
               {cheque.motivo_rebote && <Fila label="Motivo de devolución" value={cheque.motivo_rebote} />}
-              <div className="flex flex-wrap gap-3 mt-5">
-                <button
-                  onClick={() => onEditar(cheque.id)}
-                  className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition min-h-[44px]"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={onCerrar}
-                  className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition min-h-[44px]"
-                >
-                  Cerrar
-                </button>
-              </div>
-              {esAdmin && ve !== "depositado" && (
-                <button
-                  onClick={() => onEliminar(cheque.id)}
-                  className="mt-3 text-sm text-gray-400 hover:text-red-600 transition min-h-[44px] inline-flex items-center"
-                >
-                  Eliminar cheque
-                </button>
-              )}
             </div>
           );
         })()}
@@ -174,7 +185,7 @@ export function ModalRebote({
     // El motivo se escribe a mano, así que el cierre NO lo borra: el clic fuera
     // y el Escape equivalen a Cancelar, nunca a marcar el cheque.
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" {...backdrop}>
-      <div ref={panelRef} className="bg-white rounded-lg p-6 w-full max-w-md border border-gray-200">
+      <div ref={panelRef} className={`bg-white rounded-lg p-6 w-full max-w-md border border-gray-200 ${cabe(PANEL_CABE, "")}`}>
         <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-4">
           Marcar como devuelto
         </div>

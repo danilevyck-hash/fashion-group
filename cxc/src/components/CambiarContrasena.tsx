@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { KeyRound } from "lucide-react";
 import { Modal } from "@/components/ui";
 import { AVISO_CONTRASENA_CORTA, LARGO_MINIMO_CONTRASENA } from "@/lib/auth/contrasena-en-uso";
+import { cabe } from "@/lib/ui/modal-cabe-2026-11";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CAMBIAR MI CONTRASEÑA — la ventana y el botón que la abre (14-sep-2026).
@@ -62,7 +63,22 @@ export function CambiarContrasenaModal({ open, onClose }: { open: boolean; onClo
   const campo = "w-full border border-gray-300 rounded-md px-3 py-3 text-base sm:text-sm focus:outline-none focus:border-black";
 
   return (
-    <Modal open={open} onClose={cerrar} title="Cambiar mi contraseña">
+    <Modal open={open} onClose={cerrar} title="Cambiar mi contraseña"
+      pie={
+        !listo && (
+        <div className={cabe("flex gap-2", "flex gap-2 pt-1")}>
+          <button type="button" onClick={cerrar} disabled={guardando}
+            className="flex-1 min-h-[44px] border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition">
+            Cerrar
+          </button>
+          <button type="submit" form="form-cambiar-contrasena" disabled={guardando}
+            className="flex-1 min-h-[44px] bg-black text-white rounded-md text-sm font-medium active:scale-[0.97] transition disabled:opacity-50">
+            {guardando ? "Guardando…" : "Guardar contraseña"}
+          </button>
+        </div>
+        )
+      }
+    >
       {listo ? (
         <div className="space-y-4">
           <p className="text-sm text-gray-800">Contraseña actualizada.</p>
@@ -78,7 +94,7 @@ export function CambiarContrasenaModal({ open, onClose }: { open: boolean; onClo
           </button>
         </div>
       ) : (
-        <form onSubmit={guardar} className="space-y-3">
+        <form id="form-cambiar-contrasena" onSubmit={guardar} className="space-y-3">
           <label className="block">
             <span className="block text-xs text-gray-500 mb-1">Contraseña actual</span>
             <input type={ver ? "text" : "password"} value={actual} onChange={(e) => { setActual(e.target.value); setError(""); }}
@@ -101,16 +117,6 @@ export function CambiarContrasenaModal({ open, onClose }: { open: boolean; onClo
             Con la nueva entras solo tú: si ya la usa otra persona, te pedimos otra.
           </p>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={cerrar} disabled={guardando}
-              className="flex-1 min-h-[44px] border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition">
-              Cerrar
-            </button>
-            <button type="submit" disabled={guardando}
-              className="flex-1 min-h-[44px] bg-black text-white rounded-md text-sm font-medium active:scale-[0.97] transition disabled:opacity-50">
-              {guardando ? "Guardando…" : "Guardar contraseña"}
-            </button>
-          </div>
         </form>
       )}
     </Modal>

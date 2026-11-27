@@ -21,6 +21,7 @@ import { queFaltaParaRegistrar, textoFaltaRegistrar } from "@/lib/prestamos-regi
 import { MOV_TIPOS } from "./types";
 import CampoFecha from "@/components/ui/CampoFecha";
 import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
+import { cabe, CABECERA_FIJA, PIE_FIJO, MODAL_CABE_2026_11 } from "@/lib/ui/modal-cabe-2026-11";
 
 /**
  * REGISTRAR UN MOVIMIENTO — tres conceptos, y las preguntas justas.
@@ -151,8 +152,13 @@ export default function NuevoMovimientoModal({
 
   return (
     <>
+      {/* modal-cabe: lo pintan paneles con `p-6` y scroll; la cabecera y el pie
+          se estiran sobre ese padding para quedar fijos sin que se vea nada por
+          encima o por debajo. */}
+      <div className={cabe(`${CABECERA_FIJA} -mx-6 -mt-6 px-6 pt-6 mb-4`, "")}>
       <h2 className="font-medium mb-1">Nuevo movimiento</h2>
-      <p className="mb-4 text-sm text-gray-500">{nombre}</p>
+      <p className={`${MODAL_CABE_2026_11 ? "" : "mb-4 "}text-sm text-gray-500`}>{nombre}</p>
+      </div>
 
       <div className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-4">
         {MOV_TIPOS.map((t) => (
@@ -245,14 +251,16 @@ export default function NuevoMovimientoModal({
 
       {/* 🔴 El botón apagado DICE qué falta (patrón de Guías: «Falta: …»),
           visible y no solo en el `title`: en el iPad no hay mouse. */}
+      <div className={cabe(`${PIE_FIJO} -mx-6 -mb-6 mt-4 px-6 pb-6 pt-3`, "")}>
       {textoFalta && !guardando && (
-        <p className="mt-4 text-xs text-amber-700" data-testid="falta-para-registrar">{textoFalta}</p>
+        <p className={`${MODAL_CABE_2026_11 ? "" : "mt-4 "}text-xs text-amber-700`} data-testid="falta-para-registrar">{textoFalta}</p>
       )}
-      <div className={`flex gap-3 ${textoFalta && !guardando ? "mt-2" : "mt-6"}`}>
+      <div className={`flex gap-3 ${MODAL_CABE_2026_11 ? (textoFalta && !guardando ? "mt-2" : "") : textoFalta && !guardando ? "mt-2" : "mt-6"}`}>
         <button onClick={onCancelar} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
         <button onClick={guardar} disabled={!listo} title={textoFalta || undefined} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
           {guardando ? "Guardando..." : "Registrar"}
         </button>
+      </div>
       </div>
     </>
   );

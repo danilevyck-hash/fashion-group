@@ -24,7 +24,7 @@ import BloqueDestinoDelGasto, {
   type DestinoDelGasto,
 } from "@/app/marketing/components/BloqueDestinoDelGasto";
 import { MARKETING_PUERTA_GASTO, type DatosDelGasto } from "@/lib/marketing/puerta-gasto";
-import { cuerpoDeLaEdicion, datosDeLaFila } from "@/lib/marketing/editar-gasto";
+import { cuerpoDeLaEdicion, datosDeLaFila, soloLoQueCambio } from "@/lib/marketing/editar-gasto";
 import { MAX_PDF_MB, faltaLaFactura } from "@/lib/marketing/pdf-en-la-puerta";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { formatearMonto } from "@/lib/marketing/normalizar";
@@ -53,6 +53,7 @@ import { unirEnHumano } from "@/lib/guias/falta-para-despachar";
 import { useSoloCobrable } from "@/lib/marketing/solo-cobrable-contexto";
 import { SeCobraAlEditar } from "@/app/marketing/components/RegistroDelCargo";
 import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
+import { PANEL_CABE, cabe } from "@/lib/ui/modal-cabe-2026-11";
 
 export interface FacturaFormValues {
   numeroFactura: string;
@@ -72,7 +73,7 @@ export interface FacturaFormValues {
    * (22-sep-2026, los remates). Ausente = el caller no manda nada y la fila
    * guardada conserva su tienda, su «se reporta» y su nota.
    */
-  gasto?: { tiendaCodigo: string | null; seReporta: boolean; nota: string | null };
+  gasto?: Partial<{ tiendaCodigo: string | null; seReporta: boolean; nota: string | null }>;
   /**
    * 🔴 PROVEEDORES (6-oct-2026, `MKT_PROVEEDORES_2026_10`). Solo cuando el
    * paso 3 es «Se cobra a / Se cobra» (sin `marcaFija`): qué porcentaje se le
@@ -204,6 +205,12 @@ interface FacturaFormProps {
    */
   editarDatosDelGasto?: boolean;
   /**
+   * 🔴 EL MODAL CABE (27-nov-2026, `MODAL_CABE_2026_11`): «Cancelar · Guardar
+   * factura» pegado abajo del panel que desliza, siempre a la vista. Lo pide
+   * quien lo pone en un panel con cuerpo de `px-5`.
+   */
+  pieFijo?: boolean;
+  /**
    * 🔴 FICHA DE EDICIÓN, SOLO EL COMPROBANTE (7-oct-2026, `FICHA_GASTO_2026_10`).
    * El PDF que la factura YA tiene (nombre + su URL firmada). Con esto puesto
    * el paso 1 no pide un archivo: dice cuál es el que ya existe, con un
@@ -283,6 +290,7 @@ export function FacturaForm({
   pdfObligatorio = false,
   historicoProveedores,
   editarDatosDelGasto = false,
+  pieFijo = false,
   adjuntoPdfExistente = null,
   cargo,
 }: FacturaFormProps) {
@@ -389,6 +397,17 @@ export function FacturaForm({
   });
   const [marcaIdDestino, setMarcaIdDestino] = useState<string>(
     () => marcasIniciales[0]?.marcaId ?? "",
+  );
+
+  // 🩸 EDITAR NUNCA CAMBIA LO QUE NO SE TOCÓ (27-nov-2026). Tienda, nota,
+  // «se reporta» y el % se mandan SOLO si cambiaron contra lo que la ficha
+  // abrió: si la lectura vuelve a perder un campo, la base no se entera.
+  const armarGasto = (d: DatosDelGasto, dest: DestinoDelGasto) =>
+    MKT_SOLO_COBRABLE_2026_10 && usaDestino
+      ? { ...cuerpoDeLaEdicion(d), seReporta: !dest.aCargoDeLaEmpresa }
+      : cuerpoDeLaEdicion(d);
+  const [gastoAlAbrir] = useState(() =>
+    initial?.id ? { gasto: armarGasto(datosGasto, destino), pct: pctQueSeGuarda(destino) } : null,
   );
 
   const subtotal = Number(subtotalStr) || 0;
@@ -609,15 +628,14 @@ export function FacturaForm({
           permitirDuplicado,
           ...(pideDatosDelGasto
             ? {
-                gasto:
-                  MKT_SOLO_COBRABLE_2026_10 && usaDestino
-                    ? // 🔴 SOLO LO COBRABLE: «No recuperable» también apaga
-                      // «se reporta», así sale de TODA suma de la marca.
-                      { ...cuerpoDeLaEdicion(datosGasto), seReporta: !destino.aCargoDeLaEmpresa }
-                    : cuerpoDeLaEdicion(datosGasto),
+                // 🔴 SOLO LO COBRABLE: «No recuperable» también apaga «se
+                // reporta», así sale de TODA suma de la marca.
+                gasto: soloLoQueCambio(armarGasto(datosGasto, destino), gastoAlAbrir?.gasto ?? null),
               }
             : {}),
-          ...(usaDestino ? { pctALaMarca: pctQueSeGuarda(destino) } : {}),
+          ...(usaDestino && pctQueSeGuarda(destino) !== gastoAlAbrir?.pct
+            ? { pctALaMarca: pctQueSeGuarda(destino) }
+            : {}),
         },
         pdfFile,
       );
@@ -1295,7 +1313,7 @@ export function FacturaForm({
 
       {cargo?.destino}
 
-      <div className="flex items-center gap-2 justify-end">
+      <div className={`flex items-center gap-2 justify-end${pieFijo ? " sticky bottom-0 z-10 bg-white border-t border-gray-100 -mx-5 px-5 py-3" : ""}`}>
         {cargo && intentoGuardar && faltaDelCargo.length > 0 && (
           <span className="text-xs text-amber-700 mr-auto" data-testid="falta-para-guardar">
             Falta: {unirEnHumano(faltaDelCargo)}
@@ -1337,7 +1355,7 @@ export function FacturaForm({
         >
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-md w-full mx-0 sm:mx-4 border border-gray-200"
+            className={`relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-md w-full mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE, "")}`}
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold mb-2 text-gray-900">

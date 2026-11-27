@@ -9,7 +9,7 @@
 // "puede ser, no siempre").
 //
 // Mismo patrón de la casa que `ChequeFormModal`, con el que comparte pantalla:
-// `ModalOverlay` (que ya trae `fixed inset-0` + `useBodyScrollLock`), cierre con
+// `ModalOverlay` (que ya trae el fondo a pantalla completa + `useBodyScrollLock`), cierre con
 // `useFormGuard` —si ya escribiste algo, el clic fuera y el Escape no te lo
 // borran— y NO es un `<form>`: sin submit implícito, un Enter perdido no puede
 // guardar ni cerrar.

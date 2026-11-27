@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useSyncExternalStore, ReactNode, createContext, useContext } from "react";
+import { MODAL_CABE_2026_11, PANEL_CABE, PANEL_CABE_COLUMNA, CUERPO_CON_SCROLL, cabe } from "@/lib/ui/modal-cabe-2026-11";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { useSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
@@ -124,6 +125,7 @@ export function Toast({ message, type = "success", onDismiss }: { message: strin
 // con `transform` (se esconde al bajar) y `z-index: 10`. Un `transform` vuelve
 // a ese bloque el marco de todo `position: fixed` de adentro, así que el
 // `fixed inset-0` medía lo que la barra y no la pantalla; y el z-index del
+// (modal-cabe: comentario, no es un modal)
 // encabezado le ponía techo al del modal. Ningún z-index lo arregla.
 // Por eso el overlay de TODOS los modales y la BottomSheet salen por portal a
 // <body>, como ya hace `DesplegableFlotante`. En el servidor y durante la
@@ -184,10 +186,11 @@ export function ModalOverlay({
   const backdrop = useBackdropDismiss(onBackdropClick);
   return (
     <EnElCuerpo>
+      {/* modal-cabe: es el fondo; el alto máximo lo pone el panel de quien lo usa (candado) */}
       <div
         {...backdrop}
         data-modal-overlay
-        className={`fixed inset-0 z-50 flex justify-center ${items} ${sidebarPad} print:!pl-0 ${backdropClassName} ${className}`}
+        className={`fixed inset-0 z-50 flex justify-center ${items} ${sidebarPad} ${MODAL_CABE_2026_11 ? "sm:py-4" : ""} print:!pl-0 ${backdropClassName} ${className}`}
       >
         {children}
       </div>
@@ -202,12 +205,15 @@ export function Modal({
   children,
   maxWidth = "max-w-md",
   dismissOnBackdrop = true,
+  pie,
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
   children: ReactNode;
   maxWidth?: string;
+  /** Los botones: con `MODAL_CABE_2026_11` quedan fijos abajo, siempre a la vista. */
+  pie?: ReactNode;
   /** Cerrar con clic fuera del cuadro. Solo apagarlo si perder lo escrito
    *  sería grave y el modal no tiene su propio aviso. */
   dismissOnBackdrop?: boolean;
@@ -232,10 +238,19 @@ export function Modal({
 
   return (
     <ModalOverlay onBackdropClick={dismissOnBackdrop ? intentarCerrar : undefined}>
-      <div ref={ref} className={`bg-white sm:rounded-lg rounded-t-2xl p-6 ${maxWidth} w-full mx-0 sm:mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto`}>
-        {title && <h2 className="text-base font-medium mb-4">{title}</h2>}
-        {children}
-      </div>
+      {MODAL_CABE_2026_11 ? (
+        <div ref={ref} className={`bg-white sm:rounded-lg rounded-t-2xl ${maxWidth} w-full mx-0 sm:mx-4 border border-gray-200 ${PANEL_CABE_COLUMNA}`}>
+          {title && <h2 className="shrink-0 text-base font-medium px-6 pt-6 pb-4">{title}</h2>}
+          <div className={`${CUERPO_CON_SCROLL} px-6 ${title ? "" : "pt-6"} ${pie ? "pb-4" : "pb-6"}`}>{children}</div>
+          {pie && <div className="shrink-0 border-t border-gray-100 px-6 py-3">{pie}</div>}
+        </div>
+      ) : (
+        <div ref={ref} className={`bg-white sm:rounded-lg rounded-t-2xl p-6 ${maxWidth} w-full mx-0 sm:mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto`}>
+          {title && <h2 className="text-base font-medium mb-4">{title}</h2>}
+          {children}
+          {pie}
+        </div>
+      )}
     </ModalOverlay>
   );
 }
@@ -271,11 +286,13 @@ export function ConfirmModal({
   if (!open) return null;
   return (
     <ModalOverlay onBackdropClick={loading ? undefined : onClose}>
-      <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
+      <div className={`bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE_COLUMNA, "")}`}>
+        <div className={cabe(`${CUERPO_CON_SCROLL} -mx-6 px-6`, "")}>
         <h3 className="text-base font-medium mb-1">{title}</h3>
         {message && <p className="text-sm text-gray-500 mb-6">{message}</p>}
         {children}
-        <div className="flex gap-3 mt-4">
+        </div>
+        <div className={`flex gap-3 mt-4 ${cabe("shrink-0", "")}`}>
           <button
             onClick={onConfirm}
             disabled={loading}
@@ -339,10 +356,12 @@ export function ConfirmDeleteModal({
 
   return (
     <ModalOverlay onBackdropClick={loading ? undefined : onCancel} backdropClassName="bg-black/40 backdrop-blur-sm">
-      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
+      <div className={`relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE_COLUMNA, "")}`}>
+        <div className={cabe(`${CUERPO_CON_SCROLL} -mx-6 px-6`, "")}>
         <h3 className="text-base font-semibold mb-1">{title}</h3>
         <p className="text-sm text-gray-500 mb-6">{description}</p>
-        <div className="flex gap-3">
+        </div>
+        <div className={`flex gap-3 ${cabe("shrink-0", "")}`}>
           <button
             onClick={onConfirm}
             disabled={!enabled || loading}
@@ -402,7 +421,7 @@ export function ConfirmTypeNameModal({
 
   return (
     <ModalOverlay onBackdropClick={loading ? undefined : onCancel} backdropClassName="bg-black/40 backdrop-blur-sm">
-      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
+      <div className={`relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE, "")}`}>
         <h3 className="text-base font-semibold mb-1">{title}</h3>
         <p className="text-sm text-gray-500 mb-4">{description}</p>
         <label className="block text-xs text-gray-500 mb-1">
@@ -521,7 +540,7 @@ export function PdfLightbox({
     >
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-4xl h-[90vh] mx-3 sm:mx-4 bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        className="relative w-full max-w-4xl h-[90vh] max-h-[calc(100dvh-1rem)] mx-3 sm:mx-4 bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-200">
@@ -1006,12 +1025,15 @@ export function BottomSheet({
   onClose,
   children,
   abreCompleta = false,
+  pie,
 }: {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
   /** Abre ya extendida (como «Mis marcaciones»), no a media pantalla. */
   abreCompleta?: boolean;
+  /** Los botones: fijos abajo, fuera del scroll (`MODAL_CABE_2026_11`). */
+  pie?: ReactNode;
 }) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef(0);
@@ -1136,6 +1158,7 @@ export function BottomSheet({
 
   return (
     <EnElCuerpo>
+    {/* modal-cabe: la hoja ya mide la ventana (top en dvh, bottom 0) y desliza por dentro */}
     <div className="fixed inset-0 z-50 sm:hidden">
       {/* Backdrop */}
       <div
@@ -1167,10 +1190,15 @@ export function BottomSheet({
         <div
           data-bottomsheet-scroll=""
           className="flex-1 overflow-y-auto overscroll-contain px-5"
-          style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom))" }}
+          style={{ paddingBottom: pie ? "1rem" : "calc(2rem + env(safe-area-inset-bottom))" }}
         >
           {children}
         </div>
+        {pie && (
+          <div className="shrink-0 border-t border-gray-100 bg-white px-5 pt-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+            {pie}
+          </div>
+        )}
       </div>
     </div>
     </EnElCuerpo>
@@ -1198,6 +1226,8 @@ export interface EliminarAlDeslizar {
   /** La pantalla ya tiene su «Deshacer» de 5 s (y saca el renglón): se le
    *  pasa el borrado al instante y el renglón no pone otro aviso. */
   deshacerPropio?: boolean;
+  /** El rótulo del botón rojo, si no es «Eliminar» (p. ej. «Anular» en Marketing › Gastos). */
+  rotulo?: string;
 }
 
 export function SwipeableRow({
@@ -1261,7 +1291,7 @@ export function SwipeableRow({
     });
   }, [scheduleAction]);
   const derecha: SwipeAction | undefined = conEliminar
-    ? { label: "Eliminar", color: "bg-red-600", onAction: borrar }
+    ? { label: eliminar?.rotulo ?? "Eliminar", color: "bg-red-600", onAction: borrar }
     : rightAction;
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {

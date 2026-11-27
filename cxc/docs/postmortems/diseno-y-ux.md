@@ -141,3 +141,19 @@ Daniel: *«Deslice hacia abajo y no hace nada. Como apple quiero. En lugares de 
 Candados: `gestos-iphone.test.tsx` y `gestos-tarjetas-resumen.test.tsx`.
 
 - **Tarjeta mes a mes, UNA sola** (27-nov-2026): `components/shared/TarjetaMesAMes.tsx` la usan Ventas (Resumen y Clientes), Clientes, Multifashion › Vendedoras, Comisiones (por empresa) y Consulta de artículos; aviso único «Mantén presionado para ver mes a mes» (`fg_aviso_mes_a_mes`). Detalle en [ventas-referencia.md](ventas-referencia.md) › «La segunda tanda».
+
+## 27-nov-2026 — El modal cabe en la pantalla (`MODAL_CABE_2026_11`)
+
+- **Qué pasó**: en la computadora de Angela (1366×768, Chrome en Windows), «Editar factura» de Marketing salía cortado: arriba no se veían el título ni los primeros campos, y abajo no se veía «Guardar factura». Tuvo que achicar el zoom. Daniel pidió que el arreglo valga para todo el sistema.
+- **La regla**, en todo modal y toda hoja:
+  1. El alto máximo es el de la ventana (`max-h-[calc(100dvh-1rem)]`, y `-2rem` desde `sm`).
+  2. La cabecera queda fija.
+  3. El cuerpo hace scroll por dentro.
+  4. El pie con los botones queda siempre a la vista.
+- **Dónde vive**: `lib/ui/modal-cabe-2026-11.ts` tiene `PANEL_CABE`, `PANEL_CABE_COLUMNA` + `CUERPO_CON_SCROLL`, `CABECERA_FIJA`, `PIE_FIJO` y `cabe(nuevo, antes)`.
+  - Las piezas base ya la traen: `Modal` (prop nuevo `pie`), `ConfirmModal`, `ConfirmDeleteModal`, `ConfirmTypeNameModal` y `BottomSheet` (prop `pie`).
+  - `ModalOverlay` deja 1 rem arriba y abajo en la computadora.
+  - Se barrieron los modales hechos a mano de Caja, Préstamos, Asistencia, Recordatorios, Despachos, Catálogos, Comisiones, CxC (Boston), Plantilla Switch, Usuarios (contraseña), Marketing, la hoja del celular y `VentanaCentrada`.
+  - Lo que no es un modal con panel (fondos de menú, pantallas completas, cajones laterales, el visor de fotos) lleva el comentario `modal-cabe: <por qué>`.
+- **Candado**: `modal-cabe-en-la-pantalla.test.ts` revisa cada `fixed inset-0` y cada `<ModalOverlay`. Si no tiene cerca un `max-h-…`, `PANEL_CABE…` o `modal-cabe:`, el build se pone rojo.
+- **Probado** a 1366×768, 1280×720 y 390 px, con datos guardados y sin tocar la base: «Editar factura» (desde Gastos y desde el Cobro), Registrar gasto, Caja › Cerrar período, Recordatorios › Nuevo recordatorio, Préstamos › Nuevo movimiento, Catálogos › Reenviar correo y Cambiar contraseña.

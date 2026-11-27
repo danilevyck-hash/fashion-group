@@ -1070,3 +1070,43 @@ Interruptor `MKT_SOLO_COBRABLE_2026_10` (`src/lib/marketing/solo-cobrable-2026-1
 - 🔴 **EN EL CELULAR, UNA FILA ES UN NOMBRE Y UN MONTO (24-sep-2026)** — Daniel: *«ya son datos que veré adentro, eso me ensucia la pantalla, no solo aquí sino en todo el sistema»*. Mockup aprobado letra por letra (**1a · 2a · 3a · 4c · 5b · 6b · 7b · 8a · 9a · 10a · 11a · 12a · 13b**, cada una VERBATIM en el postmortem § 14; `MARKETING_CELULAR`, hoy `true`; `false` = el celular de antes): la ficha son **dos renglones por gasto con el monto a la vista** (🩸 empezaba en el píxel 537 de 390), **Marcas NO lleva total de las tres**, Mobiliario va **sin «entregadas 543 de 561»** y la × de una foto sale solo con **«Editar»**. 🔑 **UN SOLO ÁRBOL** (`useEsCelular`, hasta 639 px): con los dos montados cada nombre salía dos veces. 🔴 **Ningún número cambia**. Candado `marketing-celular`.
 - 🔴 **LA FOTO DE UNA TIENDA SE GUARDA, SIGUE AL PERÍODO Y LA MARCA SE ELIGE (24-sep-2026)**: 🩸 **ninguna se pudo guardar nunca** (`mk_adjuntos_destino_chk` exigía proyecto → 23514: **0 de 160** filas y **4 huérfanos**) y las dos de D-118 salían en «Abierto». `20261219130000` (**aplicada**) afloja la regla, agrega `mk_adjuntos.periodo_id` y sella las **52** viejas **por lista de ids**. 🔴 **Los períodos son POR MARCA**: con UNA abierta la foto va ahí sin preguntar; con DOS o más (**3 de las 4** tiendas con gasto abierto) **se elige con un toque** —44 px en el celular, `<select>` en la computadora, **nada preseleccionado**, y sin elegir no se abre el selector de archivo— y **manda el SERVIDOR** (`destinoDeFotoNueva`: 400 en español y el archivo se borra del cajón). 🔴 **A un período CERRADO no entra ni sale nada**: solo se ofrecen los abiertos y su ZIP no cambia por fotos nuevas. La cuadrícula sigue al chip. Falla ABIERTA. `MARKETING_FOTOS_CON_PERIODO`; candados `marketing-fotos-de-tienda` · `marketing-foto-elige-marca`.
 - 🔴 **ESCANEAR LA FACTURA CON LA CÁMARA (24-sep-2026, 4c)**: «＋ Gasto» en el celular abre con **tres puertas** —Escanear · Elegir el PDF · Escribirlo a mano—. 🔑 **El lector ya existía** (`/api/marketing/ia/leer-factura`): faltaba aceptar una FOTO. 🔴 **Nada de lo que se guarda cambia**: se cuelga como `foto_factura`. **Falla ABIERTA**. Candado `marketing-escanear` (📄 postmortem § 14).
+
+## 27-nov-2026 — Gastos: editar no borra la tienda, «Sin tienda», «Anular» en la lista y editar desde el Cobro
+
+Reportado por Daniel y Angela; aprobado punto por punto (1a, 2b, 3a y el 7).
+
+### 🩸 Editar borraba la tienda (sin interruptor)
+
+- **Lo que pasó**: Daniel editó solo la marca y el % de la factura 0000065973 de Impresora Comercial ($48.15, tienda D-139, creada ese día), guardó, y la tienda quedó vacía («Sin tienda — buscar…»).
+- **Causa raíz**: `getFacturaById` → `mapFactura` (`lib/marketing/queries.ts`) armaba la factura a mano y dejaba afuera las columnas del rediseño: `tienda_codigo`, `nota`, `se_reporta` y `pct_a_la_marca`. La ficha de edición abría con la tienda vacía, la nota vacía y el % en «Completo». Al guardar, `cuerpoDeLaEdicion` mandaba `tiendaCodigo: null` y `nota: null`, y `pctALaMarca: 100`. El PUT de marcas no tocaba la tienda.
+- **El arreglo**: `mapFactura` copia esas columnas tal cual (`columnasDelGastoLeidas`). Además, al editar, viaja SOLO lo que cambió contra lo que la ficha abrió (`soloLoQueCambio` en `editar-gasto.ts`): si la lectura vuelve a perder un campo, la base no se entera. Candado: `marketing-editar-no-borra-tienda.test.ts`, que falla sin el arreglo.
+- **Medido en `activity_logs`** (solo lectura, 27-nov-2026), comparando el `after` de cada edición con el anterior:
+  - `5b06bbd4-aadb-4dbe-86fc-ac36615b3035` · Javier Agustín Miranda Miranda · $4,023.47 · 14-oct-2026 (Angela): la tienda D-170 se borró y se volvió a poner 18 s después. En esas dos ediciones la nota «Apertura» quedó en NULL y el % pasó de 50 a 100. **Hoy**: D-170, sin nota, 100 %.
+  - `df20f29a-60a7-48e6-acaa-3acf6ccbed04` · Impresora Comercial · $48.15 · 27-nov-2026: la tienda D-139 se borró y se volvió a poner. En la edición siguiente el % pasó de 50 a 100. Como la ficha abría siempre en «Completo», no se sabe si ese 100 fue a propósito. **Hoy**: D-139, 100 %.
+  - Ninguna otra edición humana borró la tienda o la nota. Los cambios de 50 a NULL del 8-oct-2026 son la corrección de las impulsadoras que pidió Daniel.
+  - Las ediciones anteriores a que el `after` trajera esas columnas no se pueden revisar.
+- **Corrección propuesta, sin aplicar (decide Daniel)**:
+  ```sql
+  -- Javier Miranda: devolver la nota «Apertura» y, si el 50 % era lo correcto, el %.
+  UPDATE mk_facturas SET nota = 'Apertura' WHERE id = '5b06bbd4-aadb-4dbe-86fc-ac36615b3035' AND nota IS NULL;
+  UPDATE mk_facturas SET pct_a_la_marca = 50 WHERE id = '5b06bbd4-aadb-4dbe-86fc-ac36615b3035' AND pct_a_la_marca = 100;
+  -- Impresora Comercial 0000065973: solo si el 100 % no fue a propósito.
+  UPDATE mk_facturas SET pct_a_la_marca = 50 WHERE id = 'df20f29a-60a7-48e6-acaa-3acf6ccbed04' AND pct_a_la_marca = 100;
+  ```
+
+### Lo de pantalla (`lib/ui/marketing-gastos-2026-11.ts`, los tres prendidos)
+
+- **«Sin tienda» al registrar** (`MKT_SIN_TIENDA_AL_REGISTRAR_2026_11`): es un botón al lado del buscador de tienda. Con él elegido, `faltaEnElDestino` ya no pide la tienda; se guarda `tienda_codigo` NULL, se le cobra a la marca y va al ZIP en «General». «Se cobra» sigue naciendo en 50 % (`PCT_AL_REGISTRAR`). La impulsadora sigue al 100 %.
+- **«Anular» en la lista de Gastos** (`MKT_ANULAR_EN_LA_LISTA_2026_11`):
+  - En el teléfono, la fila se desliza a la izquierda (`SwipeableRow` con `eliminar.rotulo = "Anular"`) y queda «Deshacer» de 5 s.
+  - En la computadora, «···» → «Anular» abre la MISMA confirmación de la ficha de la tienda (escribir ELIMINAR).
+  - Las dos usan `POST …/facturas/[id]/anular`, el soft delete firmado. El DELETE sigue en 403.
+  - Se anulan facturas y pagos de impulsadora. La entrega de mobiliario no: se elimina desde su ficha y devuelve el stock.
+  - Solo admin y secretaria (`escribe`; el servidor lo vuelve a mirar).
+- **Editar desde «Cobro · Marca»** (`MKT_EDITAR_DESDE_EL_COBRO_2026_11`):
+  - Tocar la fila abre `FichaTiendaAcciones`, lo mismo que en Gastos: «Editar factura», o la entrega con `EntregaForm`. El pago de impulsadora abre «Editar factura», como en Gastos.
+  - Al guardar se vuelve a leer y el cobro se queda abierto.
+  - «Excluir» corta el toque (`stopPropagation`) y no cambió.
+  - Contabilidad solo mira: sin `escribe` la fila no se toca.
+- **Un gasto cobrado sigue editable** (2b): no se cambió.
+- **El modal de editar cabe en la pantalla**: lo cubre la regla de todo el sistema (`MODAL_CABE_2026_11`, ver `diseno-y-ux.md` › 27-nov-2026). «Editar factura» es un panel partido en tres y `FacturaForm` tiene `pieFijo`. El registro, el pago de impulsadora y la entrega de mobiliario tienen cabecera y pie fijos.

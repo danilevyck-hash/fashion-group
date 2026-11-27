@@ -33,6 +33,7 @@ import EditMovimientoModal from "../components/EditMovimientoModal";
 import { DeleteEmpleadoConfirm, ClearHistoryConfirm } from "../components/ConfirmModals";
 import { useMovimientoForm, useEditMovimiento } from "../components/useMovimientoForm";
 import { useEmpleadoActions } from "../components/useEmpleadoActions";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 export default function PrestamoDetallePage() {
   const router = useRouter();
@@ -208,7 +209,7 @@ export default function PrestamoDetallePage() {
 
       {showNuevoMov && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowNuevoMov(false)}>
-          <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className={`bg-white rounded-lg p-6 max-w-md w-full ${cabe(PANEL_CABE, "max-h-[90vh] overflow-y-auto")}`} onClick={(e) => e.stopPropagation()}>
             <NuevoMovimientoModal
               nombre={empleado.nombre}
               empleadoId={id}

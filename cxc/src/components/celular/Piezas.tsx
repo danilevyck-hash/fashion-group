@@ -23,6 +23,7 @@ import { COLCHON_LATERAL_FLOTANTE } from "@/lib/navegacion/barra-celular";
 import { EnLaBarra, useHayBarraCelular } from "./BarraDeControles";
 import { tituloCelular } from "@/lib/navegacion/barra-controles-celular";
 import { CLASE_VIDRIO, RADIO_VIDRIO, conVidrio, vidrioSobre } from "@/lib/ui/vidrio";
+import { cabe, PANEL_CABE_COLUMNA, CUERPO_CON_SCROLL, MODAL_CABE_2026_11 } from "@/lib/ui/modal-cabe-2026-11";
 
 /**
  * El lienzo: fondo de iOS y sitio para el botón flotante.
@@ -274,13 +275,14 @@ export function HojaCel({
       />
       <div
         ref={caja}
-        className={conVidrio("relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white", `relative mx-2 mb-2 overflow-hidden ${CLASE_VIDRIO} ${RADIO_VIDRIO}`)}
+        className={`${conVidrio("relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white", `relative mx-2 mb-2 overflow-hidden ${CLASE_VIDRIO} ${RADIO_VIDRIO}`)} ${cabe(PANEL_CABE_COLUMNA, "")}`}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="px-4 py-3 text-center text-[13px] leading-snug text-gray-500">
+        <div className={`px-4 py-3 text-center text-[13px] leading-snug text-gray-500 ${cabe("shrink-0", "")}`}>
           {titulo}
           {subtitulo && <div className="mt-0.5">{subtitulo}</div>}
         </div>
+        <div className={cabe(CUERPO_CON_SCROLL, "")}>
         {opciones.map((o) => (
           <button
             key={o.clave}
@@ -303,10 +305,11 @@ export function HojaCel({
             {o.detalle && <span className="mt-0.5 block text-[13px] text-gray-500">{o.detalle}</span>}
           </button>
         ))}
+        </div>
         <button
           type="button"
           onClick={() => volver()}
-          className="block w-full border-t-[6px] border-gray-100 px-4 py-3.5 text-center text-[17px] font-semibold text-gray-900 active:bg-gray-100"
+          className={`block w-full border-t-[6px] border-gray-100 px-4 py-3.5 text-center text-[17px] font-semibold text-gray-900 active:bg-gray-100 ${cabe("shrink-0", "")}`}
         >
           Cancelar
         </button>
@@ -351,14 +354,14 @@ export function HojaMenuCel({
     >
       <button type="button" aria-label="Cerrar" onClick={onCerrar} className="absolute inset-0 bg-black/30" />
       <div
-        className={vidrioSobre("relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white p-3")}
+        className={`${vidrioSobre("relative mx-2 mb-2 overflow-hidden rounded-2xl bg-white p-3")} ${cabe(PANEL_CABE_COLUMNA, "")}`}
         style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
       >
-        {children}
+        {MODAL_CABE_2026_11 ? <div className={CUERPO_CON_SCROLL}>{children}</div> : children}
         <button
           type="button"
           onClick={onCerrar}
-          className="mt-2 block w-full rounded-xl px-4 py-3 text-center text-[17px] text-gray-600 active:bg-gray-100"
+          className={`mt-2 block w-full rounded-xl px-4 py-3 text-center text-[17px] text-gray-600 active:bg-gray-100 ${cabe("shrink-0", "")}`}
         >
           Cancelar
         </button>
@@ -396,6 +399,7 @@ export function PantallaQueSube({
       role="dialog"
       aria-modal="true"
       data-pantalla-ventas
+      // modal-cabe: pantalla completa del teléfono con su propio scroll; ya ocupa el alto de la ventana.
       className="fixed inset-0 z-[55] overflow-y-auto bg-fondo-celular"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >

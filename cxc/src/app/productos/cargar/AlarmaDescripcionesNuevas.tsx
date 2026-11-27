@@ -11,6 +11,7 @@ import { marcasCandidatasDeEmpresa } from "@/lib/depurador/tienda";
 import { normalizarEspacios } from "@/lib/depurador/veredicto";
 import { Aviso } from "@/components/ui/Aviso";
 import { plural } from "@/lib/depurador/resumen-del-archivo";
+import { cabe, PANEL_CABE, PANEL_CABE_COLUMNA, CUERPO_CON_SCROLL } from "@/lib/ui/modal-cabe-2026-11";
 
 // Alarma bloqueante de descripciones NUEVAS, compartida por el Depurador y
 // Facturas Tienda. Solo llegan acá las de veredicto "alerta" (ver
@@ -124,7 +125,7 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
 
   return createPortal(
     <div {...backdropAlarma} className="fade-in fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-lg rounded-2xl border-4 border-red-500 bg-white p-6">
+      <div className={`w-full max-w-lg rounded-2xl border-4 border-red-500 bg-white p-6 ${cabe(PANEL_CABE, "")}`}>
         {ICONOS_DE_LINEA_2026_11 ? <AlertTriangle aria-hidden className="mx-auto mb-2 h-12 w-12 text-red-600" /> : <div className="mb-2 text-center text-5xl">⚠️</div>}
         <h2 className="text-center text-xl font-bold text-red-700">
           {items.length} {plural(items.length, "descripción", "descripciones")} por revisar
@@ -177,13 +178,16 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
       {/* Confirmación de aprobación (encima de la alarma) */}
       {confirm && (
         <div {...backdropConfirm} className="fade-in fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
-          <div ref={confirmPanelRef} className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6">
+          <div ref={confirmPanelRef} className={`w-full max-w-md rounded-2xl border border-gray-200 bg-white ${cabe(PANEL_CABE_COLUMNA, "p-6")}`}>
+            <div className={cabe("shrink-0 px-6 pt-6", "")}>
             <h3 className="text-center text-lg font-bold text-gray-900">Aprobar descripción</h3>
             <Aviso
               tono="aviso" className="mt-2"
             >
               Quedará <b>permanente</b> en el catálogo de <b>{confirm.marcaElegida || "…"}</b>. Avísale a Daniel antes de aprobar.
             </Aviso>
+            </div>
+            <div className={cabe(`${CUERPO_CON_SCROLL} px-6`, "")}>
             <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-800">
               {confirm.item.desc}
             </div>
@@ -219,7 +223,8 @@ export default function AlarmaDescripcionesNuevas({ items, pasaronSolas = 0, onA
                 {confirm.error}
               </Aviso>
             )}
-            <div className="mt-5 flex gap-2">
+            </div>
+            <div className={`mt-5 flex gap-2 ${cabe("shrink-0 px-6 pb-6", "")}`}>
               <button
                 type="button"
                 onClick={() => setConfirm(null)}

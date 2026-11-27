@@ -30,6 +30,7 @@
 //     NO se borró: es de donde el "?" saca los precios.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PANEL_CABE, cabe } from "@/lib/ui/modal-cabe-2026-11";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
@@ -1161,7 +1162,7 @@ export default function MobiliarioPage() {
           />
           <div
             ref={editProdDismiss.panelRef}
-            className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-md w-full mx-0 sm:mx-4 border border-gray-200"
+            className={`relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-md w-full mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE, "")}`}
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold mb-4">

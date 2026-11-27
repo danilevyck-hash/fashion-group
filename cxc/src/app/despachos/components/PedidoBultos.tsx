@@ -388,7 +388,7 @@ export default function PedidoBultos({
             </button>
             {imprimirAbierto && (
               <>
-                {/* Tocar afuera cierra. */}
+                {/* Tocar afuera cierra. modal-cabe: fondo invisible del menú «Imprimir»; no es un panel. */}
                 <button type="button" aria-label="Cerrar" onClick={() => setImprimirAbierto(false)} className="fixed inset-0 z-10 cursor-default" />
                 {/* En el celular el botón está a la izquierda: el menú se abre
                     hacia la derecha o se sale de la pantalla. */}

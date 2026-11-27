@@ -29,6 +29,7 @@
 // ============================================================================
 
 import { useCallback, useState } from "react";
+import { PANEL_CABE, cabe } from "@/lib/ui/modal-cabe-2026-11";
 import { useToast } from "@/components/ToastSystem";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import {
@@ -463,7 +464,7 @@ export default function DetallePeriodoView({
           <div className="absolute inset-0 bg-black/40" {...anularDismiss.backdrop} />
           <div
             ref={anularDismiss.panelRef}
-            className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
+            className={`relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE, "")}`}
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold mb-1">

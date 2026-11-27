@@ -13,6 +13,7 @@ import { GASTOS_APPLE_2026_10 } from "@/lib/egresos/apple-2026-10";
 import { CAJA_NUEVO_GASTO_EN_PORTADA } from "@/lib/ui/uso-2026-11";
 import { BarraAccionFija, useBarraCelular } from "@/components/celular/BarraDeControles";
 import { TECLADO_DECIMAL } from "@/lib/ui/iphone-2026-11";
+import { cabe } from "@/lib/ui/modal-cabe-2026-11";
 
 export default function CajaPage() {
   const router = useRouter();
@@ -89,6 +90,23 @@ export default function CajaPage() {
         open={showNewPeriodoModal}
         onClose={() => setShowNewPeriodoModal(false)}
         title="Nuevo período de caja"
+        pie={
+          <div className={cabe("flex gap-2", "flex gap-2 pt-2 mt-4")}>
+            <button
+              onClick={() => setShowNewPeriodoModal(false)}
+              className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 active:bg-gray-100 transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirmCreate}
+              disabled={!fondoInput || parseFloat(fondoInput) <= 0}
+              className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
+            >
+              Crear período
+            </button>
+          </div>
+        }
       >
         <div className="space-y-4">
           <div>
@@ -125,21 +143,6 @@ export default function CajaPage() {
                   <option key={r.id} value={String(r.empleado_codigo)}>{r.nombre}</option>
                 ))}
             </select>
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button
-              onClick={() => setShowNewPeriodoModal(false)}
-              className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 active:bg-gray-100 transition-all"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleConfirmCreate}
-              disabled={!fondoInput || parseFloat(fondoInput) <= 0}
-              className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
-            >
-              Crear período
-            </button>
           </div>
         </div>
       </Modal>

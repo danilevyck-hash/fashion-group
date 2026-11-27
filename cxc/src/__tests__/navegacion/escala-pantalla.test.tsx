@@ -108,7 +108,10 @@ describe("escala de la pantalla: Nuevo gasto abre como Reclamos y Marketing", ()
   // ya el sistema en Reclamos, Marketing; no es así».
   it("la ventana compartida tiene la MISMA forma que «Registrar gasto» de Marketing", async () => {
     const { CLASE_VENTANA } = await import("@/components/ui/VentanaCentrada");
-    expect(leer("app/marketing/components/PuertaGasto.tsx")).toContain(`className="${CLASE_VENTANA.replace(" flex flex-col", " overflow-y-auto")}"`);
+    // 27-nov-2026 (`MODAL_CABE_2026_11`): el alto lo pone `PANEL_CABE` (el de la ventana, en dvh).
+    const anchoYBorde = CLASE_VENTANA.split(" ").filter((c) => !/^(max-h-|flex$|flex-col$|overflow-)/.test(c)).join(" ");
+    expect(anchoYBorde).toBe("relative bg-white w-full sm:max-w-2xl rounded-lg border border-gray-200");
+    expect(leer("app/marketing/components/PuertaGasto.tsx")).toContain(`className={\`${anchoYBorde} \${cabe(PANEL_CABE, "max-h-[90vh] overflow-y-auto")}\`}`);
     const ventana = leer("components/ui/VentanaCentrada.tsx");
     expect(ventana).toContain('className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"');
     expect(ventana).toContain('className="absolute inset-0 bg-black/40"');

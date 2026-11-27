@@ -359,6 +359,7 @@ export default function CarteraBoston({
                   Descargar
                 </button>
                 {showExport && (<>
+                  {/* modal-cabe: fondo invisible que cierra el menú «Descargar»; no es un panel. */}
                   <div className="fixed inset-0 z-10" onClick={() => setShowExport(false)} />
                   <div className={vidrioSobre("absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-80 py-1")}>
                     <MenuDescargar onDescargar={(clave, formato) => { setShowExport(false); void descargar(clave, formato); }} />

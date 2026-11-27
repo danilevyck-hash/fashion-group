@@ -200,6 +200,7 @@ export default function CatalogoStickyCartBar({
     >
       {/* Backdrop */}
       {miniCartOpen && (
+        // modal-cabe: solo el fondo; el carrito de abajo ya tiene su tope de alto (320 px).
         <div className="fixed inset-0 bg-black/20 z-[-1]" onClick={() => setMiniCartOpen(false)} />
       )}
 

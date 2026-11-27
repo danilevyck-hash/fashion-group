@@ -809,6 +809,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         </button>
         {masAbierto && (
           <>
+            {/* modal-cabe: fondo invisible que cierra el menú «···»; no es un panel. */}
             <button type="button" aria-label="Cerrar" className="fixed inset-0 z-40 cursor-default" onClick={() => setMasAbierto(false)} />
             <div className={CLASES_MENU_MAS.panel}>
               {puedeVerPedidos && (

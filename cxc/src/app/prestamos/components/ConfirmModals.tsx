@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 function useEscClose(show: boolean, onClose: () => void) {
   useEffect(() => {
@@ -26,7 +27,7 @@ export function DeleteEmpleadoConfirm({ show, nombreEmpleado, deleteInput, onCha
   if (!show) return null;
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+      <div className={`bg-white rounded-lg p-6 max-w-sm w-full mx-4 ${cabe(PANEL_CABE, "")}`} onClick={e => e.stopPropagation()}>
         <h2 className="font-medium mb-2 text-red-700">Eliminar colaborador</h2>
         {/* El AVISO se queda; la instrucción de qué escribir se mudó al
             casillero, que es donde se va a escribir. */}
@@ -60,7 +61,7 @@ export function ClearHistoryConfirm({ show, movCount, clearInput, clearProgress,
   if (!show) return null;
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+      <div className={`bg-white rounded-lg p-6 max-w-sm w-full mx-4 ${cabe(PANEL_CABE, "")}`} onClick={e => e.stopPropagation()}>
         <h2 className="font-medium mb-2 text-red-700">Eliminar todo el historial</h2>
         {clearProgress ? (
           <p className="text-sm text-amber-600 font-medium py-4">{clearProgress}</p>

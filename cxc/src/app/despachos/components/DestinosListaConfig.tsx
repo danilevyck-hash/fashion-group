@@ -35,6 +35,7 @@ import {
   yaEstaEnLaLista,
   type DestinoDeLista,
 } from "@/lib/guias/destinos-lista";
+import { cabe, PANEL_CABE } from "@/lib/ui/modal-cabe-2026-11";
 
 const CAMPO =
   "w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition min-h-[44px] md:[@media(pointer:fine)]:min-h-0";
@@ -56,7 +57,7 @@ function QuitarDeLaListaModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
-        className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
+        className={`relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200 ${cabe(PANEL_CABE, "")}`}
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-base font-semibold mb-1">Quitar destino</h3>

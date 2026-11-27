@@ -6,7 +6,7 @@
 // nueva; los datos de la factura siguen siendo los de `FacturaForm`.
 //
 //   1. COMPROBANTE — arriba de todo: el PDF (o la foto) y la IA llena los datos.
-//   2. DESTINO     — debajo de los datos: Marca · Tienda (una, obligatoria) ·
+//   2. DESTINO     — debajo de los datos: Marca · Tienda (una, o «Sin tienda» → «General») ·
 //                    Se cobra 100 % · 50 % · Observaciones, discretas.
 //
 // Nada viene preseleccionado salvo lo que da el contexto (la marca o la tienda
@@ -27,6 +27,7 @@ import {
   type SeCobraAlRegistrar,
 } from "@/lib/marketing/solo-cobrable-2026-10";
 import { ROTULO_COMPROBANTE, ROTULO_SE_COBRA } from "@/lib/marketing/proveedores-2026-10";
+import { MKT_SIN_TIENDA_AL_REGISTRAR_2026_11, ROTULO_SIN_TIENDA } from "@/lib/ui/marketing-gastos-2026-11";
 
 export const ROTULO_SUBIR_FACTURA = "Subir factura";
 
@@ -200,17 +201,51 @@ export function DestinoDelCargoBloque({
             <span className="text-gray-900 font-medium truncate">{tiendaFija.nombre}</span>
             <span className="text-gray-500 tabular-nums">{tiendaFija.codigo}</span>
           </div>
+        ) : MKT_SIN_TIENDA_AL_REGISTRAR_2026_11 && valor.sinTienda && !tienda ? (
+          // 🔴 «Sin tienda» (27-nov-2026): se cobra a la marca y va a «General».
+          <div
+            className="rounded-md border border-gray-200 bg-gray-50 px-3 min-h-[44px] py-2 text-sm flex items-center justify-between gap-2"
+            data-testid="sin-tienda-elegida"
+          >
+            <span className="text-gray-900 font-medium">
+              {ROTULO_SIN_TIENDA} <span className="text-gray-500 font-normal">· va a «General»</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => cambiar({ sinTienda: false })}
+              className={`shrink-0 text-sm min-h-[44px] -my-2 inline-flex items-center ${ENLACE}`}
+            >
+              Cambiar
+            </button>
+          </div>
         ) : (
-          <ClientePicker
-            value={tienda ? tienda.nombre : ""}
-            codigo={tienda ? tienda.codigo : ""}
-            onChange={(nombre, codigo) =>
-              cambiar({ tienda: codigo.trim() ? { codigo: codigo.trim().toUpperCase(), nombre } : null })
-            }
-            permitirOtro={false}
-            placeholder="Buscar…"
-            inputClassName={`${CAMPO} pr-16`}
-          />
+          <div className={MKT_SIN_TIENDA_AL_REGISTRAR_2026_11 ? "flex items-start gap-2" : ""}>
+            <div className="flex-1 min-w-0">
+              <ClientePicker
+                value={tienda ? tienda.nombre : ""}
+                codigo={tienda ? tienda.codigo : ""}
+                onChange={(nombre, codigo) =>
+                  cambiar({
+                    tienda: codigo.trim() ? { codigo: codigo.trim().toUpperCase(), nombre } : null,
+                    sinTienda: false,
+                  })
+                }
+                permitirOtro={false}
+                placeholder="Buscar…"
+                inputClassName={`${CAMPO} pr-16`}
+              />
+            </div>
+            {MKT_SIN_TIENDA_AL_REGISTRAR_2026_11 && !tienda && (
+              <button
+                type="button"
+                onClick={() => cambiar({ tienda: null, sinTienda: true })}
+                className="shrink-0 rounded-md border border-gray-300 px-3 min-h-[44px] text-sm text-gray-700 hover:border-gray-500 active:scale-[0.97] transition"
+                data-testid="boton-sin-tienda"
+              >
+                {ROTULO_SIN_TIENDA}
+              </button>
+            )}
+          </div>
         )}
       </div>
 

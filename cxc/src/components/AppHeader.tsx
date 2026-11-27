@@ -491,6 +491,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
 
       {/* Mobile search overlay */}
       {mobileSearchOpen && (
+        // modal-cabe: buscador a pantalla completa del teléfono; ya ocupa el alto de la ventana.
         <div className="fixed inset-0 z-50 bg-white sm:hidden">
           <SearchBar fullScreen onClose={() => setMobileSearchOpen(false)} />
         </div>
@@ -499,6 +500,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
       {/* Mobile drawer — el cajón lateral de siempre. Queda EXACTAMENTE como
           estaba: con `CAJON_HOJA_ABAJO` apagado vuelve solo. */}
       {drawerOpen && !CAJON_HOJA_ABAJO && (
+        // modal-cabe: cajón lateral de alto completo (top-0 bottom-0) con su propia columna; no es un panel centrado.
         <div className="fixed inset-0 z-50 sm:hidden">
           <div {...backdropDrawer} className="absolute inset-0 bg-black/40" />
           <div className="absolute right-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
@@ -732,6 +734,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar, acci
           role="dialog"
           aria-modal="true"
           aria-label="Menú"
+          // modal-cabe: menú a pantalla completa (flex-col) que ya ocupa el alto de la ventana.
           className="fixed inset-0 z-50 flex flex-col bg-fondo-celular sm:hidden"
           style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
