@@ -44,18 +44,22 @@ export function SegmentadoCelular<K extends string>({
   activa,
   onElegir,
   etiqueta,
+  dosRenglones = false,
 }: {
   opciones: readonly OpcionSegmentada<K>[];
   activa: K | null;
   onElegir: (k: K) => void;
   etiqueta: string;
+  /** 27-nov-2026 (CxC): cada opción en dos renglones (el rótulo trae sus dos líneas); nada se corta. */
+  dosRenglones?: boolean;
 }) {
   return (
     <div
       role="group"
       aria-label={etiqueta}
       data-segmentado-celular
-      className="flex h-9 w-full gap-0.5 rounded-lg bg-pista-celular p-0.5"
+      data-dos-renglones={dosRenglones || undefined}
+      className={`flex w-full gap-0.5 rounded-lg bg-pista-celular p-0.5 ${dosRenglones ? "" : "h-9"}`}
     >
       {opciones.map((o) => {
         const prendida = o.clave === activa;
@@ -68,7 +72,9 @@ export function SegmentadoCelular<K extends string>({
             className={[
               // flex-auto y sin tabular-nums: medido a 390 px, los tres tramos suman
               // 303 px de texto (326 con tabular) en 350 de ancho; así ninguno se corta
-              `relative min-w-0 flex-auto truncate whitespace-nowrap rounded-md px-1 ${ACCESIBILIDAD_2026_11 ? "text-sm" : "text-[13px]"} transition`,
+              dosRenglones
+                ? `relative min-w-0 flex-1 basis-0 rounded-md px-1 py-1.5 text-center leading-tight ${ACCESIBILIDAD_2026_11 ? "text-sm" : "text-[13px]"} transition`
+                : `relative min-w-0 flex-auto truncate whitespace-nowrap rounded-md px-1 ${ACCESIBILIDAD_2026_11 ? "text-sm" : "text-[13px]"} transition`,
               "before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']",
               // v3.3: los montos en peso medio, prendido o no; lo prendido lo dice el fondo blanco
               "font-medium",

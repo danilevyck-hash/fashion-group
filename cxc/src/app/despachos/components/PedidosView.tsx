@@ -46,6 +46,8 @@ import PedidoAbierto from "./PedidoAbierto";
 import { MUESTRAS_2026_11 as MUESTRAS, lineaDeEsperaDelPedido } from "@/lib/guias/muestras";
 import { useAtrasCierra } from "@/lib/hooks/useAtrasCierra";
 import { PEDIDO_CON_ACCION_EN_DETALLE } from "@/lib/ui/uso-2026-11";
+import { MANTENER_PRESIONADO_2026_11 } from "@/lib/ui/mantener-presionado-2026-11";
+import { ponerGlobito } from "@/lib/globito";
 import { PEDIDOS_CONTEOS_2026_11 as CONTEOS, PEDIDOS_EMPRESA_JUNTO_A_IMPRIMIR, conteosPorEstado, lineaDeResumen, lineaMasViejo, textoMonto } from "@/lib/ui/pedidos-conteos-2026-11";
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
 import { PEDIDOS_PIPELINE_2026_11, ROTULO_VENTANA_FACTURADOS } from "@/lib/guias/facturados-sin-guia";
@@ -96,6 +98,8 @@ import {
   lineaDeLaPestana,
   tituloPedidosImpresos,
   vendedorEnPantalla,
+  porVendedor,
+  antiguedadCompleta,
   type EstadoPedido,
   type PedidoBodega,
 } from "@/lib/guias/pedidos-bodega";
@@ -252,6 +256,14 @@ export default function PedidosView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { onDetalle?.(!!abierto); }, [abierto, onDetalle]);
+  // 🔴 El número rojo del ícono (solo bodega, 27-nov-2026): baja en el acto al
+  // marcar un pedido. La lista ya viene acotada a SUS empresas por el servidor.
+  useEffect(() => {
+    if (!MANTENER_PRESIONADO_2026_11 || !pedidos) return;
+    let rol = "";
+    try { rol = window.sessionStorage.getItem("cxc_role") ?? ""; } catch { /* sin almacenamiento */ }
+    if (rol === "bodega") ponerGlobito(pedidos.filter((p) => p.estado === "pendiente").length);
+  }, [pedidos]);
 
   /**
    * Mueve el pedido al estado que se pide. Con bultos el flujo AVANZA
@@ -1017,7 +1029,7 @@ export default function PedidosView({
       <table className="w-full text-left text-xs sm:text-sm">
         <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
           <tr>
-            <ThOrden col="antiguedad" api={orden} className="py-2 pl-3 pr-1 sm:px-3"><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></ThOrden>
+            <ThOrden col="antiguedad" api={orden} className="py-2 pl-3 pr-1 sm:px-3">{MANTENER_PRESIONADO_2026_11 ? "Antigüedad" : <><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></>}</ThOrden>
             <ThOrden col="cliente" api={orden} className="px-1 py-2 sm:px-3">Cliente</ThOrden>
             <th className="hidden px-3 py-2 sm:table-cell">Firma</th>
             <th className="py-2 pl-0.5 pr-3 text-right sm:px-3"><span className="sr-only sm:not-sr-only">Estado</span></th>
@@ -1099,8 +1111,14 @@ export default function PedidosView({
       {agruparPorEmpresa(visibles).map((g) => (
         <section key={g.empresa_key}>
           <h3 className="bg-gray-50 px-4 py-2 text-[13px] font-semibold text-gray-900">{nombreCortoEmpresa(g.empresa_key)} · {g.pedidos.length}</h3>
+          {(MANTENER_PRESIONADO_2026_11 ? porVendedor(ordenarGrupo(g.pedidos)) : [{ vendedor: null as string | null, pedidos: ordenarGrupo(g.pedidos) }]).map((sub) => (
+          <Fragment key={sub.vendedor ?? "·"}>
+          {/* 🔴 27-nov-2026: el vendedor UNA vez, como subtítulo bajo la empresa. */}
+          {MANTENER_PRESIONADO_2026_11 && (
+            <h4 data-vendedor-subtitulo className="px-4 pb-1 pt-2.5 text-[13px] font-medium text-gray-500">{sub.vendedor ?? "Sin vendedor"} · {sub.pedidos.length}</h4>
+          )}
           <ul className="divide-y divide-gray-100">
-            {ordenarGrupo(g.pedidos).map((p) => {
+            {sub.pedidos.map((p) => {
               const firma = firmaParaLeer(ultimaFirmaFlujoSimple(firmasSimpleDe(p)));
               const vendedor = vendedorEnPantalla(p.vendedor_nombre);
               return (
@@ -1109,9 +1127,16 @@ export default function PedidosView({
                 <div className="flex items-center gap-3 px-4 py-2.5">
                   <button type="button" onClick={() => setAbierto(detalleDe(p))} className="min-w-0 flex-1 text-left">
                     <span className="block truncate text-[15px] font-medium text-gray-900">{p.cliente_nombre}</span>
+                    {MANTENER_PRESIONADO_2026_11 ? (
+                      <>
+                        <span className="mt-0.5 block truncate text-[13px] text-gray-500">{p.secuencial}</span>
+                        <span data-antiguedad className="block truncate text-[13px] text-gray-500">{antiguedadCompleta(fechaDeAntiguedad(p), hoy)}</span>
+                      </>
+                    ) : (
                     <span className="mt-0.5 block truncate text-[13px] text-gray-500">
                       {p.secuencial} · {haceDiasCorto(fechaDeAntiguedad(p), hoy)}{vendedor ? ` · ${vendedor}` : ""}
                     </span>
+                    )}
                     {firma && <span className="block truncate text-xs text-gray-500">{firma}</span>}
                     {avisoEsperaMuestra(p)}
                   </button>
@@ -1125,6 +1150,8 @@ export default function PedidosView({
               );
             })}
           </ul>
+          </Fragment>
+          ))}
         </section>
       ))}
     </div>
@@ -1146,7 +1173,7 @@ export default function PedidosView({
         <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
           <tr>
             {conCirculo && <th className="w-11 py-2 pl-1.5 sm:pl-2"><span className="sr-only">Preparado</span></th>}
-            <ThOrden col="antiguedad" api={orden} className={`py-2 pr-1 sm:px-3 ${conCirculo ? "pl-1" : "pl-3"}`}><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></ThOrden>
+            <ThOrden col="antiguedad" api={orden} className={`py-2 pr-1 sm:px-3 ${conCirculo ? "pl-1" : "pl-3"}`}>{MANTENER_PRESIONADO_2026_11 ? "Antigüedad" : <><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></>}</ThOrden>
             <ThOrden col="cliente" api={orden} className="px-1 py-2 sm:px-3">Cliente</ThOrden>
             {/* 🔴 EL VENDEDOR BAJA DEBAJO DEL CLIENTE (Daniel, 6-oct-2026): no
                 merece una columna propia, y la que deja libre la ocupa Bultos
@@ -1255,7 +1282,7 @@ export default function PedidosView({
       <table className="w-full text-left text-xs sm:text-sm">
         <thead className="border-b border-gray-200 text-xs font-medium text-gray-400 sm:uppercase sm:tracking-wide">
           <tr>
-            <th className="py-2 pl-3 pr-1 sm:px-3"><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></th>
+            <th className="py-2 pl-3 pr-1 sm:px-3">{MANTENER_PRESIONADO_2026_11 ? "Antigüedad" : <><span className="sm:hidden">Antig.</span><span className="hidden sm:inline">Antigüedad</span></>}</th>
             <th className="px-1 py-2 sm:px-3">Cliente</th>
             {/* En el celular, Empresa va apilada debajo del Vendedor: así entra en 375 sin scroll. */}
             <th className="px-1 py-2 sm:px-3">Vendedor</th>

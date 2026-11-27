@@ -29,7 +29,8 @@ import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
 import AvisoRechazosSwitch from "@/components/AvisoRechazosSwitch";
 import { formatCompactCurrency } from "@/lib/ventas/format";
-import { AGING_ORDER, type AgingKey } from "@/lib/cxc-aging";
+import { AGING, AGING_ORDER, type AgingKey } from "@/lib/cxc-aging";
+import { MANTENER_PRESIONADO_2026_11 } from "@/lib/ui/mantener-presionado-2026-11";
 import {
   guardarOrdenDeLaVisita,
   leerOrdenDeLaVisita,
@@ -68,6 +69,9 @@ import { CLASE_TITULO_BARRA, IconoBarra, TextoQueCabe } from "@/components/celul
 import { CLASE_LINEA_TOTAL, CLASE_TOTAL_CELULAR, SegmentadoCelular } from "@/components/celular/CabeceraCompacta";
 import { CXC_APPLE_2026_10, opcionesActualizarCxc, partirPorAtencion, saldoMas90 } from "@/lib/cxc/apple-2026-10";
 import EstadosPorWhatsApp from "./EstadosPorWhatsApp";
+import TarjetaPagosCliente from "./TarjetaPagosCliente";
+import { codigoDeCliente } from "@/lib/cxc/descargas";
+import { codigoDeClienteBoston } from "@/lib/cxc/boston-como-grupo";
 import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
 import { SwipeableRow } from "@/components/ui";
 import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
@@ -293,11 +297,21 @@ export default function PanelCxcCelular({
               etiqueta="Tramos de antigüedad"
               activa={riskFilter === "all" ? null : riskFilter}
               onElegir={(k) => setRiskFilter(k)}
-              opciones={AGING_ORDER.map((k) => ({
-                clave: k,
-                rojo: k === "overdue",
-                rotulo: `${formatCompactCurrency(k === "current" ? totals.current : k === "watch" ? totals.watch : totals.overdue)} · ${chipCorto(k)}`,
-              }))}
+              dosRenglones={MANTENER_PRESIONADO_2026_11}
+              opciones={AGING_ORDER.map((k) => {
+                const monto = formatCompactCurrency(k === "current" ? totals.current : k === "watch" ? totals.watch : totals.overdue);
+                return {
+                  clave: k,
+                  rojo: k === "overdue",
+                  // 🔴 27-nov-2026: monto arriba, tramo abajo («0-90 días»); en un renglón se cortaban.
+                  rotulo: MANTENER_PRESIONADO_2026_11 ? (
+                    <>
+                      <span className="block whitespace-nowrap font-semibold tabular-nums">{monto}</span>
+                      <span data-tramo-abajo className={`block whitespace-nowrap text-[13px] font-normal ${k === "overdue" ? "text-red-600" : "text-gray-500"}`}>{AGING[k].rangoLargo}</span>
+                    </>
+                  ) : `${monto} · ${chipCorto(k)}`,
+                };
+              })}
             />
           </div>
         </div>
@@ -462,9 +476,9 @@ export default function PanelCxcCelular({
       ) : secciones && secciones.atencion.length > 0 ? (
         <>
           {whatsapp && !enBoston && <EstadosPorWhatsApp celular />}
-          <SeccionClientes titulo="Clientes +90 días" clientes={secciones.atencion} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} onEnviarEstado={onEnviarEstado} />
+          <SeccionClientes titulo="Clientes +90 días" clientes={secciones.atencion} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} onEnviarEstado={onEnviarEstado} cartera={cartera} />
           {secciones.resto.length > 0 && (
-            <SeccionClientes titulo="Otros clientes" clientes={secciones.resto} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} onEnviarEstado={onEnviarEstado} />
+            <SeccionClientes titulo="Otros clientes" clientes={secciones.resto} diasSinPagarDe={diasSinPagarDe} onCobrar={onCobrar} onEnviarEstado={onEnviarEstado} cartera={cartera} />
           )}
         </>
       ) : (
@@ -475,6 +489,7 @@ export default function PanelCxcCelular({
               client={c}
               dias={diasSinPagarDe(c)}
               onAbrir={() => onCobrar(c)}
+              cartera={cartera}
             />
           ))}
         </ul>
@@ -523,19 +538,21 @@ function SeccionClientes({
   diasSinPagarDe,
   onCobrar,
   onEnviarEstado,
+  cartera,
 }: {
   titulo: string;
   clientes: ConsolidatedClient[];
   diasSinPagarDe: (client: ConsolidatedClient) => number | null;
   onCobrar: (client: ConsolidatedClient) => void;
   onEnviarEstado?: (client: ConsolidatedClient) => void;
+  cartera: "grupo" | "boston";
 }) {
   return (
     <section data-seccion-cxc={titulo}>
       <h2 className={ACCESIBILIDAD_2026_11 ? "px-8 pt-5 pb-1.5 text-sm font-semibold text-gray-600" : "px-8 pt-5 pb-1.5 text-xs font-medium uppercase tracking-wide text-gray-400"}>{titulo}</h2>
       <ul data-lista="cxc-celular" className="mx-4 overflow-hidden rounded-2xl bg-white">
         {clientes.map((c) => (
-          <FilaCliente key={c.nombre_normalized} client={c} dias={diasSinPagarDe(c)} onAbrir={() => onCobrar(c)} onEnviar={onEnviarEstado ? () => onEnviarEstado(c) : undefined} />
+          <FilaCliente key={c.nombre_normalized} client={c} dias={diasSinPagarDe(c)} onAbrir={() => onCobrar(c)} onEnviar={onEnviarEstado ? () => onEnviarEstado(c) : undefined} cartera={cartera} />
         ))}
       </ul>
     </section>
@@ -551,11 +568,13 @@ function FilaCliente({
   dias,
   onAbrir,
   onEnviar,
+  cartera = "grupo",
 }: {
   client: ConsolidatedClient;
   dias: number | null;
   onAbrir: () => void;
   onEnviar?: () => void;
+  cartera?: "grupo" | "boston";
 }) {
   const tramo = tramoDominante(client);
   const urge = loQueUrge(client, dias);
@@ -569,7 +588,17 @@ function FilaCliente({
 
   return (
     <li className="border-t border-gray-100 first:border-t-0">
-      {tarjeta && (
+      {tarjeta && MANTENER_PRESIONADO_2026_11 && (
+        <TarjetaPagosCliente
+          nombre={nombreDeCliente(client)}
+          codigo={cartera === "boston" ? codigoDeClienteBoston(client) : codigoDeCliente(client)}
+          saldo={client.total}
+          cartera={cartera}
+          onCerrar={() => setTarjeta(false)}
+          onAbrir={cobrable ? () => { setTarjeta(false); onAbrir(); } : undefined}
+        />
+      )}
+      {tarjeta && !MANTENER_PRESIONADO_2026_11 && (
         <TarjetaSaldoPorEmpresa
           client={client}
           onCerrar={() => setTarjeta(false)}
@@ -591,10 +620,14 @@ function FilaCliente({
         aria-disabled={!cobrable || undefined}
         className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-gray-50 disabled:active:bg-transparent"
       >
+        {/* 🔴 27-nov-2026: sin la rayita de color (confundía: verde con $78,980 a
+            +120 días); lo que urge ya lo dice la segunda línea. */}
+        {!MANTENER_PRESIONADO_2026_11 && (
         <span
           aria-hidden
           className={`w-[3px] self-stretch rounded-full ${tramo ? RAYA[tramo] : "bg-gray-200"}`}
         />
+        )}
         <span className="min-w-0 flex-1">
           {/* 🔴 El nombre es el que escribe Switch, y va COMPLETO: el renglón se
               parte antes que recortarlo — al llamar hace falta el nombre entero. */}

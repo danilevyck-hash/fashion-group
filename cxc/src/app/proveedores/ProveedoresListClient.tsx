@@ -31,6 +31,9 @@ import { TEXTOS_SIN_PARTIR } from "@/lib/ui/revision-110-ajustes";
 import { capitalizarNombre } from "@/lib/cxc/estado-cuenta-switch";
 import TramosApple, { tonoApple } from "./TramosApple";
 import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
+import TarjetaComprasEmpresa from "./TarjetaComprasEmpresa";
+import { MANTENER_PRESIONADO_2026_11 } from "@/lib/ui/mantener-presionado-2026-11";
+import { montoDeLaTabla } from "@/lib/ventas/celular";
 
 /** v2: el nombre del proveedor con la función común de nombres. */
 const nombreApple = (n: string) => nombreProveedorEnPantalla(n, capitalizarNombre);
@@ -651,6 +654,18 @@ function SinSaldoCelular({
  *  de la empresa por tramo de EDAD, con los mismos números de la fila abierta
  *  (sin leer nada). Un solo tono, como siempre: es edad, no mora. */
 function TarjetaTramos({ empresa, onAbrir, onCerrar }: { empresa: EmpresaCxp; onAbrir: () => void; onCerrar: () => void }) {
+  // 🔴 27-nov-2026 (mockup 03): las COMPRAS mes a mes contra el año pasado, en gris.
+  if (MANTENER_PRESIONADO_2026_11) {
+    return (
+      <TarjetaComprasEmpresa
+        empresaKey={empresa.empresa_key}
+        nombre={empresa.nombre}
+        porPagar={montoDeLaTabla(empresa.saldo.por_pagar)}
+        onAbrir={onAbrir}
+        onCerrar={onCerrar}
+      />
+    );
+  }
   return (
     <TarjetaResumen
       titulo={empresa.nombre}

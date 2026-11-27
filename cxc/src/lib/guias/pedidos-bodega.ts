@@ -316,3 +316,26 @@ export function abreviarEmpresa(nombre: string): string {
   const [a, ...resto] = nombre.trim().split(/\s+/);
   return resto.length ? `${a[0]}. ${resto.join(" ")}` : a;
 }
+
+/**
+ * 🔴 27-nov-2026 (`MANTENER_PRESIONADO_2026_11`): el celular dice el vendedor
+ * UNA vez, como subtítulo bajo la empresa. Parte la lista YA ordenada en
+ * tramos por vendedor, en el orden en que aparece cada uno (el primero es el
+ * del pedido que va arriba). Sin vendedor, `null`.
+ */
+export function porVendedor<P extends { vendedor_nombre: string | null }>(ordenados: readonly P[]): { vendedor: string | null; pedidos: P[] }[] {
+  const grupos = new Map<string, { vendedor: string | null; pedidos: P[] }>();
+  for (const p of ordenados) {
+    const v = (p.vendedor_nombre ?? "").trim() ? vendedorEnPantalla(p.vendedor_nombre) : null;
+    const k = v ?? "";
+    if (!grupos.has(k)) grupos.set(k, { vendedor: v, pedidos: [] });
+    grupos.get(k)!.pedidos.push(p);
+  }
+  return [...grupos.values()];
+}
+
+/** «Antigüedad: 2 días» · «Antigüedad: 1 día» · «Antigüedad: hoy», sin abreviar. */
+export function antiguedadCompleta(fechaIso: string, hoy: string): string {
+  const d = diasDesde(fechaIso, hoy);
+  return `Antigüedad: ${d === 0 ? "hoy" : d === 1 ? "1 día" : `${d} días`}`;
+}
