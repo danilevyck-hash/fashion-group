@@ -1,9 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/cron/acs-resumen-diario — Resumen de ventas ACS del día a Telegram.
-// Corre 03:15 UTC (22:15 Panamá), después de la carga de facturas ACS de
-// 03:00 UTC (22:00 Panamá) → el número de "hoy" ya incluye el día completo.
+// Corre 00:30 UTC (7:30 p. m. Panamá), 15 min después del sync de cierre de
+// 00:15 UTC. 🔴 Desde el 26-nov-2026 VUELVE a las 7:30 p. m. (Daniel, aprobado):
+// acepta que el mensaje no cuente ventas posteriores; la carga de las 03:00 UTC
+// completa el día para lo demás. Del 1 al 26-nov-2026 salió a 03:15 UTC (22:15).
 //
-// 🔴 22:15 Y NO 7:30 p.m. (1-nov-2026). La tienda sigue facturando después de
+// Nota del 1-nov-2026 (por qué entonces se movió). La tienda sigue facturando después de
 // las 7: el 31-oct hubo ventas a las 7:16 y 7:27 que el mensaje de las 7:30 no
 // contó. Medido en 90 días (80 días con venta): la última factura del día cae
 // p50 18:35 · p90 19:00 · p99 = máx 21:56 de Panamá. 22:15 queda después de la

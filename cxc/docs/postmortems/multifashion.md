@@ -919,6 +919,10 @@ Los dos envíos (el cron y la recuperación de `switch-reconciliacion`) usan el 
 - La guardia de frescura no cambió (pide una carga posterior a las 7 p.m.). La recuperación de `switch-reconciliacion` sigue en `enviarNegocioPrivado`, con `earlyUtcRun` (ventana desde las 00:00 UTC, que contiene las 03:15). Sin avisos nuevos.
 - 94 entradas de cron (tope de Vercel Pro: 100).
 
+## 26-nov-2026 — El resumen vuelve a las 7:30 p. m.
+
+Daniel (aprobado): el resumen de ACS vuelve a **00:30 UTC = 7:30 p. m. de Panamá**, aceptando que no cuente ventas posteriores. No se agregó ninguna carga: el sync de cierre de las 00:15 UTC (pg_cron `fg-switch-sync-facturas-0015`) ya existe, queda 15 min antes (= `SEPARACION_MINIMA_MIN`) y satisface la guardia de frescura; la de las 03:00 UTC se queda. La recuperación de `switch-reconciliacion` no cambia (`earlyUtcRun`, ventana desde 00:00 UTC, que contiene las 00:30; reporta «ayer» Panamá; mismo `enviarNegocioPrivado`, sin duplicar). `vercel.json` sigue en 82 entradas.
+
 ## 16-nov-2026 — «vs 2025» en la gráfica, el 4-nov sin aviso y el 28-nov como feriado
 
 Tres cosas que Daniel aprobó con «sí» el 16-nov-2026, en una sola solicitud de cambio.

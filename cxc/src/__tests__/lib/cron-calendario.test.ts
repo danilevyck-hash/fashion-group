@@ -249,17 +249,18 @@ describe("ventas intradía — cobertura de empresas", () => {
     );
   });
 
-  // 1-nov-2026: la tienda factura después de las 7 p. m. (90 días: última venta
-  // p99 = máx = 21:56 de Panamá). El resumen sale a las 22:15 (03:15 UTC) y la
-  // carga de las 22:00 (03:00 UTC) va justo antes — de ella depende.
-  it("la carga de la noche de ACS (03:00) va justo antes del resumen (03:15)", () => {
+  // 26-nov-2026 (Daniel): el resumen vuelve a las 7:30 p. m. (00:30 UTC) aceptando
+  // que no cuente ventas posteriores. De él depende el cierre de las 00:15 UTC
+  // (15 min antes = SEPARACION_MINIMA_MIN). La carga de las 03:00 se queda: completa el día.
+  it("el cierre de ACS (00:15) va justo antes del resumen (00:30) y la carga de las 03:00 se queda", () => {
     expect(ventas.filter((e) => e.hhmmUtc === "0300").map((e) => e.empresas)).toEqual([
       ["american_classic"],
     ]);
+    expect(distanciaCircularMin("0015", "0030")).toBeGreaterThanOrEqual(SEPARACION_MINIMA_MIN);
     const crons = (JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../../vercel.json"), "utf8")) as {
       crons: { path: string; schedule: string }[];
     }).crons;
-    expect(crons.find((c) => c.path === "/api/cron/acs-resumen-diario")?.schedule).toBe("15 3 * * *");
+    expect(crons.find((c) => c.path === "/api/cron/acs-resumen-diario")?.schedule).toBe("30 0 * * *");
   });
 
   it("los saldos de CXC (estadocuenta) NO se tocaron: siguen 16:0x y 21:1x", () => {
