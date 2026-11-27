@@ -614,3 +614,11 @@ html[data-cifras="sistema"] .skin-caja {
 html[data-a11y] :is(.text-\[9px\], .text-\[9\.5px\], .text-\[10px\], .text-\[10\.5px\], .text-\[11px\], .text-\[11\.5px\]) {
   font-size: 12px;
 }
+
+/* Deslizar para actualizar (26-nov-2026, `DESLIZAR_ACTUALIZA_CON_SWITCH`): el
+   rebote del iPhone en la parte de arriba se apaga para que el gesto de la app
+   sea el único (sin doble movimiento). El scroll normal y el de abajo no cambian. */
+html[data-deslizar],
+html[data-deslizar] body {
+  overscroll-behavior-y: none;
+}

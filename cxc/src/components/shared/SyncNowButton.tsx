@@ -36,6 +36,7 @@ import { syncConEnganche } from "./syncNowClient";
 import { TEXTO_ACTUALIZANDO, TEXTO_ACTUALIZAR_AHORA } from "@/lib/ui/actualizar-ahora";
 import { vidrioSobre } from "@/lib/ui/vidrio";
 import { usePausaSwitch } from "./usePausaSwitch";
+import { useAccionDelGesto } from "./DeslizarParaActualizar";
 
 export interface SyncNowOpcion {
   /** Módulo del endpoint: estadocuenta | facturas | recibos | clientes-master |
@@ -181,6 +182,19 @@ export default function SyncNowButton({
   const pausa = usePausaSwitch();
   const tocaSwitch = opciones.some((o) => o.modulo !== "refresh-vistas" && o.modulo !== "clientes-master");
 
+  // 🔴 Deslizar hacia abajo = tocar este botón (26-nov-2026): el gesto llama a
+  // `alTocar`, la MISMA función del onClick. Sin permiso o en pausa no se
+  // inscribe (el toque tampoco haría nada).
+  const alTocarRef = useRef<() => void | Promise<void>>(() => {});
+  const ocupadoRef = useRef(false);
+  useAccionDelGesto(
+    "actualizar",
+    menuRef,
+    visible && !(pausa?.activa && tocaSwitch),
+    () => alTocarRef.current(),
+    () => ocupadoRef.current,
+  );
+
   if (!visible) return <>{sinPermiso}</>;
 
   if (pausa?.activa && tocaSwitch) {
@@ -276,6 +290,14 @@ export default function SyncNowButton({
   const disabled = running || !!disabledReason || opciones.length === 0;
   const esSecuencia = !!secuencial && opciones.length > 1;
   const esMenu = !esSecuencia && opciones.length > 1;
+  // El toque del botón y el gesto de deslizar: una sola función.
+  const alTocar = (): void | Promise<void> => {
+    if (esSecuencia) return dispararSecuencia();
+    if (esMenu) return setMenuOpen((o) => !o);
+    return disparar(opciones[0]);
+  };
+  alTocarRef.current = alTocar;
+  ocupadoRef.current = disabled;
 
   return (
     <div className={`relative inline-flex flex-col ${className ?? ""}`} ref={menuRef}>
@@ -283,11 +305,7 @@ export default function SyncNowButton({
         type="button"
         title={disabledReason ?? undefined}
         disabled={disabled}
-        onClick={() => {
-          if (esSecuencia) dispararSecuencia();
-          else if (esMenu) setMenuOpen((o) => !o);
-          else disparar(opciones[0]);
-        }}
+        onClick={() => void alTocar()}
         aria-haspopup={esMenu ? "menu" : undefined}
         aria-expanded={esMenu ? menuOpen : undefined}
         // min-h-[44px]: aparece en 4 pantallas y medía 32px de alto — bajo el

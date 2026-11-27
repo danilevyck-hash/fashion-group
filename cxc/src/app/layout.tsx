@@ -20,6 +20,7 @@ import SWUpdater from "@/components/SWUpdater";
 import AvisosAlEntrar from "@/components/AvisosAlEntrar";
 import RegistroDeVisitas from "@/components/RegistroDeVisitas";
 import PantallaAnterior from "@/components/PantallaAnterior";
+import DeslizarParaActualizar from "@/components/shared/DeslizarParaActualizar";
 import SWRProvider from "@/components/SWRProvider";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import PageTransition from "@/components/PageTransition";
@@ -98,6 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 una vez cada 10 min por pestaña. Ver src/lib/visitas/registro.ts. */}
             <RegistroDeVisitas />
             <PantallaAnterior />
+            <DeslizarParaActualizar />
           </OnlineProvider>
         </SWRProvider>
         </SemillaSesionProvider>

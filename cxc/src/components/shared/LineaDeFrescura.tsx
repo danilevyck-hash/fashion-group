@@ -20,9 +20,10 @@
 // `forma` omitida = las dos, celular hasta `md` y computadora desde `md`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import SyncNowButton, { AvisoPausaEnBoton, CLASE_BOTON_LINEA, type SyncNowOpcion } from "./SyncNowButton";
 import { usePausaSwitch } from "./usePausaSwitch";
+import { useAccionDelGesto } from "./DeslizarParaActualizar";
 import { useEstadoSync, type SyncTable } from "./useEstadoSync";
 import { haceCuantoFrescura, horaDeFrescura } from "@/lib/ui/frescura";
 import { TEXTO_ACTUALIZANDO } from "@/lib/ui/actualizar-ahora";
@@ -211,21 +212,26 @@ function BotonPropio({
 }) {
   const [corriendo, setCorriendo] = useState(false);
   const ocupado = corriendo || actualizando;
+  const ref = useRef<HTMLButtonElement>(null);
+  const alTocar = async () => {
+    setCorriendo(true);
+    try {
+      await onActualizar();
+      // La hora de `/api/sync-status` se vuelve a pedir en el foco, igual
+      // que tras `SyncNowButton`.
+      window.dispatchEvent(new Event("focus"));
+    } finally {
+      setCorriendo(false);
+    }
+  };
+  // Deslizar hacia abajo = tocar este botón (misma función).
+  useAccionDelGesto("actualizar", ref, true, alTocar, () => ocupado || deshabilitado);
   return (
     <button
+      ref={ref}
       type="button"
       disabled={ocupado || deshabilitado}
-      onClick={async () => {
-        setCorriendo(true);
-        try {
-          await onActualizar();
-          // La hora de `/api/sync-status` se vuelve a pedir en el foco, igual
-          // que tras `SyncNowButton`.
-          window.dispatchEvent(new Event("focus"));
-        } finally {
-          setCorriendo(false);
-        }
-      }}
+      onClick={alTocar}
       className={CLASE_BOTON_LINEA}
     >
       {rotulo(ocupado)}
