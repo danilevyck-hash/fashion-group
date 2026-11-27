@@ -15,6 +15,8 @@ import { entregadoPorElegido } from "@/lib/guias/despachado-por";
 // cuelga del mismo interruptor.
 import { GUIAS_ATAJOS_NUEVOS, esTraslado } from "@/lib/guias/atajos-facturas";
 import { ETIQUETAS_TRASLADO_2026_10, GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
+import { GUIA_ENVIO_SIN_FACTURA_2026_11, esSinFactura } from "@/lib/guias/envio-sin-factura";
+import { esCeroDeFactura } from "@/lib/guias/numero-factura";
 import type { GuiaItem, ModoEntrega } from "./types";
 
 /**
@@ -128,11 +130,19 @@ export function validarGuia(estado: EstadoGuia): Set<string> {
     if (!item.direccion) errores.add(claveCampo(item, "direccion"));
     // 🔴 Un renglón que es SOLO traslado puede ir sin empresa (Daniel, 2-oct-2026:
     // «puede ser solamente traslado»). Con facturas, la empresa sigue obligatoria.
-    if (!item.empresa && !(ETIQUETAS_TRASLADO_2026_10 && esSoloTraslado(item.facturas))) {
+    // 🔴 26-nov-2026: el envío sin factura YA eligió empresa en su panel; «Ninguna» se guarda vacía.
+    const sinFactura = GUIA_ENVIO_SIN_FACTURA_2026_11 && esSinFactura(item.facturas);
+    if (!item.empresa && !sinFactura && !(ETIQUETAS_TRASLADO_2026_10 && esSoloTraslado(item.facturas))) {
       errores.add(claveCampo(item, "empresa"));
     }
     if (!item.facturas) {
       errores.add(claveCampo(item, "facturas"));
+    } else if (sinFactura) {
+      // «Sin factura · <qué lleva>»: no lleva número que validar.
+    } else if (GUIA_ENVIO_SIN_FACTURA_2026_11 && !item.id && item.facturas.split(",").some((p) => esCeroDeFactura(p))) {
+      // 🔴 «0000» ya no es una factura: «Usa Envío sin factura». Solo renglones
+      // NUEVOS (sin `id`): lo viejo guardado con «0000» no se toca.
+      errores.add(claveCampo(item, "facturas-cero"));
     } else {
       if (item.facturas.includes(",") && !item.facturas.match(/^[^,]+(, [^,]+)*$/)) {
         errores.add(claveCampo(item, "facturas-separator"));
@@ -249,6 +259,7 @@ export function faltaParaGuardar(estado: EstadoGuia): string[] {
     ) {
       campos.push("la factura bien escrita");
     }
+    if (errores.has(claveCampo(item, "facturas-cero"))) campos.push("usar «Envío sin factura» en vez de «0000»");
     if (campos.length > 0) malos.push({ numero: idx + 1, campos });
   });
 

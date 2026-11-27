@@ -16,6 +16,13 @@ import { emptyItem } from "@/app/despachos/components/constants";
 import type { GuiaItem } from "@/app/despachos/components/types";
 import { lineaDeTraslado, observacionesConTraslado } from "@/lib/guias/etiquetas-por-envio";
 
+// 26-nov-2026: con «Envío sin factura» prendido, este botón ya no se dibuja.
+// Este candado cuida la pantalla de ANTES (interruptor apagado).
+vi.mock("@/lib/guias/envio-sin-factura", async (orig) => ({
+  ...(await orig<typeof import("@/lib/guias/envio-sin-factura")>()),
+  GUIA_ENVIO_SIN_FACTURA_2026_11: false,
+}));
+
 vi.mock("@/components/ClientePicker", () => ({
   default: ({ id, onChange }: { id: string; onChange: (n: string, c: string) => void }) => (
     <div>

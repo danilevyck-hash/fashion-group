@@ -42,6 +42,9 @@ const TECHOS: Record<string, number> = {
   // RECOMENDACIÓN de Marcación (16-nov-2026): es la hoja de la colaboradora con
   // SUS horas. Excepción anotada, no un texto que se coló.
   "src/app/marcacion/MisMarcaciones.tsx": 1,
+  // «Qué lleva» es el rótulo que Daniel DEFINIÓ y APROBÓ en el mockup HOY vs
+  // RECOMENDACIÓN de «Envío sin factura» (26-nov-2026). Excepción anotada.
+  "src/app/despachos/components/AgregarSinFactura.tsx": 1,
   "src/app/asistencia/PlanillaTab.tsx": 2,
   "src/lib/novedades/dibujos.ts": 1,
   "src/lib/guias/etiquetas.ts": 1,

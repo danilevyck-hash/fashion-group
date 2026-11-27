@@ -74,6 +74,11 @@ import { entregadoPorElegido, nombreDespachadoPor } from "@/lib/guias/despachado
 import { useDespachadores } from "./useDespachadores";
 import { GUIA_APPLE_2026_10, GUIA_NUEVA_2026_10 } from "@/lib/guias/guias-2026-10";
 import EnviosApple from "./EnviosApple";
+import { AVISO_USA_SIN_FACTURA, GUIA_ENVIO_SIN_FACTURA_2026_11 } from "@/lib/guias/envio-sin-factura";
+import { esCeroDeFactura } from "@/lib/guias/numero-factura";
+
+/** «0000» tecleado: se avisa en el campo mismo, sin esperar a «Guardar guía». */
+const esCeroEscrito = (f: string | null | undefined) => (f ?? "").split(",").some((p) => esCeroDeFactura(p));
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
 import { ATRIBUTO_BARRA_FIJA } from "@/lib/navegacion/barra-celular";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
@@ -827,6 +832,7 @@ export default function GuiaForm({
     const err = hayError(clave, item.facturas);
     const sep = validationErrors.has(claveCampo(item, "facturas-separator"));
     const fmt = validationErrors.has(claveCampo(item, "facturas-format"));
+    const cero = GUIA_ENVIO_SIN_FACTURA_2026_11 && !item.id && esCeroEscrito(item.facturas);
     return (
       <>
         <input
@@ -836,10 +842,10 @@ export default function GuiaForm({
           value={item.facturas}
           placeholder="Número de factura"
           onChange={(e) => { onUpdateItem(idx, "facturas", e.target.value); marcarTocado(clave); }}
-          className={ctrl(err || sep || fmt)}
+          className={ctrl(err || sep || fmt || cero)}
         />
         {err && <ErrorCampo />}
-        {!soloCorregible && (
+        {!soloCorregible && !cero && (
           <AmarreDelRenglon
             item={item}
             porCliente={facturasGuia.porCliente}
@@ -849,6 +855,7 @@ export default function GuiaForm({
         )}
         {sep && <ErrorCampo>Separar con coma y espacio (ej: FA-001, FA-002)</ErrorCampo>}
         {fmt && !sep && <ErrorCampo>Mín. 4 dígitos por factura</ErrorCampo>}
+        {cero && <ErrorCampo>{AVISO_USA_SIN_FACTURA}</ErrorCampo>}
       </>
     );
   }

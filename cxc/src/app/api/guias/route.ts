@@ -5,6 +5,8 @@ import { getSession } from "@/lib/require-auth";
 import { transportistaLabel, type TransportistaSource } from "@/lib/transportistaLabel";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { validarEmpresasItems } from "@/lib/guias/validar-items";
+import { AVISO_USA_SIN_FACTURA, GUIA_ENVIO_SIN_FACTURA_2026_11 } from "@/lib/guias/envio-sin-factura";
+import { esCeroDeFactura } from "@/lib/guias/numero-factura";
 import { GUIAS_WRITE_ROLES } from "@/lib/guias/roles-escritura";
 import {
   CAMPOS_OBLIGATORIOS,
@@ -141,6 +143,12 @@ export async function POST(req: NextRequest) {
   // Guía NUEVA: empresa cerrada a las 8 del grupo, sin excepción histórica.
   const errEmpresa = validarEmpresasItems(items);
   if (errEmpresa) return NextResponse.json({ error: errEmpresa }, { status: 400 });
+
+  // 🔴 26-nov-2026: «0000» ya no entra como factura en una guía NUEVA (editar una vieja, sí).
+  if (GUIA_ENVIO_SIN_FACTURA_2026_11 && (items as Array<{ facturas?: unknown }>).some((it) =>
+    String(it?.facturas ?? "").split(",").some((p) => esCeroDeFactura(p)))) {
+    return NextResponse.json({ error: AVISO_USA_SIN_FACTURA }, { status: 400 });
+  }
 
   // Auto-increment numero with retry for race conditions (UNIQUE constraint)
   let guia: Record<string, unknown> | null = null;
