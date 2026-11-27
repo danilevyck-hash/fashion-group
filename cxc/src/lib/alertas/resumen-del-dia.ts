@@ -15,6 +15,7 @@
 
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
 import { CLIENTES_FUERA, escHtml } from "@/lib/cxc/cobros-del-dia";
+import { variacionPct } from "@/lib/variacion";
 import { signoVenta } from "@/lib/ventas/tipos-comprobante";
 import { nombreSinGritar } from "@/lib/cxc/nombre-cliente";
 
@@ -53,7 +54,33 @@ export interface FacturaDelDia {
  * negrita (HTML) y renglones con «– ». El cliente va por su NETO del día (factura
  * y nota de crédito ya restadas); el que queda en $0 no sale; los negativos, tal cual.
  */
-export function bloqueFacturas(facturas: readonly FacturaDelDia[], fecha: string): string | null {
+/** Venta neta con LA regla del total del día: NC restan, sin mostrador ni empresas del grupo. */
+export function netoDeVentas(facturas: readonly FacturaDelDia[]): number {
+  let total = 0;
+  for (const f of facturas) {
+    const signo = signoVenta(f.tipo);
+    if (signo === 0) continue;
+    if (CLIENTES_FUERA.includes((f.codigo ?? "").trim().toUpperCase())) continue;
+    total += signo * (Number(f.subtotal) || 0);
+  }
+  return total;
+}
+
+/** `Mes: $X · +Y % vs nov 2025` (27-nov-2026, Daniel). `previo` null = sin base. */
+export function lineaMes(fecha: string, actual: number, previo: number | null): string {
+  const base = `Mes: ${usd(actual)}`;
+  const pct = variacionPct(actual, previo);
+  if (pct === null) return `${base} · sin base año pasado`;
+  const p = Math.round(Math.abs(pct) * 100) * Math.sign(pct);
+  const mes = `${MESES[Number(fecha.slice(5, 7)) - 1]} ${Number(fecha.slice(0, 4)) - 1}`;
+  return `${base} · ${p < 0 ? "−" : "+"}${Math.abs(p)} % vs ${mes}`;
+}
+
+export function bloqueFacturas(
+  facturas: readonly FacturaDelDia[],
+  fecha: string,
+  mes?: { actual: number; previo: number | null } | null,
+): string | null {
   type Cli = { nombre: string; total: number };
   const porEmpresa = new Map<string, Map<string, Cli>>();
   let total = 0;
@@ -83,7 +110,7 @@ export function bloqueFacturas(facturas: readonly FacturaDelDia[], fecha: string
     .filter((g) => g.vivos.length > 0)
     .sort((a, b) => b.suma - a.suma);
   return [
-    `<b>🧾 Ventas · ${fechaDelTitulo(fecha)}</b>\n<b>${usd(total)}</b>`,
+    `<b>🧾 Ventas · ${fechaDelTitulo(fecha)}</b>\n<b>${usd(total)}</b>${mes ? `\n${lineaMes(fecha, mes.actual, mes.previo)}` : ""}`,
     ...grupos.map((g) =>
       [
         `<b>${escHtml(nombreCortoEmpresa(g.emp))} · ${usd(g.suma)}</b>`,

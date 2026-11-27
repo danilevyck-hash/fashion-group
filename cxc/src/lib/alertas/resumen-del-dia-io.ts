@@ -14,7 +14,10 @@ import type { FacturaDelDia, GuiaDespachada } from "./resumen-del-dia";
 const inicioPanama = (ymd: string) => `${ymd}T00:00:00-05:00`;
 const diaSiguiente = (ymd: string) => new Date(Date.parse(`${ymd}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 
-export async function leerFacturasDelDia(fecha: string): Promise<FacturaDelDia[]> {
+export const leerFacturasDelDia = (fecha: string) => leerFacturasDelRango(fecha, fecha);
+
+/** Facturas con fecha de Panamá entre `desde` y `hasta`, ambos inclusive. */
+export async function leerFacturasDelRango(desde: string, hasta: string): Promise<FacturaDelDia[]> {
   const filas = await leerTodoPaginado<{ empresa_key: string; cliente_switch_id: number | null; cliente_nombre: string | null; tipo_comprobante: string; subtotal_descuento: number | string }>(
     "switch_facturas (resumen del día)",
     (pedirCount, a, b) =>
@@ -22,8 +25,8 @@ export async function leerFacturasDelDia(fecha: string): Promise<FacturaDelDia[]
         .from("switch_facturas")
         .select("empresa_key, cliente_switch_id, cliente_nombre, tipo_comprobante, subtotal_descuento", pedirCount ? { count: "exact" } : {})
         .in("empresa_key", CXC_GRUPO_EMPRESA_KEYS as unknown as string[])
-        .gte("fecha", inicioPanama(fecha))
-        .lt("fecha", inicioPanama(diaSiguiente(fecha)))
+        .gte("fecha", inicioPanama(desde))
+        .lt("fecha", inicioPanama(diaSiguiente(hasta)))
         .order("id", { ascending: true })
         .range(a, b),
   );

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   bloqueDespachos,
   bloqueFacturas,
+  lineaMes,
   partirParaTelegram,
   resumenDelDia,
   type FacturaDelDia,
@@ -47,6 +48,19 @@ describe("🧾 ventas", () => {
   it("sin facturas no hay mensaje; un tipo desconocido no cuenta", () => {
     expect(bloqueFacturas([], F)).toBeNull();
     expect(bloqueFacturas([fa("vistana", "D-1", "X", 10, "Raro")], F)).toBeNull();
+  });
+});
+
+describe("Mes", () => {
+  it("con signo, sin decimales; sin base lo dice", () => {
+    expect(lineaMes(F, 1000, 800)).toBe("Mes: $1,000 · +25 % vs nov 2025");
+    expect(lineaMes(F, 700, 800)).toBe("Mes: $700 · −13 % vs nov 2025");
+    expect(lineaMes(F, 700, null)).toBe("Mes: $700 · sin base año pasado");
+    expect(lineaMes(F, 700, 50)).toBe("Mes: $700 · sin base año pasado");
+  });
+  it("va debajo del total del día", () => {
+    const t = bloqueFacturas([fa("vistana", "D-26", "X", 100)], F, { actual: 500, previo: 400 })!;
+    expect(t.split("\n").slice(0, 3)).toEqual(["<b>🧾 Ventas · jue 26 nov</b>", "<b>$100</b>", "Mes: $500 · +25 % vs nov 2025"]);
   });
 });
 
