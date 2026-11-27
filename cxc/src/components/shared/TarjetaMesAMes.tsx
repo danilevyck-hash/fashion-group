@@ -16,11 +16,14 @@ import { montoDeLaTabla } from "@/lib/ventas/celular";
 import { anchoDeBarras, cambioDelMes, type CambioDelMes, type MesDeLaTarjeta } from "@/lib/ventas/mes-a-mes";
 
 
+/** Un mes que puede no tener número (`null` = no se sabe; se dibuja «—», nunca $0). */
+type MesConHueco = Omit<MesDeLaTarjeta, "actual"> & { actual: number | null };
+
 export interface PropsTarjetaMesAMes {
   titulo: string;
   subtitulo?: string;
-  meses: MesDeLaTarjeta[];
-  total: { actual: number; previo?: number | null } | null;
+  meses: MesConHueco[];
+  total: { actual: number | null; previo?: number | null } | null;
   /** «Total 2026» por defecto. */
   rotuloTotal?: string;
   anio: number;
@@ -38,6 +41,8 @@ export interface PropsTarjetaMesAMes {
   onTocarMes?: (mes: number) => void;
   onAbrir?: () => void;
   onCerrar: () => void;
+  /** Lo que va DEBAJO de la tarjeta, aparte (el menú de acciones de CxC). */
+  debajo?: React.ReactNode;
 }
 
 type Cambio = ((actual: number, previo: number | null | undefined) => CambioDelMes) | null;
@@ -52,18 +57,19 @@ export function ListaMesAMes({
   mesEnCurso = null,
   onTocarMes,
 }: {
-  meses: MesDeLaTarjeta[];
-  total?: { actual: number; previo?: number | null } | null;
+  meses: MesConHueco[];
+  total?: { actual: number | null; previo?: number | null } | null;
   rotuloTotal?: string;
   formato?: (n: number) => string;
   cambio?: Cambio;
   mesEnCurso?: number | null;
   onTocarMes?: (mes: number) => void;
 }) {
-  const anchos = anchoDeBarras(meses.map((m) => m.actual));
-  const pct = (a: number, p: number | null | undefined) => {
+  const anchos = anchoDeBarras(meses.map((m) => m.actual ?? 0));
+  const cifra = (n: number | null) => (n == null ? "—" : formato(n));
+  const pct = (a: number | null, p: number | null | undefined) => {
     if (!cambio) return null;
-    const c = cambio(a, p);
+    const c = a == null ? { texto: "—", tono: "fl" as const } : cambio(a, p);
     return <span className={`w-[64px] shrink-0 text-right text-[13px] ${c.clase ?? colorDelTono(c.tono)}`}>{c.texto}</span>;
   };
   return (
@@ -80,7 +86,7 @@ export function ListaMesAMes({
                   style={{ width: `${anchos[i]}%` }}
                 />
               </span>
-              <span className="shrink-0 text-right tabular-nums text-gray-900">{formato(m.actual)}</span>
+              <span className="shrink-0 text-right tabular-nums text-gray-900">{cifra(m.actual)}</span>
               {pct(m.actual, m.previo)}
               {onTocarMes && <span aria-hidden className="w-2 shrink-0 text-gray-300">›</span>}
             </>
@@ -102,7 +108,7 @@ export function ListaMesAMes({
       {total && (
         <div className="mt-1 flex items-center gap-2 border-t border-gray-200 pt-2 text-[15px] font-semibold">
           <span className="flex-1">{rotuloTotal}</span>
-          <span className="tabular-nums">{formato(total.actual)}</span>
+          <span className="tabular-nums">{cifra(total.actual)}</span>
           {pct(total.actual, total.previo)}
           {onTocarMes && <span className="w-2 shrink-0" />}
         </div>
@@ -127,6 +133,7 @@ export function TarjetaMesAMes({
   onTocarMes,
   onAbrir,
   onCerrar,
+  debajo,
 }: PropsTarjetaMesAMes) {
   useEffect(() => { marcarAvisoMesAMesVisto(); }, []);
   const cuerpo = cargando ? (
@@ -147,7 +154,7 @@ export function TarjetaMesAMes({
       {nota && <p className="mt-1.5 text-[12px] text-gray-500">{nota}</p>}
     </>
   );
-  return <TarjetaResumen titulo={titulo} subtitulo={subtitulo} cuerpo={cuerpo} onAbrir={onTocarMes ? undefined : onAbrir} onCerrar={onCerrar} />;
+  return <TarjetaResumen titulo={titulo} subtitulo={subtitulo} cuerpo={cuerpo} debajo={debajo} onAbrir={onTocarMes ? undefined : onAbrir} onCerrar={onCerrar} />;
 }
 
 export type EstadoLectura<D> = { status: "cargando" } | { status: "listo"; datos: D } | { status: "error" };

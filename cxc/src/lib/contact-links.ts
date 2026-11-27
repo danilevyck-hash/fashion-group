@@ -39,3 +39,13 @@ export function mailtoHref(raw: string | null | undefined): string | null {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return null;
   return `mailto:${v}`;
 }
+
+/**
+ * ¿Es un CELULAR de Panamá? 8 dígitos que empiezan en 6 (con o sin +507).
+ * Un fijo (7 dígitos, «727-7247») no tiene WhatsApp: ahí no se ofrece.
+ */
+export function esCelularPanama(raw: string | null | undefined): boolean {
+  let d = (raw ?? "").replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("507")) d = d.slice(3);
+  return d.length === 8 && d.startsWith("6");
+}

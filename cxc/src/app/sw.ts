@@ -109,7 +109,19 @@ self.addEventListener("push", (event) => {
   } catch {
     datos = { body: event.data?.text() };
   }
-  event.waitUntil(
+  // 🔴 27-nov-2026 (`MANTENER_PRESIONADO_2026_11`): con cada aviso que llega,
+  // el número rojo del ícono se pone al día (solo bodega: a otro rol la ruta
+  // le contesta `null` y no se toca). Sin soporte, no pasa nada.
+  const globito = fetch("/api/guias/pedidos/globito", { cache: "no-store", credentials: "same-origin" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d: { pendientes?: number | null } | null) => {
+      const n = d?.pendientes;
+      const nav = self.navigator as unknown as { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+      if (n == null) return;
+      return n > 0 ? nav.setAppBadge?.(n) : nav.clearAppBadge?.();
+    })
+    .catch(() => undefined);
+  event.waitUntil(Promise.all([globito,
     self.registration.showNotification(datos.title || "Fashion Group", {
       body: datos.body || "",
       icon: "/icon-192.png",
@@ -117,7 +129,7 @@ self.addEventListener("push", (event) => {
       // Muestras (25-nov-2026) trae su propio `tag`, uno por pedido.
       tag: datos.tag || "marcacion",
       data: { url: datos.url || "/marcacion" },
-    }),
+    })]),
   );
 });
 

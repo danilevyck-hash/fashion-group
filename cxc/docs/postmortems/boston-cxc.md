@@ -1713,3 +1713,14 @@ Daniel aprobó el mockup «HOY vs RECOMENDACIÓN»: los clientes con saldo y SIN
 - **Marcado**: `whatsapp_por` · `whatsapp_en` + una fila `canal = whatsapp` en `cxc_emails_enviados` (la marca gris «Le enviaste…»). El POST sale a los 5 s; «Deshacer» lo cancela.
 - **Quién**: admin y secretaria (`ROLES_WHATSAPP`), en la pantalla y en la ruta; ni vendedor ni la gerencia de Boston, y en la cartera de Boston no se dibuja.
 - **Migración** `20270129120000_cxc_estado_cuenta_whatsapp.sql` (aditiva: tres columnas + el bucket), aplicada el 27-nov-2026. Candado `cxc-estado-cuenta-whatsapp.test.ts`.
+
+## Siete mockups aprobados: mantener presionado, tramos, número del ícono (27-nov-2026)
+
+Interruptor único `MANTENER_PRESIONADO_2026_11` (`lib/ui/mantener-presionado-2026-11.ts`, prendido). Solo el teléfono; la computadora no cambia.
+
+- **Tramos de CxC en dos renglones**: monto arriba, «0-90 días · 91-120 días · +120 días» abajo (`SegmentadoCelular dosRenglones`). En uno se cortaban a 350 px.
+- **Sin la rayita de color** del cliente: salía verde con $78,980 a +120 días; la segunda línea roja ya dice lo que urge.
+- **Mantener presionado un cliente** = sus PAGOS mes a mes contra el año pasado (`TarjetaPagosCliente` sobre la MISMA `TarjetaMesAMes`), por `/api/cxc/pagos-mes-a-mes` (las 6, empresa por empresa, sin retenciones ni recibos en cero, el vendedor solo su empresa) o `/api/cxc/boston/pagos-mes-a-mes` en la cartera de Boston (solo Boston, por `cliente_switch_id`). Cuentas en `lib/mes-contra-anio-pasado.ts`: mes en curso contra los mismos días (`hoyPanama`), suma en millonésimas enteras para dar el centavo de la base. Sin base del año pasado «—» (no «Nuevo»); bajo 1 % con un decimal.
+- **Debajo, el menú**: Llamar (tel:) · WhatsApp (solo celular de Panamá, `esCelularPanama`) · Copiar código. Teléfonos de `clientes_master` (Boston: su `switch_clientes`); sin teléfono, la opción no sale.
+- **Cuadre** `scripts/_verif-mantener-presionado.ts`: D-25 2026 = $2,447,226.40 vs 2025 = $2,235,965.57 (+9 %), los 11 meses al centavo contra la base.
+- Proveedores (compras) y el número del ícono de bodega: ver `proveedores.md` y `guias.md`. Candado `mantener-presionado-2026-11.test.tsx`.

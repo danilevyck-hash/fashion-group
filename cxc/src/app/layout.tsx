@@ -22,6 +22,7 @@ import RegistroDeVisitas from "@/components/RegistroDeVisitas";
 import PantallaAnterior from "@/components/PantallaAnterior";
 import DeslizarParaActualizar from "@/components/shared/DeslizarParaActualizar";
 import { SubirAlInicio, VolverDesdeElBorde } from "@/components/shared/GestosIphone";
+import GlobitoPedidos from "@/components/shared/GlobitoPedidos";
 import SWRProvider from "@/components/SWRProvider";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import PageTransition from "@/components/PageTransition";
@@ -103,6 +104,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <DeslizarParaActualizar />
             <VolverDesdeElBorde />
             <SubirAlInicio />
+            {/* El número rojo del ícono, solo bodega (27-nov-2026). */}
+            <GlobitoPedidos />
           </OnlineProvider>
         </SWRProvider>
         </SemillaSesionProvider>

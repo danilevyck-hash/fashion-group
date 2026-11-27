@@ -204,6 +204,7 @@ export function TarjetaResumen({
   filas,
   pie,
   cuerpo,
+  debajo,
   onAbrir,
   onCerrar,
 }: {
@@ -214,6 +215,8 @@ export function TarjetaResumen({
   /** Contenido propio en vez de `filas`/`pie` (la tarjeta mes a mes). Con él la
    *  tarjeta es un bloque y no un botón: lo de adentro puede tener sus toques. */
   cuerpo?: React.ReactNode;
+  /** Aparte, DEBAJO de la tarjeta (como el menú de Contactos del iPhone). */
+  debajo?: React.ReactNode;
   onAbrir?: () => void;
   onCerrar: () => void;
 }) {
@@ -225,13 +228,16 @@ export function TarjetaResumen({
     <div data-tarjeta-resumen className="fixed inset-0 z-[70] flex items-center justify-center px-6" role="dialog" aria-modal="true" aria-label={titulo}>
       <button type="button" aria-label="Cerrar" onClick={cerrar} className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" />
       {cuerpo ? (
+        <div className="relative flex w-full max-w-sm flex-col gap-2">
         <div
           onClick={() => { if (onAbrir && Date.now() - abiertaEn.current > 350) onAbrir(); }}
-          className="relative max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-4 text-left shadow-2xl animate-slideDown"
+          className={`relative ${debajo ? "max-h-[62vh]" : "max-h-[85vh]"} w-full overflow-y-auto rounded-2xl bg-white p-4 text-left shadow-2xl animate-slideDown`}
         >
           <span className="block text-[17px] font-semibold leading-tight text-gray-900">{titulo}</span>
           {subtitulo && <span className="mt-0.5 block text-[13px] text-gray-500">{subtitulo}</span>}
           {cuerpo}
+        </div>
+        {debajo}
         </div>
       ) : (
       <button

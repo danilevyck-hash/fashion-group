@@ -133,3 +133,18 @@ export function urlClientesDelMes(anio: number, mes: number, empresaKey: string,
   const hasta = enCurso ? corte!.slice(0, 10) : `${anio}-${mm}-${String(fin).padStart(2, "0")}`;
   return `/ventas?tab=clientes&periodo=${anio}-${mm}-01_${hasta}&empresa=${encodeURIComponent(empresaKey)}`;
 }
+
+/**
+ * Pagos (CxC) y compras (Proveedores), 27-nov-2026: sin base del año pasado
+ * dice «—», no «Nuevo» (un pago o una compra no son un cliente nuevo); con
+ * base, el MISMO texto y umbral que las tablas. Un mes sin número también «—».
+ */
+export function cambioConRaya(actual: number | null | undefined, previo: number | null | undefined): CambioDelMes {
+  const r = actual == null ? null : variacionPct(actual, previo);
+  return r == null ? { texto: "—", tono: "fl" } : porcentajeDeLaTabla(r);
+}
+
+/** Proveedores: las flechas en GRIS, nunca verde ni rojo (comprar más o menos no es bueno ni malo). */
+export function cambioEnGris(actual: number | null | undefined, previo: number | null | undefined): CambioDelMes {
+  return { ...cambioConRaya(actual, previo), clase: "text-gray-500" };
+}
