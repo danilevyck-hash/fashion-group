@@ -48,6 +48,8 @@ interface Props {
   onQuitar?: (f: Facturado) => void;
   quitadas?: readonly FacturadoQuitado[];
   onDevolver?: (q: FacturadoQuitado) => void;
+  /** Cambia en cada lectura de la lista: «Ver quitadas» vuelve a plegarse. */
+  plegarClave?: number;
   hoy: string;
   /** Celular: tarjetas de dos líneas en vez de tabla. */
   celular?: boolean;
@@ -100,7 +102,7 @@ function VerQuitadas({ quitadas, onDevolver, celular }: { quitadas: readonly Fac
   );
 }
 
-export default function FacturadosLista({ filas, hoy, celular, onQuitar, quitadas = [], onDevolver }: Props) {
+export default function FacturadosLista({ filas, hoy, celular, onQuitar, quitadas = [], onDevolver, plegarClave = 0 }: Props) {
   const conMonto = filas.some((f) => typeof f.monto === "number");
   const grupos = B2B_EMPRESA_KEYS.map((k) => ({
     k,
@@ -146,7 +148,7 @@ export default function FacturadosLista({ filas, hoy, celular, onQuitar, quitada
           </section>
         ))}
       </div>
-      <VerQuitadas quitadas={quitadas} onDevolver={onDevolver} celular />
+      <VerQuitadas key={plegarClave} quitadas={quitadas} onDevolver={onDevolver} celular />
       </>
     );
   }
@@ -208,7 +210,7 @@ export default function FacturadosLista({ filas, hoy, celular, onQuitar, quitada
         ))}
       </table>
     </div>
-    <VerQuitadas quitadas={quitadas} onDevolver={onDevolver} />
+    <VerQuitadas key={plegarClave} quitadas={quitadas} onDevolver={onDevolver} />
     </>
   );
 }

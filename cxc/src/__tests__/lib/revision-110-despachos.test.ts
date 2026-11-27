@@ -38,7 +38,7 @@ describe("revisión 110 · Despachos, Catálogos y Plantilla", () => {
   it("n.º 65: el refresco de fondo lee la BASE, nunca Switch, y el ↻ se queda", () => {
     const v = leer("src/app/despachos/components/PedidosView.tsx");
     const efecto = v.slice(v.indexOf("if (!PEDIDOS_REFRESCO_AUTOMATICO) return;"), v.indexOf("useEffect(() => { onDetalle?."));
-    expect(efecto).toContain("void cargar(true)");
+    expect(efecto).toMatch(/void cargar\(true(, true)?\)/);
     expect(efecto).not.toMatch(/sync|switch/i);
     expect(v).toContain("<LineaDeFrescura");
   });
