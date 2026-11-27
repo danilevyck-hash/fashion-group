@@ -52,7 +52,9 @@ import { PEDIDOS_CONTEOS_2026_11 as CONTEOS, PEDIDOS_EMPRESA_JUNTO_A_IMPRIMIR, c
 import { BULTOS_EN_EL_PEDIDO } from "@/lib/ui/revision-110-61";
 import { PEDIDOS_PIPELINE_2026_11, ROTULO_VENTANA_FACTURADOS } from "@/lib/guias/facturados-sin-guia";
 import PipelinePedidos from "./PipelinePedidos";
-import FacturadosLista, { type Facturado } from "./FacturadosLista";
+import FacturadosLista, { type Facturado, type FacturadoQuitado } from "./FacturadosLista";
+import { claveQuitada } from "@/lib/ui/facturados-quitar-2026-11";
+import { facturaParaMostrar } from "@/lib/guias/numero-factura";
 import {
   PEDIDOS_BULTOS_2026_10 as BULTOS,
   ESTADOS_BULTOS,
@@ -190,6 +192,9 @@ export default function PedidosView({
   // «Facturados» (26-nov-2026): facturas sin guía. null = todavía no se leyó.
   const [facturados, setFacturados] = useState<Facturado[] | null>(null);
   const [errorFacturados, setErrorFacturados] = useState(false);
+  // «Quitar» (27-nov-2026, `FACTURADOS_QUITAR_2026_11`): lo dice el SERVIDOR.
+  const [quitadas, setQuitadas] = useState<FacturadoQuitado[]>([]);
+  const [puedeQuitar, setPuedeQuitar] = useState(false);
   // v2: filtro simple; abre SIEMPRE en «Todas» y no se acota por persona (Daniel, 5-oct-2026).
   const [empresa, setEmpresa] = useState("todas");
   // La fecha exacta se ve al pasar el mouse (title) o al tocar la celda.
@@ -211,8 +216,10 @@ export default function PedidosView({
     try {
       const r = await fetch("/api/guias/pedidos/facturados", { cache: "no-store" });
       if (!r.ok) throw new Error(String(r.status));
-      const d = (await r.json()) as { facturados: Facturado[] };
+      const d = (await r.json()) as { facturados: Facturado[]; quitadas?: FacturadoQuitado[]; puedeQuitar?: boolean };
       setFacturados(d.facturados);
+      setQuitadas(d.quitadas ?? []);
+      setPuedeQuitar(!!d.puedeQuitar);
       setErrorFacturados(false);
     } catch {
       setErrorFacturados(true);
@@ -408,6 +415,50 @@ export default function PedidosView({
     return { label: ROTULO_ESTADO_FLUJO_SIMPLE[destino], color: destino === "recibido" ? "bg-emerald-600" : "bg-blue-600", onAction };
   };
 
+  // ── 🔴 Quitar de «Facturados» (27-nov-2026, `FACTURADOS_QUITAR_2026_11`) ──
+  // Sale de la lista al instante; el servidor se entera recién a los 5 s, así
+  // «Deshacer» la devuelve sin tocar nada. No borra la factura.
+  const deshacerQuitar = useUndoAction();
+  const sinEsta = (f: Facturado) => (xs: Facturado[] | null) => (xs ?? []).filter((x) => claveQuitada(x) !== claveQuitada(f));
+  const quitarFacturado = (f: Facturado) => {
+    deshacerQuitar.scheduleAction({
+      id: claveQuitada(f),
+      message: `Factura ${facturaParaMostrar(f.secuencial)} quitada`,
+      onOptimistic: () => setFacturados(sinEsta(f)),
+      onRevert: () => {
+        setFacturados((xs) => [...sinEsta(f)(xs), f]);
+        toast("No se pudo quitar la factura", "error");
+      },
+      execute: async () => {
+        const r = await fetch("/api/guias/pedidos/facturados/quitadas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ empresa_key: f.empresa_key, secuencial: f.secuencial, fecha: f.fecha }),
+        });
+        if (!r.ok) throw new Error(String(r.status));
+        void cargarFacturados();
+      },
+    });
+  };
+  async function devolverFacturado(q: FacturadoQuitado) {
+    const antes = quitadas;
+    setQuitadas((xs) => xs.filter((x) => x.quitada_id !== q.quitada_id));
+    setFacturados((xs) => [...sinEsta(q)(xs), q]);
+    try {
+      const r = await fetch("/api/guias/pedidos/facturados/quitadas", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: q.quitada_id }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+    } catch {
+      setQuitadas(antes);
+      setFacturados(sinEsta(q));
+      toast("No se pudo devolver la factura", "error");
+    }
+    void cargarFacturados();
+  }
+
   // ── 🔴 13-nov-2026 (propuesta): «Preparado» pide los bultos ─────────────
   // Un toque abre la ventana con UN número, obligatorio. El botón no se apaga:
   // si falta el número, lo dice (como «Despachar»).
@@ -556,6 +607,7 @@ export default function PedidosView({
   const PIPELINE = PEDIDOS_PIPELINE_2026_11 && conConteos;
   const esFacturados = PIPELINE && filtro === "facturado";
   const facturadosVisibles = (facturados ?? []).filter((f) => !NUEVO || empresa === "todas" || f.empresa_key === empresa);
+  const quitadasVisibles = quitadas.filter((f) => !NUEVO || empresa === "todas" || f.empresa_key === empresa);
   const pasos = [
     ...CHIPS.map((c) => ({ valor: c.value, rotulo: c.label, corto: c.value === "en_preparacion" ? "Preparación" : undefined, cuenta: pedidos ? conteos[c.value as EstadoFlujoSimple] : null })),
     { valor: "facturado", rotulo: "Facturados", cuenta: facturados ? facturadosVisibles.length : null },
@@ -1344,6 +1396,9 @@ export default function PedidosView({
     {deshacerPaso.pendingUndo && (
       <UndoToast message={deshacerPaso.pendingUndo.message} startedAt={deshacerPaso.pendingUndo.startedAt} onUndo={deshacerPaso.undoAction} />
     )}
+    {deshacerQuitar.pendingUndo && (
+      <UndoToast message={deshacerQuitar.pendingUndo.message} startedAt={deshacerQuitar.pendingUndo.startedAt} onUndo={deshacerQuitar.undoAction} />
+    )}
     <>
       {/* 🔴 Cambiar de estado pide confirmar (7-oct-2026). La MISMA ventana del
           sistema (`ConfirmModal`), nunca una propia. */}
@@ -1594,8 +1649,15 @@ export default function PedidosView({
           <Aviso tono="error">No se pudieron leer las facturas. Intenta de nuevo.</Aviso>
         ) : !facturados ? (
           <p className="py-10 text-center text-sm text-gray-500">Cargando…</p>
-        ) : facturadosVisibles.length === 0 ? null : (
-          <FacturadosLista filas={facturadosVisibles} hoy={hoy} celular={barra} />
+        ) : facturadosVisibles.length === 0 && quitadasVisibles.length === 0 ? null : (
+          <FacturadosLista
+            filas={facturadosVisibles}
+            hoy={hoy}
+            celular={barra}
+            onQuitar={puedeQuitar ? quitarFacturado : undefined}
+            quitadas={quitadasVisibles}
+            onDevolver={puedeQuitar ? devolverFacturado : undefined}
+          />
         )
       ) : error ? (
         <Aviso tono="error">No se pudieron leer los pedidos. Intenta de nuevo.</Aviso>
