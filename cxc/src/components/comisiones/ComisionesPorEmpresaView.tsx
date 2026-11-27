@@ -345,6 +345,8 @@ export function ComisionesPorEmpresaView({
             total={totalGeneral}
             onDetalle={abrirDetalle}
             v2={v2}
+            empresa={empresa}
+            year={year}
           />
 
           {/* iPad y escritorio: la tabla. El `overflow-x-auto` es nuevo — sin

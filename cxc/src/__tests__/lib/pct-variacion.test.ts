@@ -215,6 +215,11 @@ const PERMITIDOS = new Set([path.join("lib", "variacion.ts")]);
  */
 const EXCEPCIONES = new Map<string, string>([
   [
+    path.join("lib", "ventas", "articulo-mes-a-mes.ts"),
+    "Consulta de artículos, tarjeta mes a mes (27-nov-2026): son PIEZAS, no dólares; el piso de $100 de " +
+      "`variacionPct` dejaría sin % a casi todo modelo. Cualquier base positiva compara.",
+  ],
+  [
     path.join("lib", "ventas", "clientes-rango-server.ts"),
     "Ventas › Clientes con «Rango de fechas» (5-oct-2026): es el ESPEJO de `clientes_anio` en SQL " +
       "(`prev > 0 → (actual − prev) / prev`), igual que `deltaComoLaVista`; con otro umbral la columna " +

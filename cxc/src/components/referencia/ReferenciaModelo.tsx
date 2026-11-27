@@ -47,6 +47,12 @@ import { barrasDeVentana, fmtFechaCorta, fmtMesAnio, fmtMesCorto, pctVendido } f
 import { etiquetaEmpresa, fmtInt, fmtMoney, fmtPct } from "./ReferenciaTarjeta";
 import { REFERENCIA_APPLE_2026_10 } from "@/lib/ventas/referencia-apple-2026-10";
 import { useEsCelularReferencia } from "./useEsCelularReferencia";
+import { useMantenerPresionado } from "@/components/shared/GestosIphone";
+import { ListaMesAMes, TarjetaMesAMes } from "@/components/shared/TarjetaMesAMes";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
+import { articuloMesAMes, cambioDeArticulo, diasDelModelo, notaDeArticulo } from "@/lib/ventas/articulo-mes-a-mes";
+import { mesEnCursoDelCorte } from "@/lib/ventas/mes-a-mes";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { REFERENCIA_AGOTADO, REFERENCIA_RECEPCIONES_DOS_LINEAS } from "@/lib/ui/revision-110-cxc";
 
 // ─── Textos (una sola definición para pantalla y candado) ────────────────────
@@ -268,6 +274,25 @@ function RenglonTrimestres({ trimestres, titulo }: { trimestres: TrimestreVenta[
 /** La gráfica mes a mes, SOLA: barras, mes y unidades. Sin líneas de texto. */
 function GraficaMesAMes({ serie, hoyMes }: { serie: TarjetaModelo["serie"]; hoyMes: string }) {
   const barras = useMemo(() => barrasDeVentana(serie, hoyMes), [serie, hoyMes]);
+  const enCelular = useEsCelularReferencia();
+  // 🔴 En el celular (27-nov-2026, `GESTOS_IPHONE_2026_11`): la MISMA lista de
+  // la tarjeta mes a mes, con el % contra el mismo mes del año pasado. Los 12
+  // meses son completos (el en curso no se dibuja): mes entero contra mes entero.
+  if (enCelular && GESTOS_IPHONE_2026_11) {
+    const porMes = new Map(serie.map((x) => [x.mes, x.unidades]));
+    return (
+      <ListaMesAMes
+        meses={barras.map((b) => ({
+          mes: Number(b.mes.slice(5, 7)),
+          rotulo: fmtMesCorto(b.mes),
+          actual: b.unidades,
+          previo: porMes.get(`${Number(b.mes.slice(0, 4)) - 1}${b.mes.slice(4)}`) ?? 0,
+        }))}
+        formato={(n) => `${fmtInt(n)} u`}
+        cambio={cambioDeArticulo}
+      />
+    );
+  }
   const pico = Math.max(1, ...barras.map((b) => Math.max(0, b.unidades)));
   const cols = { gridTemplateColumns: `repeat(${Math.max(1, barras.length)}, minmax(0, 1fr))` };
   return (
@@ -474,13 +499,16 @@ function ColorCelular({
   mostrarMargen,
   abierta,
   onTocar,
+  onMantener,
 }: {
   f: FilaColor;
   hoyMes: string;
   mostrarMargen: boolean;
   abierta: boolean;
   onTocar: () => void;
+  onMantener?: () => void;
 }) {
+  const mantener = useMantenerPresionado(onMantener ?? null);
   const detalle = useMemo(
     () => (abierta ? armarTarjetaModelo(f.codigo, [f.art], hoyMes) : null),
     [abierta, f.art, f.codigo, hoyMes],
@@ -491,6 +519,7 @@ function ColorCelular({
         type="button"
         data-referencia="color-celular"
         onClick={onTocar}
+        {...mantener}
         aria-expanded={abierta}
         className="flex min-h-[44px] w-full flex-col py-2 text-left tabular-nums active:bg-gray-50"
       >
@@ -518,10 +547,13 @@ function TablaColores({
   filas,
   hoyMes,
   mostrarMargen,
+  onMantener,
 }: {
   filas: FilaColor[];
   hoyMes: string;
   mostrarMargen: boolean;
+  /** Mantener presionado un color → su tarjeta mes a mes. */
+  onMantener?: (f: FilaColor) => void;
 }) {
   const [abierta, setAbierta] = useState<string | null>(null);
   const enCelular = useEsCelularReferencia();
@@ -539,6 +571,7 @@ function TablaColores({
             mostrarMargen={mostrarMargen}
             abierta={abierta === f.codigo}
             onTocar={() => setAbierta((v) => (v === f.codigo ? null : f.codigo))}
+            onMantener={onMantener ? () => onMantener(f) : undefined}
           />
         ))}
       </ul>
@@ -593,15 +626,43 @@ export function ReferenciaModelo({
 }) {
   const t = useMemo(() => armarTarjetaModelo(modelo, arts, hoyMes), [modelo, arts, hoyMes]);
   const [verSinStock, setVerSinStock] = useState(false);
+  // 🔴 Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): las piezas
+  // vendidas MES A MES del año contra el mismo mes del año pasado, de lo que la
+  // búsqueda YA trajo (`lib/ventas/articulo-mes-a-mes.ts`): el modelo entero
+  // desde su encabezado, un color desde su fila.
+  const [tarjeta, setTarjeta] = useState<{ titulo: string; arts: ArticuloCompras[] } | null>(null);
+  const enCelular = useEsCelularReferencia();
+  const mantenerModelo = useMantenerPresionado(
+    enCelular ? () => setTarjeta({ titulo: soloColor ? (arts[0]?.codigo ?? t.modelo) : t.modelo, arts }) : null,
+  );
+  const datosTarjeta = useMemo(() => {
+    if (!tarjeta) return null;
+    const serie = tarjeta.arts.length === 1 ? tarjeta.arts[0].serie : armarTarjetaModelo(tarjeta.titulo, tarjeta.arts, hoyMes).serie;
+    return articuloMesAMes(serie, diasDelModelo(tarjeta.arts), hoyPanama());
+  }, [tarjeta, hoyMes]);
 
   return (
     <div className="mt-4 space-y-4">
+      {tarjeta && datosTarjeta && (
+        <TarjetaMesAMes
+          titulo={tarjeta.titulo}
+          subtitulo={`Piezas vendidas ${datosTarjeta.anio} · vs ${datosTarjeta.anio - 1}`}
+          anio={datosTarjeta.anio}
+          meses={datosTarjeta.meses}
+          total={datosTarjeta.total}
+          formato={(n) => `${fmtInt(n)} u`}
+          cambio={cambioDeArticulo}
+          mesEnCurso={mesEnCursoDelCorte(datosTarjeta.anio, datosTarjeta.corte)}
+          nota={notaDeArticulo(datosTarjeta.corte)}
+          onCerrar={() => setTarjeta(null)}
+        />
+      )}
       <section className="rounded-xl border border-gray-200 bg-white">
         {/* 🔴 El título es lo que se buscó: el MODELO cuando trae sus colores,
             y el CÓDIGO COMPLETO cuando se buscó un color — nunca el modelo
             recortado al lado de un solo color, que se leería como otro
             artículo. */}
-        <header className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-gray-200 px-3.5 py-3">
+        <header {...mantenerModelo} className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-gray-200 px-3.5 py-3">
           <h2 className="tabular-nums text-sm font-semibold text-gray-900">
             {soloColor ? (arts[0]?.codigo ?? t.modelo) : t.modelo}
           </h2>
@@ -624,7 +685,12 @@ export function ReferenciaModelo({
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-600">
             Colores · {fmtInt(t.filas.length)} con stock
           </p>
-          <TablaColores filas={t.filas} hoyMes={hoyMes} mostrarMargen={mostrarMargen} />
+          <TablaColores
+            filas={t.filas}
+            hoyMes={hoyMes}
+            mostrarMargen={mostrarMargen}
+            onMantener={(f) => setTarjeta({ titulo: f.codigo, arts: [f.art] })}
+          />
           {t.sinStock.length > 0 && (
             <>
               <button
@@ -637,7 +703,12 @@ export function ReferenciaModelo({
                 {fmtInt(t.sinStock.length)} sin stock
               </button>
               {verSinStock && (
-                <TablaColores filas={t.sinStock} hoyMes={hoyMes} mostrarMargen={mostrarMargen} />
+                <TablaColores
+                  filas={t.sinStock}
+                  hoyMes={hoyMes}
+                  mostrarMargen={mostrarMargen}
+                  onMantener={(f) => setTarjeta({ titulo: f.codigo, arts: [f.art] })}
+                />
               )}
             </>
           )}

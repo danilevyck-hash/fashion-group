@@ -139,7 +139,19 @@ export function porcentajeDeLaTabla(
   const entero = Math.round(Math.abs(pct));
   if (pct > 5) return { texto: `▲ +${entero}%`, tono: "up" };
   if (pct < -5) return { texto: `▼ −${entero}%`, tono: "dn" };
-  return { texto: `${pct < 0 && entero !== 0 ? "−" : "+"}${entero}%`, tono: "fl" };
+  // 🔴 27-nov-2026 (Daniel): bajo 1 % va con UN decimal («+0.5%»), para que un
+  // +0,49 % no se lea «+0%» como si no hubiera cambio; un cero de verdad, «0%».
+  const cifra = cifraPorcentaje(pct);
+  if (cifra === "0") return { texto: "0%", tono: "fl" };
+  return { texto: `${pct < 0 ? "−" : "+"}${cifra}%`, tono: "fl" };
+}
+
+/** El número de un % sin signo: entero desde 1 %, con un decimal por debajo («0.5»); «0» si redondea a cero. */
+export function cifraPorcentaje(pct: number): string {
+  const a = Math.abs(pct);
+  if (Math.round(a) >= 1) return String(Math.round(a));
+  const d = Math.round(a * 10) / 10;
+  return d === 0 ? "0" : d.toFixed(1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

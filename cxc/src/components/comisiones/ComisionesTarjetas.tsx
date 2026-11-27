@@ -50,6 +50,10 @@ import { DESGLOSE_DEBAJO } from "@/lib/ui/revision-110-vivo";
 import { DESGLOSE_EN_DOS_LINEAS } from "@/lib/ui/revision-110-vivo2";
 import { useRef, useState, type ReactNode } from "react";
 import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
+import { ERROR_TARJETA, TarjetaMesAMes, useLecturaDeTarjeta } from "@/components/shared/TarjetaMesAMes";
+import { comisionMesAMes, mesEnCursoDeComisiones, type ComisionPorMes } from "@/lib/comisiones/mes-a-mes";
+import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
+import { MONTHS } from "@/lib/ventas/format";
 import { fmtMoney } from "@/lib/ventas/format";
 import { nombreVendedorEnPantalla } from "@/lib/comisiones/alias";
 import { ROTULO_NO_SE_PAGA, ROTULO_VER_MENOS, rotuloVerNoSePagan } from "@/lib/comisiones/sin-pago";
@@ -419,6 +423,9 @@ interface PropsPorEmpresa {
   onDetalle: (vendedor: string) => void;
   /** 🔴 COMISIONES_APPLE_V2_2026_10: dos renglones con ›; el total ya va arriba. */
   v2?: boolean;
+  /** Para la tarjeta mes a mes de mantener presionado. */
+  empresa?: string;
+  year?: number;
 }
 
 export function ComisionesTarjetasPorEmpresa({
@@ -429,10 +436,14 @@ export function ComisionesTarjetasPorEmpresa({
   total,
   onDetalle,
   v2 = false,
+  empresa,
+  year,
 }: PropsPorEmpresa) {
   if (v2) {
     return (
       <FilasPorEmpresaV2
+        empresa={empresa}
+        year={year}
         activos={activos}
         noSePagan={noSePagan}
         verNoSePagan={verNoSePagan}
@@ -670,28 +681,38 @@ function FilasPorEmpresaV2({
   verNoSePagan,
   onVerNoSePagan,
   onDetalle,
+  empresa,
+  year,
 }: Omit<PropsPorEmpresa, "total" | "v2">) {
-  // 🔴 Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): venta,
-  // cobro y comisión del vendedor, los MISMOS campos y el MISMO `fmtMoney` de
-  // la fila (sin leer nada). Un gancho para la lista; la fila se anota al apoyar.
-  const [tarjeta, setTarjeta] = useState<FilaPorEmpresa | null>(null);
+  // 🔴 Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): la comisión
+  // del vendedor MES A MES del año, ya con los descuentos restados en el
+  // servidor (la MISMA ruta y las MISMAS filas que suman «Todo el año»), sin
+  // flechas contra el año pasado: en 2025 solo se comisionaba el cobro.
   const tocada = useRef<FilaPorEmpresa | null>(null);
-  const mantener = useMantenerPresionado(() => setTarjeta(tocada.current));
+  const lectura = useLecturaDeTarjeta<FilaPorEmpresa, ComisionPorMes>(() =>
+    empresa && year ? `/api/ventas/comisiones?empresa=${encodeURIComponent(empresa)}&year=${year}&mes=0&porMes=1` : null,
+  );
+  const mantener = useMantenerPresionado(() => { if (tocada.current) lectura.abrir(tocada.current); });
+  const t = lectura.tarjeta;
+  const meses = t?.estado.status === "listo" ? comisionMesAMes(t.estado.datos, t.item.vendedor) : [];
+  const enCurso = mesEnCursoDeComisiones(year ?? 0);
   return (
     <div data-filas-v2 className="space-y-2 lg:hidden">
-      {tarjeta && (
-        <TarjetaResumen
-          titulo={nombreVendedorEnPantalla(tarjeta.vendedor)}
-          filas={[
-            { rotulo: "Ventas", valor: fmtMoney(tarjeta.base) },
-            { rotulo: "Comisión por venta", valor: fmtMoney(tarjeta.comision) },
-            { rotulo: "Cobros", valor: fmtMoney(tarjeta.base_cobro) },
-            { rotulo: "Comisión por cobro", valor: fmtMoney(tarjeta.comision_cobro) },
-            ...((tarjeta.descuento ?? 0) > 0 ? [{ rotulo: "Descuentos", valor: fmtMoney(-(tarjeta.descuento ?? 0)) }] : []),
-          ]}
-          pie={{ rotulo: "Comisión total", valor: fmtMoney(tarjeta.comision_total) }}
-          onAbrir={() => { const v = tarjeta; setTarjeta(null); onDetalle(v.vendedor); }}
-          onCerrar={() => setTarjeta(null)}
+      {t && (
+        <TarjetaMesAMes
+          titulo={nombreVendedorEnPantalla(t.item.vendedor)}
+          subtitulo={`Comisión ${year} · ${empresa ? nombreCortoEmpresa(empresa) : ""}`}
+          anio={year ?? 0}
+          meses={meses}
+          total={t.estado.status === "listo" ? { actual: Math.round(meses.reduce((a, m) => a + m.actual, 0) * 100) / 100 } : null}
+          formato={fmtMoney}
+          cambio={null}
+          mesEnCurso={enCurso}
+          nota={enCurso ? `${MONTHS[enCurso - 1]} en curso.` : null}
+          cargando={t.estado.status === "cargando"}
+          error={t.estado.status === "error" ? ERROR_TARJETA : null}
+          onAbrir={() => { const v = t.item; lectura.cerrar(); onDetalle(v.vendedor); }}
+          onCerrar={lectura.cerrar}
         />
       )}
       <ul className={`${CLASE_GRUPO_V2} divide-y divide-gray-100`}>

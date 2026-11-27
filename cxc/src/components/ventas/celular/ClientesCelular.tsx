@@ -31,9 +31,9 @@ import { BuscarEnLaBarra, EnLaBarra, useHayBarraCelular } from "@/components/cel
 import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { useRef, useState } from "react";
 import { useMantenerPresionado } from "@/components/shared/GestosIphone";
-import { TarjetaMesAMes } from "./TarjetaMesAMes";
+import { TarjetaMesAMes } from "@/components/shared/TarjetaMesAMes";
 import type { PorEmpresaAnualVista } from "./HojaClienteCelular";
-import { delClienteEnLaFila } from "@/lib/ventas/mes-a-mes";
+import { delClienteEnLaFila, mesEnCursoDelCorte, notaDelMesEnCurso } from "@/lib/ventas/mes-a-mes";
 import type { Cliente } from "../types";
 import {
   SIN_CODIGO_EN_SWITCH,
@@ -163,7 +163,9 @@ export function ClientesCelular({
             anio={selectedYear}
             meses={d?.meses ?? []}
             total={d ? { actual: d.actual, previo: d.previo } : null}
-            corte={tarjeta.estado.status === "listo" ? tarjeta.estado.datos.corte : null}
+            subtitulo={`Ventas ${selectedYear} · vs ${selectedYear - 1}`}
+            mesEnCurso={tarjeta.estado.status === "listo" ? mesEnCursoDelCorte(selectedYear, tarjeta.estado.datos.corte) : null}
+            nota={tarjeta.estado.status === "listo" ? notaDelMesEnCurso(selectedYear, tarjeta.estado.datos.corte) : null}
             cargando={tarjeta.estado.status === "cargando"}
             error={tarjeta.estado.status === "error" ? "No se pudo cargar. Intenta de nuevo." : null}
             onAbrir={() => { const c = tarjeta.c; setTarjeta(null); onTocarCliente(c); }}

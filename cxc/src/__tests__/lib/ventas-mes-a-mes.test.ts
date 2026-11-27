@@ -2,17 +2,24 @@
 import { describe, expect, it } from "vitest";
 import { cambioDelMes, delClienteEnLaFila, marcaDelMesEnCurso, mesesDeSeries } from "@/lib/ventas/mes-a-mes";
 import { delPeriodo } from "@/lib/ventas/resumen-mes";
+import { porcentajeDeLaTabla } from "@/lib/ventas/celular";
+import { variacionPct } from "@/lib/variacion";
 
 describe("cambioDelMes", () => {
-  it("▲ verde, ▼ rojo, redondeado como la tabla", () => {
+  it("▲ verde, ▼ rojo y gris sin flecha dentro de ±5 %: EXACTO como la tabla (`porcentajeDeLaTabla`)", () => {
     expect(cambioDelMes(112, 100)).toEqual({ texto: "▲ +12%", tono: "up" });
     expect(cambioDelMes(92, 100)).toEqual({ texto: "▼ −8%", tono: "dn" });
-    expect(cambioDelMes(103.4, 100)).toEqual({ texto: "▲ +3%", tono: "up" });
+    expect(cambioDelMes(103.4, 100)).toEqual({ texto: "+3%", tono: "fl" });
+    expect(cambioDelMes(96, 100)).toEqual({ texto: "−4%", tono: "fl" });
+    for (const [a, p] of [[112, 100], [92, 100], [103.4, 100], [96, 100], [105.2, 100]] as const) {
+      expect(cambioDelMes(a, p)).toEqual(porcentajeDeLaTabla(variacionPct(a, p)));
+    }
   });
-  it("Fashion Wear nov-2026 (medido 27-nov): 1–26 nov contra 1–26 nov 2025 en DÍA DE PANAMÁ es +0,5 % → «0%»; el +3 % sale de cortar en UTC", () => {
-    expect(cambioDelMes(704252.0, 700821.19)).toEqual({ texto: "0%", tono: "fl" });
+  it("Fashion Wear nov-2026 (medido 27-nov): 1–26 nov contra 1–26 nov 2025 en DÍA DE PANAMÁ es +0,49 % → «+0.5%» (un decimal bajo 1 %, igual en la tabla); el +3 % sale de cortar en UTC", () => {
+    expect(cambioDelMes(704252.0, 700821.19)).toEqual({ texto: "+0.5%", tono: "fl" });
+    expect(porcentajeDeLaTabla(variacionPct(704252.0, 700821.19)).texto).toBe("+0.5%");
     // 682.856,19 = mismo rango cortado en UTC: pierde lo facturado el 26-nov-2025 después de las 7 p. m.
-    expect(cambioDelMes(704252.0, 682856.19).texto).toBe("▲ +3%");
+    expect(cambioDelMes(704252.0, 682856.19).texto).toBe("+3%");
   });
   it("sin base del año pasado dice «Nuevo», nunca «+0 %»", () => {
     expect(cambioDelMes(500, 0).texto).toBe("Nuevo");

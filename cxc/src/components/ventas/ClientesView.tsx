@@ -156,6 +156,17 @@ export function textoSinCompras(anio: number, periodo?: PeriodoVentas): string {
  * agregarle un `Suspense` a esa pantalla solo para leer un parámetro opcional.
  * En el servidor devuelve `""` y todo queda exactamente como estaba.
  */
+/** `?empresa=` (lo pone tocar un mes en la tarjeta del Resumen): solo una de las 6 del grupo. */
+function empresaDeLaUrl(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const e = (new URLSearchParams(window.location.search).get("empresa") ?? "").trim();
+    return EMPRESA_OPCIONES.some((o) => o.valor === e) ? e : "";
+  } catch {
+    return "";
+  }
+}
+
 function codigoDeLaUrl(): string {
   if (typeof window === "undefined") return "";
   try {
@@ -318,6 +329,14 @@ export function ClientesView({
       setLoading(false);
     }
   };
+
+  // Drill-down desde la tarjeta mes a mes del Resumen (`GESTOS_IPHONE_2026_11`):
+  // llega con `?empresa=` y abre ya filtrada en esa empresa, por la MISMA puerta del chip.
+  useEffect(() => {
+    const e = empresaDeLaUrl();
+    if (e && e !== "todas") void onEmpresaChange(e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reload de la lista tras "Actualizar ahora" (misma empresa/año vigentes).
   // La data del tab sale de clientes_empresa_12m_vw → el refetch recién tiene

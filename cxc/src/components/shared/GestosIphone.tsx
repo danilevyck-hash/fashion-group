@@ -203,13 +203,17 @@ export function TarjetaResumen({
   subtitulo,
   filas,
   pie,
+  cuerpo,
   onAbrir,
   onCerrar,
 }: {
   titulo: string;
   subtitulo?: string;
-  filas: FilaDeResumen[];
+  filas?: FilaDeResumen[];
   pie?: FilaDeResumen;
+  /** Contenido propio en vez de `filas`/`pie` (la tarjeta mes a mes). Con él la
+   *  tarjeta es un bloque y no un botón: lo de adentro puede tener sus toques. */
+  cuerpo?: React.ReactNode;
   onAbrir?: () => void;
   onCerrar: () => void;
 }) {
@@ -220,6 +224,16 @@ export function TarjetaResumen({
   return createPortal(
     <div data-tarjeta-resumen className="fixed inset-0 z-[70] flex items-center justify-center px-6" role="dialog" aria-modal="true" aria-label={titulo}>
       <button type="button" aria-label="Cerrar" onClick={cerrar} className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" />
+      {cuerpo ? (
+        <div
+          onClick={() => { if (onAbrir && Date.now() - abiertaEn.current > 350) onAbrir(); }}
+          className="relative max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-4 text-left shadow-2xl animate-slideDown"
+        >
+          <span className="block text-[17px] font-semibold leading-tight text-gray-900">{titulo}</span>
+          {subtitulo && <span className="mt-0.5 block text-[13px] text-gray-500">{subtitulo}</span>}
+          {cuerpo}
+        </div>
+      ) : (
       <button
         type="button"
         onClick={() => { if (Date.now() - abiertaEn.current > 350) (onAbrir ?? onCerrar)(); }}
@@ -228,7 +242,7 @@ export function TarjetaResumen({
         <span className="block text-[17px] font-semibold leading-tight text-gray-900">{titulo}</span>
         {subtitulo && <span className="mt-0.5 block text-[13px] text-gray-500">{subtitulo}</span>}
         <span className="mt-3 block divide-y divide-gray-100">
-          {filas.map((f) => (
+          {(filas ?? []).map((f) => (
             <span key={f.rotulo} className="flex items-center justify-between gap-3 py-2 text-[15px]">
               <span className="text-gray-700">
                 {f.rotulo}
@@ -245,6 +259,7 @@ export function TarjetaResumen({
           </span>
         )}
       </button>
+      )}
     </div>,
     document.body,
   );

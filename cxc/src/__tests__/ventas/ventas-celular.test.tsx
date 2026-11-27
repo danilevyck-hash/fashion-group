@@ -136,7 +136,10 @@ describe("2a · la tabla por empresa", () => {
     expect(porcentajeDeLaTabla(0.17)).toEqual({ texto: "▲ +17%", tono: "up" });
     expect(porcentajeDeLaTabla(-0.78)).toEqual({ texto: "▼ −78%", tono: "dn" });
     expect(porcentajeDeLaTabla(0.04)).toEqual({ texto: "+4%", tono: "fl" });
-    expect(porcentajeDeLaTabla(-0.004)).toEqual({ texto: "+0%", tono: "fl" });
+    expect(porcentajeDeLaTabla(-0.004)).toEqual({ texto: "−0.4%", tono: "fl" });
+    expect(porcentajeDeLaTabla(0)).toEqual({ texto: "0%", tono: "fl" });
+    expect(porcentajeDeLaTabla(0.0004)).toEqual({ texto: "0%", tono: "fl" });
+    expect(porcentajeDeLaTabla(0.0096)).toEqual({ texto: "+1%", tono: "fl" });
     expect(porcentajeDeLaTabla(null).texto).toBe("—"); // n.º 8, revisión 110
   });
 });

@@ -20,6 +20,7 @@ import { ROLES_VENDEDORAS_ESPEJO } from "@/lib/multifashion/acceso";
 import { supabaseServer } from "@/lib/supabase-server";
 import type { VendedorasPeriodo } from "@/components/ventas/types";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { vendedoraMesAMes, type FilaVendedoraConFecha } from "@/lib/multifashion/vendedora-mes-a-mes";
 import {
   ventanaMesAnioPasado,
   ventasPorVendedora,
@@ -51,6 +52,39 @@ export async function GET(req: NextRequest) {
   }
   if (!Number.isFinite(year) || year < 2000 || year > 2100) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
+  }
+
+  // 🔴 `?mesAMes=1&vendedora=` (27-nov-2026, mantener presionado): la venta de
+  // UNA vendedora mes a mes del año contra el año pasado, de la MISMA vista.
+  const vendedora = sp.get("vendedora");
+  if (sp.get("mesAMes") === "1" && vendedora) {
+    try {
+      const filas = await leerTodoPaginado<FilaVendedoraConFecha>(
+        "multifashion/vendedoras mes a mes",
+        (conCount, d, h) =>
+          supabaseServer
+            .from("_multifashion_sf_vw")
+            .select("fecha, vendedor, vendedor_canonico, subtotal", conCount ? { count: "exact" } : undefined)
+            .eq("vendedor_canonico", vendedora)
+            .gte("fecha", `${year - 1}-01-01`)
+            .lte("fecha", `${year}-12-31`)
+            .order("fecha_ts", { ascending: true })
+            .order("n_sistema", { ascending: true })
+            .range(d, h),
+      );
+      const ultimo = await supabaseServer
+        .from("_multifashion_sf_vw")
+        .select("fecha")
+        .lte("fecha", `${year}-12-31`)
+        .order("fecha", { ascending: false })
+        .limit(1);
+      if (ultimo.error) throw ultimo.error;
+      const corte = (ultimo.data?.[0]?.fecha as string | undefined) ?? null;
+      return NextResponse.json(vendedoraMesAMes(filas, vendedora, year, corte, new Date()));
+    } catch (e) {
+      console.error("[multifashion/vendedoras] mes a mes", e);
+      return NextResponse.json({ error: "no se pudo leer" }, { status: 500 });
+    }
   }
 
   const mes = parseIntParam(sp.get("mes"));
