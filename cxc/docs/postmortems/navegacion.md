@@ -779,3 +779,20 @@ Daniel, probando en su iPhone la barra de pestañas (`TAB_BAR_2026_10`): *«¿po
 - ⚠️ **El Historial del depurador NO se divide en pestañas**: la tabla no guarda por dónde entró el archivo.
 - 🔴 **El primer pintado ya sabe quién mira** (19-sep): `useAuth` arranca con la semilla de la cookie firmada (`lib/sesion-semilla*.ts`, leída en el layout raíz; rol · módulos · `isOwner` · nombre, **nunca el token**) con la MISMA regla que el navegador (`tieneAccesoAlModulo`); sin acceso o sin semilla, `null` como antes, y `sessionStorage` sigue mandando al hidratar. ⚠️ `/home` no PINTA en el servidor. 🔴 Sin modo oscuro (2-oct-2026, `sin-modo-oscuro`).
 - 🔴 **Quien no tiene Inicio no lo ve ni un instante** (19-sep): el rebote a la casa del rol lo decide el SERVIDOR en `src/app/home/layout.tsx` —`leerSemillaDeSesion()` + la MISMA `casaDelRol`, `redirect()` antes de una sola línea de HTML—, así que `marcacion`, `gerente_acs` y `gerente_boston` nunca reciben el Inicio. 🔴 **Falla ABIERTA**: sin cookie, forjada o rol desconocido, no redirige y el efecto del navegador decide como siempre.
+
+## Ver PDF en la app instalada (27-nov-2026)
+
+**Lo que pasó.** Daniel armó un pedido en el catálogo, lo confirmó, se envió a Switch y en esa misma pantalla tocó «Ver PDF». En el iPhone y en el iPad, con la app instalada en la pantalla de inicio, el PDF tapó la app entera: sin barra, sin «volver», sin «compartir». Tuvo que cerrar la app de fondo. Desde Catálogos › Comprobantes sí funcionaba.
+
+**La causa.** «Ver PDF» de la confirmación (`ConfirmacionClient.tsx`) era un `<a href="/api/catalogo/<marca>/orders/<id>/pdf" target="_blank">`. En modo standalone iOS no tiene pestañas: una dirección del MISMO dominio (o un `blob:`) se abre en la MISMA ventana de la app, que no tiene controles. Comprobantes no caía porque arma el PDF en el navegador y lo DESCARGA (`doc.save()`), que iOS muestra en su visor con «Listo». Una dirección de OTRO dominio (wa.me, el storage de Supabase) tampoco cae: iOS la abre en un visor con «Listo».
+
+**El arreglo — una puerta, `verPdf` en `lib/compartir-archivo.ts`.**
+- Con el dedo (`aparatoDeQuienMira()`: `pointer: coarse`, o iPad que se presenta como «Macintosh» con toque) el PDF va a la **hoja de compartir** (ver, mandar, imprimir, cerrar); sin hoja, se descarga. Nunca se abre una ventana.
+- En la computadora, pestaña nueva; si el navegador la bloquea, se descarga.
+- La confirmación baja el PDF **apenas el pedido queda** (y otra vez si cambia el envío, porque la palabra Pedido/Cotización sale de él): el botón dice «Preparando PDF…» hasta tenerlo, «Reintentar PDF» si falló, y el toque llega a `navigator.share` sin ningún `await` de red.
+
+**Los otros lugares con la misma trampa, arreglados igual:** Despachos › Pedidos «Imprimir» (`PedidosView`) y el papel de un pedido (`PedidoBultos`) → `verPdf`; Guías «Imprimir» en iPhone/iPad (`imprimir-pdf.ts`, era `window.open(blob)`) → hoja de compartir, que trae «Imprimir»; Etiquetas (`pdf-en-pestana.ts`) → con el dedo, hoja de compartir en vez de pestaña (si iOS ya no lo cuenta como toque por el POST de en medio, se descarga); «Curvas de tallas por caja» en la ayuda (`VideosAyuda.tsx`) → con el dedo el enlace ya no navega.
+
+**⚠️ Pendiente:** Marketing › nota de entrega «Imprimir» (`NotaEntregaAcciones.tsx`) abre un blob en pestaña nueva; no se tocó porque ese módulo tenía otro trabajo abierto. Está en la lista del candado marcado PENDIENTE.
+
+**Candado:** `src/__tests__/lib/ver-pdf-una-puerta.test.ts` — build rojo si aparece un `window.open` o `location.href =` fuera de una lista donde cada entrada dice por qué no es la trampa, o un enlace a un PDF/blob; y prueba `verPdf` (dedo → hoja sin ventana; computadora → pestaña o descarga).

@@ -115,6 +115,7 @@ function pdfDeLaEtiqueta(
     return {
       url: doc.output("bloburl") as unknown as string,
       descargar: () => doc.save(nombreArchivoEtiquetas(e, caja ?? null, formato)),
+      archivo: new File([doc.output("blob")], nombreArchivoEtiquetas(e, caja ?? null, formato), { type: "application/pdf" }),
     };
   };
 }
@@ -532,7 +533,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
     // el servidor dice que no, la pestaña vacía se cierra sola.
     let creada: EtiquetaFila | null = null;
     try {
-      await abrirPdfEnPestana(async () => {
+      const abierto = await abrirPdfEnPestana(async () => {
         const r = await fetch("/api/guias/etiquetas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -564,7 +565,7 @@ function PanelEtiquetar({ etiquetas, deshabilitado, onCerrar, onListo, onYaEtiqu
       });
       const guardada = creada as EtiquetaFila | null;
       if (guardada) {
-        await onListo(`Listo · ${guardada.cajas} etiquetas — se abrieron en otra pestaña`);
+        await onListo(`Listo · ${guardada.cajas} etiquetas — ${abierto === "pestana" ? "se abrieron en otra pestaña" : "listas para imprimir"}`);
         onCerrar();
       }
     } catch {

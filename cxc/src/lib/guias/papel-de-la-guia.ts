@@ -41,7 +41,7 @@ import type { Guia } from "@/app/despachos/components/types";
 export function imprimirGuia(g: Guia): "dialogo" | "visor" | "bloqueado" {
   const doc = construirPdfGuia(g);
   doc.autoPrint();
-  return imprimirPdf(doc.output("blob"));
+  return imprimirPdf(doc.output("blob"), nombreArchivoGuia(g));
 }
 
 /**

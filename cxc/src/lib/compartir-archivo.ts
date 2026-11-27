@@ -22,6 +22,8 @@
 // es lo correcto, y ahí es donde `canShare` da false casi siempre.
 // ============================================================================
 
+import { aparatoDeQuienMira } from "@/lib/aparato";
+
 export type ResultadoCompartir = "compartido" | "descargado" | "cancelado";
 
 /** ¿Este navegador puede mandar ARCHIVOS a la hoja de compartir? */
@@ -105,4 +107,56 @@ export async function compartirArchivo(
     descargarArchivo(archivo);
     return "descargado";
   }
+}
+
+// ============================================================================
+// 🔴 VER UN PDF (27-nov-2026). LA ÚNICA PUERTA PARA ABRIR UN PDF O UN BLOB.
+//
+// 🩸 LO QUE PASABA: «Ver PDF» de la confirmación del pedido era un enlace con
+// `target="_blank"`. En la app INSTALADA en la pantalla de inicio del iPhone o
+// del iPad (modo standalone) no existen las pestañas: la MISMA ventana de la app
+// se iba al PDF, sin barra, sin «volver» y sin «compartir». Daniel tenía que
+// cerrar la app de fondo. Igual con todo `window.open` a un `blob:` o a una
+// dirección de la casa. (Una dirección de OTRO dominio —wa.me, el storage— sí
+// se abre en el visor con «Listo»; esa no es la trampa.)
+//
+// 🔑 Por eso: con el DEDO (iPhone, iPad aunque diga «Macintosh», Android) el PDF
+// va a la HOJA DE COMPARTIR, que deja verlo, mandarlo, imprimirlo y cerrarla.
+// En la computadora, pestaña nueva; si el navegador la bloquea, se descarga.
+// El archivo tiene que llegar YA ARMADO: ver la regla del gesto, arriba.
+// Candado: `ver-pdf-una-puerta.test.ts`.
+// ============================================================================
+
+/** ¿Este aparato abre el PDF en la hoja de compartir (dedo + archivos)? */
+export function pdfVaALaHoja(archivo: File): boolean {
+  return aparatoDeQuienMira() === "celular" && puedeCompartirArchivos(archivo);
+}
+
+/** Abre una pestaña nueva. Solo la usan los caminos de COMPUTADORA. */
+export function abrirPestana(url: string): Window | null {
+  if (typeof window === "undefined") return null;
+  return window.open(url, "_blank");
+}
+
+/**
+ * Muestra un PDF ya armado. `imprimir` = en la computadora, además, pide el
+ * diálogo de impresión al cargar (en el celular la hoja ya trae «Imprimir»).
+ */
+export async function verPdf(
+  archivo: File,
+  opciones: { imprimir?: boolean; title?: string } = {},
+): Promise<ResultadoCompartir | "pestana"> {
+  if (aparatoDeQuienMira() === "celular") {
+    // Con dedo NUNCA se abre una ventana: sin hoja de compartir, se descarga.
+    return compartirArchivo(archivo, opciones.title ? { title: opciones.title } : undefined);
+  }
+  const url = URL.createObjectURL(archivo);
+  const ventana = abrirPestana(url);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  if (!ventana) {
+    descargarArchivo(archivo);
+    return "descargado";
+  }
+  if (opciones.imprimir) ventana.addEventListener("load", () => ventana.print(), { once: true });
+  return "pestana";
 }

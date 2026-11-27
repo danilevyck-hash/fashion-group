@@ -22,13 +22,16 @@
 //     pantalla y no hay pestaña que cerrar después.
 //
 //   · **iPhone y iPad** — Safari NO ejecuta esa orden dentro de un iframe: el
-//     PDF se queda ahí quieto y no pasa nada. Ahí se abre el visor del sistema,
-//     que trae su propio botón de imprimir/compartir (AirPrint). Es un toque
+//     PDF se queda ahí quieto y no pasa nada. Ahí se abre la HOJA DE COMPARTIR
+//     con el PDF (27-nov-2026; antes era el visor, que en la app instalada no
+//     tiene «volver»), que trae «Imprimir» (AirPrint). Es un toque
 //     igual, y es el único camino que de verdad llega a la impresora.
 //     ⚠️ El `window.open` tiene que salir DENTRO del clic: con un `await` en el
 //     medio Safari deja de contarlo como gesto y lo bloquea como popup. Por eso
 //     el PDF se arma sincrónicamente, sin `await`, antes de abrir nada.
 // ============================================================================
+
+import { compartirArchivo } from "@/lib/compartir-archivo";
 
 /** Cuánto se deja el iframe en la página antes de sacarlo (ms). */
 const VIDA_DEL_IFRAME = 60_000;
@@ -55,15 +58,16 @@ export function esIOS(): boolean {
  *          `"visor"` si se abrió el visor del sistema (iOS),
  *          `"bloqueado"` si el navegador impidió abrirlo.
  */
-export function imprimirPdf(blob: Blob): "dialogo" | "visor" | "bloqueado" {
-  const url = URL.createObjectURL(blob);
-
+export function imprimirPdf(blob: Blob, nombre = "documento.pdf"): "dialogo" | "visor" | "bloqueado" {
   if (esIOS()) {
-    const w = window.open(url, "_blank");
-    // La URL no se revoca enseguida: el visor todavía la está leyendo.
-    setTimeout(() => URL.revokeObjectURL(url), VIDA_DEL_IFRAME);
-    return w ? "visor" : "bloqueado";
+    // 🩸 27-nov-2026: era `window.open(blob)`. En la app instalada en la
+    // pantalla de inicio eso deja la app atrapada en el PDF, sin «volver».
+    // La hoja de compartir trae «Imprimir» (AirPrint) y se cierra.
+    void compartirArchivo(new File([blob], nombre, { type: "application/pdf" }));
+    return "visor";
   }
+
+  const url = URL.createObjectURL(blob);
 
   const iframe = document.createElement("iframe");
   // No `display:none`: hay navegadores que no cargan un iframe oculto del todo.

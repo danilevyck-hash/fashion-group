@@ -448,6 +448,7 @@ function stubConfirmacion(envio: Record<string, unknown> | null) {
     vi.fn(async (url: string, init?: RequestInit) => {
       if ((init?.method || "GET").toUpperCase() !== "GET") escrituras.push(url);
       const j = (b: unknown) => ({ ok: true, status: 200, json: async () => b });
+      if (url.endsWith("/pdf")) return { ok: true, status: 200, headers: new Headers({ "Content-Disposition": "inline; filename*=UTF-8''Pedido.pdf" }), blob: async () => new Blob(["%PDF"]) };
       if (url.includes("/enviar-switch")) return j({ envio });
       return j({ id: OID, order_number: "PED-017", client_name: "Sporting Shoes", total: 2760 });
     }) as unknown as typeof fetch,

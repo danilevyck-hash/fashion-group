@@ -27,12 +27,17 @@
 // → se baja el archivo, como antes. Nunca se queda nadie sin sus etiquetas.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { aparatoDeQuienMira } from "@/lib/aparato";
+import { abrirPestana, compartirArchivo } from "@/lib/compartir-archivo";
+
 /** Un PDF ya armado, listo para mostrarse o para bajarse. */
 export interface PdfListo {
   /** La dirección del blob (`doc.output("bloburl")`). */
   url: string;
   /** La red de abajo: bajar el archivo si no hubo pestaña. */
   descargar: () => void;
+  /** El PDF como archivo: es lo que va a la hoja de compartir con el dedo. */
+  archivo?: File;
 }
 
 /** Lo mínimo que este módulo le pide a una ventana abierta (para poder probarlo). */
@@ -45,11 +50,28 @@ export interface VentanaAbierta {
 export type AbrirVentana = (url: string) => VentanaAbierta | null;
 
 /** Cómo termina el intento. `"nada"` = no había PDF que mostrar. */
-export type ResultadoPestana = "pestana" | "descarga" | "nada";
+export type ResultadoPestana = "pestana" | "descarga" | "nada" | "hoja";
 
 function abrirDeVerdad(url: string): VentanaAbierta | null {
-  if (typeof window === "undefined") return null;
-  return window.open(url, "_blank") as unknown as VentanaAbierta | null;
+  return abrirPestana(url) as unknown as VentanaAbierta | null;
+}
+
+/**
+ * 🩸 CON EL DEDO NO SE ABRE NINGUNA PESTAÑA (27-nov-2026). En la app instalada
+ * en el iPhone o el iPad la «pestaña nueva» es la MISMA ventana de la app: el
+ * PDF la tapaba sin «volver». Ahí el PDF va a la hoja de compartir (ver,
+ * imprimir, mandar, cerrar). Si iOS ya no lo cuenta como toque —hubo un POST
+ * en el medio—, `compartirArchivo` lo descarga, que en iOS también funciona.
+ */
+async function enLaHoja(armar: () => Promise<PdfListo | null>): Promise<ResultadoPestana> {
+  const pdf = await armar();
+  if (!pdf) return "nada";
+  if (!pdf.archivo) {
+    pdf.descargar();
+    return "descarga";
+  }
+  const r = await compartirArchivo(pdf.archivo);
+  return r === "descargado" ? "descarga" : "hoja";
 }
 
 /**
@@ -67,6 +89,7 @@ export async function abrirPdfEnPestana(
   armar: () => Promise<PdfListo | null>,
   abrir: AbrirVentana = abrirDeVerdad,
 ): Promise<ResultadoPestana> {
+  if (aparatoDeQuienMira() === "celular") return enLaHoja(armar);
   // 🔴 PRIMERO LA PESTAÑA, DENTRO DEL GESTO. No mover debajo del `await`.
   const ventana = abrir("");
 

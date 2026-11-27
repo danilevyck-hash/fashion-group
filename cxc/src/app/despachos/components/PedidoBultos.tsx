@@ -47,7 +47,7 @@ import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
 import { ALTO_COLCHON_DE_ABAJO, BarraAccionFija, CLASE_TITULO_BARRA, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { usePublicarAltoBarraFija } from "@/lib/navegacion/useBarraFijaAbajo";
-import { descargarArchivo } from "@/lib/compartir-archivo";
+import { verPdf } from "@/lib/compartir-archivo";
 import { fmt } from "@/lib/format";
 import {
   COLUMNAS_DETALLE,
@@ -273,16 +273,12 @@ export default function PedidoBultos({
       const r = await fetch(`/api/guias/pedidos/detalle/papel?${clave}&precios=${conPrecios ? "si" : "no"}`, { cache: "no-store" });
       if (!r.ok) throw new Error(String(r.status));
       const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const ventana = window.open(url, "_blank");
-      if (ventana) {
-        ventana.addEventListener("load", () => ventana.print(), { once: true });
-      } else {
-        descargarArchivo(new File([blob], `pedido-${pedido.secuencial}${conPrecios ? "" : "-sin-precios"}.pdf`, { type: "application/pdf" }));
+      // 🩸 27-nov-2026: con el dedo va a la hoja de compartir (trae «Imprimir»);
+      // en la app instalada una pestaña nueva la dejaba sin «volver».
+      const archivo = new File([blob], `pedido-${pedido.secuencial}${conPrecios ? "" : "-sin-precios"}.pdf`, { type: "application/pdf" });
+      if ((await verPdf(archivo, { imprimir: true })) === "descargado") {
         toast("Papel descargado — ábrelo para imprimir", "success");
       }
-      // El navegador necesita la URL viva mientras abre la pestaña.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
       toast("No se pudo preparar el papel. Intenta de nuevo.", "error");
     }
