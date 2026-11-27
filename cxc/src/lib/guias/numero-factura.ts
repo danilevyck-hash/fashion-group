@@ -1,3 +1,4 @@
+import { esSinFactura } from "./envio-sin-factura";
 // ─────────────────────────────────────────────────────────────────────────────
 // EL NÚMERO DE FACTURA DE UN RENGLÓN — se GUARDA completo, se MUESTRA corto.
 // (módulo PURO: sin React, sin fetch, sin reloj)
@@ -65,6 +66,8 @@ function digitos(v: string | null | undefined): string {
  * puede inventar dígitos que no existen.
  */
 export function claveDeFactura(v: string | null | undefined): string {
+  // «Sin factura · 12 paraguas» no es la factura 12 (envio-sin-factura.ts).
+  if (esSinFactura(v)) return "";
   const d = digitos(v);
   if (d === "" || /^0+$/.test(d)) return "";
   return d.length > DIGITOS_DE_LA_FACTURA ? d.slice(-DIGITOS_DE_LA_FACTURA) : d;

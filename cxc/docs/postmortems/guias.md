@@ -2727,3 +2727,22 @@ Acumulado en hábiles: 0 → 48,2 % · 1 → 80,3 % · 2 → 92,1 % · 3 → 95,
 
 **Cómo.** `FACTURADOS_CORTE_DIAS_2026_11` (prendido) y `FACTURADOS_DIAS_HABILES = 5` en `lib/guias/facturados-sin-guia.ts`; `primerDiaDeFacturados(hoy)` es la ÚNICA ventana (la lee la ruta del servidor) y `ROTULO_VENTANA_FACTURADOS` el texto («últimos 5 días hábiles»). La cuenta del paso es la misma lista. No se escribe nada en la base; apagado = los 30 días de antes. Feriados: no se descuentan (cuentan como hábiles), a propósito. Candado: `facturados-sin-guia.test.ts` › «corte».
 
+
+## Envío sin factura (26-nov-2026)
+
+**Problema (medido 26-ago → 26-nov-2026).** 22 renglones sin factura: 20 con «0000» tecleado en «+ Agregar factura › Escribir a mano» (el camino de Angela y Andrea; el sistema lo tomaba como factura, obligaba empresa y en el papel salía en blanco) y 2 con «+ Agregar traslado» (por primera vez en la guía 328, uno mal usado: tenía la factura 3422). El chip «Traslado» de Etiquetas: 0 usos. Lo que iba se decía solo en Observaciones, texto libre (muebles Tommy/CK/Reebok, paraguas, tazas, ganchos, muestras CK, un sobre).
+
+**Lo que Daniel definió y aprobó sobre el mockup HOY vs RECOMENDACIÓN (capturas reales, 26-nov-2026).**
+- UN botón **«Envío sin factura»** junto a «+ Agregar factura»; reemplaza «+ Agregar traslado» (y el botón «Traslado» del cuadro de amarre de facturas).
+- **«Qué lleva»**: texto abierto, obligatorio; debajo, 6 sugerencias fijas que se TOCAN, nunca se aplican solas (Traslado a American Classics · Mobiliario · Material POP · Muestras · Mercancía de Boston · Documentos). No se leen guías viejas.
+- **Empresa obligatoria** (de quién es la mercancía, las 8, Boston incluida); «Ninguna (documentos o sobres)» guarda la empresa vacía.
+- Cliente, bultos y destino como un renglón normal (destino «el de siempre»).
+- Sin la línea de «si se va a facturar, primero factura» (Daniel la quitó).
+- **«0000» deja de ser factura**: en un renglón NUEVO (sin `id`) el campo dice «"0000" no es una factura: usa "Envío sin factura"», no deja guardar y el POST de `/api/guias` contesta 400. Editar una guía vieja con «0000» sigue igual.
+- En el papel (pantalla, PDF y Excel): `Sin factura · <qué lleva>` en FACTURA(S). El Telegram no cambia (no lee las facturas).
+
+**Cómo.** Sin migración: el texto vive en `guia_items.facturas` (`lib/guias/envio-sin-factura.ts`: `facturasSinFactura`, `esSinFactura`, `queLlevaDe`; las comas de lo escrito pasan a « /» porque la coma separa facturas). `claveDeFactura` devuelve vacío para esos renglones, así «12 paraguas» no choca con la factura 12. Panel en `AgregarSinFactura.tsx`; la tarjeta lleva el chip «Sin factura». `false` = la pantalla de antes.
+
+⚠️ **El chip «Traslado» de Etiquetas NO se quitó**: está tejido por todo `EtiquetasPorEnvio.tsx` (≈12 puntos de `ETIQUETAS_TRASLADO_2026_10`, la validación del POST y la barra fija); quitarlo no es un cambio chico. Queda pendiente si Daniel lo pide.
+
+**Candados:** `guias-envio-sin-factura` (lib y componente) · `guias-agregar-traslado` (la pantalla de antes, con el interruptor apagado) · `revisar-nombres` («Qué lleva» anotado como rótulo aprobado).

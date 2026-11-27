@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { claveDeFactura, facturaParaMostrar } from "@/lib/guias/numero-factura";
+import { GUIA_ENVIO_SIN_FACTURA_2026_11 } from "@/lib/guias/envio-sin-factura";
 import { TEXTO_TRASLADO, fechaDeLaFactura, type FacturaDelCliente } from "@/lib/guias/atajos-facturas";
 import { GUIA_AMARRE_FACTURAS_2026_11, partesDelRenglon as partesDeLaRegla, sinAmarre as sinAmarreDeLaRegla, type FacturaDeSwitch } from "@/lib/guias/amarre-facturas";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -110,9 +111,12 @@ export function AmarreDelRenglon({ item, porCliente, onCambiar, onActualizar }: 
                 {f.pedidoBultos ? ` · ${f.pedidoBultos} bultos` : ""}
               </button>
             ))}
-            <button type="button" onClick={() => reemplazar(falta.texto, TEXTO_TRASLADO)} className="rounded-md border border-gray-300 px-2 py-1 text-gray-700 hover:bg-gray-50">
-              Traslado
-            </button>
+            {/* 26-nov-2026: con «Envío sin factura» prendido, el traslado ya no se ofrece aquí. */}
+            {!GUIA_ENVIO_SIN_FACTURA_2026_11 && (
+              <button type="button" onClick={() => reemplazar(falta.texto, TEXTO_TRASLADO)} className="rounded-md border border-gray-300 px-2 py-1 text-gray-700 hover:bg-gray-50">
+                Traslado
+              </button>
+            )}
           </div>
           <button type="button" onClick={onActualizar} className="mt-1 text-blue-600 hover:text-blue-800">
             Actualizar facturas de hoy

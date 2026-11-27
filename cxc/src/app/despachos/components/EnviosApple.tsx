@@ -31,6 +31,8 @@ import { esSoloTraslado, filaTieneDatos } from "./guia-form-logic";
 import { lineaDeTrasladoDe } from "@/lib/guias/etiquetas-por-envio";
 import { GUIA_AGREGAR_TRASLADO_2026_10 } from "@/lib/guias/guias-2026-10";
 import AgregarTraslado from "./AgregarTraslado";
+import AgregarSinFactura from "./AgregarSinFactura";
+import { BOTON_ENVIO_SIN_FACTURA, CHIP_SIN_FACTURA, GUIA_ENVIO_SIN_FACTURA_2026_11, esSinFactura, queLlevaDe } from "@/lib/guias/envio-sin-factura";
 import { emptyItem } from "./constants";
 import AgregarSinEtiquetas from "./AgregarSinEtiquetas";
 import { CHIP_SIN_ETIQUETA, MOTIVO_FACTURA_EN_RENGLON, idsDeLosEnviosMarcados } from "./DetalleDeEnvio";
@@ -104,7 +106,7 @@ export default function EnviosApple({
 }: Props) {
   const [editando, setEditando] = useState<string | null>(null);
   /** Qué panel está abierto debajo de los botones: uno a la vez. */
-  const [agregando, setAgregando] = useState<null | "factura" | "traslado">(null);
+  const [agregando, setAgregando] = useState<null | "factura" | "traslado" | "sin-factura">(null);
 
   const envios = agruparEnEnvios(etiquetas);
   const porId = new Map(envios.map((v) => [v.envio_id, v]));
@@ -215,7 +217,7 @@ export default function EnviosApple({
         {facturas.length > 0 && (
           <>
             {/* Solo traslados: la tarjeta ya lo dice con su chip, sin título. */}
-            {facturas.some(({ item }) => !esSoloTraslado(item.facturas)) && (
+            {facturas.some(({ item }) => !esSoloTraslado(item.facturas) && !(GUIA_ENVIO_SIN_FACTURA_2026_11 && esSinFactura(item.facturas))) && (
               <h2 id="titulo-facturas" className={TITULO}>
                 Facturas <span className={CHIP}>{CHIP_SIN_ETIQUETA}</span>
               </h2>
@@ -225,8 +227,9 @@ export default function EnviosApple({
                 const abierto = item.uid === editando;
                 const nombre = item.cliente || "Sin cliente";
                 const traslado = GUIA_AGREGAR_TRASLADO_2026_10 && esSoloTraslado(item.facturas);
+                const sinFactura = GUIA_ENVIO_SIN_FACTURA_2026_11 && esSinFactura(item.facturas);
                 return (
-                  <li key={item.uid ?? idx} data-renglon={traslado ? "traslado" : "sin-etiqueta"}>
+                  <li key={item.uid ?? idx} data-renglon={sinFactura ? "sin-factura" : traslado ? "traslado" : "sin-etiqueta"}>
                     <div className={`${tarjeta(false)} !p-0 !gap-0`}>
                       <button
                         type="button"
@@ -237,12 +240,14 @@ export default function EnviosApple({
                       >
                         <Contenido
                           cliente={nombre}
-                          detalle={traslado
+                          detalle={sinFactura
+                            ? linea(item.empresa || "Ninguna", item.direccion, queLlevaDe(item.facturas))
+                            : traslado
                             ? linea(item.empresa, item.direccion, item.contenido_traslado ?? "")
                             : linea(item.empresa, item.direccion, facturasParaMostrar(item.facturas))}
                           titulo={item.facturas}
                           bultos={item.bultos || 0}
-                          extra={traslado && <span className={`mt-1 inline-block ${CHIP}`}>{CHIP_TRASLADO}</span>}
+                          extra={(sinFactura || traslado) && <span className={`mt-1 inline-block ${CHIP}`}>{sinFactura ? CHIP_SIN_FACTURA : CHIP_TRASLADO}</span>}
                         />
                       </button>
                       <button
@@ -282,7 +287,16 @@ export default function EnviosApple({
           >
             {BOTON_AGREGAR_FACTURA}
           </button>
-          {GUIA_AGREGAR_TRASLADO_2026_10 && (
+          {GUIA_ENVIO_SIN_FACTURA_2026_11 ? (
+            <button
+              type="button"
+              onClick={() => setAgregando((a) => (a === "sin-factura" ? null : "sin-factura"))}
+              aria-expanded={agregando === "sin-factura"}
+              className={BOTON}
+            >
+              {BOTON_ENVIO_SIN_FACTURA}
+            </button>
+          ) : GUIA_AGREGAR_TRASLADO_2026_10 && (
             <button
               type="button"
               onClick={() => setAgregando((a) => (a === "traslado" ? null : "traslado"))}
@@ -293,6 +307,15 @@ export default function EnviosApple({
             </button>
           )}
         </div>
+        {agregando === "sin-factura" && (
+          <AgregarSinFactura
+            items={items}
+            onReemplazarItems={onReemplazarItems}
+            onCerrar={() => setAgregando(null)}
+            clientesTop={clientesTop}
+            destinoAutollenadoDe={destinoAutollenadoDe}
+          />
+        )}
         {agregando === "traslado" && (
           <AgregarTraslado
             items={items}
