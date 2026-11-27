@@ -44,6 +44,37 @@ async function main() {
       console.log(`${ok ? "✓" : "✗"} ${id} ${desde.slice(0, 7)}  tarjeta ${enTarjeta.toFixed(2)}  pantalla ${enPantalla.toFixed(2)}  vista ${enVista.toFixed(2)}`);
     }
   }
+  // El MES EN CURSO contra los MISMOS DÍAS del año pasado (día de PANAMÁ) y el
+  // TOTAL del año: lo de la tarjeta contra la base, sin pasar por la RPC.
+  const { signoVenta } = await import("../src/lib/ventas/tipos-comprobante");
+  const corte = data.dia_corte_anio_anterior;
+  for (const [id, key] of EMPRESAS) {
+    const e = data.empresas.find((x) => x.empresa.id === id)!;
+    const tarjeta = mesesDeSeries(e.ventas2026, e.ventas2025, hasta);
+    if (corte) {
+      const ini = `${corte.slice(0, 8)}01`;
+      let suma = 0;
+      for (let desde = 0; ; desde += 1000) {
+        const { data: f, error } = await sb.from("switch_facturas").select("fecha, tipo_comprobante, subtotal_descuento")
+          .eq("empresa_key", key).gte("fecha", `${ini}T05:00:00Z`).lt("fecha", `${corte}T23:59:59.999-05:00`).order("fecha").range(desde, desde + 999);
+        if (error) throw error;
+        for (const r of f ?? []) suma += signoVenta(r.tipo_comprobante) * Number(r.subtotal_descuento ?? 0);
+        if (!f || f.length < 1000) break;
+      }
+      const enTarjeta = tarjeta.find((t) => t.mes === hasta)!.previo ?? 0;
+      const ok = Math.round(enTarjeta * 100) === Math.round(suma * 100);
+      comparados++; if (!ok) malos++;
+      console.log(`${ok ? "✓" : "✗"} ${id} ${ini.slice(0, 7)} año pasado, 1 al ${Number(corte.slice(8))} (día de Panamá)  tarjeta ${enTarjeta.toFixed(2)}  base ${suma.toFixed(2)}`);
+    }
+    const tot = tarjeta.reduce((s, m) => s + m.actual, 0);
+    const enPantalla = delPeriodo(e.ventas2026, 0);
+    const { data: v, error } = await sb.from("switch_ventas_unificado_vw").select("ventas_netas").eq("empresa_key", key).gte("mes", `${anio}-01-01`).lte("mes", `${anio}-12-01`);
+    if (error) throw error;
+    const enVista = (v ?? []).reduce((s, r) => s + Number(r.ventas_netas), 0);
+    const ok = [tot, enPantalla, enVista].every((x) => Math.round(x * 100) === Math.round(tot * 100));
+    comparados++; if (!ok) malos++;
+    console.log(`${ok ? "✓" : "✗"} ${id} total ${anio}  tarjeta ${tot.toFixed(2)}  pantalla ${enPantalla.toFixed(2)}  vista ${enVista.toFixed(2)}`);
+  }
   console.log(`${comparados} comparaciones, ${malos} no cuadran`);
   process.exit(comparados === 0 || malos > 0 ? 1 : 0);
 }

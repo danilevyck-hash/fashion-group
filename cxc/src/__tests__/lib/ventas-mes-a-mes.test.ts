@@ -9,6 +9,11 @@ describe("cambioDelMes", () => {
     expect(cambioDelMes(92, 100)).toEqual({ texto: "▼ −8%", tono: "dn" });
     expect(cambioDelMes(103.4, 100)).toEqual({ texto: "▲ +3%", tono: "up" });
   });
+  it("Fashion Wear nov-2026 (medido 27-nov): 1–26 nov contra 1–26 nov 2025 en DÍA DE PANAMÁ es +0,5 % → «0%»; el +3 % sale de cortar en UTC", () => {
+    expect(cambioDelMes(704252.0, 700821.19)).toEqual({ texto: "0%", tono: "fl" });
+    // 682.856,19 = mismo rango cortado en UTC: pierde lo facturado el 26-nov-2025 después de las 7 p. m.
+    expect(cambioDelMes(704252.0, 682856.19).texto).toBe("▲ +3%");
+  });
   it("sin base del año pasado dice «Nuevo», nunca «+0 %»", () => {
     expect(cambioDelMes(500, 0).texto).toBe("Nuevo");
     expect(cambioDelMes(500, null).texto).toBe("Nuevo");
