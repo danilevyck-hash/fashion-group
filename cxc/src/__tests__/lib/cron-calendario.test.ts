@@ -552,8 +552,8 @@ describe("pg_cron — lo que se mudó sigue en el registro y no está en los dos
     expect(VERCEL.crons.some((c) => c.path.includes("tipo=facturas"))).toBe(false);
   });
 
-  it("vercel.json quedó con aire: 83 entradas de 100 (+1 el 26-nov-2026: estado-cuenta-semanal; +2 el 27-nov-2026: estado-cuenta-switch)", () => {
-    expect(VERCEL.crons.length).toBe(83);
+  it("vercel.json quedó con aire: 82 entradas de 100 (estado-cuenta-semanal: lunes 10:50 y 11:20 desde el 27-nov-2026)", () => {
+    expect(VERCEL.crons.length).toBe(82);
   });
 
   it("la migración usa la ruta con www y el Bearer de Vault, nunca el secreto escrito", () => {

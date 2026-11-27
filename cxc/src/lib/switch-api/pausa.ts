@@ -125,7 +125,7 @@ export function sinMarca(msg: string): string {
 export const CRONS_DE_SWITCH = [
   "acs-fidelizacion",
   "boston-cartera",
-  "estado-cuenta-switch",
+  "estado-cuenta-semanal",
   "calvin-catalogo",
   "joybees-catalogo",
   "reebok-catalogo",

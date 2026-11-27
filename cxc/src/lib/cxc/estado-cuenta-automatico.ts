@@ -143,7 +143,12 @@ export function mensajeDelLunes(r: ResumenCorrida): string {
     for (const c of orden.slice(0, TOPE_LISTA)) lineas.push(`· ${c.nombre} — ${dinero(c.saldo)}`);
     if (orden.length > TOPE_LISTA) lineas.push(`y ${orden.length - TOPE_LISTA} más · Ver en CxC`);
   }
-  if (r.fallaron.length) lineas.push("", `⚠️ ${r.fallaron.length} no salieron (ver aviso de sistema).`);
+  if (r.fallaron.length) {
+    // 🔴 Lo que no cuadró con Switch se dice aquí, con su porqué (27-nov-2026).
+    lineas.push("", `⚠️ ${r.fallaron.length} no salieron:`);
+    for (const f of r.fallaron.slice(0, TOPE_LISTA)) lineas.push(`· ${f.nombre} — ${f.motivo}`);
+    if (r.fallaron.length > TOPE_LISTA) lineas.push(`y ${r.fallaron.length - TOPE_LISTA} más`);
+  }
   if (r.pendientes) lineas.push("", `⚠️ ${r.pendientes} quedaron sin mandar por tiempo.`);
   if (r.yaEnviados) lineas.push("", `(${r.yaEnviados} ya habían salido esta semana; no se repitieron.)`);
   return lineas.join("\n");

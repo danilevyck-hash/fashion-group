@@ -982,34 +982,38 @@ export async function leerFacturaMostrar(session: WebSession, facturaId: number)
 }
 
 /**
- * El botón «Email» de la ficha del cliente en el panel (26-nov-2026): Switch
- * arma SU estado de cuenta PENDIENTE y lo manda por correo a `destino`, desde
- * noreply@switch-soft.com, con el PDF adjunto («<clienteId>_<hora>.pdf»).
- * `clienteId` es el `cliente_switch_id` de `switch_clientes`. Lo usa el envío de
- * los lunes (`lib/cxc/estado-cuenta-pdf-switch-io.ts`); destino = buzón intermedio.
+ * El estado de cuenta PENDIENTE de un cliente tal cual lo IMPRIME el panel
+ * (27-nov-2026, Daniel: «el PDF de Switch»): los mismos tres pasos que hace él
+ * — abrir la ficha (`/clientes/mostrar/<id>`), ver «Pendientes» (POST
+ * `/clientes/estadodecuenta` con tipo=P) e «Imprimir»
+ * (`/clientes/exportarestadodecuenta/<id>/html`). Devuelve ese HTML; el PDF se
+ * arma imprimiéndolo con Chromium (`lib/cxc/estado-cuenta-imprimir-io.ts`).
+ * `clienteId` es el `cliente_switch_id` de `switch_clientes`. Solo lee.
  */
-export async function enviarEstadoCuentaPendiente(
-  session: WebSession,
-  clienteId: number,
-  destino: string,
-): Promise<void> {
-  const q = new URLSearchParams({
-    clienteId: String(clienteId),
-    clienteEmail: destino,
-    tipoEstadoCuenta: "Regular",
-    detalleEstadocuentaCliente: "P",
-    fechaDesde: "",
+export async function leerEstadoCuentaParaImprimir(session: WebSession, clienteId: number): Promise<string> {
+  const id = encodeURIComponent(String(clienteId));
+  const { res: rFicha, text: ficha } = await webFetch(`${session.baseUrl}/clientes/mostrar/${id}`, session.cookies, {
+    headers: { Accept: "text/html" },
   });
-  const { res, text } = await webFetch(`${session.baseUrl}/clientes/enviarestadodecuenta?${q}`, session.cookies, {
-    headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+  const token = rFicha.status === 200 ? extractToken(ficha) : null;
+  if (!token) throw new SwitchWebError(session.empresaKey, "estadocuenta-ficha", `status ${rFicha.status}, sin token`);
+  const body = new URLSearchParams({ chunk: "10000", key: "0", tipo: "P", clienteId: String(clienteId), fechaDesde: "", _token: token });
+  const { res: rPend } = await webFetch(`${session.baseUrl}/clientes/estadodecuenta`, session.cookies, {
+    method: "POST",
+    body,
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      "X-CSRF-TOKEN": token,
+      Accept: "application/json",
+    },
   });
-  let ok = false;
-  try {
-    ok = (JSON.parse(text) as { response?: unknown }).response === true;
-  } catch {
-    ok = false;
+  if (rPend.status !== 200) throw new SwitchWebError(session.empresaKey, "estadocuenta-pendientes", `status ${rPend.status}`);
+  const { res, text } = await webFetch(`${session.baseUrl}/clientes/exportarestadodecuenta/${id}/html`, session.cookies, {
+    headers: { Accept: "text/html" },
+  });
+  if (res.status !== 200 || !text.includes("Total General")) {
+    throw new SwitchWebError(session.empresaKey, "estadocuenta-imprimir", `status ${res.status}`);
   }
-  if (res.status !== 200 || !ok) {
-    throw new SwitchWebError(session.empresaKey, "enviarestadodecuenta", `status ${res.status}: ${text.slice(0, 120)}`);
-  }
+  return text;
 }

@@ -255,7 +255,13 @@ const nextConfig = {
     instrumentationHook: true,
     // sharp es un binario nativo: externalizarlo evita que webpack lo empaquete
     // (requerido para que funcione en las funciones serverless de Vercel).
-    serverComponentsExternalPackages: ["sharp"],
+    // @sparticuz/chromium y puppeteer-core (27-nov-2026): el estado de cuenta de
+    // los lunes imprime el papel de Switch a PDF. El binario de Chromium viaja
+    // comprimido en `bin/` y no lo ve el rastreo de archivos: se incluye a mano.
+    serverComponentsExternalPackages: ["sharp", "@sparticuz/chromium", "puppeteer-core"],
+    outputFileTracingIncludes: {
+      "/api/cron/estado-cuenta-semanal": ["./node_modules/@sparticuz/chromium/bin/**"],
+    },
     // Router Cache (client-side) de rutas dinámicas: al volver a un server
     // component (Ventas, Comisiones, el lado server de Cheques/Reclamos) dentro
     // de 30s, Next reusa el payload RSC cacheado en el cliente en vez de re-pedir

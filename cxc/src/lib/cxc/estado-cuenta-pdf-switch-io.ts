@@ -1,29 +1,21 @@
 // I/O del PDF de Switch para el correo de los lunes (lo puro y el porqué:
-// `estado-cuenta-pdf-switch.ts`). Tres cosas:
-//   · pedirle a Switch que mande su PDF al buzón intermedio (panel web, sesión
-//     del usuario de cada empresa, una empresa por sesión, en serie);
-//   · encontrar esos correos en el buzón por Microsoft Graph (Mail.Read);
-//   · bajar el adjunto, intacto.
-// El buzón ES el almacén: no se guarda ningún PDF en la base.
+// `estado-cuenta-pdf-switch.ts`). Por empresa, en UNA sesión del panel y en serie:
+//   · el papel de «Imprimir» de cada cliente (vista Pendientes) → PDF con Chromium;
+//   · cerrada la sesión web, el saldo de cada uno por el API, para el candado.
+// El orden importa: entrar al API con el mismo usuario CIERRA la sesión web
+// (medido 27-nov-2026). Las empresas van a la vez: cada una es otra instancia.
+// No se guarda ningún PDF: se imprimen y se mandan en la misma corrida.
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { loginSwitchWeb, cerrarSesionWeb, enviarEstadoCuentaPendiente } from "@/lib/switch-api/web-client";
-import { credencialesGraph, tokenGraph, bytesDeAdjunto } from "@/lib/tallas-pedido/graph";
-import {
-  BUZON_INTERMEDIO,
-  REMITENTE_SWITCH,
-  elegirIdSwitch,
-  empresaDelAsunto,
-  idDelAdjunto,
-  type FilaIdSwitch,
-} from "@/lib/cxc/estado-cuenta-pdf-switch";
-
+import { loginSwitchWeb, cerrarSesionWeb, leerEstadoCuentaParaImprimir, type WebSession } from "@/lib/switch-api/web-client";
+import { createSwitchClient, logoutSwitchSessions } from "@/lib/switch-api/client";
+import { cuadreDeSwitch } from "@/lib/switch-api/estadocuenta-cuadre";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { correoDelCliente } from "@/lib/cxc/correo-del-cliente";
 import { direccionesValidas, seleccionarClientes, type ClienteDelLunes } from "@/lib/cxc/estado-cuenta-automatico";
-
-const GRAPH = "https://graph.microsoft.com/v1.0";
+import { elegirIdSwitch, leerPapelSwitch, veredictoDelPapel, type FilaIdSwitch } from "@/lib/cxc/estado-cuenta-pdf-switch";
+import type { Browser } from "puppeteer-core";
 
 export interface ClienteConCorreo extends ClienteDelLunes {
   /** Vacío = sin correo: no se le manda nada. */
@@ -57,162 +49,6 @@ export async function clientesDelLunes(soloCodigos: readonly string[] = []): Pro
   for (const c of clientes) out.push({ ...c, correos: direccionesValidas(await correoDelCliente(c.codigo, c.nombreNormalizado)) });
   return out;
 }
-const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/** Entre un pedido y el siguiente en la MISMA empresa (Switch arma y manda cada PDF). */
-const PAUSA_ENTRE_PEDIDOS_MS = 1_000;
-/** Cada cuánto se mira el buzón mientras se esperan los correos. */
-const PAUSA_ENTRE_MIRADAS_MS = 10_000;
-
-export interface Par {
-  empresa: string;
-  id: number;
-}
-export const llavePar = (empresa: string, id: number) => `${empresa}:${id}`;
-
-export interface PdfEnBuzon {
-  mensajeId: string;
-  adjuntoId: string;
-  recibido: string;
-}
-
-export async function tokenDelBuzon(): Promise<string> {
-  const c = credencialesGraph();
-  if (!c) throw new Error("faltan las claves de Microsoft (GRAPH_*) en Vercel");
-  return tokenGraph(c);
-}
-
-/**
- * Los PDF de Switch que llegaron al buzón desde `desde` (ISO), por (empresa, id
- * de Switch). Si el mismo cliente llegó dos veces, manda el MÁS NUEVO.
- */
-export async function indicePdfsSwitch(
-  token: string,
-  desde: string,
-  empresas: readonly string[],
-): Promise<Map<string, PdfEnBuzon>> {
-  const q = new URLSearchParams({
-    $filter: `receivedDateTime ge ${desde} and from/emailAddress/address eq '${REMITENTE_SWITCH}'`,
-    $select: "id,subject,receivedDateTime",
-    $expand: "attachments($select=id,name)",
-    $top: "100",
-  });
-  let url: string | undefined = `${GRAPH}/users/${encodeURIComponent(BUZON_INTERMEDIO)}/messages?${q}`;
-  const indice = new Map<string, PdfEnBuzon>();
-  for (let pagina = 0; url && pagina < 30; pagina += 1) {
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-    if (!r.ok) throw new Error(`buzón ${r.status}: ${(await r.text()).slice(0, 200)}`);
-    const p = (await r.json()) as {
-      value: { id: string; subject: string; receivedDateTime: string; attachments?: { id: string; name: string }[] }[];
-      "@odata.nextLink"?: string;
-    };
-    for (const m of p.value) {
-      const empresa = empresaDelAsunto(m.subject ?? "", empresas);
-      if (!empresa) continue;
-      for (const a of m.attachments ?? []) {
-        const id = idDelAdjunto(a.name ?? "");
-        if (id == null) continue;
-        const k = llavePar(empresa, id);
-        const previo = indice.get(k);
-        if (!previo || previo.recibido < m.receivedDateTime) {
-          indice.set(k, { mensajeId: m.id, adjuntoId: a.id, recibido: m.receivedDateTime });
-        }
-      }
-    }
-    url = p["@odata.nextLink"];
-  }
-  return indice;
-}
-
-export function bajarPdf(token: string, pdf: PdfEnBuzon): Promise<Uint8Array> {
-  return bytesDeAdjunto(token, BUZON_INTERMEDIO, pdf.mensajeId, pdf.adjuntoId);
-}
-
-// ─── Que el buzón no se llene (Daniel, 27-nov-2026) ──────────────────────────
-// Ya reenviado al cliente (Resend aceptó), el correo de Switch se MUEVE a la
-// carpeta «Estados de cuenta Switch»; a los 30 días pasa a Elementos eliminados.
-// Si el correo al cliente falló, el de Switch se queda donde está para el
-// reintento. ⚠️ Mover pide Mail.ReadWrite: con Mail.Read (lo que la app tiene
-// al 27-nov-2026) Microsoft contesta 403 y esto no hace nada —no corta el envío—;
-// el día que se le dé el permiso empieza a ordenar solo.
-
-export const CARPETA_SWITCH = "Estados de cuenta Switch";
-export const DIAS_EN_CARPETA = 30;
-
-const buzonUrl = () => `${GRAPH}/users/${encodeURIComponent(BUZON_INTERMEDIO)}`;
-let sinPermisoParaMover = false;
-let carpetaId: string | null = null;
-
-async function graphJson(token: string, url: string, init: RequestInit = {}): Promise<{ status: number; body: unknown }> {
-  const r = await fetch(url, {
-    ...init,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers ?? {}) },
-    cache: "no-store",
-  });
-  if (r.status === 401 || r.status === 403) sinPermisoParaMover = true;
-  return { status: r.status, body: await r.json().catch(() => null) };
-}
-
-async function idDeLaCarpeta(token: string): Promise<string | null> {
-  if (carpetaId || sinPermisoParaMover) return carpetaId;
-  const filtro = encodeURIComponent(`displayName eq '${CARPETA_SWITCH}'`);
-  const q = await graphJson(token, `${buzonUrl()}/mailFolders?$filter=${filtro}&$select=id`);
-  const hallada = (q.body as { value?: { id: string }[] } | null)?.value?.[0]?.id;
-  if (hallada) return (carpetaId = hallada);
-  const c = await graphJson(token, `${buzonUrl()}/mailFolders`, { method: "POST", body: JSON.stringify({ displayName: CARPETA_SWITCH }) });
-  return (carpetaId = (c.body as { id?: string } | null)?.id ?? null);
-}
-
-/** Mueve el correo de Switch ya reenviado a su carpeta. Best-effort: nunca lanza. */
-export async function archivarCorreoSwitch(token: string, mensajeId: string): Promise<boolean> {
-  try {
-    const destino = await idDeLaCarpeta(token);
-    if (!destino) return false;
-    const r = await graphJson(token, `${buzonUrl()}/messages/${encodeURIComponent(mensajeId)}/move`, {
-      method: "POST",
-      body: JSON.stringify({ destinationId: destino }),
-    });
-    return r.status === 201 || r.status === 200;
-  } catch {
-    return false;
-  }
-}
-
-/** Lo de la carpeta con más de 30 días pasa a Elementos eliminados. Devuelve cuántos. */
-export async function limpiarCarpetaSwitch(token: string, ahora: number = Date.now()): Promise<number> {
-  try {
-    const destino = await idDeLaCarpeta(token);
-    if (!destino) return 0;
-    const corte = new Date(ahora - DIAS_EN_CARPETA * 86_400_000).toISOString().replace(/\.\d+Z$/, "Z");
-    const q = new URLSearchParams({ $filter: `receivedDateTime lt ${corte}`, $select: "id", $top: "100" });
-    let movidos = 0;
-    for (let vuelta = 0; vuelta < 10; vuelta += 1) {
-      const p = await graphJson(token, `${buzonUrl()}/mailFolders/${encodeURIComponent(destino)}/messages?${q}`);
-      const ids = ((p.body as { value?: { id: string }[] } | null)?.value ?? []).map((m) => m.id);
-      if (!ids.length) break;
-      for (const id of ids) {
-        const r = await graphJson(token, `${buzonUrl()}/messages/${encodeURIComponent(id)}/move`, {
-          method: "POST",
-          body: JSON.stringify({ destinationId: "deleteditems" }),
-        });
-        if (r.status === 201 || r.status === 200) movidos += 1;
-        else return movidos;
-      }
-    }
-    return movidos;
-  } catch {
-    return 0;
-  }
-}
-
-/** ¿Microsoft dejó ordenar el buzón en esta corrida? (para decirlo en la respuesta) */
-export const puedeOrdenarElBuzon = (): boolean => !sinPermisoParaMover;
-
-/** Al empezar cada corrida: el permiso pudo cambiar desde la anterior. */
-export function olvidarPermisoDelBuzon(): void {
-  sinPermisoParaMover = false;
-  carpetaId = null;
-}
 
 /** El id de Switch de cada (empresa, código). Sin id único → no está en el mapa. */
 export async function idsDeSwitch(codigos: readonly string[], empresas: readonly string[]): Promise<Map<string, number>> {
@@ -229,7 +65,7 @@ export async function idsDeSwitch(codigos: readonly string[], empresas: readonly
   );
   const grupos = new Map<string, FilaIdSwitch[]>();
   for (const f of filas) {
-    const k = `${f.empresa_key}:${f.codigo}`;
+    const k = llave(f.empresa_key, f.codigo);
     grupos.set(k, [...(grupos.get(k) ?? []), f]);
   }
   const out = new Map<string, number>();
@@ -240,84 +76,104 @@ export async function idsDeSwitch(codigos: readonly string[], empresas: readonly
   return out;
 }
 
-export interface Fallo {
+export const llave = (empresa: string, codigo: string) => `${empresa}:${codigo}`;
+
+export interface Par {
   empresa: string;
-  id: number | null;
-  motivo: string;
+  codigo: string;
+  id: number;
 }
 
-/** Le pide a Switch los PDF de una empresa, en UNA sesión, en serie. */
-async function pedirEnUnaEmpresa(empresa: string, ids: number[], hasta: number): Promise<Fallo[]> {
-  const fallos: Fallo[] = [];
-  let sesion;
+/** Lo que salió de un (empresa, cliente): su PDF ya comprobado, o por qué no. */
+export type Papel = { ok: true; total: number; pdf: Uint8Array } | { ok: false; motivo: string };
+
+async function abrirChromium(): Promise<Browser> {
+  const puppeteer = (await import("puppeteer-core")).default;
+  // Local (Mac): CHROMIUM_LOCAL = ruta de un Chromium instalado. En Vercel, el de @sparticuz.
+  if (process.env.CHROMIUM_LOCAL) return puppeteer.launch({ executablePath: process.env.CHROMIUM_LOCAL, headless: true });
+  const chromium = (await import("@sparticuz/chromium")).default;
+  return puppeteer.launch({ args: chromium.args, executablePath: await chromium.executablePath(), headless: true });
+}
+
+/** El papel de «Imprimir», guardado a PDF tal cual (A4, con fondos, como lo imprime Daniel). */
+async function aPdf(browser: Browser, sesion: WebSession, html: string): Promise<Uint8Array> {
+  const page = await browser.newPage();
+  try {
+    // El logo y la hoja de estilo los sirve el panel: van con la sesión.
+    await page.setCookie(...[...sesion.cookies].map(([name, value]) => ({ name, value, url: sesion.baseUrl })));
+    await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
+    return await page.pdf({ format: "A4", printBackground: true });
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+/** Una empresa: los papeles en una sesión web y después los saldos por el API. */
+async function imprimirEnUnaEmpresa(browser: Browser, empresa: string, pares: readonly Par[], hasta: number): Promise<Map<string, Papel>> {
+  const out = new Map<string, Papel>();
+  const impresos = new Map<string, { html: string; pdf: Uint8Array }>();
+  const falla = (p: Par, motivo: string) => out.set(llave(empresa, p.codigo), { ok: false, motivo });
+
+  let sesion: WebSession;
   try {
     sesion = await loginSwitchWeb(empresa);
   } catch (e) {
-    return ids.map((id) => ({ empresa, id, motivo: `no se pudo entrar a Switch: ${(e as Error).message}` }));
+    for (const p of pares) falla(p, `no se pudo entrar a Switch: ${(e as Error).message}`);
+    return out;
   }
   try {
-    for (const id of ids) {
+    for (const p of pares) {
       if (Date.now() > hasta) {
-        fallos.push({ empresa, id, motivo: "no alcanzó el tiempo" });
+        falla(p, "no alcanzó el tiempo");
         continue;
       }
       try {
-        await enviarEstadoCuentaPendiente(sesion, id, BUZON_INTERMEDIO);
+        const html = await leerEstadoCuentaParaImprimir(sesion, p.id);
+        impresos.set(p.codigo, { html, pdf: await aPdf(browser, sesion, html) });
       } catch (e) {
-        fallos.push({ empresa, id, motivo: (e as Error).message });
+        falla(p, `no se pudo imprimir: ${(e as Error).message}`);
       }
-      await dormir(PAUSA_ENTRE_PEDIDOS_MS);
     }
   } finally {
     await cerrarSesionWeb(sesion);
   }
-  return fallos;
-}
 
-/** Pide los pares a Switch: las empresas a la vez (sesiones distintas), cada una en serie. */
-export async function pedirASwitch(pares: readonly Par[], hasta: number): Promise<Fallo[]> {
-  const porEmpresa = new Map<string, number[]>();
-  for (const p of pares) porEmpresa.set(p.empresa, [...(porEmpresa.get(p.empresa) ?? []), p.id]);
-  const res = await Promise.all([...porEmpresa].map(([e, ids]) => pedirEnUnaEmpresa(e, ids, hasta)));
-  return res.flat();
-}
-
-export interface Asegurado {
-  indice: Map<string, PdfEnBuzon>;
-  pedidos: number;
-  faltan: Par[];
-  fallos: Fallo[];
-}
-
-/**
- * Que cada par tenga su PDF de Switch en el buzón desde `desde`: pide los que
- * faltan, espera a que lleguen (hasta `esperaMs`) y vuelve a pedir UNA vez los
- * que no llegaron. No pide lo que ya está (una segunda corrida no repite).
- */
-export async function asegurarPdfs(opts: {
-  token: string;
-  pares: readonly Par[];
-  desde: string;
-  /** Tope de reloj (epoch ms) para dejar de pedir. */
-  hasta: number;
-  esperaMs: number;
-  rondas?: number;
-}): Promise<Asegurado> {
-  const empresas = [...new Set(opts.pares.map((p) => p.empresa))];
-  const faltantes = (ix: Map<string, PdfEnBuzon>) => opts.pares.filter((p) => !ix.has(llavePar(p.empresa, p.id)));
-  let indice = await indicePdfsSwitch(opts.token, opts.desde, empresas);
-  let faltan = faltantes(indice);
-  let pedidos = 0;
-  let fallos: Fallo[] = [];
-  for (let ronda = 0; ronda < (opts.rondas ?? 2) && faltan.length && Date.now() < opts.hasta; ronda += 1) {
-    pedidos += faltan.length;
-    fallos = await pedirASwitch(faltan, opts.hasta);
-    const limite = Math.min(Date.now() + opts.esperaMs, opts.hasta + opts.esperaMs);
-    do {
-      await dormir(PAUSA_ENTRE_MIRADAS_MS);
-      indice = await indicePdfsSwitch(opts.token, opts.desde, empresas);
-      faltan = faltantes(indice);
-    } while (faltan.length && Date.now() < limite);
+  // 🔴 El candado: cada papel contra lo que Switch dice AHORA por su API.
+  try {
+    const api = createSwitchClient(empresa);
+    for (const p of pares) {
+      const impreso = impresos.get(p.codigo);
+      if (!impreso) continue;
+      let switchDice: { saldo: number | null; documentos: number | null } = { saldo: null, documentos: null };
+      try {
+        const ec = await api.getEstadoCuenta(p.id);
+        const elementos = (ec as { estadocuenta?: { elements?: unknown } })?.estadocuenta?.elements;
+        switchDice = { saldo: cuadreDeSwitch(ec).saldoTotal, documentos: Array.isArray(elementos) ? elementos.length : null };
+      } catch (e) {
+        falla(p, `Switch no dio el saldo para comprobar: ${(e as Error).message}`);
+        continue;
+      }
+      const v = veredictoDelPapel(leerPapelSwitch(impreso.html), p.codigo, switchDice);
+      out.set(llave(empresa, p.codigo), v.ok ? { ok: true, total: v.total, pdf: impreso.pdf } : v);
+    }
+  } catch (e) {
+    for (const p of pares) if (!out.has(llave(empresa, p.codigo))) falla(p, `Switch no dio el saldo para comprobar: ${(e as Error).message}`);
+  } finally {
+    await logoutSwitchSessions([empresa]);
   }
-  return { indice, pedidos, faltan, fallos };
+  return out;
+}
+
+/** Todos los papeles: las empresas a la vez (instancias distintas), cada una en serie. */
+export async function imprimirEstadosDeCuenta(pares: readonly Par[], hasta: number): Promise<Map<string, Papel>> {
+  const porEmpresa = new Map<string, Par[]>();
+  for (const p of pares) porEmpresa.set(p.empresa, [...(porEmpresa.get(p.empresa) ?? []), p]);
+  if (!porEmpresa.size) return new Map();
+  const browser = await abrirChromium();
+  try {
+    const partes = await Promise.all([...porEmpresa].map(([empresa, ps]) => imprimirEnUnaEmpresa(browser, empresa, ps, hasta)));
+    return new Map(partes.flatMap((m) => [...m]));
+  } finally {
+    await browser.close().catch(() => {});
+  }
 }
