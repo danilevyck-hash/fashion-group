@@ -34,6 +34,7 @@ function stubApi(envio: Record<string, unknown> | null) {
     const method = (init?.method || "GET").toUpperCase();
     if (method !== "GET") posts.push(url);
     const j = (b: unknown) => ({ ok: true, status: 200, json: async () => b });
+    if (url.endsWith("/pdf")) return { ok: true, status: 200, headers: new Headers({ "Content-Disposition": "inline; filename*=UTF-8''Pedido.pdf" }), blob: async () => new Blob(["%PDF"]) };
     if (url.includes("/enviar-switch")) return j({ envio });
     return j(ORDER);
   });
@@ -104,7 +105,11 @@ describe("🔴 SE FUE EL PÁRRAFO — la pantalla no explica la diferencia", () 
   it("el PDF que ofrece la pantalla es el de la ruta, no un texto inventado", async () => {
     stubApi({ estado: "verificado", numero_interno: "15-000000123", pedido_switch_id: 7, error_detalle: null, documento: "cotizacion" });
     render(<ConfirmacionClient marca="tommy" orderId={OID} />);
+    // 27-nov-2026: ya no es un enlace (en la app instalada atrapaba la
+    // pantalla); el PDF de la ruta se baja antes del toque y va a `verPdf`.
     const verPdf = await screen.findByText("Ver PDF");
-    expect(verPdf.getAttribute("href")).toContain(`/orders/${OID}/pdf`);
+    expect(verPdf.getAttribute("href")).toBeNull();
+    const urls = vi.mocked(fetch).mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.endsWith(`/orders/${OID}/pdf`))).toBe(true);
   });
 });

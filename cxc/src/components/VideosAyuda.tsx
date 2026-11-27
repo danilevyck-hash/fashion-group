@@ -151,6 +151,10 @@ function RenglonCurvas({ pdf, modulo }: { pdf: PdfDeCurvas; modulo: string }) {
   }, [pdf, enComputadora]);
 
   const alTocar = async (e: React.MouseEvent) => {
+    // 🩸 27-nov-2026: con el dedo el enlace NUNCA navega —en la app instalada
+    // dejaba la pantalla atrapada en el PDF, sin «volver»—. Si el archivo no
+    // llegó todavía, el toque espera al siguiente.
+    if (!enComputadora) e.preventDefault();
     if (archivo) {
       e.preventDefault();
       const resultado = await compartirArchivo(archivo, { title: archivo.name });

@@ -37,7 +37,7 @@ import {
 import { useToast } from "@/components/ToastSystem";
 import { Aviso } from "@/components/ui/Aviso";
 import { ThOrden, useOrdenTabla } from "@/components/ui/OrdenTabla";
-import { descargarArchivo } from "@/lib/compartir-archivo";
+import { verPdf } from "@/lib/compartir-archivo";
 import { fmtDate } from "@/lib/format";
 import { fechaPanamaDe, hoyPanama } from "@/lib/fecha-panama";
 import { B2B_EMPRESA_KEYS, nombreCortoEmpresa } from "@/lib/empresa-mapping";
@@ -596,8 +596,8 @@ export default function PedidosView({
         : tituloPedidosImpresos(filtro as EstadoPedido, empresa === "todas" ? null : nombreCortoEmpresa(empresa), new Date());
       const doc = construirPdfPedidos(titulo, visibles, hoy);
       doc.autoPrint();
-      if (!window.open(doc.output("bloburl") as unknown as string, "_blank")) {
-        descargarArchivo(new File([doc.output("blob")], `pedidos-${filtro}-${hoy}.pdf`, { type: "application/pdf" }));
+      const archivo = new File([doc.output("blob")], `pedidos-${filtro}-${hoy}.pdf`, { type: "application/pdf" });
+      if ((await verPdf(archivo)) === "descargado") {
         toast("Lista descargada — ábrela para imprimir", "success");
       }
     } catch {

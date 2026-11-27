@@ -3,8 +3,8 @@
 // Pantalla de CONFIRMACIÓN post-checkout (las 4 marcas): estado real del
 // pedido y su envío a Switch leído del server. Acciones: Enviar/Reintentar
 // solo si aplica, la LISTA (el botón que Daniel pidió el 25-ago-2026 — ver
-// `destino-comprobantes.ts`), Ver PDF directo en pestaña nueva (el share
-// nativo del visor cubre WhatsApp/mail), y Volver al catálogo.
+// `destino-comprobantes.ts`), Ver PDF (`verPdf`: hoja de compartir con el
+// dedo, pestaña nueva en la computadora), y Volver al catálogo.
 //
 // El techo de 3 acciones (decisión de Daniel del 5-jul) sigue valiendo en el
 // camino NORMAL, que es el que se ve casi siempre: con el pedido ya en Switch
@@ -27,6 +27,28 @@ import {
 } from "@/lib/catalogo/documento-switch";
 import { destinoLista } from "@/lib/catalogo/destino-comprobantes";
 import { Aviso } from "@/components/ui/Aviso";
+import { verPdf } from "@/lib/compartir-archivo";
+
+/**
+ * 🩸 EL PDF SE PREPARA ANTES DEL TOQUE (27-nov-2026). «Ver PDF» era un enlace
+ * con `target="_blank"` a la ruta del PDF: en la app instalada en el iPhone o
+ * el iPad la MISMA ventana se iba al PDF, sin «volver» ni «compartir», y había
+ * que cerrar la app. Ahora el archivo se baja apenas el pedido queda y el toque
+ * lo pasa a `verPdf` sin ningún `await` de red en el medio (iOS solo abre la
+ * hoja de compartir dentro del gesto). El nombre lo da el servidor.
+ */
+async function leerPdfDelPedido(url: string, respaldo: string): Promise<File | null> {
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) return null;
+    const cd = r.headers.get("Content-Disposition") || "";
+    const m = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+    const nombre = m ? decodeURIComponent(m[1]) : respaldo;
+    return new File([await r.blob()], nombre, { type: "application/pdf" });
+  } catch {
+    return null;
+  }
+}
 
 interface Envio {
   estado: string;
@@ -126,6 +148,25 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
   // para algo que todavía no es ninguna de las dos.
   const palabra = palabraDelPapel(envio);
 
+  // El PDF, listo antes del toque (ver `leerPdfDelPedido`). Se vuelve a pedir
+  // si el envío cambia, porque la palabra del papel (Pedido/Cotización) sale de él.
+  const [pdf, setPdf] = useState<File | null>(null);
+  const [pdfFalla, setPdfFalla] = useState(false);
+  const [intentoPdf, setIntentoPdf] = useState(0);
+  const clavePdf = enviando || envio === undefined ? null : `${envio?.estado ?? ""}|${envio?.documento ?? ""}`;
+  useEffect(() => {
+    if (clavePdf === null) return;
+    let vivo = true;
+    setPdf(null);
+    setPdfFalla(false);
+    void leerPdfDelPedido(`${cfg.api}/orders/${orderId}/pdf`, `Pedido-${orderId}.pdf`).then((f) => {
+      if (!vivo) return;
+      if (f) setPdf(f);
+      else setPdfFalla(true);
+    });
+    return () => { vivo = false; };
+  }, [clavePdf, intentoPdf, cfg.api, orderId]);
+
 
   return (
     <div className="mx-auto w-full max-w-xl px-4 py-10">
@@ -188,7 +229,7 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
           )}
 
           {/* Acciones — máximo 3: enviar/reintentar (si aplica), Ver PDF
-              directo (share nativo del visor), volver. */}
+              (hoja de compartir con el dedo), volver. */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {/* 🔴 Las dos salidas, directo (25-ago-2026): antes era un botón
                 que abría una ventana preguntando cuál. La etiqueta de la
@@ -214,14 +255,14 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
             >
               {destino.label}
             </Link>
-            <a
-              href={`${cfg.api}/orders/${orderId}/pdf`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-md border border-gray-200 px-4 min-h-[48px] text-sm font-medium text-gray-700 hover:border-gray-300 transition flex items-center justify-center"
+            <button
+              type="button"
+              onClick={() => { if (pdf) void verPdf(pdf); else setIntentoPdf((n) => n + 1); }}
+              disabled={!pdf && !pdfFalla}
+              className="rounded-md border border-gray-200 px-4 min-h-[48px] text-sm font-medium text-gray-700 hover:border-gray-300 active:scale-[0.97] transition flex items-center justify-center disabled:opacity-60"
             >
-              Ver PDF
-            </a>
+              {pdf ? "Ver PDF" : pdfFalla ? "Reintentar PDF" : "Preparando PDF…"}
+            </button>
             <Link href={cfg.catalogHref} className="rounded-md border border-gray-200 px-4 min-h-[48px] text-sm text-gray-500 hover:border-gray-300 transition flex items-center justify-center">
               Volver al catálogo
             </Link>

@@ -124,6 +124,7 @@ function pdfDelEnvio(filas: readonly EtiquetaFila[], formato: FormatoEtiquetas, 
     return {
       url: doc.output("bloburl") as unknown as string,
       descargar: () => doc.save(nombre),
+      archivo: new File([doc.output("blob")], nombre, { type: "application/pdf" }),
     };
   };
 }
@@ -927,7 +928,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
     let creadas: EtiquetaFila[] | null = null;
     let recibidos: string[] = [];
     try {
-      await abrirPdfEnPestana(async () => {
+      const abierto = await abrirPdfEnPestana(async () => {
         const r = await fetch("/api/guias/etiquetas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -950,7 +951,7 @@ function PanelEnvio({ etiquetas, deshabilitado, onCerrar, onListo, onRecargar, o
         const total = guardadas.reduce((s, e) => s + e.cajas, 0);
         // 🔴 13-nov-2026: se DICE qué pedido quedó Recibido.
         const conPedido = recibidos.length > 0 ? ` · pedido ${recibidos.join(", ")} recibido` : "";
-        await onListo(`Listo · ${total} etiquetas — se abrieron en otra pestaña${conPedido}`);
+        await onListo(`Listo · ${total} etiquetas — ${abierto === "pestana" ? "se abrieron en otra pestaña" : "listas para imprimir"}${conPedido}`);
         onCerrar();
       }
     } catch {
