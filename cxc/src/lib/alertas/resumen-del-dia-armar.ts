@@ -7,11 +7,31 @@ import { leerMas90DeSwitch } from "@/lib/cxc/cobros-del-dia-io";
 import {
   RESUMEN_DEL_DIA_2026_11,
   bloqueDespachos,
+  netoDeVentas,
   bloqueFacturas,
+  fechaDelTitulo,
   partirParaTelegram,
   resumenDelDia,
 } from "./resumen-del-dia";
-import { leerDespachosDelDia, leerFacturasDelDia } from "./resumen-del-dia-io";
+import { corteVsAnioAnterior, unAnioAntes } from "@/lib/ventas/clientes-corte-comparativo";
+import { leerDespachosDelDia, leerFacturasDelDia, leerFacturasDelRango } from "./resumen-del-dia-io";
+
+/** Sección sin nada: igual sale su mensaje, con una línea (26-nov-2026, Daniel). */
+const sinNada = (titulo: string, fecha: string, texto: string) => `<b>${titulo} · ${fechaDelTitulo(fecha)}</b>\n${texto}`;
+
+/** Venta neta del mes hasta `fecha` y la de los MISMOS días del año pasado. Si no se puede leer, sin línea. */
+export async function ventaDelMes(fecha: string): Promise<{ actual: number; previo: number | null } | null> {
+  try {
+    const { corte, cortePrev } = corteVsAnioAnterior(fecha, new Date());
+    const [a, p] = await Promise.all([
+      leerFacturasDelRango(`${corte.slice(0, 8)}01`, corte),
+      leerFacturasDelRango(`${unAnioAntes(`${corte.slice(0, 8)}01`)}`, cortePrev),
+    ]);
+    return { actual: netoDeVentas(a), previo: p.length ? netoDeVentas(p) : null };
+  } catch {
+    return null;
+  }
+}
 
 export async function armarResumenDelDia(fecha: string): Promise<{ cobros: number; mensajes: string[] }> {
   // Mismo filtro que «Últimos pagos»: sin retenciones ni recibos en cero.
@@ -39,9 +59,9 @@ export async function armarResumenDelDia(fecha: string): Promise<{ cobros: numbe
   const cobrosTexto = mensajeCobrosDelDia(cobros, mas90);
   const secciones = RESUMEN_DEL_DIA_2026_11
     ? resumenDelDia([
-        bloqueFacturas(await leerFacturasDelDia(fecha), fecha),
-        bloqueDespachos(await leerDespachosDelDia(fecha), fecha),
-        cobrosTexto,
+        bloqueFacturas(await leerFacturasDelDia(fecha), fecha, await ventaDelMes(fecha)) ?? sinNada("🧾 Ventas", fecha, "Sin ventas hoy"),
+        bloqueDespachos(await leerDespachosDelDia(fecha), fecha) ?? sinNada("🚚 Despachos", fecha, "Sin despachos hoy"),
+        cobrosTexto ?? sinNada("💰 Cobros", fecha, "Sin cobros hoy"),
       ])
     : cobrosTexto
       ? [cobrosTexto]

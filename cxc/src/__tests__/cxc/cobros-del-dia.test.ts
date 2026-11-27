@@ -29,11 +29,11 @@ describe("cobros de hoy — por cliente (24-nov-2026)", () => {
         "\n" +
         "<b>City Mall David · $78,245</b>\n" +
         "– Fashion Wear · $50,885 · le quedan +90 d $106,152\n" +
-        "– Vistana · $16,314 · al día ✓\n" +
+        "– Vistana · $16,314\n" +
         "– Fashion Shoes · $11,046 · +90 sin actualizar\n" +
         "\n" +
         "<b>Transporte Sanjur · $60</b>\n" +
-        "– Fashion Wear · $60 · al día ✓",
+        "– Fashion Wear · $60",
     );
   });
 
@@ -43,7 +43,7 @@ describe("cobros de hoy — por cliente (24-nov-2026)", () => {
       saldos({ "vistana|D-25": 12300, "fashion_wear|D-25": 0 }),
     );
     expect(m).toBe(
-      "<b>💰 Cobros · $5,500</b>\n\n<b>City Mall Paso Canoa · $5,500</b>\n– Vistana · $5,000 · le quedan +90 d $12,300\n– Fashion Wear · $500 · al día ✓",
+      "<b>💰 Cobros · $5,500</b>\n\n<b>City Mall Paso Canoa · $5,500</b>\n– Vistana · $5,000 · le quedan +90 d $12,300\n– Fashion Wear · $500",
     );
   });
 
@@ -66,7 +66,7 @@ describe("cobros de hoy — por cliente (24-nov-2026)", () => {
       [c("vistana", "D-30", "Golden Mall", 100), c("vistana", "TCKCTA", "VENTAS", 95), c("fashion_wear", "D-108", "Multi Fashion Holding", 9000)],
       saldos({ "vistana|D-30": 0 }),
     );
-    expect(m).toBe("<b>💰 Cobros · $100</b>\n\n<b>Golden Mall · $100</b>\n– Vistana · $100 · al día ✓");
+    expect(m).toBe("<b>💰 Cobros · $100</b>\n\n<b>Golden Mall · $100</b>\n– Vistana · $100");
   });
 
   it("muchos: corta a 15 clientes con «y N más · Ver en CxC»", () => {
