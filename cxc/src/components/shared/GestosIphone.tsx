@@ -190,7 +190,9 @@ export function useMantenerPresionado(alMantener: (() => void) | null) {
 
 export interface FilaDeResumen {
   rotulo: string;
-  valor: string;
+  valor: React.ReactNode;
+  /** Una aclaración chica bajo el rótulo («hasta el 26»). */
+  nota?: string;
 }
 
 /** La tarjeta flotante de «mantener presionado»: SOLO lo que ya está en
@@ -228,7 +230,10 @@ export function TarjetaResumen({
         <span className="mt-3 block divide-y divide-gray-100">
           {filas.map((f) => (
             <span key={f.rotulo} className="flex items-center justify-between gap-3 py-2 text-[15px]">
-              <span className="text-gray-700">{f.rotulo}</span>
+              <span className="text-gray-700">
+                {f.rotulo}
+                {f.nota && <span className="block text-[12px] text-gray-500">{f.nota}</span>}
+              </span>
               <span className="text-right tabular-nums text-gray-900">{f.valor}</span>
             </span>
           ))}

@@ -130,7 +130,7 @@ Daniel: *«Deslice hacia abajo y no hace nada. Como apple quiero. En lugares de 
   - CxC: saldo por empresa.
   - Clientes: saldo y compras del año. Última compra y último pago no salen porque la lista no los trae.
   - Despachos › Guías: facturas, bultos y transportista.
-  - Ventas › Clientes: el año contra el mismo período anterior.
+  - Ventas › Resumen (una empresa) y Ventas › Clientes: la venta MES A MES con ▲/▼ contra el mismo mes del año pasado (27-nov-2026; ver ventas-referencia.md).
   - Proveedores: los cuatro tramos y «Por pagar», nunca «vencido».
   - Comisiones: venta, cobro y comisión. En «Todas las empresas» no sale, porque esas filas no traen venta ni cobro.
 
