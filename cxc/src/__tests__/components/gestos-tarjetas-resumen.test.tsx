@@ -18,7 +18,6 @@ function trozo(src: string, desde: string, hasta: string): string {
 const PANTALLAS = [
   { nombre: "Clientes", archivo: "app/clientes/ClientesListClient.tsx", desde: "function FilaConTarjeta", hasta: "\nfunction " },
   { nombre: "Despachos › Guías", archivo: "app/despachos/components/GuiasList.tsx", desde: "{tarjetaGuia && (", hasta: "onCerrar=" },
-  { nombre: "Ventas › Clientes", archivo: "components/ventas/celular/ClientesCelular.tsx", desde: "{tarjeta && rotulosTarjeta && (", hasta: "onCerrar=" },
   { nombre: "Proveedores", archivo: "app/proveedores/ProveedoresListClient.tsx", desde: "function TarjetaTramos", hasta: "\nfunction " },
   { nombre: "Comisiones", archivo: "components/comisiones/ComisionesTarjetas.tsx", desde: "function FilasPorEmpresaV2", hasta: "\nfunction " },
 ];
@@ -37,6 +36,20 @@ describe("mantener presionado: tarjeta de resumen en las listas del celular", ()
     const t = trozo(leer("app/proveedores/ProveedoresListClient.tsx"), "function TarjetaTramos", "\nfunction ");
     expect(t.toLowerCase()).not.toContain("vencid");
     expect(t).toContain("TRAMOS.map");
+  });
+
+  it("Ventas › Clientes: la tarjeta mes a mes lee SOLO la ruta de la hoja del cliente", () => {
+    const src = leer("components/ventas/celular/ClientesCelular.tsx");
+    expect(src).toContain("useMantenerPresionado");
+    expect(src).toContain("<TarjetaMesAMes");
+    const fetches = src.match(/fetch\(`([^`]*)`/g) ?? [];
+    expect(fetches).toEqual(["fetch(`/api/clientes/${encodeURIComponent(c.id)}/por-empresa-anual?year=${selectedYear}`"]);
+  });
+
+  it("Ventas › Resumen: la tarjeta mes a mes sale de las series de la tabla, sin leer nada", () => {
+    const src = leer("components/ventas/celular/ResumenCelular.tsx");
+    expect(src).toContain("mesesDeSeries(tarjeta.ventas2026, tarjeta.ventas2025");
+    expect(src).not.toMatch(/fetch\(|useSWR/);
   });
 
   it("Despachos › Guías: sin SwipeableRow", () => {

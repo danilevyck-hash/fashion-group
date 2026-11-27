@@ -30,7 +30,10 @@ import { VENTAS_CLIENTES_EMPRESA_EN_LA_BARRA_2026_11 as EMPRESA_EN_LA_BARRA } fr
 import { BuscarEnLaBarra, EnLaBarra, useHayBarraCelular } from "@/components/celular/BarraDeControles";
 import { CampoBuscar } from "@/components/BuscadorDeLista";
 import { useRef, useState } from "react";
-import { TarjetaResumen, useMantenerPresionado } from "@/components/shared/GestosIphone";
+import { useMantenerPresionado } from "@/components/shared/GestosIphone";
+import { TarjetaMesAMes } from "./TarjetaMesAMes";
+import type { PorEmpresaAnualVista } from "./HojaClienteCelular";
+import { delClienteEnLaFila } from "@/lib/ventas/mes-a-mes";
 import type { Cliente } from "../types";
 import {
   SIN_CODIGO_EN_SWITCH,
@@ -86,6 +89,8 @@ interface Props {
   rotulosTarjeta?: { actual: string; anterior: string };
 }
 
+type EstadoMesAMes = { status: "cargando" } | { status: "listo"; datos: PorEmpresaAnualVista } | { status: "error" };
+
 export function ClientesCelular({
   filas,
   total,
@@ -104,12 +109,32 @@ export function ClientesCelular({
   utilidadDe,
   rotulosTarjeta,
 }: Props) {
-  // 🔴 Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): la tarjeta
-  // con las compras del período contra el comparativo, de lo que ya trae la
-  // fila (sin leer nada). Un gancho para la lista; la fila se anota al apoyar.
-  const [tarjeta, setTarjeta] = useState<Cliente | null>(null);
+  // 🔴 Mantener presionado (27-nov-2026, `GESTOS_IPHONE_2026_11`): la venta
+  // del cliente MES A MES del año, con ▲/▼ contra el mismo mes del año pasado.
+  // La lee la MISMA ruta que la hoja del cliente (mismos días, notas de crédito
+  // restando), una vez por cliente y año. Sin código de Switch no hay tarjeta.
+  const [tarjeta, setTarjeta] = useState<{ c: Cliente; estado: EstadoMesAMes } | null>(null);
   const tocada = useRef<Cliente | null>(null);
-  const mantener = useMantenerPresionado(rotulosTarjeta ? () => setTarjeta(tocada.current) : null);
+  const leidas = useRef(new Map<string, PorEmpresaAnualVista>());
+  const abrirTarjeta = () => {
+    const c = tocada.current;
+    if (!c || !tieneCodigoDeCliente(c.id)) return;
+    const clave = `${c.id}|${selectedYear}`;
+    const ya = leidas.current.get(clave);
+    if (ya) { setTarjeta({ c, estado: { status: "listo", datos: ya } }); return; }
+    setTarjeta({ c, estado: { status: "cargando" } });
+    fetch(`/api/clientes/${encodeURIComponent(c.id)}/por-empresa-anual?year=${selectedYear}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error("No se pudo cargar");
+        return (await r.json()) as PorEmpresaAnualVista;
+      })
+      .then((datos) => {
+        leidas.current.set(clave, datos);
+        setTarjeta((t) => (t && t.c === c ? { c, estado: { status: "listo", datos } } : t));
+      })
+      .catch(() => setTarjeta((t) => (t && t.c === c ? { c, estado: { status: "error" } } : t)));
+  };
+  const mantener = useMantenerPresionado(rotulosTarjeta ? abrirTarjeta : null);
   // 🔴 v2 de la barra del celular: la lupa se abre EN la barra y la empresa es
   // un ícono de la misma barra; la línea gris dice cuál está puesta.
   const hayBarra = useHayBarraCelular();
@@ -130,18 +155,22 @@ export function ClientesCelular({
 
   return (
     <PantallaVentas>
-      {tarjeta && rotulosTarjeta && (
-        <TarjetaResumen
-          titulo={tarjeta.nombre}
-          filas={[
-            { rotulo: rotulosTarjeta.actual, valor: montoDeLaTabla(tarjeta.ytd) },
-            { rotulo: rotulosTarjeta.anterior, valor: montoDeLaTabla(tarjeta.prev) },
-          ]}
-          pie={{ rotulo: "Variación", valor: porcentajeDelCliente(tarjeta.delta).texto }}
-          onAbrir={() => { const c = tarjeta; setTarjeta(null); onTocarCliente(c); }}
-          onCerrar={() => setTarjeta(null)}
-        />
-      )}
+      {tarjeta && (() => {
+        const d = tarjeta.estado.status === "listo" ? delClienteEnLaFila(tarjeta.estado.datos, tarjeta.c) : null;
+        return (
+          <TarjetaMesAMes
+            titulo={tarjeta.c.nombre}
+            anio={selectedYear}
+            meses={d?.meses ?? []}
+            total={d ? { actual: d.actual, previo: d.previo } : null}
+            corte={tarjeta.estado.status === "listo" ? tarjeta.estado.datos.corte : null}
+            cargando={tarjeta.estado.status === "cargando"}
+            error={tarjeta.estado.status === "error" ? "No se pudo cargar. Intenta de nuevo." : null}
+            onAbrir={() => { const c = tarjeta.c; setTarjeta(null); onTocarCliente(c); }}
+            onCerrar={() => setTarjeta(null)}
+          />
+        );
+      })()}
       {hayBarra && ordenar && (unaLista ? (
         <EnLaBarra filaIzq={<>{chipEmpresa}{ordenar}</>} filaDer={frescura} />
       ) : (

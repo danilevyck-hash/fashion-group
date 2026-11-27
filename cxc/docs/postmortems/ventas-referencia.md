@@ -1694,3 +1694,13 @@ Todo mes anterior a noviembre, idéntico; en noviembre solo cambian las filas de
 ⚠️ Lo que sigue igual que antes: guardar una tasa GENERAL desde la pantalla recalcula hacia atrás (para un cambio con fecha se usa una excepción), y las v9…v5 de la red de `rpc.ts` no miran las excepciones.
 
 Candado: `src/__tests__/lib/comision-tasa-vigencia.test.ts` (la última definición de la v10 y del detalle pasa empresa y fecha · la migración no toca la tasa general ni borra · las dos filas de Reynaldo · `tasaEnFecha`).
+
+## 🔴 Ventas: mantener presionado = la venta MES A MES (27-nov-2026, `GESTOS_IPHONE_2026_11`)
+
+Daniel: *«me gusta ver todo pero por la falta de espacio quedó como está hoy»*. La pantalla no cambia; en el teléfono, mantener presionado abre una tarjeta (`TarjetaMesAMes`, cuentas en `lib/ventas/mes-a-mes.ts`).
+
+- **Resumen › una empresa**: su venta mes a mes del año del período elegido, con ▲ verde / ▼ rojo y el % contra el mismo mes del año pasado, y el total del año abajo. **No lee nada**: son las MISMAS series de la tabla (`ventas2026` / `ventas2025` de `fetchVentasResumen`), así que ninguna cifra puede diferir; el mes en curso ya viene contra los MISMOS DÍAS (`prev_same_period`) y lleva «hasta el D». Los meses futuros no salen. Sin base del año pasado dice «Nuevo», nunca «+0 %».
+- **Clientes › un cliente**: reemplaza la tarjeta de año contra año. Lee al mantener presionado la MISMA ruta de la hoja del cliente (`/api/clientes/[codigo]/por-empresa-anual`: mismos días, notas de crédito restando), una vez por cliente y año, con «Cargando…» en la tarjeta. La fila es (cliente, empresa): con una empresa se mira esa; con «N empresas», la suma.
+- **Cuadre** (`scripts/_cuadre-ventas-mes-a-mes.ts`, solo lee), 27-nov-2026, 2 empresas × 3 meses, tarjeta = pantalla = `switch_ventas_unificado_vw`, al centavo: Vistana sep 214.212,27 · oct 144.935,20 · nov 405.132,72; Fashion Wear sep 388.473,14 · oct 271.374,76 · nov 704.252,00.
+- Candados: `ventas-mes-a-mes.test.ts` y `gestos-tarjetas-resumen.test.tsx`.
+- 🩸 **«Noviembre y el total en 0 %» NO es un error (medido el 27-nov-2026)**: Fashion Wear 1–26 nov 2026 = $704.252,00 contra 1–26 nov 2025 = $700.821,19 en DÍA DE PANAMÁ (+0,49 % → «0%»); el total del año, $3.451.675,05 contra $3.455.371 (−0,1 %). El «+3 %» ($682.856,19) sale de cortar el 26-nov-2025 a medianoche UTC, que deja afuera $17.965 facturados esa noche después de las 7 p. m. de Panamá. La regla del sistema es el día de Panamá (`prev_same_period_v3`+). El cuadre ahora mide también el mes en curso contra la base y el total del año.

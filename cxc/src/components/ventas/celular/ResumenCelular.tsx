@@ -22,7 +22,10 @@
 // grupo», donde siempre estuvo.
 // ============================================================================
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useMantenerPresionado } from "@/components/shared/GestosIphone";
+import { TarjetaMesAMes } from "./TarjetaMesAMes";
+import { mesesDeSeries } from "@/lib/ventas/mes-a-mes";
 import type { VentasResumen, EmpresaMonthlySales } from "../types";
 import { MONTHS, fmtMoney, fmtPorcentaje } from "@/lib/ventas/format";
 import { variacionPct } from "@/lib/variacion";
@@ -373,9 +376,28 @@ function ResumenCelularPorPeriodo({
     [data, mes, isClosedYear],
   );
 
+  // 🔴 Mantener presionada una empresa (27-nov-2026, `GESTOS_IPHONE_2026_11`):
+  // su venta mes a mes del año, de las MISMAS series que esta tabla (sin leer
+  // nada). Meses futuros no; el mes en curso ya va contra los mismos días.
+  const [tarjeta, setTarjeta] = useState<EmpresaMonthlySales | null>(null);
+  const tocada = useRef<EmpresaMonthlySales | null>(null);
+  const mantener = useMantenerPresionado(() => setTarjeta(tocada.current));
+  const hastaMes = isClosedYear ? 12 : data.mesActual;
+
   const th = "py-1.5 text-[9.5px] font-semibold uppercase tracking-wide text-gray-500";
   return (
     <PantallaVentas>
+      {tarjeta && (
+        <TarjetaMesAMes
+          titulo={nombreEmpresaEnPantalla(tarjeta.empresa.id, tarjeta.empresa.nombre)}
+          anio={selectedYear}
+          meses={mesesDeSeries(tarjeta.ventas2026, tarjeta.ventas2025, hastaMes)}
+          total={{ actual: delPeriodo(tarjeta.ventas2026, 0), previo: delPeriodo(tarjeta.ventas2025, 0) }}
+          corte={isClosedYear ? null : data.fecha_corte}
+          onAbrir={() => { const id = tarjeta.empresa.id; setTarjeta(null); onOpenEmpresa(id); }}
+          onCerrar={() => setTarjeta(null)}
+        />
+      )}
       <TituloVentas
         enLaBarra
         detalleEnLaBarra={conFrescura(data.fecha_corte ? `Datos al ${diaCorto(data.fecha_corte)}` : "", frescura)}
@@ -410,6 +432,8 @@ function ResumenCelularPorPeriodo({
                   key={f.id}
                   data-fila-empresa={f.id}
                   onClick={() => onOpenEmpresa(f.id)}
+                  {...mantener}
+                  onTouchStart={mantener.onTouchStart ? (e) => { tocada.current = data.empresas.find((x) => x.empresa.id === f.id) ?? null; mantener.onTouchStart!(e); } : undefined}
                   className="border-t border-gray-100 active:bg-gray-50"
                 >
                   <th scope="row" className="truncate px-3 py-2.5 text-left font-semibold text-gray-900">
