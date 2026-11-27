@@ -133,10 +133,10 @@ export default function DeslizarParaActualizar() {
     <div
       aria-hidden
       data-deslizar-indicador
-      className={vidrioSobre("pointer-events-none fixed left-1/2 z-[11] flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm")}
+      className={vidrioSobre("pointer-events-none fixed inset-x-0 mx-auto z-[11] flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm")}
       style={{
         top: "calc(var(--fg-altura-encabezado, 0px) + env(safe-area-inset-top))",
-        transform: `translate(-50%, ${y - 40}px)`,
+        transform: `translateY(${y - 40}px)`,
         opacity: corriendo ? 1 : Math.min(1, jalon / UMBRAL_PX),
         transition: jalon === 0 || corriendo ? "transform 200ms ease-out, opacity 200ms" : "none",
       }}
