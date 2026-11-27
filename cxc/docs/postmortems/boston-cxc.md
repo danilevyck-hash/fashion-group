@@ -1700,4 +1700,6 @@ Daniel, 26-nov-2026: *«te dije que era de switch que quiero el pdf, no uno rege
 
 **Prueba**: `GET /api/cron/estado-cuenta-semanal?prueba=D-24` (CRON_SECRET) imprime ese cliente y manda el correo SOLO a daniel@fashiongr.com con «[PRUEBA]», con el interruptor apagado también; no escribe nada. `?test=true` no toca Switch ni manda nada. En local, `CHROMIUM_LOCAL=<ruta de un Chromium>`.
 
+**Prendido el 27-nov-2026** (Daniel aprobó el envío): la prueba en producción con D-24 imprimió las 5 empresas en 18,6 s y todas cuadraron al centavo con el API — Vistana $76.058,15 · Fashion Wear $180.150,18 · Fashion Shoes $28.247,37 · Active Shoes $26.835,48 · Active Wear $9.897,37 = $321.188,55. El primer envío a clientes es el lunes 30-nov-2026 a las 10:50 UTC.
+
 **Candados**: `cxc-estado-cuenta-pdf-switch.test.ts` (lectura del papel, el candado al centavo y por documentos, el API después de cerrar la sesión web, el correo no sale si una empresa no cuadró), `cron-login-web-oficina.test.ts` (madrugada), `cron-calendario.test.ts` (separación), `switch-pausa.test.ts`.
