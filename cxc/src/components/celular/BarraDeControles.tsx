@@ -212,8 +212,6 @@ function PortalA({ destino, children }: { destino: HTMLElement; children: ReactN
 export interface PestanaDeBarra {
   value: string;
   label: string;
-  /** Lo que dice la opción en la lista, si es más que el rótulo (con su número). */
-  opcion?: string;
 }
 
 export function BarraDeControles({
@@ -272,7 +270,7 @@ export function BarraDeControles({
               etiqueta="Sección"
               valor={activa ?? ""}
               texto={texto}
-              opciones={pestanas!.map((p) => ({ valor: p.value, etiqueta: p.opcion ?? p.label }))}
+              opciones={pestanas!.map((p) => ({ valor: p.value, etiqueta: p.label }))}
               onCambiar={(v) => onPestana?.(v)}
             />
           ) : (
