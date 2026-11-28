@@ -12,8 +12,7 @@ import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { useMantenerPresionado } from "@/components/shared/GestosIphone";
 import { AvisoMesAMes, ERROR_TARJETA, TarjetaMesAMes, useLecturaDeTarjeta } from "@/components/shared/TarjetaMesAMes";
 import { VG_MARGEN_COBROS_MES_A_MES_2026_11 } from "@/lib/ui/vista-general-mes-a-mes-2026-11";
-import { cambioConRaya } from "@/lib/ventas/mes-a-mes";
-import { notaDelCorte, type MesesContraAnioPasado } from "@/lib/mes-contra-anio-pasado";
+import { type MesesContraAnioPasado } from "@/lib/mes-contra-anio-pasado";
 import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 import { DIAS_INVENTARIO_NUEVO, INVENTARIO_90_DIAS_2026_11 } from "@/lib/ui/inventario-90-dias-2026-11";
 import { useUrlState } from "@/lib/hooks/useUrlState";
@@ -149,13 +148,12 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
       {cobrosMesAMes.tarjeta && (
         <TarjetaMesAMes
           titulo={nombreEmpresa}
-          subtitulo={`Cobros ${data.anio} · vs ${data.anio - 1}`}
+          subtitulo={`Cobros ${data.anio}`}
           anio={data.anio}
           meses={cobrosMesAMes.tarjeta.estado.status === "listo" ? cobrosMesAMes.tarjeta.estado.datos.meses : []}
           total={cobrosMesAMes.tarjeta.estado.status === "listo" ? cobrosMesAMes.tarjeta.estado.datos.total : null}
-          cambio={cambioConRaya}
+          cambio={null}
           mesEnCurso={data.mes}
-          nota={cobrosMesAMes.tarjeta.estado.status === "listo" ? notaDelCorte(cobrosMesAMes.tarjeta.estado.datos.corte) : null}
           cargando={cobrosMesAMes.tarjeta.estado.status === "cargando"}
           error={cobrosMesAMes.tarjeta.estado.status === "error" ? ERROR_TARJETA : null}
           onCerrar={cobrosMesAMes.cerrar}
