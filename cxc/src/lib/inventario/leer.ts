@@ -32,6 +32,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { B2B_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { esFuncionAusente } from "@/lib/multifashion/productos-lectura";
+import { sumarDias } from "@/lib/cheques-aviso-ventana";
 import {
   agregarEmpresa,
   agregarInventario,
@@ -209,4 +210,40 @@ export async function leerInventarioValorizado(
     ...armarInventario(base.porEmpresa.map((e) => (corridas.has(e.key) ? { ...e, medidoEn: corridas.get(e.key)!.fin ?? e.medidoEn } : e)), empresas, ahoraMs),
     fuente: "paginado",
   };
+}
+
+export const RPC_ANTIGUEDAD = "inventario_antiguedad_v1";
+
+/** El inventario de una empresa partido por antigüedad, al costo. */
+export interface AntiguedadEmpresa {
+  /** Lo que llegó en los últimos `dias` (tope: la existencia de hoy). */
+  nuevo: number;
+  /** El resto de la existencia. */
+  viejo: number;
+  /** Con stock y sin ninguna llegada registrada. */
+  sinFecha: number;
+}
+
+/**
+ * La antigüedad del inventario (primero entra, primero sale), por empresa.
+ * Mismas reglas que `leerInventarioValorizado`: solo existencia > 0, sin costo =
+ * 0, y lo que no vino en la última corrida buena no suma — así nuevo + viejo +
+ * sin fecha = el costo de la tarjeta. `hoy` es la fecha de Panamá.
+ */
+export async function leerAntiguedadInventario(
+  hoy: string,
+  dias: number,
+  empresas: readonly string[] = EMPRESAS_CON_INVENTARIO,
+): Promise<Map<string, AntiguedadEmpresa>> {
+  const corridas = await leerUltimasCorridas(empresas);
+  const cortes = Object.fromEntries([...corridas].map(([k, c]) => [k, c.inicio]));
+  const { data, error } = await supabaseServer.rpc(RPC_ANTIGUEDAD, { p_desde: sumarDias(hoy, -dias), p_cortes: cortes });
+  if (error) throw new Error(`${RPC_ANTIGUEDAD}: ${error.message}`);
+  const r2 = (v: unknown) => Math.round(n0(v) * 100) / 100;
+  const set = new Set(empresas);
+  return new Map(
+    ((data as { e: string; nuevo: unknown; viejo: unknown; sin_fecha: unknown }[] | null) ?? [])
+      .filter((f) => set.has(f.e))
+      .map((f) => [f.e, { nuevo: r2(f.nuevo), viejo: r2(f.viejo), sinFecha: r2(f.sin_fecha) }]),
+  );
 }

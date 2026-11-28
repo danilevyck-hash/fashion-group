@@ -337,6 +337,9 @@ export function parseDetalleCsv(empresaKey: string, csv: string): DetalleParsead
     "detalle",
   );
   const idx = indicesDe(lineas[0], esperadas, "detalle");
+  // 🔴 Cada fila trae las columnas del ENCABEZADO, no las esperadas: Multifashion
+  // agrega CODIGO BARRA, TALLA y COLOR (16 en vez de 13) y se leen por nombre.
+  const nCols = lineas[0].split(SEPARADOR).length;
   const col = (partes: string[], nombre: string): string => partes[idx.get(nombre)!] ?? "";
 
   const filas: LineaIngreso[] = [];
@@ -349,10 +352,10 @@ export function parseDetalleCsv(empresaKey: string, csv: string): DetalleParsead
   for (let i = 1; i < lineas.length; i++) {
     const crudo = lineas[i];
     const partes = crudo.split(SEPARADOR);
-    if (partes.length !== esperadas.length) {
+    if (partes.length !== nCols) {
       skips.push({
         linea: i + 1,
-        motivo: `esperaba ${esperadas.length} columnas y vinieron ${partes.length}`,
+        motivo: `esperaba ${nCols} columnas y vinieron ${partes.length}`,
         crudo: crudo.slice(0, 200),
       });
       continue;
@@ -429,6 +432,7 @@ export function parseResumenCsv(csv: string): ResumenParseado {
     "resumen",
   );
   const idx = indicesDe(lineas[0], esperadas, "resumen");
+  const nCols = lineas[0].split(SEPARADOR).length;
   const col = (partes: string[], nombre: string): string => partes[idx.get(nombre)!] ?? "";
 
   const documentos: DocumentoResumen[] = [];
@@ -439,10 +443,10 @@ export function parseResumenCsv(csv: string): ResumenParseado {
   for (let i = 1; i < lineas.length; i++) {
     const crudo = lineas[i];
     const partes = crudo.split(SEPARADOR);
-    if (partes.length !== esperadas.length) {
+    if (partes.length !== nCols) {
       skips.push({
         linea: i + 1,
-        motivo: `esperaba ${esperadas.length} columnas y vinieron ${partes.length}`,
+        motivo: `esperaba ${nCols} columnas y vinieron ${partes.length}`,
         crudo: crudo.slice(0, 200),
       });
       continue;

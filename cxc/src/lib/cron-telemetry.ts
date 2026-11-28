@@ -648,7 +648,8 @@ const CRON_EMPRESAS_CXP = empresasConCxp();
  *  DERIVADA de la misma capability que define el universo de Ventas ›
  *  Referencia — es la pantalla que consume esas compras. Escribir acá un array
  *  literal dejaría que el calendario y el sync se separaran en silencio. */
-const CRON_EMPRESAS_INGRESOS = empresasConCxc();
+// + Multifashion desde el 27-nov-2026 (`INGRESOS_SYNC_EMPRESA_KEYS`), primera de la fila.
+const CRON_EMPRESAS_INGRESOS = ["american_classic", ...empresasConCxc()];
 /** Las 8 del grupo: switch-articulos y la reconciliación pueden tocar cualquiera. */
 const CRON_EMPRESAS_TODAS = ALL_EMPRESA_KEYS;
 /**

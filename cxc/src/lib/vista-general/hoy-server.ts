@@ -7,7 +7,8 @@
 //   · Pedidos: `switch_pedidos` + `pedidos_bodega_estado`, como Despachos › Pedidos.
 //   · Por cobrar: la MV de CxC (grupo) y `_aging_boston` (Boston).
 //   · Por pagar: `buildPorEmpresa` de Proveedores, con sus amarres.
-//   · Inventario: `leerInventarioValorizado` (sin los artículos que Switch ya no manda).
+//   · Inventario: `leerInventarioValorizado` (sin los artículos que Switch ya no manda)
+//     y su antigüedad, `leerAntiguedadInventario` (90 días, primero entra primero sale).
 // Cada bloque falla ABIERTO: lo que no se lee viaja `null` y la tarjeta dice
 // «No se pudo medir», nunca $0.
 
@@ -20,7 +21,8 @@ import { cobroCuenta } from "@/lib/cxc/cobros-del-dia";
 import { fetchAllProveedorRows } from "@/lib/proveedores/lista";
 import { leerAmarresProveedor } from "@/lib/proveedores/amarre-lectura";
 import { buildPorEmpresa } from "@/lib/proveedores/por-empresa";
-import { leerInventarioValorizado } from "@/lib/inventario/leer";
+import { leerAntiguedadInventario, leerInventarioValorizado } from "@/lib/inventario/leer";
+import { DIAS_INVENTARIO_NUEVO, INVENTARIO_90_DIAS_2026_11 } from "@/lib/ui/inventario-90-dias-2026-11";
 import { estadoFlujoSimpleLeido } from "@/lib/guias/pedidos-flujo-simple";
 import { diasDesde } from "@/lib/guias/pedidos-bodega";
 import {
@@ -192,9 +194,14 @@ export async function leerCxp(): Promise<Map<string, Cartera>> {
   );
 }
 
-async function leerInventario(ahoraMs: number): Promise<Map<string, Inventario>> {
-  const inv = await leerInventarioValorizado(ahoraMs, [...B2B_EMPRESA_KEYS, MULTIFASHION]);
-  return new Map(inv.porEmpresa.map((e) => [e.key, { costo: e.costo, unidades: e.unidades }]));
+async function leerInventario(ahoraMs: number, hoy: string): Promise<Map<string, Inventario>> {
+  const empresas = [...B2B_EMPRESA_KEYS, MULTIFASHION];
+  const [inv, ant] = await Promise.all([
+    leerInventarioValorizado(ahoraMs, empresas),
+    // La antigüedad falla ABIERTO: sin ella la tarjeta queda como antes.
+    INVENTARIO_90_DIAS_2026_11 ? seguro("inventario/antigüedad", () => leerAntiguedadInventario(hoy, DIAS_INVENTARIO_NUEVO, empresas)) : null,
+  ]);
+  return new Map(inv.porEmpresa.map((e) => [e.key, { costo: e.costo, unidades: e.unidades, antiguedad: ant ? (ant.get(e.key) ?? { nuevo: 0, viejo: 0, sinFecha: 0 }) : undefined }]));
 }
 
 export async function leerVistaGeneralHoy(ahora: Date = new Date()): Promise<VistaGeneralHoyData> {
@@ -207,7 +214,7 @@ export async function leerVistaGeneralHoy(ahora: Date = new Date()): Promise<Vis
     seguro("pedidos", () => leerPedidos(hoy)),
     seguro("cxc", leerCxc),
     seguro("cxp", leerCxp),
-    seguro("inventario", () => leerInventario(ahora.getTime())),
+    seguro("inventario", () => leerInventario(ahora.getTime(), hoy)),
   ]);
 
   const poner = <T,>(e: EmpresaHoy, k: string, d: "cobros" | "pedidos" | "cxc" | "cxp" | "inventario", m: PorEmpresa<T>, cero: T) => {

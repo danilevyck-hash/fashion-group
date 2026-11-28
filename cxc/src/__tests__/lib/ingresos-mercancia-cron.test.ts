@@ -524,7 +524,9 @@ describe("barridos estáticos (con los comentarios BORRADOS primero)", () => {
     const src = sinComentarios(LIB);
     expect(src).toMatch(/B2B_EMPRESA_KEYS/);
     expect(src).not.toMatch(/"confecciones_boston"/);
-    expect(src).not.toMatch(/"american_classic"/);
+    // Multifashion entra al CRON (27-nov-2026) en UN solo lugar, no a Referencia.
+    expect(src.match(/"american_classic"/g)).toHaveLength(1);
+    expect(src).toMatch(/INGRESOS_SYNC_EMPRESA_KEYS[^=]*= \["american_classic", \.\.\.INGRESOS_EMPRESA_KEYS\]/);
   });
 
   it("el route reusa alertSwitchCronErrors: no estrena una alerta nueva", () => {
@@ -538,7 +540,7 @@ describe("barridos estáticos (con los comentarios BORRADOS primero)", () => {
 
   it("las empresas se filtran contra el universo, no se confía en la URL", () => {
     const src = sinComentarios(path.join("app", "api", "cron", "sync-ingresos-mercancia", "route.ts"));
-    expect(src).toMatch(/INGRESOS_EMPRESA_KEYS\.includes/);
+    expect(src).toMatch(/INGRESOS_SYNC_EMPRESA_KEYS\.includes/);
   });
 
   it("la migración del CHECK es ADITIVA y no nombra ninguna tabla de negocio", () => {

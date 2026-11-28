@@ -15,6 +15,7 @@ import { VG_MARGEN_COBROS_MES_A_MES_2026_11 } from "@/lib/ui/vista-general-mes-a
 import { cambioConRaya } from "@/lib/ventas/mes-a-mes";
 import { notaDelCorte, type MesesContraAnioPasado } from "@/lib/mes-contra-anio-pasado";
 import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
+import { DIAS_INVENTARIO_NUEVO, INVENTARIO_90_DIAS_2026_11 } from "@/lib/ui/inventario-90-dias-2026-11";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { hasModuleAccess } from "@/lib/auth-check";
 import { ALL_MODULES } from "@/lib/modules";
@@ -245,6 +246,7 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
               <>
                 <p className={CLASE_CIFRA}>{montoCorto(r.inventario.valor.costo)}</p>
                 <p className="mt-0.5 text-sm tabular-nums text-gray-500">{Math.round(r.inventario.valor.unidades).toLocaleString("en-US")} unidades</p>
+                {INVENTARIO_90_DIAS_2026_11 && r.inventario.valor.antiguedad && <InventarioPorAntiguedad a={r.inventario.valor.antiguedad} />}
               </>
             ) : (
               <SinMedir />
@@ -324,6 +326,27 @@ function CarteraCifras({ c, rojo = false }: { c: Celda<{ total: number; mas120: 
           <p className="text-sm text-gray-500">Más de 120 días</p>
         </div>
       </div>
+    </>
+  );
+}
+
+/** El mismo partido de Por cobrar, a 90 días: lo que llegó hace poco y lo de antes. */
+function InventarioPorAntiguedad({ a }: { a: { nuevo: number; viejo: number; sinFecha: number } }) {
+  return (
+    <>
+      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3">
+        <div className="min-w-0">
+          <p className="text-lg font-semibold tabular-nums text-gray-900">{montoCorto(a.nuevo)}</p>
+          <p className="text-sm text-gray-500">Hasta {DIAS_INVENTARIO_NUEVO} días</p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-lg font-semibold tabular-nums text-gray-900">{montoCorto(a.viejo)}</p>
+          <p className="text-sm text-gray-500">Más de {DIAS_INVENTARIO_NUEVO} días</p>
+        </div>
+      </div>
+      {Math.round(a.sinFecha) > 0 && (
+        <p className="mt-2 text-sm tabular-nums text-gray-500">Sin fecha de llegada: {montoCorto(a.sinFecha)}</p>
+      )}
     </>
   );
 }

@@ -111,6 +111,17 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 export const INGRESOS_EMPRESA_KEYS: readonly string[] = B2B_EMPRESA_KEYS;
 
 /**
+ * 🔴 LO QUE EL CRON TRAE: las 6 de arriba + Multifashion (27-nov-2026).
+ *
+ * Multifashion entra para la antigüedad del inventario de la Vista general
+ * (`INVENTARIO_90_DIAS_2026_11`), NO para Referencia: Referencia y Proveedores
+ * siguen leyendo `INGRESOS_EMPRESA_KEYS`. Va PRIMERA a propósito: su login cae
+ * a las 09:05 en punto, a 25 min de `switch-articulos` (08:40) y de
+ * `sync-proveedores` (09:30). Sus traspasos desde el grupo son llegadas.
+ */
+export const INGRESOS_SYNC_EMPRESA_KEYS: readonly string[] = ["american_classic", ...INGRESOS_EMPRESA_KEYS];
+
+/**
  * Cuántos días hacia atrás se le piden a Switch en una corrida normal.
  *
  * 45 y no 7: un documento de ingreso se puede registrar con fecha atrasada, y
@@ -457,7 +468,7 @@ export async function syncEmpresaIngresos(
  * admite una sola por empresa (un 2º login mata el token del 1º).
  */
 export async function syncAllIngresos(
-  empresas: readonly string[] = INGRESOS_EMPRESA_KEYS,
+  empresas: readonly string[] = INGRESOS_SYNC_EMPRESA_KEYS,
   rango?: { desde: string; hasta: string },
   hoy: string = hoyPanama(),
 ): Promise<ResultadoIngresosEmpresa[]> {
