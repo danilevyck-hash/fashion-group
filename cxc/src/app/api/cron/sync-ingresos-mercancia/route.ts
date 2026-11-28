@@ -1,6 +1,8 @@
 /**
  * Cron de INGRESO DE MERCANCÍA — trae de Switch las COMPRAS de las 6 empresas
- * de Fashion Group y las deja en `switch_ingresos_mercancia`.
+ * de Fashion Group y de Multifashion (desde el 27-nov-2026, primera de la fila;
+ * solo para la antigüedad del inventario, Referencia sigue con las 6) y las deja
+ * en `switch_ingresos_mercancia`.
  *
  * Corre 1×/día a las **09:05 UTC = 04:05 a.m. de Panamá**.
  *
@@ -80,7 +82,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { respuestaSiSwitchEnPausa } from "@/lib/switch-api/pausa-cron";
 import {
   syncAllIngresos,
-  INGRESOS_EMPRESA_KEYS,
+  INGRESOS_SYNC_EMPRESA_KEYS,
   type ResultadoIngresosEmpresa,
 } from "@/lib/switch-api/ingresos-mercancia-web";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
@@ -106,11 +108,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const sp = req.nextUrl.searchParams;
   const pedidas = sp.get("empresas")?.split(",").map((s) => s.trim()).filter(Boolean);
-  // 🔴 Siempre dentro de las 6. Un `?empresas=confecciones_boston` no abre una
+  // 🔴 Siempre dentro de las 6 + Multifashion. Un `?empresas=confecciones_boston` no abre una
   // puerta lateral: se filtra contra el universo, no se confía en el que llama.
   const empresas = pedidas?.length
-    ? pedidas.filter((e) => INGRESOS_EMPRESA_KEYS.includes(e))
-    : INGRESOS_EMPRESA_KEYS;
+    ? pedidas.filter((e) => INGRESOS_SYNC_EMPRESA_KEYS.includes(e))
+    : INGRESOS_SYNC_EMPRESA_KEYS;
 
   if (empresas.length === 0) {
     return NextResponse.json(

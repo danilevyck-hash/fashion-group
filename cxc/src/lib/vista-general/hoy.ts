@@ -66,6 +66,8 @@ export interface Cartera {
 export interface Inventario {
   costo: number;
   unidades: number;
+  /** Por antigüedad (`INVENTARIO_90_DIAS_2026_11`); ausente si no se pudo leer. */
+  antiguedad?: { nuevo: number; viejo: number; sinFecha: number };
 }
 
 export interface EmpresaHoy {
@@ -205,6 +207,15 @@ export function resumir(keys: readonly string[], data: Pick<VistaGeneralHoyData,
     inventario: sumarCelda<Inventario>(keys, data.empresas, "inventario", (a, b) => ({
       costo: a.costo + b.costo,
       unidades: a.unidades + b.unidades,
+      // Si a una empresa le falta, el conjunto no se parte: nunca medio número.
+      antiguedad:
+        a.antiguedad && b.antiguedad
+          ? {
+              nuevo: a.antiguedad.nuevo + b.antiguedad.nuevo,
+              viejo: a.antiguedad.viejo + b.antiguedad.viejo,
+              sinFecha: a.antiguedad.sinFecha + b.antiguedad.sinFecha,
+            }
+          : undefined,
     })),
   };
 }
