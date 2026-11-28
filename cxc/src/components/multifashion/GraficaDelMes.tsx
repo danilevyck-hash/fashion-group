@@ -7,6 +7,11 @@
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useLecturaDeTarjeta } from "@/components/shared/TarjetaMesAMes";
+import { TarjetaDelDia } from "@/components/multifashion/TarjetaDelDia";
+import { hoyPanama } from "@/lib/fecha-panama";
+import { MULTIFASHION_TARJETA_DIA_2026_11 } from "@/lib/ui/multifashion-dia-2026-11";
+import type { DiaDeLaTarjeta } from "@/lib/multifashion/tarjeta-dia";
 import { MULTIFASHION_VS_ANIO_PASADO, etiquetaEnCelular, graficaDelMes, lineaDeLaGrafica, type EstadoDia } from "@/lib/multifashion/grafica-mes";
 
 const BARRA: Record<EstadoDia, string> = {
@@ -52,17 +57,29 @@ export function GraficaDelMes({
   const altoHoy = ventaHoy != null && ventaHoy > 0 && maxCerrado > 0 ? Math.min(1, ventaHoy / maxCerrado) : null;
   const [tocado, setTocado] = useState<number | null>(null);
   const linea = lineaDeLaGrafica(g, year, mes, tocado, alta);
+  // `MULTIFASHION_TARJETA_DIA_2026_11`: tocar (o hacer clic en) un día abre su tarjeta; «Hoy» también.
+  const tarjeta = useLecturaDeTarjeta<string, DiaDeLaTarjeta>((f) => `/api/multifashion/dia?fecha=${f}`);
+  const fechaDe = (dia: number) => `${year}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
 
   // El dedo o el mouse eligen por la posición: cada barra mide ~10 px en el celular.
   const diaEn = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const i = Math.min(g.dias.length - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * g.dias.length)));
     const d = g.dias[i];
+    if (MULTIFASHION_TARJETA_DIA_2026_11 && d?.estado === "hoy") return d.dia;
     return d && d.estado !== "futuro" && d.estado !== "hoy" ? d.dia : null;
   };
 
   return (
     <div data-elemento="grafica-dias">
+      {tarjeta.tarjeta && (
+        <TarjetaDelDia
+          fecha={tarjeta.tarjeta.item}
+          esHoy={tarjeta.tarjeta.item === hoyPanama()}
+          estado={tarjeta.tarjeta.estado}
+          onCerrar={() => { tarjeta.cerrar(); setTocado(null); }}
+        />
+      )}
       <p data-elemento="grafica-linea" className="min-h-[20px] text-sm text-gray-950 tabular-nums">
         {linea ?? " "}
       </p>
@@ -73,6 +90,13 @@ export function GraficaDelMes({
         onPointerMove={(e) => { if (e.pointerType === "mouse") setTocado(diaEn(e)); }}
         onPointerLeave={(e) => { if (e.pointerType === "mouse") setTocado(null); }}
         onPointerUp={(e) => {
+          if (MULTIFASHION_TARJETA_DIA_2026_11) {
+            const d = diaEn(e);
+            if (d == null) return;
+            setTocado(d);
+            tarjeta.abrir(fechaDe(d));
+            return;
+          }
           if (e.pointerType === "mouse") return;
           const d = diaEn(e);
           setTocado((t) => (t === d ? null : d));

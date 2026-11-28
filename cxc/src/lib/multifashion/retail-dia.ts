@@ -116,3 +116,32 @@ export async function leerMayoreoRango(desde: string, hasta: string): Promise<Re
     return null;
   }
 }
+
+/**
+ * UN día retail con su venta por hora de Panamá (la tarjeta del día,
+ * `MULTIFASHION_TARJETA_DIA_2026_11`). Mismas filas y misma suma que
+ * `leerRetailRango(fecha, fecha)`; las horas salen de `fecha_ts` (UTC−5 fijo,
+ * como `horasDeFacturas`).
+ */
+export async function leerRetailDia(fecha: string): Promise<RetailRango & { horas: number[] }> {
+  const filas = await leerTodoPaginado<FilaRetail & { fecha_ts: string | null }>(
+    `${VISTA_RETAIL} día [${fecha}]`,
+    (pedirCount, from, to) =>
+      supabaseServer
+        .from(VISTA_RETAIL)
+        .select("subtotal, fecha_ts", pedirCount ? { count: "exact" } : {})
+        .eq("is_wholesale", false)
+        .eq("fecha", fecha)
+        .order("n_sistema", { ascending: true })
+        .range(from, to),
+  );
+  let suma = 0;
+  const horas = Array.from({ length: 24 }, () => 0);
+  for (const f of filas) {
+    const v = Number(f.subtotal) || 0;
+    suma += v;
+    const t = f.fecha_ts ? Date.parse(f.fecha_ts) : NaN;
+    if (Number.isFinite(t)) horas[new Date(t - 5 * 3_600_000).getUTCHours()] += v;
+  }
+  return { ventas: Math.round(suma * 100) / 100, documentos: filas.length, horas: horas.map((h) => Math.round(h * 100) / 100) };
+}

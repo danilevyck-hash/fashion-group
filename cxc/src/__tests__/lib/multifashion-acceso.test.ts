@@ -201,6 +201,10 @@ describe("candado estructural — /api/multifashion/**", () => {
       // `american_classic`, constante del servidor).
       "contactos",
       "detalle-mensual",
+      // 27-nov-2026 · NOTA FECHADA — `dia`: la tarjeta del día de la gráfica
+      // (`MULTIFASHION_TARJETA_DIA_2026_11`). `requireRole(req, ROLES_MULTIFASHION)`,
+      // solo lee, sin empresa de la URL; rechaza fechas futuras (400).
+      "dia",
       "fidelizacion",
       // 11-oct-2026 · NOTA FECHADA — `historico`: «Últimos 12 meses» del Resumen
       // del celular (propuesta, `MULTIFASHION_BARRA_2026_10`).
