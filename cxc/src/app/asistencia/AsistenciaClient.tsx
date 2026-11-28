@@ -109,10 +109,9 @@ import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { ASISTENCIA_PANTALLA_2026_09 } from "@/lib/asistencia/pantalla-2026-09";
 import { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
 import { aparatoDeQuienMira } from "@/lib/aparato";
-import PortadaCelular, { useConteosPortada } from "./PortadaCelular";
-import { filasDeLaPortada } from "@/lib/asistencia/celular-asistencia";
+import PortadaCelular from "./PortadaCelular";
 import {
-  ASIS_PASTILLA_EMPRESA_R110, ASIS_SIN_PORTADA_R110, opcionConNumeros, textoPastillaEmpresa,
+  ASIS_PASTILLA_EMPRESA_R110, ASIS_SIN_PORTADA_R110, textoPastillaEmpresa,
 } from "@/lib/ui/revision-110-asistencia";
 import SelectorPeriodo from "@/components/asistencia/SelectorPeriodo";
 import {
@@ -365,12 +364,7 @@ function AsistenciaInner() {
   // sección como selector, el período con el «···» y la acción principal abajo.
   // Apagada, o en la computadora, todo queda como estaba.
   const barra = useBarraCelular() && !enLaPortada;
-  // 73: los números de la portada viajan dentro de cada opción del título ▾.
-  // Las MISMAS lecturas de la portada; solo con la barra del celular.
-  const conteos = useConteosPortada(empresa, periodo.desde, periodo.hasta, ASIS_SIN_PORTADA_R110 && barra);
-  const opcionesDelTitulo = ASIS_SIN_PORTADA_R110
-    ? new Map(filasDeLaPortada(visibles, conteos).map((f) => [f.clave, opcionConNumeros(f.rotulo, f.detalle, f.cuenta)]))
-    : null;
+  // 73: el título ▾ lista SOLO los títulos de las secciones, sin números pegados.
   const conCalendario = !ayuda && !config ? PERIODO_EN_LA_BARRA[tab] : undefined;
 
   return (
@@ -407,7 +401,7 @@ function AsistenciaInner() {
           <div className="-mx-4 -mt-6">
             <BarraDeControles
               titulo="Asistencia"
-              pestanas={visibles.map(([k, label]) => ({ value: k, label, opcion: opcionesDelTitulo?.get(k) }))}
+              pestanas={visibles.map(([k, label]) => ({ value: k, label }))}
               activa={tab}
               onPestana={(k) => irAPestana(k as Tab)}
               periodo={conCalendario === undefined ? undefined : (

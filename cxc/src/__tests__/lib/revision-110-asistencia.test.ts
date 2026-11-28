@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  colaColaboradores, opcionConNumeros, pendientesConUnidad, pendientesEnDosRenglones, textoPastillaEmpresa,
+  colaColaboradores, pendientesConUnidad, pendientesEnDosRenglones, textoPastillaEmpresa,
 } from "@/lib/ui/revision-110-asistencia";
 import { datosDeLaTarjeta, filasDeLaPortada } from "@/lib/asistencia/celular-asistencia";
 
@@ -20,12 +20,6 @@ describe("revisión 110 · Asistencia (solo pantalla)", () => {
     expect(filasDeLaPortada(tabs, base)[0]).toMatchObject({ detalle: "118 pendientes · 586:52 h", cuenta: "118" });
     expect(filasDeLaPortada(tabs, { ...base, colaboradoresPorDecidir: 36, minutosPorDecidir: 35212 })[0])
       .toMatchObject({ detalle: "36 colaboradores · 118 días · 586:52 h", cuenta: "36" });
-  });
-
-  it("73 · la opción del título lleva su número sin repetirlo", () => {
-    expect(opcionConNumeros("Préstamos", "19 con saldo", "$20,097.51")).toBe("Préstamos · 19 con saldo · $20,097.51");
-    expect(opcionConNumeros("Aprobaciones", "36 colaboradores · 118 días · 586:52 h", "36")).toBe("Aprobaciones · 36 colaboradores · 118 días · 586:52 h");
-    expect(opcionConNumeros("Planilla", null, null)).toBe("Planilla");
   });
 
   it("76 · horas sin segundos solo con el interruptor", () => {

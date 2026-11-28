@@ -58,14 +58,6 @@ export function colaColaboradores(colaboradores: number, dias: number, minutos: 
   return pendientesConUnidad(colaboradores, dias, minutos).replace(/^\d+ /, "");
 }
 
-/** 73 · La opción del selector de secciones con su número: «Préstamos · 19 con saldo · $20,097.51». */
-export function opcionConNumeros(rotulo: string, detalle: string | null, cuenta: string | null): string {
-  const partes = [rotulo];
-  if (detalle) partes.push(detalle);
-  if (cuenta && !(detalle ?? "").startsWith(`${cuenta} `)) partes.push(cuenta);
-  return partes.join(" · ");
-}
-
 /** 79 · El texto de la pastilla: «Todas» dice qué filtra. */
 export function textoPastillaEmpresa(etiqueta: string): string {
   return etiqueta === "Todas" ? "Todas las empresas" : etiqueta;

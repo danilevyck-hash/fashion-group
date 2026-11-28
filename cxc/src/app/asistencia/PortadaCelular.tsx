@@ -118,10 +118,8 @@ export default function PortadaCelular({
 
 /**
  * Los números de la portada. Las MISMAS lecturas de cada pestaña; solo leen.
- * 73 (revisión 110): también los usa el selector de secciones del título,
- * ahora que en el celular se entra directo a Asistencia.
  */
-export function useConteosPortada(empresa: string, desde: string, hasta: string, activo = true): ConteosPortada {
+function useConteosPortada(empresa: string, desde: string, hasta: string): ConteosPortada {
   const [conteos, setConteos] = useState<ConteosPortada>({
     colaboradores: null, sinFicha: null, personasDelReporte: null, ausencias: null,
     porDecidir: null, horasPorDecidir: null, quincenaCerrada: null,
@@ -129,7 +127,6 @@ export function useConteosPortada(empresa: string, desde: string, hasta: string,
   });
 
   useEffect(() => {
-    if (!activo) return;
     let vivo = true;
     const emp = empresaParaPedir(empresa);
     const q = new URLSearchParams({ desde, hasta });
@@ -205,7 +202,7 @@ export function useConteosPortada(empresa: string, desde: string, hasta: string,
     }
 
     return () => { vivo = false; };
-  }, [empresa, desde, hasta, activo]);
+  }, [empresa, desde, hasta]);
 
   return conteos;
 }

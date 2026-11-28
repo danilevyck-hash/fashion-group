@@ -109,4 +109,13 @@ describe("en el celular, elegir una sección SIEMPRE la abre", () => {
     await waitFor(() =>
       expect((screen.getByRole("combobox", { name: "Sección" }) as HTMLSelectElement).value).toBe("asistencia"));
   });
+
+  // 27-nov-2026 (Daniel): el título ▾ lista SOLO los títulos, sin conteos ni montos.
+  it("el selector de secciones muestra solo títulos", async () => {
+    montar("tab=planilla");
+    const lista = (await screen.findByRole("combobox", { name: "Sección" })) as HTMLSelectElement;
+    const textos = Array.from(lista.options).map((o) => o.textContent ?? "");
+    expect(textos.length).toBe(ORDEN_DEL_TRABAJO.length);
+    for (const t of textos) expect(t, t).toMatch(/^[^·\d$]+$/);
+  });
 });
