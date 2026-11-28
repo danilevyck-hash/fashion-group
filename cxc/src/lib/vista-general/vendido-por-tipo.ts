@@ -200,23 +200,34 @@ export interface VendidoPorTipo {
 }
 
 /**
+ * 🔴 «Camisetas» y «Ropa» no van por separado (Daniel, 28-nov-2026): donde
+ * aparecen los DOS (Active Shoes, o Fashion Group sumando las seis), las
+ * camisetas son ropa y se suman a «Ropa». Donde solo hay «Camisetas» (Fashion
+ * Wear, Active Wear) se quedan con su nombre.
+ */
+export const SE_SUMA_A: Readonly<Record<string, string>> = { Camisetas: "Ropa" };
+
+/**
  * Suma por tipo. Con varias empresas («Fashion Group») los tipos del MISMO
  * nombre se suman entre empresas («Camisetas» de Active Shoes + Fashion Wear +
  * Active Wear); después, en todos los casos, quedan los `MAX_TIPOS` con más
  * piezas y el resto se pliega en «Otros». «Otros» con 0 o menos no se dibuja.
  */
 export function agruparPorTipo(articulos: readonly ArticuloVendido[]): VendidoPorTipo {
+  const presentes = new Set(articulos.map((a) => a.tipo));
+  const fusion = (t: string) => (SE_SUMA_A[t] && presentes.has(SE_SUMA_A[t]) ? SE_SUMA_A[t] : t);
   const porTipo = new Map<string, number>();
   let total = 0;
   for (const a of articulos) {
-    porTipo.set(a.tipo, (porTipo.get(a.tipo) ?? 0) + a.piezas);
+    const t = fusion(a.tipo);
+    porTipo.set(t, (porTipo.get(t) ?? 0) + a.piezas);
     total += a.piezas;
   }
   const conNombre = [...porTipo.entries()]
     .filter(([t, q]) => t !== OTROS && q > 0)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"));
   const quedan = new Set(conNombre.slice(0, MAX_TIPOS).map(([t]) => t));
-  const visible = (t: string) => (quedan.has(t) ? t : OTROS);
+  const visible = (t: string) => (quedan.has(fusion(t)) ? fusion(t) : OTROS);
   const otros = [...porTipo.entries()].filter(([t]) => !quedan.has(t)).reduce((s, [, q]) => s + q, 0);
   const parte = (q: number) => (total > 0 && q > 0 ? q / total : null);
   const filas: FilaTipo[] = conNombre.slice(0, MAX_TIPOS).map(([tipo, piezas]) => ({ tipo, piezas, parte: parte(piezas) }));
