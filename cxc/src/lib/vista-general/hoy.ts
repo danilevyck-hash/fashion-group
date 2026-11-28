@@ -73,6 +73,8 @@ export interface Inventario {
 export interface EmpresaHoy {
   ventas: SeriesVentas | null;
   cobros?: number | null;
+  /** Cobros del año en curso (enero → hoy), misma regla que `cobros`. */
+  cobrosAnio?: number | null;
   pedidos?: ConteoPedidos | null;
   cxc?: Cartera | null;
   cxp?: Cartera | null;
@@ -135,26 +137,58 @@ export interface Resumen {
   ventasAnio: Comparado | null;
   /** 0–1; null = sin venta con costo en el mes. */
   margenMes: number | null;
+  /** Utilidad y margen del mes y del año (`VG_UTILIDAD_Y_VENDIDO_POR_TIPO_2026_11`). */
+  utilidadMes: UtilidadConMargen | null;
+  utilidadAnio: UtilidadConMargen | null;
   cobros: Celda<number>;
+  cobrosAnio: Celda<number>;
   pedidos: Celda<ConteoPedidos>;
   cxc: Celda<Cartera>;
   cxp: Celda<Cartera>;
   inventario: Celda<Inventario>;
 }
 
+export interface UtilidadConMargen {
+  utilidad: number;
+  /** 0–1; null = sin venta con costo. */
+  margen: number | null;
+}
+
 const v0 = (n: number | null | undefined) => n ?? 0;
+
+/**
+ * 🔴 UTILIDAD Y MARGEN CON UNA SOLA REGLA (28-nov-2026, Daniel: «Ok» al mockup).
+ * La de Ventas › Resumen: solo cuentan los empresa-mes con costo > 0, y el mes
+ * en curso va hasta el último día con costo (`margen-mes-en-curso.ts`). La
+ * utilidad en $ y su % salen de los MISMOS empresa-mes, así «$34k · 28%» nunca
+ * mezclan bases distintas. El año = la suma de esos meses, enero → mes en curso.
+ */
+export function utilidadDeMeses(series: readonly SeriesVentas[], meses: readonly number[]): UtilidadConMargen {
+  let u = 0;
+  let vm = 0;
+  for (const s of series) {
+    for (const i of meses) {
+      if (v0(s.costo[i]) > 0 && s.utilidad[i] != null) {
+        u += v0(s.utilidad[i]);
+        vm += v0(s.ventasMargen[i]);
+      }
+    }
+  }
+  return { utilidad: u, margen: vm > 0 ? u / vm : null };
+}
 
 function sumarCelda<T>(
   keys: readonly string[],
   datos: Record<string, EmpresaHoy>,
   d: Dato,
   sumar: (a: T, b: T) => T,
+  campo: keyof EmpresaHoy = d,
 ): Celda<T> {
   const suyas = keys.filter((k) => loManeja(k, d));
   if (suyas.length === 0) return { estado: "no-maneja" };
   let acc: T | null = null;
   for (const k of suyas) {
-    const v = datos[k]?.[d] as T | null | undefined;
+    const v = datos[k]?.[campo] as T | null | undefined;
     if (v == null) return { estado: "sin-medir" };
     acc = acc == null ? v : sumar(acc, v);
   }
@@ -171,6 +205,8 @@ export function resumir(keys: readonly string[], data: Pick<VistaGeneralHoyData,
   let ventasMes: Comparado | null = null;
   let ventasAnio: Comparado | null = null;
   let margenMes: number | null = null;
+  let utilidadMes: UtilidadConMargen | null = null;
+  let utilidadAnio: UtilidadConMargen | null = null;
   if (conVentas) {
     const mes = conVentas.reduce((s, v) => s + v0(v.serie[i]), 0);
     const mesPrev = conVentas.some((v) => v.seriePrev[i] != null) ? conVentas.reduce((s, v) => s + v0(v.seriePrev[i]), 0) : null;
@@ -180,22 +216,19 @@ export function resumir(keys: readonly string[], data: Pick<VistaGeneralHoyData,
     ventasAnio = { actual: anio, previo: anioPrev, pct: variacionPct(anio, anioPrev) };
     // La MISMA regla del margen de Ventas: solo empresa-mes con costo > 0, y la
     // venta sin lo de hoy (`margen-mes-en-curso.ts`).
-    let u = 0;
-    let vm = 0;
-    for (const v of conVentas) {
-      if (v0(v.costo[i]) > 0 && v.utilidad[i] != null) {
-        u += v0(v.utilidad[i]);
-        vm += v0(v.ventasMargen[i]);
-      }
-    }
-    margenMes = vm > 0 ? u / vm : null;
+    utilidadMes = utilidadDeMeses(conVentas, [i]);
+    utilidadAnio = utilidadDeMeses(conVentas, Array.from({ length: data.mes }, (_, m) => m));
+    margenMes = utilidadMes.margen;
   }
 
   return {
     ventasMes,
     ventasAnio,
     margenMes,
+    utilidadMes,
+    utilidadAnio,
     cobros: sumarCelda<number>(keys, data.empresas, "cobros", (a, b) => a + b),
+    cobrosAnio: sumarCelda<number>(keys, data.empresas, "cobros", (a, b) => a + b, "cobrosAnio"),
     pedidos: sumarCelda<ConteoPedidos>(keys, data.empresas, "pedidos", (a, b) => ({
       pendiente: a.pendiente + b.pendiente,
       en_preparacion: a.en_preparacion + b.en_preparacion,
