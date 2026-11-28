@@ -139,7 +139,7 @@ describe("Vendido por tipo — las sumas", () => {
 describe("Vendido por tipo — el período", () => {
   it("abre en el año en curso y ofrece el mes y los últimos 12 meses", () => {
     expect(opcionesPeriodoTipo("2026-11-28").map((o) => o.etiqueta)).toEqual(["Año 2026", "Noviembre 2026", "Últimos 12 meses"]);
-    expect(periodoTipoValido("raro")).toBe("anio");
+    expect(periodoTipoValido("raro", "2026-11-28")).toBe("anio");
     expect(rangoPeriodoTipo("anio", "2026-11-28")).toEqual({ desde: "2026-01-01", hasta: "2026-11-28" });
     expect(rangoPeriodoTipo("mes", "2026-11-28")).toEqual({ desde: "2026-11-01", hasta: "2026-11-28" });
     expect(rangoPeriodoTipo("12m", "2026-11-28")).toEqual({ desde: "2025-12-01", hasta: "2026-11-28" });
@@ -194,5 +194,27 @@ describe("El orden de las tarjetas", () => {
     const src = fs.readFileSync(path.join(process.cwd(), "src/app/vista-general/VistaGeneralHoy.tsx"), "utf8");
     expect(src).toMatch(/\[\.\.\.\(urgente \? \[pedidos\] : \[\]\), \.\.\.ordenTarjetas\(\{[^}]*pedidos: urgente \? null : pedidos \}\)\]/);
     expect(src).toMatch(/const disponibilidad = orden \? null/);
+  });
+});
+
+describe("Años anteriores en el filtro", () => {
+  const hoy = "2026-11-28";
+  it("2025 y 2024 para las que tienen ventas; Joystep solo 2025; Boston ninguno; 2023 nunca", () => {
+    expect(opcionesPeriodoTipo(hoy, ["active_shoes"]).map((o) => o.etiqueta)).toEqual(["Año 2026", "Año 2025", "Año 2024", "Noviembre 2026", "Últimos 12 meses"]);
+    expect(opcionesPeriodoTipo(hoy, ["joystep"]).map((o) => o.valor)).toEqual(["anio", "a2025", "mes", "12m"]);
+    expect(opcionesPeriodoTipo(hoy, ["confecciones_boston"]).map((o) => o.valor)).toEqual(["anio", "mes", "12m"]);
+    expect(opcionesPeriodoTipo(hoy, ["joystep", "vistana"]).map((o) => o.valor)).toContain("a2024");
+  });
+  it("un año anterior va entero y solo dentro de la ventana", () => {
+    expect(rangoPeriodoTipo(periodoTipoValido("a2025", hoy), hoy)).toEqual({ desde: "2025-01-01", hasta: "2025-12-31" });
+    expect(periodoTipoValido("a2024", hoy)).toBe("a2024");
+    expect(periodoTipoValido("a2023", hoy)).toBe("anio");
+    expect(periodoTipoValido("a2026", hoy)).toBe("anio");
+  });
+  it("la tarjeta Ventas lleva la utilidad debajo y la de Utilidad se retira", () => {
+    const src = fs.readFileSync(path.join(process.cwd(), "src/app/vista-general/VistaGeneralHoy.tsx"), "utf8");
+    expect(src).toMatch(/const utilidad = juntas \? null/);
+    expect(src).toMatch(/<LineaUtilidad u=\{r\.utilidadMes\} mantener=\{mantenerMargen\} \/>/);
+    expect(src).toMatch(/<LineaUtilidad u=\{r\.utilidadAnio\} mantener=\{mantenerMargen\} \/>/);
   });
 });

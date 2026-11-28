@@ -1,6 +1,6 @@
 // ¿«Vendido por tipo» suma TODAS las piezas del período? SOLO LEE.
 //
-//   npx tsx scripts/_verif-vendido-por-tipo.ts [anio|mes|12m]
+//   npx tsx scripts/_verif-vendido-por-tipo.ts [anio|a2025|a2024|mes|12m]
 //
 // Por empresa: el total de la tarjeta (`leerVendidoPorTipo` + `agruparPorTipo`)
 // contra la suma cruda de la fuente, leída aparte y SIN clasificar (renglones de
@@ -23,7 +23,7 @@ for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
   const { agruparPorTipo, periodoTipoValido, rangoPeriodoTipo, OTROS } = await import("../src/lib/vista-general/vendido-por-tipo");
   const { leerVendidoPorTipo } = await import("../src/lib/vista-general/vendido-por-tipo-server");
 
-  const periodo = periodoTipoValido(process.argv[2]);
+  const periodo = periodoTipoValido(process.argv[2], hoyPanama());
   const { desde, hasta } = rangoPeriodoTipo(periodo, hoyPanama());
   const siguiente = new Date(`${hasta}T00:00:00Z`);
   siguiente.setUTCDate(siguiente.getUTCDate() + 1);
