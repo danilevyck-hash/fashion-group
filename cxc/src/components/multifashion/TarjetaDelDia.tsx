@@ -13,6 +13,7 @@ import {
   cambioDelDia, fechaEquivalente, horaCorta, horasDeMayorVenta, horasDelDibujo, subtituloDelDia, ticketPromedio, tituloDelDia,
   type DiaDeLaTarjeta,
 } from "@/lib/multifashion/tarjeta-dia";
+import { notaDeCobertura } from "@/lib/multifashion/margen-estimado";
 
 function Fila({ rotulo, nota, children }: { rotulo: string; nota?: string | null; children: React.ReactNode }) {
   return (
@@ -41,7 +42,11 @@ function Cuerpo({ d }: { d: DiaDeLaTarjeta }) {
         {fmtMoneyCompact(d.venta)}
         {cambio && <span data-elemento="cambio-dia" className={cn("ml-1.5", colorDelTono(cambio.tono))}>{cambio.texto}</span>}
       </Fila>
-      {d.esHoy ? (
+      {d.margenEstimado ? (
+        <Fila rotulo="Margen" nota={(d.cobertura != null && notaDeCobertura(d.cobertura)) || "el real llega de madrugada"}>
+          <span data-elemento="margen-estimado">{fmtPorcentaje(d.margen)} <span className="text-gray-500">estimado</span></span>
+        </Fila>
+      ) : d.esHoy ? (
         <Fila rotulo="Margen" nota="el costo llega de madrugada"><span className="text-gray-500">mañana</span></Fila>
       ) : (
         <Fila rotulo="Margen">{fmtPorcentaje(d.margen)}</Fila>
