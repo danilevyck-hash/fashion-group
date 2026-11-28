@@ -8,6 +8,8 @@ import {
   enlaceDe,
   opcionesEmpresaHoy,
   resumir,
+  margenMesAMes,
+  cambioEnPuntos,
   type EmpresaHoy,
 } from "@/lib/vista-general/hoy";
 import { descontarFantasmas, type InventarioEmpresa } from "@/lib/inventario/valorizado";
@@ -79,5 +81,25 @@ describe("inventario: lo que Switch ya no manda no suma", () => {
     expect(r.unidades).toBe(80854);
     expect(r.costo).toBe(1193531.7);
     expect(r.medidoEn).toBe("2026-11-27T04:43:14Z");
+  });
+});
+
+describe("margen mes a mes", () => {
+  it("cada mes con la regla de la tarjeta (solo empresa-mes con costo) y el año pasado en puntos", () => {
+    const d = datos();
+    for (const k of B2B_EMPRESA_KEYS) d.empresas[k].ventas!.utilidadPrev = serie(11, 20);
+    d.empresas.vistana.ventas = { ...d.empresas.vistana.ventas!, costo: serie(11, 0) };
+    const m = margenMesAMes(empresasDe(VALOR_GRUPO), d)!;
+    expect(m.meses).toHaveLength(11);
+    expect(m.meses[10].actual).toBeCloseTo(30 / 90);
+    expect(m.meses[10].actual).toBeCloseTo(resumir(empresasDe(VALOR_GRUPO), d).margenMes!);
+    expect(m.meses[0].previo).toBeCloseTo(20 / 80);
+    expect(m.total.actual).toBeCloseTo(30 / 90);
+    expect(margenMesAMes([BOSTON], { mes: 11, empresas: { [BOSTON]: { ventas: null } } })).toBeNull();
+  });
+  it("«▲ +1.2 pts», «▼ −0.8 pts», sin base «—»", () => {
+    expect(cambioEnPuntos(0.312, 0.3).texto).toBe("▲ +1.2 pts");
+    expect(cambioEnPuntos(0.292, 0.3).texto).toBe("▼ −0.8 pts");
+    expect(cambioEnPuntos(0.3, null).texto).toBe("—");
   });
 });

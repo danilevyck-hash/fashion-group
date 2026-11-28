@@ -45,6 +45,8 @@ export interface SeriesVentas {
   /** La venta con que se divide el margen (sin la venta de hoy en el mes en curso). */
   ventasMargen: (number | null)[];
   costo: (number | null)[];
+  /** Utilidad del año pasado (mismos días en el mes en curso), para el margen mes a mes. */
+  utilidadPrev?: (number | null)[];
 }
 
 export interface ConteoPedidos {
@@ -205,6 +207,60 @@ export function resumir(keys: readonly string[], data: Pick<VistaGeneralHoyData,
       unidades: a.unidades + b.unidades,
     })),
   };
+}
+
+// ── El margen mes a mes (mantener presionado «Margen del mes») ─────────────
+
+export interface MargenDelMes {
+  mes: number;
+  /** 0–1; null = sin venta con costo ese mes. */
+  actual: number | null;
+  previo: number | null;
+}
+
+/**
+ * Margen de cada mes del año con la MISMA regla de la tarjeta (`resumir`) y de
+ * Ventas › Resumen: solo empresa-mes con costo > 0; el mes en curso, hasta el
+ * último día con costo. El año pasado igual, con su utilidad y su venta (el mes
+ * en curso a los mismos días). El total = margen del año hasta el mes en curso.
+ */
+export function margenMesAMes(
+  keys: readonly string[],
+  data: Pick<VistaGeneralHoyData, "mes" | "empresas">,
+): { meses: MargenDelMes[]; total: { actual: number | null; previo: number | null } } | null {
+  const vs = keys.map((k) => data.empresas[k]?.ventas ?? null);
+  if (vs.some((v) => v == null)) return null;
+  const series = vs as SeriesVentas[];
+  const acc = { u: 0, v: 0, up: 0, vp: 0 };
+  const meses: MargenDelMes[] = [];
+  for (let i = 0; i < data.mes; i++) {
+    let u = 0, vm = 0, up = 0, vp = 0;
+    for (const s of series) {
+      if (v0(s.costo[i]) > 0 && s.utilidad[i] != null) {
+        u += v0(s.utilidad[i]);
+        vm += v0(s.ventasMargen[i]);
+      }
+      const uPrev = s.utilidadPrev?.[i];
+      if (uPrev != null && v0(s.seriePrev[i]) - uPrev > 0) {
+        up += uPrev;
+        vp += v0(s.seriePrev[i]);
+      }
+    }
+    acc.u += u; acc.v += vm; acc.up += up; acc.vp += vp;
+    meses.push({ mes: i + 1, actual: vm > 0 ? u / vm : null, previo: vp > 0 ? up / vp : null });
+  }
+  return {
+    meses,
+    total: { actual: acc.v > 0 ? acc.u / acc.v : null, previo: acc.vp > 0 ? acc.up / acc.vp : null },
+  };
+}
+
+/** «▲ +1.2 pts» / «▼ −0.8 pts»: la diferencia de dos márgenes, en puntos (como Ventas › Resumen). */
+export function cambioEnPuntos(actual: number, previo: number | null | undefined): { texto: string; tono: "up" | "dn" | "fl" } {
+  if (previo == null) return { texto: "—", tono: "fl" };
+  const pts = Math.round((actual - previo) * 1000) / 10;
+  if (pts === 0) return { texto: "0.0 pts", tono: "fl" };
+  return pts > 0 ? { texto: `▲ +${pts.toFixed(1)} pts`, tono: "up" } : { texto: `▼ −${Math.abs(pts).toFixed(1)} pts`, tono: "dn" };
 }
 
 export const porDespachar = (p: ConteoPedidos): number => p.pendiente + p.en_preparacion + p.preparado;
