@@ -74,7 +74,7 @@ async function main() {
       let v = 0, c = 0;
       for (const r of art ?? []) { const s = r.tipo === "NC" ? -1 : 1; v += s * Number(r.venta_total ?? 0); c += s * Number(r.costo_total ?? 0); }
       igual("margen ×10000 (switch_articulo_diario)", t.margen == null ? null : Math.round(t.margen * 10000), v > 0 ? Math.round(((v - c) / v) * 10000) : null);
-    } else if (t.margen !== null) { fallas++; console.log("  ✗ hoy trae margen"); }
+    } else if (t.margen !== null && !t.margenEstimado) { fallas++; console.log("  ✗ hoy trae margen real"); }
 
     const h = horasDeMayorVenta(t.horas);
     const cambio = cambioDelDia(t);

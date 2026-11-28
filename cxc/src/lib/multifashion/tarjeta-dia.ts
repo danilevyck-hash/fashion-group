@@ -9,7 +9,9 @@
 //     Telegram de ACS (`ventanasResumen().fechaComparable`). «Hoy» se compara
 //     con ese día COMPLETO.
 //   · margen = `switch_articulo_diario` (NC restan, sin ND), que llega de
-//     madrugada: hoy no tiene costo y dice «mañana».
+//     madrugada: hoy no tiene costo. Desde el 28-nov-2026 hoy va ESTIMADO
+//     (`margen-estimado.ts`, `MULTIFASHION_MARGEN_ESTIMADO_2026_11`); si Switch
+//     no contesta, dice «mañana».
 //   · horas = las 3 horas seguidas de mayor venta (`bloqueDeHoras`, la misma
 //     cuenta de «Últimos 12 meses»), sobre las facturas del día.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,6 +33,10 @@ export interface DiaDeLaTarjeta {
   hayHistoriaPrevia: boolean;
   /** Fracción (0.34). `null` = sin costo (hoy, o el día sin artículos). */
   margen: number | null;
+  /** `true` = el margen de hoy es ESTIMADO (costo actual del artículo), no el de Switch. */
+  margenEstimado: boolean;
+  /** Fracción de la venta con costo conocido en el estimado; `null` si no es estimado. */
+  cobertura: number | null;
   /** Venta por hora de Panamá, 24 posiciones. */
   horas: number[];
 }
