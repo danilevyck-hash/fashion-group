@@ -404,7 +404,8 @@ export function ChipSelector({
 }: {
   rotulo: string;
   valor: string;
-  opciones: readonly { valor: string; etiqueta: string }[];
+  /** `grupo`: las opciones con grupo van al final, separadas bajo ese título (Vista general: Boston y Multifashion). */
+  opciones: readonly { valor: string; etiqueta: string; grupo?: string }[];
   onCambiar: (v: string) => void;
   /** Sin el «Rótulo:» delante, cuando la opción ya dice qué es («Todas las empresas ▾»). */
   soloValor?: boolean;
@@ -432,8 +433,15 @@ export function ChipSelector({
         onChange={(e) => onCambiar(e.target.value)}
         className="absolute inset-x-0 -inset-y-1 cursor-pointer appearance-none rounded-full text-base opacity-0"
       >
-        {opciones.map((o) => (
+        {opciones.filter((o) => !o.grupo).map((o) => (
           <option key={o.valor} value={o.valor}>{o.etiqueta}</option>
+        ))}
+        {[...new Set(opciones.map((o) => o.grupo).filter((g): g is string => !!g))].map((g) => (
+          <optgroup key={g} label={g}>
+            {opciones.filter((o) => o.grupo === g).map((o) => (
+              <option key={o.valor} value={o.valor}>{o.etiqueta}</option>
+            ))}
+          </optgroup>
         ))}
       </select>
     </span>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { leerDashboardSummary, RPC_DASHBOARD_SUMMARY } from "@/lib/ventas/dashboard-summary";
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -118,6 +119,15 @@ const CXP_VIGILANCIA_TITLES = new Set(["91-120"]); // detalle (⊂ vencido)
 const CXP_VENCIDO_TITLES = new Set(["91-120", "121-180", "181-270", "271-365", "Mas de 365"]); // ≥91
 // #36: el corte del reclamo viejo es el de Reclamos (`DIAS_RECLAMO_VIEJO`, 120); no hay uno propio.
 
+/** 🩸 27-nov-2026: CxC, CxP y bancos se leen PAGINADOS (`db-max-rows` = 1000
+ *  corta en silencio) con la misma forma `{ data, error }` de antes. */
+function comoRespuesta<T>(p: Promise<T[]>): Promise<{ data: T[] | null; error: { message: string } | null }> {
+  return p.then(
+    (data) => ({ data, error: null }),
+    (e: unknown) => ({ data: null, error: { message: e instanceof Error ? e.message : String(e) } }),
+  );
+}
+
 function num(x: unknown): number {
   const n = typeof x === "number" ? x : parseFloat(String(x ?? ""));
   return Number.isFinite(n) ? n : 0;
@@ -204,13 +214,19 @@ export async function GET(req: NextRequest) {
     // (switch_estadocuenta_aging_mv) refresca 1×/día (06:30 UTC) y queda atrás de
     // los re-syncs de la reconciliación → divergía con /admin intradía. Leer la
     // misma vista base garantiza Δ=0.00 con /admin siempre.
-    supabaseServer.from("switch_estadocuenta_aging")
-      .select("company_key,nombre,codigo,total,d0_30,d31_60,d61_90,d91_120,d121_180,d181_270,d271_365,mas_365"),
+    comoRespuesta(leerTodoPaginado<AgingRow>("switch_estadocuenta_aging", (c, d, h) =>
+      supabaseServer.from("switch_estadocuenta_aging")
+        .select("company_key,nombre,codigo,total,d0_30,d31_60,d61_90,d91_120,d121_180,d181_270,d271_365,mas_365", c ? { count: "exact" } : {})
+        .order("company_key", { ascending: true }).order("codigo", { ascending: true }).order("id", { ascending: true })
+        .range(d, h))),
     // CXP: TODAS las filas (incl. saldos a favor / negativos) para cuadrar con el
     // grupo_saldo del módulo Proveedores. Antes filtraba saldo_total>0 y excluía 2
     // proveedores con saldo a favor → total no cuadraba con el módulo.
-    supabaseServer.from("switch_proveedor_estadocuenta")
-      .select("empresa_key,nombre,saldo_total,aging"),
+    comoRespuesta(leerTodoPaginado<CxpRow>("switch_proveedor_estadocuenta", (c, d, h) =>
+      supabaseServer.from("switch_proveedor_estadocuenta")
+        .select("empresa_key,nombre,saldo_total,aging", c ? { count: "exact" } : {})
+        .order("empresa_key", { ascending: true }).order("proveedor_switch_id", { ascending: true })
+        .range(d, h))),
     supabaseServer.from("reclamos")
       .select(DIAS_COMO_RECLAMOS ? "id,nro_reclamo,empresa,estado,fecha_reclamo,fecha_factura" : "id,nro_reclamo,empresa,estado,fecha_reclamo")
       .eq("deleted", false).neq("estado", ESTADO_PAGADO)
@@ -229,9 +245,11 @@ export async function GET(req: NextRequest) {
     }),
     // Saldos bancarios: orden fecha_dato DESC → el primero por empresa es el
     // más reciente.
-    supabaseServer.from("bancos_saldos")
-      .select("empresa_key,saldo,fecha_dato")
-      .order("fecha_dato", { ascending: false }),
+    comoRespuesta(leerTodoPaginado<BancoRow>("bancos_saldos", (c, d, h) =>
+      supabaseServer.from("bancos_saldos")
+        .select("empresa_key,saldo,fecha_dato", c ? { count: "exact" } : {})
+        .order("fecha_dato", { ascending: false }).order("id", { ascending: true })
+        .range(d, h))),
     // INVENTARIO VALORIZADO. Falla ABIERTO, igual que el mayor: si la lectura
     // se cae, la pantalla se dibuja entera y la tarjeta dice que no se pudo
     // medir — nunca un $0, que se ve idéntico a "no tengo mercancía".

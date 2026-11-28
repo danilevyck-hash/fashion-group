@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { derivarProveedor, type ElementoLedger } from "@/lib/proveedores-derivados";
 import {
   aplicarAmarre,
@@ -64,11 +65,17 @@ const COLS =
  * verdades posibles.
  */
 export async function fetchAllProveedorRows(): Promise<ProveedorRow[]> {
-  const { data, error } = await supabaseServer
-    .from("switch_proveedor_estadocuenta")
-    .select(COLS);
-  if (error) throw new Error(`switch_proveedor_estadocuenta: ${error.message}`);
-  return (data ?? []).map((r) => {
+  // 🩸 Paginado (27-nov-2026): `db-max-rows` = 1000 corta EN SILENCIO. Hoy son
+  // 73 filas; el día que pasen de mil, el «Por pagar» no se encoge sin avisar.
+  const data = await leerTodoPaginado<ProveedorRow & { elements?: ElementoLedger[] }>("switch_proveedor_estadocuenta", (pedirCount, desde, hasta) =>
+    supabaseServer
+      .from("switch_proveedor_estadocuenta")
+      .select(COLS, pedirCount ? { count: "exact" } : {})
+      .order("empresa_key", { ascending: true })
+      .order("proveedor_switch_id", { ascending: true })
+      .range(desde, hasta),
+  );
+  return data.map((r) => {
     const { elements, ...row } = r as ProveedorRow & { elements?: ElementoLedger[] };
     return { ...row, ...derivarProveedor(elements) } as ProveedorRow;
   });

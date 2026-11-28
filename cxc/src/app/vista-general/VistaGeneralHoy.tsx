@@ -1,0 +1,349 @@
+"use client";
+
+// Vista general «HOY» (27-nov-2026, `VISTA_GENERAL_HOY_2026_11`). Cómo está el
+// negocio hoy: sin mes ni período. Las sumas y los enlaces viven en
+// `lib/vista-general/hoy.ts`; esta pantalla solo dibuja.
+
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import useSWR from "swr";
+import { ChipSelector } from "@/components/celular/BarraDeControles";
+import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
+import { useMantenerPresionado } from "@/components/shared/GestosIphone";
+import { AvisoMesAMes, TarjetaMesAMes } from "@/components/shared/TarjetaMesAMes";
+import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
+import { useUrlState } from "@/lib/hooks/useUrlState";
+import { hasModuleAccess } from "@/lib/auth-check";
+import { ALL_MODULES } from "@/lib/modules";
+import { MONTHS } from "@/lib/ventas/format";
+import { mesEnCursoDelCorte, mesesDeSeries, notaDelMesEnCurso } from "@/lib/ventas/mes-a-mes";
+import {
+  BOSTON,
+  DIAS_PEDIDO_ATRASADO,
+  MULTIFASHION,
+  VALOR_GRUPO,
+  empresaValida,
+  empresasDe,
+  enlaceDe,
+  moduloDe,
+  montoCorto,
+  opcionesEmpresaHoy,
+  porDespachar,
+  porcentaje,
+  resumir,
+  type Celda,
+  type Comparado,
+  type Destino,
+  type VistaGeneralHoyData,
+} from "@/lib/vista-general/hoy";
+
+const fetcher = (url: string) => fetch(url).then((r) => { if (!r.ok) throw new Error("err"); return r.json(); });
+
+const MESES_LARGOS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+const CLASE_TARJETA = "block rounded-[14px] border border-gray-200 bg-white p-4";
+const CLASE_TOCABLE = "transition hover:border-gray-300 active:scale-[0.99]";
+const CLASE_ROTULO = "text-sm font-medium text-gray-500";
+const CLASE_CIFRA = "mt-1 text-2xl font-bold tabular-nums text-gray-900";
+
+/** ¿El rol de quien mira tiene el módulo de destino? (después de hidratar). */
+function useModulos(): (key: string) => boolean {
+  const [listo, setListo] = useState(false);
+  useEffect(() => setListo(true), []);
+  return (key: string) => {
+    if (!listo) return false;
+    const m = ALL_MODULES.find((x) => x.key === key);
+    return !!m && hasModuleAccess(key, m.roles);
+  };
+}
+
+export default function VistaGeneralHoy() {
+  const [empresaUrl, setEmpresaUrl] = useUrlState("empresa", VALOR_GRUPO);
+  const empresa = empresaValida(empresaUrl);
+  const { data, error, isLoading, mutate } = useSWR<VistaGeneralHoyData>("/api/dashboard/vista-general/hoy", fetcher, {
+    dedupingInterval: 60_000,
+    revalidateOnFocus: true,
+  });
+  const puede = useModulos();
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 pb-8 pt-2 md:py-6">
+      <h1 className="sr-only">Vista general</h1>
+      <div className="mb-3 flex min-h-11 flex-wrap items-center gap-x-3 gap-y-2">
+        <ChipSelector rotulo="Empresa" soloValor valor={empresa} opciones={opcionesEmpresaHoy()} onCambiar={setEmpresaUrl} />
+        <span className="flex-1" />
+        <LineaDeFrescura actualizado={data?.actualizado ?? null} onActualizar={async () => { await mutate(); }} sinSwitch />
+      </div>
+
+      {isLoading && !data ? (
+        <Esqueleto />
+      ) : error || !data ? (
+        <div className={`${CLASE_TARJETA} text-center`}>
+          <p className="text-sm text-gray-700">No se pudo cargar la vista general. Intenta de nuevo en unos segundos.</p>
+          <button type="button" onClick={() => mutate()} className="mt-4 rounded-md bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.97]">
+            Reintentar
+          </button>
+        </div>
+      ) : (
+        <Tarjetas data={data} empresa={empresa} puede={puede} onEmpresa={setEmpresaUrl} />
+      )}
+    </div>
+  );
+}
+
+function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyData; empresa: string; puede: (k: string) => boolean; onEmpresa: (v: string) => void }) {
+  const keys = useMemo(() => empresasDe(empresa), [empresa]);
+  const r = useMemo(() => resumir(keys, data), [keys, data]);
+  const destino = (d: Destino) => (puede(moduloDe(d, empresa)) ? enlaceDe(d, empresa) : null);
+  const [mesAMes, setMesAMes] = useState(false);
+  const mantener = useMantenerPresionado(() => setMesAMes(true));
+
+  const noManeja = [
+    r.pedidos.estado === "no-maneja" && "Pedidos",
+    r.cxc.estado === "no-maneja" && "Por cobrar",
+    r.cxp.estado === "no-maneja" && "Por pagar",
+    r.inventario.estado === "no-maneja" && "Inventario",
+  ].filter(Boolean) as string[];
+
+  const series = useMemo(() => {
+    const suma = (f: (k: string) => (number | null)[]) =>
+      Array.from({ length: 12 }, (_, i) => {
+        const vs = keys.map((k) => f(k)[i]);
+        return vs.every((v) => v == null) ? null : vs.reduce<number>((s, v) => s + (v ?? 0), 0);
+      });
+    const ok = keys.every((k) => data.empresas[k]?.ventas);
+    return ok
+      ? { actual: suma((k) => data.empresas[k].ventas!.serie), previo: suma((k) => data.empresas[k].ventas!.seriePrev) }
+      : null;
+  }, [keys, data]);
+
+  return (
+    <>
+      {GESTOS_IPHONE_2026_11 && <AvisoMesAMes />}
+      {mesAMes && series && r.ventasAnio && (
+        <TarjetaMesAMes
+          titulo={opcionesEmpresaHoy().find((o) => o.valor === empresa)?.etiqueta ?? ""}
+          subtitulo={`Ventas ${data.anio} · vs ${data.anio - 1}`}
+          anio={data.anio}
+          meses={mesesDeSeries(series.actual, series.previo, data.mes)}
+          total={{ actual: r.ventasAnio.actual, previo: r.ventasAnio.previo }}
+          mesEnCurso={mesEnCursoDelCorte(data.anio, data.fechaCorte)}
+          nota={notaDelMesEnCurso(data.anio, data.fechaCorte)}
+          onCerrar={() => setMesAMes(false)}
+        />
+      )}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {/* Ventas: el mes y el año, cada uno con su ▲▼. Mantener presionado = mes a mes. */}
+        <Tarjeta href={destino("ventas")} className="col-span-2" extra={mantener}>
+          <p className={CLASE_ROTULO}>Ventas</p>
+          {r.ventasMes && r.ventasAnio ? (
+            <div className="mt-1 grid grid-cols-2 gap-3">
+              <VentaComparada rotulo={MESES_LARGOS[data.mes - 1] ?? MONTHS[data.mes - 1]} c={r.ventasMes} />
+              <VentaComparada rotulo={String(data.anio)} c={r.ventasAnio} />
+            </div>
+          ) : (
+            <SinMedir />
+          )}
+        </Tarjeta>
+
+        <Tarjeta href={destino("ventas")}>
+          <p className={CLASE_ROTULO}>Margen del mes</p>
+          <p className={CLASE_CIFRA}>{r.margenMes == null ? "—" : porcentaje(r.margenMes)}</p>
+        </Tarjeta>
+
+        {r.cobros.estado !== "no-maneja" && (
+          <Tarjeta href={destino("cxc")}>
+            <p className={CLASE_ROTULO}>Cobros del mes</p>
+            <Cifra c={r.cobros} f={montoCorto} />
+          </Tarjeta>
+        )}
+
+        {r.pedidos.estado !== "no-maneja" && (
+          <Tarjeta href={destino("pedidos")} className="col-span-2">
+            <p className={`${CLASE_ROTULO} flex items-center gap-2`}>
+              Pedidos por despachar
+              {r.pedidos.estado === "ok" && r.pedidos.valor.atrasados > 0 && (
+                <span data-punto-pedidos className="inline-block h-2 w-2 rounded-full bg-amber-500">
+                  <span className="sr-only">{`${r.pedidos.valor.atrasados} con más de ${DIAS_PEDIDO_ATRASADO} días`}</span>
+                </span>
+              )}
+            </p>
+            {r.pedidos.estado === "ok" ? (
+              <>
+                <p className={CLASE_CIFRA}>{porDespachar(r.pedidos.valor)}</p>
+                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-gray-100 pt-3">
+                  <Paso n={r.pedidos.valor.pendiente} rotulo="Pendiente" />
+                  <Paso n={r.pedidos.valor.en_preparacion} rotulo="En preparación" />
+                  <Paso n={r.pedidos.valor.preparado} rotulo="Preparado" />
+                </div>
+              </>
+            ) : (
+              <SinMedir />
+            )}
+          </Tarjeta>
+        )}
+
+        {r.cxc.estado !== "no-maneja" && (
+          <Tarjeta href={destino("cxc")} className="col-span-2">
+            <p className={CLASE_ROTULO}>Por cobrar</p>
+            <CarteraCifras c={r.cxc} rojo />
+          </Tarjeta>
+        )}
+
+        {r.cxp.estado !== "no-maneja" && (
+          <Tarjeta href={destino("cxp")} className="col-span-2">
+            <p className={CLASE_ROTULO}>Por pagar</p>
+            <CarteraCifras c={r.cxp} />
+          </Tarjeta>
+        )}
+
+        {r.inventario.estado !== "no-maneja" && (
+          <Tarjeta href={destino("inventario")}>
+            <p className={CLASE_ROTULO}>Inventario</p>
+            {r.inventario.estado === "ok" ? (
+              <>
+                <p className={CLASE_CIFRA}>{montoCorto(r.inventario.valor.costo)}</p>
+                <p className="mt-0.5 text-sm tabular-nums text-gray-500">{Math.round(r.inventario.valor.unidades).toLocaleString("en-US")} unidades</p>
+              </>
+            ) : (
+              <SinMedir />
+            )}
+          </Tarjeta>
+        )}
+
+        <Tarjeta href={null}>
+          <p className={CLASE_ROTULO}>Disponibilidad</p>
+          <p className="mt-1 text-base text-gray-500">No disponible por ahora</p>
+        </Tarjeta>
+      </div>
+
+      {noManeja.length > 0 && (
+        <p data-no-lo-maneja className="mt-3 text-sm text-gray-500">No lo maneja en el sistema: {noManeja.join(" · ")}</p>
+      )}
+
+      {empresa === VALOR_GRUPO && (
+        <div className="mt-4 divide-y divide-gray-100 overflow-hidden rounded-[14px] border border-gray-200 bg-white">
+          <FilaAparte data={data} k={BOSTON} nombre="Confecciones Boston" onEmpresa={onEmpresa} />
+          <FilaAparte data={data} k={MULTIFASHION} nombre="Multifashion" onEmpresa={onEmpresa} />
+        </div>
+      )}
+
+      <p className="mt-4 text-center text-sm text-gray-500">▲▼ contra los mismos días de {data.anio - 1}</p>
+    </>
+  );
+}
+
+function Tarjeta({ href, className = "", extra, children }: { href: string | null; className?: string; extra?: object; children: ReactNode }) {
+  if (!href) return <div className={`${CLASE_TARJETA} ${className}`} {...extra}>{children}</div>;
+  return (
+    <Link href={href} className={`${CLASE_TARJETA} ${CLASE_TOCABLE} ${className}`} {...extra}>
+      {children}
+    </Link>
+  );
+}
+
+function Delta({ pct }: { pct: number | null }) {
+  if (pct == null) return null;
+  const sube = pct >= 0;
+  return (
+    <p className={`mt-0.5 text-sm font-medium tabular-nums ${sube ? "text-green-700" : "text-red-700"}`}>
+      {sube ? "▲ +" : "▼ −"}
+      {porcentaje(Math.abs(pct))}
+    </p>
+  );
+}
+
+function VentaComparada({ rotulo, c }: { rotulo: string; c: Comparado }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-sm text-gray-500">{rotulo}</p>
+      <p className={CLASE_CIFRA}>{montoCorto(c.actual)}</p>
+      <Delta pct={c.pct} />
+    </div>
+  );
+}
+
+function Cifra({ c, f }: { c: Celda<number>; f: (n: number) => string }) {
+  return c.estado === "ok" ? <p className={CLASE_CIFRA}>{f(c.valor)}</p> : <SinMedir />;
+}
+
+function CarteraCifras({ c, rojo = false }: { c: Celda<{ total: number; mas120: number }>; rojo?: boolean }) {
+  if (c.estado !== "ok") return <SinMedir />;
+  const { total, mas120 } = c.valor;
+  return (
+    <>
+      <p className={CLASE_CIFRA}>{montoCorto(total)}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3">
+        <div className="min-w-0">
+          <p className="text-lg font-semibold tabular-nums text-gray-900">{montoCorto(total - mas120)}</p>
+          <p className="text-sm text-gray-500">Hasta 120 días</p>
+        </div>
+        <div className="min-w-0">
+          <p className={`text-lg font-semibold tabular-nums ${rojo && mas120 > 0 ? "text-red-700" : "text-gray-900"}`}>{montoCorto(mas120)}</p>
+          <p className="text-sm text-gray-500">Más de 120 días</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Paso({ n, rotulo }: { n: number; rotulo: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-lg font-semibold tabular-nums text-gray-900">{n}</p>
+      <p className="text-sm text-gray-500">{rotulo}</p>
+    </div>
+  );
+}
+
+function SinMedir() {
+  return <p className="mt-1 text-sm text-gray-500">No se pudo medir</p>;
+}
+
+/** Boston y Multifashion, aparte del grupo. Tocar la fila elige esa empresa. */
+function FilaAparte({ data, k, nombre, onEmpresa }: { data: VistaGeneralHoyData; k: string; nombre: string; onEmpresa: (v: string) => void }) {
+  const r = resumir([k], data);
+  const extra =
+    k === BOSTON
+      ? `Por cobrar ${r.cxc.estado === "ok" ? montoCorto(r.cxc.valor.total) : "—"}`
+      : `Inventario ${r.inventario.estado === "ok" ? montoCorto(r.inventario.valor.costo) : "—"}`;
+  return (
+    <button
+      type="button"
+      data-fila-aparte={k}
+      onClick={() => {
+        onEmpresa(k);
+        window.scrollTo({ top: 0 });
+      }}
+      className="flex min-h-[44px] w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-gray-900">{nombre}</span>
+        <span className="block text-sm tabular-nums text-gray-500">{extra}</span>
+      </span>
+      <span className="text-right">
+        <span className="block text-base font-semibold tabular-nums text-gray-900">{r.ventasMes ? montoCorto(r.ventasMes.actual) : "—"}</span>
+        {r.ventasMes?.pct != null && (
+          <span className={`block text-sm font-medium tabular-nums ${r.ventasMes.pct >= 0 ? "text-green-700" : "text-red-700"}`}>
+            {r.ventasMes.pct >= 0 ? "▲ +" : "▼ −"}
+            {porcentaje(Math.abs(r.ventasMes.pct))}
+          </span>
+        )}
+      </span>
+    </button>
+  );
+}
+
+function Esqueleto() {
+  return (
+    <div className="grid animate-pulse grid-cols-2 gap-3 lg:grid-cols-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className={`${CLASE_TARJETA} ${i === 0 ? "col-span-2" : ""}`}>
+          <div className="h-3 w-20 rounded bg-gray-200" />
+          <div className="mt-2 h-7 w-24 rounded bg-gray-200" />
+        </div>
+      ))}
+    </div>
+  );
+}

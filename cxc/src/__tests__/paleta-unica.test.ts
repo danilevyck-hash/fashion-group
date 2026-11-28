@@ -14,6 +14,7 @@ const EXCEPCIONES: Record<string, number> = {
   // Colores que llevan información (semáforo, ▲ verde / ▼ rojo): no se tocan.
   "src/app/vista-general/RentabilidadPorEmpresa.tsx": 4, // semáforo «Rentable» y el signo de la rentabilidad
   "src/app/vista-general/page.tsx": 1, // ▲ verde del «vs año pasado»
+  "src/app/vista-general/VistaGeneralHoy.tsx": 2, // ▲ verde del «vs mismos días» (tarjeta Ventas y filas de Boston/Multifashion)
   "src/app/prestamos/components/types.ts": 6, // semáforo de avance (verde ≥ 75 %) y el chip del concepto «Terceros»
   "src/app/prestamos/PrestamosClient.tsx": 1, // semáforo de avance (verde ≥ 75 %)
   "src/components/ui.tsx": 4, // `Badge` de estados: «En revisión» (morado) y «En proceso/Preparando/En camino» (naranja)
