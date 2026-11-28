@@ -50,10 +50,13 @@ for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
     const fuente = await crudo(empresa);
     const dibujado = r.filas.reduce((s, f) => s + f.piezas, 0);
     const otros = arts.filter((a) => r.visible(a.tipo) === OTROS).reduce((s, a) => s + a.piezas, 0);
-    const oculto = r.filas.some((f) => f.tipo === OTROS) ? 0 : otros;
-    const ok = Math.abs(r.total - fuente) < 0.001 && Math.abs(dibujado + oculto - r.total) < 0.001;
+    // Lo que se ve en la tarjeta: las barras + la línea de «Otros» negativo (`otrosNegativo`).
+    // Un «Otros» en 0 exacto no se dibuja ni se dice (no cambia la suma).
+    const ok = Math.abs(r.total - fuente) < 0.001 && Math.abs(dibujado + r.otrosNegativo - r.total) < 0.001;
     if (!ok) malas += 1;
     const pct = r.total > 0 ? ((otros / r.total) * 100).toFixed(1) : "—";
+    // 28-nov-2026: con las formas viejas clasificadas, Active Wear y Joystep tienen menos de 2 % en «Otros» en 2025.
+    if (periodo === "a2025" && (empresa === "active_wear" || empresa === "joystep") && otros / r.total > 0.02) malas += 1;
     console.log(`${ok ? "✓" : "✗"} ${empresa.padEnd(18)} tarjeta ${r.total.toFixed(0).padStart(7)} · fuente ${fuente.toFixed(0).padStart(7)} · Otros ${otros.toFixed(0)} (${pct}%) · ${r.filas.map((f) => `${f.tipo} ${f.piezas}`).join(" · ")}`);
   }
   // Fashion Group: las seis juntas, con los tipos del mismo nombre sumados y

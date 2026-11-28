@@ -69,7 +69,7 @@ async function leerGrupo(empresas: readonly string[], desde: string, hasta: stri
   );
   for (const f of filas) {
     const signo = f.tipo_comprobante === NOTA_DE_CREDITO ? -1 : 1;
-    const tipo = tipoDe(f.empresa_key, [f.subrubro, f.rubro]);
+    const tipo = tipoDe(f.empresa_key, [f.subrubro, f.rubro], f.descripcion);
     acc.sumar(f.empresa_key, f.codigo ?? "(sin código)", f.descripcion ?? "", tipo, signo * num(f.cantidad));
   }
 }

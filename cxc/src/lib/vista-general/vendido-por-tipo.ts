@@ -57,11 +57,14 @@ export const DICCIONARIOS: Readonly<Record<string, Diccionario>> = {
     Pantuflas: ["SLIPPERS"],
   },
   active_wear: {
-    Camisetas: ["T-SHIRTS S-S", "HEAVYWEIGHT", "T-SHIRTS", "T-SHIRT", "T-SHIRT MEN", "T-SHIRT WOMEN", "GIRLS T-SHIRT"],
+    Camisetas: ["T-SHIRTS S-S", "HEAVYWEIGHT", "T-SHIRTS", "T-SHIRT", "T-SHIRT MEN", "T-SHIRT WOMEN", "GIRLS T-SHIRT", "T-SHIRT (SHORT SLEEVE)"],
+    // Daniel, 28-nov-2026: las camisetas de la selección van aparte; shorts a Pantalones.
+    "Camisetas de selección": ["CAMISETA SELECCION"],
     Polos: ["POLOS S-S"],
     "Suéteres": ["SWEATERS", "HOODIE"],
-    Bolsos: ["BAGS"],
-    Pantalones: ["PANT NON-DENIM"],
+    Bolsos: ["BAGS", "BAG"],
+    Pantalones: ["PANT NON-DENIM", "SHORTS"],
+    "Brasieres deportivos": ["WORKOUT BRA - LIGHT SUPPORT"],
     Medias: ["SOCKS"],
     Gorras: ["HEADWEAR", "CAP"],
     Chancletas: ["FLIP FLOPS"],
@@ -90,6 +93,8 @@ export const DICCIONARIOS: Readonly<Record<string, Diccionario>> = {
     Sandalias: ["LAKESHORE SANDAL", "RIVIERA SANDAL", "EVERYDAY SANDAL", "TREKKING SLIDE"],
     Chancletas: ["VARSITY FLIP", "CASUAL FLIP", "ADULT CASUAL FLIP"],
     "Zapatos planos": ["FRIDAY FLAT"],
+    Zapatos: ["TREKKING SHOE"],
+    Popinz: ["POPINZ"],
     Paquetes: ["4 PACK"],
   },
   [MULTIFASHION]: {
@@ -128,15 +133,54 @@ const INDICES = new Map<string, Map<string, string>>(
 );
 
 /**
- * El tipo de un artículo: el PRIMER valor que el diccionario de la empresa
- * conoce (grupo: `[subrubro, rubro]`; Multifashion: `[marca]`). Si ninguno → «Otros».
+ * Joystep (Joybees) nombra por MODELO, y Switch lo guardó de varias formas en
+ * 2025: con el género pegado con espacio («WOMEN LAKESHORE SANDAL»), modelos que
+ * el diccionario no tenía («ADULT TREKKING CLOG») o solo «KIDS» en el rubro y el
+ * modelo en la descripción («Kids Varsity Clog Solid…»). Daniel, 28-nov-2026:
+ * se clasifican por la PALABRA del modelo. Igualdad de palabra entera, nunca por
+ * parecido; la descripción solo cuenta, en sus tres primeras palabras, si no
+ * hay subrubro.
  */
-export function tipoDe(empresa: string, valores: readonly (string | null | undefined)[]): string {
+export const PALABRAS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  joystep: {
+    CLOG: "Zuecos",
+    SANDAL: "Sandalias",
+    SLIDE: "Sandalias",
+    FLIP: "Chancletas",
+    FLAT: "Zapatos planos",
+    SHOE: "Zapatos",
+    POPINZ: "Popinz",
+  },
+};
+
+const GENERO_CON_ESPACIO = /^(?:KIDS|WOMEN|MEN|ADULT|BOYS|GIRLS|UNISEX) /;
+
+/**
+ * El tipo de un artículo: el PRIMER valor que el diccionario de la empresa
+ * conoce (grupo: `[subrubro, rubro]`; Multifashion: `[marca]`). Si ninguno y la
+ * empresa tiene `PALABRAS`: el mismo valor sin el género pegado con espacio, y
+ * después la palabra del modelo (rubro antes que subrubro, que en esas filas trae
+ * el COLOR; y al final la descripción). Si nada → «Otros».
+ */
+export function tipoDe(empresa: string, valores: readonly (string | null | undefined)[], descripcion?: string | null): string {
   const idx = INDICES.get(empresa);
   if (!idx) return OTROS;
   for (const v of valores) {
     const t = idx.get(normalizar(v));
     if (t) return t;
+  }
+  const palabras = PALABRAS[empresa];
+  if (!palabras) return OTROS;
+  // La descripción solo cuando Switch no trae subrubro (las filas «KIDS» de 2025):
+  // los muebles «GENERAL» la tienen y no se leen («MUEBLE POPINZ» no es un Popinz).
+  const desc = normalizar(valores[0]) ? "" : normalizar(descripcion).split(" ").slice(0, 3).join(" ");
+  const todos = [...valores.map(normalizar).reverse(), desc].filter(Boolean);
+  for (const v of todos) {
+    const t = idx.get(v.replace(GENERO_CON_ESPACIO, ""));
+    if (t) return t;
+  }
+  for (const v of todos) {
+    for (const w of v.split(/[^A-Z]+/)) if (palabras[w]) return palabras[w];
   }
   return OTROS;
 }
@@ -232,6 +276,12 @@ export interface VendidoPorTipo {
   filas: FilaTipo[];
   /** tipo del artículo → el que se dibuja (lo plegado va a «Otros»). */
   visible: (tipo: string) => string;
+  /**
+   * «Otros» cuando su neto es NEGATIVO (un ajuste de precio o devoluciones sin
+   * tipo): no se dibuja como barra, se dice aparte para que las filas + esto =
+   * `total`. 0 si «Otros» no es negativo.
+   */
+  otrosNegativo: number;
 }
 
 /**
@@ -246,7 +296,8 @@ export const SE_SUMA_A: Readonly<Record<string, string>> = { Camisetas: "Ropa" }
  * Suma por tipo. Con varias empresas («Fashion Group») los tipos del MISMO
  * nombre se suman entre empresas («Camisetas» de Active Shoes + Fashion Wear +
  * Active Wear); después, en todos los casos, quedan los `MAX_TIPOS` con más
- * piezas y el resto se pliega en «Otros». «Otros» con 0 o menos no se dibuja.
+ * piezas y el resto se pliega en «Otros». «Otros» con 0 o menos no se dibuja como
+ * barra; si es negativo se dice aparte (`otrosNegativo`) y el total cuadra.
  */
 export function agruparPorTipo(articulos: readonly ArticuloVendido[]): VendidoPorTipo {
   const presentes = new Set(articulos.map((a) => a.tipo));
@@ -264,10 +315,12 @@ export function agruparPorTipo(articulos: readonly ArticuloVendido[]): VendidoPo
   const quedan = new Set(conNombre.slice(0, MAX_TIPOS).map(([t]) => t));
   const visible = (t: string) => (quedan.has(fusion(t)) ? fusion(t) : OTROS);
   const otros = [...porTipo.entries()].filter(([t]) => !quedan.has(t)).reduce((s, [, q]) => s + q, 0);
-  const parte = (q: number) => (total > 0 && q > 0 ? q / total : null);
+  // Con «Otros» negativo, el % se toma sobre lo que se dibuja (si no, las filas pasan del 100 %).
+  const base = otros < 0 ? total - otros : total;
+  const parte = (q: number) => (base > 0 && q > 0 ? q / base : null);
   const filas: FilaTipo[] = conNombre.slice(0, MAX_TIPOS).map(([tipo, piezas]) => ({ tipo, piezas, parte: parte(piezas) }));
   if (otros > 0) filas.push({ tipo: OTROS, piezas: otros, parte: parte(otros) });
-  return { total, filas, visible };
+  return { total, filas, visible, otrosNegativo: otros < 0 ? otros : 0 };
 }
 
 /** Los artículos que forman una fila (lo que se ve al tocar la barra), de más a menos piezas. */

@@ -105,6 +105,18 @@ export default function VendidoPorTipo({ empresa, className = "" }: { empresa: s
               );
             })}
           </ul>
+          {r.otrosNegativo < 0 && (
+            <button
+              type="button"
+              data-otros-negativo
+              onClick={() => setAbierto(OTROS)}
+              className="mt-1 flex min-h-[44px] w-full items-baseline gap-2 rounded-md py-1.5 text-left text-sm text-gray-500 transition active:bg-gray-50"
+            >
+              <span>Otros (ajustes y devoluciones sin tipo)</span>
+              <span className="ml-auto font-semibold tabular-nums text-gray-900">{piezasTexto(r.otrosNegativo)}</span>
+              <span className="w-10" />
+            </button>
+          )}
         </>
       )}
 
