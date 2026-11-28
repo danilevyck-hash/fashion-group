@@ -115,6 +115,8 @@ import {
   ASIS_PASTILLA_EMPRESA_R110, ASIS_SIN_PORTADA_R110, opcionConNumeros, textoPastillaEmpresa,
 } from "@/lib/ui/revision-110-asistencia";
 import SelectorPeriodo from "@/components/asistencia/SelectorPeriodo";
+import SelectorDia from "@/components/asistencia/SelectorDia";
+import { MARCACIONES_UN_DIA } from "@/lib/ui/marcaciones-dia-2026-11";
 import {
   BarraDeControles, CLASE_FILA_MENU, ChipSelector, ProveedorBarraCelular, useBarraCelular,
 } from "@/components/celular/BarraDeControles";
@@ -410,7 +412,9 @@ function AsistenciaInner() {
               pestanas={visibles.map(([k, label]) => ({ value: k, label, opcion: opcionesDelTitulo?.get(k) }))}
               activa={tab}
               onPestana={(k) => irAPestana(k as Tab)}
-              periodo={conCalendario === undefined ? undefined : (
+              periodo={conCalendario === undefined ? undefined : MARCACIONES_UN_DIA && tab === "marcaciones" ? (
+                <SelectorDia anchoCompleto />
+              ) : (
                 <SelectorPeriodo
                   desde={periodo.desde}
                   hasta={periodo.hasta}

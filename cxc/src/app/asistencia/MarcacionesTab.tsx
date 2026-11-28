@@ -40,6 +40,9 @@
 import { useReleerAlVolver } from "@/lib/hooks/useReleerAlVolver";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SelectorPeriodo, { usePeriodoAsistencia } from "@/components/asistencia/SelectorPeriodo";
+// 🔴 UN DÍA A LA VEZ (27-nov-2026): `?dia=`, por defecto hoy de Panamá.
+import SelectorDia, { useDiaMarcaciones } from "@/components/asistencia/SelectorDia";
+import { MARCACIONES_UN_DIA, SIN_MARCAS_DEL_DIA } from "@/lib/ui/marcaciones-dia-2026-11";
 // 🔴 El encabezado de la tabla se pega DEBAJO del de la app (29-sep-2026): la
 // única forma de hacerlo es esta clase (`lib/ui/barra-pegajosa.ts`).
 import { CLASE_BARRA_PEGAJOSA } from "@/lib/ui/barra-pegajosa";
@@ -204,7 +207,10 @@ export default function MarcacionesTab({ empresa }: { empresa: string }) {
 }
 
 function PorDia({ empresa }: { empresa: string }) {
-  const { desde, hasta, hoy, elegir } = usePeriodoAsistencia();
+  const periodo = usePeriodoAsistencia();
+  const unDia = useDiaMarcaciones();
+  const desde = MARCACIONES_UN_DIA ? unDia.dia : periodo.desde;
+  const hasta = MARCACIONES_UN_DIA ? unDia.dia : periodo.hasta;
   const barra = useHayBarraCelular();
 
   const [marcas, setMarcas] = useState<MarcaDeTelefono[]>([]);
@@ -335,7 +341,11 @@ function PorDia({ empresa }: { empresa: string }) {
         />
       )}
       <div className={barra ? "hidden" : "flex flex-wrap items-center gap-2"}>
-        <SelectorPeriodo desde={desde} hasta={hasta} hoy={hoy} onElegir={elegir} />
+        {MARCACIONES_UN_DIA ? (
+          <SelectorDia />
+        ) : (
+          <SelectorPeriodo desde={desde} hasta={hasta} hoy={periodo.hoy} onElegir={periodo.elegir} />
+        )}
         {gente.length > 0 && (
           <label className="flex items-center gap-2 text-sm">
             <span className="sr-only">{ETIQUETA_COLABORADOR}</span>
@@ -361,7 +371,7 @@ function PorDia({ empresa }: { empresa: string }) {
       {error && <p className="rounded-md bg-gray-50 px-3 py-2.5 text-sm text-gray-700">{error}</p>}
       {cargando && !error && <p className="text-sm text-gray-500">Cargando…</p>}
       {vacio && (
-        <p className="rounded-md bg-gray-50 px-3 py-2.5 text-sm text-gray-600">{SIN_MARCAS}</p>
+        <p className="rounded-md bg-gray-50 px-3 py-2.5 text-sm text-gray-600">{MARCACIONES_UN_DIA ? SIN_MARCAS_DEL_DIA : SIN_MARCAS}</p>
       )}
 
       {/* ── EL DÍA MANDA, en la computadora y en el celular ──────────────── */}

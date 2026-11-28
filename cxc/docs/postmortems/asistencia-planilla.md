@@ -3688,3 +3688,7 @@ Daniel aprobó el mockup HOY vs RECOMENDACIÓN de Marcación (versión 2, la tab
 
 - `src/__tests__/marcacion/historial-y-recordatorios.test.ts`: hora corregida y marca quitada, solo lo suyo, feriado · día libre · ya marcó · anti-duplicado · baja, 401 sin secreto, interruptor apagado.
 - «Mis marcaciones» es nombre APROBADO por Daniel: anotado como excepción en `revisar-nombres.test.ts`.
+
+## 🔴 Marcaciones, un día a la vez y solo admin (27-nov-2026)
+
+Daniel: ver por día y «del módulo marcaciones solamente para mí». La pestaña pide un solo día (`?dia=`, replace, por defecto `hoyPanama()`, ‹ › de a un día, nunca después de hoy; `MARCACIONES_UN_DIA` en `lib/ui/marcaciones-dia-2026-11.ts`, `SelectorDia`). Ya era solo `admin` desde el 25-sep-2026 (`MARCACIONES_ROLES`, pantalla y ruta); visitas de Asistencia en los 30 días previos: contabilidad 114, daniel 23, bodega 4, Alberto 0 (`visitas_modulo` anota el MÓDULO, no la pestaña). ⚠️ Hay dos admin: dejarla solo al usuario de Daniel queda por confirmar. Candado `marcaciones-un-dia.test.ts`.

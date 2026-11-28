@@ -879,3 +879,27 @@ describe("🔴 15 · 27a — la línea gris sale de la fila; queda el punto y la
     expect(screen.queryByText(/lleg[oó]/)).toBeNull();
   });
 });
+
+describe("🔴 un día a la vez (27-nov-2026, `MARCACIONES_UN_DIA`)", () => {
+  it("sin `?dia=` pide SOLO hoy de Panamá, y «Día siguiente» está apagado", async () => {
+    URL_ACTUAL = "";
+    const { hoyPanama } = await import("@/lib/fecha-panama");
+    const hoy = hoyPanama();
+    const llamadas = servir([]);
+    render(<MarcacionesTab empresa="todas" />);
+    await waitFor(() => expect(llamadas.some((l) => l.url.includes("/api/asistencia/marcaciones"))).toBe(true));
+    const u = llamadas.find((l) => l.url.includes("/api/asistencia/marcaciones"))!.url;
+    expect(u).toContain(`desde=${hoy}&hasta=${hoy}`);
+    expect((screen.getByRole("button", { name: "Día siguiente" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("con `?dia=` pide ese día, y ‹ lo escribe con replace", async () => {
+    URL_ACTUAL = "dia=2026-09-24";
+    const llamadas = servir([...DIA_DE_ANA]);
+    render(<MarcacionesTab empresa="todas" />);
+    await yaSalio();
+    expect(llamadas.some((l) => l.url.includes("desde=2026-09-24&hasta=2026-09-24"))).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Día anterior" }));
+    expect(URL_ACTUAL).toContain("dia=2026-09-23");
+  });
+});
