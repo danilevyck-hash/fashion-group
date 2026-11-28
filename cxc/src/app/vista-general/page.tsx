@@ -5,6 +5,8 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import AppHeader from "@/components/AppHeader";
+import VistaGeneralHoy from "./VistaGeneralHoy";
+import { VISTA_GENERAL_HOY_2026_11 } from "@/lib/ui/vista-general-2026-11";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { hoyPanama } from "@/lib/fecha-panama";
@@ -148,12 +150,22 @@ function VistaGeneralInner() {
   const esMesActual = mes >= hoy;
 
   const { data, isLoading, error, mutate } = useSWR<VistaGeneral>(
-    authChecked ? `/api/dashboard/vista-general?mes=${mes}` : null,
+    authChecked && !VISTA_GENERAL_HOY_2026_11 ? `/api/dashboard/vista-general?mes=${mes}` : null,
     fetcher,
     { dedupingInterval: 60_000, revalidateOnFocus: true },
   );
 
   if (!authChecked) return null;
+
+  // 27-nov-2026: la pantalla «HOY» (sin mes). `false` = la de abajo, la de antes.
+  if (VISTA_GENERAL_HOY_2026_11) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <AppHeader module="Vista general" />
+        <VistaGeneralHoy />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

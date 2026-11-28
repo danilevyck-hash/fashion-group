@@ -52,7 +52,7 @@ const tocadas: string[] = [];
 
 function cadena(res: Res): Record<string, unknown> {
   const self: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "in", "not", "order", "limit", "insert", "update", "delete", "range"]) {
+  for (const m of ["select", "eq", "in", "not", "gt", "order", "limit", "insert", "update", "delete", "range"]) {
     self[m] = () => self;
   }
   self.maybeSingle = () => Promise.resolve(res);

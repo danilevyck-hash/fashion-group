@@ -159,6 +159,13 @@ const detalleDe = (p: PedidoBodega): PedidoDelDetalle => ({
   cliente_nombre: p.cliente_nombre,
 });
 
+/** `?empresa=` de un enlace (Vista general); cualquier otra cosa = «todas». */
+function empresaDelEnlace(): string {
+  if (typeof window === "undefined") return "todas";
+  const e = new URLSearchParams(window.location.search).get("empresa") ?? "";
+  return (B2B_EMPRESA_KEYS as readonly string[]).includes(e) ? e : "todas";
+}
+
 export default function PedidosView({
   puedeMarcar = true,
   /** 🔴 «Verificado» lo marca la secretaria (y admin), nunca bodega. */
@@ -200,7 +207,9 @@ export default function PedidosView({
   // vuelve a plegar. No se recuerda en ningún lado; solo el botón lo abre.
   const [plegarQuitadas, setPlegarQuitadas] = useState(0);
   // v2: filtro simple; abre SIEMPRE en «Todas» y no se acota por persona (Daniel, 5-oct-2026).
+  // 27-nov-2026: si llega desde Vista general con `?empresa=`, abre en ESA (solo al entrar).
   const [empresa, setEmpresa] = useState("todas");
+  useEffect(() => setEmpresa(empresaDelEnlace()), []);
   // La fecha exacta se ve al pasar el mouse (title) o al tocar la celda.
   const [fechaAbierta, setFechaAbierta] = useState<string | null>(null);
   // AJUSTES_APPLE_6: el círculo se llena (o se vacía) un instante antes de que

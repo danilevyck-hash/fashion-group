@@ -283,3 +283,33 @@ export function inventarioNoDisponible(cubiertas: readonly string[]): Inventario
     horas: null,
   };
 }
+
+/**
+ * 🩸 LOS ARTÍCULOS QUE SWITCH YA NO MANDA NO SUMAN (27-nov-2026). El sync hace
+ * upsert y nunca borra: un artículo que dejó de venir en la corrida conserva
+ * la existencia de la última vez (Fashion Wear: THU211NS02003 con 23 u. desde
+ * el 28-oct y NADA502 con 4 u. desde el 11-nov). Y su `synced_at` viejo era el
+ * MIN que pintaba «sin actualizar desde el 8-sep». Se descuenta lo que no vino
+ * en la última corrida buena, y la frescura pasa a ser el FIN de esa corrida.
+ * PURO: `fantasma` es la misma empresa agregada sobre las filas que no vinieron.
+ */
+export function descontarFantasmas(
+  e: InventarioEmpresa,
+  fantasma: InventarioEmpresa | null,
+  medidoEn: string | null,
+): InventarioEmpresa {
+  const f = fantasma;
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return {
+    ...e,
+    articulos: e.articulos - (f?.articulos ?? 0),
+    conStock: e.conStock - (f?.conStock ?? 0),
+    unidades: e.unidades - (f?.unidades ?? 0),
+    costo: r2(e.costo - (f?.costo ?? 0)),
+    precio: r2(e.precio - (f?.precio ?? 0)),
+    sinCostoArticulos: e.sinCostoArticulos - (f?.sinCostoArticulos ?? 0),
+    sinCostoUnidades: e.sinCostoUnidades - (f?.sinCostoUnidades ?? 0),
+    unidadesNegativas: e.unidadesNegativas - (f?.unidadesNegativas ?? 0),
+    medidoEn: medidoEn ?? e.medidoEn,
+  };
+}

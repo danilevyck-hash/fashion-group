@@ -33,8 +33,10 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { B2B_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { esFuncionAusente } from "@/lib/multifashion/productos-lectura";
 import {
+  agregarEmpresa,
   agregarInventario,
   armarInventario,
+  descontarFantasmas,
   num,
   type FilaArticuloInfo,
   type InventarioEmpresa,
@@ -93,19 +95,82 @@ function deRpc(r: FilaRpc): InventarioEmpresa {
   };
 }
 
+const COLCHON_RELOJ_MS = 10 * 60_000;
+
+/** La última corrida BUENA de `sync-articulo-info` por empresa (switch_sync_log). */
+export interface CorridaArticuloInfo {
+  inicio: string;
+  fin: string | null;
+}
+
+export async function leerUltimasCorridas(empresas: readonly string[]): Promise<Map<string, CorridaArticuloInfo>> {
+  const out = new Map<string, CorridaArticuloInfo>();
+  await Promise.all(
+    empresas.map(async (k) => {
+      const { data, error } = await supabaseServer
+        .from("switch_sync_log")
+        .select("started_at, finished_at")
+        .eq("empresa_key", k)
+        .eq("sync_type", "articulo_info")
+        .eq("status", "success")
+        // Una corrida «buena» que no escribió nada no dice qué artículos existen.
+        .gt("records_inserted", 0)
+        .order("started_at", { ascending: false })
+        .limit(1);
+      if (error) throw new Error(`switch_sync_log (articulo_info ${k}): ${error.message}`);
+      const f = (data ?? [])[0] as { started_at: string; finished_at: string | null } | undefined;
+      // El sello de las filas lo pone el reloj del servidor y el inicio, el de
+      // la base: 10 min de colchón (la corrida anterior es de hace ~24 h).
+      if (f) out.set(k, { inicio: new Date(Date.parse(f.started_at) - COLCHON_RELOJ_MS).toISOString(), fin: f.finished_at });
+    }),
+  );
+  return out;
+}
+
+/** Las filas que NO vinieron en la última corrida buena de su empresa. */
+async function leerFantasmas(empresa: string, inicio: string): Promise<FilaArticuloInfo[]> {
+  return leerTodoPaginado<FilaArticuloInfo>(`switch_articulo_info (no vino en la corrida, ${empresa})`, (pedirCount, desde, hasta) =>
+    supabaseServer
+      .from("switch_articulo_info")
+      .select("empresa_key, existencia, costo_api, precio_etiqueta, synced_at", pedirCount ? { count: "exact" } : {})
+      .eq("empresa_key", empresa)
+      .lt("synced_at", inicio)
+      .order("codigo", { ascending: true })
+      .range(desde, hasta),
+  );
+}
+
 /**
  * El inventario valorizado de las empresas cubiertas por el sync.
  *
  * `ahoraMs` entra por parámetro para que la frescura sea testeable con fechas
  * FIJAS (el repo ya se quemó con `new Date()` dentro de la lógica).
+ *
+ * 🩸 27-nov-2026: solo suma lo que vino en la ÚLTIMA corrida buena de cada
+ * empresa (`switch_sync_log`), y la frescura es el fin de esa corrida — ver
+ * `descontarFantasmas`. Sin corrida registrada, la empresa queda como antes.
  */
-export async function leerInventarioValorizado(ahoraMs: number = Date.now()): Promise<LecturaInventario> {
+export async function leerInventarioValorizado(
+  ahoraMs: number = Date.now(),
+  empresas: readonly string[] = EMPRESAS_CON_INVENTARIO,
+): Promise<LecturaInventario> {
+  const corridas = await leerUltimasCorridas(empresas);
+  const fantasmas = new Map<string, InventarioEmpresa>();
+  await Promise.all(
+    [...corridas].map(async ([k, c]) => {
+      const filas = await leerFantasmas(k, c.inicio);
+      if (filas.length > 0) fantasmas.set(k, agregarEmpresa(k, filas));
+    }),
+  );
+  const corregir = (e: InventarioEmpresa) =>
+    corridas.has(e.key) ? descontarFantasmas(e, fantasmas.get(e.key) ?? null, corridas.get(e.key)!.fin) : e;
+
   // ── Camino rápido: la suma la hace Postgres ──
   const { data, error } = await supabaseServer.rpc(RPC_INVENTARIO);
   if (!error) {
     const filas = (data as FilaRpc[] | null) ?? [];
     return {
-      ...armarInventario(filas.map(deRpc), EMPRESAS_CON_INVENTARIO, ahoraMs),
+      ...armarInventario(filas.map(deRpc).map(corregir), empresas, ahoraMs),
       fuente: "rpc",
     };
   }
@@ -135,8 +200,13 @@ export async function leerInventarioValorizado(ahoraMs: number = Date.now()): Pr
         .order("codigo", { ascending: true })
         .range(desde, hasta),
   );
+  const vinieron = filas.filter((f) => {
+    const c = corridas.get(f.empresa_key);
+    return !c || (f.synced_at != null && Date.parse(String(f.synced_at)) >= Date.parse(c.inicio));
+  });
+  const base = agregarInventario(vinieron, empresas, ahoraMs);
   return {
-    ...agregarInventario(filas, EMPRESAS_CON_INVENTARIO, ahoraMs),
+    ...armarInventario(base.porEmpresa.map((e) => (corridas.has(e.key) ? { ...e, medidoEn: corridas.get(e.key)!.fin ?? e.medidoEn } : e)), empresas, ahoraMs),
     fuente: "paginado",
   };
 }
