@@ -56,5 +56,14 @@ for (const l of fs.readFileSync(".env.local", "utf8").split("\n")) {
     const pct = r.total > 0 ? ((otros / r.total) * 100).toFixed(1) : "—";
     console.log(`${ok ? "✓" : "✗"} ${empresa.padEnd(18)} tarjeta ${r.total.toFixed(0).padStart(7)} · fuente ${fuente.toFixed(0).padStart(7)} · Otros ${otros.toFixed(0)} (${pct}%) · ${r.filas.map((f) => `${f.tipo} ${f.piezas}`).join(" · ")}`);
   }
+  // Fashion Group: las seis juntas, con los tipos del mismo nombre sumados y
+  // «Camisetas» dentro de «Ropa» (SE_SUMA_A). El total = la suma de las seis.
+  const seis = await leerVendidoPorTipo(B2B_EMPRESA_KEYS, desde, hasta);
+  const g = agruparPorTipo(seis);
+  let fuenteSeis = 0;
+  for (const e of B2B_EMPRESA_KEYS) fuenteSeis += await crudo(e);
+  const okG = Math.abs(g.total - fuenteSeis) < 0.001 && !g.filas.some((f) => f.tipo === "Camisetas");
+  if (!okG) malas += 1;
+  console.log(`${okG ? "✓" : "✗"} ${"Fashion Group".padEnd(18)} tarjeta ${g.total.toFixed(0).padStart(7)} · fuente ${fuenteSeis.toFixed(0).padStart(7)} · ${g.filas.map((f) => `${f.tipo} ${f.piezas}`).join(" · ")}`);
   process.exit(malas ? 1 : 0);
 })();

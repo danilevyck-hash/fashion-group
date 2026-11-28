@@ -88,7 +88,9 @@ describe("Vendido por tipo — las sumas", () => {
       art("active_shoes", OTROS, -1),
     ]);
     expect(r.total).toBe(5958);
-    expect(r.filas.map((f) => f.tipo)).toEqual(["Calzado", "Camisetas", "Ropa", "Medias", "Gorras", OTROS]);
+    // «Camisetas» se suma a «Ropa» (1,572 + 1,027).
+    expect(r.filas.map((f) => f.tipo)).toEqual(["Calzado", "Ropa", "Medias", "Gorras", OTROS]);
+    expect(r.filas[1].piezas).toBe(2599);
     expect(r.filas.at(-1)?.piezas).toBe(17);
     expect(parteTexto(r.filas[0].parte)).toBe("51%");
     expect(parteTexto(r.filas.at(-1)!.parte)).toBe("<1%");
@@ -109,8 +111,18 @@ describe("Vendido por tipo — las sumas", () => {
   });
 
   it("Fashion Group suma los tipos del MISMO nombre entre empresas", () => {
-    const r = agruparPorTipo([art("active_shoes", "Camisetas", 10), art("fashion_wear", "Camisetas", 5), art("vistana", "Medias", 3)]);
-    expect(r.filas[0]).toMatchObject({ tipo: "Camisetas", piezas: 15 });
+    const r = agruparPorTipo([art("active_shoes", "Medias", 10), art("fashion_wear", "Medias", 5), art("vistana", "Calzado", 3)]);
+    expect(r.filas[0]).toMatchObject({ tipo: "Medias", piezas: 15 });
+  });
+
+  it("«Camisetas» se suma a «Ropa» solo donde están las dos (también al tocar la barra)", () => {
+    const fw = [art("fashion_wear", "Camisetas", 10), art("fashion_wear", "Medias", 5)];
+    expect(agruparPorTipo(fw).filas[0]).toMatchObject({ tipo: "Camisetas", piezas: 10 });
+    const grupo = [...fw, art("active_shoes", "Ropa", 4), art("active_shoes", "Camisetas", 3)];
+    const r = agruparPorTipo(grupo);
+    expect(r.filas.map((f) => f.tipo)).toEqual(["Ropa", "Medias"]);
+    expect(r.filas[0].piezas).toBe(17);
+    expect(articulosDeFila(grupo, r, "Ropa")).toHaveLength(3);
   });
 
   it("los artículos de una barra van de más a menos piezas", () => {
@@ -168,5 +180,19 @@ describe("La pantalla", () => {
     expect(src).toMatch(/!nuevo && r\.cobros\.estado/);
     expect(src).toMatch(/extra=\{nuevo \? mantenerCobros : undefined\}/);
     expect(src).toMatch(/Utilidad/);
+  });
+});
+
+describe("El orden de las tarjetas", () => {
+  it("Ventas → Utilidad → Por cobrar → Por pagar → Inventario → Vendido por tipo → Pedidos; sin las que no van", async () => {
+    const { ordenTarjetas } = await import("@/lib/ui/vista-general-orden-2026-11");
+    expect(ordenTarjetas({ ventas: "V", utilidad: "U", cxc: "C", cxp: "P", inventario: "I", tipo: "T", pedidos: "D" }).join("")).toBe("VUCPITD");
+    expect(ordenTarjetas({ ventas: "V", utilidad: "U", cxc: null, cxp: null, inventario: "I", tipo: null, pedidos: null }).join("")).toBe("VUI");
+  });
+
+  it("con el punto ámbar, Pedidos sube arriba de Ventas; Disponibilidad ya no se dibuja", () => {
+    const src = fs.readFileSync(path.join(process.cwd(), "src/app/vista-general/VistaGeneralHoy.tsx"), "utf8");
+    expect(src).toMatch(/\[\.\.\.\(urgente \? \[pedidos\] : \[\]\), \.\.\.ordenTarjetas\(\{[^}]*pedidos: urgente \? null : pedidos \}\)\]/);
+    expect(src).toMatch(/const disponibilidad = orden \? null/);
   });
 });

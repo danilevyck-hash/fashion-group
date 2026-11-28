@@ -14,6 +14,7 @@ import { AvisoMesAMes, ERROR_TARJETA, TarjetaMesAMes, useLecturaDeTarjeta } from
 import { VG_MARGEN_COBROS_MES_A_MES_2026_11 } from "@/lib/ui/vista-general-mes-a-mes-2026-11";
 import { VG_UTILIDAD_Y_VENDIDO_POR_TIPO_2026_11 } from "@/lib/ui/vista-general-utilidad-tipo-2026-11";
 import VendidoPorTipo from "./VendidoPorTipo";
+import { VG_ORDEN_TARJETAS_2026_11, ordenTarjetas } from "@/lib/ui/vista-general-orden-2026-11";
 import { type MesesContraAnioPasado } from "@/lib/mes-contra-anio-pasado";
 import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 import { DIAS_INVENTARIO_NUEVO, INVENTARIO_90_DIAS_2026_11 } from "@/lib/ui/inventario-90-dias-2026-11";
@@ -107,6 +108,7 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
   const mantener = useMantenerPresionado(() => setMesAMes("ventas"));
   const extras = VG_MARGEN_COBROS_MES_A_MES_2026_11;
   const nuevo = VG_UTILIDAD_Y_VENDIDO_POR_TIPO_2026_11;
+  const orden = VG_ORDEN_TARJETAS_2026_11;
   const mantenerMargen = useMantenerPresionado(extras ? () => setMesAMes("margen") : null);
   const cobrosMesAMes = useLecturaDeTarjeta<string, MesesContraAnioPasado>((e) => `/api/dashboard/vista-general/cobros-mes-a-mes?empresa=${encodeURIComponent(e)}`);
   const mantenerCobros = useMantenerPresionado(extras ? () => cobrosMesAMes.abrir(empresa) : null);
@@ -177,110 +179,115 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
         />
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {/* Ventas: el mes y el año, cada uno con su ▲▼. Mantener presionado = mes a mes. */}
-        <Tarjeta href={destino("ventas")} className="col-span-2" extra={mantener}>
-          <p className={CLASE_ROTULO}>Ventas</p>
-          {r.ventasMes && r.ventasAnio ? (
-            <div className="mt-1 grid grid-cols-2 gap-3">
-              <VentaComparada rotulo={MESES_LARGOS[data.mes - 1] ?? MONTHS[data.mes - 1]} c={r.ventasMes} />
-              <VentaComparada rotulo={String(data.anio)} c={r.ventasAnio} />
-            </div>
-          ) : (
-            <SinMedir />
-          )}
-        </Tarjeta>
-
-        {nuevo ? (
-          <>
-            {/* «Utilidad»: el mes y el año en $, con su margen debajo. Mantener presionado = margen mes a mes. */}
-            <Tarjeta href={destino("ventas")} className="col-span-2" extra={mantenerMargen}>
-              <p className={CLASE_ROTULO}>Utilidad</p>
-              {r.utilidadMes && r.utilidadAnio ? (
-                <div className="mt-1 grid grid-cols-2 gap-3">
-                  <UtilidadColumna rotulo={MESES_LARGOS[data.mes - 1] ?? MONTHS[data.mes - 1]} u={r.utilidadMes} />
-                  <UtilidadColumna rotulo={String(data.anio)} u={r.utilidadAnio} />
-                </div>
+      {(() => {
+        const ventas = (
+          <Tarjeta key="ventas" href={destino("ventas")} className="col-span-2" extra={mantener}>
+            <p className={CLASE_ROTULO}>Ventas</p>
+            {r.ventasMes && r.ventasAnio ? (
+              <div className="mt-1 grid grid-cols-2 gap-3">
+                <VentaComparada rotulo={MESES_LARGOS[data.mes - 1] ?? MONTHS[data.mes - 1]} c={r.ventasMes} />
+                <VentaComparada rotulo={String(data.anio)} c={r.ventasAnio} />
+              </div>
+            ) : (
+              <SinMedir />
+            )}
+          </Tarjeta>
+        );
+        /* «Utilidad»: el mes y el año en $, con su margen debajo. Mantener presionado = margen mes a mes. */
+        const utilidad = nuevo ? (
+          <Tarjeta key="utilidad" href={destino("ventas")} className="col-span-2" extra={mantenerMargen}>
+            <p className={CLASE_ROTULO}>Utilidad</p>
+            {r.utilidadMes && r.utilidadAnio ? (
+              <div className="mt-1 grid grid-cols-2 gap-3">
+                <UtilidadColumna rotulo={MESES_LARGOS[data.mes - 1] ?? MONTHS[data.mes - 1]} u={r.utilidadMes} />
+                <UtilidadColumna rotulo={String(data.anio)} u={r.utilidadAnio} />
+              </div>
+            ) : (
+              <SinMedir />
+            )}
+          </Tarjeta>
+        ) : (
+          <Tarjeta key="utilidad" href={destino("ventas")} extra={mantenerMargen}>
+            <p className={CLASE_ROTULO}>Margen del mes</p>
+            <p className={CLASE_CIFRA}>{r.margenMes == null ? "—" : porcentaje(r.margenMes)}</p>
+          </Tarjeta>
+        );
+        const tipo = nuevo && empresa !== BOSTON ? <VendidoPorTipo key="tipo" empresa={empresa} className="col-span-2" /> : null;
+        const cobros =
+          !nuevo && r.cobros.estado !== "no-maneja" ? (
+            <Tarjeta key="cobros" href={destino("cxc")} extra={mantenerCobros}>
+              <p className={CLASE_ROTULO}>Cobros del mes</p>
+              <Cifra c={r.cobros} f={montoCorto} />
+            </Tarjeta>
+          ) : null;
+        const urgente = r.pedidos.estado === "ok" && r.pedidos.valor.atrasados > 0;
+        const pedidos =
+          r.pedidos.estado !== "no-maneja" ? (
+            <Tarjeta key="pedidos" href={destino("pedidos")} className="col-span-2">
+              <p className={`${CLASE_ROTULO} flex items-center gap-2`}>
+                Pedidos por despachar
+                {r.pedidos.estado === "ok" && r.pedidos.valor.atrasados > 0 && (
+                  <span data-punto-pedidos className="inline-block h-2 w-2 rounded-full bg-amber-500">
+                    <span className="sr-only">{`${r.pedidos.valor.atrasados} con más de ${DIAS_PEDIDO_ATRASADO} días`}</span>
+                  </span>
+                )}
+              </p>
+              {r.pedidos.estado === "ok" ? (
+                <>
+                  <p className={CLASE_CIFRA}>{porDespachar(r.pedidos.valor)}</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 border-t border-gray-100 pt-3">
+                    <Paso n={r.pedidos.valor.pendiente} rotulo="Pendiente" />
+                    <Paso n={r.pedidos.valor.en_preparacion} rotulo="En preparación" />
+                    <Paso n={r.pedidos.valor.preparado} rotulo="Preparado" />
+                  </div>
+                </>
               ) : (
                 <SinMedir />
               )}
             </Tarjeta>
-            {empresa !== BOSTON && <VendidoPorTipo empresa={empresa} className="col-span-2" />}
-          </>
-        ) : (
-          <Tarjeta href={destino("ventas")} extra={mantenerMargen}>
-            <p className={CLASE_ROTULO}>Margen del mes</p>
-            <p className={CLASE_CIFRA}>{r.margenMes == null ? "—" : porcentaje(r.margenMes)}</p>
-          </Tarjeta>
-        )}
-
-        {!nuevo && r.cobros.estado !== "no-maneja" && (
-          <Tarjeta href={destino("cxc")} extra={mantenerCobros}>
-            <p className={CLASE_ROTULO}>Cobros del mes</p>
-            <Cifra c={r.cobros} f={montoCorto} />
-          </Tarjeta>
-        )}
-
-        {r.pedidos.estado !== "no-maneja" && (
-          <Tarjeta href={destino("pedidos")} className="col-span-2">
-            <p className={`${CLASE_ROTULO} flex items-center gap-2`}>
-              Pedidos por despachar
-              {r.pedidos.estado === "ok" && r.pedidos.valor.atrasados > 0 && (
-                <span data-punto-pedidos className="inline-block h-2 w-2 rounded-full bg-amber-500">
-                  <span className="sr-only">{`${r.pedidos.valor.atrasados} con más de ${DIAS_PEDIDO_ATRASADO} días`}</span>
-                </span>
+          ) : null;
+        const cxc =
+          r.cxc.estado !== "no-maneja" ? (
+            <Tarjeta key="cxc" href={destino("cxc")} className="col-span-2" extra={nuevo ? mantenerCobros : undefined}>
+              <p className={CLASE_ROTULO}>Por cobrar</p>
+              <CarteraCifras c={r.cxc} rojo />
+              {nuevo && r.cobros.estado !== "no-maneja" && <Cobrado mes={r.cobros} anio={r.cobrosAnio} rotuloMes={(MESES_LARGOS[data.mes - 1] ?? "").toLowerCase()} anioNum={data.anio} />}
+            </Tarjeta>
+          ) : null;
+        const cxp =
+          r.cxp.estado !== "no-maneja" ? (
+            <Tarjeta key="cxp" href={destino("cxp")} className="col-span-2">
+              <p className={CLASE_ROTULO}>Por pagar</p>
+              <CarteraCifras c={r.cxp} />
+            </Tarjeta>
+          ) : null;
+        const inventario =
+          r.inventario.estado !== "no-maneja" ? (
+            <Tarjeta key="inventario" href={destino("inventario")} className={orden ? "col-span-2" : ""}>
+              <p className={CLASE_ROTULO}>Inventario</p>
+              {r.inventario.estado === "ok" ? (
+                <>
+                  <p className={CLASE_CIFRA}>{montoCorto(r.inventario.valor.costo)}</p>
+                  <p className="mt-0.5 text-sm tabular-nums text-gray-500">{Math.round(r.inventario.valor.unidades).toLocaleString("en-US")} unidades</p>
+                  {INVENTARIO_90_DIAS_2026_11 && r.inventario.valor.antiguedad && <InventarioPorAntiguedad a={r.inventario.valor.antiguedad} />}
+                </>
+              ) : (
+                <SinMedir />
               )}
-            </p>
-            {r.pedidos.estado === "ok" ? (
-              <>
-                <p className={CLASE_CIFRA}>{porDespachar(r.pedidos.valor)}</p>
-                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-gray-100 pt-3">
-                  <Paso n={r.pedidos.valor.pendiente} rotulo="Pendiente" />
-                  <Paso n={r.pedidos.valor.en_preparacion} rotulo="En preparación" />
-                  <Paso n={r.pedidos.valor.preparado} rotulo="Preparado" />
-                </div>
-              </>
-            ) : (
-              <SinMedir />
-            )}
+            </Tarjeta>
+          ) : null;
+        // Disponibilidad no tiene dato (no hay saldos de banco al día): con el orden nuevo no se dibuja.
+        const disponibilidad = orden ? null : (
+          <Tarjeta key="disponibilidad" href={null}>
+            <p className={CLASE_ROTULO}>Disponibilidad</p>
+            <p className="mt-1 text-base text-gray-500">No disponible por ahora</p>
           </Tarjeta>
-        )}
-
-        {r.cxc.estado !== "no-maneja" && (
-          <Tarjeta href={destino("cxc")} className="col-span-2" extra={nuevo ? mantenerCobros : undefined}>
-            <p className={CLASE_ROTULO}>Por cobrar</p>
-            <CarteraCifras c={r.cxc} rojo />
-            {nuevo && r.cobros.estado !== "no-maneja" && <Cobrado mes={r.cobros} anio={r.cobrosAnio} rotuloMes={(MESES_LARGOS[data.mes - 1] ?? "").toLowerCase()} anioNum={data.anio} />}
-          </Tarjeta>
-        )}
-
-        {r.cxp.estado !== "no-maneja" && (
-          <Tarjeta href={destino("cxp")} className="col-span-2">
-            <p className={CLASE_ROTULO}>Por pagar</p>
-            <CarteraCifras c={r.cxp} />
-          </Tarjeta>
-        )}
-
-        {r.inventario.estado !== "no-maneja" && (
-          <Tarjeta href={destino("inventario")}>
-            <p className={CLASE_ROTULO}>Inventario</p>
-            {r.inventario.estado === "ok" ? (
-              <>
-                <p className={CLASE_CIFRA}>{montoCorto(r.inventario.valor.costo)}</p>
-                <p className="mt-0.5 text-sm tabular-nums text-gray-500">{Math.round(r.inventario.valor.unidades).toLocaleString("en-US")} unidades</p>
-                {INVENTARIO_90_DIAS_2026_11 && r.inventario.valor.antiguedad && <InventarioPorAntiguedad a={r.inventario.valor.antiguedad} />}
-              </>
-            ) : (
-              <SinMedir />
-            )}
-          </Tarjeta>
-        )}
-
-        <Tarjeta href={null}>
-          <p className={CLASE_ROTULO}>Disponibilidad</p>
-          <p className="mt-1 text-base text-gray-500">No disponible por ahora</p>
-        </Tarjeta>
-      </div>
+        );
+        const tarjetas = orden
+          ? [...(urgente ? [pedidos] : []), ...ordenTarjetas({ ventas, utilidad, cxc, cxp, inventario, tipo, pedidos: urgente ? null : pedidos })]
+          : [ventas, utilidad, tipo, cobros, pedidos, cxc, cxp, inventario, disponibilidad];
+        return <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{tarjetas}</div>;
+      })()}
 
       {noManeja.length > 0 && (
         <p data-no-lo-maneja className="mt-3 text-sm text-gray-500">No lo maneja en el sistema: {noManeja.join(" · ")}</p>
