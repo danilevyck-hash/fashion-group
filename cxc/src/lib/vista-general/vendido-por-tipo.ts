@@ -20,6 +20,8 @@
 // que el diccionario no conoce cae en «Otros», y se ve.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { VG_VENTAS_CON_UTILIDAD_Y_ANIOS_2026_11 } from "@/lib/ui/vista-general-ventas-anios-2026-11";
+
 export const OTROS = "Otros";
 /** Tipos con nombre que se dibujan; el resto se pliega en «Otros». */
 export const MAX_TIPOS = 6;
@@ -141,30 +143,63 @@ export function tipoDe(empresa: string, valores: readonly (string | null | undef
 
 // ── El período (su propio desplegable; el resto de la Vista general es «hoy») ──
 
-export type PeriodoTipo = "anio" | "mes" | "12m";
+export type PeriodoTipo = "anio" | "mes" | "12m" | `a${number}`;
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-/** El primero es el que abre (el año en curso). */
-export function opcionesPeriodoTipo(hoy: string): { valor: PeriodoTipo; etiqueta: string }[] {
+/**
+ * Años anteriores en el desplegable (28-nov-2026, Daniel: «Si y así con todas
+ * las empresas»): los DOS años cerrados anteriores. 2023 queda fuera: su rubro
+ * traía la línea («REEBOK CLASSICS CORE FTW MEN») y no el tipo, y caía en «Otros».
+ */
+export const ANIOS_ATRAS = 2;
+
+/**
+ * Desde qué año hay ventas con renglón por empresa (medido 28-nov-2026). Solo
+ * se anotan las que empiezan DENTRO de la ventana: Joystep no tiene 2024.
+ */
+export const PRIMER_ANIO_CON_VENTAS: Readonly<Record<string, number>> = { joystep: 2025 };
+
+/** Los años anteriores que se ofrecen para estas empresas (alguna con tipo y con ventas ese año). */
+export function aniosAnteriores(hoy: string, empresas: readonly string[]): number[] {
+  if (!VG_VENTAS_CON_UTILIDAD_Y_ANIOS_2026_11) return [];
+  const y = Number(hoy.slice(0, 4));
+  const out: number[] = [];
+  for (let a = y - 1; a >= y - ANIOS_ATRAS; a--) {
+    if (empresas.some((e) => tieneTipo(e) && (PRIMER_ANIO_CON_VENTAS[e] ?? 0) <= a)) out.push(a);
+  }
+  return out;
+}
+
+/** El primero es el que abre (el año en curso); después los años anteriores, el mes y 12 meses. */
+export function opcionesPeriodoTipo(hoy: string, empresas: readonly string[] = []): { valor: PeriodoTipo; etiqueta: string }[] {
   const anio = hoy.slice(0, 4);
   return [
     { valor: "anio", etiqueta: `Año ${anio}` },
+    ...aniosAnteriores(hoy, empresas).map((a) => ({ valor: `a${a}` as PeriodoTipo, etiqueta: `Año ${a}` })),
     { valor: "mes", etiqueta: `${MESES[Number(hoy.slice(5, 7)) - 1]} ${anio}` },
     { valor: "12m", etiqueta: "Últimos 12 meses" },
   ];
 }
 
-export const periodoTipoValido = (v: string | null | undefined): PeriodoTipo =>
-  v === "mes" || v === "12m" ? v : "anio";
+/** Lo que no se entiende, o un año fuera de la ventana, abre en el año en curso. */
+export function periodoTipoValido(v: string | null | undefined, hoy: string): PeriodoTipo {
+  if (v === "mes" || v === "12m") return v;
+  const m = /^a(\d{4})$/.exec(v ?? "");
+  const y = Number(hoy.slice(0, 4));
+  if (VG_VENTAS_CON_UTILIDAD_Y_ANIOS_2026_11 && m && Number(m[1]) < y && Number(m[1]) >= y - ANIOS_ATRAS) return v as PeriodoTipo;
+  return "anio";
+}
 
 /**
  * Días de Panamá, ambos inclusive, hasta HOY. «Últimos 12 meses» = 12 meses de
  * calendario que terminan en el mes en curso (la ventana de Ventas, `periodo.ts`).
+ * Un año anterior va entero: 1-ene al 31-dic.
  */
 export function rangoPeriodoTipo(p: PeriodoTipo, hoy: string): { desde: string; hasta: string } {
   const y = Number(hoy.slice(0, 4));
   const m = Number(hoy.slice(5, 7));
+  if (p.startsWith("a") && p !== "anio") return { desde: `${p.slice(1)}-01-01`, hasta: `${p.slice(1)}-12-31` };
   if (p === "mes") return { desde: `${hoy.slice(0, 7)}-01`, hasta: hoy };
   if (p === "anio") return { desde: `${y}-01-01`, hasta: hoy };
   const total = y * 12 + (m - 1) - 11;

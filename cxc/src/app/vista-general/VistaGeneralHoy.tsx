@@ -14,6 +14,7 @@ import { AvisoMesAMes, ERROR_TARJETA, TarjetaMesAMes, useLecturaDeTarjeta } from
 import { VG_MARGEN_COBROS_MES_A_MES_2026_11 } from "@/lib/ui/vista-general-mes-a-mes-2026-11";
 import { VG_UTILIDAD_Y_VENDIDO_POR_TIPO_2026_11 } from "@/lib/ui/vista-general-utilidad-tipo-2026-11";
 import VendidoPorTipo from "./VendidoPorTipo";
+import { VG_VENTAS_CON_UTILIDAD_Y_ANIOS_2026_11 } from "@/lib/ui/vista-general-ventas-anios-2026-11";
 import { VG_ORDEN_TARJETAS_2026_11, ordenTarjetas } from "@/lib/ui/vista-general-orden-2026-11";
 import { type MesesContraAnioPasado } from "@/lib/mes-contra-anio-pasado";
 import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
@@ -109,6 +110,7 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
   const extras = VG_MARGEN_COBROS_MES_A_MES_2026_11;
   const nuevo = VG_UTILIDAD_Y_VENDIDO_POR_TIPO_2026_11;
   const orden = VG_ORDEN_TARJETAS_2026_11;
+  const juntas = VG_VENTAS_CON_UTILIDAD_Y_ANIOS_2026_11;
   const mantenerMargen = useMantenerPresionado(extras ? () => setMesAMes("margen") : null);
   const cobrosMesAMes = useLecturaDeTarjeta<string, MesesContraAnioPasado>((e) => `/api/dashboard/vista-general/cobros-mes-a-mes?empresa=${encodeURIComponent(e)}`);
   const mantenerCobros = useMantenerPresionado(extras ? () => cobrosMesAMes.abrir(empresa) : null);
@@ -185,8 +187,12 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
             <p className={CLASE_ROTULO}>Ventas</p>
             {r.ventasMes && r.ventasAnio ? (
               <div className="mt-1 grid grid-cols-2 gap-3">
-                <VentaComparada rotulo={MESES_LARGOS[data.mes - 1] ?? MONTHS[data.mes - 1]} c={r.ventasMes} />
-                <VentaComparada rotulo={String(data.anio)} c={r.ventasAnio} />
+                <VentaComparada rotulo={MESES_LARGOS[data.mes - 1] ?? MONTHS[data.mes - 1]} c={r.ventasMes}>
+                  {juntas && r.utilidadMes && <LineaUtilidad u={r.utilidadMes} mantener={mantenerMargen} />}
+                </VentaComparada>
+                <VentaComparada rotulo={String(data.anio)} c={r.ventasAnio}>
+                  {juntas && r.utilidadAnio && <LineaUtilidad u={r.utilidadAnio} mantener={mantenerMargen} />}
+                </VentaComparada>
               </div>
             ) : (
               <SinMedir />
@@ -194,7 +200,7 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
           </Tarjeta>
         );
         /* «Utilidad»: el mes y el año en $, con su margen debajo. Mantener presionado = margen mes a mes. */
-        const utilidad = nuevo ? (
+        const utilidad = juntas ? null : nuevo ? (
           <Tarjeta key="utilidad" href={destino("ventas")} className="col-span-2" extra={mantenerMargen}>
             <p className={CLASE_ROTULO}>Utilidad</p>
             {r.utilidadMes && r.utilidadAnio ? (
@@ -325,13 +331,37 @@ function Delta({ pct }: { pct: number | null }) {
   );
 }
 
-function VentaComparada({ rotulo, c }: { rotulo: string; c: Comparado }) {
+function VentaComparada({ rotulo, c, children }: { rotulo: string; c: Comparado; children?: ReactNode }) {
   return (
     <div className="min-w-0">
       <p className="text-sm text-gray-500">{rotulo}</p>
       <p className={CLASE_CIFRA}>{montoCorto(c.actual)}</p>
       <Delta pct={c.pct} />
+      {children}
     </div>
+  );
+}
+
+/**
+ * «Utilidad $34k · 28%» bajo la venta. Mantenerla presionada abre el margen mes
+ * a mes; el resto de la tarjeta, las ventas mes a mes (el toque que empieza aquí
+ * no le llega a la tarjeta).
+ */
+function LineaUtilidad({ u, mantener }: { u: UtilidadConMargen; mantener: ReturnType<typeof useMantenerPresionado> }) {
+  const m = mantener as { onTouchStart?: (e: React.TouchEvent) => void };
+  return (
+    <p
+      data-utilidad
+      {...mantener}
+      onTouchStart={(e) => {
+        if (m.onTouchStart) e.stopPropagation();
+        m.onTouchStart?.(e);
+      }}
+      className="mt-1 truncate text-sm tabular-nums text-gray-600"
+    >
+      Utilidad {montoCorto(u.utilidad)}
+      {u.margen == null ? "" : ` · ${porcentaje(u.margen)}`}
+    </p>
   );
 }
 

@@ -12,7 +12,7 @@ import { BottomSheet } from "@/components/ui";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { nombreCortoEmpresa } from "@/lib/empresa-mapping";
-import { VALOR_GRUPO } from "@/lib/vista-general/hoy";
+import { VALOR_GRUPO, empresasDe } from "@/lib/vista-general/hoy";
 import {
   OTROS,
   agruparPorTipo,
@@ -37,8 +37,10 @@ const fetcher = (url: string) => fetch(url).then((r) => { if (!r.ok) throw new E
 export default function VendidoPorTipo({ empresa, className = "" }: { empresa: string; className?: string }) {
   const hoy = hoyPanama();
   const [periodoUrl, setPeriodo] = useUrlState("periodoTipo", "anio");
-  const periodo = periodoTipoValido(periodoUrl);
-  const opciones = opcionesPeriodoTipo(hoy);
+  const opciones = opcionesPeriodoTipo(hoy, empresasDe(empresa));
+  // Un año que esta empresa no tiene (Joystep 2024) abre en el año en curso.
+  const pedido = periodoTipoValido(periodoUrl, hoy);
+  const periodo = opciones.some((o) => o.valor === pedido) ? pedido : "anio";
   const { data, error, isLoading } = useSWR<Respuesta>(
     `/api/dashboard/vista-general/vendido-por-tipo?empresa=${encodeURIComponent(empresa)}&periodo=${periodo}`,
     fetcher,

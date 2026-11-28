@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 /**
- * «Vendido por tipo» de la Vista general (`?empresa=grupo|<key>&periodo=anio|mes|12m`):
+ * «Vendido por tipo» de la Vista general (`?empresa=grupo|<key>&periodo=anio|aAAAA|mes|12m`):
  * los artículos vendidos con su tipo y sus piezas netas. Solo admin. Solo lee.
  */
 export async function GET(req: NextRequest) {
@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
   const empresas = empresasDe(empresaValida(req.nextUrl.searchParams.get("empresa")));
-  const { desde, hasta } = rangoPeriodoTipo(periodoTipoValido(req.nextUrl.searchParams.get("periodo")), hoyPanama());
+  const hoy = hoyPanama();
+  const { desde, hasta } = rangoPeriodoTipo(periodoTipoValido(req.nextUrl.searchParams.get("periodo"), hoy), hoy);
   if (!empresas.some(tieneTipo)) return NextResponse.json({ desde, hasta, sinTipo: true, articulos: [] });
   try {
     const articulos = await leerVendidoPorTipo(empresas, desde, hasta);
