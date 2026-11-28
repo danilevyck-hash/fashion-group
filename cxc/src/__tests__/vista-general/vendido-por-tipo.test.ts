@@ -100,6 +100,14 @@ describe("Vendido por tipo — las sumas", () => {
     const r = agruparPorTipo([art("fashion_shoes", "Chancletas", 100), art("fashion_shoes", OTROS, -175)]);
     expect(r.filas.map((f) => f.tipo)).toEqual(["Chancletas"]);
     expect(r.total).toBe(-75);
+    expect(r.otrosNegativo).toBe(-175);
+  });
+
+  it("con «Otros» negativo: filas + otrosNegativo = total y el % es sobre lo que se dibuja", () => {
+    const r = agruparPorTipo([art("active_wear", "Camisetas", 300), art("active_wear", "Medias", 100), art("active_wear", OTROS, -100)]);
+    expect(r.total).toBe(300);
+    expect(r.filas.reduce((s, f) => s + f.piezas, 0) + r.otrosNegativo).toBe(r.total);
+    expect(r.filas.map((f) => parteTexto(f.parte))).toEqual(["75%", "25%"]);
   });
 
   it(`quedan ${MAX_TIPOS} tipos con nombre; el resto se pliega en «Otros» (también al tocarlo)`, () => {
@@ -216,5 +224,42 @@ describe("Años anteriores en el filtro", () => {
     expect(src).toMatch(/const utilidad = juntas \? null/);
     expect(src).toMatch(/<LineaUtilidad u=\{r\.utilidadMes\} mantener=\{mantenerMargen\} \/>/);
     expect(src).toMatch(/<LineaUtilidad u=\{r\.utilidadAnio\} mantener=\{mantenerMargen\} \/>/);
+  });
+});
+
+describe("Active Wear y Joystep: las formas viejas de Switch (Daniel, 28-nov-2026)", () => {
+  it("Active Wear: BAG, CAMISETA SELECCION, SHORTS, WORKOUT BRA y T-SHIRT (SHORT SLEEVE)", () => {
+    expect(tipoDe("active_wear", ["UNISEX", "BAG"])).toBe("Bolsos");
+    expect(tipoDe("active_wear", ["GAME MEN", "CAMISETA SELECCION"])).toBe("Camisetas de selección");
+    expect(tipoDe("active_wear", ["CAMISETA SELECCION", "GAME WOMEN"])).toBe("Camisetas de selección");
+    expect(tipoDe("active_wear", ["MEN", "SHORTS"])).toBe("Pantalones");
+    expect(tipoDe("active_wear", ["WOMEN", "WORKOUT BRA - LIGHT SUPPORT"])).toBe("Brasieres deportivos");
+    expect(tipoDe("active_wear", ["T-SHIRT (SHORT SLEEVE)", "REEBOK APP MEN"])).toBe("Camisetas");
+    expect(tipoDe("active_wear", ["3.5", "UNISEX"], "LIMPIEZA DE SALDO")).toBe(OTROS);
+  });
+
+  it("Joystep: el género pegado con espacio y la palabra del modelo; el color del subrubro no cuenta", () => {
+    expect(tipoDe("joystep", ["SOLID DUSTY OLIVE-DUSTY OLIVE", "WOMEN LAKESHORE SANDAL"])).toBe("Sandalias");
+    expect(tipoDe("joystep", ["GRAPHIC RAINBOW TIE DYE", "KIDS VARSITY CLOG"])).toBe("Zuecos");
+    expect(tipoDe("joystep", ["BLOCK CHICORY-BROWN", "ADULT TREKKING CLOG"])).toBe("Zuecos");
+    expect(tipoDe("joystep", ["STUDIO CLOG", "WOMEN"])).toBe("Zuecos");
+    expect(tipoDe("joystep", ["SOLID COAL", "ADULT TREKKING SLIDE"])).toBe("Sandalias");
+    expect(tipoDe("joystep", ["CHARCOAL-RED", "KIDS ADVENTURE SANDAL"])).toBe("Sandalias");
+    expect(tipoDe("joystep", ["SOLID PASTEL LILAC", "WOMEN VARSITY FLIP"])).toBe("Chancletas");
+    expect(tipoDe("joystep", ["DUSTY BLUE-BONE", "WOMEN FRIDAY FLAT"])).toBe("Zapatos planos");
+    expect(tipoDe("joystep", ["GREEN GARDEN", "POPINZ 3 PACK"])).toBe("Popinz");
+    expect(tipoDe("joystep", ["3 PACK", "POPINZ"])).toBe("Popinz");
+  });
+
+  it("Joystep «KIDS» sin subrubro: lee las tres primeras palabras de la descripción; los muebles no", () => {
+    expect(tipoDe("joystep", [null, "KIDS"], "Kids Varsity Clog Solid Olive/Midnight Tea")).toBe("Zuecos");
+    expect(tipoDe("joystep", [null, "KIDS"], "Kids Active Clog Navy/Citrus")).toBe("Zuecos");
+    expect(tipoDe("joystep", [null, "KIDS"], "Kids Trekking Shoe Block Cloud Grey/Black")).toBe("Zapatos");
+    expect(tipoDe("joystep", ["GENERAL", "GENERAL"], "MUEBLE POPINZ")).toBe(OTROS);
+    expect(tipoDe("joystep", [null, "KIDS"], "Kids Solid Navy Flat")).toBe(OTROS);
+  });
+
+  it("las palabras no se aplican a otras empresas", () => {
+    expect(tipoDe("fashion_shoes", [null, "WOMEN STUDIO CLOG"])).toBe(OTROS);
   });
 });
