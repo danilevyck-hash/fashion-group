@@ -98,10 +98,28 @@ export async function leerRecibosQueCuentan(
       if (empresas) q = q.in("empresa_key", [...empresas]);
       return q.order("id", { ascending: true }).range(d, h);
     },
+    undefined,
+    // El año entero son unas pocas páginas: se piden juntas.
+    4,
   );
   return filas
     .filter((f) => cobroCuenta({ empresa: f.empresa_key, codigo: f.cliente_codigo, cliente: "", monto: 0 }))
     .map((f) => ({ empresa_key: f.empresa_key, fecha: String(f.fecha), total: n(f.total) }));
+}
+
+/** Cobros del mes y del año por empresa, de UNA lectura (`desdeMes` ≥ `desdeAnio`). */
+export async function leerCobrosMesYAnio(
+  desdeAnio: string,
+  desdeMes: string,
+  hasta: string,
+): Promise<{ mes: Map<string, number>; anio: Map<string, number> }> {
+  const mes = new Map<string, number>();
+  const anio = new Map<string, number>();
+  for (const f of await leerRecibosQueCuentan(desdeAnio, hasta)) {
+    anio.set(f.empresa_key, (anio.get(f.empresa_key) ?? 0) + f.total);
+    if (f.fecha.slice(0, 10) >= desdeMes) mes.set(f.empresa_key, (mes.get(f.empresa_key) ?? 0) + f.total);
+  }
+  return { mes, anio };
 }
 
 /** Cobros del mes por empresa: la regla del Telegram de cobros. */
@@ -210,7 +228,8 @@ export async function leerVistaGeneralHoy(ahora: Date = new Date()): Promise<Vis
   const mes = Number(hoy.slice(5, 7));
   const [ventas, cobros, pedidos, cxc, cxp, inventario] = await Promise.all([
     seguro("ventas", () => leerVentas(anio)),
-    seguro("cobros", () => leerCobrosDelMes(`${hoy.slice(0, 7)}-01`, hoy)),
+    // UNA lectura del año: de ahí salen el mes y el año (misma regla, mismos recibos).
+    seguro("cobros", () => leerCobrosMesYAnio(`${anio}-01-01`, `${hoy.slice(0, 7)}-01`, hoy)),
     seguro("pedidos", () => leerPedidos(hoy)),
     seguro("cxc", leerCxc),
     seguro("cxp", leerCxp),
@@ -224,7 +243,8 @@ export async function leerVistaGeneralHoy(ahora: Date = new Date()): Promise<Vis
   const empresas: Record<string, EmpresaHoy> = {};
   for (const k of ALL_EMPRESA_KEYS) {
     const e: EmpresaHoy = { ventas: ventas?.porEmpresa.get(k) ?? null };
-    poner(e, k, "cobros", cobros, 0);
+    poner(e, k, "cobros", cobros ? cobros.mes : null, 0);
+    if (loManeja(k, "cobros")) e.cobrosAnio = cobros ? (cobros.anio.get(k) ?? 0) : null;
     poner(e, k, "pedidos", pedidos, { pendiente: 0, en_preparacion: 0, preparado: 0, atrasados: 0 });
     poner<Cartera>(e, k, "cxc", cxc, { total: 0, mas120: 0 });
     poner<Cartera>(e, k, "cxp", cxp, { total: 0, mas120: 0 });

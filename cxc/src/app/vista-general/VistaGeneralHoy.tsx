@@ -12,6 +12,8 @@ import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { useMantenerPresionado } from "@/components/shared/GestosIphone";
 import { AvisoMesAMes, ERROR_TARJETA, TarjetaMesAMes, useLecturaDeTarjeta } from "@/components/shared/TarjetaMesAMes";
 import { VG_MARGEN_COBROS_MES_A_MES_2026_11 } from "@/lib/ui/vista-general-mes-a-mes-2026-11";
+import { VG_UTILIDAD_Y_VENDIDO_POR_TIPO_2026_11 } from "@/lib/ui/vista-general-utilidad-tipo-2026-11";
+import VendidoPorTipo from "./VendidoPorTipo";
 import { type MesesContraAnioPasado } from "@/lib/mes-contra-anio-pasado";
 import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 import { DIAS_INVENTARIO_NUEVO, INVENTARIO_90_DIAS_2026_11 } from "@/lib/ui/inventario-90-dias-2026-11";
@@ -39,6 +41,7 @@ import {
   type Celda,
   type Comparado,
   type Destino,
+  type UtilidadConMargen,
   type VistaGeneralHoyData,
 } from "@/lib/vista-general/hoy";
 
@@ -103,6 +106,7 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
   const [mesAMes, setMesAMes] = useState<"ventas" | "margen" | null>(null);
   const mantener = useMantenerPresionado(() => setMesAMes("ventas"));
   const extras = VG_MARGEN_COBROS_MES_A_MES_2026_11;
+  const nuevo = VG_UTILIDAD_Y_VENDIDO_POR_TIPO_2026_11;
   const mantenerMargen = useMantenerPresionado(extras ? () => setMesAMes("margen") : null);
   const cobrosMesAMes = useLecturaDeTarjeta<string, MesesContraAnioPasado>((e) => `/api/dashboard/vista-general/cobros-mes-a-mes?empresa=${encodeURIComponent(e)}`);
   const mantenerCobros = useMantenerPresionado(extras ? () => cobrosMesAMes.abrir(empresa) : null);
@@ -114,6 +118,7 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
     r.cxc.estado === "no-maneja" && "Por cobrar",
     r.cxp.estado === "no-maneja" && "Por pagar",
     r.inventario.estado === "no-maneja" && "Inventario",
+    nuevo && empresa === BOSTON && "Vendido por tipo",
   ].filter(Boolean) as string[];
 
   const series = useMemo(() => {
@@ -186,12 +191,30 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
           )}
         </Tarjeta>
 
-        <Tarjeta href={destino("ventas")} extra={mantenerMargen}>
-          <p className={CLASE_ROTULO}>Margen del mes</p>
-          <p className={CLASE_CIFRA}>{r.margenMes == null ? "—" : porcentaje(r.margenMes)}</p>
-        </Tarjeta>
+        {nuevo ? (
+          <>
+            {/* «Utilidad»: el mes y el año en $, con su margen debajo. Mantener presionado = margen mes a mes. */}
+            <Tarjeta href={destino("ventas")} className="col-span-2" extra={mantenerMargen}>
+              <p className={CLASE_ROTULO}>Utilidad</p>
+              {r.utilidadMes && r.utilidadAnio ? (
+                <div className="mt-1 grid grid-cols-2 gap-3">
+                  <UtilidadColumna rotulo={MESES_LARGOS[data.mes - 1] ?? MONTHS[data.mes - 1]} u={r.utilidadMes} />
+                  <UtilidadColumna rotulo={String(data.anio)} u={r.utilidadAnio} />
+                </div>
+              ) : (
+                <SinMedir />
+              )}
+            </Tarjeta>
+            {empresa !== BOSTON && <VendidoPorTipo empresa={empresa} className="col-span-2" />}
+          </>
+        ) : (
+          <Tarjeta href={destino("ventas")} extra={mantenerMargen}>
+            <p className={CLASE_ROTULO}>Margen del mes</p>
+            <p className={CLASE_CIFRA}>{r.margenMes == null ? "—" : porcentaje(r.margenMes)}</p>
+          </Tarjeta>
+        )}
 
-        {r.cobros.estado !== "no-maneja" && (
+        {!nuevo && r.cobros.estado !== "no-maneja" && (
           <Tarjeta href={destino("cxc")} extra={mantenerCobros}>
             <p className={CLASE_ROTULO}>Cobros del mes</p>
             <Cifra c={r.cobros} f={montoCorto} />
@@ -224,9 +247,10 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
         )}
 
         {r.cxc.estado !== "no-maneja" && (
-          <Tarjeta href={destino("cxc")} className="col-span-2">
+          <Tarjeta href={destino("cxc")} className="col-span-2" extra={nuevo ? mantenerCobros : undefined}>
             <p className={CLASE_ROTULO}>Por cobrar</p>
             <CarteraCifras c={r.cxc} rojo />
+            {nuevo && r.cobros.estado !== "no-maneja" && <Cobrado mes={r.cobros} anio={r.cobrosAnio} rotuloMes={(MESES_LARGOS[data.mes - 1] ?? "").toLowerCase()} anioNum={data.anio} />}
           </Tarjeta>
         )}
 
@@ -300,6 +324,33 @@ function VentaComparada({ rotulo, c }: { rotulo: string; c: Comparado }) {
       <p className="text-sm text-gray-500">{rotulo}</p>
       <p className={CLASE_CIFRA}>{montoCorto(c.actual)}</p>
       <Delta pct={c.pct} />
+    </div>
+  );
+}
+
+/** Una columna de «Utilidad»: el monto grande y «N% margen» debajo. */
+function UtilidadColumna({ rotulo, u }: { rotulo: string; u: UtilidadConMargen }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-sm text-gray-500">{rotulo}</p>
+      <p className={CLASE_CIFRA}>{montoCorto(u.utilidad)}</p>
+      <p className="mt-0.5 text-sm tabular-nums text-gray-500">{u.margen == null ? "Sin costo cargado" : `${porcentaje(u.margen)} margen`}</p>
+    </div>
+  );
+}
+
+/** La línea «Cobrado» bajo Por cobrar: el mes y el año, con la regla de los cobros. */
+function Cobrado({ mes, anio, rotuloMes, anioNum }: { mes: Celda<number>; anio: Celda<number>; rotuloMes: string; anioNum: number }) {
+  const celda = (c: Celda<number>, rotulo: string) => (
+    <div className="min-w-0">
+      <p className="text-lg font-semibold tabular-nums text-gray-900">{c.estado === "ok" ? montoCorto(c.valor) : "—"}</p>
+      <p className="text-sm text-gray-500">{rotulo}</p>
+    </div>
+  );
+  return (
+    <div data-cobrado className="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3">
+      {celda(mes, `Cobrado en ${rotuloMes}`)}
+      {celda(anio, `Cobrado en ${anioNum}`)}
     </div>
   );
 }
