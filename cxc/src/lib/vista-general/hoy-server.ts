@@ -64,6 +64,7 @@ async function leerVentas(anio: number) {
       seriePrev: e.ventas2025,
       utilidad: e.utilidad2026,
       ventasMargen,
+      utilidadPrev: e.utilidad2025,
       // venta (la del margen) − utilidad = costo, mes por mes.
       costo: ventasMargen.map((v, i) => (v == null || e.utilidad2026[i] == null ? null : v - (e.utilidad2026[i] as number))),
     });
@@ -71,27 +72,40 @@ async function leerVentas(anio: number) {
   return { porEmpresa: out, fechaCorte: r.fecha_corte, actualizado: r.data_actualizada_at };
 }
 
-/** Cobros del mes por empresa: la regla del Telegram de cobros. */
-export async function leerCobrosDelMes(desde: string, hasta: string): Promise<Map<string, number>> {
-  const filas = await leerTodoPaginado<{ empresa_key: string; cliente_codigo: string; total: number | string }>(
-    "switch_recibos (cobros del mes)",
-    (c, d, h) =>
-      supabaseServer
+/**
+ * Los recibos que cuentan como cobro (la regla del Telegram de cobros): sin
+ * retenciones, sin recibos en cero, sin los códigos de `CLIENTES_FUERA`.
+ * `empresas` = solo esas (la tarjeta mes a mes); sin ella, todas.
+ */
+export async function leerRecibosQueCuentan(
+  desde: string,
+  hasta: string,
+  empresas?: readonly string[],
+): Promise<{ empresa_key: string; fecha: string; total: number }[]> {
+  const filas = await leerTodoPaginado<{ empresa_key: string; cliente_codigo: string; fecha: string; total: number | string }>(
+    "switch_recibos (cobros)",
+    (c, d, h) => {
+      let q = supabaseServer
         .from("switch_recibos")
-        .select("empresa_key, cliente_codigo, total", c ? { count: "exact" } : {})
+        .select("empresa_key, cliente_codigo, fecha, total", c ? { count: "exact" } : {})
         .gte("fecha", desde)
         .lte("fecha", hasta)
         .eq("es_retencion", false)
         .neq("total", 0)
-        .not("cliente_codigo", "is", null)
-        .order("id", { ascending: true })
-        .range(d, h),
+        .not("cliente_codigo", "is", null);
+      if (empresas) q = q.in("empresa_key", [...empresas]);
+      return q.order("id", { ascending: true }).range(d, h);
+    },
   );
+  return filas
+    .filter((f) => cobroCuenta({ empresa: f.empresa_key, codigo: f.cliente_codigo, cliente: "", monto: 0 }))
+    .map((f) => ({ empresa_key: f.empresa_key, fecha: String(f.fecha), total: n(f.total) }));
+}
+
+/** Cobros del mes por empresa: la regla del Telegram de cobros. */
+export async function leerCobrosDelMes(desde: string, hasta: string): Promise<Map<string, number>> {
   const out = new Map<string, number>();
-  for (const f of filas) {
-    if (!cobroCuenta({ empresa: f.empresa_key, codigo: f.cliente_codigo, cliente: "", monto: 0 })) continue;
-    out.set(f.empresa_key, (out.get(f.empresa_key) ?? 0) + n(f.total));
-  }
+  for (const f of await leerRecibosQueCuentan(desde, hasta)) out.set(f.empresa_key, (out.get(f.empresa_key) ?? 0) + f.total);
   return out;
 }
 

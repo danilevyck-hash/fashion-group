@@ -10,7 +10,10 @@ import useSWR from "swr";
 import { ChipSelector } from "@/components/celular/BarraDeControles";
 import LineaDeFrescura from "@/components/shared/LineaDeFrescura";
 import { useMantenerPresionado } from "@/components/shared/GestosIphone";
-import { AvisoMesAMes, TarjetaMesAMes } from "@/components/shared/TarjetaMesAMes";
+import { AvisoMesAMes, ERROR_TARJETA, TarjetaMesAMes, useLecturaDeTarjeta } from "@/components/shared/TarjetaMesAMes";
+import { VG_MARGEN_COBROS_MES_A_MES_2026_11 } from "@/lib/ui/vista-general-mes-a-mes-2026-11";
+import { cambioConRaya } from "@/lib/ventas/mes-a-mes";
+import { notaDelCorte, type MesesContraAnioPasado } from "@/lib/mes-contra-anio-pasado";
 import { GESTOS_IPHONE_2026_11 } from "@/lib/ui/gestos-iphone-2026-11";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { hasModuleAccess } from "@/lib/auth-check";
@@ -19,6 +22,8 @@ import { MONTHS } from "@/lib/ventas/format";
 import { mesEnCursoDelCorte, mesesDeSeries, notaDelMesEnCurso } from "@/lib/ventas/mes-a-mes";
 import {
   BOSTON,
+  cambioEnPuntos,
+  margenMesAMes,
   DIAS_PEDIDO_ATRASADO,
   MULTIFASHION,
   VALOR_GRUPO,
@@ -95,8 +100,14 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
   const keys = useMemo(() => empresasDe(empresa), [empresa]);
   const r = useMemo(() => resumir(keys, data), [keys, data]);
   const destino = (d: Destino) => (puede(moduloDe(d, empresa)) ? enlaceDe(d, empresa) : null);
-  const [mesAMes, setMesAMes] = useState(false);
-  const mantener = useMantenerPresionado(() => setMesAMes(true));
+  const [mesAMes, setMesAMes] = useState<"ventas" | "margen" | null>(null);
+  const mantener = useMantenerPresionado(() => setMesAMes("ventas"));
+  const extras = VG_MARGEN_COBROS_MES_A_MES_2026_11;
+  const mantenerMargen = useMantenerPresionado(extras ? () => setMesAMes("margen") : null);
+  const cobrosMesAMes = useLecturaDeTarjeta<string, MesesContraAnioPasado>((e) => `/api/dashboard/vista-general/cobros-mes-a-mes?empresa=${encodeURIComponent(e)}`);
+  const mantenerCobros = useMantenerPresionado(extras ? () => cobrosMesAMes.abrir(empresa) : null);
+  const margen = useMemo(() => (extras ? margenMesAMes(keys, data) : null), [extras, keys, data]);
+  const nombreEmpresa = opcionesEmpresaHoy().find((o) => o.valor === empresa)?.etiqueta ?? "";
 
   const noManeja = [
     r.pedidos.estado === "no-maneja" && "Pedidos",
@@ -120,16 +131,45 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
   return (
     <>
       {GESTOS_IPHONE_2026_11 && <AvisoMesAMes />}
-      {mesAMes && series && r.ventasAnio && (
+      {mesAMes === "margen" && margen && (
         <TarjetaMesAMes
-          titulo={opcionesEmpresaHoy().find((o) => o.valor === empresa)?.etiqueta ?? ""}
+          titulo={nombreEmpresa}
+          subtitulo={`Margen ${data.anio} · vs ${data.anio - 1}`}
+          anio={data.anio}
+          meses={margen.meses}
+          total={margen.total}
+          formato={porcentaje}
+          cambio={cambioEnPuntos}
+          mesEnCurso={mesEnCursoDelCorte(data.anio, data.fechaCorte)}
+          nota={notaDelMesEnCurso(data.anio, data.fechaCorte)}
+          onCerrar={() => setMesAMes(null)}
+        />
+      )}
+      {cobrosMesAMes.tarjeta && (
+        <TarjetaMesAMes
+          titulo={nombreEmpresa}
+          subtitulo={`Cobros ${data.anio} · vs ${data.anio - 1}`}
+          anio={data.anio}
+          meses={cobrosMesAMes.tarjeta.estado.status === "listo" ? cobrosMesAMes.tarjeta.estado.datos.meses : []}
+          total={cobrosMesAMes.tarjeta.estado.status === "listo" ? cobrosMesAMes.tarjeta.estado.datos.total : null}
+          cambio={cambioConRaya}
+          mesEnCurso={data.mes}
+          nota={cobrosMesAMes.tarjeta.estado.status === "listo" ? notaDelCorte(cobrosMesAMes.tarjeta.estado.datos.corte) : null}
+          cargando={cobrosMesAMes.tarjeta.estado.status === "cargando"}
+          error={cobrosMesAMes.tarjeta.estado.status === "error" ? ERROR_TARJETA : null}
+          onCerrar={cobrosMesAMes.cerrar}
+        />
+      )}
+      {mesAMes === "ventas" && series && r.ventasAnio && (
+        <TarjetaMesAMes
+          titulo={nombreEmpresa}
           subtitulo={`Ventas ${data.anio} · vs ${data.anio - 1}`}
           anio={data.anio}
           meses={mesesDeSeries(series.actual, series.previo, data.mes)}
           total={{ actual: r.ventasAnio.actual, previo: r.ventasAnio.previo }}
           mesEnCurso={mesEnCursoDelCorte(data.anio, data.fechaCorte)}
           nota={notaDelMesEnCurso(data.anio, data.fechaCorte)}
-          onCerrar={() => setMesAMes(false)}
+          onCerrar={() => setMesAMes(null)}
         />
       )}
 
@@ -147,13 +187,13 @@ function Tarjetas({ data, empresa, puede, onEmpresa }: { data: VistaGeneralHoyDa
           )}
         </Tarjeta>
 
-        <Tarjeta href={destino("ventas")}>
+        <Tarjeta href={destino("ventas")} extra={mantenerMargen}>
           <p className={CLASE_ROTULO}>Margen del mes</p>
           <p className={CLASE_CIFRA}>{r.margenMes == null ? "—" : porcentaje(r.margenMes)}</p>
         </Tarjeta>
 
         {r.cobros.estado !== "no-maneja" && (
-          <Tarjeta href={destino("cxc")}>
+          <Tarjeta href={destino("cxc")} extra={mantenerCobros}>
             <p className={CLASE_ROTULO}>Cobros del mes</p>
             <Cifra c={r.cobros} f={montoCorto} />
           </Tarjeta>
